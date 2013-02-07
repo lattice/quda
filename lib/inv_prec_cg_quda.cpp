@@ -119,6 +119,8 @@ namespace quda {
     param.nFace  = max_overlap;
     param.create = QUDA_COPY_FIELD_CREATE; 
     cudaColorSpinorField r(b,param);
+    Extender extendCuda(r); // function object used to implement overlapping domains
+
 
     param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;

@@ -3,15 +3,11 @@
 #include <float_vector.h>
 #include <domain_decomposition.h>
 #include <color_spinor_field.h>
-
+#include <resize_quda.h>
 
 // streams is defined in interface_quda.cpp
 
 namespace quda {
-
-  FaceBuffer* face; // need to set this. I can u
-  // I need to use setFace to set this. 
-  // Factor out of dslash_quda.cu
 
   namespace resize {
 #include <texture.h> 
@@ -344,7 +340,7 @@ namespace quda {
 #endif
 
   template<class DataType, class DstSpinorType, class SrcSpinorType>
-    static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParam& params, const int parity, const int* const domain_overlap)
+    static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParam& params, const int parity, const int* const domain_overlap, FaceBuffer* face)
     {
 #ifdef MULTI_GPU
       for(int i=3; i >= 0; i--){
@@ -443,11 +439,24 @@ BORK_COMPILATION;
     typedef typename SpinorType<1, DST_PRECISION, SRC_PRECISION>::OutType DstSpinorType; \
     SrcSpinorType src_spinor(src);                                                       \
     DstSpinorType dst_spinor(dst);                                                       \
-    extendCuda__<DataType,DstSpinorType,SrcSpinorType>(dst, src, params, parity, domain_overlap);        \
+    extendCuda__<DataType,DstSpinorType,SrcSpinorType>(dst, src, params, parity, domain_overlap, face);        \
   }
 
+// Constructor
+Extender::Extender(const cudaColorSpinorField& field) : face(NULL)
+{
+  int X[4];
+  X[0] = field.X(0)*2;
+  X[1] = field.X(1);
+  X[2] = field.X(2);
+  X[3] = field.X(3);
 
-void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParam& params, const int * const domain_overlap) 
+  // allocate the FaceBuffer
+  // delete is called in Extender's destructor
+  face = new FaceBuffer(X, 4, 2*field.Nspin()*field.Ncolor(), field.Nface(), field.Precision());
+}
+
+void Extender::operator()(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParam& params, const int * const domain_overlap) 
 {
   if (&src == &dst) return; // aliasing fields
 

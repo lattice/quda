@@ -63,6 +63,7 @@ namespace quda {
   public:
     FaceBuffer(const int *X, const int nDim, const int Ninternal,
 	       const int nFace, const QudaPrecision precision, const int Ls = 1);
+
     FaceBuffer(const FaceBuffer &);
     virtual ~FaceBuffer();
     
