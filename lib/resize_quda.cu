@@ -13,11 +13,11 @@ namespace quda {
   // I need to use setFace to set this. 
   // Factor out of dslash_quda.cu
 
-namespace resize {
+  namespace resize {
 #include <texture.h> 
 #include <spinor_types.h>
-} 
-using namespace resize;
+  } 
+  using namespace resize;
 
   // code for extending and cropping cudaColorSpinorField
   template<typename FloatN, int N, typename Output, typename Input>
@@ -219,7 +219,7 @@ using namespace resize;
         FloatN x[N];
         X.load(x, cb_index);
         Y.save(x, large_cb_index);
-        
+
         cb_index += gridSize;
       }
       return;
@@ -245,7 +245,7 @@ using namespace resize;
 
         ExtendCuda(Output &Y, Input &X, int length, const DecompParam& params, int parity, const int dir) :
           X(X), Y(Y), length(length), params(params), parity(parity), dir(dir) {}
-        virtual ~ExtendCuda();
+        virtual ~ExtendCuda(){}
 
         void apply(const cudaStream_t &stream){
 
@@ -277,8 +277,8 @@ using namespace resize;
 
         int sharedBytesPerThread() const { return 0; }
       public:
-        CropCuda(Output &Y, Input &X, int length, const DecompParam& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity) {;}
-        virtual ~CropCuda();
+        CropCuda(Output &Y, Input &X, int length, const DecompParam& params, int parity) : X(X), Y(Y), length(length), params(params), parity(parity) {}
+        virtual ~CropCuda(){}
 
         void apply(const cudaStream_t &stream){
           // Need to set gridDim and blockDim
@@ -302,14 +302,13 @@ using namespace resize;
   int previousDir[Nstream];
   int commsCompleted[Nstream];
   int extendCompleted[Nstream];
-#endif
 
   static cudaEvent_t packEnd[Nstream];
   static cudaEvent_t gatherStart[Nstream];
   static cudaEvent_t gatherEnd[Nstream];
   static cudaEvent_t scatterStart[Nstream];
   static cudaEvent_t scatterEnd[Nstream];
-
+#endif
 
 #ifdef MULTI_GPU
   static void initCommsPattern(int* commDimTotal, const int* const domain_overlap) 
@@ -414,7 +413,7 @@ using namespace resize;
             // to the ghost zone in the larger field
             // Call the constructor Spinor(void* spinor, float* norm, int stride)
             DstSpinorType dst_spinor(dst);
-       
+
             // Wait for the scatter to finish 
             cudaStreamWaitEvent(streams[2*i], scatterEnd[2*i], 0);
             SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
@@ -436,7 +435,7 @@ using namespace resize;
 
 
 #ifdef EXTEND_CORE
-  BORK_COMPILATION;
+BORK_COMPILATION;
 #endif
 #define EXTEND_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
   if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
@@ -448,52 +447,46 @@ using namespace resize;
   }
 
 
-  void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParam& params, const int * const domain_overlap) 
+void extendCuda(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParam& params, const int * const domain_overlap) 
+{
+  if (&src == &dst) return; // aliasing fields
+
+  if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported");
+
+  if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length");
+
+  if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
   {
-    if (&src == &dst) return; // aliasing fields
-
-    if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported");
-
-    if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length");
-
-    if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-    {
-      errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported\n");
-      // This probably won't work. Need to think about it.
-      // extendCuda(dst.Even(), src.Even(), params, domain_overlap);
-      //extendCuda(dst.Odd(), src.Odd(), params, domain_overlap);   
-      return;
-    }
-
-    const int parity = 0; // Need to change this
-    // I should really use a function to do this
-    EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
-/*
-    else
-      EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
-    else 
-      EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
-    else
-      EXTEND_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
-    else
-      EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
-        else
-          EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
-            else
-              EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
-                else
-                  EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
-                    else
-                      EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
-*/
+    errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported\n");
+    // This probably won't work. Need to think about it.
+    // extendCuda(dst.Even(), src.Even(), params, domain_overlap);
+    //extendCuda(dst.Odd(), src.Odd(), params, domain_overlap);   
     return;
   }
 
-/*
+  const int parity = 0; // Need to change this
+  // I should really use a function to do this
+  {
+    EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
+      else EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
+        else EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
+          else EXTEND_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
+            else EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
+              else EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+                else EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+                  else EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+                    else EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
+  }
+  return;
+}
+
 #undef EXTEND_CORE
 
+
+
+
 #ifdef CROP_CORE
-  BORK_COMPILATION;
+BORK_COMPILATION;
 #endif
 #define CROP_CORE(DataType, DST_PRECISION, SRC_PRECISION) \
   if ((src.Precision() == SRC_PRECISION) && (dst.Precision() == DST_PRECISION)) { \
@@ -507,45 +500,46 @@ using namespace resize;
   } 
 
 
-  void cropCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParam& params) {
-    if (&src == &dst) return; // aliasing fields
+void cropCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src, const DecompParam& params) {
+  if (&src == &dst) return; // aliasing fields
 
-    if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
+  if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
 
-    if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length\n");
+  if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length\n");
 
-    if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
-    {
-      errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported");
-  //    cropCuda(dst.Even(), src.Even(), params);
-  //    cropCuda(dst.Odd(), src.Odd(), params);   
-      return;
-    }
+  if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+  {
+    errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported");
+    //    cropCuda(dst.Even(), src.Even(), params);
+    //    cropCuda(dst.Odd(), src.Odd(), params);   
+    return;
+  }
 
-    const int parity = 0; // Need to change this
+  const int parity = 0; // Need to change this
 
+  {
+    // vim indentation doesn't do this right
     CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
-    else
-      CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
-    else
-      CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
-    else
-      CROP_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
-    else
-      CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
-        else
-          CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
-            else
-              CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
-                else
-                  CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
-                    else
-                      CROP_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION);
-
-                    return;
-  } // cropCuda
+      else
+        CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
+          else
+            CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
+              else
+                CROP_CORE(float2, QUDA_DOUBLE_PRECISION, QUDA_SINGLE_PRECISION)
+                  else
+                    CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_DOUBLE_PRECISION)
+                      else
+                        CROP_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_HALF_PRECISION)
+                          else
+                            CROP_CORE(float2, QUDA_HALF_PRECISION, QUDA_SINGLE_PRECISION)
+                              else
+                                CROP_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
+                                  else
+                                    CROP_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION);
+  }
+  return;
+} // cropCuda
 #undef CROP_CORE
 
-*/
 
 } // namespace quda
