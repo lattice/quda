@@ -171,6 +171,8 @@ unitarize_link_test()
 
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
 
+  delete cpuOutLink;
+
   setUnitarizeLinksConstants(unitarize_eps,
 				   max_allowed_error,
 				   reunit_allow_svd,
@@ -196,6 +198,7 @@ unitarize_link_test()
   int num_failures=0;
   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
+ delete cpuOutLink;
  delete cudaFatLink;
  delete cudaULink;
  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
