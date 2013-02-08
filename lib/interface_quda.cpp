@@ -357,7 +357,7 @@ void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *precondition = new cudaGaugeField(gauge_param);
 
   precondition->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
-  param->gaugeGiB += precise->GBytes();
+  param->gaugeGiB += precondition->GBytes();
   
   switch (param->type) {
   case QUDA_WILSON_LINKS:
