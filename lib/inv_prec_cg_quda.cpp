@@ -168,10 +168,12 @@ namespace quda {
 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       minvr_ptr = new cudaColorSpinorField(r);
+      globalReduce = false;
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
+      globalReduce = true;
 
       if(max_overlap > 0){
-    //    cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
+        cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
       }else{
         *minvr_ptr = *minvrPre_ptr;
       }
@@ -209,7 +211,9 @@ namespace quda {
         r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
         *rPre_ptr = r;
         *minvrPre_ptr = *rPre_ptr;
+        globalReduce = false;
         K->operator()(*minvrPre_ptr, *rPre_ptr);
+        globalReduce = true;
         *minvr_ptr = *minvrPre_ptr;
         rMinvr = reDotProductCuda(r,*minvr_ptr);
 

@@ -118,7 +118,7 @@ extern "C" {
     double reliable_delta; /**< Reliable update tolerance */
 
 
-    unsigned int domain_overlap[QUDA_MAX_DIM]; /**< overlaps for Schwarz preconditioning */
+    int domain_overlap[QUDA_MAX_DIM]; /**< overlaps for Schwarz preconditioning */
 
 
     int num_offset; /**< Number of offsets in the multi-shift solver */
@@ -300,6 +300,12 @@ extern "C" {
    * @param param   Contains all metadata regarding host and device storage
    */
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
+  
+  /**
+   * Load the preconditioning gauge field.
+   *
+   */
+  void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
   /**
    * Free QUDA's internal copy of the gauge field.

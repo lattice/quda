@@ -6,7 +6,6 @@ namespace quda {
 
   DiracStaggered::DiracStaggered(const DiracParam &param) : 
     Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
-    //face(param.fatGauge->X(), 4, 6, param.Nface, param.fatGauge->Precision()), hasNaik(param.hasNaik) 
     face(param.fatGauge->X(), 4, 6, param.Nface, param.fatGauge->Precision()), hasNaik(param.hasNaik) 
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {

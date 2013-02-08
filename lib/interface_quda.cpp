@@ -315,16 +315,16 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     gaugeFatPrecise = precise;
     if (gaugeFatSloppy) errorQuda("Sloppy gauge fat field already allocated");
     gaugeFatSloppy = sloppy;
-    if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
-    gaugeFatPrecondition = precondition;
+//    if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
+//    gaugeFatPrecondition = precondition;
     break;
   case QUDA_ASQTAD_LONG_LINKS:
     if (gaugeLongPrecise) errorQuda("Precise gauge long field already allocated");
     gaugeLongPrecise = precise;
     if (gaugeLongSloppy) errorQuda("Sloppy gauge long field already allocated");
     gaugeLongSloppy = sloppy;
-    if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
-    gaugeLongPrecondition = precondition;
+//    if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
+//    gaugeLongPrecondition = precondition;
     break;
   default:
     errorQuda("Invalid gauge type");   
@@ -332,6 +332,52 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   profileGauge[QUDA_PROFILE_TOTAL].Stop();
 }
+
+void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param)
+{
+
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
+
+  checkGaugeParam(param);
+
+  // Set the specific cpu parameters and create the cpu gauge field
+  GaugeFieldParam gauge_param(h_gauge, *param);
+
+  cpuGaugeField* cpu = new cpuGaugeField(gauge_param);
+
+  // switch the parameters for creating the mirror precise cuda gauge field
+  gauge_param.create = QUDA_NULL_FIELD_CREATE;
+  gauge_param.precision = param->cuda_prec_precondition;
+  gauge_param.reconstruct = param->reconstruct_precondition;
+  gauge_param.pad = param->ga_pad;
+  gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
+		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  cudaGaugeField *precondition = new cudaGaugeField(gauge_param);
+
+  precondition->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
+  param->gaugeGiB += precise->GBytes();
+  
+  switch (param->type) {
+  case QUDA_WILSON_LINKS:
+    //if (gaugePrecondition) errorQuda("Precondition gauge field already allocated");
+    gaugePrecondition = precondition;
+    break;
+  case QUDA_ASQTAD_FAT_LINKS:
+    if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
+    gaugeFatPrecondition = precondition;
+    break;
+  case QUDA_ASQTAD_LONG_LINKS:
+    if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
+    gaugeLongPrecondition = precondition;
+    break;
+  default:
+    errorQuda("Invalid gauge type");   
+  }
+
+}
+
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
@@ -628,7 +674,9 @@ namespace quda {
     diracParam.longGauge = gaugeLongPrecondition;    
     diracParam.clover = cloverPrecondition;
 
-    diracParam.Nface = 0; // No need for ghost zones in the preconditioner
+ //   diracParam.Nface = 0; // No need for ghost zones in the preconditioner
+ //                         // but setting Nface = 0 causes problems 
+ //                         // Fix this!
     diracParam.hasNaik = false;
 
     for (int i=0; i<4; i++) {

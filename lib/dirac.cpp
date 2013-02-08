@@ -161,6 +161,7 @@ namespace quda {
       return new DiracStaggered(param);
     } else if (param.type == QUDA_ASQTADPC_DIRAC) {
       if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
+      printfQuda("param.Nface = %d\n", param.Nface);
       return new DiracStaggeredPC(param);    
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
       if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator\n");

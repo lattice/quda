@@ -294,15 +294,14 @@ namespace quda {
   };
 
 #ifdef MULTI_GPU
-  int gatherCompleted[Nstream]; // transfer of ghost data from device to host
-  int previousDir[Nstream];
-  int commsCompleted[Nstream];
-  int extendCompleted[Nstream];
+  static  int gatherCompleted[Nstream]; // transfer of ghost data from device to host
+  static int previousDir[Nstream];
+  static int commsCompleted[Nstream];
 
   static cudaEvent_t packEnd[Nstream];
-  static cudaEvent_t gatherStart[Nstream];
+//  static cudaEvent_t gatherStart[Nstream];
   static cudaEvent_t gatherEnd[Nstream];
-  static cudaEvent_t scatterStart[Nstream];
+//  static cudaEvent_t scatterStart[Nstream];
   static cudaEvent_t scatterEnd[Nstream];
 #endif
 
