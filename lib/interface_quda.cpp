@@ -242,7 +242,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // Set the specific cpu parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
 
+  printfQuda("About to create cpu\n");
+  fflush(stdout);
   cpuGaugeField* cpu = new cpuGaugeField(gauge_param);
+  printfQuda("cpu created\n");
+  fflush(stdout);
 
   profileGauge[QUDA_PROFILE_INIT].Start();  
   // switch the parameters for creating the mirror precise cuda gauge field
@@ -253,11 +257,19 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+
+  printfQuda("About to create precise field\n");
+  fflush(stdout);
   cudaGaugeField *precise = new cudaGaugeField(gauge_param);
+  printfQuda("precise field created\n");
   profileGauge[QUDA_PROFILE_INIT].Stop();  
 
-  profileGauge[QUDA_PROFILE_H2D].Start();  
+  profileGauge[QUDA_PROFILE_H2D].Start(); 
+  printfQuda("About to load field\n");
+  fflush(stdout); 
   precise->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
+  printfQuda("field loaded\n");
+  fflush(stdout);
 
   param->gaugeGiB += precise->GBytes();
 
@@ -267,16 +279,33 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+
+  printfQuda("About to create sloppy field\n");
   cudaGaugeField *sloppy = NULL;
   if (param->cuda_prec != param->cuda_prec_sloppy) {
+    printfQuda("Creating new sloppy field\n");
+    fflush(stdout);
     sloppy = new cudaGaugeField(gauge_param);
+    printfQuda("New sloppy field created\n");
+    fflush(stdout);
+
+    printfQuda("About to load sloppy field\n");
+    fflush(stdout);
     sloppy->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
+    printfQuda("Sloppy field loaded\n");
+    fflush(stdout);
     param->gaugeGiB += sloppy->GBytes();
   } else {
+    printfQuda("sloppy field is identical to precise field\n");
+    fflush(stdout);
     sloppy = precise;
+    printfQuda("sloppy field set\n");
+    fflush(stdout);
   }
 
   if(param->precondition){ // use "cpu" to load the gauge field for the preconditioner
+    printfQuda("Loading special preconditioning field\n");
+    fflush(stdout);
     GaugeFieldParam precon_gauge_param(param->precondition, *param);
     delete cpu;
     cpu = new cpuGaugeField(precon_gauge_param);
@@ -289,7 +318,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   gauge_param.order = (gauge_param.precision == QUDA_DOUBLE_PRECISION || 
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
   QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
-  if ((param->cuda_prec_sloppy != param->cuda_prec_precondition) | (param->precondition != NULL)) {
+  if ((param->cuda_prec_sloppy != param->cuda_prec_precondition) || (param->precondition != NULL)) {
     precondition = new cudaGaugeField(gauge_param);
     precondition->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
     param->gaugeGiB += precondition->GBytes();
@@ -297,7 +326,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     precondition = sloppy;
   }
   delete cpu;     
-   
 
   profileGauge[QUDA_PROFILE_H2D].Stop();  
   
@@ -308,7 +336,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     //if (gaugeSloppy) errorQuda("Sloppy gauge field already allocated");
     gaugeSloppy = sloppy;
     //if (gaugePrecondition) errorQuda("Precondition gauge field already allocated");
-    gaugePrecondition = precondition;
+       gaugePrecondition = precondition;
     break;
   case QUDA_ASQTAD_FAT_LINKS:
     if (gaugeFatPrecise) errorQuda("Precise gauge fat field already allocated");
@@ -316,7 +344,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     if (gaugeFatSloppy) errorQuda("Sloppy gauge fat field already allocated");
     gaugeFatSloppy = sloppy;
 //    if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
-//    gaugeFatPrecondition = precondition;
+    gaugeFatPrecondition = precondition;
     break;
   case QUDA_ASQTAD_LONG_LINKS:
     if (gaugeLongPrecise) errorQuda("Precise gauge long field already allocated");
@@ -324,7 +352,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     if (gaugeLongSloppy) errorQuda("Sloppy gauge long field already allocated");
     gaugeLongSloppy = sloppy;
 //    if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
-//    gaugeLongPrecondition = precondition;
+    gaugeLongPrecondition = precondition;
     break;
   default:
     errorQuda("Invalid gauge type");   
@@ -365,11 +393,14 @@ void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     gaugePrecondition = precondition;
     break;
   case QUDA_ASQTAD_FAT_LINKS:
-    if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
-    gaugeFatPrecondition = precondition;
+    if (gaugeFatPrecondition && gaugeFatPrecondition != gaugeFatSloppy){
+      delete gaugeFatPrecondition;
+    }
     break;
   case QUDA_ASQTAD_LONG_LINKS:
-    if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
+    if (gaugeLongPrecondition && gaugeLongPrecondition != gaugeLongSloppy){
+      delete gaugeLongPrecondition;
+    }
     gaugeLongPrecondition = precondition;
     break;
   default:

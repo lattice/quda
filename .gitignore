@@ -8,3 +8,4 @@ make.inc
 milc_interface
 *.log
 out
+include/quda_milc_interface.h
