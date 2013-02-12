@@ -87,6 +87,64 @@ namespace quda {
 
   DslashParam dslashParam;
 
+
+#define DSLASH_HOST_PROFILE
+#ifdef DSLASH_HOST_PROFILE
+
+#define TDIFF(a,b) 1e3*(b.tv_sec - a.tv_sec + 1e-6*(b.tv_usec - a.tv_usec))
+
+  static float packProfile = 0;
+  static float dslashKernelProfile = 0;
+  static float gatherProfile = 0;
+  static float eventRecordProfile = 0;
+  static float eventQueryProfile = 0;
+  static float commsPatternProfile = 0;
+  static float commsStartProfile = 0;
+  static float commsQueryProfile = 0;
+  static float scatterProfile = 0;
+  static float streamWaitEventProfile = 0;
+  static float totalTime = 0;
+
+#define HOST_PROFILE_INIT			\
+  static int count = 0;				\
+  struct timeval dslashProfile0;		\
+  static float accountProfile = 0;			\
+  gettimeofday(&dslashProfile0, NULL);
+
+#define HOST_PROFILE_END						\
+  struct timeval dslashProfile1;					\
+  gettimeofday(&dslashProfile1, NULL);					\
+  totalTime += TDIFF(dslashProfile0, dslashProfile1);			\
+  count++;								\
+  if (count == 1000) {							\
+    printf("pack        = %e %8.5f\n", packProfile, packProfile/totalTime); \
+    printf("kernel      = %e %8.5f\n", dslashKernelProfile, dslashKernelProfile/totalTime); \
+    printf("gather      = %e %8.5f\n", gatherProfile, gatherProfile/totalTime); \
+    printf("eventRecord = %e %8.5f\n", eventRecordProfile, eventRecordProfile/totalTime); \
+    printf("eventQuery  = %e %8.5f\n", eventQueryProfile, eventQueryProfile/totalTime); \
+    printf("initPattern = %e %8.5f\n", commsPatternProfile, commsPatternProfile/totalTime); \
+    printf("commsStart  = %e %8.5f\n", commsStartProfile, commsStartProfile/totalTime); \
+    printf("commsQuery  = %e %8.5f\n", commsQueryProfile, commsQueryProfile/totalTime); \
+    printf("accounted   = %e %8.5f\n", accountProfile, accountProfile/totalTime); \
+    printf("Total time  = %e\n", totalTime);				\
+  }
+
+#define HOST_PROFILE(func, timer) {				\
+  struct timeval t0, t1;					\
+  gettimeofday(&t0, NULL);					\
+  func;								\
+  gettimeofday(&t1, NULL);					\
+  timer += TDIFF(t0, t1);					\
+  accountProfile += TDIFF(t0, t1); }
+
+#else
+
+#define HOST_PROFILE_INIT
+#define HOST_PROFILE_END
+#define HOST_PROFILE(func, timer) { func; }
+
+#endif
+
   // these are set in initDslashConst
   int Vspatial;
 
@@ -1240,34 +1298,38 @@ namespace quda {
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
-    gettimeofday(&dslashStart_h, NULL);
+    HOST_PROFILE_INIT;
 
 #ifdef MULTI_GPU
     // Initialize pack from source spinor
-    face->pack(*inSpinor, 1-parity, dagger, streams);
+    HOST_PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), packProfile);
     
     // Record the end of the packing
-    cudaEventRecord(packEnd[0], streams[Nstream-1]);
+    bool pack = false;
+    for (int i=3; i>=0; i--) 
+      if (dslashParam.commDim[i] && (i!=3 || kernelPackT)) { pack = true; break; }
+    if (pack) HOST_PROFILE(cudaEventRecord(packEnd[0], streams[Nstream-1]),eventRecordProfile);
 
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-	if (i!=3 || kernelPackT) cudaStreamWaitEvent(streams[2*i+dir], packEnd[0], 0);
+	if (i!=3 || kernelPackT) 
+	  HOST_PROFILE(cudaStreamWaitEvent(streams[2*i+dir], packEnd[0], 0), streamWaitEventProfile);
 
 	// Initialize host transfer from source spinor
-	face->gather(*inSpinor, dagger, 2*i+dir);
+	HOST_PROFILE(face->gather(*inSpinor, dagger, 2*i+dir), gatherProfile);
 
 	// Record the end of the gathering
-	cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]);
+	HOST_PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), eventRecordProfile);
       }
     }
 #endif
 
-    dslash.apply(streams[Nstream-1]);
+    HOST_PROFILE(dslash.apply(streams[Nstream-1]), dslashKernelProfile);
 
 #ifdef MULTI_GPU
-    initDslashCommsPattern();
+    HOST_PROFILE(initDslashCommsPattern(), commsPatternProfile);
 
     int completeSum = 0;
     while (completeSum < commDimTotal) {
@@ -1278,24 +1340,26 @@ namespace quda {
 	
 	  // Query if gather has completed
 	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
-	    if (cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])) {
+	    cudaError_t event_test;
+	    HOST_PROFILE(event_test = cudaEventQuery(gatherEnd[2*i+dir]), eventQueryProfile);
+	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
-	      gettimeofday(&commsStart[2*i+dir], NULL);
-	      face->commsStart(2*i+dir);
+	      HOST_PROFILE(face->commsStart(2*i+dir), commsStartProfile);
 	    }
 	  }
 	
 	  // Query if comms has finished
 	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
 	      gatherCompleted[2*i+dir]) {
-	    if (face->commsQuery(2*i+dir)) { 
+	    int comms_test;
+	    HOST_PROFILE(comms_test = face->commsQuery(2*i+dir), commsQueryProfile)
+	    if (comms_test) { 
 	      commsCompleted[2*i+dir] = 1;
 	      completeSum++;
-	      gettimeofday(&commsEnd[2*i+dir], NULL);
 	    
 	      // Scatter into the end zone
-	      face->scatter(*inSpinor, dagger, 2*i+dir);	    
+	      HOST_PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), scatterProfile);
 	    }
 	  }
 
@@ -1304,15 +1368,15 @@ namespace quda {
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
 	if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
 	  // Record the end of the scattering
-	  cudaEventRecord(scatterEnd[2*i], streams[2*i]);
+	  HOST_PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), eventRecordProfile);;
 
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 	  
 	  // wait for scattering to finish and then launch dslash
-	  cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
+	  HOST_PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), streamWaitEventProfile);
 	  
-	  dslash.apply(streams[Nstream-1]); // all faces use this stream
+	  HOST_PROFILE(dslash.apply(streams[Nstream-1]), dslashKernelProfile); // all faces use this stream
 
 	  dslashCompleted[2*i] = 1;
 	}
@@ -1322,6 +1386,8 @@ namespace quda {
     }
 
     //DSLASH_TIME_PROFILE();
+
+    HOST_PROFILE_END;
 #endif // MULTI_GPU
   }
 
