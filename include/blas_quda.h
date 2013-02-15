@@ -74,6 +74,10 @@ namespace quda {
   double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r);
   double3 xpyHeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &r);
 
+  void tripleCGUpdateCuda(const double &alpha, const double &beta, cudaColorSpinorField &q,
+			  cudaColorSpinorField &r, cudaColorSpinorField &x, cudaColorSpinorField &p);
+  double3 tripleCGReductionCuda(cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z);
+
   // CPU variants
 
   double axpyNormCpu(const double &a, const cpuColorSpinorField &x, cpuColorSpinorField &y);

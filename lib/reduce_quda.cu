@@ -600,5 +600,31 @@ namespace quda {
   }
 
 #endif
-  
+    
+  /**
+     double3 tripleCGUpdate(V x, V y, V z){}
+
+     First performs the operation norm2(x)
+     Second performs the operatio norm2(y)
+     Third performs the operation dotPropduct(y,z)
+  */
+
+  template <typename ReduceType, typename Float2, typename FloatN>
+#if (__COMPUTE_CAPABILITY__ >= 200)
+  struct tripleCGReduction : public ReduceFunctor<ReduceType, Float2, FloatN> {
+#else
+  struct tripleCGReduction {
+#endif
+    tripleCGReduction(const Float2 &a, const Float2 &b) { ; }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) 
+    { sum.x += norm2_(x); sum.y += norm2_(y); sum.z += dot_(y,z); }
+    static int streams() { return 3; } //! total number of input and output streams
+    static int flops() { return 6; } //! flops per element
+  };
+
+  double3 tripleCGReductionCuda(cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z) {
+    return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,tripleCGReduction,0,0,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, x);
+  }
+
 } // namespace quda

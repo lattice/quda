@@ -121,18 +121,39 @@ namespace quda {
       }
     }
 
+    int steps_since_reliable = 1;
+
     while (distance_to_solution > convergence_threshold  && k < invParam.maxiter) {
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
-      pAp = reDotProductCuda(p, Ap);
-      alpha = r2 / pAp;        
-      r2_old = r2;
+      double sigma;
 
-      //r2 = axpyNormCuda(-alpha, Ap, rSloppy);
-      // here we are deploying the alternative beta computation 
-      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
-      r2 = real(cg_norm); // (r_new, r_new)
-      double zr = imag(cg_norm); // (r_new, r_new-r_old)
+      bool breakdown = false;
+      int pipeline = 0;
+      if (pipeline) {
+	double3 triplet = tripleCGReductionCuda(rSloppy, Ap, p);
+	r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
+	r2_old = r2;
+
+	alpha = r2 / pAp;        
+	sigma = alpha*(alpha * Ap2 - pAp);
+	if (sigma < 0.0 || steps_since_reliable==0) { // sigma condition has broken down
+	  r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+	  sigma = r2;
+	  breakdown = true;
+	}
+
+	r2 = sigma;
+      } else {
+	r2_old = r2;
+	pAp = reDotProductCuda(p, Ap);
+	alpha = r2 / pAp;        
+
+	// here we are deploying the alternative beta computation 
+	Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
+	r2 = real(cg_norm); // (r_new, r_new)
+	sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
+      }
 
       // reliable update conditions
       rNorm = sqrt(r2);
@@ -145,15 +166,18 @@ namespace quda {
       //if (distance_to_solution < convergence_threshold) updateX = 1;
 
       if ( !(updateR || updateX)) {
-	beta = zr / r2_old; // use the stabilized beta computation
-	//beta = r2 / r2_old;
-	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
+	//beta = r2 / r2_old; // use the traditional method if just done a reliable update
+	beta = sigma / r2_old; // use the alternative beta computation
+
+	if (pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, rSloppy, xSloppy, p);
+	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	  copyCuda(tmp,y);
 	  heavy_quark_residual = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
 	}
 
+	steps_since_reliable++;
       } else {
 	axpyCuda(alpha, p, xSloppy);
 	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -187,8 +211,11 @@ namespace quda {
 	xpayCuda(rSloppy, beta, p);
 
 	if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
+	
+	steps_since_reliable = 0;
       }
 
+      breakdown = false;
       k++;
 
       if (invParam.verbosity >= QUDA_VERBOSE) {
