@@ -1572,7 +1572,7 @@ class PackFaceNdegTM : public PackFace<FloatN> {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
     PackParam<FloatN> param = this->prepareParam();
     if (this->dagger) {
-      packFaceNdegTMKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
+      packFaceNdegTMKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
     } else {
       packFaceNdegTMKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
     }
