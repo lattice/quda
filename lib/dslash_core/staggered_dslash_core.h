@@ -318,7 +318,7 @@ int X;
 
 */
 
-
+//if(kernel_type != INTERIOR_KERNEL) return; // hack added by J.F.
 
 if(kernel_type == INTERIOR_KERNEL){
 

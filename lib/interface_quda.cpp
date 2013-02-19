@@ -142,12 +142,12 @@ void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfil
 void initQuda(int dev)
 {
   profileInit[QUDA_PROFILE_TOTAL].Start();
-  checkCudaError();
+  checkCudaErrorNoSync();
 
   //static bool initialized = false;
   if (initialized) return;
   initialized = true;
-  checkCudaError();
+  checkCudaErrorNoSync();
 
 #if defined(GPU_DIRECT) && defined(MULTI_GPU) && (CUDA_VERSION == 4000)
   //check if CUDA_NIC_INTEROP is set to 1 in the enviroment
@@ -161,7 +161,7 @@ void initQuda(int dev)
     errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1\n");    
   }
 #endif
-  checkCudaError();
+  checkCudaErrorNoSync();
 
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
@@ -177,7 +177,7 @@ void initQuda(int dev)
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
     }
   }
-  checkCudaError();
+  checkCudaErrorNoSync();
 
 #ifdef MULTI_GPU
   comm_init();
@@ -185,31 +185,28 @@ void initQuda(int dev)
 #else
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
-  checkCudaError();
 
   cudaGetDeviceProperties(&deviceProp, dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
-  checkCudaError();
   
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
   cudaSetDevice(dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
-  checkCudaError();
 
 #ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
     setNumaAffinity(dev);
   }
 #endif
-  checkCudaError();
+  checkCudaErrorNoSync();
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
-  checkCudaError();
+  checkCudaErrorNoSync();
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
@@ -219,9 +216,9 @@ void initQuda(int dev)
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
   }
-  checkCudaError();
+  checkCudaErrorNoSync();
   createDslashEvents();
-
+  createExtendEvents();
   initBlas();
 
   loadTuneCache(getVerbosity());
@@ -597,6 +594,7 @@ void endQuda(void)
     streams = NULL;
   }
   destroyDslashEvents();
+  destroyExtendEvents();
 
   saveTuneCache(getVerbosity());
 
@@ -1365,7 +1363,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // param->nface = 4;
 
   createDirac(d, dSloppy, dPre, *param, pc_solve);
-
+  
+  printfQuda("Dirac operators have been created\n");
+  fflush(stdout);
+  
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
@@ -1379,23 +1380,43 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   const int *X = cudaGauge->X();
 
+ 
   // wrap CPU host side pointers
+  printfQuda("Creating h_b\n");
+  printfQuda("param.cuda_prec = %d\n", param->cuda_prec);
+  printfQuda("param.cuda_prec_sloppy = %d\n", param->cuda_prec_sloppy);
+  printfQuda("param.cuda_prec_precondition = %d\n", param->cuda_prec_precondition);
   ColorSpinorParam cpuParam(hp_b, param->input_location, *param, X, pc_solution);
+  printfQuda("cpuParam.precision = %d\n", cpuParam.precision);
+  if(param->input_location == QUDA_CPU_FIELD_LOCATION){
+    printfQuda("Host location\n");
+  }else{
+    printfQuda("Device location\n");
+  }
+
   ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  printfQuda("h_b created\n");
+  fflush(stdout);
 
   cpuParam.v = hp_x;
+  printfQuda("Creating h_x\n");
   ColorSpinorField *h_x = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  printfQuda("h_x created\n");
+  fflush(stdout);  
 
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param);
   
-//  cudaParam.nFace = param->nFace;
-
+  printfQuda("Creating device b field\n");
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam); 
-
+  printfQuda("device b field created\n");
+  fflush(stdout);
+ 
+  printfQuda("Creating device x field\n");
+  fflush(stdout);
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
@@ -1408,6 +1429,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
     x = new cudaColorSpinorField(cudaParam); // solution
   }
+  printfQuda("device x field created\n");
+  fflush(stdout);
 
   if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL && 
       (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) ) {
@@ -2341,7 +2364,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   
   initLatticeConstants(*cudaMom);
-  checkCudaError();
+  checkCudaErrorNoSync();
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
 #ifdef MULTI_GPU
@@ -2378,7 +2401,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
     timeinfo[2] = TDIFF(t2, t3);
   }
 
-  checkCudaError();
+  checkCudaErrorNoSync();
   return 0;  
 }
 

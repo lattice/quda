@@ -196,6 +196,9 @@ namespace quda {
     //if (precision == QUDA_DOUBLE_PRECISION) fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
+
+    printfQuda("Bytes : %d\n", bytes);
+    fflush(stdout);
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
@@ -252,7 +255,10 @@ namespace quda {
       }
     }
 
+    checkCudaError();
 #ifdef USE_TEXTURE_OBJECTS
+    printfQuda("Calling createTexObject\n");
+    fflush(stdout);
     createTexObject();
 #endif
 
@@ -262,7 +268,10 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
 
+    checkCudaError();
     if (texInit) errorQuda("Already bound textures");
+   
+    checkCudaError();
 
     // create the texture for the field components
 
@@ -293,8 +302,11 @@ namespace quda {
 
     cudaTextureDesc texDesc;
     memset(&texDesc, 0, sizeof(texDesc));
+    checkCudaError();
+  
     if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
     else texDesc.readMode = cudaReadModeElementType;
+    checkCudaError();
 
     cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
     checkCudaError();
@@ -399,6 +411,8 @@ namespace quda {
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
+    printfQuda("Calling cudaColorSpinorField::copy\n");
+    fflush(stdout);
     checkField(*this, src);
     copyCuda(*this, src);
   }

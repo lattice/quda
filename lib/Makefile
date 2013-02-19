@@ -100,9 +100,8 @@ cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
 dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-
-extend_quark_field.o: extend_quark_field.cu $(HDRS) $(DSLASH_INLIN) $(CORE)
-	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+resize_quda.o: resize_quda.cu $(HDRS) $(CORE)
+	$(NVCC) $(NVCCFLAGS) -G $< -c -o $@
 
 
 %.o: %.cpp $(HDRS)

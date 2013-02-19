@@ -34,7 +34,10 @@ namespace quda {
   bool getDslashLaunch();
 
   void createDslashEvents();
+  void createExtendEvents();
+  
   void destroyDslashEvents();
+  void destroyExtendEvents();
 
   void initLatticeConstants(const LatticeField &lat);
   void initGaugeConstants(const cudaGaugeField &gauge);

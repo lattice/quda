@@ -919,6 +919,15 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 template <typename Float2>
 __device__ void packSpinor(Float2 *out, float *outNorm, int out_idx, int out_stride, 
 			   const Float2 *in, const float *inNorm, int in_idx, int in_stride) {
+
+  if(out_idx == 0){ 
+    printf("In packSpinor\n");
+    printf("in_idx = %d\n", in_idx);
+    printf("out_idx = %d\n", out_idx);
+    printf("in_stride = %d\n", in_stride);
+    printf("out_stride = %d\n", out_stride);
+  }
+
   out[out_idx + 0*out_stride] = in[in_idx + 0*in_stride];
   out[out_idx + 1*out_stride] = in[in_idx + 1*in_stride];
   out[out_idx + 2*out_stride] = in[in_idx + 2*in_stride];
@@ -931,6 +940,7 @@ template<> __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, 
   outNorm[out_idx] = inNorm[in_idx];
 }
 #else
+
 __device__ void packSpinor(double2 *out, float *outNorm, int out_idx, int out_stride, 
 			   const double2 *in, const float *inNorm, int in_idx, int in_stride) {
   out[out_idx + 0*out_stride] = fetch_double2(spinorTexDouble, in_idx + 0*in_stride);
@@ -974,6 +984,9 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
   int face_volume = ghostFace[dim]; // ghostFace[0] = X[1]*X[2]*X[3]/2, etc.
   int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
 
+  if(face_idx == 0) printf("In packFaceStaggered Kernel\n");
+
+
   if (face_idx >= 2*nFace*face_volume) return;
 
   // face_num determines which end of the lattice we are packing: 0 = beginning, 1 = end
@@ -993,15 +1006,23 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
   idx = X1*X2*X3*t + X1*X2*z + X1*y + x;
   idx = idx >> 1;
 
-
+  __syncthreads();
+  if(face_idx == 0) printf("In packFaceStaggeredKernel: About to call packSpinor\n");
+  __syncthreads();
 
   if (face_num) {
     out = (Float2*)((char*)out + faceBytes);
     outNorm = (float*)((char*)outNorm + faceBytes);
   }
-
+  
+  if(face_idx == 0) {
+   printf("out_stride = %d\n", nFace*face_volume);
+   printf("in_stride = %d\n", sp_stride); 
+  } 
   packSpinor(out, outNorm, face_idx, nFace*face_volume, in, inNorm, idx, sp_stride);
 
+
+  if(face_idx == 0) printf("Call to packStaggeredKernel complete\n");
   /*  Float2 tmp1 = in[idx + 0*sp_stride];
   Float2 tmp2 = in[idx + 1*sp_stride];
   Float2 tmp3 = in[idx + 2*sp_stride];
@@ -1182,6 +1203,7 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
 {
 
   if(in.Nspin() == 1){
+    printfQuda("Calling packFaceStaggered\n");
     switch(in.Nface()){
       case 1: packFaceStaggered<1>(ghost_buf, in, dim, dagger, parity, stream); break;
       case 2: packFaceStaggered<2>(ghost_buf, in, dim, dagger, parity, stream); break;

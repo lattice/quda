@@ -290,9 +290,9 @@ namespace quda {
       errorQuda("checkSpinor: spins do not match: %d %d", a.Nspin(), b.Nspin());
     }
 
-    if (a.Nface() != b.Nface()){
-      errorQuda("checkSpinor: bordor regions do not match: %d %d", a.Nface(), b.Nface());
-    }
+    //if (a.Nface() != b.Nface()){
+    //  errorQuda("checkSpinor: bordor regions do not match: %d %d", a.Nface(), b.Nface());
+   // }
 
     if (a.TwistFlavor() != b.TwistFlavor()) {
       errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());

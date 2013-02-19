@@ -212,6 +212,8 @@ namespace quda {
   }
 
   void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
+    printfQuda("Calling cpuColorSpinorField::copy\n");
+    fflush(stdout);
     checkField(*this, src);
     if (fieldOrder == src.fieldOrder) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
@@ -329,6 +331,9 @@ namespace quda {
 
   int cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, 
 				   const int tol) {
+
+    printfQuda("Calling cpuColorSpinorField::Compare\n");
+    fflush(stdout);
     checkField(a, b);
 
     int ret = 0;

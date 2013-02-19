@@ -38,6 +38,7 @@
 //#define DIRECT_ACCESS_PACK
 #endif
 #endif // GPU_STAGGERED_DIRAC
+#define DIRECT_ACCESS_PACK
 
 #include <quda_internal.h>
 #include <dslash_quda.h>
@@ -1252,10 +1253,19 @@ namespace quda {
 
             void apply(const cudaStream_t &stream)
             {
+              checkCudaError();
               TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+              checkCudaError();
               dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+              checkCudaError();
+              printfQuda("In apply\n");
+              printfQuda("hasNaik = %d\n", hasNaik);
+              printfQuda("nFace = %d\n", nFace);
+              fflush(stdout); 
+              checkCudaError();
               STAGGERED_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
                   out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a, kernel_params);
+              checkCudaError();
             }
 
             /*
@@ -1481,6 +1491,17 @@ namespace quda {
       void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
           const int volume, const int *faceVolumeCB) {
 
+        if(faceVolumeCB == NULL){
+          errorQuda("faceVolumeCB == NULL");
+        }else{
+          for(int dir=0; dir<4; ++dir){
+            printfQuda("faceVolumeCB[%d] = %d\n", dir, faceVolumeCB[dir]);
+          }
+        }
+
+        checkCudaError();
+
+
         dslashParam.parity = parity;
         dslashParam.kernel_type = INTERIOR_KERNEL;
         dslashParam.threads = volume;
@@ -1519,13 +1540,25 @@ namespace quda {
           }
         }
 #endif
+        printfQuda("About tp apply internal dslash\n");
+        fflush(stdout);
+        checkCudaError();
 
         CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
         dslash.apply(streams[Nstream-1]);
         CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
 
+
+        cudaDeviceSynchronize();
+        printfQuda("Call to internal dslash complete\n");
+        fflush(stdout);
+        checkCudaError();
+
 #ifdef MULTI_GPU
+        printfQuda("Calling initDslashCommsPattern\n");
+        fflush(stdout);
         initDslashCommsPattern();
+        checkCudaError();
 
         int completeSum = 0;
         while (completeSum < commDimTotal) {
@@ -1541,22 +1574,29 @@ namespace quda {
                   completeSum++;
                   gettimeofday(&commsStart[2*i+dir], NULL);
                   face->commsStart(2*i+dir);
+                  checkCudaError();
                 }
               }
+              checkCudaError();
 
               // Query if comms has finished
               if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
                   gatherCompleted[2*i+dir]) {
                 if (face->commsQuery(2*i+dir)) { 
                   commsCompleted[2*i+dir] = 1;
+                  checkCudaError();
                   completeSum++;
+                  checkCudaError();
                   gettimeofday(&commsEnd[2*i+dir], NULL);
+                  checkCudaError();
 
+                  checkCudaError();
                   // Record the end of the scattering
                   CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
 
                   // Scatter into the end zone
                   face->scatter(*inSpinor, dagger, 2*i+dir);	    
+                  checkCudaError();
                 }
               }
 
@@ -1566,15 +1606,23 @@ namespace quda {
             if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
               // Record the end of the scattering
               cudaEventRecord(scatterEnd[2*i], streams[2*i]);
+              checkCudaError();
 
               dslashParam.kernel_type = static_cast<KernelType>(i);
+              checkCudaError();
               dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
+              printfQuda("dslash.Nface() funny = %d\n", dslash.Nface());
+              fflush(stdout);
+              checkCudaError();
 
               // wait for scattering to finish and then launch dslash
               cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
+              checkCudaError();
 
               CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
               dslash.apply(streams[Nstream-1]); // all faces use this stream
+              cudaDeviceSynchronize();
+              checkCudaError();
               CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);	  
 
               dslashCompleted[2*i] = 1;
@@ -1588,6 +1636,9 @@ namespace quda {
         DSLASH_TIME_PROFILE();
 
 #endif // MULTI_GPU
+        checkCudaError();
+        printfQuda("Call to dslashCuda complete\n");  
+        fflush(stdout);
       }
 
       // Wilson wrappers
@@ -1935,6 +1986,7 @@ namespace quda {
       {
         inSpinor = (cudaColorSpinorField*)in; // EVIL
 
+        printfQuda("staggeredDslashCuda nFace = %d\n", nFace);
         checkCudaError();
 
 
@@ -1983,6 +2035,8 @@ namespace quda {
 
         if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
+          printfQuda("Creating new dslash operator\n");
+          fflush(stdout);
           dslash = new StaggeredDslashCuda<double2, double2, double2>((double2*)out->V(), (float*)out->Norm(), 
               (double2*)fatGauge0, (double2*)fatGauge1,
               (double2*)longGauge0, (double2*)longGauge1, 
@@ -1994,6 +2048,8 @@ namespace quda {
               hasNaik);
           regSize = sizeof(double);
           checkCudaError();
+          printfQuda("Dslash operator created\n");
+          fflush(stdout);
 #else
           errorQuda("Double precision not supported on this GPU");
 #endif
@@ -2020,6 +2076,13 @@ namespace quda {
               hasNaik);
         }
         checkCudaError();
+
+
+        printfQuda("regSize = %d\n", regSize);
+        printfQuda("parity = %d\n", parity);
+        printfQuda("dagger = %d\n", dagger);
+        printfQuda("in->Volume() = %d\n", in->Volume());
+        fflush(stdout);
 
         dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
         checkCudaError();
