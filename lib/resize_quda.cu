@@ -501,6 +501,7 @@ namespace quda {
       printfQuda("extendCuda__ half done:\n");
       printfQuda("Total memory = %d\n", total);
       printfQuda("Free memory = %d\n", free);
+      printfQuda("src.Stride() = %d\n", src.Stride());
       fflush(stdout);
 
 
@@ -604,8 +605,15 @@ namespace quda {
 
               // Wait for the scatter to finish 
               cudaStreamWaitEvent(streams[2*i], scatterEnd[2*i], 0);
-              //SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
-              SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), 0); 
+              // Warning! - Need to get the stride right!
+
+              if(src.Ghost(i) == NULL){
+                printfQuda("Ghost pointer is NULL!\n");
+              }else{
+                printfQuda("Ghost pointer is okay\n");
+              }
+              SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
+              //SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), 0); 
 
               printfQuda("About to call exterior extend.apply\n");
               cudaMemGetInfo(&free, &total);
@@ -745,7 +753,7 @@ namespace quda {
 
     if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
 
-    if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length\n");
+    if (src.Length() < dst.Length()) errorQuda("src length should be greater than destination length\n");
 
     if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
     {

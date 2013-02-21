@@ -356,7 +356,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 	  for (int j=0; j<M; j++) y[j] = xN*tex[i + j*stride];
 	} else { // other types
 #pragma unroll 
-	  for (int j=0; j<M; j++) copyFloatN(y[j], tex[i + j*stride]);
+//	  for (int j=0; j<M; j++) copyFloatN(y[j], tex[i + j*stride]);
 	}
 
       // now convert into desired register order

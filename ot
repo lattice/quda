@@ -1,0 +1,13 @@
+#endif
+#endif // (__COMPUTE_CAPABILITY__ >= 130)
+#endif
+#endif
+#endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
+#endif  
+#endif // GPU_STAGGERED_DIRAC
+#endif  
+#endif
+#endif
+#endif  
+#endif //GPU_WILSON_DIRAC
+#endif // MULTI_GPU
