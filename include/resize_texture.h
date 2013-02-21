@@ -1,5 +1,5 @@
-#ifndef _TEXTURE_H
-#define _TEXTURE_H
+#ifndef _RESIZE_TEXTURE_H
+#define _RESIZE_TEXTURE_H
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -25,6 +25,7 @@ public:
   Texture(const cudaColorSpinorField *x) : spinor(x->Tex()) { }
 #else
   Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
+  Texture(const InputType *inspinor) : spinor(inspinor) {}
 #endif
   Texture(const Texture &tex) : spinor(tex.spinor) { }
   ~Texture() { }
@@ -295,13 +296,21 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor(const Spinor &st) 
       : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
 
+#ifndef DIRECT_ACCESS_BLAS
     Spinor(StoreType* spinor, float* norm, int stride) 
-      : spinor(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
-
+      : spinor(spinor), norm(norm), stride(stride), { checkTypes<RegType, InterType, StoreType>(); }
 
     Spinor(void* spinor, float* norm, int stride)
       : spinor(static_cast<StoreType*>(spinor)), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
+#else
+   // Need to initialise the Texture objects since they are used even when textures are not
+   // Note: the use of texture reads is not yet supported here!
+    Spinor(StoreType* spinor, float* norm, int stride) 
+      : spinor(spinor), tex(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
 
+    Spinor(void* spinor, float* norm, int stride)
+      : spinor(static_cast<StoreType*>(spinor)), tex(static_cast<StoreType*>(spinor)), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
+#endif
 
     void set(StoreType* spinor, float* norm, int stride)
     {
@@ -327,13 +336,14 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       // load data into registers first using the storage order
       const int M = (N * sizeof(RegType)) / sizeof(InterType);
       InterType y[M];
-    
-      if(i==0){ 
-        printf("M = %d\n", M);
-        printf("RegType size = %d\n", sizeof(RegType));
-        printf("InterType size = %d\n", sizeof(InterType));
-      }
 
+
+      if(i==0){
+        printf("M = %d\n", M);
+        printf("sizeof(InterType) = %d\n", sizeof(InterType));
+        printf("sizeof(RegType) = %d\n", sizeof(RegType));
+        printf("stride = %d\n", stride);
+      }
 
       // If we are using tex references, then we can only use the predeclared texture ids
 #ifndef USE_TEXTURE_OBJECTS
@@ -348,25 +358,9 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 #pragma unroll 
 	  for (int j=0; j<M; j++) copyFloatN(y[j], tex[i + j*stride]);
 	}
-#ifndef USE_TEXTURE_OBJECTS
-      } else { // default load when out of tex_id range
-
-	if ( IS_SHORT(StoreType) ) { 
-	  float xN = norm[i];
-#pragma unroll
-	  for (int j=0; j<M; j++) {
-	    copyFloatN(y[j], spinor[i + j*stride]);
-	    y[j] *= xN;
-	  }
-	} else { // other types
-#pragma unroll
-	  for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*stride]);
-	}
-      }
-#endif
 
       // now convert into desired register order
-      convert<RegType, InterType>(x, y, N);
+   //   convert<RegType, InterType>(x, y, N);
     }
 
     // default store used for simple fields
@@ -436,4 +430,4 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 #undef MAX_TEX_ID
 #endif
 
-#endif // _TEXTURE_H
+#endif // _RESIZE_TEXTURE_H

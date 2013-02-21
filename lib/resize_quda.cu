@@ -10,7 +10,7 @@
 namespace quda {
 
   namespace resize {
-#include <texture.h> 
+#include <resize_texture.h> 
 #include <spinor_types.h>
   } 
   using namespace resize;
@@ -204,14 +204,22 @@ namespace quda {
 
       int x1, x2, x3, x4;
       int y1, y2, y3, y4;
-
       while(cb_index < length){
         getCoordinates(&x1, &x2, &x3, &x4, cb_index, params, parity, Dir);
-
         getDomainCoordsFromGhostCoords(&y1, &y2, &y3, &y4,
             x1, x2, x3, x4, params, Dir); 
 
         int large_cb_index = (y4*params.Y3Y2Y1 + y3*params.Y2Y1 + y2*params.Y1 + y1) >> 1;
+
+        if(large_cb_index == 0){
+          printf("Y3Y3Y1 = %d\n", params.Y3Y2Y1);
+          printf("Y2Y1 = %d\n", params.Y2Y1);
+          printf("Y1 = %d\n", params.Y1);
+          printf("N = %d\n", N);
+        }
+        printf("blockIdx.x = %d, cb_index = %d, large_cb_index = %d\n",  blockIdx.x, cb_index, large_cb_index);
+        printf("Ghost Coords : (%d, %d, %d, %d), Domain Coords : (%d, %d, %d, %d)\n", x1, x2, x3, x4, 
+                                                                                      y1, y2, y3, y4);        
 
         FloatN x[N];
         X.load(x, cb_index);
@@ -250,13 +258,33 @@ namespace quda {
           const unsigned int blockX = 128;
           const unsigned int gridX = (length + (blockX-1))/blockX;
 
+          printfQuda("In ExtendQuda::apply\n");
+          printfQuda("length = %d\n",length);
+          printfQuda("blockX = %d\n", blockX);
+          printfQuda("gridX = %d\n", gridX);
+          fflush(stdout);
+
+
           dim3 blockDim(blockX,1,1); // warp size on GK110
           dim3 gridDim(gridX,1,1); // random choice - change this
 
           if(dir<0){
             copyInteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity); 
           }else if(dir>=0 && dir<4){
+            size_t total, free;
+            cudaMemGetInfo(&free, &total);
+            printfQuda("Calling copyExteriorKernel\n");
+            printfQuda("Total mem = %d\n", total);
+            printfQuda("Free mem = %d\n", free);
+            fflush(stdout);
             copyExteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity, dir); 
+           
+            cudaDeviceSynchronize(); 
+            cudaMemGetInfo(&free, &total);
+            printfQuda("Just called copyExteriorKernel\n");
+            printfQuda("Total mem = %d\n", total);
+            printfQuda("Free mem = %d\n", free);
+        
           }else{
             errorQuda("dir %d is unrecognized");
           }
@@ -469,6 +497,13 @@ namespace quda {
 
 #endif  // MULTI_GPU  
 
+      cudaMemGetInfo(&free, &total);
+      printfQuda("extendCuda__ half done:\n");
+      printfQuda("Total memory = %d\n", total);
+      printfQuda("Free memory = %d\n", free);
+      fflush(stdout);
+
+
       cudaDeviceSynchronize();
 
       SrcSpinorType src_spinor(src);  
@@ -551,6 +586,13 @@ namespace quda {
             } // dir = 0,1
 
             if((attempts % 500) == 0) printfQuda("Attempts = %d\n", attempts);
+      
+            printfQuda("Close to the end of extendCuda__\n");
+            cudaMemGetInfo(&free, &total);
+            printfQuda("Free memory = %d\n", free);
+            printfQuda("Total memory = %d\n", total);
+            fflush(stdout);
+
 
             if(!extendCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1])
             {
@@ -562,12 +604,26 @@ namespace quda {
 
               // Wait for the scatter to finish 
               cudaStreamWaitEvent(streams[2*i], scatterEnd[2*i], 0);
-              SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
+              //SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
+              SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), 0); 
 
               printfQuda("About to call exterior extend.apply\n");
+              cudaMemGetInfo(&free, &total);
+              printfQuda("Free memory = %d\n", free);
+              printfQuda("Total memory = %d\n", total);
               fflush(stdout);
+   
+
               ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
-                extend(dst_spinor, src_spinor, src.GhostFace()[i], params, parity, i);
+                extend(dst_spinor, src_spinor, 2*src.Nface()*src.GhostFace()[i], params, parity, i);
+  
+              printfQuda("Created extend\n");
+              cudaMemGetInfo(&free, &total);
+              printfQuda("Total memory = %d\n", total);
+              printfQuda("Free memory = %d\n", free);
+              fflush(stdout);
+
+
               // Need to be careful here to ensure that face->scatter has completed
               // I believe that streams used for extend.apply now match the scatter streams
               extend.apply(streams[2*i]);

@@ -132,7 +132,7 @@ namespace quda {
     if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
       for(int i=0; i<dims; ++i){
         if(commDimPartitioned(i)){
-          ghost[i] = (char*)v + (length*precision + nColor*nSpin*2*ghostOffset[i])*precision;
+          ghost[i] = (char*)v + (length + nColor*nSpin*2*ghostOffset[i])*precision;
           if(precision == QUDA_HALF_PRECISION)
             ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
         }

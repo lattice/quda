@@ -3,7 +3,7 @@
 
 
 
-#include <texture.h>
+#include <resize_texture.h>
   
   class NullType {};
 
