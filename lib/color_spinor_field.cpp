@@ -66,9 +66,10 @@ namespace quda {
       if (commDimPartitioned(i)) {
         ghostFace[i] = 1;
         for (int j=0; j<dims; j++) {
+          if(i==j) printfQuda("x[%d] = %d\n",j,x[j]);
           if (i==j) continue;
           border[j] = 0;
-          ghostFace[i] *= (x[j] -2*border[j]);
+          ghostFace[i] *= (x[j]-2*border[j]);
         }
         ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
         if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
@@ -123,22 +124,12 @@ namespace quda {
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
 
+    printfQuda("total_length = %d\n", total_length);
     printfQuda("length = %d\n", length);
     printfQuda("ghost length = %d\n", ghost_length);
+
+
     printfQuda("Call to createGhostZone() complete\n");
-
-
-    // initialize the ghost pointers 
-    if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
-      for(int i=0; i<dims; ++i){
-        if(commDimPartitioned(i)){
-          ghost[i] = (char*)v + (length + nColor*nSpin*2*ghostOffset[i])*precision;
-          if(precision == QUDA_HALF_PRECISION)
-            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
-        }
-      }
-    }
-
 
 
   }
@@ -170,7 +161,9 @@ namespace quda {
     pad = Pad;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       stride = volume/2 + pad; // padding is based on half volume
-      length = 2*stride*nColor*nSpin*2;    
+      length = 2*stride*nColor*nSpin*2;   
+      printfQuda("Stride = %d\n", stride);
+      printfQuda("Pad = %d\n", pad); 
     } else {
       stride = volume + pad;
       length = stride*nColor*nSpin*2;
@@ -189,8 +182,6 @@ namespace quda {
     norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
     init = true;
 
-    //printfQuda("ColorSpinorField::bytes = %d\n", bytes);
-    clearGhostPointers();
   }
 
   void ColorSpinorField::destroy() {
@@ -230,6 +221,8 @@ namespace quda {
       length = 2*stride*nColor*nSpin*2;
     } else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
       stride = volume + pad;
+      printfQuda("pad = %d\n", pad);
+      printfQuda("stride = %d\n", stride);
       length = stride*nColor*nSpin*2;  
     } else {
       //errorQuda("SiteSubset not defined %d", param.siteSubset);
@@ -299,38 +292,31 @@ namespace quda {
     }
   }
 
-  // Set the ghost pointers to NULL.
-  // This is a private initialisation routine.
-  void ColorSpinorField::clearGhostPointers()
-  {
-    for(int dim=0; dim<QUDA_MAX_DIM; ++dim){
-      ghost[dim] = NULL;
-      ghostNorm[dim] = NULL;
-    }
-  }
-
-
 
 
   void* ColorSpinorField::Ghost(const int i) {
+    if(!commDimPartitioned(i)) return NULL;
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghost;
+    return (char*)v + (length + ghostOffset[i]*nColor*nSpin*2)*precision;
   }
 
   const void* ColorSpinorField::Ghost(const int i) const {
+    if(!commDimPartitioned(i)) return NULL;
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghost;
+    return (char*)v + (length + ghostOffset[i]*nColor*nSpin*2)*precision;
   }
 
 
   void* ColorSpinorField::GhostNorm(const int i){
+    if(!commDimPartitioned(i)) return NULL;
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghostNorm[i];
+    return (char*)v + (length + ghostNormOffset[i]*nColor*nSpin*2)*precision;
   }
 
   const void* ColorSpinorField::GhostNorm(const int i) const{
+    if(!commDimPartitioned(i)) return NULL;
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
-    return ghostNorm[i];
+    return (char*)v + (length + ghostNormOffset[i]*nColor*nSpin*2)*precision;
   }
 
 

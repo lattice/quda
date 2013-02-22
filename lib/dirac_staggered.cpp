@@ -60,9 +60,13 @@ namespace quda {
 			      const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-   
-    if(Nface != in.Nface()) errorQuda("DiracStaggered::Nface does not match in.Nface()");
-
+  
+      
+    if(Nface != in.Nface()){ 
+      printfQuda("Nface : %d, in.Nface() : %d\n", Nface, in.Nface());
+      errorQuda("DiracStaggered::Nface does not match in.Nface()");
+    }
+    printfQuda("in.Stride() = %d\n", in.Stride());
     initSpinorConstants(in);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     initSpinorParams(&kernel_params, in);

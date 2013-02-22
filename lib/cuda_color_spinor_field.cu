@@ -752,6 +752,10 @@ namespace quda {
 
     int len = nFace*ghostFace[dim]*Nint;
     int offset = length + ghostOffset[dim]*nColor*nSpin*2;
+
+    if(nFace==2) printfQuda("cudaColorSpinorField::loadGhost : offset = %d\n", offset);
+    fflush(stdout);
+
     offset += (dir == QUDA_BACKWARDS) ? 0 : len;
 
     void *dst = (char*)v + precision*offset;

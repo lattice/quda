@@ -183,10 +183,6 @@ namespace quda {
     int real_length; // physical length only
     int length; // length including pads, but not ghost zone - used for BLAS
 
-    // multi-GPU parameters
-    void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
-    void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
-
     int ghostFace[QUDA_MAX_DIM];// the size of each face
     int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
     int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
@@ -214,7 +210,6 @@ namespace quda {
     void reset(const ColorSpinorParam &);
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
-    void clearGhostPointers();
 
   public:
     //ColorSpinorField();

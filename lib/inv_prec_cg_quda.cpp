@@ -213,6 +213,9 @@ namespace quda {
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       minvr_ptr = new cudaColorSpinorField(r);
       globalReduce = false;
+
+      printfQuda("About to call K->operator()(*minvrPre_ptr, *rPre_ptr)");
+      fflush(stdout);
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
       globalReduce = true;
 
@@ -239,7 +242,9 @@ namespace quda {
     r2 = normCuda(r);
     printfQuda("r2 = %e\n",r2);
 
-
+    printfQuda("About to enter inv_prec_cg while loop\n");
+    printfQuda("p_ptr->Nface() = %d\n", p_ptr->Nface());
+    fflush(stdout);
     while(r2 > stop && k < invParam.maxiter){
       mat(Ap, *p_ptr, tmp);
       pAp   = reDotProductCuda(*p_ptr,Ap);

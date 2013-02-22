@@ -219,7 +219,7 @@ namespace quda {
         }
         printf("blockIdx.x = %d, cb_index = %d, large_cb_index = %d\n",  blockIdx.x, cb_index, large_cb_index);
         printf("Ghost Coords : (%d, %d, %d, %d), Domain Coords : (%d, %d, %d, %d)\n", x1, x2, x3, x4, 
-                                                                                      y1, y2, y3, y4);        
+            y1, y2, y3, y4);        
 
         FloatN x[N];
         X.load(x, cb_index);
@@ -278,13 +278,13 @@ namespace quda {
             printfQuda("Free mem = %d\n", free);
             fflush(stdout);
             copyExteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity, dir); 
-           
+
             cudaDeviceSynchronize(); 
             cudaMemGetInfo(&free, &total);
             printfQuda("Just called copyExteriorKernel\n");
             printfQuda("Total mem = %d\n", total);
             printfQuda("Free mem = %d\n", free);
-        
+
           }else{
             errorQuda("dir %d is unrecognized");
           }
@@ -416,7 +416,6 @@ namespace quda {
       printfQuda("Free memory : %d\n", free);
       printfQuda("Total memory: %d\n", total);
       fflush(stdout);       
-
 #ifdef MULTI_GPU
       for(int i=3; i >= 0; i--){
         if(domain_overlap[i]){
@@ -432,23 +431,23 @@ namespace quda {
           cudaEventRecord(packEnd[2*i], streams[Nstream-1]);
           printfQuda("extendCuda__ : packing in direction %d complete\n", i);
           fflush(stdout);
-          cudaError_t packQuery = cudaEventQuery(packEnd[2*i]);
-          switch(packQuery){
-            case cudaErrorInvalidValue:
-              printfQuda("pack cudaErrorInvalidValue!\n");
-              break;
-            case cudaErrorInitializationError:
-              printfQuda("pack cudaErrorInitializationError!\n");
-              break;
-            case cudaErrorInvalidResourceHandle:
-              printfQuda("pack cudaErrorInvalidResourceHandle!\n");
-              break;
-            case cudaErrorLaunchFailure:
-              printfQuda("pack cudaErrorLaunchFailure!\n");
-              break;
-            default:
-              break;
-          }
+          //          cudaError_t packQuery = cudaEventQuery(packEnd[2*i]);
+          //          switch(packQuery){
+          //            case cudaErrorInvalidValue:
+          //              printfQuda("pack cudaErrorInvalidValue!\n");
+          //              break;
+          //           case cudaErrorInitializationError:
+          //              printfQuda("pack cudaErrorInitializationError!\n");
+          //              break;
+          //            case cudaErrorInvalidResourceHandle:
+          //              printfQuda("pack cudaErrorInvalidResourceHandle!\n");
+          //              break;
+          //            case cudaErrorLaunchFailure:
+          //              printfQuda("pack cudaErrorLaunchFailure!\n");
+          //              break;
+          //            default:
+          //              break;
+          //          }
         }
       }
 
@@ -471,25 +470,24 @@ namespace quda {
             cudaDeviceSynchronize();
             // Record the end of the gathering 
             cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]);
-
-            cudaError_t gatherQuery = cudaEventQuery(gatherEnd[2*i+dir]);
-
-            switch(gatherQuery){
-              case cudaErrorInvalidValue:
-                printfQuda("cudaErrorInvalidValue!\n");
-                break;
-              case cudaErrorInitializationError:
-                printfQuda("cudaErrorInitializationError!\n");
-                break;
-              case cudaErrorInvalidResourceHandle:
-                printfQuda("cudaErrorInvalidResourceHandle!\n");
-                break;
-              case cudaErrorLaunchFailure:
-                printfQuda("cudaErrorLaunchFailure!\n");
-                break;
-              default:
-                break;
-            }
+            //            cudaError_t gatherQuery = cudaEventQuery(gatherEnd[2*i+dir]);
+            //
+            //            switch(gatherQuery){
+            //              case cudaErrorInvalidValue:
+            //                printfQuda("cudaErrorInvalidValue!\n");
+            //                break;
+            //              case cudaErrorInitializationError:
+            //                printfQuda("cudaErrorInitializationError!\n");
+            //                break;
+            //              case cudaErrorInvalidResourceHandle:
+            //                printfQuda("cudaErrorInvalidResourceHandle!\n");
+            //                break;
+            //              case cudaErrorLaunchFailure:
+            //                printfQuda("cudaErrorLaunchFailure!\n");
+            //                break;
+            //              default:
+            //                break;
+            //            }
 
           } // dir = 0,1
         } // if domain_overlap[i]
@@ -539,25 +537,23 @@ namespace quda {
                 printfQuda("Checking to see if gather[%d] completed\n",2*i+dir);
 
 
-                cudaError_t gatherQuery = cudaEventQuery(gatherEnd[2*i+dir]);
-                /*
-                   switch(gatherQuery){
-                   case cudaErrorInvalidValue:
-                   printfQuda("cudaErrorInvalidValue!\n");
-                   break;
-                   case cudaErrorInitializationError:
-                   printfQuda("cudaErrorInitializationError!\n");
-                   break;
-                   case cudaErrorInvalidResourceHandle:
-                   printfQuda("cudaErrorInvalidResourceHandle!\n");
-                   break;
-                   case cudaErrorLaunchFailure:
-                   printfQuda("cudaErrorLaunchFailure!\n");
-                   break;
-                   default:
-                   break;
-                   }
-                 */
+                //                cudaError_t gatherQuery = cudaEventQuery(gatherEnd[2*i+dir]);
+                //                   switch(gatherQuery){
+                //                   case cudaErrorInvalidValue:
+                //                   printfQuda("cudaErrorInvalidValue!\n");
+                //                   break;
+                //                   case cudaErrorInitializationError:
+                //                   printfQuda("cudaErrorInitializationError!\n");
+                //                   break;
+                //                  case cudaErrorInvalidResourceHandle:
+                //                   printfQuda("cudaErrorInvalidResourceHandle!\n");
+                //                   break;
+                //                   case cudaErrorLaunchFailure:
+                //                   printfQuda("cudaErrorLaunchFailure!\n");
+                //                   break;
+                //                   default:
+                //                   break;
+                //                   }
                 if(cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])){
                   printfQuda("Gather Completed!\n");
                   gatherCompleted[2*i+dir] = 1;
@@ -587,7 +583,7 @@ namespace quda {
             } // dir = 0,1
 
             if((attempts % 500) == 0) printfQuda("Attempts = %d\n", attempts);
-      
+
             printfQuda("Close to the end of extendCuda__\n");
             cudaMemGetInfo(&free, &total);
             printfQuda("Free memory = %d\n", free);
@@ -612,7 +608,23 @@ namespace quda {
               }else{
                 printfQuda("Ghost pointer is okay\n");
               }
-              SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), src.GhostFace()[i]); 
+
+              char* v  = (char*)src.V();
+              char* v1 = (char*)src.V() + src.Length()*src.Precision();
+              char* v2 = (char*)src.Ghost(i);
+              char* v3 = (char*)src.V() + src.TotalLength()*src.Precision();
+              char* v4 = (char*)src.Ghost(i);
+              printfQuda("src.V() = %p\n", v);
+              printfQuda("v1 = %p, v2 = %p\n", v1, v2);
+              printfQuda("v3 = %p\n", v3);
+              printfQuda("v4 = %p\n", v4);
+              fflush(stdout);
+
+              const int ghost_stride = 2*src.Nface()*src.GhostFace()[i];
+              printfQuda("Extend:: ghost_stride = %d\n",ghost_stride);
+
+
+              SrcSpinorType src_spinor(v1, static_cast<float*>(src.GhostNorm(i)), ghost_stride); 
               //SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), 0); 
 
               printfQuda("About to call exterior extend.apply\n");
@@ -620,11 +632,11 @@ namespace quda {
               printfQuda("Free memory = %d\n", free);
               printfQuda("Total memory = %d\n", total);
               fflush(stdout);
-   
+
 
               ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
-                extend(dst_spinor, src_spinor, 2*src.Nface()*src.GhostFace()[i], params, parity, i);
-  
+                extend(dst_spinor, src_spinor, ghost_stride, params, parity, i);
+
               printfQuda("Created extend\n");
               cudaMemGetInfo(&free, &total);
               printfQuda("Total memory = %d\n", total);
@@ -653,6 +665,9 @@ namespace quda {
       printfQuda("total memory = %d\n", total);
       printfQuda("free memory = %d\n", free);
       fflush(stdout); 
+
+      /*
+       */
       return;
     }
 

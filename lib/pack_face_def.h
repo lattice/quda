@@ -967,7 +967,7 @@ __device__ void packSpinor(short2 *out, float *outNorm, int out_idx, int out_str
   out[out_idx + 2*out_stride] = float22short2(1.0f, tex1Dfetch(spinorTexHalf2, in_idx + 2*in_stride));
   outNorm[out_idx] = tex1Dfetch(spinorTexHalfNorm, in_idx);
 }
-#endi
+#endif
 
 //
 // TODO: add support for textured reads

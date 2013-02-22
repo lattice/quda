@@ -328,12 +328,6 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       const int M = (N * sizeof(RegType)) / sizeof(InterType);
       InterType y[M];
     
-      if(i==0){ 
-        printf("M = %d\n", M);
-        printf("RegType size = %d\n", sizeof(RegType));
-        printf("InterType size = %d\n", sizeof(InterType));
-      }
-
 
       // If we are using tex references, then we can only use the predeclared texture ids
 #ifndef USE_TEXTURE_OBJECTS

@@ -393,6 +393,7 @@ void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     if (gaugeFatPrecondition && gaugeFatPrecondition != gaugeFatSloppy){
       delete gaugeFatPrecondition;
     }
+    gaugeFatPrecondition = precondition;
     break;
   case QUDA_ASQTAD_LONG_LINKS:
     if (gaugeLongPrecondition && gaugeLongPrecondition != gaugeLongSloppy){
