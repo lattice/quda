@@ -121,6 +121,8 @@ namespace quda {
 
     DecompParam dparam;
     initDecompParam(&dparam,X,Y);
+    int domain_overlap[4];
+    for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
     printfQuda("Calling ColorSpinorParam param(b)\n");
     fflush(stdout);
@@ -141,6 +143,7 @@ namespace quda {
     param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b,param);
+    minvr_ptr = new cudaColorSpinorField(b,param);
 
     printfQuda("Calling mat(r,x,y)\n");
     fflush(stdout);
@@ -169,8 +172,8 @@ namespace quda {
       prec_param.precision  = invParam.cuda_prec_precondition;
       prec_param.nColor     = 3;
       prec_param.nDim       = 4;
-      //prec_param.pad        = 0; // Not sure if this will cause a problem
-      prec_param.pad        = r.Pad(); 
+      prec_param.pad        = 0; // Not sure if this will cause a problem
+      //prec_param.pad        = r.Pad(); 
       prec_param.nSpin      = 1;
       prec_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       prec_param.siteOrder  = QUDA_EVEN_ODD_SITE_ORDER;
@@ -192,29 +195,26 @@ namespace quda {
         extendCuda(*rPre_ptr,r,dparam,domain_overlap);
         printfQuda("Call to extendCuda complete\n");
         fflush(stdout);
-/*
-      }else{
-        printfQuda("Calling *rPre_ptr = r\n");
-        fflush(stdout);
-        printfQuda("rPre_ptr->Length() = %d\n", rPre_ptr->Length());
-        printfQuda("rPre_ptr->RealLength() = %d\n", rPre_ptr->RealLength());
-        printfQuda("rPre_ptr->Pad() = %d\n", rPre_ptr->Pad());
-        printfQuda("rPre_ptr->Stride() = %d\n", rPre_ptr->Stride());
-        printfQuda("r.Length() = %d\n",r.Length());
-        printfQuda("r.RealLength() = %d\n", r.RealLength());
-        printfQuda("r.Pad() = %d\n", r.Pad());
-        printfQuda("r.Stride() = %d\n", r.Stride());
-        fflush(stdout);
+//      }else{
+//        printfQuda("Calling *rPre_ptr = r\n");
+//        fflush(stdout);
+//        printfQuda("rPre_ptr->Length() = %d\n", rPre_ptr->Length());
+//        printfQuda("rPre_ptr->RealLength() = %d\n", rPre_ptr->RealLength());
+//        printfQuda("rPre_ptr->Pad() = %d\n", rPre_ptr->Pad());
+//        printfQuda("rPre_ptr->Stride() = %d\n", rPre_ptr->Stride());
+//        printfQuda("r.Length() = %d\n",r.Length());
+//        printfQuda("r.RealLength() = %d\n", r.RealLength());
+//        printfQuda("r.Pad() = %d\n", r.Pad());
+//        printfQuda("r.Stride() = %d\n", r.Stride());
+//        fflush(stdout);
       
-        *rPre_ptr = r;
-        printfQuda("Call to *rPre_ptr complete\n");
-      }
-*/
+//        *rPre_ptr = r;
+//        printfQuda("Call to *rPre_ptr complete\n");
+//      }
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
-      minvr_ptr = new cudaColorSpinorField(r);
+      
       globalReduce = false;
-
-      printfQuda("About to call K->operator()(*minvrPre_ptr, *rPre_ptr)");
+     printfQuda("About to call K->operator()(*minvrPre_ptr, *rPre_ptr)");
       fflush(stdout);
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
       globalReduce = true;
@@ -225,11 +225,12 @@ namespace quda {
         *minvr_ptr = *minvrPre_ptr;
       }
 
-      p_ptr = new cudaColorSpinorField(*minvr_ptr);
+  //    p_ptr = new cudaColorSpinorField(*minvr_ptr);
     }else{
-      p_ptr = new cudaColorSpinorField(r);
+  //    p_ptr = new cudaColorSpinorField(r);
     }
 
+    p_ptr = new cudaColorSpinorField(b);
 
     double src_norm = norm2(b);
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition
@@ -241,48 +242,50 @@ namespace quda {
     double r2_old = 0;
     r2 = normCuda(r);
     printfQuda("r2 = %e\n",r2);
+    printfQuda("Calling device_free_\n");
 
     printfQuda("About to enter inv_prec_cg while loop\n");
-    printfQuda("p_ptr->Nface() = %d\n", p_ptr->Nface());
     fflush(stdout);
-    while(r2 > stop && k < invParam.maxiter){
+  
+    //while(r2 > stop && k < invParam.maxiter){
+    while(r2 > stop && k < 100){
       mat(Ap, *p_ptr, tmp);
       pAp   = reDotProductCuda(*p_ptr,Ap);
       alpha = (K) ? rMinvr/pAp : r2/pAp;
-      printfQuda("alpha = %e\n",alpha);
+      //alpha = r2/pAp;
       Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r); 
       // disregard cg_norm
       //axpyCuda(-alpha, Ap, r);
       // r --> r - alpha*A*p
 
-      if(K){
-        rMinvr_old = rMinvr;
-        r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
-        *rPre_ptr = r;
-        *minvrPre_ptr = *rPre_ptr;
-        globalReduce = false;
-        K->operator()(*minvrPre_ptr, *rPre_ptr);
-        globalReduce = true;
-        *minvr_ptr = *minvrPre_ptr;
-        rMinvr = reDotProductCuda(r,*minvr_ptr);
+//      if(K){
+//        rMinvr_old = rMinvr;
+//        r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
+//        extendCuda(*rPre_ptr,r,dparam,domain_overlap);
+//        *minvrPre_ptr = *rPre_ptr;
+//        globalReduce = false;
+//        K->operator()(*minvrPre_ptr, *rPre_ptr);
+//        globalReduce = true;
+//        cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
+//        rMinvr = reDotProductCuda(r,*minvr_ptr);
 
 
-        beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
-        if(beta < 0){ 
-          beta = 0.0; 
-        }else{
-          if(beta > (rMinvr/rMinvr_old)) beta = rMinvr/rMinvr_old;
-        }
-
-        r2 = real(cg_norm);
+//        beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
+//        if(beta < 0){ 
+//          beta = 0.0; 
+//        }else{
+//          if(beta > (rMinvr/rMinvr_old)) beta = rMinvr/rMinvr_old;
+//        }
+//
+//        r2 = real(cg_norm);
         // x = x + alpha*p, p = Minvr + beta*p
-        axpyZpbxCuda(alpha, *p_ptr, x, *minvr_ptr, beta);
-      }else{
+//        axpyZpbxCuda(alpha, *p_ptr, x, *minvr_ptr, beta);
+//      }else{
         r2_old = r2;
         r2 = real(cg_norm);
         beta = r2/r2_old;
         axpyZpbxCuda(alpha, *p_ptr, x, r, beta);
-      }
+//      }
 
       printfQuda("r2 = %e\n", r2);
       // update x and p
@@ -298,13 +301,13 @@ namespace quda {
     invParam.true_res = sqrt(true_res / src_norm);
     printfQuda("true_res = %e\n", invParam.true_res);
 
-
+    // FIX THIS!!
     if(K){ // These are only needed if preconditioning is used
       delete minvrPre_ptr;
       delete rPre_ptr;
-      delete minvr_ptr;
     }
     delete p_ptr;
+    delete minvr_ptr;
 
     return;
   }

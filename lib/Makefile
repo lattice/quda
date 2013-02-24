@@ -91,11 +91,11 @@ clean:
 tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
-blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
-	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+blas_quda.o: blas_quda.cu  $(HDRS) $(BLAS_INLN)
+	$(NVCC) $(NVCCFLAGS) -G $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
-	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) -G $< -c -o $@
 
 dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@

@@ -758,7 +758,7 @@ namespace quda {
     SrcSpinorType src_spinor(src);                                                       \
     DstSpinorType dst_spinor(dst);                                                       \
     CropCuda<DataType, 3, DstSpinorType, SrcSpinorType >                                       \
-    crop(dst_spinor, src_spinor, src.Volume(), params, parity);                  \
+    crop(dst_spinor, src_spinor, dst.Volume(), params, parity);                  \
     crop.apply(streams[Nstream-1]);                                                  \
   } 
 

@@ -1415,7 +1415,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   b = new cudaColorSpinorField(*h_b, cudaParam); 
   printfQuda("device b field created\n");
   fflush(stdout);
- 
+
   printfQuda("Creating device x field\n");
   fflush(stdout);
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
@@ -1439,7 +1439,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
     
   profileInvert[QUDA_PROFILE_H2D].Stop();
-
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
     double nb = norm2(*b);
@@ -1523,7 +1522,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
    printfQuda("Solution = %g\n",nx);
   }
   dirac.reconstruct(*x, *b, param->solution_type);
-  
+  // WARNING!! ADDED BY JF
+  //*x = *b;
+  // ADDED BY JF 
+ 
   profileInvert[QUDA_PROFILE_D2H].Start();
   *h_x = *x;
   profileInvert[QUDA_PROFILE_D2H].Stop();
@@ -1533,11 +1535,18 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nh_x = norm2(*h_x);
     printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
   }
-  
-  delete h_b;
+
   delete h_x;
-  delete b;
   delete x;
+
+  double nb = norm2(*b);
+  *h_b = *b;
+  double hn_b = norm2(*h_b);
+
+  printfQuda("Test: CUDA source = %g, CPU copy = %g\n", nb, hn_b);
+
+  delete h_b;
+  delete b;
 
   delete d;
   delete dSloppy;

@@ -97,16 +97,12 @@ namespace quda {
     size_t size = alloc[type][ptr].base_size;
     total_bytes[type] -= size;
     
-    printfQuda("total_bytes = %d\n", total_bytes);
-
-        
 
     if (type != DEVICE) {
       total_host_bytes -= size;
     }
     if (type == PINNED || type == MAPPED) {
       total_pinned_bytes -= size;
-      printfQuda("total_pinned_bytes = %d\n", total_pinned_bytes);
     }
     alloc[type].erase(ptr);
   }
@@ -154,16 +150,6 @@ namespace quda {
 
     size_t free;
     size_t total;
-
-    if(cudaSuccess != cudaMemGetInfo(&free,&total)){
-      printfQuda("cudaMemGetInfo failed!\n");
-    }
-    printfQuda("Total memory = %d\n",total);
-    printfQuda("Free memory = %d\n",free);
- //   printfQuda("File = %s\n", a.file);
- //   printfQuda("Line = %d\n", a.line);
- //   printfQuda("Size = %d\n", a.size);
-
 
     cudaError_t err = cudaMalloc(&ptr, size);
     if (err != cudaSuccess) {
@@ -260,7 +246,6 @@ namespace quda {
       printfQuda("ERROR: Failed to free device memory (%s:%d in %s())\n", file, line, func);
       errorQuda("Aborting");
     }
-    printfQuda("Calling device_free_\n");
     track_free(DEVICE, ptr);
   }
 
