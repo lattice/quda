@@ -17,19 +17,17 @@
 extern "C" {
 #endif
 
+typedef struct MsgHandle_s MsgHandle;
+
 /* The following routines are implemented over MPI only. */
 
-unsigned long	comm_send(void*, int, int, void*);
-unsigned long	comm_send_to_rank(void*, int, int, void*);
-unsigned long   comm_send_with_tag(void*, int, int, int, void*);
-unsigned long	comm_recv(void*, int, int, void*);
-unsigned long	comm_recv_from_rank(void*, int, int, void*);
-unsigned long   comm_recv_with_tag(void*, int, int, int, void*);
-int		comm_gpuid();
+MsgHandle *	comm_send_to_rank(void*, int, int);
+MsgHandle *	comm_recv_from_rank(void*, int, int);
 int		comm_get_neighbor_rank(int dx, int dy, int dz, int dt);
 
-/* implemented over both MPI, QMP and single */
+/* implemented over MPI, QMP, and single */
 
+int		comm_gpuid();
 void            comm_create(int argc, char **argv);
 void		comm_init(void);
 void		comm_cleanup(void);
@@ -40,12 +38,12 @@ void		comm_barrier(void);
 void            comm_broadcast(void *data, size_t nbytes);
 int		comm_rank(void);
 int		comm_size(void);
-void*           comm_declare_send_relative(void *buffer, int i, int dir, size_t bytes);
-void*           comm_declare_receive_relative(void *buffer, int i, int dir, size_t bytes);
-void            comm_free(void *comm);
-void            comm_start(void* comm);
-void		comm_wait(void*);
-int             comm_query(void* comm);
+MsgHandle *     comm_declare_send_relative(void *buffer, int i, int dir, size_t bytes);
+MsgHandle *     comm_declare_receive_relative(void *buffer, int i, int dir, size_t bytes);
+void            comm_free(MsgHandle *handle);
+void            comm_start(MsgHandle *handle);
+void		comm_wait(MsgHandle *handle);
+int             comm_query(MsgHandle *handle);
 int             comm_dim_partitioned(int dir);
 void            comm_dim_partitioned_set(int dir);
 int             comm_dim(int);

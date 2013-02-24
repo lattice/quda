@@ -7,13 +7,45 @@
 #include <quda_internal.h>
 #include <face_quda.h>
 
+
+#define X_FASTEST_DIM_NODE_RANKING
+
+
+#define MPI_CHECK(mpi_call) do {                    \
+  int status = mpi_call;                            \
+  if (status != MPI_SUCCESS) {                      \
+    char err_string[128];                           \
+    int err_len;                                    \
+    MPI_Error_string(status, err_string, &err_len); \
+    err_string[127] = '\0';                         \
+    errorQuda("(MPI) %s", err_string);              \
+  }                                                 \
+} while (0)
+
+
+struct MsgHandle_s {
+  MPI_Request request;
+};
+
+
+typedef struct {
+  int ndim;
+  int *dim;
+  int *rank;
+  int (*coord)[QUDA_MAX_DIM];
+  MPI_Comm comm;
+} Lattice;
+
+
+extern int getGpuCount();
+
+
 static char hostname[128] = "undetermined";
-static int fwd_nbr=-1;
-static int back_nbr=-1;
+static int fwd_nbr= -1;
+static int back_nbr = -1;
 static int rank = 0;
 static int size = -1;
 static int num_nodes;
-extern int getGpuCount();
 static int which_gpu = -1;
 
 static int x_fwd_nbr=-1;
@@ -34,12 +66,10 @@ static int ygridid = -1;
 static int zgridid = -1;
 static int tgridid = -1;
 
-static int manual_set_partition[4] ={0, 0, 0, 0};
+static int manual_set_partition[4] = {0, 0, 0, 0};
 
-#define X_FASTEST_DIM_NODE_RANKING
 
-void
-comm_set_gridsize(const int *X, int nDim)
+void comm_set_gridsize(const int *X, int nDim)
 {
   if (nDim != 4) errorQuda("Comms dimensions %d != 4", nDim);
 
@@ -53,28 +83,22 @@ comm_set_gridsize(const int *X, int nDim)
 
   int size = -1;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
-  if (volume != size)
-    errorQuda("Number of processes %d must match requested MPI volume %d",
-	      size, volume);
-
-  return;
+  if (volume != size) {
+    errorQuda("Number of processes %d must match requested MPI volume %d", size, volume);
+  }
 }
 
-/* This function is for and testing debugging purpose only The
- * partitioning schedume should be generated automatically in
- * production runs. Don't use this function if you don't know what you
- * are doing
+
+/**
+ * Force communication in a given dimension, for testing purposes.
  */
-void
-comm_dim_partitioned_set(int dir)
+void comm_dim_partitioned_set(int dir)
 {
   manual_set_partition[dir] = 1;
-  return;
 }
 
 
-int 
-comm_dim_partitioned(int dir)
+int comm_dim_partitioned(int dir)
 {
   int ret = 0;
   
@@ -96,22 +120,16 @@ comm_dim_partitioned(int dir)
     comm_exit(1);
   }
   
-  if( manual_set_partition[dir]){
+  if (manual_set_partition[dir]) {
     ret = manual_set_partition[dir];
   }
   
   return ret;
 }
 
-static void
-comm_partition(void)
+
+static void comm_partition(void)
 {
-  /*
-  printf("xgridsize=%d\n", xgridsize);
-  printf("ygridsize=%d\n", ygridsize);
-  printf("zgridsize=%d\n", zgridsize);
-  printf("tgridsize=%d\n", tgridsize);
-  */
   if(xgridsize*ygridsize*zgridsize*tgridsize != size){
     if (rank ==0){
       printf("ERROR: Invalid configuration (t,z,y,x gridsize=%d %d %d %d) "
@@ -189,17 +207,17 @@ comm_partition(void)
   }
 }
 
-int 
-comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
-{
-  int ret;
+
 #ifdef X_FASTEST_DIM_NODE_RANKING
 #define GRID_ID(xid,yid,zid,tid) (tid*zgridsize*ygridsize*xgridsize+zid*ygridsize*xgridsize+yid*xgridsize+xid)
 #else
 #define GRID_ID(xid,yid,zid,tid) (xid*ygridsize*zgridsize*tgridsize+yid*zgridsize*tgridsize+zid*tgridsize+tid)
 #endif
-
   
+int comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
+{
+  int ret;
+
   int xid, yid, zid, tid;
   xid=(xgridid + dx + xgridsize)%xgridsize;
   yid=(ygridid + dy + ygridsize)%ygridsize;
@@ -211,13 +229,14 @@ comm_get_neighbor_rank(int dx, int dy, int dz, int dt)
   return ret;
 }
 
+
 void comm_create(int argc, char **argv)
 {
-  MPI_Init (&argc, &argv);  
+  MPI_CHECK( MPI_Init(&argc, &argv) );
 }
 
-void 
-comm_init(void)
+
+void comm_init(void)
 {
   int i;
   
@@ -251,13 +270,13 @@ comm_init(void)
     comm_exit(1);
   }
 
-  which_gpu=0;
-  for(i=0;i < size; i++){
-    if (i == rank){
+  which_gpu = 0;
+  for (i = 0; i < size; i++) {
+    if (i == rank) {
       break;
     }
     if (strncmp(hostname, hostname_recv_buf + 128*i, 128) == 0){
-      which_gpu ++;
+      which_gpu++;
     }
   }
   
@@ -272,34 +291,33 @@ comm_init(void)
   return;
 }
 
-char *
-comm_hostname(void)
+
+char *comm_hostname(void)
 {
   return hostname;
 }
 
+
 int comm_gpuid()
 {
-  //int gpu = rank%getGpuCount();
-
   return which_gpu;
 }
 
-int
-comm_rank(void)
+
+int comm_rank(void)
 {
   return rank;
 }
 
-int
-comm_size(void)
+
+int comm_size(void)
 {
   return size;
 }
 
-int
-comm_dim(int dir) {
 
+int comm_dim(int dir)
+{
   int i=1;
   switch(dir) {
   case 0:
@@ -322,8 +340,8 @@ comm_dim(int dir) {
   return i;
 }
 
-int
-comm_coords(int dir) {
+
+int comm_coords(int dir) {
 
   int i=-1;
   switch(dir) {
@@ -347,43 +365,6 @@ comm_coords(int dir) {
   return i;
 }
 
-unsigned long
-comm_send(void* buf, int len, int dst, void* _request)
-{
-  
-  MPI_Request* request = (MPI_Request*)_request;
-
-  int dstproc=-1;
-  int sendtag=99;
-  if (dst == BACK_NBR){
-    dstproc = back_nbr;
-    sendtag = BACK_NBR;
-  }else if (dst == FWD_NBR){
-    dstproc = fwd_nbr;
-    sendtag = FWD_NBR;
-  }else{
-    printf("ERROR: invalid dest\n");
-    comm_exit(1);
-  }
-
-  MPI_Isend(buf, len, MPI_BYTE, dstproc, sendtag, MPI_COMM_WORLD, request);  
-  return (unsigned long)request;  
-}
-
-unsigned long
-comm_send_to_rank(void* buf, int len, int dst_rank, void* _request)
-{
-  
-  MPI_Request* request = (MPI_Request*)_request;
-  
-  if(dst_rank < 0 || dst_rank >= comm_size()){
-    printf("ERROR: Invalid dst rank(%d)\n", dst_rank);
-    comm_exit(1);
-  }
-  int sendtag = 99;
-  MPI_Isend(buf, len, MPI_BYTE, dst_rank, sendtag, MPI_COMM_WORLD, request);  
-  return (unsigned long)request;  
-}
 
 int find_neighbor_proc(int which) {
   int proc = -1;
@@ -420,44 +401,23 @@ int find_neighbor_proc(int which) {
 }
  
 
-unsigned long
-comm_send_with_tag(void* buf, int len, int dst, int tag, void*_request)
+MsgHandle *comm_send_to_rank(void* buf, int len, int dst_rank)
 {
-  MPI_Request* request = (MPI_Request*)_request;
-  int dstproc = find_neighbor_proc(dst);
-  MPI_Isend(buf, len, MPI_BYTE, dstproc, tag, MPI_COMM_WORLD, request);
-  return (unsigned long)request;
-}
-
-
-
-unsigned long
-comm_recv(void* buf, int len, int src, void*_request)
-{
-  MPI_Request* request = (MPI_Request*)_request;
+  MsgHandle* mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   
-  int srcproc=-1;
-  int recvtag=99; //recvtag is opposite to the sendtag
-  if (src == BACK_NBR){
-    srcproc = back_nbr;
-    recvtag = FWD_NBR;
-  }else if (src == FWD_NBR){
-    srcproc = fwd_nbr;
-    recvtag = BACK_NBR;
-  }else{
-    printf("ERROR: invalid source\n");
+  if(dst_rank < 0 || dst_rank >= comm_size()){
+    printf("ERROR: Invalid dst rank(%d)\n", dst_rank);
     comm_exit(1);
   }
-  
-  MPI_Irecv(buf, len, MPI_BYTE, srcproc, recvtag, MPI_COMM_WORLD, request);
-  
-  return (unsigned long)request;
+  int sendtag = 99;
+  MPI_CHECK( MPI_Isend(buf, len, MPI_BYTE, dst_rank, sendtag, MPI_COMM_WORLD, &(mh->request)) );  
+  return mh;
 }
 
-unsigned long
-comm_recv_from_rank(void* buf, int len, int src_rank, void* _request)
+
+MsgHandle *comm_recv_from_rank(void* buf, int len, int src_rank)
 {
-  MPI_Request* request = (MPI_Request*)_request;
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   
   if(src_rank < 0 || src_rank >= comm_size()){
     printf("ERROR: Invalid src rank(%d)\n", src_rank);
@@ -465,183 +425,131 @@ comm_recv_from_rank(void* buf, int len, int src_rank, void* _request)
   }
   
   int recvtag = 99;
-  MPI_Irecv(buf, len, MPI_BYTE, src_rank, recvtag, MPI_COMM_WORLD, request);
-  
-  return (unsigned long)request;
+  MPI_CHECK( MPI_Irecv(buf, len, MPI_BYTE, src_rank, recvtag, MPI_COMM_WORLD, &(mh->request)) );
+
+  return mh;
 }
 
-unsigned long
-comm_recv_with_tag(void* buf, int len, int src, int tag, void* _request)
-{ 
-  MPI_Request* request = (MPI_Request*)_request;
-  int srcproc = find_neighbor_proc(src);
-  MPI_Irecv(buf, len, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);
-  
-  return (unsigned long)request;
-}
 
 /**
-   Send to the "dir" direction in the "dim" dimension
+ * Send to the "dir" direction in the "dim" dimension
  */
-void* comm_declare_send_relative(void *buffer, int dim, int dir, size_t count)
+MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t count)
 {
   int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
   int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   int uptags[4] = {XUP, YUP, ZUP, TUP};
 
-  MPI_Request *request = (MPI_Request*)safe_malloc(sizeof(MPI_Request));
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   int tag = (dir == 1) ? uptags[dim] : downtags[dim];
   int dst = (dir == 1) ? fwd_nbr[dim] : back_nbr[dim];
   int dstproc = find_neighbor_proc(dst);  
-  MPI_Send_init(buffer, count, MPI_BYTE, dstproc, tag, MPI_COMM_WORLD, request);
-  return (void*)request;
+  MPI_CHECK( MPI_Send_init(buffer, count, MPI_BYTE, dstproc, tag, MPI_COMM_WORLD, &(mh->request)) );
+
+  return mh;
 }
 
+
 /**
-   Receive from the "dir" direction in the "dim" dimension
+ * Receive from the "dir" direction in the "dim" dimension
  */
-void* comm_declare_receive_relative(void *buffer, int dim, int dir, size_t count)
+MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t count)
 {
   int back_nbr[4] = {X_BACK_NBR,Y_BACK_NBR,Z_BACK_NBR,T_BACK_NBR};
   int fwd_nbr[4] = {X_FWD_NBR,Y_FWD_NBR,Z_FWD_NBR,T_FWD_NBR};
   int downtags[4] = {XDOWN, YDOWN, ZDOWN, TDOWN};
   int uptags[4] = {XUP, YUP, ZUP, TUP};
 
-  MPI_Request *request = (MPI_Request*)safe_malloc(sizeof(MPI_Request));
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   int tag = (dir == 1) ? downtags[dim] : uptags[dim];  // this should match neighbour's tag
   int src = (dir == 1) ? fwd_nbr[dim] : back_nbr[dim]; // this is relative
-  int srcproc = find_neighbor_proc(src);  
-  MPI_Recv_init(buffer, count, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, request);
-  return (void*)request;
+  int srcproc = find_neighbor_proc(src);
+  MPI_CHECK( MPI_Recv_init(buffer, count, MPI_BYTE, srcproc, tag, MPI_COMM_WORLD, &(mh->request)) );
+
+  return mh;
 }
 
-void comm_start(void *request)
-{
-  int rc = MPI_Start( (MPI_Request*)request);
-  if (rc != MPI_SUCCESS) {
-    printf("ERROR: MPI_Test failed\n");
-    comm_exit(1);
-  }
 
-  return;
+void comm_free(MsgHandle *handle) {
+  host_free(handle);
 }
 
-int comm_query(void* request) 
+
+void comm_start(MsgHandle *handle)
 {
-  MPI_Status status;
+  MPI_CHECK( MPI_Start(&(handle->request)) );
+}
+
+
+void comm_wait(MsgHandle *handle)
+{
+  MPI_CHECK( MPI_Wait(&(handle->request), MPI_STATUS_IGNORE) );
+}
+
+
+int comm_query(MsgHandle *handle) 
+{
   int query;
-  int rc = MPI_Test( (MPI_Request*)request, &query, &status);
-  if (rc != MPI_SUCCESS) {
-    printf("ERROR: MPI_Test failed\n");
-    comm_exit(1);
-  }
+  MPI_CHECK( MPI_Test(&(handle->request), &query, MPI_STATUS_IGNORE) );
 
   return query;
 }
 
 
-//this request should be some return value from comm_recv
-void 
-comm_wait(void* request)
-{
-  
-  MPI_Status status;
-  int rc = MPI_Wait( (MPI_Request*)request, &status);
-  if (rc != MPI_SUCCESS){
-    printf("ERROR: MPI_Wait failed\n");
-    comm_exit(1);
-  }
-  
-  return;
-}
-
-//we always reduce one double value
-void
-comm_allreduce(double* data)
+void comm_allreduce(double* data)
 {
   double recvbuf;
-  int rc = MPI_Allreduce ( data, &recvbuf,1,MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  if (rc != MPI_SUCCESS){
-    printf("ERROR: MPI_Allreduce failed\n");
-    comm_exit(1);
-  }
-  
+  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
   *data = recvbuf;
-  
-  return;
 } 
 
-void 
-comm_allreduce_int(int* data)
+
+void comm_allreduce_int(int* data)
 {
   int recvbuf;
-  int rc = MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-  if(rc!=MPI_SUCCESS){
-    printf("ERROR: MPI_Allreduce failed\n");
-    comm_exit(1); 
-  }
+  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD) );
   *data = recvbuf;
-  return;
 }
 
-//reduce n double value
-void
-comm_allreduce_array(double* data, size_t size)
+
+void comm_allreduce_array(double* data, size_t size)
 {
   double recvbuf[size];
-  int rc = MPI_Allreduce ( data, &recvbuf,size,MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  if (rc != MPI_SUCCESS){
-    printf("ERROR: MPI_Allreduce failed\n");
-    comm_exit(1);
-  }
-  
+  MPI_CHECK( MPI_Allreduce(data, &recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
   memcpy(data, recvbuf, sizeof(recvbuf));
-  
-  return;
 }
 
-//we always reduce one double value
-void
-comm_allreduce_max(double* data)
+
+void comm_allreduce_max(double* data)
 {
   double recvbuf;
-  int rc = MPI_Allreduce ( data, &recvbuf,1,MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-  if (rc != MPI_SUCCESS){
-    printf("ERROR: MPI_Allreduce failed\n");
-    comm_exit(1);
-  }
-  
+  MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD) );
   *data = recvbuf;
-  
-  return;
 } 
 
-void comm_free(void *handle) {
-  host_free((MPI_Request*)handle);
-}
 
 // broadcast from rank 0
-void
-comm_broadcast(void *data, size_t nbytes)
+void comm_broadcast(void *data, size_t nbytes)
 {
-  MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_WORLD);
+  MPI_CHECK( MPI_Bcast(data, (int)nbytes, MPI_BYTE, 0, MPI_COMM_WORLD) );
 }
 
-void
-comm_barrier(void)
+
+void comm_barrier()
 {
-  MPI_Barrier(MPI_COMM_WORLD);  
-}
-void 
-comm_cleanup()
-{
-  MPI_Finalize();
+  MPI_CHECK( MPI_Barrier(MPI_COMM_WORLD) );
 }
 
-void
-comm_exit(int ret)
+
+void comm_cleanup()
 {
-  MPI_Finalize();
+  MPI_CHECK( MPI_Finalize() );
+}
+
+
+void comm_exit(int ret)
+{
+  comm_cleanup();
   exit(ret);
 }

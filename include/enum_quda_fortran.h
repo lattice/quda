@@ -255,8 +255,8 @@
 #define QUDA_USE_INIT_GUESS_INVALID QUDA_INVALID_ENUM
 
 #define QudaDirection integer(4)
-#define QUDA_BACKWARDS 0
-#define QUDA_FORWARDS  1
+#define QUDA_BACKWARDS -1
+#define QUDA_FORWARDS  +1
   
 #define QudaComputeFatMethod integer(4)
 #define QUDA_COMPUTE_FAT_STANDARD 0

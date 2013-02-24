@@ -290,8 +290,8 @@ extern "C" {
   } QudaUseInitGuess;
 
   typedef enum QudaDirection_s {
-    QUDA_BACKWARDS,
-    QUDA_FORWARDS
+    QUDA_BACKWARDS = -1,
+    QUDA_FORWARDS = +1
   } QudaDirection;
   
   typedef enum QudaComputeFatMethod_s {
