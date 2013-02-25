@@ -229,24 +229,11 @@ if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
   // Inline by hand for the moment and assume even dimensions
-  //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
 
-  int xt = blockIdx.x*blockDim.x + threadIdx.x;
-  int aux = xt+xt;
-  if (aux >= X1*X4) return;
-
-  x4 = aux / X1;
-  x1 = aux - x4*X1;
-
-  x2 = blockIdx.y*blockDim.y + threadIdx.y;
+  // only need to check Y and Z dims currently since X and T set to match exactly
   if (x2 >= X2) return;
-
-  x3 = blockIdx.z*blockDim.z + threadIdx.z;
   if (x3 >= X3) return;
-
-  x1 += (param.parity + x4 + x3 + x2) &1;
-  X = ((x4*X3 + x3)*X2 + x2)*X1 + x1;
-  sid = X >> 1; 
 
   o00_re = 0;  o00_im = 0;
   o01_re = 0;  o01_im = 0;

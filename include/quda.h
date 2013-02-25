@@ -13,8 +13,8 @@
 #include <stdio.h> /* for FILE */
 
 #define QUDA_VERSION_MAJOR     0
-#define QUDA_VERSION_MINOR     4
-#define QUDA_VERSION_SUBMINOR  1
+#define QUDA_VERSION_MINOR     5
+#define QUDA_VERSION_SUBMINOR  0
 
 /**
  * @def   QUDA_VERSION
@@ -79,7 +79,6 @@ extern "C" {
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
-    int packed_size;
     double gaugeGiB;
 
     int preserve_gauge; /**< Used by link fattening */
@@ -105,9 +104,13 @@ extern "C" {
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
     double mu;    /**< Twisted mass parameter */
+    double epsilon; /**< Twisted mass parameter */
+    
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
-    double tol;
+    double tol;   /**< Solver tolerance in the L2 residual norm */
+    double true_res; /**< Actual L2 residual norm achieved in solver */
+    double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
     int maxiter;
     double reliable_delta; /**< Reliable update tolerance */
 
@@ -117,7 +120,16 @@ extern "C" {
     double offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_MULTI_SHIFT];
+    double tol_offset[QUDA_MAX_MULTI_SHIFT];     
+
+    /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
+    double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
+
+    /** Actual L2 residual norm achieved in solver for each offset */
+    double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
+
+    /** Actual heavy quark residual norm achieved in solver for each offset */
+    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
     QudaSolutionType solution_type;  /**< Type of system to solve */
     QudaSolveType solve_type;        /**< How to solve it */
@@ -159,9 +171,6 @@ extern "C" {
     /** Enable auto-tuning? */
     QudaTune tune;
 
-    /** Free the Dirac operator or keep it resident? */
-    QudaPreserveDirac preserve_dirac;
-
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 
@@ -185,9 +194,6 @@ extern "C" {
     /** Maximum number of iterations allowed in the inner solver */
     int maxiter_precondition;
 
-    /** Precision used in the inner solver */
-    QudaPrecision prec_precondition;
-
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
 
@@ -196,6 +202,9 @@ extern "C" {
 
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
+
+    /** Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence */
+    QudaResidualType residual_type;
 
   } QudaInvertParam;
 
@@ -267,16 +276,20 @@ extern "C" {
 
   /**
    * Print the members of QudaGaugeParam.
+   * @param param The QudaGaugeParam whose elements we are to print.
    */
   void printQudaGaugeParam(QudaGaugeParam *param);
 
   /**
    * Print the members of QudaGaugeParam.
+   * @param param The QudaGaugeParam whose elements we are to print.
    */
   void printQudaInvertParam(QudaInvertParam *param);
 
   /**
    * Load the gauge field from the host.
+   * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
+   * @param param   Contains all metadata regarding host and device storage
    */
   void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
@@ -287,12 +300,17 @@ extern "C" {
 
   /**
    * Save the gauge field to the host.
+   * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
+   * @param param   Contains all metadata regarding host and device storage
    */
   void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param);
 
   /**
    * Load the clover term and/or the clover inverse from the host.
    * Either h_clover or h_clovinv may be set to NULL.
+   * @param h_clover    Base pointer to host clover field
+   * @param h_cloverinv Base pointer to host clover inverse field
+   * @param inv_param   Contains all metadata regarding host and device storage
    */
   void loadCloverQuda(void *h_clover, void *h_clovinv,
 		      QudaInvertParam *inv_param);
@@ -306,37 +324,60 @@ extern "C" {
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().
+   * @param h_x    Solution spinor field
+   * @param h_b    Source spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
    */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
    * Solve for multiple shifts (e.g., masses).
+   * @param _hp_x    Array of solution spinor fields
+   * @param _hp_b    Array of source spinor fields
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
    */
-  void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param,
-			    double* offsets, int num_offsets,
-			    double* residue_sq);
+  void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
 
   /**
-   * Mixed-precision multi-shift solver.  In the future, this functionality
-   * will be folded into invertMultiShiftQuda().
-   */
-  void invertMultiShiftQudaMixed(void **_hp_x, void *_hp_b,
-				 QudaInvertParam *param, double* offsets,
-				 int num_offsets, double* residue_sq);
-    
-  /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   * @param parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
 		  QudaParity parity);
 
   /**
+   * Apply the clover operator or its inverse.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   * @param parity The source and destination parity of the field
+   * @param inverse Whether to apply the inverse of the clover term
+   */
+  void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
+		  QudaParity *parity, int inverse);
+
+  /**
    * Apply the full Dslash matrix, possibly even/odd preconditioned.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
    */
   void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
   /**
    * Apply M^{\dag}M, possibly even/odd preconditioned.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
    */
   void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param);
 
@@ -346,11 +387,6 @@ extern "C" {
    * link-fattening code.
    */
 
-  void  record_gauge(int* X, void *_fatlink, int _fatlink_pad, 
-		     void* _longlink, int _longlink_pad, 
-		     QudaReconstructType _longlink_recon,
-		     QudaReconstructType _longlink_recon_sloppy,
-		     QudaGaugeParam *_param);
   void set_dim(int *);
   void pack_ghost(void **cpuLink, void **cpuGhost, int nFace,
 		  QudaPrecision precision);
@@ -360,7 +396,7 @@ extern "C" {
 			 QudaComputeFatMethod method);
 
   /**
-   * Compute the gauge action force.
+   * Compute the gauge force.
    */
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 			    void* loop_coeff, int num_paths, int max_length, double eb3,
@@ -377,6 +413,7 @@ extern "C" {
 }
 #endif
 
-//#include <quda_new_interface.h>
+#include <quda_fortran.h>
+/* #include <quda_new_interface.h> */
 
 #endif /* _QUDA_H */

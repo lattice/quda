@@ -109,6 +109,8 @@ __constant__ fat_force_const_t fl; //fatlink
 __constant__ fat_force_const_t gf; //gauge force
 __constant__ fat_force_const_t hf; //hisq force
 
+//!ndeg tm:
+__constant__ int fl_stride;
 
 void initLatticeConstants(const LatticeField &lat)
 {
@@ -341,6 +343,7 @@ void initSpinorConstants(const cudaColorSpinorField &spinor)
   if (sp_stride_h != last_sp_stride) {
     cudaMemcpyToSymbol(sp_stride, &sp_stride_h, sizeof(int));
     checkCudaError();
+    last_sp_stride = sp_stride_h;
   }
   
   // for domain wall:
@@ -350,6 +353,7 @@ void initSpinorConstants(const cudaColorSpinorField &spinor)
       cudaMemcpyToSymbol(Ls, &Ls_h, sizeof(int));  
       dslashConstants.Ls = Ls_h; // needed by tuneLaunch()
       checkCudaError();
+      last_Ls = Ls_h;
     }
   }
 }
@@ -390,6 +394,14 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
   cudaMemcpyToSymbol(fat_ga_stride, &fat_ga_stride_h, sizeof(int));  
   cudaMemcpyToSymbol(long_ga_stride, &long_ga_stride_h, sizeof(int));  
   cudaMemcpyToSymbol(fat_ga_max, &fat_link_max_h, sizeof(float));
+
+  checkCudaError();
+}
+
+//!ndeg tm: 
+void initTwistedMassConstants(const int fl_stride_h)
+{
+  cudaMemcpyToSymbol(fl_stride, &fl_stride_h, sizeof(int));    
 
   checkCudaError();
 }

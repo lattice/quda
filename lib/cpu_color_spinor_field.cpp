@@ -15,7 +15,7 @@
   void *
   aligned_malloc(size_t n, void **m0)
   {
-  size_t m = (size_t) malloc(n+ALIGN);
+  size_t m = (size_t) safe_malloc(n+ALIGN);
   *m0 = (void*)m;
   size_t r = m % ALIGN;
   if(r) m += (ALIGN - r);
@@ -140,10 +140,10 @@ namespace quda {
       // array of 4-d fields
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
 	int Ls = x[nDim-1];
-	v = (void**)malloc(Ls * sizeof(void*));
-	for (int i=0; i<Ls; i++) ((void**)v)[i] = (void*)malloc(bytes / Ls);
+	v = (void**)safe_malloc(Ls * sizeof(void*));
+	for (int i=0; i<Ls; i++) ((void**)v)[i] = safe_malloc(bytes / Ls);
       } else {
-	v = (void*)malloc(bytes);
+	v = safe_malloc(bytes);
       }
       init = true;
     }
@@ -189,8 +189,8 @@ namespace quda {
   
     if (init) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	for (int i=0; i<x[nDim-1]; i++) free(((void**)v)[i]);
-      free(v);
+	for (int i=0; i<x[nDim-1]; i++) host_free(((void**)v)[i]);
+      host_free(v);
       init = false;
     }
 
@@ -400,21 +400,23 @@ namespace quda {
       if (b.precision == QUDA_DOUBLE_PRECISION)
 	ret = compareSpinor(*(a.order_single), *(b.order_double), tol);
       else
-	ret =compareSpinor(*(a.order_single), *(b.order_single), tol);
+	ret = compareSpinor(*(a.order_single), *(b.order_single), tol);
 
     return ret;
   }
+
 
   template <class Order>
   void print_vector(const Order &o, unsigned int x) {
 
     for (int s=0; s<o.Nspin(); s++) {
+      std::cout << "x = " << x << ", s = " << s << ", { ";
       for (int c=0; c<o.Ncolor(); c++) {
-	for (int z=0; z<2; z++) {
-	  std::cout << o(x, s, c, z) << std::endl;
-	}
+	std::cout << " ( " << o(x, s, c, 0) << " , " ;
+	if (c<o.Ncolor()-1) std::cout << o(x, s, c, 1) << " ) ," ;
+	else std::cout << o(x, s, c, 1) << " ) " ;
       }
-      std::cout << std::endl;
+      std::cout << " } " << std::endl;
     }
 
   }
@@ -447,52 +449,41 @@ namespace quda {
     int X2 = this->x[1];
     int X3 = this->x[2];
     int X4 = this->x[3];
-    //BEGIN NEW  
     int X5 = this->nDim == 5 ? this->x[4] : 1;
   
     int Vsh[4]={ X2*X3*X4*X5/2,
 		 X1*X3*X4*X5/2,
 		 X1*X2*X4*X5/2,
 		 X1*X2*X3*X5/2};
-    //END NEW  
   
     int num_faces = 1;
     if(this->nSpin == 1) num_faces = 3; // staggered
 
     int spinor_size = 2*this->nSpin*this->nColor*this->precision;
-    for(int i=0;i < 4; i++){
-      fwdGhostFaceBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
-      backGhostFaceBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
+    for (int i=0; i<4; i++) {
+      size_t nbytes = num_faces*Vsh[i]*spinor_size;
 
-      fwdGhostFaceSendBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
-      backGhostFaceSendBuffer[i] = malloc(num_faces*Vsh[i]*spinor_size);
-    
-      if(fwdGhostFaceBuffer[i]== NULL || backGhostFaceBuffer[i] == NULL||
-	 fwdGhostFaceSendBuffer[i]== NULL || backGhostFaceSendBuffer[i]==NULL){
-	errorQuda("malloc for ghost buf in cpu spinor failed\n");
-      }
+      fwdGhostFaceBuffer[i] = safe_malloc(nbytes);
+      backGhostFaceBuffer[i] = safe_malloc(nbytes);
+      fwdGhostFaceSendBuffer[i] = safe_malloc(nbytes);
+      backGhostFaceSendBuffer[i] = safe_malloc(nbytes);
     }
-  
     initGhostFaceBuffer = 1;
-    return;
   }
+
 
   void cpuColorSpinorField::freeGhostBuffer(void)
   {
     if(!initGhostFaceBuffer) return;
 
     for(int i=0;i < 4; i++){
-      free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
-      free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
-      free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
-      free(backGhostFaceSendBuffer[i]);  backGhostFaceSendBuffer[i] = NULL;
+      host_free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
+      host_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
+      host_free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
+      host_free(backGhostFaceSendBuffer[i]);  backGhostFaceSendBuffer[i] = NULL;
     } 
-
     initGhostFaceBuffer = 0;
-  
-    return;
   }
-
 
 
   void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim, 
@@ -516,9 +507,7 @@ namespace quda {
     int X2 = this->x[1];
     int X3 = this->x[2];
     int X4 = this->x[3];
-    //BEGIN NEW 
     int X5 = this->nDim == 5 ? this->x[4]: 1;
-    //END NEW    
 
 
     for(int i=0;i < this->volume;i++){ 
@@ -530,18 +519,16 @@ namespace quda {
       int x1h = sid - za*X1h;
       int zb = za/X2;
       int x2 = za - zb*X2;
-      //BEGIN NEW
       int zc = zb / X3;
       int x3 = zb - zc*X3;
       int x5 = zc / X4; //this->nDim == 5 ? zz / X4 : 0;
       int x4 = zc - x5*X4;
       int x1odd = (x2 + x3 + x4 + x5 + oddBit) & 1;
-      //END NEW
       int x1 = 2*x1h + x1odd;
 
       int ghost_face_idx ;
     
-      //NOTE: added extra dimension for DW dslash    
+      //NOTE: added extra dimension for DW and TM dslash    
 
       switch(dim){            
       case 0: //X dimension

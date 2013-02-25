@@ -22,9 +22,15 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern int niter;
 
+extern bool tune;
+
 extern void usage(char** );
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
+const int Nkernels = 32;
+#else // exclude Heavy Quark Norm if on Tesla architecture
 const int Nkernels = 31;
+#endif
 
 using namespace quda;
 
@@ -105,7 +111,7 @@ void initFields(int prec)
   lH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
 
   // Now set the parameters for the cuda fields
-  param.pad = 0; //LX*LY*LZ/2;
+  //param.pad = xdim*ydim*zdim/2;
   
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -317,6 +323,10 @@ double benchmark(int kernel, const int niter) {
 
     case 30:
       caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      break;
+
+    case 31:
+      HeavyQuarkResidualNormCuda(*xD, *yD);
       break;
 
     default:
@@ -603,6 +613,15 @@ double test(int kernel) {
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
 
+  case 31:
+    *xD = *xH;
+    *yD = *yH;
+    { double3 d = HeavyQuarkResidualNormCuda(*xD, *yD);
+      double3 h = HeavyQuarkResidualNormCpu(*xH, *yH);
+      error = fabs(d.x - h.x) / fabs(h.x) + 
+	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
+    break;
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
@@ -656,7 +675,8 @@ int main(int argc, char** argv)
     "caxpyDotzy",
     "cDotProductNormA",
     "cDotProductNormB",
-    "caxpbypzYmbwcDotProductWYNormY"
+    "caxpbypzYmbwcDotProductWYNormY",
+    "HeavyQuarkResidualNorm"
   };
 
   char *prec_str[] = {"half", "single", "double"};
@@ -669,7 +689,7 @@ int main(int argc, char** argv)
 #endif
 
   // enable the tuning
-  quda::setBlasTuning(QUDA_TUNE_YES, QUDA_SILENT);
+  quda::setBlasTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO, QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
 

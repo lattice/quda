@@ -3,7 +3,7 @@
 
 #include <quda_internal.h>
 #include <quda.h>
-#include "gauge_field.h"
+#include <gauge_field.h>
 
 #define freeLinkQuda freeGaugeField
 

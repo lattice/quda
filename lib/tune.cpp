@@ -235,6 +235,10 @@ static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VER
    */
   TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
+    // We must switch off the global sum when tuning in case of process divergence
+    bool reduceState = globalReduce;
+    globalReduce = false;
+
     static bool tuning = false; // tuning in progress?
     static const Tunable *active_tunable; // for error checking
     static TuneParam param;
@@ -320,6 +324,9 @@ static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VER
     } else if (&tunable != active_tunable) {
       errorQuda("Unexpected call to tuneLaunch() in %s::apply()", typeid(tunable).name());
     }
+
+    // restore the original reduction state
+    globalReduce = reduceState;
 
     return param;
   }

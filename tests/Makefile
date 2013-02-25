@@ -2,13 +2,13 @@ include ../make.inc
 
 QUDA = ../lib/libquda.a
 
-INC += -I../include -I.
+INC += -I../include -I. 
 
 HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h    \
 	domain_wall_dslash_reference.h test_util.h dslash_util.h
 
-TESTS = su3_test blas_test pack_test $(DIRAC_TEST)			\
-	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)	\
+TESTS = su3_test blas_test dslash_test invert_test $(DIRAC_TEST)			\
+	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)     \
 	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
 	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)
 
@@ -21,7 +21,7 @@ invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dsl
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
-	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS) 
 
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
@@ -57,7 +57,7 @@ clean:
 	-rm -f *.o dslash_test invert_test staggered_dslash_test	\
 	staggered_invert_test su3_test pack_test blas_test llfat_test	\
 	gauge_force_test fermion_force_test hisq_paths_force_test	\
-	hisq_unitarize_force_test unitarize_links_test
+	hisq_unitarize_force_test unitarize_link_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

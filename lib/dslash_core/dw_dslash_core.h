@@ -174,8 +174,8 @@ VOLATILE spinorFloat o32_im;
 int sp_norm_idx;
 #endif // MULTI_GPU half precision
 
-int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if (sid >= param.threads) return;
+int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
+if (sid >= param.threads*Ls) return;
 
 int X, x1, x2, x3, x4, xs;
 
@@ -216,7 +216,7 @@ xs = X/(X1*X2*X3*X4);
 } else { // exterior kernel
 
 const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads >> 1); // volume of one face
+const int face_volume = (param.threads*Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 
@@ -1962,12 +1962,12 @@ if(kernel_type == INTERIOR_KERNEL)
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
-     int sp_idx = ( xs == 0 ? X+(Ls-1)*2*Vh : X-2*Vh ) / 2;
+     int sp_idx = ( xs == Ls-1 ? X-(Ls-1)*2*Vh : X+2*Vh ) / 2;
 
 // read spinor from device memory
      READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
 
-     if ( xs != 0 )
+     if ( xs != Ls-1 )
      {
    o00_re += +i00_re-i20_re;   o00_im += +i00_im-i20_im;
    o01_re += +i01_re-i21_re;   o01_im += +i01_im-i21_im;
@@ -2002,17 +2002,17 @@ if(kernel_type == INTERIOR_KERNEL)
    o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
    o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
    o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
-    } // end if ( xs != 0 )
+    } // end if ( xs != Ls-1 )
   } // end P_L
 
  // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
   {
-    int sp_idx = ( xs == Ls-1 ? X-(Ls-1)*2*Vh : X+2*Vh ) / 2;
+    int sp_idx = ( xs == 0 ? X+(Ls-1)*2*Vh : X-2*Vh ) / 2;
 
 // read spinor from device memory
     READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
 
-    if ( xs != Ls-1 )
+    if ( xs != 0 )
     {
    o00_re += +i00_re+i20_re;   o00_im += +i00_im+i20_im;
    o01_re += +i01_re+i21_re;   o01_im += +i01_im+i21_im;
@@ -2047,7 +2047,7 @@ if(kernel_type == INTERIOR_KERNEL)
    o30_re += -mferm*(+i10_re+i30_re);   o30_im += -mferm*(+i10_im+i30_im);
    o31_re += -mferm*(+i11_re+i31_re);   o31_im += -mferm*(+i11_im+i31_im);
    o32_re += -mferm*(+i12_re+i32_re);   o32_im += -mferm*(+i12_im+i32_im);
-    } // end if ( xs != Ls-1 )
+    } // end if ( xs != 0 )
   } // end P_R
 } // end 5th dimension
 

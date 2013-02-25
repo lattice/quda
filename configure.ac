@@ -1,4 +1,4 @@
-AC_INIT([quda],[0.4],[quda-developers@googlegroups.com])
+AC_INIT([quda],[0.5],[quda-developers@googlegroups.com])
 
 
 dnl Specify CUDA Location
@@ -17,9 +17,9 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_10, sm_12, sm_13, sm_20, sm_21, sm_30 (default: sm_20)]),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, sm_35 (default: sm_35)]),
  [ gpu_arch=${enableval} ],
- [ gpu_arch="sm_20" ]
+ [ gpu_arch="sm_35" ]
 )
 
 AC_ARG_ENABLE(os, 
@@ -50,12 +50,6 @@ AC_ARG_ENABLE(verbose-build,
    AC_HELP_STRING([--enable-verbose-build], [ Display kernel register usage]),
    [ quda_verbose_build=${enableval} ], 
    [ quda_verbose_build="no" ]
-)
-
-AC_ARG_ENABLE(dslash-profiling, 
-  AC_HELP_STRING([--enable-dslash-profiling], [ Enable profiling of multi-GPU Dslash]),
-  [ quda_dslash_profiling=${enableval} ], 
-  [ quda_dslash_profiling="no" ]
 )
 
 AC_ARG_ENABLE(wilson-dirac,
@@ -127,18 +121,18 @@ AC_ARG_ENABLE(multi-gpu,
   [ multi_gpu="no" ]
 )
 
-dnl enable comms compute/overlap
-AC_ARG_ENABLE(overlap-comms,
-  AC_HELP_STRING([--enable-overlap-comms], [ Enable comms/compute overlap (default: enabled)]),
-  [ overlap_comms=${enableval}],
-  [ overlap_comms="yes" ]
-)
-
 dnl enable cuda / nic interop buffer
 AC_ARG_ENABLE(gpu-direct,
   AC_HELP_STRING([--enable-gpu-direct], [ Enable CUDA/NIC interop pinned memory (default: enabled)]),
   [ gpu_direct=${enableval}],
   [ gpu_direct="yes" ]
+)
+
+dnl enable packing and unpacking on the device
+AC_ARG_ENABLE(device-pack,
+  AC_HELP_STRING([--enable-device-pack], [ Enable the packing / unpacking of fields on the device (default: disabled)]),
+  [ device_pack=${enableval}],
+  [ device_pack="no" ]
 )
 
 AC_ARG_WITH(mpi,
@@ -149,8 +143,8 @@ AC_ARG_WITH(mpi,
 
 
 AS_CASE([$build_mpi],
-	[yes], [AC_PROG_CC($mpi_home/bin/mpicc mpicc), AC_PROG_CXX($mpi_home/bin/mpicxx mpicxx CC)],
-	[no], [AC_PROG_CC(gcc cc), AC_PROG_CXX(g++ CC cxx)])
+	[yes], [AC_PROG_CC($mpi_home/bin/mpicc mpicc) AC_PROG_CXX($mpi_home/bin/mpicxx mpicxx CC)],
+	[no], [AC_PROG_CC(gcc cc) AC_PROG_CXX(g++ CC cxx)])
 
 
 AC_ARG_WITH(qmp,
@@ -200,11 +194,16 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
 fi
 
 
+AC_ARG_ENABLE(blas-tex,
+ AC_HELP_STRING([--enable-blas-tex], [ Enable texture reads for blas (default: enabled)]),
+ [ blas_tex=${enableval}],
+ [ blas_tex="yes" ]
+)
 
 AC_ARG_ENABLE(fermi-double-tex,
- AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: disabled)]),
+ AC_HELP_STRING([--enable-fermi-double-tex], [ Enable double-precision texture reads on Fermi (default: enabled)]),
  [ fermi_double_tex=${enableval}],
- [ fermi_double_tex="no" ]
+ [ fermi_double_tex="yes" ]
 )
 
 AC_ARG_ENABLE(numa-affinity,
@@ -224,9 +223,9 @@ esac
 
 dnl CPU Arch
 case ${gpu_arch} in
-sm_10 | sm_11 | sm_12 | sm_13 | sm_20 | sm_21 | sm_30 ) ;;
+sm_11 | sm_12 | sm_13 | sm_20 | sm_21 | sm_30 | sm_35) ;;
 *) 
-  AC_MSG_ERROR([ GPU arch must be one of: sm_10, sm_11, sm_12, sm_13, sm_20, sm_21 or sm_30 ])
+  AC_MSG_ERROR([ GPU arch must be one of: sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, or sm_35 ])
   ;;
 esac
 
@@ -259,14 +258,6 @@ case ${quda_verbose_build} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-quda-verbose-build ])
-  ;;
-esac
-
-dnl DSLASH_PROFILING
-case ${quda_dslash_profiling} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-dslash-profiling ])
   ;;
 esac
 
@@ -358,14 +349,6 @@ yes|no);;
   ;;
 esac
 
-dnl Enables overlapping comms
-case ${overlap_comms} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-overlap-comms ])
-  ;;
-esac
-
 dnl Enables CUDA/NIC buffer interop
 case ${gpu_direct} in
 yes|no);;
@@ -407,7 +390,8 @@ then
 
 
   if test "X${qmp_home}X" = "XX"; then
-    if test "X${mpi_home}X" = "XX"; then
+#    if test "X${mpi_home}X" = "XX"; then
+    if test "X${build_mpi}X" = "XnoX"; then
         AC_MSG_WARN([ Multi-GPU build without QMP or MPI.  Will build single node code with copies ])
     fi
   else
@@ -426,6 +410,14 @@ if test "X${build_qio}X" = "XyesX"; then
   fi	
 fi
  
+dnl Enables textures for blas functions
+case ${blas_tex} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-blas-tex ])
+  ;;
+esac
+
 dnl Enables textures on Fermi
 case ${fermi_double_tex} in
 yes|no);;
@@ -466,9 +458,6 @@ AC_SUBST( DEVICE_DEBUG,  [${quda_device_debug}] )
 AC_MSG_NOTICE([Setting VERBOSE = ${quda_verbose_build} ])
 AC_SUBST( VERBOSE,	 [${quda_verbose_build}] )
 
-AC_MSG_NOTICE([Setting DSLASH_PROFILING = ${quda_dslash_profiling} ])
-AC_SUBST( DSLASH_PROFILING,	 [${quda_dslash_profiling}] )
-
 AC_MSG_NOTICE([Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} ])
 AC_SUBST( BUILD_WILSON_DIRAC, [${build_wilson_dirac}])
 
@@ -508,11 +497,11 @@ AC_SUBST( BUILD_QMP, [${build_qmp}])
 AC_MSG_NOTICE([Setting BUILD_MPI = ${build_mpi} ])
 AC_SUBST( BUILD_MPI, [${build_mpi}])
 
-AC_MSG_NOTICE([Setting OVERLAP_COMMS= ${overlap_comms}])
-AC_SUBST( OVERLAP_COMMS, [${overlap_comms}])
-
-AC_MSG_NOTICE([Setting GPU_DIRECTS= ${gpu_direct}])
+AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
 AC_SUBST( GPU_DIRECT, [${gpu_direct}])
+
+AC_MSG_NOTICE([Setting DEVICE_PACK= ${device_pack}])
+AC_SUBST( DEVICE_PACK, [${device_pack}])
 
 AC_MSG_NOTICE([Setting BUILD_QIO = ${build_qio} ])
 AC_SUBST( BUILD_QIO, [${build_qio}])
@@ -523,6 +512,9 @@ AC_SUBST( FECC, [${CC}])
 AC_MSG_NOTICE([Setting FECXX = ${CXX} ])
 AC_SUBST( FECXX, [${CXX}])
 
+AC_MSG_NOTICE([Setting FEF90 = ${F90} ])
+AC_SUBST( FEF90, [${F90}])
+
 AC_MSG_NOTICE([Setting MPI_HOME=${mpi_home}])
 AC_SUBST( MPI_HOME, [${mpi_home}] )
 
@@ -531,6 +523,9 @@ AC_SUBST( QMP_HOME, [${qmp_home}] )
 
 AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
 AC_SUBST( QIO_HOME, [${qio_home}] )
+
+AC_MSG_NOTICE([Setting BLAS_TEX= ${blas_tex}])
+AC_SUBST( BLAS_TEX, [${blas_tex}])
 
 AC_MSG_NOTICE([Setting FERMI_DBLE_TEX= ${fermi_double_tex}])
 AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])

@@ -12,12 +12,17 @@ namespace quda {
 
   protected:
     QudaInvertParam &invParam;
+    TimeProfile &profile;
 
   public:
-  Solver(QudaInvertParam &invParam) : invParam(invParam) { ; }
+  Solver(QudaInvertParam &invParam, TimeProfile &profile) : invParam(invParam), profile(profile) { ; }
     virtual ~Solver() { ; }
 
     virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+
+    // solver factory
+    static Solver* create(QudaInvertParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
+			  DiracMatrix &matPrecon, TimeProfile &profile);
   };
 
   class CG : public Solver {
@@ -27,7 +32,7 @@ namespace quda {
     const DiracMatrix &matSloppy;
 
   public:
-    CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
+    CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~CG();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -46,7 +51,7 @@ namespace quda {
 
   public:
     BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	     QudaInvertParam &invParam);
+	     QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~BiCGstab();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -64,7 +69,7 @@ namespace quda {
 
   public:
     GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	QudaInvertParam &invParam);
+	QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~GCR();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -81,7 +86,7 @@ namespace quda {
     bool allocate_r;
 
   public:
-    MR(DiracMatrix &mat, QudaInvertParam &invParam);
+    MR(DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~MR();
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
@@ -94,7 +99,7 @@ namespace quda {
     const DiracMatrix &mat;
 
   public:
-    alphaSA(DiracMatrix &mat, QudaInvertParam &invParam);
+    alphaSA(DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~alphaSA() { ; }
 
     void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
@@ -104,9 +109,11 @@ namespace quda {
 
   protected:
     QudaInvertParam &invParam;
+    TimeProfile &profile;
 
   public:
-  MultiShiftSolver(QudaInvertParam &invParam) : invParam(invParam) { ; }
+    MultiShiftSolver(QudaInvertParam &invParam, TimeProfile &profile) : 
+    invParam(invParam), profile(profile) { ; }
     virtual ~MultiShiftSolver() { ; }
 
     virtual void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in) = 0;
@@ -119,10 +126,39 @@ namespace quda {
     const DiracMatrix &matSloppy;
 
   public:
-    MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam);
+    MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile);
     virtual ~MultiShiftCG();
 
     void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
+  };
+
+  /**
+  This computes the optimum guess for the system Ax=b in the L2
+  residual norm.  For use in the HMD force calculations using a
+  minimal residual chronological method This computes the guess
+  solution as a linear combination of a given number of previous
+  solutions.  Following Brower et al, only the orthogonalised vector
+  basis is stored to conserve memory.*/
+  class MinResExt {
+
+  protected:
+    const DiracMatrix &mat;
+    TimeProfile &profile;
+
+  public:
+    MinResExt(DiracMatrix &mat, TimeProfile &profile);
+    virtual ~MinResExt();
+
+    /**
+       param x The optimum for the solution vector.
+       param b The source vector in the equation to be solved. This is not preserved.
+       param p The basis vectors in which we are building the guess
+       param q The basis vectors multipled by A
+       param N The number of basis vectors
+       return The residue of this guess.
+    */  
+    void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p,
+		    cudaColorSpinorField **q, int N);
   };
 
 } // namespace quda

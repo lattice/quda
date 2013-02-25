@@ -15,15 +15,20 @@ void setVerbosity(const QudaVerbosity verbosity);
 void setOutputPrefix(const char *prefix);
 void setOutputFile(FILE *outfile);
 
+void pushVerbosity(QudaVerbosity verbosity);
+void popVerbosity();
+
+char *getPrintBuffer();
 
 // Note that __func__ is part of C++11 and has long been supported by GCC.
 
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \
+  sprintf(getPrintBuffer(), __VA_ARGS__);	       \
   if (comm_rank() == 0) {	                       \
     fprintf(getOutputFile(), "%s", getOutputPrefix()); \
-    fprintf(getOutputFile(), __VA_ARGS__);             \
+    fprintf(getOutputFile(), "%s", getPrintBuffer());  \
     fflush(getOutputFile());                           \
   }                                                    \
 } while (0)
@@ -38,9 +43,10 @@ void setOutputFile(FILE *outfile);
 } while (0)
 
 #define warningQuda(...) do {                                   \
+  sprintf(getPrintBuffer(), __VA_ARGS__);			\
   if (comm_rank() == 0) {                                       \
     fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-    fprintf(getOutputFile(), __VA_ARGS__);                      \
+    fprintf(getOutputFile(), "%s", getPrintBuffer());		\
     fprintf(getOutputFile(), "\n");                             \
     fflush(getOutputFile());                                    \
   }                                                             \
@@ -91,18 +97,6 @@ void setOutputFile(FILE *outfile);
 #define checkCudaError() checkCudaErrorNoSync()
 
 #endif // HOST_DEBUG
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-  
-  void stopwatchStart();
-  double stopwatchReadSeconds();
-
-#ifdef __cplusplus
-}
-#endif
 
 
 #endif // _UTIL_QUDA_H

@@ -252,8 +252,7 @@ namespace quda {
       Tunable::initTuneParam(param);
       param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
     }
-  
-  
+    
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
       Tunable::defaultTuneParam(param);
@@ -281,45 +280,31 @@ namespace quda {
 		       const QudaGaugeParam* param, int** input_path, const int* length, const void* path_coeff, 
 		       const int num_paths, const int max_length)
   {
-    int i, j;
     //input_path
-    int bytes = num_paths*max_length* sizeof(int);
-    int* input_path_d;
-   
-    if(cudaMalloc((void**)&input_path_d, bytes) != cudaSuccess){
-      errorQuda("cudaMalloc failed for input_path_d\n");
-    }
+    size_t bytes = num_paths*max_length*sizeof(int);
 
-    cudaMemset(input_path_d, 0, bytes);checkCudaError();
+    int *input_path_d = (int *) device_malloc(bytes);
+    cudaMemset(input_path_d, 0, bytes);
+    checkCudaError();
 
-    int* input_path_h = (int*)malloc(bytes);
-    if (input_path_h == NULL){
-      printf("ERROR: malloc failed for input_path_h in function %s\n", __FUNCTION__);
-      exit(1);
-    }
-        
+    int* input_path_h = (int *) safe_malloc(bytes);
     memset(input_path_h, 0, bytes);
-    for(i=0;i < num_paths;i++){
-      for(j=0; j < length[i]; j++){
-	input_path_h[i*max_length + j] =input_path[i][j];
+
+    for(int i=0; i < num_paths; i++) {
+      for(int j=0; j < length[i]; j++) {
+	input_path_h[i*max_length + j] = input_path[i][j];
       }
     }
 
     cudaMemcpy(input_path_d, input_path_h, bytes, cudaMemcpyHostToDevice); 
     
     //length
-    int* length_d;
-    if(cudaMalloc((void**)&length_d, num_paths*sizeof(int)) != cudaSuccess){
-      errorQuda("cudaMalloc failed for length_d\n");
-    }
+    int* length_d = (int *) device_malloc(num_paths*sizeof(int));
     cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice);
     
     //path_coeff
     int gsize = param->cuda_prec;
-    void* path_coeff_d;
-    if(cudaMalloc((void**)&path_coeff_d, num_paths*gsize) != cudaSuccess){
-      errorQuda("cudaMalloc failed for path_coeff_d\n");
-    }
+    void* path_coeff_d = device_malloc(num_paths*gsize);
     cudaMemcpy(path_coeff_d, path_coeff, num_paths*gsize, cudaMemcpyHostToDevice); 
 
     //compute the gauge forces
@@ -327,23 +312,21 @@ namespace quda {
         
     kernel_param_t kparam;
 #ifdef MULTI_GPU
-    for(int i =0;i < 4;i++){
+    for(int i=0; i<4; i++) {
       kparam.ghostDim[i] = commDimPartitioned(i);
     }
 #endif
-    kparam.threads  = volume/2;
+    kparam.threads = volume/2;
 
-    
-    // call here
     GaugeForceCuda gaugeForce(cudaMom, dir, eb3, cudaSiteLink, input_path_d, 
 			      length_d, path_coeff_d, num_paths, kparam);
     gaugeForce.apply(0);
     checkCudaError();
     
-    cudaFree(input_path_d); checkCudaError();
-    free(input_path_h);
-    cudaFree(length_d);
-    cudaFree(path_coeff_d);
+    host_free(input_path_h);
+    device_free(input_path_d);
+    device_free(length_d);
+    device_free(path_coeff_d);
   }
 
 
@@ -351,13 +334,11 @@ namespace quda {
   gauge_force_cuda(cudaGaugeField&  cudaMom, double eb3, cudaGaugeField& cudaSiteLink,
 		   QudaGaugeParam* param, int*** input_path, 
 		   int* length, void* path_coeff, int num_paths, int max_length)
-  {
-  
+  {  
     for(int dir=0; dir < 4; dir++){
       gauge_force_cuda_dir(cudaMom, dir, eb3, cudaSiteLink, param, input_path[dir], 
 			   length, path_coeff, num_paths, max_length);
-    }
-  
+    }  
   }
 
 } // namespace quda

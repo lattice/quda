@@ -457,7 +457,11 @@ void packSpinor(dstFloat *Dst, srcFloat *Src, ColorSpinorField &dst, const Color
     errorQuda("Volumes %d %d don't match", dst.Volume(), src.Volume());
   }
 
-  if (dst.SiteOrder() != src.SiteOrder()) {
+  if (!( dst.SiteOrder() == src.SiteOrder() ||
+	 (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER && 
+	  src.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) ||
+	 (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER && 
+	  src.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER) ) ) {
     errorQuda("Subset orders %d %d don't match", dst.SiteOrder(), src.SiteOrder());
   }
 

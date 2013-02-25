@@ -16,18 +16,20 @@
 
 namespace quda {
 
-  MR::MR(DiracMatrix &mat, QudaInvertParam &invParam) :
-    Solver(invParam), mat(mat), init(false), allocate_r(false)
+  MR::MR(DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile) :
+    Solver(invParam, profile), mat(mat), init(false), allocate_r(false)
   {
  
   }
 
   MR::~MR() {
+    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile[QUDA_PROFILE_FREE].Start();
     if (init) {
       if (allocate_r) delete rp;
       delete Arp;
       delete tmpp;
     }
+    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile[QUDA_PROFILE_FREE].Stop();
   }
 
   void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
@@ -67,7 +69,7 @@ namespace quda {
 
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
       quda::blas_flops = 0;
-      stopwatchStart();
+      profile[QUDA_PROFILE_COMPUTE].Start();
     }
 
     double omega = 1.0;
@@ -83,9 +85,9 @@ namespace quda {
     while (r2 > stop && k < invParam.maxiter) {
     
       mat(Ar, r, tmp);
-    
+
       double3 Ar3 = cDotProductNormACuda(Ar, r);
-      quda::Complex alpha = quda::Complex(Ar3.x, Ar3.y) / Ar3.z;
+      Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
 
       // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = norm2(r)
       //r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
@@ -105,7 +107,7 @@ namespace quda {
   
     if (invParam.verbosity >= QUDA_VERBOSE) {
       mat(Ar, r, tmp);    
-      quda::Complex Ar2 = cDotProductCuda(Ar, r);
+      Complex Ar2 = cDotProductCuda(Ar, r);
       printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
     }
 
@@ -116,23 +118,31 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
   
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
-      invParam.secs += stopwatchReadSeconds();
+        profile[QUDA_PROFILE_COMPUTE].Stop();
+        profile[QUDA_PROFILE_EPILOGUE].Start();
+	invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
   
-      double gflops = (quda::blas_flops + mat.flops())*1e-9;
-      reduceDouble(gflops);
-
-      invParam.gflops += gflops;
-      invParam.iter += k;
-    
-      if (invParam.verbosity >= QUDA_SUMMARIZE) {
+	double gflops = (quda::blas_flops + mat.flops())*1e-9;
+	reduceDouble(gflops);
+	
+	invParam.gflops += gflops;
+	invParam.iter += k;
+	
 	// Calculate the true residual
 	r2 = norm2(r);
 	mat(r, x);
 	double true_res = xmyNormCuda(b, r);
-      
-	printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		   k, sqrt(r2/b2), sqrt(true_res / b2));    
-      }
+	invParam.true_res = sqrt(true_res / b2);
+
+	if (invParam.verbosity >= QUDA_SUMMARIZE) {
+	  printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
+		     k, sqrt(r2/b2), invParam.true_res);    
+	}
+
+	// reset the flops counters
+	quda::blas_flops = 0;
+	mat.flops();
+        profile[QUDA_PROFILE_EPILOGUE].Stop();
     }
 
     globalReduce = true; // renable global reductions for outer solver

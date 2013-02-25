@@ -18,8 +18,6 @@
 
 namespace quda {
 
-  struct timeval orth0, orth1, pre0, pre1, mat0, mat1, rst0, rst1;
-
   double timeInterval(struct timeval start, struct timeval end) {
     long ds = end.tv_sec - start.tv_sec;
     long dus = end.tv_usec - start.tv_usec;
@@ -32,8 +30,8 @@ namespace quda {
     inner.maxiter = outer.maxiter_precondition;
     inner.reliable_delta = 1e-20; // no reliable updates within the inner solver
   
-    inner.cuda_prec = outer.prec_precondition; // preconditioners are uni-precision solvers
-    inner.cuda_prec_sloppy = outer.prec_precondition;
+    inner.cuda_prec = outer.cuda_prec_precondition; // preconditioners are uni-precision solvers
+    inner.cuda_prec_sloppy = outer.cuda_prec_precondition;
   
     inner.verbosity = outer.verbosity_precondition;
   
@@ -43,15 +41,13 @@ namespace quda {
 
     inner.inv_type_precondition = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
 
-    if (outer.inv_type == QUDA_GCR_INVERTER && outer.cuda_prec_sloppy != outer.prec_precondition) 
+    if (outer.inv_type == QUDA_GCR_INVERTER && outer.cuda_prec_sloppy != outer.cuda_prec_precondition) 
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
     else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
 
   }
 
-  void orthoDir(quda::Complex **beta, cudaColorSpinorField *Ap[], int k) {
-    gettimeofday(&orth0, NULL);
-
+  void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
     int type = 1;
 
     switch (type) {
@@ -102,10 +98,9 @@ namespace quda {
       errorQuda("Orthogonalization type not defined");
     }
 
-    gettimeofday(&orth1, NULL);
   }   
 
-  void backSubs(const quda::Complex *alpha, quda::Complex** const beta, const double *gamma, quda::Complex *delta, int n) {
+  void backSubs(const Complex *alpha, Complex** const beta, const double *gamma, Complex *delta, int n) {
     for (int k=n-1; k>=0;k--) {
       delta[k] = alpha[k];
       for (int j=k+1;j<n; j++) {
@@ -115,10 +110,10 @@ namespace quda {
     }
   }
 
-  void updateSolution(cudaColorSpinorField &x, const quda::Complex *alpha, quda::Complex** const beta, 
+  void updateSolution(cudaColorSpinorField &x, const Complex *alpha, Complex** const beta, 
 		      double *gamma, int k, cudaColorSpinorField *p[]) {
 
-    quda::Complex *delta = new quda::Complex[k];
+    Complex *delta = new Complex[k];
 
     // Update the solution vector
     backSubs(alpha, beta, gamma, delta, k);
@@ -136,40 +131,46 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam) :
-    Solver(invParam), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0)
+  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, QudaInvertParam &invParam,
+	   TimeProfile &profile) :
+    Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0)
   {
 
     Kparam = newQudaInvertParam();
     fillInnerInvertParam(Kparam, invParam);
 
     if (invParam.inv_type_precondition == QUDA_CG_INVERTER) // inner CG preconditioner
-      K = new CG(matPrecon, matPrecon, Kparam);
+      K = new CG(matPrecon, matPrecon, Kparam, profile);
     else if (invParam.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab preconditioner
-      K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam);
+      K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
     else if (invParam.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
-      K = new MR(matPrecon, Kparam);
+      K = new MR(matPrecon, Kparam, profile);
     else if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
       errorQuda("Unknown inner solver %d", invParam.inv_type_precondition);
 
   }
 
   GCR::~GCR() {
+    profile[QUDA_PROFILE_FREE].Start();
+
     if (K) delete K;
+
+    profile[QUDA_PROFILE_FREE].Stop();
   }
 
   void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
+    profile[QUDA_PROFILE_INIT].Start();
+
     int Nkrylov = invParam.gcrNkrylov; // size of Krylov space
 
     ColorSpinorParam param(x);
     param.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField r(x, param); 
-
     cudaColorSpinorField y(x, param); // high precision accumulator
 
     // create sloppy fields used for orthogonalization
-    param.precision = invParam.cuda_prec_sloppy;
+    param.setPrecision(invParam.cuda_prec_sloppy);
     cudaColorSpinorField **p = new cudaColorSpinorField*[Nkrylov];
     cudaColorSpinorField **Ap = new cudaColorSpinorField*[Nkrylov];
     for (int i=0; i<Nkrylov; i++) {
@@ -181,7 +182,7 @@ namespace quda {
 
     cudaColorSpinorField *x_sloppy, *r_sloppy;
     if (invParam.cuda_prec_sloppy != invParam.cuda_prec) {
-      param.precision = invParam.cuda_prec_sloppy;
+      param.setPrecision(invParam.cuda_prec_sloppy);
       x_sloppy = new cudaColorSpinorField(x, param);
       r_sloppy = new cudaColorSpinorField(x, param);
     } else {
@@ -195,8 +196,8 @@ namespace quda {
     // these low precision fields are used by the inner solver
     bool precMatch = true;
     cudaColorSpinorField *r_pre, *p_pre;
-    if (invParam.prec_precondition != invParam.cuda_prec_sloppy || invParam.precondition_cycle > 1) {
-      param.precision = invParam.prec_precondition;
+    if (invParam.cuda_prec_precondition != invParam.cuda_prec_sloppy || invParam.precondition_cycle > 1) {
+      param.setPrecision(invParam.cuda_prec_precondition);
       p_pre = new cudaColorSpinorField(x, param);
       r_pre = new cudaColorSpinorField(x, param);
       precMatch = false;
@@ -206,9 +207,9 @@ namespace quda {
     }
     cudaColorSpinorField &rPre = *r_pre;
 
-    quda::Complex *alpha = new quda::Complex[Nkrylov];
-    quda::Complex **beta = new quda::Complex*[Nkrylov];
-    for (int i=0; i<Nkrylov; i++) beta[i] = new quda::Complex[Nkrylov];
+    Complex *alpha = new Complex[Nkrylov];
+    Complex **beta = new Complex*[Nkrylov];
+    for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
     double *gamma = new double[Nkrylov];
 
     double b2 = normCuda(b);
@@ -225,12 +226,14 @@ namespace quda {
     cudaColorSpinorField rM(rSloppy);
     cudaColorSpinorField xM(rSloppy);
 
-    quda::blas_flops = 0;
+    profile[QUDA_PROFILE_INIT].Stop();
+    profile[QUDA_PROFILE_PREAMBLE].Start();
 
-    stopwatchStart();
+    blas_flops = 0;
 
     // calculate initial residual
-    mat(r, x);
+    mat(r, x, y);
+    zeroCuda(y);
     double r2 = xmyNormCuda(b, r);  
     copyCuda(rSloppy, r);
 
@@ -239,14 +242,14 @@ namespace quda {
     double r2_old = r2;
 
     if (invParam.verbosity >= QUDA_VERBOSE) 
-      printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter+k, k, r2);
+      printfQuda("GCR: %d total iterations, %d Krylov iterations, <r,r> = %e, |r|/|b| = %e\n", 
+		 total_iter+k, k, r2, sqrt(r2/b2));
 
-    double orthT = 0, matT = 0, preT = 0, resT = 0;
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
 
     while (r2 > stop && total_iter < invParam.maxiter) {
     
-      gettimeofday(&pre0, NULL);
-
       for (int m=0; m<invParam.precondition_cycle; m++) {
 	if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) {
 	  cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
@@ -267,20 +270,14 @@ namespace quda {
 	
 	  if (m==0) { copyCuda(*p[k], pPre); }
 	  else { copyCuda(tmp, pPre); xpyCuda(tmp, *p[k]); }
+
 	} else { // no preconditioner
 	  *p[k] = rSloppy;
 	} 
       
       
-	gettimeofday(&pre1, NULL);
-	preT += timeInterval(pre0, pre1);
-      
-	gettimeofday(&mat0, NULL);
 	matSloppy(*Ap[k], *p[k], tmp);
-	gettimeofday(&mat1, NULL);
-	matT += timeInterval(mat0, mat1);
       }
-      //    exit(0);
 
       orthoDir(beta, Ap, k);
 
@@ -288,28 +285,20 @@ namespace quda {
 
       gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
       if (gamma[k] == 0.0) errorQuda("GCR breakdown\n");
-      alpha[k] = quda::Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
+      alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
       r2 = cabxpyAxNormCuda(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 
-
-      if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
-	double x2 = norm2(x);
-	double p2 = norm2(*p[k]);
-	double Ap2 = norm2(*Ap[k]);
-	printfQuda("GCR: alpha = (%e,%e), norm2(x) = %e, norm2(p) = %e, norm2(Ap) = %e\n", 
-		   real(alpha[k]), imag(alpha[k]), x2, p2, Ap2);
-      }
 
       k++;
       total_iter++;
 
       if (invParam.verbosity >= QUDA_VERBOSE) 
-	printfQuda("GCR: %d total iterations, %d Krylov iterations, r2 = %e\n", total_iter, k, r2);
+	printfQuda("GCR: %d total iterations, %d Krylov iterations, <r,r> = %e, |r|/|b| = %e\n", 
+		   total_iter, k, r2, sqrt(r2/b2));
 
-      gettimeofday(&rst0, NULL);
-      // update solution and residual since max Nkrylov reached, converged or reliable update required
-      if (k==Nkrylov || r2 < stop || r2/r2_old < invParam.reliable_delta) { 
+      // update since Nkrylov or maxiter reached, converged or reliable update required
+      if (k==Nkrylov || total_iter==invParam.maxiter || r2 < stop || r2/r2_old < invParam.reliable_delta) { 
 
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
@@ -321,7 +310,7 @@ namespace quda {
 	double r2Sloppy = r2;
 
 	k = 0;
-	mat(r, y);
+	mat(r, y, x);
 	r2 = xmyNormCuda(b, r);  
 
 	if (r2 > stop) {
@@ -336,35 +325,47 @@ namespace quda {
 
 	r2_old = r2;
       }
-      gettimeofday(&rst1, NULL);
-
-      orthT += timeInterval(orth0, orth1);
-      resT += timeInterval(rst0, rst1);
 
     }
 
     if (total_iter > 0) copyCuda(x, y);
+
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+    profile[QUDA_PROFILE_EPILOGUE].Start();
+
+    invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
+  
+    double gflops = (blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    reduceDouble(gflops);
 
     if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
 
     if (invParam.verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
   
-    invParam.secs += stopwatchReadSeconds();
-  
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
-    reduceDouble(gflops);
+    // Calculate the true residual
+    mat(r, x);
+    double true_res = xmyNormCuda(b, r);
+    invParam.true_res = sqrt(true_res / b2);
+#if (__COMPUTE_CAPABILITY__ >= 200)
+    invParam.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+#else
+    invParam.true_res_hq = 0.0;
+#endif   
 
-    printfQuda("%f gflops %e Preconditoner = %e, Mat-Vec = %e, orthogonolization %e restart %e\n", 
-	       gflops / stopwatchReadSeconds(), invParam.secs, preT, matT, orthT, resT);
     invParam.gflops += gflops;
     invParam.iter += total_iter;
   
+    // reset the flops counters
+    blas_flops = 0;
+    mat.flops();
+    matSloppy.flops();
+    matPrecon.flops();
+
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile[QUDA_PROFILE_FREE].Start();
+
     if (invParam.verbosity >= QUDA_SUMMARIZE) {
-      // Calculate the true residual
-      mat(r, x);
-      double true_res = xmyNormCuda(b, r);
-    
       printfQuda("GCR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 		 total_iter, sqrt(r2/b2), sqrt(true_res / b2));    
     }
@@ -374,7 +375,7 @@ namespace quda {
       delete r_sloppy;
     }
 
-    if (invParam.prec_precondition != invParam.cuda_prec_sloppy) {
+    if (invParam.cuda_prec_precondition != invParam.cuda_prec_sloppy) {
       delete p_pre;
       delete r_pre;
     }
@@ -386,10 +387,12 @@ namespace quda {
     delete[] p;
     delete[] Ap;
 
-    delete alpha;
+    delete []alpha;
     for (int i=0; i<Nkrylov; i++) delete []beta[i];
     delete []beta;
-    delete gamma;
+    delete []gamma;
+
+    profile[QUDA_PROFILE_FREE].Stop();
 
     return;
   }

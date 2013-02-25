@@ -21,7 +21,7 @@ namespace quda {
     double kappa;
     double mass;
     double m5; // used by domain wall only
-    int Ls;    //!NEW: used by domain wall only  
+    int Ls;    //!NEW: used by domain wall only and twisted mass  
     MatPCType matpcType;
     DagType dagger;
     cudaGaugeField *gauge;
@@ -30,6 +30,7 @@ namespace quda {
     cudaCloverField *clover;
   
     double mu; // used by twisted mass only
+    double epsilon; //2nd tm parameter (used by twisted mass only)
 
     cudaColorSpinorField *tmp1;
     cudaColorSpinorField *tmp2; // used by Wilson-like kernels only
@@ -40,12 +41,25 @@ namespace quda {
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), 
+      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0),
       tmp1(0), tmp2(0), verbose(QUDA_SILENT)
     {
 
     }
 
+    void print() {
+      printfQuda("Printing DslashParam\n");
+      printfQuda("type = %d\n", type);
+      printfQuda("kappa = %g\n", kappa);
+      printfQuda("mass = %g\n", mass);
+      printfQuda("m5 = %g\n", m5);
+      printfQuda("Ls = %d\n", Ls);
+      printfQuda("matpcType = %d\n", matpcType);
+      printfQuda("dagger = %d\n", dagger);
+      printfQuda("mu = %g\n", mu);
+      printfQuda("epsilon = %g\n", epsilon);
+      for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
+    }
   };
 
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
@@ -125,9 +139,7 @@ namespace quda {
   public:
     DiracWilson(const DiracParam &param);
     DiracWilson(const DiracWilson &dirac);
-    //BEGIN NEW
-    DiracWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW
-    //END NEW    
+    DiracWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW and non-deg twisted mass   
   
     virtual ~DiracWilson();
     DiracWilson& operator=(const DiracWilson &dirac);
@@ -274,12 +286,13 @@ namespace quda {
 
   protected:
     double mu;
+    double epsilon;
     void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaTwistGamma5Type twistType) const;
 
   public:
-    DiracTwistedMass(const DiracParam &param);
     DiracTwistedMass(const DiracTwistedMass &dirac);
+    DiracTwistedMass(const DiracParam &param, const int nDim);
     virtual ~DiracTwistedMass();
     DiracTwistedMass& operator=(const DiracTwistedMass &dirac);
 
@@ -299,8 +312,9 @@ namespace quda {
   class DiracTwistedMassPC : public DiracTwistedMass {
 
   public:
-    DiracTwistedMassPC(const DiracParam &param);
     DiracTwistedMassPC(const DiracTwistedMassPC &dirac);
+    DiracTwistedMassPC(const DiracParam &param, const int nDim);
+
     virtual ~DiracTwistedMassPC();
     DiracTwistedMassPC& operator=(const DiracTwistedMassPC &dirac);
 

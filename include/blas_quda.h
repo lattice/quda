@@ -17,7 +17,6 @@ namespace quda {
   extern unsigned long long blas_flops;
   extern unsigned long long blas_bytes;
 
-
   // C++ linkage
 
   // Generic variants
@@ -71,6 +70,13 @@ namespace quda {
 		       const Complex &, cudaColorSpinorField &, cudaColorSpinorField &);
   Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 			       cudaColorSpinorField &z);
+  Complex axpyCGNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+  double3 HeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &r);
+  double3 xpyHeavyQuarkResidualNormCuda(cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &r);
+
+  void tripleCGUpdateCuda(const double &alpha, const double &beta, cudaColorSpinorField &q,
+			  cudaColorSpinorField &r, cudaColorSpinorField &x, cudaColorSpinorField &p);
+  double3 tripleCGReductionCuda(cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z);
 
   // CPU variants
 
@@ -122,6 +128,8 @@ namespace quda {
 		      const Complex &, cpuColorSpinorField &, cpuColorSpinorField &);
   Complex caxpyDotzyCpu(const Complex &a, cpuColorSpinorField &x, cpuColorSpinorField &y,
 			      cpuColorSpinorField &z);
+  double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &r);
+  double3 xpyHeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &y, cpuColorSpinorField &r);
 
 } // namespace quda
 

@@ -19,6 +19,7 @@ using namespace std;
 #define ZUP 2
 #define TUP 3
 
+
 int Z[4];
 int V;
 int Vh;
@@ -1182,7 +1183,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   }
 
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*gaugeSiteSize, fail[f] / (double)(len*6));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], 4*len*18, fail[f] / (double)(4*len*18));
   }
   
   return accuracy_level;
@@ -1412,6 +1413,7 @@ int xdim = 24;
 int ydim = 24;
 int zdim = 24;
 int tdim = 24;
+int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 int gridsize_from_cmdline[4]={1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -1439,6 +1441,7 @@ void usage(char** argv )
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
+  printf("    --Lsdim <n>                                # Set Ls dimension size(default 16)\n");  
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1538,7 +1541,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     xdim= atoi(argv[i+1]);
-    if (xdim < 0 || xdim > 128){
+    if (xdim < 0 || xdim > 512){
       printf("ERROR: invalid X dimension (%d)\n", xdim);
       usage(argv);
     }
@@ -1552,7 +1555,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     ydim= atoi(argv[i+1]);
-    if (ydim < 0 || ydim > 128){
+    if (ydim < 0 || ydim > 512){
       printf("ERROR: invalid T dimension (%d)\n", ydim);
       usage(argv);
     }
@@ -1567,7 +1570,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     zdim= atoi(argv[i+1]);
-    if (zdim < 0 || zdim > 128){
+    if (zdim < 0 || zdim > 512){
       printf("ERROR: invalid T dimension (%d)\n", zdim);
       usage(argv);
     }
@@ -1581,7 +1584,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }	    
     tdim =  atoi(argv[i+1]);
-    if (tdim < 0 || tdim > 128){
+    if (tdim < 0 || tdim > 512){
       errorQuda("Error: invalid t dimension");
     }
     i++;
@@ -1594,10 +1597,24 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }	    
     int sdim =  atoi(argv[i+1]);
-    if (sdim < 0 || sdim > 128){
+    if (sdim < 0 || sdim > 512){
       printfQuda("ERROR: invalid S dimension\n");
     }
     xdim=ydim=zdim=sdim;
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--Lsdim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    int Ls =  atoi(argv[i+1]);
+    if (Ls < 0 || Ls > 128){
+      printfQuda("ERROR: invalid Ls dimension\n");
+    }
+    Lsdim=Ls;
     i++;
     ret = 0;
     goto out;
@@ -1766,3 +1783,21 @@ int process_command_line_option(int argc, char** argv, int* idx)
   return ret ;
 
 }
+
+
+static struct timeval startTime;
+
+void stopwatchStart() {
+  gettimeofday(&startTime, NULL);
+}
+
+double stopwatchReadSeconds() {
+  struct timeval endTime;
+  gettimeofday(&endTime, NULL);
+
+  long ds = endTime.tv_sec - startTime.tv_sec;
+  long dus = endTime.tv_usec - startTime.tv_usec;
+  return ds + 0.000001*dus;
+}
+
+

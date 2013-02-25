@@ -35,6 +35,7 @@ extern int tdim;
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern char latfile[];
+extern int gridsize_from_cmdline[];
     
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
@@ -54,7 +55,11 @@ void init() {
   param.X[1] = ydim;
   param.X[2] = zdim;
   param.X[3] = tdim;
+#ifdef MULTI_GPU
+  param.ga_pad = xdim*ydim*zdim/2;
+#else
   param.ga_pad = 0;
+#endif
   setDims(param.X);
 
   param.anisotropy = 2.3;
@@ -165,19 +170,6 @@ void packTest() {
 
   stopwatchStart();
 
-#if (CUDA_VERSION >= 4010)
-  /*cudaError_t error = cudaHostRegister(spinor->V(), spinor->Bytes(), 0);
-  if (error != cudaSuccess) {
-    printfQuda("Error in registering memory: %s\n", cudaGetErrorString(error));
-    exit(0);
-    }*/
-  /*cudaError_t error2 = cudaHostRegister(spinor2->V(), spinor2->Bytes(), 0);
-  if (error2 != cudaSuccess) {
-    printfQuda("Error in registering memory: %s\n", cudaGetErrorString(error2));
-    exit(0);
-    }*/
-#endif
-
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
   printf("Spinor send time = %e seconds\n", sSendTime); fflush(stdout);
@@ -187,13 +179,6 @@ void packTest() {
   double sRecTime = stopwatchReadSeconds();
   printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
   
-#if (CUDA_VERSION >= 4010)
-  //cudaHostUnregister(spinor->V());
-  //checkCudaError();
-  //cudaHostUnregister(spinor2->V());
-  //checkCudaError();
-#endif
-
   double spinor_norm = norm2(*spinor);
   double cuda_spinor_norm = norm2(*cudaSpinor);
   double spinor2_norm = norm2(*spinor2);
@@ -217,8 +202,12 @@ int main(int argc, char **argv) {
     usage(argv);
   }
 
+  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+
   init();
   packTest();
   end();
+
+  endCommsQuda();
 }
 
