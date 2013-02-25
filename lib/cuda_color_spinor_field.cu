@@ -673,10 +673,16 @@ namespace quda {
 #ifdef MULTI_GPU
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
       void* gpu_buf = this->backGhostFaceBuffer[dim];
-      if(this->nDim == 5)//!For DW fermions
+      if(this->nDim == 5){ //!For DW fermions
 	packFaceDW(gpu_buf, *this, dim, dagger, parity, *stream);
-      else	
+      }
+      else if(nSpin != 1){	
 	packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
+      }else{
+        int y[4] = {2*x[0], x[1], x[2], x[3]};
+        printfQuda("y = %d %d %d %d\n", y[0], y[1], y[2], y[3]);
+        packFace(gpu_buf, *this, dim, dagger, parity, *stream, y);
+      }
     }
 #else
     errorQuda("packGhost not built on single-GPU build");

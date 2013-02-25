@@ -691,7 +691,6 @@ namespace quda {
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
-
   }
 
   // The preconditioner currently mimicks the sloppy operator with no comms

@@ -91,6 +91,9 @@ namespace quda {
 
   // face packing routines
   void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
+		const int parity, const cudaStream_t &stream, int* y);
+
+  void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const int dagger, 
 		const int parity, const cudaStream_t &stream);
   //BEGIN NEW	
   //currently as a separate function (can be integrated into packFace)

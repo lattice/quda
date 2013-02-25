@@ -711,8 +711,13 @@ namespace quda {
     if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported");
 
     //if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length");
-    if (src.Length() > dst.Length()) errorQuda("src length should be less than destination length");
+    if (src.RealLength() > dst.RealLength()){
+      printfQuda("src.RealLength() = %d\n", src.RealLength());
+      printfQuda("dst.RealLength() = %d\n", dst.RealLength());
 
+      errorQuda("src length should be less than destination length");
+    }
+  
     if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
     {
       errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported\n");
@@ -768,7 +773,7 @@ namespace quda {
 
     if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n");
 
-    if (src.Length() < dst.Length()) errorQuda("src length should be greater than destination length\n");
+    if (src.RealLength() < dst.RealLength()) errorQuda("src length should be greater than destination length\n");
 
     if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
     {
