@@ -14,6 +14,12 @@
 #include <gauge_field.h>
 #include <blas_quda.h>
 
+#if defined(QMP_COMMS)
+#include <qmp.h>
+#elif defined(MPI_COMMS)
+#include <mpi.h>
+#endif
+
 #ifdef MULTI_GPU
 #include <face_quda.h>
 #endif
@@ -138,6 +144,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->output_location = QUDA_CPU_FIELD_LOCATION;
 }
 
+
 int
 invert_test(void)
 {
@@ -151,6 +158,9 @@ invert_test(void)
 	     cpu_prec, prec, prec_sloppy,
 	     link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
 	     0.8);
+
+  // declare the dimensions of the communication grid
+  initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
   
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -441,10 +451,10 @@ display_test_info()
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     commDimPartitioned(0),
-	     commDimPartitioned(1),
-	     commDimPartitioned(2),
-	     commDimPartitioned(3)); 
+	     dimPartitioned(0),
+	     dimPartitioned(1),
+	     dimPartitioned(2),
+	     dimPartitioned(3)); 
   
   return ;
   
@@ -466,15 +476,12 @@ usage_extra(char** argv )
 }
 int main(int argc, char** argv)
 {
-
-  int i;
-  for (i =1;i < argc; i++){
+  for (int i = 1; i < argc; i++) {
 
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }   
     
-
     if( strcmp(argv[i], "--tol") == 0){
       float tmpf;
       if (i+1 >= argc){
@@ -490,7 +497,6 @@ int main(int argc, char** argv)
       continue;
     }
     
-    
     if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){
 	usage(argv);
@@ -499,12 +505,10 @@ int main(int argc, char** argv)
       i++;
       continue;
     }
-   
-        
+       
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
-
 
   if (prec_sloppy == QUDA_INVALID_PRECISION){
     prec_sloppy = prec;
@@ -512,14 +516,28 @@ int main(int argc, char** argv)
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
     link_recon_sloppy = link_recon;
   }
-  
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  // initialize QMP or MPI
+#if defined(QMP_COMMS)
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+#elif defined(MPI_COMMS)
+  MPI_Init(&argc, &argv);
+#endif
+
+  // call srand() with a rank-dependent seed
+  initRand();
+
   display_test_info();
   
   int ret = invert_test();
 
-  endCommsQuda();
+  // finalize the communications layer
+#if defined(QMP_COMMS)
+  QMP_finalize_msg_passing();
+#elif defined(MPI_COMMS)
+  MPI_Finalize();
+#endif
 
   return ret;
 }

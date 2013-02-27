@@ -243,9 +243,7 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-#ifdef MULTI_GPU
-    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
-#endif
+  initComms(argc, argv, gridsize_from_cmdline);
 
   setPrecision(prec);
 
@@ -253,12 +251,8 @@ main(int argc, char **argv)
     
   hisq_force_test();
 
+  finalizeComms();
 
-#ifdef MULTI_GPU
-    endCommsQuda();
-#endif
-    
-    
   return EXIT_SUCCESS;
 }
 

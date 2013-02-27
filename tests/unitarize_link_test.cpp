@@ -228,10 +228,10 @@ display_test_info()
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n",
-             commDimPartitioned(0),
-             commDimPartitioned(1),
-             commDimPartitioned(2),
-             commDimPartitioned(3));
+             dimPartitioned(0),
+             dimPartitioned(1),
+             dimPartitioned(2),
+             dimPartitioned(3));
 #endif
 
   return ;
@@ -257,7 +257,7 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
   int num_failures = unitarize_link_test();
@@ -274,7 +274,7 @@ main(int argc, char **argv)
   }else{
     printfQuda("Unitarization successfull!\n");
   }
-  endCommsQuda();
+  finalizeComms();
 
   return EXIT_SUCCESS;
 }

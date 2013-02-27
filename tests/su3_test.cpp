@@ -114,11 +114,11 @@ void SU3Test(int argc, char **argv) {
 
 int main(int argc, char **argv) {
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
 
   SU3Test(argc, argv);
 
-  endCommsQuda();
+  finalizeComms();
 
   return 0;
 }

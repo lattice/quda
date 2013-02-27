@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.5.0                        3 December 2012
+Release Notes for QUDA v0.5.0 (PRE-RELEASE)              XX March 2013
 -----------------------------
 
 Overview:
@@ -135,10 +135,6 @@ Known Issues:
   Dslash kernels (visible if the verbosity is set to at least
   QUDA_SUMMARIZE), rather than the correct values.  This does not
   affect the tuning process or actual performance.
-
-* At present, using MPI directly for communications (as opposed to
-  QMP) requires calling some initialization routines that are not
-  exposed in quda.h.  This will be corrected in the next release.
 
 * Attempts to compile with GCC 4.7.x will fail due to bugs in the
   compiler.

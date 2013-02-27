@@ -411,7 +411,7 @@ void reduceDoubleArray(double *sum, const int len)
 
 int commDim(int dir) { return comm_dim(dir); }
 
-int commCoords(int dir) { return comm_coords(dir); }
+int commCoords(int dir) { return comm_coord(dir); }
 
 int commDimPartitioned(int dir){ return comm_dim_partitioned(dir);}
 
