@@ -184,7 +184,10 @@ namespace quda {
   void DiracStaggeredPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp1, in);
-  
+    
+    printfQuda("In DiracStaggeredPC::MdagM\n"); 
+
+ 
     QudaParity parity = QUDA_INVALID_PARITY;
     QudaParity other_parity = QUDA_INVALID_PARITY;
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -196,6 +199,7 @@ namespace quda {
     } else {
       errorQuda("Invalid matpcType(%d) in function\n", matpcType);    
     }
+    printfQuda("other_parity = %d\n", other_parity);
     Dslash(*tmp1, in, other_parity);  
     DslashXpay(out, *tmp1, parity, in, 4*mass*mass);
 

@@ -673,6 +673,7 @@ namespace quda {
     diracParam.hasNaik = inv_param->hasNaik ? true : false;
     diracParam.Nface = inv_param->nface; 
 
+    diracParam.hasNaik = false;
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -688,6 +689,7 @@ namespace quda {
     diracParam.longGauge = gaugeLongSloppy;    
     diracParam.clover = cloverSloppy;
 
+    diracParam.hasNaik = false;
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }

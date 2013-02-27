@@ -275,7 +275,7 @@ __device__ inline float store_norm(float *norm, FloatN x[M], int i) {
 template <typename RegType, typename InterType, typename StoreType, int N, int write, int tex_id=-1>
 class Spinor {
 
-  private:
+  public:
     StoreType *spinor;
 #ifdef USE_TEXTURE_OBJECTS // texture objects
     Texture<InterType, StoreType> tex;
@@ -285,7 +285,7 @@ class Spinor {
     float *norm; // direct reads for norm
     int stride;
 
-  public:
+//  public:
     Spinor() 
       : spinor(0), tex(), norm(0), stride(0) { } // default constructor
 
@@ -297,21 +297,21 @@ class Spinor {
       : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
 
 #ifndef DIRECT_ACCESS_BLAS
-    Spinor(StoreType* spinor, float* norm, int stride) 
-      : spinor(spinor), norm(norm), stride(stride), { checkTypes<RegType, InterType, StoreType>(); }
+    Spinor(StoreType* spinor, float* norm, int field_stride) 
+      : spinor(spinor), norm(norm), stride(field_stride/(N*REG_LENGTH)), { checkTypes<RegType, InterType, StoreType>(); }
 
-    Spinor(void* spinor, float* norm, int stride)
-      : spinor(static_cast<StoreType*>(spinor)), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
+    Spinor(void* spinor, float* norm, int field_stride)
+      : spinor(static_cast<StoreType*>(spinor)), norm(norm), stride(field_stride/(N*REG_LENGTH)) { checkTypes<RegType, InterType, StoreType>(); }
 #else
     // Need to initialise the Texture objects since they are used even when textures are not
     // Note: the use of texture reads is not yet supported here!
-    Spinor(StoreType* spinor, float* norm, int stride) 
-      : spinor(spinor), tex(spinor), norm(norm), stride(stride) { 
+    Spinor(StoreType* spinor, float* norm, int field_stride) 
+      : spinor(spinor), tex(spinor), norm(norm), stride(field_stride/(N*REG_LENGTH)) { 
         printfQuda("Calling Spinor::Spinor(StoreType* spinor, float* norm, int stride\n");
         checkTypes<RegType, InterType, StoreType>(); }
 
-    Spinor(void* spinor, float* norm, int stride)
-      : spinor(static_cast<StoreType*>(spinor)), tex(static_cast<StoreType*>(spinor)), norm(norm), stride(stride) { 
+    Spinor(void* spinor, float* norm, int field_stride)
+      : spinor(static_cast<StoreType*>(spinor)), tex(static_cast<StoreType*>(spinor)), norm(norm), stride(field_stride/(N*REG_LENGTH)) { 
       printfQuda("Calling Spinor::Spinor(void* spinor, float* norm, int stride\n");
       checkTypes<RegType, InterType, StoreType>(); }
 #endif

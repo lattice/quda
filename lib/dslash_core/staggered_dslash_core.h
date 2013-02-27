@@ -603,22 +603,14 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_Y){
       if(x2 >= kparam.X2m1){
-      //  printf("+Y x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
-      //  printf("+Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf)\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im);
+        printf("+Y x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
+        printf("+Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf)\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im);
       }
     }else if(kparam.X2 == 12){
       if(x2 == kparam.X2-3 && x1==0 && x3==0 && x4==0){
-       // printf("+Y x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
+        printf("+Y x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+Y x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf)\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im);
-      }else if(x2 == 2 && x1 ==0 && x3==0 && x4 == 0){
-        READ_KS_NBR_SPINOR(I, SPINORTEX, (X>>1), kparam.sp_stride);
-        printf("+Y x = (%d, %d, %d, %d), this I = (%lf, %lf, %lf, %lf, %lf, %lf)\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im);
       }     
-    }else if(kparam.X2 == 8){
-      if(x2==0 && x1==0 && x3==0 && x4==0){
-        READ_KS_NBR_SPINOR(I, SPINORTEX, (X>>1), kparam.sp_stride);
-        printf("+Y x = (%d, %d, %d, %d), this I = (%lf, %lf, %lf, %lf, %lf, %lf)\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im);
-      }
     }
 
     o0_re += A0_re;

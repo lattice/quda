@@ -204,6 +204,14 @@ namespace quda {
 
       int x1, x2, x3, x4;
       int y1, y2, y3, y4;
+
+      if(cb_index == 0){
+        printf("copyExteriorKernel : length = %d\n", length);
+      }
+
+
+      int offset = (cb_index >=length/2) ? (N-1)*length/2 : 0;
+
       while(cb_index < length){
         getCoordinates(&x1, &x2, &x3, &x4, cb_index, params, parity, Dir);
         getDomainCoordsFromGhostCoords(&y1, &y2, &y3, &y4,
@@ -211,22 +219,20 @@ namespace quda {
 
         int large_cb_index = (y4*params.Y3Y2Y1 + y3*params.Y2Y1 + y2*params.Y1 + y1) >> 1;
 
-        if(large_cb_index == 0){
-          printf("Y3Y3Y1 = %d\n", params.Y3Y2Y1);
-          printf("Y2Y1 = %d\n", params.Y2Y1);
-          printf("Y1 = %d\n", params.Y1);
-          printf("N = %d\n", N);
-        }
-        printf("blockIdx.x = %d, cb_index = %d, large_cb_index = %d\n",  blockIdx.x, cb_index, large_cb_index);
-        printf("Ghost Coords : (%d, %d, %d, %d), Domain Coords : (%d, %d, %d, %d)\n", x1, x2, x3, x4, 
-            y1, y2, y3, y4);        
-
         FloatN x[N];
-        X.load(x, cb_index);
+        X.load(x, cb_index + offset);
         Y.save(x, large_cb_index);
+
+          printf("blockIdx.x = %d, cb_index = %d, large_cb_index = %d\n",  blockIdx.x, cb_index, large_cb_index);
+          printf("Ghost Coords : (%d, %d, %d, %d), Domain Coords : (%d, %d, %d, %d)\n", x1, x2, x3, x4, 
+                  y1, y2, y3, y4);    
+          if(N==3){
+            printf("x[%d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n", cb_index, x[0].x, x[0].y, x[1].x, x[1].y, x[2].x, x[2].y);
+          }    
 
         cb_index += gridSize;
       }
+
       return;
     }
 
@@ -274,9 +280,11 @@ namespace quda {
             size_t total, free;
             cudaMemGetInfo(&free, &total);
             printfQuda("Calling copyExteriorKernel\n");
+            printfQuda("length = %d\n", length);
             printfQuda("Total mem = %d\n", total);
             printfQuda("Free mem = %d\n", free);
             fflush(stdout);
+            
             copyExteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity, dir); 
 
             cudaDeviceSynchronize(); 
@@ -620,8 +628,11 @@ namespace quda {
               printfQuda("v4 = %p\n", v4);
               fflush(stdout);
 
-              const int ghost_stride = 2*src.Nface()*src.GhostFace()[i];
+              const int ghost_stride = 2*src.Nface()*src.Nspin()*src.Ncolor()*src.GhostFace()[i];
               printfQuda("Extend:: ghost_stride = %d\n",ghost_stride);
+
+              const int ghost_volume = 2*src.Nface()*src.GhostFace()[i];
+              printfQuda("Extend::ghost_volume = %d\n",ghost_volume);
 
 
               SrcSpinorType src_spinor(v1, static_cast<float*>(src.GhostNorm(i)), ghost_stride); 
@@ -635,7 +646,7 @@ namespace quda {
 
 
               ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
-                extend(dst_spinor, src_spinor, ghost_stride, params, parity, i);
+                extend(dst_spinor, src_spinor, ghost_volume, params, parity, i);
 
               printfQuda("Created extend\n");
               cudaMemGetInfo(&free, &total);

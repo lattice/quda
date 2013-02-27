@@ -680,14 +680,14 @@ namespace quda {
 	packFace(gpu_buf, *this, dim, dagger, parity, *stream); 
       }else{
         int y[4] = {2*x[0], x[1], x[2], x[3]};
-        printfQuda("y = %d %d %d %d\n", y[0], y[1], y[2], y[3]);
+        cudaDeviceSynchronize();
         packFace(gpu_buf, *this, dim, dagger, parity, *stream, y);
       }
     }
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
-
+    cudaDeviceSynchronize();
   }
  
   // send the ghost zone to the host
@@ -707,6 +707,20 @@ namespace quda {
 	(dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
 
       cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
+      
+      cudaDeviceSynchronize();
+      
+      if(dir == QUDA_BACKWARDS){
+        if(precision == QUDA_SINGLE_PRECISION){
+          float num = *((float*)ghost_spinor);
+          printfQuda("Sending back %lf\n", num); 
+        }else{
+          double num = *((double*)ghost_spinor);
+          printfQuda("Sending back %lf\n", num); 
+        }
+
+      }
+  
     } else { // do multiple cudaMemcpys 
 
       int Npad = Nint / Nvec; // number Nvec buffers we have
@@ -768,7 +782,21 @@ namespace quda {
     void *src = ghost_spinor;
 
     cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
-    
+
+    cudaDeviceSynchronize();
+    if(dir == QUDA_FORWARDS){
+      if(precision == QUDA_SINGLE_PRECISION){
+          float num = *((float*)src);
+          printf("Getting %lf\n", num);
+      }else if(precision == QUDA_DOUBLE_PRECISION){
+          double num = *((double*)src);
+          printf("Getting %lf\n", num);
+      }
+      printf("Len: %d\n", len);
+    }   
+
+
+ 
     if (precision == QUDA_HALF_PRECISION) {
       int normlen = nFace*ghostFace[dim];
       int norm_offset = stride + ghostNormOffset[dim];

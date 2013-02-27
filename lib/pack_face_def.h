@@ -930,15 +930,15 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 template <typename Float2>
 __device__ void packSpinor(Float2 *out, float *outNorm, int out_idx, int out_stride, 
     const Float2 *in, const float *inNorm, int in_idx, int in_stride) {
-
-  if(out_idx == 0){ 
-    printf("In packSpinor\n");
-    printf("in_idx = %d\n", in_idx);
-    printf("out_idx = %d\n", out_idx);
-    printf("in_stride = %d\n", in_stride);
-    printf("out_stride = %d\n", out_stride);
-  }
-
+/*
+  __syncthreads(); 
+  printf("in_idx = %d; out[%d, %d, %d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n",in_idx, out_idx, out_idx+out_stride, out_idx+2*out_stride,
+                                                              in[in_idx ].x, in[in_idx].y, 
+                                                              in[in_idx + in_stride].x, in[in_idx + in_stride].y,
+                                                              in[in_idx + 2*in_stride].x, in[in_idx + 2*in_stride].y);
+                                                                
+  __syncthreads();
+*/
   out[out_idx + 0*out_stride] = in[in_idx + 0*in_stride];
   out[out_idx + 1*out_stride] = in[in_idx + 1*in_stride];
   out[out_idx + 2*out_stride] = in[in_idx + 2*in_stride];
@@ -1027,9 +1027,14 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
     outNorm = (float*)((char*)outNorm + faceBytes);
   }
 
-  if(face_idx == 0) {
+  if(face_idx == 0 && face_num == 0) {
     printf("out_stride = %d\n", nFace*face_volume);
     printf("in_stride = %d\n", sp_stride); 
+    printf("in_idx = %d; out = (%lf, %lf, %lf, %lf, %lf, %lf)\n",idx, 
+                                                              in[idx ].x, in[idx].y, 
+                                                              in[idx + sp_stride].x, in[idx + sp_stride].y,
+                                                              in[idx + 2*sp_stride].x, in[idx + 2*sp_stride].y);
+                                                                
   } 
   packSpinor(out, outNorm, face_idx, nFace*face_volume, in, inNorm, idx, sp_stride);
 
@@ -1198,6 +1203,7 @@ void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim,
   int Nint = 6;
   float *ghostNorm = (float*)((char*)ghost_buf + Nint*nFace*in.GhostFace()[dim]*in.Precision());
 
+  printfQuda("packFaceStaggered: input address = %p\n", in.V());
   switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       packFaceStaggeredKernelWrapper<nFace>((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
