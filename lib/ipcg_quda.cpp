@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <iostream>
-#include <mpi.h>
+
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -147,17 +147,12 @@ namespace quda {
     cudaColorSpinorField y(b,param);
     minvr_ptr = new cudaColorSpinorField(b,param);
 
-
-
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    printfQuda("Calling test mat(r,x,y)\n");
+    printfQuda("Calling mat(r,x,y)\n");
     fflush(stdout);
-    mat(r, b, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     //		cudaColorSpinorField& tmp);
     //
     // => r = A*x;
-    MPI_Barrier(MPI_COMM_WORLD);
 
     printfQuda("Call to mat(r,x,y)\n");
     fflush(stdout);
@@ -201,7 +196,7 @@ namespace quda {
       fflush(stdout);
 
       double norm2_r = norm2(r);
-      extendCuda(*rPre_ptr,b,dparam,domain_overlap);
+      extendCuda(*rPre_ptr,r,dparam,domain_overlap);
       printfQuda("Call to extendCuda complete\n");
       cropCuda(*minvr_ptr,*rPre_ptr,dparam);
       //cropCuda(*minvr_ptr,r,param2);
@@ -231,9 +226,7 @@ namespace quda {
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       globalReduce = false;
-      MPI_Barrier(MPI_COMM_WORLD);
       printfQuda("About to call K->operator()(*minvrPre_ptr, *rPre_ptr)");
-      MPI_Barrier(MPI_COMM_WORLD);
       fflush(stdout);
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
       globalReduce = true;
@@ -251,6 +244,109 @@ namespace quda {
 
 
 
+    p_ptr = new cudaColorSpinorField(*minvr_ptr);
+
+    axpyCuda(-1.0, r,*minvr_ptr);
+
+    double norm2_zero = norm2(*minvr_ptr);
+    printfQuda("norm2_zero = %g\n", norm2_zero);
+    fflush(stdout);
+
+
+    double src_norm = norm2(b);
+    double stop = src_norm*invParam.tol*invParam.tol; // stopping condition
+    double alpha = 0.0, beta=0.0;
+    double pAp;
+    double rMinvr  = reDotProductCuda(r,*minvr_ptr);
+    double rMinvr_old = 0.0;
+    double r_new_Minvr_old = 0.0;
+    double r2_old = 0;
+    r2 = normCuda(r);
+    printfQuda("r2 = %e\n",r2);
+    printfQuda("Calling device_free_\n");
+
+    printfQuda("About to enter inv_prec_cg while loop\n");
+    fflush(stdout);
+
+    //while(r2 > stop && k < invParam.maxiter){
+    while(r2 > stop && k < 200){
+      mat(Ap, *p_ptr, tmp);
+
+      double norm2_ap = norm2(Ap);
+      printfQuda("norm2_ap = %lf\n", norm2_ap); 
+      pAp   = reDotProductCuda(*p_ptr,Ap);
+      printfQuda("pAp = %lf\n", pAp);
+
+
+      alpha = (K) ? rMinvr/pAp : r2/pAp;
+      //alpha = r2/pAp;
+      printfQuda("alpha = %lf\n", alpha);
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r); 
+      // disregard cg_norm
+      //axpyCuda(-alpha, Ap, r);
+      // r --> r - alpha*A*p
+
+      if(K){
+        rMinvr_old = rMinvr;
+        r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
+        zeroCuda(*rPre_ptr);
+        printfQuda("rPre_ptr->Length() = %d\n", rPre_ptr->Length());
+        printfQuda("zeroed norm2_rPre_ptr = %lf\n", norm2(*rPre_ptr));
+
+       
+        extendCuda(*rPre_ptr,r,dparam,domain_overlap);
+
+        printfQuda("norm2_rPre_ptr = %lf\n", norm2(*rPre_ptr));
+        printfQuda("norm2_r = %lf\n", norm2(r));
+        *minvrPre_ptr = *rPre_ptr;
+        printfQuda("norm2_minvrPre_ptr = %lf\n", norm2(*minvrPre_ptr));
+        globalReduce = false;
+        K->operator()(*minvrPre_ptr, *rPre_ptr);
+        globalReduce = true;
+        cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
+        rMinvr = reDotProductCuda(r,*minvr_ptr);
+
+
+        beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
+        if(beta < 0){ 
+          beta = 0.0; 
+        }else{
+          if(beta > (rMinvr/rMinvr_old)) beta = rMinvr/rMinvr_old;
+        }
+
+        r2 = real(cg_norm);
+        // x = x + alpha*p, p = Minvr + beta*p
+        axpyZpbxCuda(alpha, *p_ptr, x, *minvr_ptr, beta);
+      }else{
+        r2_old = r2;
+        r2 = real(cg_norm);
+
+        printfQuda("real(cg_norm = %lf\n", r2);
+
+        beta = r2/r2_old;
+        printfQuda("beta = %lf\n", beta);
+        axpyZpbxCuda(alpha, *p_ptr, x, r, beta);
+
+        double norm2_x = norm2(x);
+        double norm2_p = norm2(*p_ptr);
+        printfQuda("norm2_x = %lf\n", norm2_x);
+        printfQuda("norm2_p = %lf\n", norm2_p);
+
+      }
+
+      printfQuda("r2 = %e\n", r2);
+      // update x and p
+      // x = x + alpha*p
+      // p = Minv_r + beta*p
+      ++k;
+    }
+    printfQuda("Number of outer-solver iterations = %d\n",k);
+
+    // compute the true residual 
+    mat(r, x, y);
+    double true_res = xmyNormCuda(b, r);
+    invParam.true_res = sqrt(true_res / src_norm);
+    printfQuda("true_res = %e\n", invParam.true_res);
 
     // FIX THIS!!
     if(K){ // These are only needed if preconditioning is used
@@ -260,8 +356,6 @@ namespace quda {
     delete p_ptr;
     delete minvr_ptr;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
     return;
   }
 

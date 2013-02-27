@@ -930,7 +930,6 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 template <typename Float2>
 __device__ void packSpinor(Float2 *out, float *outNorm, int out_idx, int out_stride, 
     const Float2 *in, const float *inNorm, int in_idx, int in_stride) {
-/*
   __syncthreads(); 
   printf("in_idx = %d; out[%d, %d, %d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n",in_idx, out_idx, out_idx+out_stride, out_idx+2*out_stride,
                                                               in[in_idx ].x, in[in_idx].y, 
@@ -938,7 +937,7 @@ __device__ void packSpinor(Float2 *out, float *outNorm, int out_idx, int out_str
                                                               in[in_idx + 2*in_stride].x, in[in_idx + 2*in_stride].y);
                                                                 
   __syncthreads();
-*/
+
   out[out_idx + 0*out_stride] = in[in_idx + 0*in_stride];
   out[out_idx + 1*out_stride] = in[in_idx + 1*in_stride];
   out[out_idx + 2*out_stride] = in[in_idx + 2*in_stride];
@@ -1027,6 +1026,7 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
     outNorm = (float*)((char*)outNorm + faceBytes);
   }
 
+/*
   if(face_idx == 0 && face_num == 0) {
     printf("out_stride = %d\n", nFace*face_volume);
     printf("in_stride = %d\n", sp_stride); 
@@ -1035,7 +1035,8 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
                                                               in[idx + sp_stride].x, in[idx + sp_stride].y,
                                                               in[idx + 2*sp_stride].x, in[idx + 2*sp_stride].y);
                                                                 
-  } 
+  }
+*/ 
   packSpinor(out, outNorm, face_idx, nFace*face_volume, in, inNorm, idx, sp_stride);
 
 

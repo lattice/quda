@@ -88,6 +88,8 @@ namespace quda {
     int k=0;
     int rUpdate;
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
     cudaColorSpinorField* minvrPre_ptr;
     cudaColorSpinorField* rPre_ptr;
     cudaColorSpinorField* minvr_ptr;
@@ -145,31 +147,26 @@ namespace quda {
     param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b,param);
-    minvr_ptr = new cudaColorSpinorField(b,param);
 
-
-
-
-    MPI_Barrier(MPI_COMM_WORLD);
     printfQuda("Calling test mat(r,x,y)\n");
     fflush(stdout);
     mat(r, b, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     //		cudaColorSpinorField& tmp);
     //
     // => r = A*x;
+    cudaDeviceSynchronize();
     MPI_Barrier(MPI_COMM_WORLD);
-
-    printfQuda("Call to mat(r,x,y)\n");
+    printfQuda("Call to test mat(r,x,y) complete\n");
     fflush(stdout);
+
+    printfQuda("Calling extendCuda\n");
+    
+
 
     double r2 = xmyNormCuda(b,r);
     rUpdate++;
 
     param.precision = invParam.cuda_prec_sloppy;
-    cudaColorSpinorField Ap(x,param);
-    cudaColorSpinorField tmp(x,param);
-
-
     ColorSpinorParam prec_param(x);
     prec_param.create = QUDA_COPY_FIELD_CREATE;
     prec_param.precision = invParam.cuda_prec_precondition;
@@ -194,6 +191,8 @@ namespace quda {
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
+
+      MPI_Barrier(MPI_COMM_WORLD);
       printfQuda("About to check max_overlap\n");
       fflush(stdout);
       //      if(max_overlap > 0){
@@ -201,66 +200,16 @@ namespace quda {
       fflush(stdout);
 
       double norm2_r = norm2(r);
+      printfQuda("Before extendCuda: source address = %p\n", b.V());
       extendCuda(*rPre_ptr,b,dparam,domain_overlap);
       printfQuda("Call to extendCuda complete\n");
-      cropCuda(*minvr_ptr,*rPre_ptr,dparam);
-      //cropCuda(*minvr_ptr,r,param2);
-
-      double norm2_mr = norm2(*minvr_ptr);
-
-      printfQuda("norm2_mr = %lf, norm2_r = %lf\n", norm2_mr, norm2_r);
-
-      fflush(stdout);
-      //      }else{
-      //        printfQuda("Calling *rPre_ptr = r\n");
-      //        fflush(stdout);
-      //        printfQuda("rPre_ptr->Length() = %d\n", rPre_ptr->Length());
-      //        printfQuda("rPre_ptr->RealLength() = %d\n", rPre_ptr->RealLength());
-      //        printfQuda("rPre_ptr->Pad() = %d\n", rPre_ptr->Pad());
-      //        printfQuda("rPre_ptr->Stride() = %d\n", rPre_ptr->Stride());
-      //        printfQuda("r.Length() = %d\n",r.Length());
-      //        printfQuda("r.RealLength() = %d\n", r.RealLength());
-      //        printfQuda("r.Pad() = %d\n", r.Pad());
-      //        printfQuda("r.Stride() = %d\n", r.Stride());
-      //        fflush(stdout);
-
-      //        *rPre_ptr = r;
-      //        printfQuda("Call to *rPre_ptr complete\n");
-      //      }
-
-      // Create minvrPre_ptr 
-      minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
-      globalReduce = false;
-      MPI_Barrier(MPI_COMM_WORLD);
-      printfQuda("About to call K->operator()(*minvrPre_ptr, *rPre_ptr)");
-      MPI_Barrier(MPI_COMM_WORLD);
-      fflush(stdout);
-      K->operator()(*minvrPre_ptr, *rPre_ptr);  
-      globalReduce = true;
-
-
-      if(max_overlap)
-        cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
-      else
-        *minvr_ptr = *minvrPre_ptr;
-
-      p_ptr = new cudaColorSpinorField(*minvr_ptr);
-    }else{
-      p_ptr = new cudaColorSpinorField(r);
     }
 
-
-
-
-    // FIX THIS!!
+    // compute the true residual 
     if(K){ // These are only needed if preconditioning is used
-      delete minvrPre_ptr;
       delete rPre_ptr;
     }
-    delete p_ptr;
-    delete minvr_ptr;
 
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     return;
   }

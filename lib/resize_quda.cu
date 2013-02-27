@@ -101,7 +101,7 @@ namespace quda {
         *x3_p = (cb_index/params.X2h) % params.X3;
         *x1_p = cb_index/params.X4X3X2h;
         *x4_p = (cb_index/params.X3X2h) % params.X4;
-        xodd = (*x1_p + *x3_p + *x2_p + parity) & 1;
+        xodd = (*x1_p + *x3_p + *x4_p + parity) & 1;
         *x2_p = 2*xh + xodd;
         break;
 
@@ -223,8 +223,8 @@ namespace quda {
         X.load(x, cb_index + offset);
         Y.save(x, large_cb_index);
 
-          printf("blockIdx.x = %d, cb_index = %d, large_cb_index = %d\n",  blockIdx.x, cb_index, large_cb_index);
-          printf("Ghost Coords : (%d, %d, %d, %d), Domain Coords : (%d, %d, %d, %d)\n", x1, x2, x3, x4, 
+          printf("blockIdx.x = %d, offset = %d, cb_index = %d, large_cb_index = %d\n",  blockIdx.x, offset, cb_index, large_cb_index);
+          printf("offset = %d, Ghost Coords : (%d, %d, %d, %d), Domain Coords : (%d, %d, %d, %d)\n", offset, x1, x2, x3, x4, 
                   y1, y2, y3, y4);    
           if(N==3){
             printf("x[%d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n", cb_index, x[0].x, x[0].y, x[1].x, x[1].y, x[2].x, x[2].y);
