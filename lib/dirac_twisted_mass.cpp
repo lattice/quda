@@ -365,20 +365,21 @@ namespace quda {
         double b = -2.0 * kappa * epsilon;
         double c = 1.0;
 
-        bool reset_asym = newTmp(&tmp2, in);
+        cudaColorSpinorField *asymTmp=0;
+        bool reset_asym = newTmp(&asymTmp, in);
 
         if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 	  Dslash(*tmp1, in, QUDA_ODD_PARITY); 
-          twistGamma5Cuda(tmp2, &in, dagger, a, b, c, QUDA_TWIST_GAMMA5_DIRECT);//direct due to c and b
+          twistGamma5Cuda(asymTmp, &in, dagger, a, b, c, QUDA_TWIST_GAMMA5_DIRECT);//direct due to c and b
           ///imitate wilson dslash:
-          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_EVEN_PARITY, dagger, tmp2, 0.0, 0.0, kappa2, commDim); 	 
+          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_EVEN_PARITY, dagger, asymTmp, 0.0, 0.0, kappa2, commDim); 	 
         } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
           Dslash(*tmp1, in, QUDA_EVEN_PARITY); // fused kernel
-	  twistGamma5Cuda(tmp2, &in, dagger, a, b, c, QUDA_TWIST_GAMMA5_DIRECT);
+	  twistGamma5Cuda(asymTmp, &in, dagger, a, b, c, QUDA_TWIST_GAMMA5_DIRECT);
           ///imitate wilson dslash:	 
-          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_ODD_PARITY, dagger, tmp2, 0.0, 0.0, kappa2, commDim); 	 
+          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_ODD_PARITY, dagger, asymTmp, 0.0, 0.0, kappa2, commDim); 	 
         } 
-        deleteTmp(&tmp2, reset_asym);   
+        deleteTmp(&asymTmp, reset_asym);   
       }
     }
     deleteTmp(&tmp1, reset);
