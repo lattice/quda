@@ -1,15 +1,12 @@
-#include <quda_internal.h>
-#include <face_quda.h>
-#include <comm_quda.h>
 #include <cstdio>
 #include <cstdlib>
-#include <quda.h>
 #include <string.h>
 #include <sys/time.h>
-#include <mpi.h>
-#include <cuda.h>
 
+#include <quda_internal.h>
+#include <comm_quda.h>
 #include <fat_force_quda.h>
+#include <face_quda.h>
 
 using namespace quda;
 
@@ -19,7 +16,18 @@ extern cudaStream_t *stream;
  * Staple exchange routine
  * used in fat link computation
  ***************************************************************/
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE)
+#if defined(MULTI_GPU) && (defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE))
+
+enum {
+  XUP = 0,
+  YUP = 1,
+  ZUP = 2,
+  TUP = 3,
+  TDOWN = 4,
+  ZDOWN = 5,
+  YDOWN = 6,
+  XDOWN = 7
+};
 
 #define gaugeSiteSize 18
 
