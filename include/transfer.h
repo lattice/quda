@@ -22,7 +22,7 @@ namespace quda {
   private:
 
     /** The raw null space components */
-    cpuColorSpinorField *B;
+    cpuColorSpinorField **B;
 
     /** The block-normalized null-space components that define the prolongator */
     cpuColorSpinorField *V;
@@ -64,7 +64,7 @@ namespace quda {
      * @param geo_map Geometric mapping from fine grid to coarse grid 
      * @param spin_map Mapping from fine spin to coarse spin 
      */
-    Transfer(cpuColorSpinorField *B, int Nvec, Dirac &d, int *geo_bs, int spin_bs);
+    Transfer(cpuColorSpinorField **B, int Nvec, Dirac &d, int *geo_bs, int spin_bs);
 
     /** The destructor for Transfer */
     virtual ~Transfer();

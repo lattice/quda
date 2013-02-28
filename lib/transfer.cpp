@@ -2,14 +2,14 @@
 
 namespace quda {
 
-  Transfer::Transfer(cpuColorSpinorField *B, int Nvec, Dirac &d, int *geo_bs, int spin_bs)
+  Transfer::Transfer(cpuColorSpinorField **B, int Nvec, Dirac &d, int *geo_bs, int spin_bs)
     : B(B), V(0), tmp(0), geo_map(0), spin_map(0) 
   {
 
     // create the storage for the final block orthogonal elements
-    ColorSpinorParam param(B[0]); // takes the geometry from the null-space vectors
-    param.nSpin = B[0].Ncolor(); // the spin dimension corresponds to fine nColor
-    param.nColor = B[0].Nspin() * Nvec; // nColor = number of spin components * number of null-space vectors
+    ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
+    param.nSpin = B[0]->Ncolor(); // the spin dimension corresponds to fine nColor
+    param.nColor = B[0]->Nspin() * Nvec; // nColor = number of spin components * number of null-space vectors
     // the V field is defined on all sites regardless of B field
     if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -18,16 +18,16 @@ namespace quda {
     V = new cpuColorSpinorField(param);
 
     // create the storage for the intermediate temporary vector
-    param.nSpin = B[0].Nspin(); // tmp has same nSpin has the fine dimension
+    param.nSpin = B[0]->Nspin(); // tmp has same nSpin has the fine dimension
     param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
     tmp = new cpuColorSpinorField(param);
 
     // allocate and compute the fine-to-coarse site map
-    geo_map = new int[B[0].Volume()];
+    geo_map = new int[B[0]->Volume()];
     createGeoMap(geo_bs);
 
     // allocate the fine-to-coarse spin map
-    spin_map = new int[B[0].Nspin()];
+    spin_map = new int[B[0]->Nspin()];
     createSpinMap(spin_bs);
   }
 
@@ -71,7 +71,7 @@ namespace quda {
   // compute the fine spin to coarse spin map
   void Transfer::createSpinMap(int spin_bs) {
 
-    for (int s=0; s<B[0].Nspin(); s++) {
+    for (int s=0; s<B[0]->Nspin(); s++) {
       spin_map[s] = s / spin_bs;
     }
 
