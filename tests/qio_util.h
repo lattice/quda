@@ -29,6 +29,7 @@ void vget_M(char *buf, size_t index, int count, void *qfin);
 void vput_r(char *buf, size_t index, int count, void *qfin);
 void vget_r(char *buf, size_t index, int count, void *qfin);
 
+// for vector fields this order implies [spin][color][complex]
 // templatized version of vput_M to allow for precision conversion
 template <typename oFloat, typename iFloat, int len>
 void vputM(char *s1, size_t index, int count, void *s2)
@@ -43,9 +44,12 @@ void vputM(char *s1, size_t index, int count, void *s2)
     {
       oFloat *dest = field[i] + len*index;
       for (int j=0; j<len; j++) dest[j] = src[i*len+j];
+      //printf("dest %8d src %8d index %8d %8d\n", 
+      //     len*index, i*len, index, len);
     }
 }
 
+// for vector fields this order implies [spin][color][complex]
 // templatized version of vget_M to allow for precision conversion
 template <typename oFloat, typename iFloat, int len>
 void vgetM(char *s1, size_t index, int count, void *s2)
@@ -55,7 +59,7 @@ void vgetM(char *s1, size_t index, int count, void *s2)
 
 /* For the site specified by "index", move an array of "count" data
    from the array of fields to the write buffer */
-  for (int i=0; i<count; i++, dest+=18)
+  for (int i=0; i<count; i++, dest+=len)
     {
       iFloat *src = field[i] + len*index;
       for (int j=0; j<len; j++) dest[j] = src[j];

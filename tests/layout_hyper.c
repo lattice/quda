@@ -151,16 +151,17 @@ int setup_layout(int len[], int nd, int numnodes){
    this functionality is included for possible future use.
   */
 
-#if 0
-  if(QMP_get_msg_passing_type()==QMP_GRID) {
-    printf("grid\n");
-    setup_qmp_grid(len, ndim, numnodes);
-  }  else {
-    printf("prime\n");    setup_hyper_prime(len, ndim, numnodes);
+  int create_geom = 0;
+  if (create_geom) {
+    if(QMP_get_msg_passing_type()==QMP_GRID) {
+      printf("grid\n");
+      setup_qmp_grid(len, ndim, numnodes);
+    }  else {
+      printf("prime\n");    setup_hyper_prime(len, ndim, numnodes);
+    }
+  } else {
+    setup_qmp_fixed(len, ndim, numnodes); // use the predetermined geometry
   }
-#else
-  setup_qmp_fixed(len, ndim, numnodes); // use the predetermined geometry
-#endif
 
   /* setup QMP logical topology */
   if(!QMP_logical_topology_is_declared()) {

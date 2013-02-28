@@ -115,7 +115,7 @@ endif
 ifeq ($(strip $(BUILD_QIO)), yes)
   INC += -DHAVE_QIO -I$(QIO_HOME)/include
   LIB += -L$(QIO_HOME)/lib -lqio -llime
-  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
+  QIO_UTIL = qio_field.o qio_util.o layout_hyper.o
 endif
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)

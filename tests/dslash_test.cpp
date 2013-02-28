@@ -17,7 +17,7 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#include <gauge_qio.h>
+#include <qio_field.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 

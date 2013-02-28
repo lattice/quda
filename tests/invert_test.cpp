@@ -18,7 +18,7 @@
 #include <qmp.h>
 #endif
 
-#include <gauge_qio.h>
+#include <qio_field.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 

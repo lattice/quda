@@ -1421,6 +1421,8 @@ char latfile[256] = "";
 bool tune = true;
 int niter = 10;
 int test_type = 0;
+int nvec  = 1;
+char vecfile[256] = "";
 
 void __attribute__((weak)) usage_extra(char** argv){};
 
@@ -1454,6 +1456,8 @@ void usage(char** argv )
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
+  printf("    --nvec                                    # Number of vectors to load\n");
+  printf("    --load-vec file                           # Load the vectors \"file\" for the multigrid_test (requires QIO\n");
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -1757,6 +1761,30 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;	    
   }
     
+  if( strcmp(argv[i], "--nvec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    nvec= atoi(argv[i+1]);
+    if (nvec < 0 || nvec > 128){
+      printf("ERROR: invalid number of vectors (%d)\n", nvec);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--load-vec") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    strcpy(vecfile, argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);
