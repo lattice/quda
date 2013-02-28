@@ -12,6 +12,7 @@
 #include <blas_quda.h>
 
 #include <qio_field.h>
+#include <transfer.h>
 
 using namespace quda;
 
@@ -81,19 +82,27 @@ void loadTest() {
   void **V = new void*[Nvec];
   for (int i=0; i<Nvec; i++) V[i] = W[i]->V();
     //supports seperate reading or single file read
+
+  if (strcmp(vecfile,"")!=0) {
 #if 0
-  read_spinor_field(vecfile, &V[0], W[0]->Precision(), W[0]->X(), 
-		    W[0]->Ncolor(), W[0]->Nspin(), Nvec, 0,  (char**)0);
+    read_spinor_field(vecfile, &V[0], W[0]->Precision(), W[0]->X(), 
+		      W[0]->Ncolor(), W[0]->Nspin(), Nvec, 0,  (char**)0);
 #else 
-  for (int i=0; i<Nvec; i++) {
-    char filename[256];
-    sprintf(filename, "%s.%d", vecfile, i);
-    read_spinor_field(filename, &V[i], W[i]->Precision(), W[i]->X(), 
-		      W[i]->Ncolor(), W[i]->Nspin(), 1, 0,  (char**)0);
-  }
+    for (int i=0; i<Nvec; i++) {
+      char filename[256];
+      sprintf(filename, "%s.%d", vecfile, i);
+      read_spinor_field(filename, &V[i], W[i]->Precision(), W[i]->X(), 
+			W[i]->Ncolor(), W[i]->Nspin(), 1, 0,  (char**)0);
+    }
 #endif
+  }
 
   for (int i=0; i<Nvec; i++) printfQuda("%d norm = %e\n", i, norm2(*W[i]));
+
+  int geom_bs[] = {4, 2, 2, 2};
+  int spin_bs = 2;
+
+  Transfer P(W, Nvec, geom_bs, spin_bs);
 
   delete []V;
 

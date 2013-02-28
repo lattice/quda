@@ -203,29 +203,27 @@ namespace quda {
     coordinates.
   */
   void cpuColorSpinorField::LatticeIndex(int *y, int i) const {
-
     int z[QUDA_MAX_DIM];
     memcpy(z, x, QUDA_MAX_DIM*sizeof(int));
 
     // parity is the slowest running dimension
     int parity = 0;
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      parity = i % (volume / 2);
-      i /= (volume / 2);
-      z[0] /= 2; // half this for convenience
-    }
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) z[0] /= 2;
 
     for (int d=0; d<nDim; d++) {
       y[d] = i % z[d];
       i /= z[d];    
     }
 
+    parity = i;
+
     // convert into the full-field lattice coordinate
+    int oddBit = parity;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      for (int d=1; d<nDim; d++) parity += y[d];
-      parity = parity & 1;
+      for (int d=1; d<nDim; d++) oddBit += y[d];
+      oddBit = oddBit & 1;
     }
-    y[0] = 2*y[0] + parity;  // compute the full x coordinate
+    y[0] = 2*y[0] + oddBit;  // compute the full x coordinate
   }
 
   /*
@@ -236,24 +234,25 @@ namespace quda {
   void cpuColorSpinorField::OffsetIndex(int &i, int *y) const {
 
     int parity = 0;
-    int y0 = y[0];
+    int z[QUDA_MAX_DIM];
+    memcpy(z, x, QUDA_MAX_DIM*sizeof(int));
+
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      for (int d=1; d<nDim; d++) parity += y[d];
+      for (int d=0; d<nDim; d++) parity += y[d];
       parity = parity & 1;
-      y0 = y[0];
       y[0] /= 2;
+      z[0] /= 2;
     }
 
-    i = y[nDim-1];
-    for (int d=nDim-2; d>=0; d--) {
-      i = x[d]*i + y[d];
+    i = parity;
+    for (int d=nDim-1; d>=0; d--) {
+      i = z[d]*i + y[d];
+      //printf("z[%d]=%d y[%d]=%d ", d, z[d], d, y[d]);
     }
 
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      i = i + parity * (volume / 2);
-      y[0] = y0;
-    }
+    //printf("\nparity = %d\n", parity);
 
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] *= 2;
   }
 
   template <class D, class S>

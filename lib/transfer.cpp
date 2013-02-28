@@ -2,7 +2,7 @@
 
 namespace quda {
 
-  Transfer::Transfer(cpuColorSpinorField **B, int Nvec, Dirac &d, int *geo_bs, int spin_bs)
+  Transfer::Transfer(cpuColorSpinorField **B, int Nvec, int *geo_bs, int spin_bs)
     : B(B), V(0), tmp(0), geo_map(0), spin_map(0) 
   {
 
@@ -10,6 +10,7 @@ namespace quda {
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
     param.nSpin = B[0]->Ncolor(); // the spin dimension corresponds to fine nColor
     param.nColor = B[0]->Nspin() * Nvec; // nColor = number of spin components * number of null-space vectors
+    param.create = QUDA_ZERO_FIELD_CREATE;
     // the V field is defined on all sites regardless of B field
     if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -21,6 +22,8 @@ namespace quda {
     param.nSpin = B[0]->Nspin(); // tmp has same nSpin has the fine dimension
     param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
     tmp = new cpuColorSpinorField(param);
+
+    //std::cout << *V << *tmp;
 
     // allocate and compute the fine-to-coarse site map
     geo_map = new int[B[0]->Volume()];
@@ -50,20 +53,28 @@ namespace quda {
     ColorSpinorParam param(*tmp);
     param.nColor = 1;
     param.nSpin = 1;
+    param.create = QUDA_ZERO_FIELD_CREATE;
+    for (int d=0; d<param.nDim; d++) param.x[d] /= geo_bs[d];
     cpuColorSpinorField coarse(param);
 
-    // compute the coarse grid point for every site
+    //std::cout << coarse;
+
+    // compute the coarse grid point for every site (assuming parity ordering currently)
     for (int i=0; i<tmp->Volume(); i++) {
-      // compute the lattice-site index for this offet index
+      // compute the lattice-site index for this offset index
       tmp->LatticeIndex(x, i);
-    
+
+      //printf("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
+
       // compute the corresponding coarse-grid index given the block size
       for (int d=0; d<tmp->Ndim(); d++) x[d] /= geo_bs[d];
 
       // compute the coarse-offset index and store in the geo_map
       int k;
-      coarse.OffsetIndex(k, x);
+      coarse.OffsetIndex(k, x); // this index is parity ordered
       geo_map[i] = k;
+
+      //printf("coarse (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
     }
 
   }
