@@ -162,6 +162,10 @@ namespace quda {
     *y3_p = x3;
     *y4_p = x4; 
 
+    if(x1==0 && x2==0 && x3==0 && x4==0){
+      printf("params.B = %d %d %d %d\n", params.B1, params.B2, params.B3, params.B4);
+    }
+
     switch(Dir){
       case 0:
         if(x1 >= params.B1) *y1_p += params.X1;
@@ -191,6 +195,9 @@ namespace quda {
         if(params.B3 > 0) *y3_p += params.B3;
         break;
     }
+
+    printf("x = (%d, %d, %d, %d), y = (%d, %d, %d, %d)\n", x1, x2, x3, x4, *y1_p, *y2_p, *y3_p, *y4_p);
+
     return;
   }
 
@@ -217,18 +224,26 @@ namespace quda {
         getDomainCoordsFromGhostCoords(&y1, &y2, &y3, &y4,
             x1, x2, x3, x4, params, Dir); 
 
+
+        if(cb_index == 288 && Dir==2){
+          printf("cb_index = 288, x = (%d, %d, %d, %d), y = (%d, %d, %d, %d)\n", x1, x2, x3, x4, y1, y2, y3, y4);
+        }
+
+
         int large_cb_index = (y4*params.Y3Y2Y1 + y3*params.Y2Y1 + y2*params.Y1 + y1) >> 1;
 
         FloatN x[N];
         X.load(x, cb_index + offset);
         Y.save(x, large_cb_index);
 
-          printf("blockIdx.x = %d, offset = %d, cb_index = %d, large_cb_index = %d\n",  blockIdx.x, offset, cb_index, large_cb_index);
-          printf("offset = %d, Ghost Coords : (%d, %d, %d, %d), Domain Coords : (%d, %d, %d, %d)\n", offset, x1, x2, x3, x4, 
-                  y1, y2, y3, y4);    
-          if(N==3){
-            printf("x[%d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n", cb_index, x[0].x, x[0].y, x[1].x, x[1].y, x[2].x, x[2].y);
-          }    
+             
+
+ 
+        if((y1/2)==0 && y2==2 && y3==1 && y4==0){
+          printf("cb_index = %d, XX[%d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n", cb_index, cb_index+offset, x[0].x, x[0].y, x[1].x, x[1].y, x[2].x, x[2].y);
+        }  
+
+
 
         cb_index += gridSize;
       }
@@ -618,7 +633,7 @@ namespace quda {
               }
 
               char* v  = (char*)src.V();
-              char* v1 = (char*)src.V() + src.Length()*src.Precision();
+              char* v1 = (char*)src.V() + (src.Length() + src.GhostOffset(i)*6)*src.Precision();
               char* v2 = (char*)src.Ghost(i);
               char* v3 = (char*)src.V() + src.TotalLength()*src.Precision();
               char* v4 = (char*)src.Ghost(i);

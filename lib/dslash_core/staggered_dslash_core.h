@@ -930,12 +930,12 @@ const float fatlinkMax = kparam.fatlinkMax;
     if(kernel_type == EXTERIOR_KERNEL_Z){
       if(x3 == 0){
         printf("-Z x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
-        printf("-Z x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
+        printf("-Z x = (%d, %d, %d, %d), parity = %d,  I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, param.parity, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X3 == 12){
       if(x3 == 2){
         printf("-Z x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
-        printf("-Z x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
+        printf("-Z x = (%d, %d, %d, %d), parity = %d,  I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, param.parity, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
 

@@ -161,6 +161,7 @@ namespace quda {
 
     printfQuda("Call to mat(r,x,y)\n");
     fflush(stdout);
+//    MPI_Finalize();
 
     double r2 = xmyNormCuda(b,r);
     rUpdate++;
