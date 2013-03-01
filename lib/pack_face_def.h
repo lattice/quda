@@ -114,16 +114,6 @@ static inline __device__ int indexFromFaceIndexAsqtad(int face_idx, const int &f
   int V = x[0]*x[1]*x[2]*x[3];
   int face_X = x[0], face_Y = x[1], face_Z = x[2]; // face_T = X4;
 
-
-  if(face_idx ==0){
-    printf("In indexFromFaceIndexAsqtad\n");
-    printf("X1 = %d, x[0] = %d\n", X1, x[0]);
-    printf("X2 = %d, x[1] = %d\n", X2, x[1]);
-    printf("X3 = %d, x[2] = %d\n", X3, x[2]);
-    printf("X4 = %d, x[3] = %d\n", X4, x[3]);
-    printf("V = %d\n",V);
-  }
-
   switch (dim) {
     case 0:
       face_X = nLayers;
@@ -930,14 +920,6 @@ void packFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dim, co
 template <typename Float2>
 __device__ void packSpinor(Float2 *out, float *outNorm, int out_idx, int out_stride, 
     const Float2 *in, const float *inNorm, int in_idx, int in_stride) {
-  __syncthreads(); 
-/*
-  printf("in_idx = %d; out[%d, %d, %d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n",in_idx, out_idx, out_idx+out_stride, out_idx+2*out_stride,
-                                                              in[in_idx ].x, in[in_idx].y, 
-                                                              in[in_idx + in_stride].x, in[in_idx + in_stride].y,
-                                                              in[in_idx + 2*in_stride].x, in[in_idx + 2*in_stride].y);
-*/                                                                
-  __syncthreads();
 
   out[out_idx + 0*out_stride] = in[in_idx + 0*in_stride];
   out[out_idx + 1*out_stride] = in[in_idx + 1*in_stride];
@@ -996,10 +978,6 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
   int face_volume = ghost_face; // ghostFace[0] = X[1]*X[2]*X[3]/2, etc.
   int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
 
-  if(face_idx == 0){ 
-    printf("In packFaceStaggered Kernel\n");
-    printf("ghostFace[%d] = %d,  ghost_face = %d\n", dim, ghostFace[dim], ghost_face);
-  }
   int x[4] = {x1, x2, x3, x4};
 
   if (face_idx >= 2*nFace*face_volume) return;
@@ -1013,40 +991,14 @@ __global__ void packFaceStaggeredKernel(Float2 *out, float *outNorm, const Float
   int idx = indexFromFaceIndexAsqtad<dim, nFace>(face_idx, face_volume, face_num, parity, x);
 
 
-  // Test to see if this works!!
-  // Does coordsFromIndex work??
-  //  int x, y, z, t, full_idx; 
-  //  coordsFromIndex(full_idx , x, y, z, t, idx, parity);
-
-  //  idx = X1*X2*X3*t + X1*X2*z + X1*y + x;
-  //  idx = idx >> 1;
-
-  if(face_idx == 0) printf("In packFaceStaggeredKernel: About to call packSpinor\n");
-
   if (face_num) {
     out = (Float2*)((char*)out + faceBytes);
     outNorm = (float*)((char*)outNorm + faceBytes);
   }
   
-  if(face_idx == 0){
-    printf("out_stride = %d\n", nFace*face_volume);
-    printf("in_stride = %d\n", sp_stride); 
-  }
 
-  if(dim == 2) {
-    printf("in_idx = %d; out[%d, %d, %d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n",idx, 
-                                                              face_idx, 
-                                                              face_idx + nFace*face_volume,
-                                                              face_idx + 2*nFace*face_volume,
-                                                              in[idx ].x, in[idx].y, 
-                                                              in[idx + sp_stride].x, in[idx + sp_stride].y,
-                                                              in[idx + 2*sp_stride].x, in[idx + 2*sp_stride].y);
-    __syncthreads();                                                            
-  }
   packSpinor(out, outNorm, face_idx, nFace*face_volume, in, inNorm, idx, sp_stride);
 
-
-  if(face_idx == 0) printf("Call to packStaggeredKernel complete\n");
   /*  Float2 tmp1 = in[idx + 0*sp_stride];
       Float2 tmp2 = in[idx + 1*sp_stride];
       Float2 tmp3 = in[idx + 2*sp_stride];
@@ -1210,7 +1162,6 @@ void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, const int dim,
   int Nint = 6;
   float *ghostNorm = (float*)((char*)ghost_buf + Nint*nFace*in.GhostFace()[dim]*in.Precision());
 
-  printfQuda("packFaceStaggered: input address = %p\n", in.V());
   switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       packFaceStaggeredKernelWrapper<nFace>((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
@@ -1232,8 +1183,6 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dim, const in
 {
 
   if(in.Nspin() == 1){
-    printfQuda("Calling packFaceStaggered\n");
-    printfQuda("y = %d %d %d %d\n", y[0], y[1], y[2], y[3]);
     switch(in.Nface()){
       case 1: packFaceStaggered<1>(ghost_buf, in, dim, dagger, parity, stream, y); break;
       case 2: packFaceStaggered<2>(ghost_buf, in, dim, dagger, parity, stream, y); break;
@@ -1332,7 +1281,6 @@ void packFaceDW(void *ghost_buf, cudaColorSpinorField &in, const int dim, const 
   int Nint = in.Ncolor() * in.Nspin(); // assume spin projection
   float *ghostNorm = (float*)((char*)ghost_buf + Nint*nFace*in.GhostFace()[dim]*in.Precision()); // norm zone
 
-  //printfQuda("Starting face packing: dimension = %d, direction = %d, face size = %d\n", dim, dir, in.ghostFace[dim]);
   switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       packFaceDW((double2*)ghost_buf, ghostNorm, (double2*)in.V(), (float*)in.Norm(), 
@@ -1347,7 +1295,6 @@ void packFaceDW(void *ghost_buf, cudaColorSpinorField &in, const int dim, const 
           dim, dagger, parity, gridDim, blockDim, stream);
       break;
   }  
-  //printfQuda("Completed face packing\n", dim, dir, ghostFace[dir]);
 #else
   errorQuda("DW face parking routines are not built. Check that both GPU_WILSON_DIRAC and GPU_DOMAIN_WALL_DIRAC compiler flags are set.");
 #endif //GPU_WILSON_DIRAC

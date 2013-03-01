@@ -197,8 +197,6 @@ namespace quda {
     //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
 
-    printfQuda("Bytes : %d\n", bytes);
-    fflush(stdout);
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
@@ -257,8 +255,6 @@ namespace quda {
 
     checkCudaError();
 #ifdef USE_TEXTURE_OBJECTS
-    printfQuda("Calling createTexObject\n");
-    fflush(stdout);
     createTexObject();
 #endif
 
@@ -411,8 +407,6 @@ namespace quda {
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
-    printfQuda("Calling cudaColorSpinorField::copy\n");
-    fflush(stdout);
     checkField(*this, src);
     copyCuda(*this, src);
   }
@@ -708,18 +702,6 @@ namespace quda {
 
       cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
       
-      cudaDeviceSynchronize();
-      
-      if(dir == QUDA_BACKWARDS){
-        if(precision == QUDA_SINGLE_PRECISION){
-          float num = *((float*)ghost_spinor);
-          printfQuda("Sending back %lf\n", num); 
-        }else{
-          double num = *((double*)ghost_spinor);
-          printfQuda("Sending back %lf\n", num); 
-        }
-
-      }
   
     } else { // do multiple cudaMemcpys 
 
@@ -773,8 +755,6 @@ namespace quda {
     int len = nFace*ghostFace[dim]*Nint;
     int offset = length + ghostOffset[dim]*nColor*nSpin*2;
 
-    if(nFace==2) printfQuda("cudaColorSpinorField::loadGhost : offset = %d\n", offset);
-    fflush(stdout);
 
     offset += (dir == QUDA_BACKWARDS) ? 0 : len;
 
@@ -782,18 +762,6 @@ namespace quda {
     void *src = ghost_spinor;
 
     cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
-
-    cudaDeviceSynchronize();
-    if(dir == QUDA_FORWARDS){
-      if(precision == QUDA_SINGLE_PRECISION){
-          float num = *((float*)src);
-          printf("Getting %lf\n", num);
-      }else if(precision == QUDA_DOUBLE_PRECISION){
-          double num = *((double*)src);
-          printf("Getting %lf\n", num);
-      }
-      printf("Len: %d\n", len);
-    }   
 
 
  

@@ -439,12 +439,10 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_X){
       if(x1 >= kparam.X1m1){
-        printf("+X x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+X x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X1 == 12){
       if(x1 == kparam.X1-3){
-        printf("+X x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+X x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
@@ -534,12 +532,10 @@ const float fatlinkMax = kparam.fatlinkMax;
       
     if(kernel_type == EXTERIOR_KERNEL_X){
       if(x1 == 0){
-        printf("-X x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-X x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X1 == 12){ // Need to think more about this
       if(x1 == 2){
-        printf("-X x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-X x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
@@ -630,12 +626,10 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_Y){
       if(x2 >= kparam.X2m1){
-        printf("+Y x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X2 == 12){
       if(x2 == kparam.X2-3){
-        printf("+Y x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+Y x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
@@ -720,13 +714,6 @@ const float fatlinkMax = kparam.fatlinkMax;
         norm_idx = param.ghostNormOffset[1]  + (Nface-1)*kparam.ghostFace[1]+ space_con;
 #endif	
 
-//        if(sid==0){
-//          printf("+Y: x2 = %d\n", x2);
-//          printf("+Y: nbr_idx1 = %d\n", nbr_idx1);
-//          printf("+Y: stride1 = %d\n", stride1);
-//          printf("+Y Nface = %d\n", Nface);
-//          printf("+Y fatlinkStride = %d\n", fatlinkStride);
-//        }
       }              
     }
 #endif
@@ -735,12 +722,10 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_Y){
       if(x2 == 0){
-        printf("-Y x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X2 == 12){
       if(x2 == 2){
-        printf("-Y x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
@@ -833,12 +818,10 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_Z){
       if(x3 >= kparam.X3m1){
-        printf("+Z x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+Z x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X3 == 12){
       if(x3 == kparam.X3-3){
-        printf("+Z x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+Z x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
@@ -929,12 +912,10 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_Z){
       if(x3 == 0){
-        printf("-Z x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-Z x = (%d, %d, %d, %d), parity = %d,  I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, param.parity, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X3 == 12){
       if(x3 == 2){
-        printf("-Z x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-Z x = (%d, %d, %d, %d), parity = %d,  I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, param.parity, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
@@ -1024,12 +1005,10 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_T){
       if(x4 >= kparam.X4m1){
-        printf("+T x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+T x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X4 == 12){
       if(x4 == kparam.X4-3){
-        printf("+T x = %d, %d, %d, %d, nbr_idx1 = %d, ga_idx = %d\n", x1, x2, x3, x4, nbr_idx1, ga_idx);
         printf("+T x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
@@ -1114,12 +1093,10 @@ const float fatlinkMax = kparam.fatlinkMax;
 
     if(kernel_type == EXTERIOR_KERNEL_T){
       if(x4 == 0){
-        printf("-T x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-T x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }else if(kparam.X4 == 12){
       if(x4 == 2){
-        printf("-T x = %d, %d, %d, %d, nbr_idx1 = %d, fat_idx = %d\n", x1, x2, x3, x4, nbr_idx1, fat_idx);
         printf("-T x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }

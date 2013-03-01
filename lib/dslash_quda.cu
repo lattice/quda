@@ -1258,11 +1258,6 @@ namespace quda {
               checkCudaError();
               dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
               checkCudaError();
-              printfQuda("In apply\n");
-              printfQuda("hasNaik = %d\n", hasNaik);
-              printfQuda("nFace = %d\n", nFace);
-              fflush(stdout); 
-              checkCudaError();
               STAGGERED_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
                   out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a, kernel_params);
               checkCudaError();
@@ -1540,8 +1535,6 @@ namespace quda {
           }
         }
 #endif
-        printfQuda("About tp apply internal dslash\n");
-        fflush(stdout);
         checkCudaError();
 
         CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
@@ -1549,16 +1542,10 @@ namespace quda {
         CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
 
 
-        cudaDeviceSynchronize();
-        printfQuda("Call to internal dslash complete\n");
-        fflush(stdout);
         checkCudaError();
 
 #ifdef MULTI_GPU
-        printfQuda("Calling initDslashCommsPattern\n");
-        fflush(stdout);
         initDslashCommsPattern();
-        checkCudaError();
 
         int completeSum = 0;
         while (completeSum < commDimTotal) {
@@ -1611,8 +1598,6 @@ namespace quda {
               dslashParam.kernel_type = static_cast<KernelType>(i);
               checkCudaError();
               dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-              printfQuda("dslash.Nface() funny = %d\n", dslash.Nface());
-              fflush(stdout);
               checkCudaError();
 
               // wait for scattering to finish and then launch dslash
@@ -1637,8 +1622,6 @@ namespace quda {
 
 #endif // MULTI_GPU
         checkCudaError();
-        printfQuda("Call to dslashCuda complete\n");  
-        fflush(stdout);
       }
 
       // Wilson wrappers
@@ -1985,8 +1968,6 @@ namespace quda {
           const bool hasNaik=true)
       {
         inSpinor = (cudaColorSpinorField*)in; // EVIL
-
-        printfQuda("staggeredDslashCuda nFace = %d\n", nFace);
         checkCudaError();
 
 
@@ -2035,8 +2016,6 @@ namespace quda {
 
         if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-          printfQuda("Creating new dslash operator\n");
-          fflush(stdout);
           dslash = new StaggeredDslashCuda<double2, double2, double2>((double2*)out->V(), (float*)out->Norm(), 
               (double2*)fatGauge0, (double2*)fatGauge1,
               (double2*)longGauge0, (double2*)longGauge1, 
@@ -2048,8 +2027,6 @@ namespace quda {
               hasNaik);
           regSize = sizeof(double);
           checkCudaError();
-          printfQuda("Dslash operator created\n");
-          fflush(stdout);
 #else
           errorQuda("Double precision not supported on this GPU");
 #endif
@@ -2076,13 +2053,6 @@ namespace quda {
               hasNaik);
         }
         checkCudaError();
-
-
-        printfQuda("regSize = %d\n", regSize);
-        printfQuda("parity = %d\n", parity);
-        printfQuda("dagger = %d\n", dagger);
-        printfQuda("in->Volume() = %d\n", in->Volume());
-        fflush(stdout);
 
         dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
         checkCudaError();

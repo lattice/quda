@@ -53,8 +53,6 @@ namespace quda {
     const int num_norm_faces = 2*nFace;
 
 
-    printfQuda("In createGhostZone: nFace = %d\n",nFace);
-
     // calculate size of ghost zone required
     int ghostVolume = 0;
     //BEGIN NEW:  
@@ -66,10 +64,9 @@ namespace quda {
       if (commDimPartitioned(i)) {
         ghostFace[i] = 1;
         for (int j=0; j<dims; j++) {
-          if(i==j) printfQuda("x[%d] = %d\n",j,x[j]);
           if (i==j) continue;
           border[j] = 0;
-          ghostFace[i] *= (x[j]-2*border[j]);
+          ghostFace[i] *= x[j];
         }
         ghostFace[i] *= x5; ///temporal hack : extra dimension for DW ghosts
         if (i==0 && siteSubset != QUDA_FULL_SITE_SUBSET) ghostFace[i] /= 2;
@@ -91,7 +88,6 @@ namespace quda {
 #endif
     }//end of outmost for loop
     //END NEW 
-    printfQuda("ghostVolume = %d\n", ghostVolume); 
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
@@ -123,15 +119,6 @@ namespace quda {
       printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
-
-    printfQuda("total_length = %d\n", total_length);
-    printfQuda("length = %d\n", length);
-    printfQuda("ghost length = %d\n", ghost_length);
-
-
-    printfQuda("Call to createGhostZone() complete\n");
-
-
   }
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nface, QudaTwistFlavorType Twistflavor, 
@@ -162,8 +149,6 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       stride = volume/2 + pad; // padding is based on half volume
       length = 2*stride*nColor*nSpin*2;   
-      printfQuda("Stride = %d\n", stride);
-      printfQuda("Pad = %d\n", pad); 
     } else {
       stride = volume + pad;
       length = stride*nColor*nSpin*2;
@@ -173,8 +158,6 @@ namespace quda {
 
     createGhostZone();
 
-    printfQuda("ColorSpinorField::total_length = %d\n", total_length);
-    printfQuda("precision = %d\n", precision); 
 
     bytes = total_length * precision; // includes pads and ghost zones
     bytes = ALIGNMENT_ADJUST(bytes);
@@ -221,8 +204,6 @@ namespace quda {
       length = 2*stride*nColor*nSpin*2;
     } else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
       stride = volume + pad;
-      printfQuda("pad = %d\n", pad);
-      printfQuda("stride = %d\n", stride);
       length = stride*nColor*nSpin*2;  
     } else {
       //errorQuda("SiteSubset not defined %d", param.siteSubset);
