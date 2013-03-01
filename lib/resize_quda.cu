@@ -162,10 +162,6 @@ namespace quda {
     *y3_p = x3;
     *y4_p = x4; 
 
-    if(x1==0 && x2==0 && x3==0 && x4==0){
-      printf("params.B = %d %d %d %d\n", params.B1, params.B2, params.B3, params.B4);
-    }
-
     switch(Dir){
       case 0:
         if(x1 >= params.B1) *y1_p += params.X1;
@@ -196,8 +192,6 @@ namespace quda {
         break;
     }
 
-    printf("x = (%d, %d, %d, %d), y = (%d, %d, %d, %d)\n", x1, x2, x3, x4, *y1_p, *y2_p, *y3_p, *y4_p);
-
     return;
   }
 
@@ -212,11 +206,6 @@ namespace quda {
       int x1, x2, x3, x4;
       int y1, y2, y3, y4;
 
-      if(cb_index == 0){
-        printf("copyExteriorKernel : length = %d\n", length);
-      }
-
-
       int offset = (cb_index >=length/2) ? (N-1)*length/2 : 0;
 
       while(cb_index < length){
@@ -224,26 +213,11 @@ namespace quda {
         getDomainCoordsFromGhostCoords(&y1, &y2, &y3, &y4,
             x1, x2, x3, x4, params, Dir); 
 
-
-        if(cb_index == 288 && Dir==2){
-          printf("cb_index = 288, x = (%d, %d, %d, %d), y = (%d, %d, %d, %d)\n", x1, x2, x3, x4, y1, y2, y3, y4);
-        }
-
-
         int large_cb_index = (y4*params.Y3Y2Y1 + y3*params.Y2Y1 + y2*params.Y1 + y1) >> 1;
 
         FloatN x[N];
         X.load(x, cb_index + offset);
         Y.save(x, large_cb_index);
-
-             
-
- 
-        if((y1/2)==0 && y2==2 && y3==1 && y4==0){
-          printf("cb_index = %d, XX[%d] = (%lf, %lf, %lf, %lf, %lf, %lf)\n", cb_index, cb_index+offset, x[0].x, x[0].y, x[1].x, x[1].y, x[2].x, x[2].y);
-        }  
-
-
 
         cb_index += gridSize;
       }
@@ -279,35 +253,13 @@ namespace quda {
           const unsigned int blockX = 128;
           const unsigned int gridX = (length + (blockX-1))/blockX;
 
-          printfQuda("In ExtendQuda::apply\n");
-          printfQuda("length = %d\n",length);
-          printfQuda("blockX = %d\n", blockX);
-          printfQuda("gridX = %d\n", gridX);
-          fflush(stdout);
-
-
           dim3 blockDim(blockX,1,1); // warp size on GK110
           dim3 gridDim(gridX,1,1); // random choice - change this
 
           if(dir<0){
             copyInteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity); 
           }else if(dir>=0 && dir<4){
-            size_t total, free;
-            cudaMemGetInfo(&free, &total);
-            printfQuda("Calling copyExteriorKernel\n");
-            printfQuda("length = %d\n", length);
-            printfQuda("Total mem = %d\n", total);
-            printfQuda("Free mem = %d\n", free);
-            fflush(stdout);
-            
             copyExteriorKernel<FloatN, N><<<gridDim, blockDim, 0, stream>>>(Y, X, length, params, parity, dir); 
-
-            cudaDeviceSynchronize(); 
-            cudaMemGetInfo(&free, &total);
-            printfQuda("Just called copyExteriorKernel\n");
-            printfQuda("Total mem = %d\n", total);
-            printfQuda("Free mem = %d\n", free);
-
           }else{
             errorQuda("dir %d is unrecognized");
           }
@@ -368,14 +320,12 @@ namespace quda {
     // copied from createDslashEvents
 #ifndef DSLASH_PROFILING
     // add cudaEventDisableTiming for lower sync overhead 
-    printfQuda("Calling createExtendEvents()\n");
     for(int i=0; i<Nstream; ++i){
       cudaEventCreate(&packEnd[i], cudaEventDisableTiming);
       cudaEventCreate(&gatherEnd[i], cudaEventDisableTiming);
       cudaEventCreate(&scatterEnd[i], cudaEventDisableTiming);
     }
 #else
-    printfQuda("Calling createExtendEvents()\n");
     for(int i=0; i<Nstream; ++i){
       cudaEventCreate(&packEnd[i]);
       cudaEventCreate(&gatherEnd[i]);
@@ -386,7 +336,6 @@ namespace quda {
   }
 
   void destroyExtendEvents(){
-    printfQuda("Calling destroyExtendEvents()\n");
     for(int i=0; i<Nstream; ++i){
       cudaEventDestroy(packEnd[i]);
       cudaEventDestroy(gatherEnd[i]);
@@ -433,44 +382,19 @@ namespace quda {
     static void extendCuda__(cudaColorSpinorField& dst, cudaColorSpinorField& src, const DecompParam& params, const int parity, const int* const domain_overlap, FaceBuffer* face)
     {
 
-      printfQuda("Inside extendCuda__\n");
-      size_t free, total;
-      cudaMemGetInfo(&free, &total);
-      printfQuda("Free memory : %d\n", free);
-      printfQuda("Total memory: %d\n", total);
-      fflush(stdout);       
 #ifdef MULTI_GPU
       for(int i=3; i >= 0; i--){
         if(domain_overlap[i]){
           // Initiate pack from source spinor on the device
-          printfQuda("extendCuda__ : packing direction %d\n", i);
-          fflush(stdout);
           face->pack(src, parity, 0, i, streams); // pack in stream[Nstream-1]
-
+#ifdef DD_DEBUG
           cudaError_t packSync = cudaDeviceSynchronize();
           if(packSync != cudaSuccess){
-            printfQuda("face->pack failed\n");
+            errorQuda("Face packing error: %d", packSync);
           }
+          checkCudaError();
+#endif
           cudaEventRecord(packEnd[2*i], streams[Nstream-1]);
-          printfQuda("extendCuda__ : packing in direction %d complete\n", i);
-          fflush(stdout);
-          //          cudaError_t packQuery = cudaEventQuery(packEnd[2*i]);
-          //          switch(packQuery){
-          //            case cudaErrorInvalidValue:
-          //              printfQuda("pack cudaErrorInvalidValue!\n");
-          //              break;
-          //           case cudaErrorInitializationError:
-          //              printfQuda("pack cudaErrorInitializationError!\n");
-          //              break;
-          //            case cudaErrorInvalidResourceHandle:
-          //              printfQuda("pack cudaErrorInvalidResourceHandle!\n");
-          //              break;
-          //            case cudaErrorLaunchFailure:
-          //              printfQuda("pack cudaErrorLaunchFailure!\n");
-          //              break;
-          //            default:
-          //              break;
-          //          }
         }
       }
 
@@ -478,77 +402,35 @@ namespace quda {
         if(domain_overlap[i]){
           for(int dir=1; dir >= 0; dir--){
             cudaStreamWaitEvent(streams[2*i+dir], packEnd[2*i], 0);
-
-            printfQuda("extendCuda__ : gathering direction %d \n", i);
-            fflush(stdout);
-
             // Initiate transfer of packed ghost data from device to host
-            face->gather(src, 0, 2*i+dir); // what does dagger do, and should I be concerned?
-
-            cudaDeviceSynchronize();
-
-            printfQuda("extendCuda__ : gather in direction %d complete\n", i);
-            fflush(stdout);
-
-            cudaDeviceSynchronize();
+            face->gather(src, 0, 2*i+dir); 
+#ifdef DD_DEBUG
+            cudaError_t gatherSync = cudaDeviceSynchronize();
+            if(gatherSync != cudaSuccess){
+              errorQuda("Face gather error: %d", gatherSync);
+            }
+            checkCudaError();
+#endif
             // Record the end of the gathering 
             cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]);
-            //            cudaError_t gatherQuery = cudaEventQuery(gatherEnd[2*i+dir]);
-            //
-            //            switch(gatherQuery){
-            //              case cudaErrorInvalidValue:
-            //                printfQuda("cudaErrorInvalidValue!\n");
-            //                break;
-            //              case cudaErrorInitializationError:
-            //                printfQuda("cudaErrorInitializationError!\n");
-            //                break;
-            //              case cudaErrorInvalidResourceHandle:
-            //                printfQuda("cudaErrorInvalidResourceHandle!\n");
-            //                break;
-            //              case cudaErrorLaunchFailure:
-            //                printfQuda("cudaErrorLaunchFailure!\n");
-            //                break;
-            //              default:
-            //                break;
-            //            }
-
           } // dir = 0,1
         } // if domain_overlap[i]
       } // i = 0,1,2,3
 
 #endif  // MULTI_GPU  
+      { // copy the interior region
+        SrcSpinorType src_spinor(src);  
+        DstSpinorType dst_spinor(dst);
 
-      cudaMemGetInfo(&free, &total);
-      printfQuda("extendCuda__ half done:\n");
-      printfQuda("Total memory = %d\n", total);
-      printfQuda("Free memory = %d\n", free);
-      printfQuda("src.Stride() = %d\n", src.Stride());
-      fflush(stdout);
-
-
-      cudaDeviceSynchronize();
-
-      SrcSpinorType src_spinor(src);  
-      DstSpinorType dst_spinor(dst);
-
-      ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
-        extend(dst_spinor, src_spinor, src.Volume(), params, parity);
-
-      printfQuda("Calling interior extend.apply\n");
-      fflush(stdout);
-      extend.apply(streams[Nstream-1]); // copy the interior region. 
-
-      printfQuda("Call to interior extend.apply complete\n");
-      fflush(stdout);
+        ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
+          extend(dst_spinor, src_spinor, src.Volume(), params, parity);
+        extend.apply(streams[Nstream-1]); // copy the interior region. 
+      }
 #ifdef MULTI_GPU
       int commDimTotal=0;
       initCommsPattern(&commDimTotal,domain_overlap);
 
       int completeSum = 0;
-      printfQuda("commDimTotal = %d\n", commDimTotal);
-      printfQuda("domain_overlap = %d %d %d %d\n", domain_overlap[0], domain_overlap[1],
-          domain_overlap[2], domain_overlap[3]);
-
       int attempts = 0;
       while(completeSum < commDimTotal) {
         attempts++;
@@ -557,32 +439,9 @@ namespace quda {
             for(int dir=1; dir >= 0; dir--){
               // Query if gather (transfer of ghost data to host) has completed
               if(!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]){
-                printfQuda("Checking to see if gather[%d] completed\n",2*i+dir);
-
-
-                //                cudaError_t gatherQuery = cudaEventQuery(gatherEnd[2*i+dir]);
-                //                   switch(gatherQuery){
-                //                   case cudaErrorInvalidValue:
-                //                   printfQuda("cudaErrorInvalidValue!\n");
-                //                   break;
-                //                   case cudaErrorInitializationError:
-                //                   printfQuda("cudaErrorInitializationError!\n");
-                //                   break;
-                //                  case cudaErrorInvalidResourceHandle:
-                //                   printfQuda("cudaErrorInvalidResourceHandle!\n");
-                //                   break;
-                //                   case cudaErrorLaunchFailure:
-                //                   printfQuda("cudaErrorLaunchFailure!\n");
-                //                   break;
-                //                   default:
-                //                   break;
-                //                   }
                 if(cudaSuccess == cudaEventQuery(gatherEnd[2*i+dir])){
-                  printfQuda("Gather Completed!\n");
                   gatherCompleted[2*i+dir] = 1;
                   completeSum++;
-                  printfQuda("extendCuda__ : calling face->commsStart(%d)\n",2*i+dir);
-                  fflush(stdout);
                   face->commsStart(2*i+dir); // start communication
                 }
               } // if not gather completed
@@ -591,27 +450,14 @@ namespace quda {
               // Query if comms has finished 
               if(!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] && 
                   gatherCompleted[2*i+dir]){
-
-                printfQuda("calling face->commsQuery\n");
-
                 if(face->commsQuery(2*i+dir)){     
                   commsCompleted[2*i+dir] = 1;
                   completeSum++;
                   // copy data back to the ghost zones on the device
-                  printfQuda("extendCuda__ : calling face->scatter in direction %d\n", 2*i+dir);
-                  fflush(stdout);
                   face->scatter(src, 0, 2*i+dir);
                 }
               } // if comms not completed
             } // dir = 0,1
-
-            if((attempts % 500) == 0) printfQuda("Attempts = %d\n", attempts);
-
-            printfQuda("Close to the end of extendCuda__\n");
-            cudaMemGetInfo(&free, &total);
-            printfQuda("Free memory = %d\n", free);
-            printfQuda("Total memory = %d\n", total);
-            fflush(stdout);
 
 
             if(!extendCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1])
@@ -626,57 +472,20 @@ namespace quda {
               cudaStreamWaitEvent(streams[2*i], scatterEnd[2*i], 0);
               // Warning! - Need to get the stride right!
 
-              if(src.Ghost(i) == NULL){
-                printfQuda("Ghost pointer is NULL!\n");
-              }else{
-                printfQuda("Ghost pointer is okay\n");
-              }
-
-              char* v  = (char*)src.V();
-              char* v1 = (char*)src.V() + (src.Length() + src.GhostOffset(i)*6)*src.Precision();
-              char* v2 = (char*)src.Ghost(i);
-              char* v3 = (char*)src.V() + src.TotalLength()*src.Precision();
-              char* v4 = (char*)src.Ghost(i);
-              printfQuda("src.V() = %p\n", v);
-              printfQuda("v1 = %p, v2 = %p\n", v1, v2);
-              printfQuda("v3 = %p\n", v3);
-              printfQuda("v4 = %p\n", v4);
-              fflush(stdout);
-
               const int ghost_stride = 2*src.Nface()*src.Nspin()*src.Ncolor()*src.GhostFace()[i];
-              printfQuda("Extend:: ghost_stride = %d\n",ghost_stride);
-
               const int ghost_volume = 2*src.Nface()*src.GhostFace()[i];
-              printfQuda("Extend::ghost_volume = %d\n",ghost_volume);
 
 
-              SrcSpinorType src_spinor(v1, static_cast<float*>(src.GhostNorm(i)), ghost_stride); 
+              SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), ghost_stride); 
               //SrcSpinorType src_spinor(src.Ghost(i), static_cast<float*>(src.GhostNorm(i)), 0); 
-
-              printfQuda("About to call exterior extend.apply\n");
-              cudaMemGetInfo(&free, &total);
-              printfQuda("Free memory = %d\n", free);
-              printfQuda("Total memory = %d\n", total);
-              fflush(stdout);
-
 
               ExtendCuda<DataType, 3, DstSpinorType, SrcSpinorType> 
                 extend(dst_spinor, src_spinor, ghost_volume, params, parity, i);
-
-              printfQuda("Created extend\n");
-              cudaMemGetInfo(&free, &total);
-              printfQuda("Total memory = %d\n", total);
-              printfQuda("Free memory = %d\n", free);
-              fflush(stdout);
-
 
               // Need to be careful here to ensure that face->scatter has completed
               // I believe that streams used for extend.apply now match the scatter streams
               extend.apply(streams[2*i]);
               extendCompleted[2*i] = 1;
-
-              printfQuda("Call to extend.apply complete\n");
-              fflush(stdout);
             }
           }
         } // i = 0,1,2,3
@@ -685,15 +494,6 @@ namespace quda {
 
 #endif
       cudaDeviceSynchronize(); // as a safety measure
-
-      printfQuda("At the end of extendCuda__\n");
-      cudaMemGetInfo(&free, &total);
-      printfQuda("total memory = %d\n", total);
-      printfQuda("free memory = %d\n", free);
-      fflush(stdout); 
-
-      /*
-       */
       return;
     }
 
@@ -728,22 +528,12 @@ namespace quda {
   void Extender::operator()(cudaColorSpinorField &dst, cudaColorSpinorField &src, const DecompParam& params, const int * const domain_overlap) 
   {
 
-    printfQuda("Calling Extender::operator()\n");
-    fflush(stdout);
-
     if (&src == &dst) return; // aliasing fields
-
 
     if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported");
 
-    //if (src.Length() >= dst.Length()) errorQuda("src length should be less than destination length");
-    if (src.RealLength() > dst.RealLength()){
-      printfQuda("src.RealLength() = %d\n", src.RealLength());
-      printfQuda("dst.RealLength() = %d\n", dst.RealLength());
+    if (src.RealLength() > dst.RealLength()) errorQuda("src length should be less than destination length");
 
-      errorQuda("src length should be less than destination length");
-    }
-  
     if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET)
     {
       errorQuda("QUDA_FULL_SITE_SUBSET is not yet supported\n");
@@ -756,9 +546,6 @@ namespace quda {
     const int parity = 0; // Need to change this
     // I should really use a function to do this
     {
-      printfQuda("About to call EXTEND_CORE\n");
-      fflush(stdout);
-
       EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_DOUBLE_PRECISION)
         else EXTEND_CORE(float2, QUDA_SINGLE_PRECISION, QUDA_SINGLE_PRECISION)
           else EXTEND_CORE(float2, QUDA_HALF_PRECISION, QUDA_HALF_PRECISION)
@@ -769,8 +556,6 @@ namespace quda {
                     else EXTEND_CORE(double2, QUDA_DOUBLE_PRECISION, QUDA_HALF_PRECISION)
                       else EXTEND_CORE(double2, QUDA_HALF_PRECISION, QUDA_DOUBLE_PRECISION)
     }
-    printfQuda("Call to EXTEND_CORE complete\n");
-    fflush(stdout);
     return;
   }
 
