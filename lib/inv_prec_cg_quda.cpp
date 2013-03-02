@@ -232,18 +232,17 @@ namespace quda {
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       globalReduce = false;
-      MPI_Barrier(MPI_COMM_WORLD);
       printfQuda("About to call K->operator()(*minvrPre_ptr, *rPre_ptr)");
-      MPI_Barrier(MPI_COMM_WORLD);
       fflush(stdout);
       K->operator()(*minvrPre_ptr, *rPre_ptr);  
       globalReduce = true;
 
 
-      if(max_overlap)
+      if(max_overlap){
         cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
-      else
+      }else{
         *minvr_ptr = *minvrPre_ptr;
+      }
 
       p_ptr = new cudaColorSpinorField(*minvr_ptr);
     }else{
@@ -261,8 +260,6 @@ namespace quda {
     delete p_ptr;
     delete minvr_ptr;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
     return;
   }
 

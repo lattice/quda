@@ -383,6 +383,7 @@ void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   precondition->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
   param->gaugeGiB += precondition->GBytes();
+  delete cpu;
   
   switch (param->type) {
   case QUDA_WILSON_LINKS:
@@ -404,6 +405,7 @@ void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   default:
     errorQuda("Invalid gauge type");   
   }
+
 
 }
 
