@@ -332,9 +332,9 @@ namespace quda {
   
     if (invParam.cuda_prec_sloppy != x[0]->Precision()) {
       for (int i=0; i<num_offset; i++) delete x_sloppy[i];
-      delete []x_sloppy;
       delete r_sloppy;
     }
+    delete []x_sloppy;
   
     delete []zeta_old;
     delete []zeta;
