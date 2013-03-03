@@ -59,6 +59,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src),  alloc(false), init(true), texInit(false) {
+    checkCudaError();
     create(QUDA_COPY_FIELD_CREATE);
     if (isNative() && src.isNative()) copy(src);
     else errorQuda("Cannot copy using non-native fields");
@@ -197,6 +198,7 @@ namespace quda {
       }
     } else if (precision == QUDA_HALF_PRECISION) {
       if (nSpin == 4) {
+    checkCudaError();
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 1) {
 	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
@@ -211,6 +213,7 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER) {
       errorQuda("Subset not implemented");
     }
+    checkCudaError();
 
     //FIXME: This addition is temporary to ensure we have the correct
     //field order for a given precision
@@ -219,12 +222,17 @@ namespace quda {
 
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
+      printfQuda("bytes = %d\n", bytes);
+      fflush(stdout);
       v = device_malloc(bytes);
+    checkCudaError();
       if (precision == QUDA_HALF_PRECISION) {
 	norm = device_malloc(norm_bytes);
       }
       alloc = true;
+    checkCudaError();
     }
+    checkCudaError();
 
     // Check if buffer isn't big enough
     if ((bytes > bufferBytes) && bufferInit) {
@@ -235,7 +243,9 @@ namespace quda {
 	buffer_d = NULL;
       }
       bufferInit = false;
+    checkCudaError();
     }
+    checkCudaError();
 
     if (!bufferInit) {
       bufferBytes = bytes;
@@ -245,6 +255,7 @@ namespace quda {
       }
       bufferInit = true;
     }
+    checkCudaError();
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       // create the associated even and odd subsets
@@ -265,12 +276,15 @@ namespace quda {
 	(dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((unsigned long)norm + norm_bytes/2);
     }
 
+
+    checkCudaError();
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (siteSubset != QUDA_FULL_SITE_SUBSET) {
 	zeroPad();
       } else {
 	(dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
 	(dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
+    checkCudaError();
       }
     }
 
