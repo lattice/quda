@@ -45,7 +45,7 @@ namespace quda {
       const DiracMatrix &mat;
 
     public:
-      SimpleCG(const DiracMatrix &mat, TimeProfile &profile);
+      SimpleCG(const DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
       virtual ~SimpleCG();
 
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);

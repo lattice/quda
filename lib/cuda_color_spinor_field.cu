@@ -68,6 +68,9 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
     ColorSpinorField(src),  alloc(false), init(true), texInit(false) {  
 
+// JF
+    checkCudaError();
+
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
 	(param.create == QUDA_REFERENCE_FIELD_CREATE && 
@@ -75,38 +78,56 @@ namespace quda {
 	 param.siteSubset == QUDA_PARITY_SITE_SUBSET && 
 	 typeid(src) == typeid(cudaColorSpinorField) ) ) {
       reset(param);
+// JF
+    checkCudaError();
     } else {
       errorQuda("Undefined behaviour"); // else silent bug possible?
     }
+// JF
+    checkCudaError();
 
     // This must be set before create is called
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       if (typeid(src) == typeid(cudaColorSpinorField)) {
 	v = (dynamic_cast<const cudaColorSpinorField&>(src)).v;
 	norm = (dynamic_cast<const cudaColorSpinorField&>(src)).norm;
+// JF
+    checkCudaError();
       } else {
 	errorQuda("Cannot reference a non-cuda field");
       }
     }
+// JF
+    checkCudaError();
 
     create(param.create);
+// JF 
+    checkCudaError();
 
     if (param.create == QUDA_NULL_FIELD_CREATE) {
       // do nothing
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
+// JF
+    checkCudaError();
     } else if (param.create == QUDA_COPY_FIELD_CREATE) {
       if (typeid(src) == typeid(cudaColorSpinorField) && 
 	  isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
 	copy(dynamic_cast<const cudaColorSpinorField&>(src));
+// JF
+    checkCudaError();
       } else {
 	loadSpinorField(src);
+// JF
+    checkCudaError();
       }
     } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else {
       errorQuda("CreateType %d not implemented", param.create);
     }
+// JF
+    checkCudaError();
 
   }
 

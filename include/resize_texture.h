@@ -307,12 +307,10 @@ class Spinor {
     // Note: the use of texture reads is not yet supported here!
     Spinor(StoreType* spinor, float* norm, int field_stride) 
       : spinor(spinor), tex(spinor), norm(norm), stride(field_stride/(N*REG_LENGTH)) { 
-        printfQuda("Calling Spinor::Spinor(StoreType* spinor, float* norm, int stride\n");
         checkTypes<RegType, InterType, StoreType>(); }
 
     Spinor(void* spinor, float* norm, int field_stride)
       : spinor(static_cast<StoreType*>(spinor)), tex(static_cast<StoreType*>(spinor)), norm(norm), stride(field_stride/(N*REG_LENGTH)) { 
-      printfQuda("Calling Spinor::Spinor(void* spinor, float* norm, int stride\n");
       checkTypes<RegType, InterType, StoreType>(); }
 #endif
 
@@ -341,14 +339,6 @@ class Spinor {
       const int M = (N * sizeof(RegType)) / sizeof(InterType);
       InterType y[M];
 
-
-      if(i==0){
-        printf("N = %d\n", N);
-        printf("M = %d\n", M);
-        printf("sizeof(InterType) = %d\n", sizeof(InterType));
-        printf("sizeof(RegType) = %d\n", sizeof(RegType));
-        printf("stride = %d\n", stride);
-      }
 
       // If we are using tex references, then we can only use the predeclared texture ids
 #ifndef USE_TEXTURE_OBJECTS
