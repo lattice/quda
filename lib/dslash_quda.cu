@@ -1488,10 +1488,6 @@ namespace quda {
 
         if(faceVolumeCB == NULL){
           errorQuda("faceVolumeCB == NULL");
-        }else{
-          for(int dir=0; dir<4; ++dir){
-            printfQuda("faceVolumeCB[%d] = %d\n", dir, faceVolumeCB[dir]);
-          }
         }
 
         checkCudaError();

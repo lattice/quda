@@ -437,6 +437,7 @@ const float fatlinkMax = kparam.fatlinkMax;
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
     MAT_MUL_V(A, fat, i);    
 
+/*
     if(kernel_type == EXTERIOR_KERNEL_X){
       if(x1 >= kparam.X1m1){
         printf("+X x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -446,6 +447,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("+X x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
+*/
 
     o0_re += A0_re;
     o0_im += A0_im;
@@ -529,7 +531,8 @@ const float fatlinkMax = kparam.fatlinkMax;
 #endif
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
     ADJ_MAT_MUL_V(A, fat, i); 
-      
+     
+/* 
     if(kernel_type == EXTERIOR_KERNEL_X){
       if(x1 == 0){
         printf("-X x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -539,7 +542,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("-X x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
-
+*/
 
     o0_re -= A0_re;
     o0_im -= A0_im;
@@ -624,6 +627,7 @@ const float fatlinkMax = kparam.fatlinkMax;
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
     MAT_MUL_V(A, fat, i);
 
+/*
     if(kernel_type == EXTERIOR_KERNEL_Y){
       if(x2 >= kparam.X2m1){
         printf("+Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -633,6 +637,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("+Y x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
+*/
 
     o0_re += A0_re;
     o0_im += A0_im;
@@ -720,6 +725,7 @@ const float fatlinkMax = kparam.fatlinkMax;
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
     ADJ_MAT_MUL_V(A, fat, i);
 
+/*
     if(kernel_type == EXTERIOR_KERNEL_Y){
       if(x2 == 0){
         printf("-Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -729,6 +735,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("-Y x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
+*/
 
     o0_re -= A0_re;
     o0_im -= A0_im;
@@ -816,6 +823,7 @@ const float fatlinkMax = kparam.fatlinkMax;
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
     MAT_MUL_V(A, fat, i);	 
 
+/*
     if(kernel_type == EXTERIOR_KERNEL_Z){
       if(x3 >= kparam.X3m1){
         printf("+Z x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -825,6 +833,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("+Z x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
+*/
 
     o0_re += A0_re;
     o0_im += A0_im;
@@ -910,6 +919,7 @@ const float fatlinkMax = kparam.fatlinkMax;
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
     ADJ_MAT_MUL_V(A, fat, i);
 
+/*
     if(kernel_type == EXTERIOR_KERNEL_Z){
       if(x3 == 0){
         printf("-Z x = (%d, %d, %d, %d), parity = %d,  I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, param.parity, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -919,6 +929,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("-Z x = (%d, %d, %d, %d), parity = %d,  I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, param.parity, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
+*/
 
     o0_re -= A0_re;
     o0_im -= A0_im;
@@ -1003,6 +1014,7 @@ const float fatlinkMax = kparam.fatlinkMax;
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);    
     MAT_MUL_V(A, fat, i);
 
+/*
     if(kernel_type == EXTERIOR_KERNEL_T){
       if(x4 >= kparam.X4m1){
         printf("+T x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -1012,6 +1024,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("+T x = (%d, %d, %d, %d), neighbor I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }     
     }
+*/
 
     o0_re += A0_re;
     o0_im += A0_im;
@@ -1091,6 +1104,7 @@ const float fatlinkMax = kparam.fatlinkMax;
     READ_KS_NBR_SPINOR(I, SPINORTEX, nbr_idx1, stride1);
     ADJ_MAT_MUL_V(A, fat, i);
 
+/*
     if(kernel_type == EXTERIOR_KERNEL_T){
       if(x4 == 0){
         printf("-T x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
@@ -1100,7 +1114,7 @@ const float fatlinkMax = kparam.fatlinkMax;
         printf("-T x = (%d, %d, %d, %d), I = (%lf, %lf, %lf, %lf, %lf, %lf), f = %lf, %lf\n", x1, x2, x3, x4, i00_re, i00_im, i01_re, i01_im, i02_re, i02_im, fat00_re, fat22_im);
       }
     }
-
+*/
 
     o0_re -= A0_re;
     o0_im -= A0_im;

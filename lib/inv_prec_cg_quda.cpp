@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <iostream>
-#include <mpi.h>
+
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -104,8 +104,6 @@ namespace quda {
       }
     }
 
-    printfQuda("max_overlap = %d\n", max_overlap);
-    fflush(stdout);
 
     int X[4]; // smaller sublattice dimensions
     int Y[4]; // extended subdomain dimensions
@@ -126,42 +124,20 @@ namespace quda {
     int domain_overlap[4];
     for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
-    printfQuda("Calling ColorSpinorParam param(b)\n");
-    fflush(stdout);
     ColorSpinorParam param(b);
     param.nFace  = max_overlap;
     param.create = QUDA_COPY_FIELD_CREATE; 
-    printfQuda("Calling cudaColorSpinorField r(b,param)\n");
-    fflush(stdout);
     cudaColorSpinorField r(b,param);
-    printfQuda("Call to cudaColorSpinorField r(b,param) complete\n");
 
-    printfQuda("Calling Extender constructor\n");
-    fflush(stdout);
     Extender extendCuda(r); // function object used to implement overlapping domains
-    printfQuda("Call to Extender constructor completed\n");
-    fflush(stdout);
 
     param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b,param);
-    minvr_ptr = new cudaColorSpinorField(b,param);
+    if(K) minvr_ptr = new cudaColorSpinorField(b,param);
 
-
-
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    printfQuda("Calling test mat(r,x,y)\n");
-    fflush(stdout);
-    mat(r, b, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
-    //		cudaColorSpinorField& tmp);
-    //
+    mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    printfQuda("Call to mat(r,x,y)\n");
-    fflush(stdout);
-//    MPI_Finalize();
 
     double r2 = xmyNormCuda(b,r);
     rUpdate++;
@@ -180,8 +156,7 @@ namespace quda {
       prec_param.precision  = invParam.cuda_prec_precondition;
       prec_param.nColor     = 3;
       prec_param.nDim       = 4;
-      prec_param.pad        = 0; // Not sure if this will cause a problem
-      // prec_param.pad        = r.Pad(); 
+      prec_param.pad        = r.Pad(); // Not sure if this will cause a problem
       prec_param.nSpin      = 1;
       prec_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       prec_param.siteOrder  = QUDA_EVEN_ODD_SITE_ORDER;
@@ -195,48 +170,18 @@ namespace quda {
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
-      printfQuda("About to check max_overlap\n");
-      fflush(stdout);
-      //      if(max_overlap > 0){
-      printfQuda("Calling extendCuda\n");
-      fflush(stdout);
-
-      double norm2_r = norm2(r);
-      extendCuda(*rPre_ptr,b,dparam,domain_overlap);
-      printfQuda("Call to extendCuda complete\n");
-      cropCuda(*minvr_ptr,*rPre_ptr,dparam);
-      //cropCuda(*minvr_ptr,r,param2);
-
-      double norm2_mr = norm2(*minvr_ptr);
-
-      printfQuda("norm2_mr = %lf, norm2_r = %lf\n", norm2_mr, norm2_r);
-
-      fflush(stdout);
-      //      }else{
-      //        printfQuda("Calling *rPre_ptr = r\n");
-      //        fflush(stdout);
-      //        printfQuda("rPre_ptr->Length() = %d\n", rPre_ptr->Length());
-      //        printfQuda("rPre_ptr->RealLength() = %d\n", rPre_ptr->RealLength());
-      //        printfQuda("rPre_ptr->Pad() = %d\n", rPre_ptr->Pad());
-      //        printfQuda("rPre_ptr->Stride() = %d\n", rPre_ptr->Stride());
-      //        printfQuda("r.Length() = %d\n",r.Length());
-      //        printfQuda("r.RealLength() = %d\n", r.RealLength());
-      //        printfQuda("r.Pad() = %d\n", r.Pad());
-      //        printfQuda("r.Stride() = %d\n", r.Stride());
-      //        fflush(stdout);
-
-      //        *rPre_ptr = r;
-      //        printfQuda("Call to *rPre_ptr complete\n");
-      //      }
-
+      if(max_overlap){
+        extendCuda(*rPre_ptr,r,dparam,domain_overlap);
+      }else{
+        *rPre_ptr = r;
+      }
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       globalReduce = false;
-      printfQuda("About to call K->operator()(*minvrPre_ptr, *rPre_ptr)");
-      fflush(stdout);
-      K->operator()(*minvrPre_ptr, *rPre_ptr);  
+      (*K)(*minvrPre_ptr, *rPre_ptr);  
       globalReduce = true;
 
+      printfQuda("r.Precision() = %d, rPre_ptr->Precision() = %d\n", r.Precision(), rPre_ptr->Precision());
 
       if(max_overlap){
         cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
@@ -246,22 +191,93 @@ namespace quda {
 
       p_ptr = new cudaColorSpinorField(*minvr_ptr);
     }else{
+      printfQuda("Creating p_ptr\n");
+      fflush(stdout);
       p_ptr = new cudaColorSpinorField(r);
     }
 
 
 
+    double src_norm = norm2(b);
+    double stop = src_norm*invParam.tol*invParam.tol; // stopping condition
+    double alpha = 0.0, beta=0.0;
+    double pAp;
+    double rMinvr  = 0;
+    double rMinvr_old = 0.0;
+    double r_new_Minvr_old = 0.0;
+    double r2_old = 0;
+    r2 = norm2(r);
+
+    if(K) rMinvr = reDotProductCuda(r,*minvr_ptr);
+
+    while(r2 > stop && k < invParam.maxiter){
+      mat(Ap, *p_ptr, tmp);
+      pAp   = reDotProductCuda(*p_ptr,Ap);
+
+      alpha = (K) ? rMinvr/pAp : r2/pAp;
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r); 
+      // r --> r - alpha*A*p
+
+      if(K){
+        rMinvr_old = rMinvr;
+        r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
+        //  zeroCuda(*rPre_ptr);
+
+        if(max_overlap){       
+          extendCuda(*rPre_ptr,r,dparam,domain_overlap);
+        }else{
+          *rPre_ptr = r;
+        }
+
+        *minvrPre_ptr = *rPre_ptr;
+
+
+        globalReduce = false;
+        (*K)(*minvrPre_ptr, *rPre_ptr);
+        globalReduce = true;
+
+        if(max_overlap){
+          cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
+        }else{
+          *minvr_ptr = *minvrPre_ptr;
+        }
+        rMinvr = reDotProductCuda(r,*minvr_ptr);
+
+        beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
+        r2 = real(cg_norm);
+        // x = x + alpha*p, p = Minvr + beta*p
+        axpyZpbxCuda(alpha, *p_ptr, x, *minvr_ptr, beta);
+      }else{
+        r2_old = r2;
+        r2 = real(cg_norm);
+
+        beta = r2/r2_old;
+        axpyZpbxCuda(alpha, *p_ptr, x, r, beta);
+      }
+      printfQuda("r2 = %e\n", r2);
+      // update x and p
+      // x = x + alpha*p
+      // p = Minv_r + beta*p
+      ++k;
+    }
+    printfQuda("Number of outer-solver iterations = %d\n",k);
+
+    // compute the true residual 
+    mat(r, x, y);
+    double true_res = xmyNormCuda(b, r);
+    invParam.true_res = sqrt(true_res / src_norm);
+    printfQuda("true_res = %e\n", invParam.true_res);
 
     // FIX THIS!!
     if(K){ // These are only needed if preconditioning is used
       delete minvrPre_ptr;
       delete rPre_ptr;
+      delete minvr_ptr;
     }
     delete p_ptr;
-    delete minvr_ptr;
 
     return;
   }
 
 
-  } // namespace quda
+} // namespace quda

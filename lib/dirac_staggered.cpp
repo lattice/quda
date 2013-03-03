@@ -63,10 +63,8 @@ namespace quda {
   
       
     if(Nface != in.Nface()){ 
-      printfQuda("Nface : %d, in.Nface() : %d\n", Nface, in.Nface());
-      errorQuda("DiracStaggered::Nface does not match in.Nface()");
+      errorQuda("DiracStaggered::Nface %d does not match in.Nface() %d",Nface, in.Nface());
     }
-    printfQuda("in.Stride() = %d\n", in.Stride());
     initSpinorConstants(in);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     initSpinorParams(&kernel_params, in);
@@ -185,7 +183,6 @@ namespace quda {
   {
     bool reset = newTmp(&tmp1, in);
     
-    printfQuda("In DiracStaggeredPC::MdagM\n"); 
 
  
     QudaParity parity = QUDA_INVALID_PARITY;
@@ -199,7 +196,6 @@ namespace quda {
     } else {
       errorQuda("Invalid matpcType(%d) in function\n", matpcType);    
     }
-    printfQuda("other_parity = %d\n", other_parity);
     Dslash(*tmp1, in, other_parity);  
     DslashXpay(out, *tmp1, parity, in, 4*mass*mass);
 
