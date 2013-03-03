@@ -24,6 +24,9 @@ namespace quda {
     /** The raw null space components */
     cpuColorSpinorField **B;
 
+    /** The number of null space components */
+    const int Nvec;
+
     /** The block-normalized null-space components that define the prolongator */
     cpuColorSpinorField *V;
 
@@ -35,6 +38,11 @@ namespace quda {
 
     /** The mapping onto coarse spin from fine spin */
     int *spin_map;
+
+    /**
+     * Copies the null-space vector components into the V-field
+     */
+    void fillV();
 
     /** 
      * Creates the map between fine and coarse grids 

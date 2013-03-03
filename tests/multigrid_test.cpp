@@ -97,7 +97,7 @@ void loadTest() {
 #endif
   }
 
-  for (int i=0; i<Nvec; i++) printfQuda("%d norm = %e\n", i, norm2(*W[i]));
+  for (int i=0; i<Nvec; i++) printfQuda("Vector %d has norm = %e\n", i, norm2(*W[i]));
 
   int geom_bs[] = {4, 2, 2, 2};
   int spin_bs = 2;

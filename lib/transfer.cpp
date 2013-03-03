@@ -1,9 +1,10 @@
 #include <transfer.h>
+#include <blas_quda.h>
 
 namespace quda {
 
   Transfer::Transfer(cpuColorSpinorField **B, int Nvec, int *geo_bs, int spin_bs)
-    : B(B), V(0), tmp(0), geo_map(0), spin_map(0) 
+    : B(B), Nvec(Nvec), V(0), tmp(0), geo_map(0), spin_map(0) 
   {
 
     // create the storage for the final block orthogonal elements
@@ -17,6 +18,7 @@ namespace quda {
       param.x[0] *= 2;
     }
     V = new cpuColorSpinorField(param);
+    fillV();
 
     // create the storage for the intermediate temporary vector
     param.nSpin = B[0]->Nspin(); // tmp has same nSpin has the fine dimension
@@ -42,6 +44,28 @@ namespace quda {
     if (V) delete V;
     if (tmp) delete tmp;
 
+  }
+
+  // copy the null-space vectors into the V-field
+  template <class V, class B>
+  void fill(V &out, const B &in, int v, int Nvec) {
+
+    for (int x=0; x<out.Volume(); x++) {
+      for (int s=0; s<in.Nspin(); s++) {
+	for (int c=0; c<in.Ncolor(); c++) {
+	  out(x, c, s*Nvec + v) = in(x, s, c);
+	}
+      }
+    }
+  }
+
+  void Transfer::fillV() {
+    if (V->Precision() == QUDA_DOUBLE_PRECISION) {
+      for (int v=0; v<Nvec; v++) fill(*(V->order_double), *(B[v]->order_double), v, Nvec);
+    } else {
+      for (int v=0; v<Nvec; v++) fill(*(V->order_single), *(B[v]->order_single), v, Nvec);
+    }    
+    //printfQuda("V fill check %e\n", norm2(*V));
   }
 
   // compute the fine-to-coarse site map
@@ -150,7 +174,7 @@ namespace quda {
   }
 
   /*
-    Rotates from the fine-color basis into the color-color basis.
+    Rotates from the fine-color basis into the coarse-color basis.
   */
   template <class CoarseColor, class FineColor, class Rotator>
   void rotateCoarseColor(CoarseColor &out, const FineColor &in, const Rotator &V) {
