@@ -9,10 +9,10 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
 #include <face_quda.h>
 #include <domain_decomposition.h>
 #include <resize_quda.h>
+#include <time.h>
 
 // I need to add functionality to the conjugate-gradient solver.
 // Should I do this by simple inheritance, or should I use a decorator? 
@@ -85,7 +85,10 @@ namespace quda {
 
   void PreconCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b)
   {
-    printfQuda("Calling preconditioned solver\n");
+    printfQuda("Calling preconditioned solver\n");  
+    time_t start_precon_time, end_precon_time;
+    double precon_time = 0.0;
+    time_t start_time = time(NULL);
     int k=0;
     int rUpdate;
 
@@ -179,9 +182,12 @@ namespace quda {
       }
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
+      start_precon_time = time(NULL);
       globalReduce = false;
       (*K)(*minvrPre_ptr, *rPre_ptr);  
       globalReduce = true;
+      precon_time += difftime(time(NULL), start_precon_time);
+      
 
       if(max_overlap){
         cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
@@ -229,10 +235,11 @@ namespace quda {
 
         *minvrPre_ptr = *rPre_ptr;
 
-
+        start_precon_time = time(NULL);
         globalReduce = false;
         (*K)(*minvrPre_ptr, *rPre_ptr);
         globalReduce = true;
+        precon_time += difftime(time(NULL), start_precon_time);
 
         if(max_overlap){
           cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
@@ -273,7 +280,12 @@ namespace quda {
       delete minvr_ptr;
     }
     delete p_ptr;
+    
+    double total_time = difftime(time(NULL), start_time); 
 
+    printfQuda("PreconCG time : %lf seconds\n", total_time);
+    printfQuda("SimpleCG time : %lf seconds\n", precon_time);
+    printfQuda("Fraction of time spent in preconditioner : %lf\n", (double)precon_time/(double)total_time);
     return;
   }
 
