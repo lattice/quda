@@ -127,14 +127,9 @@ namespace quda {
 
     ColorSpinorParam param(b);
     param.nFace  = max_overlap;
-    printfQuda("Here 0\n");
-    printfQuda("param.nFace = %d\n", param.nFace);
-    fflush(stdout);
     param.create = QUDA_COPY_FIELD_CREATE; 
     cudaColorSpinorField r(b,param);
 
-    printfQuda("Here 1\n");
-    fflush(stdout);
 
 
     Extender extendCuda(r); // function object used to implement overlapping domains
@@ -142,30 +137,17 @@ namespace quda {
     param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b,param);
-    printfQuda("Here 2\n");
-    fflush(stdout);
     if(K) minvr_ptr = new cudaColorSpinorField(b,param);
-      
-    printfQuda("Here 3\n");
-    fflush(stdout);
 
     mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
-    printfQuda("Here 4\n");
-    fflush(stdout);
 
     double r2 = xmyNormCuda(b,r);
     rUpdate++;
-    printfQuda("Here 5\n");
-    fflush(stdout);
 
     param.precision = invParam.cuda_prec_sloppy;
     cudaColorSpinorField Ap(x,param);
-    printfQuda("Here 6\n");
-    fflush(stdout);
     cudaColorSpinorField tmp(x,param);
-    printfQuda("Here 7\n");
-    fflush(stdout);
 
     ColorSpinorParam prec_param(x);
     prec_param.create = QUDA_COPY_FIELD_CREATE;
@@ -185,11 +167,7 @@ namespace quda {
       prec_param.x[0] /= 2; // since QUDA_PARITY_SITE_SUBSET
 
 
-      printfQuda("Here 8\n");
-      fflush(stdout);
       rPre_ptr = new cudaColorSpinorField(prec_param);
-      printfQuda("Here 9\n");
-      fflush(stdout);
       // HACK!!!
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
@@ -199,18 +177,12 @@ namespace quda {
       }else{
         *rPre_ptr = r;
       }
-      printfQuda("Here 10\n");
-      fflush(stdout);
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
-      printfQuda("Here 11\n");
-      fflush(stdout);
       globalReduce = false;
       (*K)(*minvrPre_ptr, *rPre_ptr);  
       globalReduce = true;
 
-      printfQuda("r.Precision() = %d, rPre_ptr->Precision() = %d\n", r.Precision(), rPre_ptr->Precision());
-      fflush(stdout);
       if(max_overlap){
         cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
       }else{
@@ -219,8 +191,6 @@ namespace quda {
 
       p_ptr = new cudaColorSpinorField(*minvr_ptr);
     }else{
-      printfQuda("Creating p_ptr\n");
-      fflush(stdout);
       p_ptr = new cudaColorSpinorField(r);
     }
 

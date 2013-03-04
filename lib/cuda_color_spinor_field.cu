@@ -69,8 +69,6 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
     ColorSpinorField(src),  alloc(false), init(true), texInit(false) {  
 
-// JF
-    checkCudaError();
 
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -79,56 +77,38 @@ namespace quda {
 	 param.siteSubset == QUDA_PARITY_SITE_SUBSET && 
 	 typeid(src) == typeid(cudaColorSpinorField) ) ) {
       reset(param);
-// JF
-    checkCudaError();
     } else {
       errorQuda("Undefined behaviour"); // else silent bug possible?
     }
-// JF
-    checkCudaError();
 
     // This must be set before create is called
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       if (typeid(src) == typeid(cudaColorSpinorField)) {
 	v = (dynamic_cast<const cudaColorSpinorField&>(src)).v;
 	norm = (dynamic_cast<const cudaColorSpinorField&>(src)).norm;
-// JF
-    checkCudaError();
       } else {
 	errorQuda("Cannot reference a non-cuda field");
       }
     }
-// JF
-    checkCudaError();
 
     create(param.create);
-// JF 
-    checkCudaError();
 
     if (param.create == QUDA_NULL_FIELD_CREATE) {
       // do nothing
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
-// JF
-    checkCudaError();
     } else if (param.create == QUDA_COPY_FIELD_CREATE) {
       if (typeid(src) == typeid(cudaColorSpinorField) && 
 	  isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
 	copy(dynamic_cast<const cudaColorSpinorField&>(src));
-// JF
-    checkCudaError();
       } else {
 	loadSpinorField(src);
-// JF
-    checkCudaError();
       }
     } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else {
       errorQuda("CreateType %d not implemented", param.create);
     }
-// JF
-    checkCudaError();
 
   }
 
@@ -198,7 +178,6 @@ namespace quda {
       }
     } else if (precision == QUDA_HALF_PRECISION) {
       if (nSpin == 4) {
-    checkCudaError();
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 1) {
 	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
@@ -213,7 +192,6 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER) {
       errorQuda("Subset not implemented");
     }
-    checkCudaError();
 
     //FIXME: This addition is temporary to ensure we have the correct
     //field order for a given precision
@@ -222,17 +200,12 @@ namespace quda {
 
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-      printfQuda("bytes = %d\n", bytes);
-      fflush(stdout);
       v = device_malloc(bytes);
-    checkCudaError();
       if (precision == QUDA_HALF_PRECISION) {
 	norm = device_malloc(norm_bytes);
       }
       alloc = true;
-    checkCudaError();
     }
-    checkCudaError();
 
     // Check if buffer isn't big enough
     if ((bytes > bufferBytes) && bufferInit) {
@@ -243,9 +216,7 @@ namespace quda {
 	buffer_d = NULL;
       }
       bufferInit = false;
-    checkCudaError();
     }
-    checkCudaError();
 
     if (!bufferInit) {
       bufferBytes = bytes;
@@ -255,7 +226,6 @@ namespace quda {
       }
       bufferInit = true;
     }
-    checkCudaError();
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       // create the associated even and odd subsets
@@ -277,18 +247,15 @@ namespace quda {
     }
 
 
-    checkCudaError();
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (siteSubset != QUDA_FULL_SITE_SUBSET) {
 	zeroPad();
       } else {
 	(dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
 	(dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
-    checkCudaError();
       }
     }
 
-    checkCudaError();
 #ifdef USE_TEXTURE_OBJECTS
     createTexObject();
 #endif
@@ -299,10 +266,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
 
-    checkCudaError();
     if (texInit) errorQuda("Already bound textures");
    
-    checkCudaError();
 
     // create the texture for the field components
 
@@ -333,14 +298,11 @@ namespace quda {
 
     cudaTextureDesc texDesc;
     memset(&texDesc, 0, sizeof(texDesc));
-    checkCudaError();
   
     if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
     else texDesc.readMode = cudaReadModeElementType;
-    checkCudaError();
 
     cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-    checkCudaError();
 
     // create the texture for the norm components
     if (precision == QUDA_HALF_PRECISION) {

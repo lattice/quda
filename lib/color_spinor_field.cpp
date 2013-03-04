@@ -30,14 +30,8 @@ namespace quda {
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
   even(0), odd(0), v(0), norm(0) 
   {
-// JF
-    checkCudaError();
-    printfQuda("field.nDim = %d\n", field.nDim);
-    printfQuda("field.x = %d %d %d %d\n", field.x[0], field.x[1], field.x[2], field.x[3]);
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nFace, field.twistFlavor, field.precision, field.pad,
         field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis);
-// JF
-    checkCudaError();
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -134,26 +128,17 @@ namespace quda {
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
     this->gammaBasis = gammaBasis;
-// JF
-    checkCudaError(); 
 
     if (Ndim > QUDA_MAX_DIM){
       errorQuda("Number of dimensions nDim = %d too great", Ndim);
     }
-// JF
-    checkCudaError(); 
     nDim = Ndim;
     nColor = Nc;
     nSpin = Ns;
     nFace = Nface;
     twistFlavor = Twistflavor;
-// JF
-    checkCudaError(); 
 
  
-// JF 
-    printf("nFace = %d\n", nFace); 
-    checkCudaError();
 
     precision = Prec;
     volume = 1;
@@ -171,20 +156,14 @@ namespace quda {
     }
 
     real_length = volume*nColor*nSpin*2; // physical length
-// JF
-    checkCudaError();
     createGhostZone();
 
-// JF
-    checkCudaError();
 
     bytes = total_length * precision; // includes pads and ghost zones
     bytes = ALIGNMENT_ADJUST(bytes);
     norm_bytes = total_norm_length * sizeof(float);
     norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
     init = true;
-// JF
-    checkCudaError();
 
   }
 
