@@ -197,10 +197,6 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, cudaStre
 
 void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
 {
-
-  // FIXME workaround to call gather immediately
-  stream = streams;
-
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
