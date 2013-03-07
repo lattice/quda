@@ -5,6 +5,7 @@
 #include <typeinfo>
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
+#include <comm_quda.h> // for comm_drand()
 
 /*
   Maybe this will be useful at some point
@@ -305,7 +306,7 @@ namespace quda {
       for (int s=0; s<t.Nspin(); s++) {
 	for (int c=0; c<t.Ncolor(); c++) {
 	  for (int z=0; z<2; z++) {
-	    t(x,s,c,z) = rand() / (double)RAND_MAX;
+	    t(x,s,c,z) = comm_drand();
 	  }
 	}
       }

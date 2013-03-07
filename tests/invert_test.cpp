@@ -14,8 +14,10 @@
 
 #include "face_quda.h"
 
-#ifdef QMP_COMMS
+#if defined(QMP_COMMS)
 #include <qmp.h>
+#elif defined(MPI_COMMS)
+#include <mpi.h>
 #endif
 
 #include <qio_field.h>
@@ -57,10 +59,10 @@ display_test_info()
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     commDimPartitioned(0),
-	     commDimPartitioned(1),
-	     commDimPartitioned(2),
-	     commDimPartitioned(3)); 
+	     dimPartitioned(0),
+	     dimPartitioned(1),
+	     dimPartitioned(2),
+	     dimPartitioned(3)); 
   
   return ;
   
@@ -68,8 +70,8 @@ display_test_info()
 
 int main(int argc, char **argv)
 {
-  int i;
-  for (i =1;i < argc; i++){
+
+  for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     } 
@@ -84,7 +86,16 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  // initialize QMP or MPI
+#if defined(QMP_COMMS)
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+#elif defined(MPI_COMMS)
+  MPI_Init(&argc, &argv);
+#endif
+
+  // call srand() with a rank-dependent seed
+  initRand();
 
   display_test_info();
 
@@ -165,7 +176,7 @@ int main(int argc, char **argv)
   }
 
   inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-10;
+  inv_param.tol = 1e-6;
   //inv_param.residual_type = QUDA_HEAVY_QUARK_RESIDUAL;
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) inv_param.tol_offset[i] = inv_param.tol;
@@ -222,6 +233,10 @@ int main(int argc, char **argv)
 
   Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1; 
   inv_param.Ls = Ls;
+
+  // declare the dimensions of the communication grid
+  initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
+
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -448,7 +463,11 @@ int main(int argc, char **argv)
   endQuda();
 
   // finalize the communications layer
-  endCommsQuda();
+#if defined(QMP_COMMS)
+  QMP_finalize_msg_passing();
+#elif defined(MPI_COMMS)
+  MPI_Finalize();
+#endif
 
   return 0;
 }

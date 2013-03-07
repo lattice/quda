@@ -242,10 +242,50 @@ extern "C" {
 			FILE *outfile);
 
   /**
+   * initCommsGridQuda() takes an optional "rank_from_coords" argument that
+   * should be a pointer to a user-defined function with this prototype.  
+   *
+   * @param coords  Node coordinates
+   * @param fdata   Any auxiliary data needed by the function
+   * @return        MPI rank or QMP node ID cooresponding to the node coordinates
+   *
+   * @see initCommsGridQuda
+   */
+  typedef int (*QudaCommsMap)(const int *coords, void *fdata);
+
+  /**
+   * Declare the grid mapping ("logical topology" in QMP parlance)
+   * used for communications in a multi-GPU grid.  This function
+   * should be called prior to initQuda().  The only case in which
+   * it's optional is when QMP is used for communication and the
+   * logical topology has already been declared by the application.
+   *
+   * @param nDim   Number of grid dimensions.  "4" is the only supported
+   *               value currently.
+   *
+   * @param dims   Array of grid dimensions.  dims[0]*dims[1]*dims[2]*dims[3]
+   *               must equal the total number of MPI ranks or QMP nodes.
+   *
+   * @param func   Pointer to a user-supplied function that maps coordinates
+   *               in the communication grid to MPI ranks (or QMP node IDs).
+   *               If the pointer is NULL, the default mapping depends on
+   *               whether QMP or MPI is being used for communication.  With
+   *               QMP, the existing logical topology is used if it's been
+   *               declared.  With MPI or as a fallback with QMP, the default
+   *               ordering is lexicographical with the fourth ("t") index
+   *               varying fastest.
+   *
+   * @param fdata  Pointer to any data required by "func" (may be NULL)               
+   *
+   * @see QudaCommsMap
+   */
+  void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
+
+  /**
    * Initialize the library.
    *
    * @param device  CUDA device number to use.  In a multi-GPU build,
-   *                this parameter may be either set explicitly on a
+   *                this parameter may either be set explicitly on a
    *                per-process basis or set to -1 to enable a default
    *                allocation of devices to processes.
    */
@@ -401,13 +441,6 @@ extern "C" {
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 			    void* loop_coeff, int num_paths, int max_length, double eb3,
 			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
-  
-  /*
-   * The following routines are only used by the examples in tests/ .
-   * They should not be called in a typical application.
-   */  
-  void initCommsQuda(int argc, char **argv, const int *X, int nDim);
-  void endCommsQuda();
 
 #ifdef __cplusplus
 }

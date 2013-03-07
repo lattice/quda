@@ -290,6 +290,8 @@ namespace quda {
     void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaTwistGamma5Type twistType) const;
 
+    static int initTMFlag;
+
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
     DiracTwistedMass(const DiracParam &param, const int nDim);

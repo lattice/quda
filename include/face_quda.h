@@ -89,21 +89,12 @@ int commCoords(int);
 int commDimPartitioned(int dir);
 void commDimPartitionedSet(int dir);
 
-  //void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
-  //			int veclength, QudaReconstructType reconstruct, int V, int Vs);
-
-#define XUP 0
-#define YUP 1
-#define ZUP 2
-#define TUP 3
-#define TDOWN 4
-#define ZDOWN 5
-#define YDOWN 6
-#define XDOWN 7
-
 #ifdef __cplusplus
   extern "C" {
 #endif
+
+    // implemented in face_gauge.cpp
+
     void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
 			       void** ghost_sitelink_diag, 
 			       QudaPrecision gPrecision, QudaGaugeParam* param, int optflag); 

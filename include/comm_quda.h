@@ -1,58 +1,59 @@
 #ifndef _COMM_QUDA_H
 #define _COMM_QUDA_H
 
-#define BACK_NBR 1
-#define FWD_NBR 2
-
-#define X_BACK_NBR 1
-#define Y_BACK_NBR 2
-#define Z_BACK_NBR 3
-#define T_BACK_NBR 4
-#define X_FWD_NBR  5
-#define Y_FWD_NBR  6
-#define Z_FWD_NBR  7
-#define T_FWD_NBR  8
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct MsgHandle_s MsgHandle;
+  typedef struct MsgHandle_s MsgHandle;
+  typedef struct Topology_s Topology;
 
-/* The following routines are implemented over MPI only. */
+  /* defined in quda.h; redefining here to avoid circular references */ 
+  typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
-MsgHandle *	comm_send_to_rank(void*, int, int);
-MsgHandle *	comm_recv_from_rank(void*, int, int);
-int		comm_get_neighbor_rank(int dx, int dy, int dz, int dt);
+  /* implemented in comm_common.cpp */
 
-/* implemented over MPI, QMP, and single */
+  char *comm_hostname(void);
+  double comm_drand(void);
+  Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+  void comm_destroy_topology(Topology *topo);
+  int comm_ndim(const Topology *topo);
+  const int *comm_dims(const Topology *topo);
+  const int *comm_coords(const Topology *topo);
+  const int *comm_coords_from_rank(const Topology *topo, int rank);
+  int comm_rank_from_coords(const Topology *topo, const int *coords);
+  int comm_rank_displaced(const Topology *topo, const int displacement[]);
+  void comm_set_default_topology(Topology *topo);
+  Topology *comm_default_topology(void);
+  int comm_dim(int dim);
+  int comm_coord(int dim);
+  MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t nbytes);
+  MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t nbytes);
+  void comm_finalize(void);
+  void comm_dim_partitioned_set(int dim);
+  int comm_dim_partitioned(int dim);
 
-int		comm_gpuid();
-void            comm_create(int argc, char **argv);
-void		comm_init(void);
-void		comm_cleanup(void);
-void		comm_exit(int);
-char *          comm_hostname(void);
-void            comm_set_gridsize(const int *X, int nDim);
-void		comm_barrier(void);
-void            comm_broadcast(void *data, size_t nbytes);
-int		comm_rank(void);
-int		comm_size(void);
-MsgHandle *     comm_declare_send_relative(void *buffer, int i, int dir, size_t bytes);
-MsgHandle *     comm_declare_receive_relative(void *buffer, int i, int dir, size_t bytes);
-void            comm_free(MsgHandle *handle);
-void            comm_start(MsgHandle *handle);
-void		comm_wait(MsgHandle *handle);
-int             comm_query(MsgHandle *handle);
-int             comm_dim_partitioned(int dir);
-void            comm_dim_partitioned_set(int dir);
-int             comm_dim(int);
-int             comm_coords(int);
-void		comm_allreduce(double* data);
-void            comm_allreduce_int(int* data);
-void		comm_allreduce_array(double* data, size_t size);
-void		comm_allreduce_max(double* data);
-  
+
+  /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
+
+  void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+  int comm_rank(void);
+  int comm_size(void);
+  int comm_gpuid(void);
+  MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes);
+  MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes);
+  void comm_free(MsgHandle *mh);
+  void comm_start(MsgHandle *mh);
+  void comm_wait(MsgHandle *mh);
+  int comm_query(MsgHandle *mh);
+  void comm_allreduce(double* data);
+  void comm_allreduce_max(double* data);
+  void comm_allreduce_array(double* data, size_t size);
+  void comm_allreduce_int(int* data);
+  void comm_broadcast(void *data, size_t nbytes);
+  void comm_barrier(void);
+  void comm_abort(int status);
+
 #ifdef __cplusplus
 }
 #endif

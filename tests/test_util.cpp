@@ -2,8 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
 #include <short.h>
+
+#if defined(QMP_COMMS)
+#include <qmp.h>
+#elif defined(MPI_COMMS)
+#include <mpi.h>
+#endif
 
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
@@ -39,6 +44,43 @@ int V5h;
 int mySpinorSiteSize;
 
 extern float fat_link_max;
+
+
+void initComms(int argc, char **argv, const int *commDims)
+{
+#if defined(QMP_COMMS)
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+#elif defined(MPI_COMMS)
+  MPI_Init(&argc, &argv);
+#endif
+  initCommsGridQuda(4, commDims, NULL, NULL);
+  initRand();
+}
+
+
+void finalizeComms()
+{
+#if defined(QMP_COMMS)
+  QMP_finalize_msg_passing();
+#elif defined(MPI_COMMS)
+  MPI_Finalize();
+#endif
+}
+
+
+void initRand()
+{
+  int rank = 0;
+
+#if defined(QMP_COMMS)
+  rank = QMP_get_node_number();
+#elif defined(MPI_COMMS)
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+
+  srand(17*rank + 137);
+}
 
 
 void setDims(int *X) {
@@ -1415,7 +1457,7 @@ int zdim = 24;
 int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
-int gridsize_from_cmdline[4]={1,1,1,1};
+int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 bool tune = true;
@@ -1423,6 +1465,14 @@ int niter = 10;
 int test_type = 0;
 int nvec  = 1;
 char vecfile[256] = "";
+
+static int dim_partitioned[4] = {0,0,0,0};
+
+int dimPartitioned(int dim)
+{
+  return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]);
+}
+
 
 void __attribute__((weak)) usage_extra(char** argv){};
 
@@ -1639,6 +1689,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     for(int j=0; j < 4;j++){
       if (value &  (1 << j)){
 	commDimPartitionedSet(j);
+	dim_partitioned[j] = 1;
       }
     }
 #else

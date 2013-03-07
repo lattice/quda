@@ -95,6 +95,8 @@ namespace quda {
   static cudaEvent_t gatherEnd[Nstream];
   static cudaEvent_t scatterStart[Nstream];
   static cudaEvent_t scatterEnd[Nstream];
+  static cudaEvent_t dslashStart;
+  static cudaEvent_t dslashEnd;
 
   static struct timeval dslashStart_h;
 #ifdef MULTI_GPU
@@ -106,8 +108,6 @@ namespace quda {
 #ifdef DSLASH_PROFILING
 #define DSLASH_TIME_PROFILE() dslashTimeProfile()
 
-  static cudaEvent_t dslashStart;
-  static cudaEvent_t dslashEnd;
   static cudaEvent_t packStart[Nstream];
   static cudaEvent_t kernelStart[Nstream];
   static cudaEvent_t kernelEnd[Nstream];
@@ -228,6 +228,8 @@ namespace quda {
       cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
     }
+    cudaEventCreateWithFlags(&dslashStart, cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
 #else
     cudaEventCreate(&dslashStart);
     cudaEventCreate(&dslashEnd);
@@ -272,10 +274,10 @@ namespace quda {
       cudaEventDestroy(scatterEnd[i]);
     }
 
-#ifdef DSLASH_PROFILING
     cudaEventDestroy(dslashStart);
     cudaEventDestroy(dslashEnd);
 
+#ifdef DSLASH_PROFILING
     for (int i=0; i<Nstream; i++) {
       cudaEventDestroy(packStart[i]);
       cudaEventDestroy(kernelStart[i]);
@@ -1243,6 +1245,9 @@ namespace quda {
     gettimeofday(&dslashStart_h, NULL);
 
 #ifdef MULTI_GPU
+    // Record the start of the dslash
+    cudaEventRecord(dslashStart, streams[Nstream-1]);
+
     // Initialize pack from source spinor
     face->pack(*inSpinor, 1-parity, dagger, streams);
     
@@ -1253,7 +1258,10 @@ namespace quda {
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-	if (i!=3 || kernelPackT) cudaStreamWaitEvent(streams[2*i+dir], packEnd[0], 0);
+	if (i!=3 || getKernelPackT()) 
+	  cudaStreamWaitEvent(streams[2*i+dir], packEnd[0], 0);
+	else
+	  cudaStreamWaitEvent(streams[2*i+dir], dslashStart, 0);
 
 	// Initialize host transfer from source spinor
 	face->gather(*inSpinor, dagger, 2*i+dir);
@@ -1285,7 +1293,7 @@ namespace quda {
 	      face->commsStart(2*i+dir);
 	    }
 	  }
-	
+
 	  // Query if comms has finished
 	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
 	      gatherCompleted[2*i+dir]) {
@@ -1321,6 +1329,7 @@ namespace quda {
     
     }
 
+    //cudaEventRecord(dslashEnd, streams[Nstream-1]);
     //DSLASH_TIME_PROFILE();
 #endif // MULTI_GPU
   }

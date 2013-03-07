@@ -558,10 +558,10 @@ void display_test_info()
 	     get_dslash_type_str(dslash_type), niter);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     commDimPartitioned(0),
-	     commDimPartitioned(1),
-	     commDimPartitioned(2),
-	     commDimPartitioned(3));
+	     dimPartitioned(0),
+	     dimPartitioned(1),
+	     dimPartitioned(2),
+	     dimPartitioned(3));
 
   return ;
     
@@ -582,7 +582,7 @@ int main(int argc, char **argv)
     usage(argv);
   }
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
 
@@ -643,5 +643,5 @@ int main(int argc, char **argv)
   }    
   end();
 
-  endCommsQuda();
+  finalizeComms();
 }

@@ -11,8 +11,7 @@ QUDA_OBJS = transfer.o timer.o malloc.o solver.o inv_bicgstab_quda.o	\
 	dirac_staggered.o dirac_domain_wall.o dirac_twisted_mass.o	\
 	tune.o fat_force_quda.o llfat_quda_itf.o clover_quda.o		\
 	dslash_quda.o blas_quda.o copy_quda.o reduce_quda.o face_buffer.o \
-	${FACE_COMMS_OBJS} ${NUMA_AFFINITY_OBJS}
-
+	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\

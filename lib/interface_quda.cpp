@@ -80,11 +80,6 @@ cudaCloverField *cloverPrecise = NULL;
 cudaCloverField *cloverSloppy = NULL;
 cudaCloverField *cloverPrecondition = NULL;
 
-/*Dirac *diracPrecise = NULL;
-Dirac *diracSloppy = NULL;
-Dirac *diracPrecondition = NULL;
-*/
-
 
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
@@ -112,25 +107,87 @@ static TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
-int getGpuCount()
-{
-  int count;
-  cudaGetDeviceCount(&count);
-  if (count <= 0){
-    errorQuda("No devices supporting CUDA");
-  }
-  if(count > MAX_GPU_NUM_PER_NODE){
-    errorQuda("GPU count (%d) is larger than limit\n", count);
-  }
-  return count;
-}
-
 
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
 {
   setVerbosity(verbosity);
   setOutputPrefix(prefix);
   setOutputFile(outfile);
+}
+
+
+typedef struct {
+  int ndim;
+  int dims[QUDA_MAX_DIM];
+} LexMapData;
+
+/**
+ * For MPI, the default node mapping is lexicographical with t varying fastest.
+ */
+static int lex_rank_from_coords(const int *coords, void *fdata)
+{
+  LexMapData *md = static_cast<LexMapData *>(fdata);
+
+  int rank = coords[0];
+  for (int i = 1; i < md->ndim; i++) {
+    rank = md->dims[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+#ifdef QMP_COMMS
+/**
+ * For QMP, we use the existing logical topology if already declared.
+ */
+static int qmp_rank_from_coords(const int *coords, void *fdata)
+{
+  return QMP_get_node_number_from(coords);
+}
+#endif
+
+
+static bool comms_initialized = false;
+
+void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata)
+{
+  if (nDim != 4) {
+    errorQuda("Number of communication grid dimensions must be 4");
+  }
+
+  if (!func) {
+
+#if QMP_COMMS
+    if (QMP_logical_topology_is_declared()) {
+      if (QMP_get_logical_number_of_dimensions() != 4) {
+	errorQuda("QMP logical topology must have 4 dimensions");
+      }
+      for (int i=0; i<nDim; i++) {
+	int qdim = QMP_get_logical_dimensions()[i];
+	if(qdim != dims[i]) {
+	  errorQuda("QMP logical dims[%d]=%d does not match dims[%d]=%d argument", i, qdim, i, dims[i]);
+	}
+      }
+      fdata = NULL;
+      func = qmp_rank_from_coords;
+    } else {
+      warningQuda("QMP logical topology is undeclared; using default lexicographical ordering");
+#endif
+
+      LexMapData map_data;
+      map_data.ndim = nDim;
+      for (int i=0; i<nDim; i++) {
+	map_data.dims[i] = dims[i];
+      }
+      fdata = (void *) &map_data;
+      func = lex_rank_from_coords;
+
+#if QMP_COMMS
+    }
+#endif      
+
+  }
+  comm_init(nDim, dims, func, fdata);
+  comms_initialized = true;
 }
 
 
@@ -158,7 +215,7 @@ void initQuda(int dev)
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
-    errorQuda("No devices supporting CUDA");
+    errorQuda("No CUDA devices found");
   }
 
   for(int i=0; i<deviceCount; i++) {
@@ -169,8 +226,25 @@ void initQuda(int dev)
     }
   }
 
+  if (!comms_initialized) {
+#if defined(QMP_COMMS)
+    if (QMP_logical_topology_is_declared()) {
+      int ndim = QMP_get_logical_number_of_dimensions();
+      const int *dims = QMP_get_logical_dimensions();
+      initCommsGridQuda(ndim, dims, NULL, NULL);
+    } else {
+      errorQuda("initQuda() called without prior call to initCommsGridQuda(),"
+		" and QMP logical topology has not been declared");
+    }
+#elif defined(MPI_COMMS)
+    errorQuda("When using MPI for communications, initCommsGridQuda() must be called before initQuda()");
+#else // single-GPU
+    const int dims[4] = {1, 1, 1, 1};
+    initCommsGridQuda(4, dims, NULL, NULL);
+#endif
+  }
+
 #ifdef MULTI_GPU
-  comm_init();
   if (dev < 0) dev = comm_gpuid();
 #else
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
@@ -504,6 +578,9 @@ void endQuda(void)
   cudaDeviceReset();
 
   initialized = false;
+
+  comm_finalize();
+  comms_initialized = false;
 
   profileEnd[QUDA_PROFILE_TOTAL].Stop();
 
@@ -1879,20 +1956,6 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif
 
 
-void initCommsQuda(int argc, char **argv, const int *X, int nDim) {
-#ifdef MULTI_GPU
-  comm_create(argc, argv);
-  comm_set_gridsize(X, nDim);  
-  comm_init();
-#endif
-}
-
-void endCommsQuda() {
-#ifdef MULTI_GPU
-  comm_cleanup();
-#endif
-}
-
 /*
   The following functions are for the Fortran interface.
 */
@@ -1920,8 +1983,25 @@ void new_quda_gauge_param_(QudaGaugeParam *param) {
 void new_quda_invert_param_(QudaInvertParam *param) {
   *param = newQudaInvertParam();
 }
-void comm_set_gridsize_(int *grid) {
+
+
+/**
+ * BQCD wants a node mapping with x varying fastest.
+ */
+static int bqcd_rank_from_coords(const int *coords, void *fdata)
+{
+  int *dims = static_cast<int *>(fdata);
+
+  int rank = coords[3];
+  for (int i = 2; i >= 0; i--) {
+    rank = dims[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+void comm_set_gridsize_(int *grid)
+{
 #ifdef MULTI_GPU
-  comm_set_gridsize(grid, 4);
+  initCommsGridQuda(4, grid, bqcd_rank_from_coords, static_cast<void *>(grid));
 #endif
 }

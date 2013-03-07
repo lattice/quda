@@ -1,15 +1,12 @@
-#include <quda_internal.h>
-#include <face_quda.h>
-#include <comm_quda.h>
 #include <cstdio>
 #include <cstdlib>
-#include <quda.h>
 #include <string.h>
 #include <sys/time.h>
-#include <mpi.h>
-#include <cuda.h>
 
+#include <quda_internal.h>
+#include <comm_quda.h>
 #include <fat_force_quda.h>
+#include <face_quda.h>
 
 using namespace quda;
 
@@ -19,7 +16,18 @@ extern cudaStream_t *stream;
  * Staple exchange routine
  * used in fat link computation
  ***************************************************************/
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE)
+#if defined(MULTI_GPU) && (defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE))
+
+enum {
+  XUP = 0,
+  YUP = 1,
+  ZUP = 2,
+  TUP = 3,
+  TDOWN = 4,
+  ZDOWN = 5,
+  YDOWN = 6,
+  XDOWN = 7
+};
 
 #define gaugeSiteSize 18
 
@@ -156,29 +164,26 @@ void exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_di
       
       pack_gauge_diag(sendbuf, X, (void**)sitelink, nu, mu, dir1, dir2, (QudaPrecision)sizeof(Float));
   
-      //post recv
-      int dx[4]={0,0,0,0};
-      dx[nu]=-1;
-      dx[mu]=+1;
-      int src_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
-      MsgHandle *mh_recv;
-      mh_recv = comm_recv_from_rank(ghost_sitelink_diag[nu*4+mu], len, src_rank);
-      //do send
-      dx[nu]=+1;
-      dx[mu]=-1;
-      int dst_rank = comm_get_neighbor_rank(dx[0], dx[1], dx[2], dx[3]);
-      MsgHandle *mh_send;
-      mh_send = comm_send_to_rank(sendbuf, len, dst_rank);
+      int dx[4] = {0};
+      dx[nu] = -1;
+      dx[mu] = +1;
+      MsgHandle *mh_recv = comm_declare_receive_displaced(ghost_sitelink_diag[nu*4+mu], dx, len);
+      comm_start(mh_recv);
+
+      dx[nu] = +1;
+      dx[mu] = -1;
+      MsgHandle *mh_send = comm_declare_send_displaced(sendbuf, dx, len);
+      comm_start(mh_send);
       
-      comm_wait(mh_recv);
       comm_wait(mh_send);
+      comm_wait(mh_recv);
             
-      comm_free(mh_recv);
       comm_free(mh_send);
+      comm_free(mh_recv);
             
       host_free(sendbuf);
-    }//mu
-  }//nu
+    }
+  }
 }
 
 

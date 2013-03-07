@@ -87,7 +87,7 @@ ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
   COPT += -DMULTI_GPU
   NVCCOPT += -DMULTI_GPU
 else
-  FACE_COMMS_OBJS=comm_single.o
+  COMM_OBJS = comm_single.o
 endif
 
 CC  = $(FECC)
@@ -100,7 +100,7 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_LIBS =
   INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
-  FACE_COMMS_OBJS=face_mpi.o comm_mpi.o
+  COMM_OBJS = comm_mpi.o
 endif
 
 ifeq ($(strip $(BUILD_QMP)), yes)
@@ -109,7 +109,7 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
-  FACE_COMMS_OBJS=face_qmp.o comm_qmp.o
+  COMM_OBJS = comm_qmp.o
 endif 
 
 ifeq ($(strip $(BUILD_QIO)), yes)
@@ -254,4 +254,3 @@ else
   NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 endif
-
