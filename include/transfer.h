@@ -39,6 +39,12 @@ namespace quda {
     /** The mapping onto coarse spin from fine spin */
     int *spin_map;
 
+    /** The length of the fine lattice */
+    int fine_length;
+
+    /** The length of the coarse lattice */
+    int coarse_length;
+
     /**
      * Copies the null-space vector components into the V-field
      */
