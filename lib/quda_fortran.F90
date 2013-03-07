@@ -68,6 +68,7 @@ module quda_fortran
      integer(4) :: Ls       ! Extent of the 5th dimension (for domain wall) 
      
      real(8) :: mu    ! Twisted mass parameter 
+     real(8) :: epsilon ! Twisted mass parameter
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor 
      
      real(8) :: tol
