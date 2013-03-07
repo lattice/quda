@@ -97,6 +97,9 @@ namespace quda {
       if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n", src.Nspin());
 
       if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+	if (src.SiteSubset() != dst.SiteSubset()) 
+	  errorQuda("Spinor fields do not have matching subsets dst=%d src=%d\n", 
+		    dst.SiteSubset(), src.SiteSubset());
 	copy::copyCuda(dst.Even(), src.Even());
 	copy::copyCuda(dst.Odd(), src.Odd());
 	return;
@@ -111,8 +114,9 @@ namespace quda {
       // src precision.
 
       blas_bytes += (unsigned long long)src.RealLength()*(src.Precision() + dst.Precision());
-
+      
       if (dst.Precision() == src.Precision()) {
+	if (src.Bytes() != dst.Bytes()) errorQuda("Precisions match, but bytes do not");
 	cudaMemcpy(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice);
 	if (dst.Precision() == QUDA_HALF_PRECISION) {
 	  cudaMemcpy(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice);
