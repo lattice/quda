@@ -220,6 +220,8 @@ namespace quda {
 	}
 
 	mat(*r, *y[0], *x[0]); // here we can use x as tmp
+	if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) axpyCuda(offset[0], *y[0], *r);
+
 	r2[0] = xmyNormCuda(b, *r);
 	for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
 	for (int j=0; j<num_offset_now; j++) zeroCuda(*x_sloppy[j]);

@@ -159,15 +159,15 @@ int main(int argc, char **argv)
 
   // offsets used only by multi-shift solver
   inv_param.num_offset = 4;
-  double offset[QUDA_MAX_MULTI_SHIFT] = {0.01, 0.02, 0.03, 0.04};
+  double offset[4] = {0.01, 0.02, 0.03, 0.04};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = multi_shift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
     inv_param.inv_type = QUDA_CG_INVERTER;
   } else {
@@ -248,7 +248,6 @@ int main(int argc, char **argv)
     setDims(gauge_param.X);
   }
 
-
   setSpinorSiteSize(24);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -311,7 +310,11 @@ int main(int argc, char **argv)
   
   memset(spinorIn, 0, Ls*V*spinorSiteSize*sSize);
   memset(spinorCheck, 0, Ls*V*spinorSiteSize*sSize);
-  memset(spinorOut, 0, Ls*V*spinorSiteSize*sSize);
+  if (multi_shift) {
+    for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, Ls*V*spinorSiteSize*sSize);    
+  } else {
+    memset(spinorOut, 0, Ls*V*spinorSiteSize*sSize);
+  }
 
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
   {
