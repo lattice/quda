@@ -12,20 +12,18 @@ namespace quda {
     param.nSpin = B[0]->Ncolor(); // the spin dimension corresponds to fine nColor
     param.nColor = B[0]->Nspin() * Nvec; // nColor = number of spin components * number of null-space vectors
     param.create = QUDA_ZERO_FIELD_CREATE;
-    // the V field is defined on all sites regardless of B field
+    // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
     if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
     V = new cpuColorSpinorField(param);
-    fillV();
+    fillV(); // copy the null space vectors into V
 
     // create the storage for the intermediate temporary vector
     param.nSpin = B[0]->Nspin(); // tmp has same nSpin has the fine dimension
     param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
     tmp = new cpuColorSpinorField(param);
-
-    //std::cout << *V << *tmp;
 
     // allocate and compute the fine-to-coarse site map
     geo_map = new int[B[0]->Volume()];
@@ -221,9 +219,16 @@ namespace quda {
 
   }
 
+  template <class Complex>
+  void blockOrder(Complex &out, Complex &in, int ) {
+
+
+
+  }
+
   // Orthogonalise the nc vectors v[] of length n
   template <class Complex>
-  void blockGramSchmidt(Complex ***v, int nBlocks, int Nc, int blockSize) {
+  void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize) {
     
     for (int b=0; b<nBlocks; b++) {
       for (int jc=0; jc<Nc; jc++) {
@@ -231,19 +236,18 @@ namespace quda {
 	for (int ic=0; ic<jc; ic++) {
 	  // Calculate dot product
 	  std::complex<double> dot = 0.0;
-	  for (int i=0; i<blockSize; i++) dot += v[b][ic][i] * v[b][jc][i];
+	  for (int i=0; i<blockSize; i++) dot += v[(b*Nc+ic)*blockSize+i] * v[(b*Nc+jc)*blockSize+i];
 	
 	  // Subtract the blocks to orthogonalise
-	  for (int i=0; i<blockSize; i++) v[b][jc][i] -= dot * v[b][ic][i];
+	  for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] -= dot * v[(b*Nc+ic)*blockSize+i];
 	}
       
 	// Normalize the block
 	double nrm2 = 0.0;
-	for (int i=0; i<blockSize; i++) 
-	  nrm2 += real(v[b][jc][i])*real(v[b][jc][i]) + imag(v[b][jc][i])*imag(v[b][jc][i]);
+	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*Nc+jc)*blockSize+i]);
 	nrm2 = 1.0/sqrt(nrm2);
       
-	for (int i=0; i<blockSize; i++) v[b][jc][i] = nrm2 * v[b][jc][i];
+	for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] = nrm2 * v[(b*Nc+jc)*blockSize+i];
       }
 
     }
