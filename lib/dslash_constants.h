@@ -63,7 +63,7 @@ __constant__ int Vsh;
 __constant__ int sp_stride;
 __constant__ int ga_stride;
 __constant__ int cl_stride;
-__constant__ int ghostFace[QUDA_MAX_DIM];
+__constant__ int ghostFace[QUDA_MAX_DIM+1];
 
 __constant__ int fat_ga_stride;
 __constant__ int long_ga_stride;

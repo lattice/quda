@@ -7,9 +7,6 @@
 #include <iostream>
 #include <complex>
 
-// Probably want some checking for this limit
-#define QUDA_MAX_DIM 6
-
 #include <lattice_field.h>
 
 namespace quda {
