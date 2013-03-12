@@ -173,12 +173,17 @@ int comm_rank_from_coords(const Topology *topo, const int *coords)
 }
 
 
+static inline int mod(int a, int b)
+{
+  return ((a % b) + b) % b;
+}
+
 int comm_rank_displaced(const Topology *topo, const int displacement[])
 {
   int coords[QUDA_MAX_DIM];
 
   for (int i = 0; i < topo->ndim; i++) {
-    coords[i] = (comm_coords(topo)[i] + displacement[i]) % comm_dims(topo)[i];
+    coords[i] = mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]);
   }
   return comm_rank_from_coords(topo, coords);
 }
