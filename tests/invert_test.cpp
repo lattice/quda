@@ -125,7 +125,7 @@ int main(int argc, char **argv)
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
-  inv_param.Ls = (dslash_type == QUDA_DOMAIN_WALL_DSLASH) ? Lsdim : 1;
+  inv_param.Ls = 1;
 
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
@@ -151,10 +151,12 @@ int main(int argc, char **argv)
     inv_param.epsilon = 0.1385;
     inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
     //inv_param.twist_flavor = QUDA_TWIST_MINUS;
+    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     inv_param.mass = 0.02;
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
+    inv_param.Ls = Lsdim;
   }
 
   // offsets used only by multi-shift solver
@@ -240,9 +242,6 @@ int main(int argc, char **argv)
   }
 
   inv_param.verbosity = QUDA_VERBOSE;
-
-  Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1; 
-  inv_param.Ls = Ls;
 
   // declare the dimensions of the communication grid
   initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
