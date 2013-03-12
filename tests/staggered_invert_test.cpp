@@ -110,8 +110,15 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1;
-  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;  
-  //inv_param->residual_type = QUDA_HEAVY_QUARK_RESIDUAL;
+
+#if __COMPUTE_CAPABILITY__ >= 200
+  // require both L2 relative and heavy quark residual to determine convergence
+  inv_param->residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
+  inv_param->tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
+#else
+  // Pre Fermi architecture only supports L2 relative residual norm
+  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
+#endif
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
@@ -151,7 +158,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.002;
+  double mass = 0.005;
 
   set_params(&gaugeParam, &inv_param,
 	     xdim, ydim, zdim, tdim,
@@ -318,7 +325,7 @@ invert_test(void)
       // these can be set independently
       for (int i=0; i<inv_param.num_offset; i++) {
 	inv_param.tol_offset[i] = inv_param.tol;
-	inv_param.tol_hq_offset[i] = inv_param.tol;
+	inv_param.tol_hq_offset[i] = inv_param.tol_hq;
       }
       void* outArray[NUM_OFFSETS];
       int len;
@@ -381,9 +388,9 @@ invert_test(void)
 	double hqr = sqrt(HeavyQuarkResidualNormCpu(*spinorOutArray[i], *ref).z);
 	double l2r = sqrt(nrm2/src2);
 
-	printfQuda("Residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g, host = %g\n",
-		   inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
-		   inv_param.true_res_hq_offset[i], hqr);
+	printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
+		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
 
 	//emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
 	if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
@@ -405,7 +412,8 @@ invert_test(void)
     double hqr = sqrt(HeavyQuarkResidualNormCpu(*out, *ref).z);
     double l2r = sqrt(nrm2/src2);
 
-    printfQuda("Residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g, host = %g\n", inv_param.tol, inv_param.true_res, l2r, inv_param.true_res_hq, hqr);
+    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
     printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
 	       time0, inv_param.secs, inv_param.iter, inv_param.secs,

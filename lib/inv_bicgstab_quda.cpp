@@ -137,10 +137,9 @@ namespace quda {
 
     double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
 
-    const bool use_heavy_quark_res = (invParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    double heavy_quark_residual = use_heavy_quark_res ? sqrt(HeavyQuarkResidualNormCuda(x,r).z) : 0.0;
-    double & distance_to_solution   =  (use_heavy_quark_res) ? heavy_quark_residual : r2;
-    double & convergence_threshold  =  (use_heavy_quark_res) ? invParam.tol : stop;
+    const bool use_heavy_quark_res = 
+      (invParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    double heavy_quark_res = use_heavy_quark_res ? sqrt(HeavyQuarkResidualNormCuda(x,r).z) : 0.0;
     int heavy_quark_check = 10; // how often to check the heavy quark residual
 
     double delta = invParam.reliable_delta;
@@ -162,14 +161,7 @@ namespace quda {
     double maxrr = rNorm;
     double maxrx = rNorm;
 
-    if (invParam.verbosity >= QUDA_VERBOSE) {
-      if (use_heavy_quark_res) {
-	printfQuda("BiCGstab: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n", 
-		   k, r2, sqrt(r2/b2), heavy_quark_residual);
-      } else {
-	printfQuda("BiCGstab: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2, sqrt(r2/b2));
-      }
-    }
+    PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
     
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
       quda::blas_flops = 0;    
@@ -178,7 +170,8 @@ namespace quda {
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
 
-    while (distance_to_solution > convergence_threshold  && k < invParam.maxiter) {
+    while ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && 
+	    k < invParam.maxiter) {
     
       if (k==0) {
 	rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
@@ -233,7 +226,7 @@ namespace quda {
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	copyCuda(tmp,y);
-	heavy_quark_residual = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
       }
 
       // reliable updates
@@ -265,15 +258,7 @@ namespace quda {
     
       k++;
 
-      if (invParam.verbosity >= QUDA_VERBOSE) {
-	if (use_heavy_quark_res) {
-	  printfQuda("BiCGstab: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n", 
-		     k, r2, sqrt(r2/b2), heavy_quark_residual);
-	} else {
-	  printfQuda("BiCGstab: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2, sqrt(r2/b2));
-	}
-      }
-
+      PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
     }
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -300,18 +285,10 @@ namespace quda {
 #if (__COMPUTE_CAPABILITY__ >= 200)
       invParam.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 #else
-    invParam.true_res_hq = 0.0;
+      invParam.true_res_hq = 0.0;
 #endif
  
-      if (invParam.verbosity >= QUDA_SUMMARIZE) {
-	if (use_heavy_quark_res) {
-	  printfQuda("BiCGstab: Converged after %d iterations, relative residua: iterated = %e, true = %e, heavy-quark residual = %e\n", k, sqrt(r2/b2), invParam.true_res, invParam.true_res_hq);    
-	} else {
-	  printfQuda("BiCGstab: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		     k, sqrt(r2/b2), invParam.true_res);
-	}
-      }
-      
+      PrintSummary("BiCGstab", k, r2, b2);      
     }
 
     // reset the flops counters

@@ -1202,11 +1202,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = new cudaColorSpinorField(cudaParam); // solution
   }
 
-  if (param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL && 
-      (param->inv_type != QUDA_CG_INVERTER && param->inv_type != QUDA_BICGSTAB_INVERTER) ) {
-    errorQuda("Heavy quark residual only supported for CG and BiCGStab");
-  }
-    
   profileInvert[QUDA_PROFILE_H2D].Stop();
 
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -1519,19 +1514,19 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField r(*b, cudaParam);
   for(int i=0; i < param->num_offset; i++) { 
-    double rsd = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
-      param->true_res_hq_offset[i] : param->true_res_offset[i];
+    double rsd_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
+      param->true_res_hq_offset[i] : 0;
     
-    double tol = param->residual_type == QUDA_HEAVY_QUARK_RESIDUAL ?
-      param->tol_hq_offset[i] : param->tol_offset[i];
+    double tol_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
+      param->tol_hq_offset[i] : 0;
     
-    if (rsd > tol) {
+    // refine if either L2 or heavy quark residual tolerances have not been met
+    if (param->true_res_offset[i] > param->tol_offset[i] || rsd_hq > tol_hq) {
       if (getVerbosity() >= QUDA_VERBOSE) 
-	printfQuda("Refining shift %d since achieved residual %e is greater than requested %e\n",
-		   i, rsd, tol);
+	printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
+		   i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
       
-      // for staggered the shift is just a change in mass term
-      // FIXME: can do this for twisted mass also
+      // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
       if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
 	dirac.setMass(sqrt(param->offset[i]/4));  
 	diracSloppy.setMass(sqrt(param->offset[i]/4));  
@@ -1546,7 +1541,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       }
       
       param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      param->tol = tol;
+      param->tol = param->tol_offset[i]; // set L2 tolerance
+      param->tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
       CG cg(m, mSloppy, *param, profileMulti);
       cg(*x[i], *b);        
       param->true_res_offset[i] = param->true_res;

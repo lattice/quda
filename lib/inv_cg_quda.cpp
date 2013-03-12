@@ -80,20 +80,17 @@ namespace quda {
     cudaColorSpinorField &rSloppy = *r_sloppy;
     cudaColorSpinorField p(rSloppy);
     
-    const bool use_heavy_quark_res = (invParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    const bool use_heavy_quark_res = 
+      (invParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     
     profile[QUDA_PROFILE_INIT].Stop();
     profile[QUDA_PROFILE_PREAMBLE].Start();
 
     double r2_old;
-
-
     double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
 
-    double heavy_quark_residual;
-    if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-    double & distance_to_solution   =  (use_heavy_quark_res) ? heavy_quark_residual : r2;
-    double & convergence_threshold  =  (use_heavy_quark_res) ? invParam.tol : stop;
+    double heavy_quark_res = 0.0; // heavy quark residual
+    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
     int heavy_quark_check = 10; // how often to check the heavy quark residual
 
     double alpha=0.0, beta=0.0;
@@ -108,22 +105,16 @@ namespace quda {
 
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
-    quda::blas_flops = 0;
+    blas_flops = 0;
 
     int k=0;
     
-    if (invParam.verbosity >= QUDA_VERBOSE) {
-      if (use_heavy_quark_res) {
-	printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n", 
-		   k, r2, sqrt(r2/b2), heavy_quark_residual);
-      } else {
-	printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2, sqrt(r2/b2));
-      }
-    }
+    PrintStats("CG", k, r2, b2, heavy_quark_res);
 
     int steps_since_reliable = 1;
 
-    while (distance_to_solution > convergence_threshold  && k < invParam.maxiter) {
+    while ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && 
+	    k < invParam.maxiter) {
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
       double sigma;
@@ -174,7 +165,7 @@ namespace quda {
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	  copyCuda(tmp,y);
-	  heavy_quark_residual = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
 	}
 
 	steps_since_reliable++;
@@ -210,7 +201,7 @@ namespace quda {
 	beta = r2 / r2_old; 
 	xpayCuda(rSloppy, beta, p);
 
-	if(use_heavy_quark_res) heavy_quark_residual = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
+	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
 	
 	steps_since_reliable = 0;
       }
@@ -218,15 +209,7 @@ namespace quda {
       breakdown = false;
       k++;
 
-      if (invParam.verbosity >= QUDA_VERBOSE) {
-	if (use_heavy_quark_res) {
-	  printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n", 
-		     k, r2, sqrt(r2/b2), heavy_quark_residual);
-	} else {
-	  printfQuda("CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2, sqrt(r2/b2));
-	}
-      }
-
+      PrintStats("CG", k, r2, b2, heavy_quark_res);
     }
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -256,15 +239,7 @@ namespace quda {
     invParam.true_res_hq = 0.0;
 #endif      
 
-    if (invParam.verbosity >= QUDA_SUMMARIZE) {
-      if (use_heavy_quark_res) {
-	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e, heavy-quark residual = %e\n", k, sqrt(r2/b2), invParam.true_res, invParam.true_res_hq);    
-      }else{
-	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		   k, sqrt(r2/b2), invParam.true_res);
-      }
-
-    }
+    PrintSummary("CG", k, r2, b2);
 
     // reset the flops counters
     quda::blas_flops = 0;

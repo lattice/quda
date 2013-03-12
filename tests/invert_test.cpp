@@ -176,10 +176,20 @@ int main(int argc, char **argv)
   }
 
   inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-6;
-  //inv_param.residual_type = QUDA_HEAVY_QUARK_RESIDUAL;
+  inv_param.tol = 1e-7;
+#if __COMPUTE_CAPABILITY__ >= 200
+  // require both L2 relative and heavy quark residual to determine convergence
+  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
+  inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
+#else
+  // Pre Fermi architecture only supports L2 relative residual norm
+  inv_param.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
+#endif
   // these can be set individually
-  for (int i=0; i<inv_param.num_offset; i++) inv_param.tol_offset[i] = inv_param.tol;
+  for (int i=0; i<inv_param.num_offset; i++) {
+    inv_param.tol_offset[i] = inv_param.tol;
+    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+  }
   inv_param.maxiter = 25000;
   inv_param.reliable_delta = 1e-2; // ignored by multi-shift solver
 
@@ -383,9 +393,9 @@ int main(int argc, char **argv)
       double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
       double l2r = sqrt(nrm2 / src2);
 
-      printfQuda("Shift i=%d residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g\n",
+      printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
 		 i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
-		 inv_param.true_res_hq_offset[i]);
+		 inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i]);
     }
     free(spinorTmp);
 
@@ -454,8 +464,8 @@ int main(int argc, char **argv)
     double src2 = norm_2(spinorIn, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
     double l2r = sqrt(nrm2 / src2);
 
-    printfQuda("Residuals: requested %g; relative QUDA = %g, host = %g; heavy-quark QUDA = %g\n",
-	       inv_param.tol, inv_param.true_res, l2r, inv_param.true_res_hq);
+    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
+	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
   }
 

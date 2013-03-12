@@ -37,22 +37,28 @@ Version 0.5.0
   mixed precision and implements per-shift refinement after the
   multi-shift solver completes to ensure accuracy of the final result.
   The old invertMultiShiftQudaMixed() interface function has been
-  removed.
+  removed.  The multi-shift solver now supports setting the
+  convergence tolerance on a per-pole basis, through the
+  QudaInvertParam tol_offset[QUDA_MAX_MULTI_SHIFT] member;
 
 - Improved the stability and accuracy of mixed-precision CG.  As a
   result, mixed double/single CG has a virtually identical iteration
   count to pure double CG, and using half precision is now a win.
 
-- Added experimental support for the Fermilab heavy-quark residual as
-  a stopping condition in BiCGstab and CG.  To minimize the impact on
+- Added support for the Fermilab heavy-quark residual as a stopping
+  condition in BiCGstab, CG and GCR.  To minimize the impact on
   performance, the heavy-quark residual is only measured every 10
-  iterations.  This stopping condition has also been incorporated into
-  the sequential CG refinement stage of the multi-shift solver for
-  staggered fermions (and will be enabled for Wilson fermions in a
-  future release).  Owing to hardware-limitations of the Tesla-class
-  architecture (e.g., GT200), the heavy-quark residual is not
-  supported for sm_1x targets.  Attempting to use it will result in a
-  runtime error.
+  iterations (BiCGstab and GCR) or only when the solution is computed
+  (GCR).  This stopping condition has also been incorporated into the
+  sequential CG refinement stage of the multi-shift solver.  Owing to
+  hardware-limitations of the Tesla-class architecture (e.g., GT200),
+  the heavy-quark residual is not supported for sm_1x targets.
+  Attempting to use it will result in a runtime error.
+  QudaInvertParam has a new member residual_type which is used to
+  define the stopping conditioner, this respects a bitwise setting to
+  allow for multiple stopping conditions.  The member double tol_hq is
+  used to set the heavy quark residual tolerance (tol_hq_offset for
+  the multi-shift solver).
 
 - The value of the true residual(s) are now returned in the true_res
   and (for multi-shift) true_res_offset members of the QudaInvertParam

@@ -71,7 +71,8 @@ module quda_fortran
      real(8) :: epsilon ! Twisted mass parameter
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor 
      
-     real(8) :: tol
+     real(8) :: tol ! Requested L2 residual norm
+     real(8) :: tol_hq ! Requested heavy quark residual norm
      real(8) :: true_res ! Actual L2 residual norm achieved in solver
      real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter

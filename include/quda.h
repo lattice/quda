@@ -109,6 +109,7 @@ extern "C" {
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
+    double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */
     double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
     int maxiter;
@@ -203,7 +204,8 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
-    /** Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence */
+    /** Whether to use the L2 relative residual, Fermilab heavy-quark
+	residual or both to gauge convergence */
     QudaResidualType residual_type;
 
   } QudaInvertParam;

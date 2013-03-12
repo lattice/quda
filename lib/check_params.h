@@ -135,6 +135,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
   P(tol, INVALID_DOUBLE);
+
+  if (param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+    P(tol_hq, INVALID_DOUBLE);
+  }
+
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
 
@@ -146,7 +151,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     for (int i=0; i<param->num_offset; i++) {
       P(offset[i], INVALID_DOUBLE);
       P(tol_offset[i], INVALID_DOUBLE);     
-      if (param->residual_type==QUDA_HEAVY_QUARK_RESIDUAL)
+      if (param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL)
 	P(tol_hq_offset[i], INVALID_DOUBLE);
 #ifndef CHECK_PARAM
       P(true_res_offset[i], INVALID_DOUBLE); 
