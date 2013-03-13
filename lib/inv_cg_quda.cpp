@@ -181,11 +181,14 @@ namespace quda {
 	zeroCuda(xSloppy);
 
 	// break-out check if we have reached the limit of the precision
+	static int resIncrease = 0;
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
 	  k++;
 	  rUpdate++;
-	  break;
+	  if (++resIncrease > 2) break; // only allowed two consecutive residual increases
+	} else {
+	  resIncrease = 0;
 	}
 
 	rNorm = sqrt(r2);
@@ -194,9 +197,9 @@ namespace quda {
 	r0Norm = rNorm;      
 	rUpdate++;
 
-	// this is an experiment where we restore orthogonality of the gradient vector
-	//double rp = reDotProductCuda(rSloppy, p) / (r2);
-	//axpyCuda(-rp, rSloppy, p);
+	// explicitly restore the orthogonality of the gradient vector
+	double rp = reDotProductCuda(rSloppy, p) / (r2);
+	axpyCuda(-rp, rSloppy, p);
 
 	beta = r2 / r2_old; 
 	xpayCuda(rSloppy, beta, p);
