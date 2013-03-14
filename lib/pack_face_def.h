@@ -1614,7 +1614,7 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const
 {
   int nDimPack = 0;
   for (int dim=0; dim<4; dim++) {
-    if(!commDimPartitioned(dim)) continue;
+    if(!dslashParam.commDim[dim]) continue;
     if (dim != 3 || getKernelPackT()) nDimPack++;
   }
   if (!nDimPack) return; // if zero then we have nothing to pack 
