@@ -61,6 +61,7 @@ namespace quda {
       const DiracMatrix &mat;
       const DiracMatrix &matSloppy;
       const DiracMatrix &matPrecon;
+      TimeProfile innerProfile;
 
       Solver* K;
       QudaInvertParam Kparam;

@@ -32,6 +32,8 @@ namespace quda {
 
   void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b)
   {
+    profile[QUDA_PROFILE_INIT].Start();
+
     int k=0;
 
     // Find the maximum domain overlap.
@@ -49,12 +51,16 @@ namespace quda {
     double r2 = xmyNormCuda(b,r);
     cudaColorSpinorField p(r);
     cudaColorSpinorField Ap(r);
-
+    
+    profile[QUDA_PROFILE_INIT].Stop();
+    profile[QUDA_PROFILE_PREAMBLE].Start();
 
     double alpha = 0.0, beta=0.0;
     double pAp;
     double r2_old;
 
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
 
     while( k < invParam.maxiter-1 ){
       mat(Ap, p, y);
@@ -75,7 +81,9 @@ namespace quda {
     pAp = reDotProductCuda(p, Ap);
     alpha  = r2/pAp;
     axpyCuda(alpha, p, x); // x --> x + alpha*p
-    
+   
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+ 
     return;
   }
 

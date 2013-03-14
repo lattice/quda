@@ -46,7 +46,7 @@ namespace quda {
 
 
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrec, QudaInvertParam &invParam, TimeProfile &profile) :
-    Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrec), K(NULL)
+    Solver(invParam, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrec), K(NULL), innerProfile("innerSolver")
   {
     Kparam = newQudaInvertParam();
 
@@ -75,7 +75,7 @@ namespace quda {
 
 
     //K = new CG(matPrecon, matPrecon, Kparam, profile);
-    K = new SimpleCG(matPrecon, Kparam, profile);
+    K = new SimpleCG(matPrecon, Kparam, innerProfile);
   }
 
 
@@ -282,6 +282,9 @@ namespace quda {
     delete p_ptr;
     
     double total_time = difftime(time(NULL), start_time); 
+
+    
+    innerProfile.Print();
 
     printfQuda("PreconCG time : %lf seconds\n", total_time);
     printfQuda("SimpleCG time : %lf seconds\n", precon_time);
