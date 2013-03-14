@@ -75,7 +75,9 @@ namespace quda {
 
 
     //K = new CG(matPrecon, matPrecon, Kparam, profile);
-    K = new SimpleCG(matPrecon, Kparam, profile);
+    // Can switch off the preconditioning by choosing the number of preconditioner 
+    // iterations to be negative
+    if(Kparam.maxiter >= 0) K = new SimpleCG(matPrecon, Kparam, profile);
   }
 
 
@@ -85,7 +87,10 @@ namespace quda {
 
   void PreconCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b)
   {
+    profile[QUDA_PROFILE_INIT].Start();
+
     printfQuda("Calling preconditioned solver\n");  
+
     time_t start_precon_time, end_precon_time;
     double precon_time = 0.0;
     time_t start_time = time(NULL);
@@ -133,16 +138,14 @@ namespace quda {
     param.create = QUDA_COPY_FIELD_CREATE; 
     cudaColorSpinorField r(b,param);
 
-
-
     Extender extendCuda(r); // function object used to implement overlapping domains
 
     param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(b,param);
+    cudaColorSpinorField tmp(b,param);
     if(K) minvr_ptr = new cudaColorSpinorField(b,param);
 
-    mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    mat(r, x, tmp); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
 
     double r2 = xmyNormCuda(b,r);
@@ -150,8 +153,6 @@ namespace quda {
 
     param.precision = invParam.cuda_prec_sloppy;
     cudaColorSpinorField Ap(x,param);
-    cudaColorSpinorField tmp(x,param);
-
     ColorSpinorParam prec_param(x);
     prec_param.create = QUDA_COPY_FIELD_CREATE;
     prec_param.precision = invParam.cuda_prec_precondition;
@@ -200,8 +201,9 @@ namespace quda {
       p_ptr = new cudaColorSpinorField(r);
     }
 
+    profile[QUDA_PROFILE_INIT].Stop();
 
-
+    profile[QUDA_PROFILE_PREAMBLE].Start();
     double src_norm = norm2(b);
     double stop = src_norm*invParam.tol*invParam.tol; // stopping condition
     double alpha = 0.0, beta=0.0;
@@ -213,6 +215,9 @@ namespace quda {
     r2 = norm2(r);
 
     if(K) rMinvr = reDotProductCuda(r,*minvr_ptr);
+
+    profile[QUDA_PROFILE_PREAMBLE].Stop();
+    profile[QUDA_PROFILE_COMPUTE].Start();
 
     while(r2 > stop && k < invParam.maxiter){
       mat(Ap, *p_ptr, tmp);
@@ -267,11 +272,19 @@ namespace quda {
     }
     printfQuda("Number of outer-solver iterations = %d\n",k);
 
+
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+
+    profile[QUDA_PROFILE_EPILOGUE].Start();
+
     // compute the true residual 
-    mat(r, x, y);
+    mat(r, x, tmp);
     double true_res = xmyNormCuda(b, r);
     invParam.true_res = sqrt(true_res / src_norm);
     printfQuda("true_res = %e\n", invParam.true_res);
+
+    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile[QUDA_PROFILE_FREE].Start();
 
     // FIX THIS!!
     if(K){ // These are only needed if preconditioning is used
@@ -280,11 +293,14 @@ namespace quda {
       delete minvr_ptr;
     }
     delete p_ptr;
-    
+    profile[QUDA_PROFILE_FREE].Stop();
+   
+ 
     double total_time = difftime(time(NULL), start_time); 
 
     printfQuda("PreconCG time : %lf seconds\n", total_time);
     printfQuda("SimpleCG time : %lf seconds\n", precon_time);
+    printfQuda("Number of preconditioning steps : %lf\n",invParam.maxiter_precondition);
     printfQuda("Fraction of time spent in preconditioner : %lf\n", (double)precon_time/(double)total_time);
     return;
   }

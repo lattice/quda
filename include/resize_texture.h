@@ -13,20 +13,12 @@ template<typename OutputType, typename InputType>
 class Texture {
 
   private: 
-#ifndef DIRECT_ACCESS_BLAS
-    cudaTextureObject_t spinor;
-#else
     const InputType *spinor; // used when textures are disabled
-#endif
 
   public:
     Texture() : spinor(0) { }   
-#ifndef DIRECT_ACCESS_BLAS
-    Texture(const cudaColorSpinorField *x) : spinor(x->Tex()) { }
-#else
     Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
     Texture(const InputType *inspinor) : spinor(inspinor) { printfQuda("Calling Texture::Texture(const Input *inspinor)\n"); }
-#endif
     Texture(const Texture &tex) : spinor(tex.spinor) { }
     ~Texture() { }
 
@@ -35,27 +27,12 @@ class Texture {
       return *this;
     }
 
-#ifndef DIRECT_ACCESS_BLAS
-    __device__ inline OutputType fetch(unsigned int idx) 
-    { return tex1Dfetch<OutputType>(spinor, idx); }
-#else
     __device__ inline OutputType fetch(unsigned int idx) 
     { OutputType out; copyFloatN(out, spinor[idx]); return out; } 
-#endif
 
     __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
 };
 
-#ifndef DIRECT_ACCESS_BLAS
-__device__ inline double2 fetch_double2(int4 v)
-{ return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
-
-template<> __device__ inline double2 Texture<double2,double2>::fetch(unsigned int idx) 
-{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
-
-template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int idx) 
-{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
-#endif
 
 #else 
 
@@ -296,13 +273,6 @@ class Spinor {
     Spinor(const Spinor &st) 
       : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
 
-#ifndef DIRECT_ACCESS_BLAS
-    Spinor(StoreType* spinor, float* norm, int field_stride) 
-      : spinor(spinor), norm(norm), stride(field_stride/(N*REG_LENGTH)), { checkTypes<RegType, InterType, StoreType>(); }
-
-    Spinor(void* spinor, float* norm, int field_stride)
-      : spinor(static_cast<StoreType*>(spinor)), norm(norm), stride(field_stride/(N*REG_LENGTH)) { checkTypes<RegType, InterType, StoreType>(); }
-#else
     // Need to initialise the Texture objects since they are used even when textures are not
     // Note: the use of texture reads is not yet supported here!
     Spinor(StoreType* spinor, float* norm, int field_stride) 
@@ -312,7 +282,6 @@ class Spinor {
     Spinor(void* spinor, float* norm, int field_stride)
       : spinor(static_cast<StoreType*>(spinor)), tex(static_cast<StoreType*>(spinor)), norm(norm), stride(field_stride/(N*REG_LENGTH)) { 
       checkTypes<RegType, InterType, StoreType>(); }
-#endif
 
     void set(StoreType* spinor, float* norm, int stride)
     {
