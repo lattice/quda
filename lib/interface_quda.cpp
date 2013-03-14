@@ -672,7 +672,8 @@ namespace quda {
     diracParam.mu = inv_param->mu;
     diracParam.verbose = getVerbosity();
 
-    diracParam.hasNaik = inv_param->hasNaik ? true : false;
+    //diracParam.hasNaik = inv_param->hasNaik ? true : false;
+    diracParam.hasNaik = inv_param->hasNaik = true;
     diracParam.Nface = inv_param->nface; 
 
    // diracParam.hasNaik = false;
@@ -710,7 +711,7 @@ namespace quda {
  //   diracParam.Nface = 0; // No need for ghost zones in the preconditioner
  //                         // but setting Nface = 0 causes problems 
  //                         // Fix this!
-    diracParam.hasNaik = false;
+    diracParam.hasNaik = inv_param->hasNaik ? true : false;
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 0; // comms are always off
