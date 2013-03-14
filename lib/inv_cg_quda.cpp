@@ -153,11 +153,11 @@ namespace quda {
       int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
-      // force a reliable update if we are within target tolerance (experimental)
-      //if (distance_to_solution < convergence_threshold) updateX = 1;
+      // force a reliable update if we are within target tolerance (only if doing reliable updates)
+      if ( convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && delta >= invParam.tol) updateX = 1;
 
       if ( !(updateR || updateX)) {
-	//beta = r2 / r2_old; // use the traditional method if just done a reliable update
+	//beta = r2 / r2_old;
 	beta = sigma / r2_old; // use the alternative beta computation
 
 	if (pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, rSloppy, xSloppy, p);
