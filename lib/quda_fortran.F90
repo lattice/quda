@@ -14,7 +14,7 @@
 
 !-------------------------------------------------------------------------------
 
-#define QUDA_MAX_DIM 6
+#define QUDA_MAX_DIM 5
 #define QUDA_MAX_MULTI_SHIFT 32
 
 module quda_fortran
