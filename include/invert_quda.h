@@ -18,7 +18,8 @@ namespace quda {
       Solver(QudaInvertParam &invParam, TimeProfile &profile) : invParam(invParam), profile(profile) { ; }
       virtual ~Solver() { ; }
 
-      virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+      virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in){}
+      virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in, double* time){}
 
       // solver factory
       static Solver* create(QudaInvertParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
@@ -48,7 +49,7 @@ namespace quda {
       SimpleCG(const DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
       virtual ~SimpleCG();
 
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in, double* time);
 
   };
 

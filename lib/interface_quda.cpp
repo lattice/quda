@@ -673,7 +673,7 @@ namespace quda {
     diracParam.verbose = getVerbosity();
 
     //diracParam.hasNaik = inv_param->hasNaik ? true : false;
-    diracParam.hasNaik = inv_param->hasNaik = true;
+    diracParam.hasNaik = true;
     diracParam.Nface = inv_param->nface; 
 
    // diracParam.hasNaik = false;

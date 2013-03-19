@@ -33,6 +33,14 @@ namespace quda {
   double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 
+
+  // Single-precision operations
+  void axpyCuda(const float &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+  void xpayCuda(const float &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+  
+  void axpyZpbxCuda(const float &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z, const float& b);
+
+
   void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y);
   void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
   void axCuda(const double &a, cudaColorSpinorField &x);

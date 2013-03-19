@@ -92,16 +92,16 @@ tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu  $(HDRS) $(BLAS_INLN)
-	$(NVCC) $(NVCCFLAGS) -G $(MAXREG) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
-	$(NVCC) $(NVCCFLAGS) -G $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 resize_quda.o: resize_quda.cu $(HDRS) $(CORE)
-	$(NVCC) $(NVCCFLAGS) -G $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 
 %.o: %.cpp $(HDRS)

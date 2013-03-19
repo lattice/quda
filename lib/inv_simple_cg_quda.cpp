@@ -30,7 +30,15 @@ namespace quda {
   SimpleCG::~SimpleCG() {
   }
 
-  void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b)
+
+  inline void accumulate_time(double* time_difference, const timeval& start, const timeval& stop)
+  {
+    long ds = stop.tv_sec - start.tv_sec;
+    long dus = stop.tv_usec - start.tv_usec;
+    *time_difference += ds + 0.000001*dus;
+  }
+
+  void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b, double* time)
   {
     profile[QUDA_PROFILE_INIT].Start();
 
@@ -45,10 +53,17 @@ namespace quda {
     cudaColorSpinorField r(b);
     cudaColorSpinorField y(b);
 
+    timeval mat_start, mat_stop;
 
+
+    gettimeofday(&mat_start, NULL);
     mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
     double r2 = xmyNormCuda(b,r);
+    gettimeofday(&mat_stop, NULL);
+
+    accumulate_time(time, mat_start, mat_stop);
+
     cudaColorSpinorField p(r);
     cudaColorSpinorField Ap(r);
     
@@ -63,9 +78,13 @@ namespace quda {
     profile[QUDA_PROFILE_COMPUTE].Start();
 
     while( k < invParam.maxiter-1 ){
+      gettimeofday(&mat_start, NULL);
       mat(Ap, p, y);
       pAp = reDotProductCuda(p, Ap);
-      
+      gettimeofday(&mat_stop, NULL);
+            
+      accumulate_time(time, mat_start, mat_stop);
+
       alpha = r2/pAp; 
       axpyCuda(-alpha, Ap, r); // r --> r - alpha*Ap
       r2_old = r2;
@@ -77,8 +96,12 @@ namespace quda {
       ++k;
     }
 
+    gettimeofday(&mat_start, NULL);
     mat(Ap, p, y);
     pAp = reDotProductCuda(p, Ap);
+    gettimeofday(&mat_start, NULL);
+    accumulate_time(time, mat_start, mat_stop);
+
     alpha  = r2/pAp;
     axpyCuda(alpha, p, x); // x --> x + alpha*p
    

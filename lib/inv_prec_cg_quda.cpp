@@ -84,15 +84,27 @@ namespace quda {
     if (K) delete K;
   }
 
+  inline void accumulate_time(double* time_difference, const timeval& start, const timeval& stop)
+  {
+    long ds = stop.tv_sec - start.tv_sec;
+    long dus = stop.tv_usec - start.tv_usec;
+    *time_difference += ds + 0.000001*dus;
+  }
+
+
   void PreconCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b)
   {
     profile[QUDA_PROFILE_INIT].Start();
 
     printfQuda("Calling preconditioned solver\n");  
 
-    time_t start_precon_time, end_precon_time;
+    
+    timeval precon_start, precon_stop;
     double precon_time = 0.0;
-    time_t start_time = time(NULL);
+    timeval pcstart, pcstop;
+    double pctime = 0.0;
+    timeval common_start, common_stop;
+    double common_time = 0.0;
     int k=0;
     int rUpdate;
 
@@ -121,6 +133,7 @@ namespace quda {
     X[3] = b.X(3);
     for(int dir=0; dir<4; ++dir) Y[dir] = X[dir] + 2*Kparam.domain_overlap[dir];
 
+    double simple_matrix_time = 0.;
 
     printfQuda("Y = %d %d %d %d\n", Y[0], Y[1], Y[2], Y[3]);
     fflush(stdout);
@@ -175,6 +188,9 @@ namespace quda {
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
+    
+      gettimeofday(&pcstart, NULL);
+
       if(max_overlap){
         extendCuda(*rPre_ptr,r,dparam,domain_overlap);
       }else{
@@ -182,11 +198,12 @@ namespace quda {
       }
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
-      start_precon_time = time(NULL);
+      gettimeofday(&precon_start, NULL); 
       globalReduce = false;
-      (*K)(*minvrPre_ptr, *rPre_ptr);  
+      (*K)(*minvrPre_ptr, *rPre_ptr, &simple_matrix_time);  
       globalReduce = true;
-      precon_time += difftime(time(NULL), start_precon_time);
+      gettimeofday(&precon_stop, NULL);
+      accumulate_time(&precon_time, precon_start, precon_stop);
       
 
       if(max_overlap){
@@ -194,6 +211,9 @@ namespace quda {
       }else{
         *minvr_ptr = *minvrPre_ptr;
       }
+
+      gettimeofday(&pcstop, NULL);
+      accumulate_time(&pctime, pcstart, pcstop);
 
       p_ptr = new cudaColorSpinorField(*minvr_ptr);
     }else{
@@ -219,17 +239,24 @@ namespace quda {
     profile[QUDA_PROFILE_COMPUTE].Start();
 
     while(r2 > stop && k < invParam.maxiter){
+
+      gettimeofday(&common_start, NULL);
       mat(Ap, *p_ptr, tmp);
       pAp   = reDotProductCuda(*p_ptr,Ap);
 
       alpha = (K) ? rMinvr/pAp : r2/pAp;
       Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r); 
       // r --> r - alpha*A*p
+      gettimeofday(&common_stop, NULL);
+      accumulate_time(&common_time, common_start, common_stop);
 
       if(K){
         rMinvr_old = rMinvr;
         r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
         //  zeroCuda(*rPre_ptr);
+
+
+        gettimeofday(&pcstart, NULL);
 
         if(max_overlap){       
           extendCuda(*rPre_ptr,r,dparam,domain_overlap);
@@ -239,17 +266,21 @@ namespace quda {
 
         *minvrPre_ptr = *rPre_ptr;
 
-        start_precon_time = time(NULL);
+        gettimeofday(&precon_start,NULL);
         globalReduce = false;
-        (*K)(*minvrPre_ptr, *rPre_ptr);
+        (*K)(*minvrPre_ptr, *rPre_ptr, &simple_matrix_time);
         globalReduce = true;
-        precon_time += difftime(time(NULL), start_precon_time);
+        gettimeofday(&precon_stop,NULL);
+        accumulate_time(&precon_time, precon_start, precon_stop);
 
         if(max_overlap){
           cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
         }else{
           *minvr_ptr = *minvrPre_ptr;
         }
+        gettimeofday(&pcstop, NULL);
+        accumulate_time(&pctime, pcstart, pcstop);
+
         rMinvr = reDotProductCuda(r,*minvr_ptr);
 
         beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
@@ -263,7 +294,7 @@ namespace quda {
         beta = r2/r2_old;
         axpyZpbxCuda(alpha, *p_ptr, x, r, beta);
       }
-      printfQuda("r2 = %e\n", r2);
+      if(k%100 == 0) printfQuda("r2 = %e\n", r2);
       // update x and p
       // x = x + alpha*p
       // p = Minv_r + beta*p
@@ -295,15 +326,14 @@ namespace quda {
     profile[QUDA_PROFILE_FREE].Stop();
    
  
-    double total_time = difftime(time(NULL), start_time); 
 
     
     innerProfile.Print();
 
-    printfQuda("PreconCG time : %lf seconds\n", total_time);
+    printfQuda("SimpleCG matrix time : %lf seconds\n", simple_matrix_time);
     printfQuda("SimpleCG time : %lf seconds\n", precon_time);
-    printfQuda("Number of preconditioning steps : %lf\n",invParam.maxiter_precondition);
-    printfQuda("Fraction of time spent in preconditioner : %lf\n", (double)precon_time/(double)total_time);
+    printfQuda("SimpleCG + Copy time : %lf seconds\n", pctime);
+    printfQuda("Common time : %lf seconds\n", common_time);
     return;
   }
 

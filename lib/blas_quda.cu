@@ -117,6 +117,13 @@ namespace quda {
     blasCuda<axpy,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
 			   x, y, x, x);
   }
+ /** 
+  Single-precision variant
+  void axpyCuda(const float &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
+    blasCuda<axpy,0,1,0,0>(make_float2(a, 0.0), make_float2(1.0, 0.0), make_float2(0.0, 0.0), 
+			   x, y, x, x);
+  }
+ */
 
   /**
      Functor to perform the operation y = x + a*y
@@ -134,6 +141,16 @@ namespace quda {
     blasCuda<xpay,0,1,0,0>(make_double2(a,0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0),
 			   x, y, x, x);
   }
+
+  /**
+    Single-precision variant 
+  void xpayCuda(cudaColorSpinorField &x, const float &a, cudaColorSpinorField &y) {
+    blasCuda<xpay,0,1,0,0>(make_float2(a,0.0), make_float2(0.0, 0.0), make_float2(0.0, 0.0),
+			   x, y, x, x);
+  }
+  */
+    
+
 
   /**
      Functor to perform the operation y -= x;
@@ -327,6 +344,17 @@ namespace quda {
     blasCuda<axpyZpbx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
 			       x, y, z, x);
   }
+
+  /**
+    Single-precision variant 
+  void axpyZpbxCuda(const float &a, cudaColorSpinorField& x, cudaColorSpinorField& y,
+		    cudaColorSpinorField& z, const float &b) {
+    // swap arguments around 
+    blasCuda<axpyZpbx,1,1,0,0>(make_float2(a,0.0), make_float2(b,0.0), make_float2(0.0,0.0),
+			       x, y, z, x);
+  }
+  */
+
 
   /**
      Functor performing the operations z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
