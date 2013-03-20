@@ -204,8 +204,14 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
-    /** Whether to use the L2 relative residual, Fermilab heavy-quark
-	residual or both to gauge convergence */
+    /**
+     * Whether to use the L2 relative residual, Fermilab heavy-quark
+     * residual, or both to determine convergence.  To require that both
+     * stopping conditions are satisfied, use a bitwise OR as follows:
+     *
+     * p.residual_type = (QudaResidualType) (QUDA_L2_RELATIVE_RESIDUAL
+     *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
+     */
     QudaResidualType residual_type;
 
   } QudaInvertParam;

@@ -1,20 +1,26 @@
-Release Notes for QUDA v0.5.0 (PRE-RELEASE)              XX March 2013
+Release Notes for QUDA v0.5.0                           20 March 2013
 -----------------------------
 
 Overview:
 
 QUDA is a library for performing calculations in lattice QCD on
-graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
-This release includes optimized kernels for applying a variety of
-Dirac operators (Wilson, clover-improved Wilson, twisted mass,
-improved staggered, and domain wall), kernels for performing various
-BLAS-like operations, and full inverters built on these kernels.
-Mixed-precision implementations of both CG and BiCGstab are provided,
-with support for double, single, and half (16-bit fixed-point)
-precision.  The staggered implementation additionally includes support
-for HISQ link fattening, force terms for the HISQ fermion action
-and one-loop improved Symanzik gauge action, and a multi-shift CG
-solver.  Use of multiple GPUs in parallel is supported for all actions.
+graphics processing units (GPUs), leveraging NVIDIA's CUDA platform.
+The current release includes optimized Dirac operators and solvers for
+the following fermion actions:
+
+* Wilson
+* Clover-improved Wilson
+* Twisted mass
+* Improved staggered (asqtad or HISQ)
+* Domain wall
+
+Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
+GCR are provided, including robust mixed-precision variants supporting
+combinations of double, single, and half (16-bit "block floating
+point") precision.  The library also includes routines for HISQ link
+fattening and force terms for the HISQ fermion action and one-loop
+improved Symanzik gauge action.  Use of many GPUs in parallel is
+supported throughout, with communication handled by QMP or MPI.
 
 
 Software Compatibility:
@@ -38,12 +44,12 @@ Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to QUDA's configure script.  For example, the Tesla
-C1060 is listed on the above website as having compute capability 1.3,
+C2075 is listed on the above website as having compute capability 2.0,
 and so to configure the library for this card, you'd run "configure
---enable-gpu-arch=sm_13 [other options]" before typing "make".
+--enable-gpu-arch=sm_20 [other options]" before typing "make".
 
 As of QUDA 0.4.0, only devices of compute capability 1.1 or greater
-are supported.
+are supported.  See also "Known Issues" below.
 
 
 Installation:
@@ -110,11 +116,21 @@ enumerated in include/enum_quda.h.
 
 Known Issues:
 
-* To perform staggered calculations on Kepler GPUs, it is necessary 
-  to use texture objects to implement texture reads in the BLAS kernels. 
-  Otherwise, for unclear reasons, the staggered multi-shift solver 
-  can give junk results (NaNs). Texture objects are enabled by passing 
-  the --enable-tex-object flag to configure.
+* Issues affecting devices with compute capability 1.1, 1.2, or 1.3
+  (i.e., those predating the "Fermi" architecture):
+
+  1. Building for these targets results in a large number of warnings
+     that the compiler "Cannot tell what pointer points to, assuming
+     global memory space."  The warnings are annoying but harmless.
+
+  2. Computation of the Fermilab heavy-quark residual (and its use as
+     a stopping condition in the solvers) is not supported on these
+     devices.  Selecting it will result in a run-time error.
+
+  3. It is anticipated that QUDA 0.6.0 will drop support for pre-Fermi
+     cards completely.  QUDA 0.5.x will continue to be maintained as a
+     separate branch (with bug fixes but minimal new features) for
+     those needing this support.
 
 * When used with drivers predating the CUDA 5.0 production release,
   Fermi-based GeForce cards suffer from occasional hangs when reading
