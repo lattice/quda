@@ -1,29 +1,33 @@
-
-Release Notes for QUDA v0.4.0                             4 April 2012
+Release Notes for QUDA v0.5.0                           20 March 2013
 -----------------------------
 
 Overview:
 
 QUDA is a library for performing calculations in lattice QCD on
-graphics processing units (GPUs) using NVIDIA's "C for CUDA" API.
-This release includes optimized kernels for applying a variety of
-Dirac operators (Wilson, clover-improved Wilson, twisted mass,
-improved staggered, and domain wall), kernels for performing various
-BLAS-like operations, and full inverters built on these kernels.
-Mixed-precision implementations of both CG and BiCGstab are provided,
-with support for double, single, and half (16-bit fixed-point)
-precision.  The staggered implementation additionally includes support
-for asqtad link fattening, force terms for the asqtad fermion action
-and one-loop improved Symanzik gauge action, and a multi-shift CG
-solver.  Use of multiple GPUs in parallel is supported for all actions
-except domain wall.
+graphics processing units (GPUs), leveraging NVIDIA's CUDA platform.
+The current release includes optimized Dirac operators and solvers for
+the following fermion actions:
+
+* Wilson
+* Clover-improved Wilson
+* Twisted mass
+* Improved staggered (asqtad or HISQ)
+* Domain wall
+
+Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
+GCR are provided, including robust mixed-precision variants supporting
+combinations of double, single, and half (16-bit "block floating
+point") precision.  The library also includes routines for HISQ link
+fattening and force terms for the HISQ fermion action and one-loop
+improved Symanzik gauge action.  Use of many GPUs in parallel is
+supported throughout, with communication handled by QMP or MPI.
 
 
 Software Compatibility:
 
-The library has been tested under Linux (CentOS 5.7 and Ubuntu 10.04)
-using release 4.1 of the CUDA toolkit.  CUDA 3.x and earlier are no
-longer supported.  The library also seems to work under Mac OS X
+The library has been tested under Linux (CentOS 5.8 and Ubuntu 12.04)
+using release 4.0, 4.1, 4.2, and 5.0 of the CUDA toolkit.  CUDA 3.x
+and earlier are not supported.  The library also works under Mac OS X
 10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
 Intel-based Macs.
 
@@ -40,9 +44,12 @@ Before building the library, you should determine the "compute
 capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to QUDA's configure script.  For example, the Tesla
-C1060 is listed on the above website as having compute capability 1.3,
+C2075 is listed on the above website as having compute capability 2.0,
 and so to configure the library for this card, you'd run "configure
---enable-gpu-arch=sm_13 [other options]" before typing "make".
+--enable-gpu-arch=sm_20 [other options]" before typing "make".
+
+As of QUDA 0.4.0, only devices of compute capability 1.1 or greater
+are supported.  See also "Known Issues" below.
 
 
 Installation:
@@ -72,6 +79,17 @@ configure into thinking that it's cross-compiling by setting the
 --build=none and --host=<HOST> flags.  For the latter,
 "--host=x86_64-linux-gnu" should work on a 64-bit linux system.
 
+If Fortran interface support is desired, the F90 environment variable
+should be set when configure is invoked, and "make fortran" must be
+run explicitly, since the Fortran interface modules are not built by
+default.
+
+As examples, the scripts "configure.milc.titan" and
+"configure.chroma.titan" are provided.  These configure QUDA for
+expected use with MILC and Chroma, respectively, on Titan (the Tesla
+K20X-powered Cray XK7 supercomputer at the Oak Ridge Leadership
+Computing Facility).
+
 Throughout the library, auto-tuning is used to select optimal launch
 parameters for most performance-critical kernels.  This tuning
 process takes some time and will generally slow things down the first
@@ -89,13 +107,38 @@ for one card on a different card may lead to unexpected errors.
 Using the Library:
 
 Include the header file include/quda.h in your application, link
-against lib/libquda.a, and study tests/wilson_invert_test.c (or the
-corresponding tests for staggered, domain wall, and twisted mass) for
-an example of the interface.  The various inverter options are
+against lib/libquda.a, and study tests/invert_test.cpp (for Wilson,
+clover, twisted-mass, or domain wall fermions) or
+tests/staggered_invert_test.cpp (for asqtad/HISQ fermions) for
+examples of the solver interface.  The various solver options are
 enumerated in include/enum_quda.h.
 
 
 Known Issues:
+
+* Issues affecting devices with compute capability 1.1, 1.2, or 1.3
+  (i.e., those predating the "Fermi" architecture):
+
+  1. Building for these targets results in a large number of warnings
+     that the compiler "Cannot tell what pointer points to, assuming
+     global memory space."  The warnings are annoying but harmless.
+
+  2. Computation of the Fermilab heavy-quark residual (and its use as
+     a stopping condition in the solvers) is not supported on these
+     devices.  Selecting it will result in a run-time error.
+
+  3. It is anticipated that QUDA 0.6.0 will drop support for pre-Fermi
+     cards completely.  QUDA 0.5.x will continue to be maintained as a
+     separate branch (with bug fixes but minimal new features) for
+     those needing this support.
+
+* When used with drivers predating the CUDA 5.0 production release,
+  Fermi-based GeForce cards suffer from occasional hangs when reading
+  from double-precision textures, recoverable only with a soft reset.
+  The recommended solution is to upgrade to the latest driver.
+  Alternatively, such texture reads can be disabled (at the
+  expense of some performance) by passing the
+  --disable-fermi-double-tex flag to configure.
 
 * For compatibility with CUDA, on 32-bit platforms the library is
   compiled with the GCC option -malign-double.  This differs from the
@@ -104,23 +147,13 @@ Known Issues:
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
 
-* With current drivers, Fermi-based GeForce cards suffer from
-  occasional hangs when reading from double-precision textures,
-  recoverable only with a soft reset.  Such texture reads are thus
-  disabled by default at the expense of some performance.  To
-  re-enable double-precision texture reads on Fermi-based Tesla and
-  Quadro cards, pass the --enable-fermi-double-tex flag to configure.
-  This flag has no effect when the library is build for GPU
-  architectures other than Fermi (sm_20).
-
 * The auto-tuner reports "0 Gflop/s" and "0 GB/s" for several of the
   Dslash kernels (visible if the verbosity is set to at least
   QUDA_SUMMARIZE), rather than the correct values.  This does not
   affect the tuning process or actual performance.
 
-* At present, using MPI directly for communications (as opposed to
-  QMP) requires calling some initialization routines that are not
-  exposed in quda.h.  This will be corrected in the next release.
+* Attempts to compile with GCC 4.7.x will fail due to bugs in the
+  compiler.
 
 
 Getting Help:
@@ -160,7 +193,7 @@ Steven Gottlieb (Indiana University)
 Balint Joo (Jefferson Laboratory)
 Claudio Rebbi (Boston University)
 Guochun Shi (NCSA)
-Alexei Strelchenko (Cyprus Institute)
+Alexei Strelchenko (Fermi National Accelerator Laboratory)
 
 Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications
@@ -168,10 +201,12 @@ http://www.ncsa.uiuc.edu/AboutUs/Directorates/ISL.html
 
 Development was supported in part by the U.S. Department of Energy
 under grants DE-FC02-06ER41440, DE-FC02-06ER41449, and
-DE-AC05-06OR23177, as well as by the National Science Foundation under
-grants DGE-0221680, PHY-0427646, PHY-0835713, OCI-0946441, and
-OCI-1060067.  Any opinions, findings, and conclusions or
-recommendations expressed in this material are those of the authors
-and do not necessarily reflect the views of the Department of Energy
-or the National Science Foundation.
+DE-AC05-06OR23177; the National Science Foundation under grants
+DGE-0221680, PHY-0427646, PHY-0835713, OCI-0946441, and OCI-1060067;
+as well as the PRACE project funded in part by the EUs 7th Framework
+Programme (FP7/2007-2013) under grants RI-211528 and FP7-261557.  Any
+opinions, findings, and conclusions or recommendations expressed in
+this material are those of the authors and do not necessarily reflect
+the views of the Department of Energy, the National Science
+Foundation, or the PRACE project.
 
