@@ -133,7 +133,7 @@ namespace quda {
     X[3] = b.X(3);
     for(int dir=0; dir<4; ++dir) Y[dir] = X[dir] + 2*Kparam.domain_overlap[dir];
 
-    double simple_matrix_time = 0.;
+    double simple_time[3] = {0., 0., 0.};
 
     printfQuda("Y = %d %d %d %d\n", Y[0], Y[1], Y[2], Y[3]);
     fflush(stdout);
@@ -198,12 +198,17 @@ namespace quda {
       }
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
-      gettimeofday(&precon_start, NULL); 
+
+      printfQuda("minvrPre_ptr->Precision() = %d\n", minvrPre_ptr->Precision());
+
+
       globalReduce = false;
-      (*K)(*minvrPre_ptr, *rPre_ptr, &simple_matrix_time);  
-      globalReduce = true;
+      gettimeofday(&precon_start, NULL); 
+      (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);  
       gettimeofday(&precon_stop, NULL);
       accumulate_time(&precon_time, precon_start, precon_stop);
+      printfQuda("Time: %lf, %lf\n", simple_time[2], precon_time);
+      globalReduce = true;
       
 
       if(max_overlap){
@@ -266,12 +271,13 @@ namespace quda {
 
         *minvrPre_ptr = *rPre_ptr;
 
-        gettimeofday(&precon_start,NULL);
         globalReduce = false;
-        (*K)(*minvrPre_ptr, *rPre_ptr, &simple_matrix_time);
-        globalReduce = true;
+        gettimeofday(&precon_start,NULL);
+        (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);
         gettimeofday(&precon_stop,NULL);
         accumulate_time(&precon_time, precon_start, precon_stop);
+        //printfQuda("Time: %lf, %lf\n", simple_time[2], precon_time);
+        globalReduce = true;
 
         if(max_overlap){
           cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
@@ -330,7 +336,9 @@ namespace quda {
     
     innerProfile.Print();
 
-    printfQuda("SimpleCG matrix time : %lf seconds\n", simple_matrix_time);
+    printfQuda("SimpleCG matrix time : %lf seconds\n", simple_time[0]);
+    printfQuda("SimpleCG other time : %lf seconds\n", simple_time[1]);
+    printfQuda("SimpleCG inner total : %lf seconds\n", simple_time[2]);
     printfQuda("SimpleCG time : %lf seconds\n", precon_time);
     printfQuda("SimpleCG + Copy time : %lf seconds\n", pctime);
     printfQuda("Common time : %lf seconds\n", common_time);

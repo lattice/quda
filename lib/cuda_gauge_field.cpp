@@ -85,7 +85,9 @@ namespace quda {
 #endif
 
     fat_link_max = fat_link_max_double;
-    
+
+     
+ 
     int voxels[] = {volumeCB, volumeCB, volumeCB, volumeCB};
     
     // FIXME - hack for the moment
@@ -101,8 +103,8 @@ namespace quda {
       packCPSGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad);
       packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad);    
     } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
-      packMILCGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad);
-      packMILCGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad);    
+      packMILCGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad, type);
+      packMILCGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad, type);    
     } else if (cpu_order == QUDA_BQCD_GAUGE_ORDER) {
       packBQCDGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad);
       packBQCDGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad);    
@@ -201,6 +203,7 @@ namespace quda {
 	  }
 	
 	} else if (precision == QUDA_HALF_PRECISION) {
+      
 	
 	  if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
 	    if (reconstruct == QUDA_RECONSTRUCT_NO) {

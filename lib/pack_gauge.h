@@ -193,6 +193,7 @@ template<typename Float>
 inline void fatlink_short_pack18(short2 *d_gauge, Float *h_gauge, int dir, int V) 
 {
   short2 *dg = d_gauge + dir*9*V;
+
   for (int j=0; j<9; j++) {
     dg[j*V].x = FloatToShort((h_gauge[j*2+0]/fat_link_max_)); 
     dg[j*V].y = FloatToShort((h_gauge[j*2+1]/fat_link_max_)); 
@@ -491,6 +492,7 @@ template <typename Float, typename FloatN>
 static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit, 
 			      QudaReconstructType reconstruct, int Vh, int *voxels,
 			      int pad, int offset, int nFace, QudaLinkType type) {
+
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       int nMat = nFace*voxels[dir];
@@ -621,7 +623,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
 // space-time row-column ordering even-odd space-time
 template <typename Float, typename FloatN>
 void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit, 
-			QudaReconstructType reconstruct, int Vh, int pad)
+			QudaReconstructType reconstruct, int Vh, int pad, QudaLinkType type)
 {
   int dir, i;
   if (reconstruct == QUDA_RECONSTRUCT_12) {
@@ -641,12 +643,19 @@ void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit,
   }else{
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
-      for (i = 0; i < Vh; i++) {
-	pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
+      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
+        for(i=0; i<Vh; ++i){
+	  fatlink_short_pack18((short2*)(res+i), g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
+        }
+      }else{
+        for (i = 0; i < Vh; i++) {
+	  pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
+        }
       }
     }
   }
 }
+
 
 // Assume the gauge field is MILC ordered: directions inside of
 // space-time row-column ordering even-odd space-time

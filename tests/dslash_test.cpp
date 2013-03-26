@@ -70,6 +70,8 @@ void init(int argc, char **argv) {
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
+  inv_param->nface = 3;
+
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;

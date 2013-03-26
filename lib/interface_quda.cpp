@@ -308,6 +308,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     cpu = new cpuGaugeField(precon_gauge_param);
   }
 
+  printfQuda("In loadGaugeQuda: cpu->order = %d\n", cpu->Order());
+
   cudaGaugeField *precondition = NULL;
   // switch the parameters for creating the mirror preconditioner cuda gauge field
   gauge_param.precision = param->cuda_prec_precondition;
@@ -380,6 +382,9 @@ void loadPreconGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField *precondition = new cudaGaugeField(gauge_param);
+
+
+  printfQuda("In loadPreconGaugeQuda: cpu->order = %d\n", cpu->Order());
 
   precondition->loadCPUField(*cpu, QUDA_CPU_FIELD_LOCATION);
   param->gaugeGiB += precondition->GBytes();
@@ -711,7 +716,8 @@ namespace quda {
  //   diracParam.Nface = 0; // No need for ghost zones in the preconditioner
  //                         // but setting Nface = 0 causes problems 
  //                         // Fix this!
-    diracParam.hasNaik = inv_param->hasNaik ? true : false;
+    //diracParam.hasNaik = inv_param->hasNaik ? true : false;
+    diracParam.hasNaik = false;
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 0; // comms are always off

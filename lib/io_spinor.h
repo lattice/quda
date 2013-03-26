@@ -454,7 +454,8 @@
     float C = tex1Dfetch((spinorTexHalfNorm), norm_idx);		\
     (I##0).x *= C; (I##0).y *= C;						\
     (I##1).x *= C; (I##1).y *= C;						\
-    (I##2).x *= C; (I##2).y *= C;}
+    (I##2).x *= C; (I##2).y *= C;                                               \
+  }
 
 #define READ_3RD_NBR_SPINOR_HALF_TEX(T, spinor, idx, mystride)		\
   T##0 = tex1Dfetch((spinor), idx + 0*mystride);			\

@@ -110,6 +110,8 @@ void init()
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
+  inv_param.nface = 3;
+
   int tmpint = MAX(X[1]*X[2]*X[3], X[0]*X[2]*X[3]);
   tmpint = MAX(tmpint, X[0]*X[1]*X[3]);
   tmpint = MAX(tmpint, X[0]*X[1]*X[2]);
@@ -122,6 +124,7 @@ void init()
   csParam.nColor=3;
   csParam.nSpin=1;
   csParam.nDim=4;
+  csParam.nFace = inv_param.nface;
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gaugeParam.X[d];
   }
