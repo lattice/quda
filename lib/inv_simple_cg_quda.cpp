@@ -40,9 +40,10 @@ namespace quda {
 
   void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b, double* time)
   {
+#ifdef PRECON_TIME
     timeval tstart, tstop;
     gettimeofday(&tstart, NULL);
-
+#endif
     profile[QUDA_PROFILE_INIT].Start();
     timeval mat_start, mat_stop;
     timeval start1, stop1;
@@ -62,33 +63,37 @@ namespace quda {
     cudaColorSpinorField r(b);
     cudaColorSpinorField y(b);
 
+#ifdef PRECON_TIME
     cudaDeviceSynchronize();
     gettimeofday(&stop1, NULL);
     accumulate_time(&time[0], start1, stop1);
-
+#endif
 
     gettimeofday(&mat_start, NULL);
     mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
     double r2 = xmyNormCuda(b,r);
+#ifdef PRECON_TIME
     cudaDeviceSynchronize();
     gettimeofday(&mat_stop, NULL);
     accumulate_time(&time[0], mat_start, mat_stop);
-  
 
     gettimeofday(&start1, NULL);
+#endif
     cudaColorSpinorField p(r);
     cudaColorSpinorField Ap(r);
-    
+
     profile[QUDA_PROFILE_INIT].Stop();
     profile[QUDA_PROFILE_PREAMBLE].Start();
 
     double alpha = 0.0, beta=0.0;
     double pAp;
     double r2_old;
+#ifdef PRECON_TIME
     cudaDeviceSynchronize();
     gettimeofday(&stop1, NULL);
     accumulate_time(&time[1], start1, stop1);
+#endif
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
 
@@ -96,22 +101,24 @@ namespace quda {
       gettimeofday(&mat_start, NULL);
       mat(Ap, p, y);
       pAp = reDotProductCuda(p, Ap);
-
+#ifdef PRECON_TIME
       cudaDeviceSynchronize();
       gettimeofday(&mat_stop, NULL);
       accumulate_time(&time[0], mat_start, mat_stop);
 
       gettimeofday(&start1, NULL);
+#endif
       alpha = r2/pAp; 
       axpyCuda(-alpha, Ap, r); // r --> r - alpha*Ap
       r2_old = r2;
       r2 = norm2(r);
       beta = r2/r2_old;
       axpyZpbxCuda(alpha, p, x, r, beta);
-
+#ifdef PRECON_TIME
       cudaDeviceSynchronize();
       gettimeofday(&stop1, NULL);
       accumulate_time(&(time[1]), start1, stop1);
+#endif
       // x = x + alpha*p
       // p = r + beta*p
       ++k;
@@ -120,25 +127,27 @@ namespace quda {
     gettimeofday(&mat_start, NULL);
     mat(Ap, p, y);
     pAp = reDotProductCuda(p, Ap);
-
+#ifdef PRECON_TIME
     cudaDeviceSynchronize();
     gettimeofday(&mat_stop, NULL);
     accumulate_time(&time[0], mat_start, mat_stop);
 
     gettimeofday(&start1, NULL);
+#endif
     alpha  = r2/pAp;
     axpyCuda(alpha, p, x); // x --> x + alpha*p
 
+#ifdef PRECON_TIME
     cudaDeviceSynchronize();
     gettimeofday(&stop1, NULL);
     accumulate_time(&(time[1]), start1, stop1);
-   
+#endif
     profile[QUDA_PROFILE_COMPUTE].Stop();
 
-    
+#ifdef PRECON_TIME    
     gettimeofday(&tstop, NULL);
     accumulate_time(&(time[2]), tstart, tstop);
- 
+#endif 
     return;
   }
 

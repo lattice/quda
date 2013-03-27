@@ -188,7 +188,7 @@ namespace quda {
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
-    
+   
       gettimeofday(&pcstart, NULL);
 
       if(max_overlap){
@@ -335,10 +335,11 @@ namespace quda {
 
     
     innerProfile.Print();
-
+#ifdef PRECON_TIME
     printfQuda("SimpleCG matrix time : %lf seconds\n", simple_time[0]);
     printfQuda("SimpleCG other time : %lf seconds\n", simple_time[1]);
     printfQuda("SimpleCG inner total : %lf seconds\n", simple_time[2]);
+#endif
     printfQuda("SimpleCG time : %lf seconds\n", precon_time);
     printfQuda("SimpleCG + Copy time : %lf seconds\n", pctime);
     printfQuda("Common time : %lf seconds\n", common_time);
