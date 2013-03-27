@@ -1964,8 +1964,6 @@ namespace quda {
           const bool hasNaik=true)
       {
         inSpinor = (cudaColorSpinorField*)in; // EVIL
-        checkCudaError();
-
 
 #ifdef GPU_STAGGERED_DIRAC
 
@@ -1975,11 +1973,9 @@ namespace quda {
             errorQuda("ERROR: partitioned dimension with local size less than 6 is not supported in staggered dslash\n");
           }    
         }
-        checkCudaError();
 #endif
 
         int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
-        checkCudaError();
 
         dslashParam.parity = parity;
         dslashParam.threads = in->Volume();
@@ -1989,26 +1985,22 @@ namespace quda {
           dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
           dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
         }
-        checkCudaError();
         void *fatGauge0, *fatGauge1;
         void* longGauge0, *longGauge1;
         bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
-        bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
-        checkCudaError();
+        if(hasNaik) bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
 
         if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
           errorQuda("Mixing gauge and spinor precision not supported"
               "(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
               in->Precision(), fatGauge.Precision(), longGauge.Precision());
         }
-        checkCudaError();
 
         const void *xv = x ? x->V() : 0;
         const void *xn = x ? x->Norm() : 0;
 
         DslashCuda *dslash = 0;
         size_t regSize = sizeof(float);
-        checkCudaError();
 
         if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
@@ -2022,7 +2014,6 @@ namespace quda {
               nFace,
               hasNaik);
           regSize = sizeof(double);
-          checkCudaError();
 #else
           errorQuda("Double precision not supported on this GPU");
 #endif
@@ -2036,7 +2027,6 @@ namespace quda {
               kernel_params,
               nFace,
               hasNaik);
-          checkCudaError();
         } else if (in->Precision() == QUDA_HALF_PRECISION) {	
           dslash = new StaggeredDslashCuda<short2, short2, short4>((short2*)out->V(), (float*)out->Norm(), 
               (short2*)fatGauge0, (short2*)fatGauge1,
@@ -2048,15 +2038,12 @@ namespace quda {
               nFace,
               hasNaik);
         }
-        checkCudaError();
 
         dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace());
-        checkCudaError();
 
         delete dslash;
-        checkCudaError();
         unbindGaugeTex(fatGauge);
-        unbindGaugeTex(longGauge);
+        if(hasNaik) unbindGaugeTex(longGauge);
 
         checkCudaError();
 
