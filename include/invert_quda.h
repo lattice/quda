@@ -21,6 +21,8 @@ namespace quda {
       virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in){}
       virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in, double* time){}
 
+      virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in, cudaColorSpinorField& temp, double* time){}
+
       // solver factory
       static Solver* create(QudaInvertParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
           DiracMatrix &matPrecon, TimeProfile &profile);
@@ -44,12 +46,14 @@ namespace quda {
 
     private: 
       const DiracMatrix &mat;
+      cudaColorSpinorField* Ap;
+      bool init;
 
     public:
       SimpleCG(const DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
       virtual ~SimpleCG();
 
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in, double* time);
+      void operator()(cudaColorSpinorField& out, cudaColorSpinorField& in, cudaColorSpinorField& temp, double* time);
 
   };
 
