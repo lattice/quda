@@ -46,6 +46,7 @@ namespace quda {
 
     private: 
       const DiracMatrix &mat;
+      cudaColorSpinorField* p;
       cudaColorSpinorField* Ap;
       cudaColorSpinorField* r;
       bool init;

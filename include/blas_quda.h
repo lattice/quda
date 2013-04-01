@@ -41,6 +41,10 @@ namespace quda {
   void axpyZpbxCuda(const float &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z, const float& b);
 
 
+
+  void axpyzCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y, cudaColorSpinorField &z);
+
+
   void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y);
   void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
   void axCuda(const double &a, cudaColorSpinorField &x);

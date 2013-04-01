@@ -22,16 +22,18 @@ namespace quda {
 
 
   SimpleCG::SimpleCG(const DiracMatrix &mat,  QudaInvertParam &invParam, TimeProfile &profile) :
-    Solver(invParam, profile), mat(mat) 
+    Solver(invParam, profile), mat(mat), init(false)
   {
   }
 
 
   SimpleCG::~SimpleCG() {
     if(init){ 
+      delete p;
       delete Ap;
       delete r;
     }
+    init = false;
   }
 
 
@@ -54,7 +56,6 @@ namespace quda {
     timeval mat_start, mat_stop;
     timeval start1, stop1;
 
-    int k=0;
 
 
 
@@ -66,41 +67,53 @@ namespace quda {
 
     if(!init){
       r = new cudaColorSpinorField(b);
+      p = new cudaColorSpinorField(b);
       Ap = new cudaColorSpinorField(b); // I don't need to instantiate this every time either!
       init = true;                                  // There has to be a nicer way of doing this!
     }
 
     gettimeofday(&mat_start, NULL);
-    mat(*r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    mat(*p, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
                   // Switching to a zero source would get rid of this operation. 
                   // Will it affect the number of iterations
                   // => r = A*x;
-    double r2 = xmyNormCuda(b,*r);
+    double r2 = xmyNormCuda(b,*p);
 
-    cudaColorSpinorField p(*r); // I can also get rid of this initial copy
-                               // by having a special case
+
 
     double alpha = 0.0, beta=0.0;
     double pAp;
     double r2_old;
+
+    mat(*Ap, *p, y);
+    pAp = reDotProductCuda(*p, *Ap);
+    alpha = r2/pAp;
+    axpyzCuda(-alpha, *Ap, *p, *r); // r = p - alpha*Ap
+    r2_old = r2;
+    r2 = norm2(*r);
+    beta = r2/r2_old;
+    axpyZpbxCuda(alpha, *p, x, *r, beta);
+    // x = x + alpha*p
+    // p = r + beta*p
+    int k=1;
     while( k < invParam.maxiter-1 ){
       gettimeofday(&mat_start, NULL);
-      mat(*Ap, p, y);
-      pAp = reDotProductCuda(p, *Ap);
+      mat(*Ap, *p, y);
+      pAp = reDotProductCuda(*p, *Ap);
       alpha = r2/pAp; 
       axpyCuda(-alpha, *Ap, *r); // r --> r - alpha*Ap
       r2_old = r2;
       r2 = norm2(*r);
       beta = r2/r2_old;
-      axpyZpbxCuda(alpha, p, x, *r, beta);
+      axpyZpbxCuda(alpha, *p, x, *r, beta);
       // x = x + alpha*p
       // p = r + beta*p
       ++k;
     }
-    mat(*Ap, p, y);
-    pAp = reDotProductCuda(p, *Ap);
+    mat(*Ap, *p, y);
+    pAp = reDotProductCuda(*p, *Ap);
     alpha  = r2/pAp;
-    axpyCuda(alpha, p, x); // x --> x + alpha*p
+    axpyCuda(alpha, *p, x); // x --> x + alpha*p
 #ifdef PRECON_TIME    
     cudaDeviceSynchronize();
     gettimeofday(&tstop, NULL);

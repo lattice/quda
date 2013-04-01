@@ -304,6 +304,25 @@ namespace quda {
   }
 
   /**
+    Functor performing the operation: z[i] = a*x[i] + y[i]
+   */
+  template<typename Float2, typename FloatN>
+  struct axpyz {
+    const Float2 a;
+    axpyz(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) {}
+    __device__ void operator()(const FloatN &x, const FloatN &y, FloatN &z, const FloatN &w)
+    { z = a.x*x + y; }
+    static int streams(){ return 3; }
+    static int flops(){ return 2; }
+  };
+
+  void axpyzCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, cudaColorSpinorField& z)
+  {
+    blasCuda<axpyz,0,0,1,0>(make_double2(a,0.0), make_double2(0.0,0.), make_double2(0.0,0.0), 
+                            x, y, z, z);
+  }
+
+  /**
      Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
   */
   template <typename Float2, typename FloatN>
