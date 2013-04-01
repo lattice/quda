@@ -190,10 +190,12 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
   comms_initialized = true;
 }
 
-
-void initQuda(int dev)
-{
-  profileInit[QUDA_PROFILE_TOTAL].Start();
+/*
+  Set the device that QUDA uses.  At this point we also have to set
+  the communications topology since this is used to determine the
+  device number if a negative device number is given.
+ */
+void initQudaDevice(int dev) {
 
   //static bool initialized = false;
   if (initialized) return;
@@ -267,6 +269,7 @@ void initQuda(int dev)
     setNumaAffinity(dev);
   }
 #endif
+
   // if the device supports host-mapped memory, then enable this
   if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
   checkCudaError();
@@ -274,7 +277,12 @@ void initQuda(int dev)
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
+}
 
+/*
+  Any persistent memory allocations that QUDA uses are done here.
+ */
+void initQudaMemory() {
   streams = new cudaStream_t[Nstream];
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
@@ -285,6 +293,17 @@ void initQuda(int dev)
   initBlas();
 
   loadTuneCache(getVerbosity());
+}
+
+void initQuda(int dev)
+{
+  profileInit[QUDA_PROFILE_TOTAL].Start();
+
+  // set the device that QUDA uses
+  initQudaDevice(dev);
+
+  // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
+  initQudaMemory();
 
   profileInit[QUDA_PROFILE_TOTAL].Stop();
 }

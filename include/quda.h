@@ -290,7 +290,28 @@ extern "C" {
   void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
 
   /**
-   * Initialize the library.
+   * Initialize the library.  This is a low-level interface that is
+   * called by initQuda.  Calling initQudaDevice requires that the
+   * user also call initQudaMemory before using QUDA.
+   *
+   * @param device CUDA device number to use.  In a multi-GPU build,
+   *               this parameter may either be set explicitly on a
+   *               per-process basis or set to -1 to enable a default
+   *               allocation of devices to processes.  
+   */
+  void initQudaDevice(int device);
+
+  /**
+   * Initialize the library persistant memory allocations (both host
+   * and device).  This is a low-level interface that is called by
+   * initQuda.  Calling initQudaMemory requires that the user has
+   * previously called initQudaDevice.
+   */
+  void initQudaMemory();
+
+  /**
+   * Initialize the library.  This function is actually a wrapper
+   * around calls to initQudaDevice() and initQudaMemory().
    *
    * @param device  CUDA device number to use.  In a multi-GPU build,
    *                this parameter may either be set explicitly on a
