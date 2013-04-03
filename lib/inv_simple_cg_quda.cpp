@@ -58,13 +58,6 @@ namespace quda {
 
 
 
-
-    // Find the maximum domain overlap.
-    // This will determine the number of faces needed by the vector r.
-    // Have to be very careful to ensure that setting the number of 
-    // ghost faces here doesn't screw anything up further down the line.
-    //    gettimeofday(&start1, NULL);
-
     if(!init){
       r = new cudaColorSpinorField(b);
       p = new cudaColorSpinorField(b);
@@ -72,8 +65,10 @@ namespace quda {
       init = true;                                  // There has to be a nicer way of doing this!
     }
 
+
+    // Assumes x = b
     gettimeofday(&mat_start, NULL);
-    mat(*p, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    mat(*p, b, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
                   // Switching to a zero source would get rid of this operation. 
                   // Will it affect the number of iterations
                   // => r = A*x;
@@ -92,7 +87,9 @@ namespace quda {
     r2_old = r2;
     r2 = norm2(*r);
     beta = r2/r2_old;
-    axpyZpbxCuda(alpha, *p, x, *r, beta);
+ //  axpyZpbxCuda(alpha, *p, x, *r, beta);
+    axpyzCuda(alpha, *p, b, x);   // This will do away with an additional copy
+    axpyzCuda(beta, *p, *r, *p);  // Will it work.
     // x = x + alpha*p
     // p = r + beta*p
     int k=1;

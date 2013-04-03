@@ -288,16 +288,13 @@ namespace quda {
           *rPre_ptr = r;
         }
 
-        *minvrPre_ptr = *rPre_ptr;
+//        *minvrPre_ptr = *rPre_ptr;
 
         globalReduce = false;
         gettimeofday(&precon_start,NULL);
         (*K)(*minvrPre_ptr, *rPre_ptr, *tempPre_ptr, simple_time);
-//        test_time(minvrPre_ptr, rPre_ptr, simple_time);
-
         gettimeofday(&precon_stop,NULL);
         accumulate_time(&precon_time, precon_start, precon_stop);
-        //printfQuda("Time: %lf, %lf\n", simple_time[2], precon_time);
         globalReduce = true;
 
         if(max_overlap){
