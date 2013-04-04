@@ -49,15 +49,37 @@ namespace quda {
       cudaColorSpinorField* p;
       cudaColorSpinorField* Ap;
       cudaColorSpinorField* r;
+      cudaColorSpinorField* y;
       bool init;
 
     public:
       SimpleCG(const DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
       virtual ~SimpleCG();
 
-      void operator()(cudaColorSpinorField& out, cudaColorSpinorField& in, cudaColorSpinorField& temp, double* time);
+      void operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,  double* time);
 
   };
+
+  // Stripped down version of the CG solver used as a preconditioner
+  class SimpleMR : public Solver {
+
+    private: 
+      const DiracMatrix &mat;
+      cudaColorSpinorField* Ar;
+      cudaColorSpinorField* r;
+      cudaColorSpinorField* y;
+      bool init;
+
+    public:
+      SimpleMR(const DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
+      virtual ~SimpleCG();
+
+      void operator()(cudaColorSpinorField& out, cudaColorSpinorField& in, double* time);
+
+  };
+
+
+
 
 
 
