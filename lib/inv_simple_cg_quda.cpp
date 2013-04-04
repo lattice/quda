@@ -32,6 +32,7 @@ namespace quda {
       delete p;
       delete Ap;
       delete r;
+      delete y;
     }
     init = false;
   }
@@ -45,7 +46,7 @@ namespace quda {
   }
 
   //void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b, double* time)
-  void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField& b, cudaColorSpinorField& y, double* time)
+  void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField& b,  double* time)
   {
 #ifdef PRECON_TIME
     timeval tstart, tstop;
@@ -61,8 +62,9 @@ namespace quda {
     if(!init){
       r = new cudaColorSpinorField(b);
       p = new cudaColorSpinorField(b);
-      Ap = new cudaColorSpinorField(b); // I don't need to instantiate this every time either!
-      init = true;                                  // There has to be a nicer way of doing this!
+      Ap = new cudaColorSpinorField(b); 
+      y = new cudaColorSpinorField(b);
+      init = true;                        
     }
 
 
@@ -80,7 +82,7 @@ namespace quda {
     double pAp;
     double r2_old;
 
-    mat(*Ap, *p, y);
+    mat(*Ap, *p, *y);
     pAp = reDotProductCuda(*p, *Ap);
     alpha = r2/pAp;
     axpyzCuda(-alpha, *Ap, *p, *r); // r = p - alpha*Ap
@@ -95,7 +97,7 @@ namespace quda {
     int k=1;
     while( k < invParam.maxiter-1 ){
       gettimeofday(&mat_start, NULL);
-      mat(*Ap, *p, y);
+      mat(*Ap, *p, *y);
       pAp = reDotProductCuda(*p, *Ap);
       alpha = r2/pAp; 
       axpyCuda(-alpha, *Ap, *r); // r --> r - alpha*Ap
@@ -107,7 +109,7 @@ namespace quda {
       // p = r + beta*p
       ++k;
     }
-    mat(*Ap, *p, y);
+    mat(*Ap, *p, *y);
     pAp = reDotProductCuda(*p, *Ap);
     alpha  = r2/pAp;
     axpyCuda(alpha, *p, x); // x --> x + alpha*p

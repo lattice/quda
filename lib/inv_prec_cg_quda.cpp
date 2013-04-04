@@ -129,7 +129,6 @@ namespace quda {
     cudaColorSpinorField* rPre_ptr;
     cudaColorSpinorField* minvr_ptr;
     cudaColorSpinorField* p_ptr;
-    cudaColorSpinorField* tempPre_ptr;
 
     // Find the maximum domain overlap.
     // This will determine the number of faces needed by the vector r.
@@ -202,7 +201,6 @@ namespace quda {
 
 
       rPre_ptr = new cudaColorSpinorField(prec_param);
-      tempPre_ptr = new cudaColorSpinorField(*rPre_ptr);
       // HACK!!!
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
@@ -223,7 +221,7 @@ namespace quda {
 
       globalReduce = false;
       gettimeofday(&precon_start, NULL); 
-      (*K)(*minvrPre_ptr, *rPre_ptr, *tempPre_ptr, simple_time);  
+      (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);  
       gettimeofday(&precon_stop, NULL);
       accumulate_time(&precon_time, precon_start, precon_stop);
       printfQuda("Time: %lf, %lf\n", simple_time[2], precon_time);
@@ -292,7 +290,7 @@ namespace quda {
 
         globalReduce = false;
         gettimeofday(&precon_start,NULL);
-        (*K)(*minvrPre_ptr, *rPre_ptr, *tempPre_ptr, simple_time);
+        (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);
         gettimeofday(&precon_stop,NULL);
         accumulate_time(&precon_time, precon_start, precon_stop);
         globalReduce = true;
@@ -345,7 +343,6 @@ namespace quda {
       delete minvrPre_ptr;
       delete rPre_ptr;
       delete minvr_ptr;
-      delete tempPre_ptr;
     }
     delete p_ptr;
     profile[QUDA_PROFILE_FREE].Stop();
