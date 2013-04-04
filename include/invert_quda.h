@@ -72,7 +72,7 @@ namespace quda {
 
     public:
       SimpleMR(const DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
-      virtual ~SimpleCG();
+      virtual ~SimpleMR();
 
       void operator()(cudaColorSpinorField& out, cudaColorSpinorField& in, double* time);
 

@@ -162,11 +162,16 @@ namespace quda {
           }
 
 
-          template<class real2>
-            __device__ double2 dotNormA_(const real2 &a, const real22 &b)
+            __device__ double2 dotNormA_(const double2 &a, const double2 &b)
             {
               return make_double2(a.x*b.x + a.y*b.y, a.x*a.x + a.y*a.y);
             }
+
+            __device__ double2 dotNormA_(const float2 &a, const float2 &b)
+            {
+              return make_double2(a.x*b.x + a.y*b.y, a.x*a.x + a.y*a.y);
+            }
+
 
           __device__ double2 dotNormA_(const float4 &a, const float4 & b)
           {
@@ -181,9 +186,9 @@ namespace quda {
 #else
               struct DotNormA {
 #endif
-                Dot(const Float2 &a, const Float2 &b){}
+                DotNormA(const Float2 &a, const Float2 &b){}
 
-                __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &w, FloatN &v){
+                __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,  FloatN &w, FloatN &v){
                   sum += dotNormA_(x,y);
                 }
 
@@ -192,8 +197,8 @@ namespace quda {
               };
 
               double2 reDotProductNormACuda(cudaColorSpinorField &x,cudaColorSpinorField &y){
-                return reduce::reduceCuda<double2, QudaSumFloat2, QudaSumFloat, DotNormA, 0,0,0,0,0,false>
-                  (make_double2(0.0,0.0), make_double2(0.0, 0,0), x, y, x, x, x);
+            return reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,DotNormA,0,0,0,0,0,false>
+              (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
               } 
 
 

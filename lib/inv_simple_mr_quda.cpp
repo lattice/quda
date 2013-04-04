@@ -67,7 +67,7 @@ namespace quda {
 
     // Assumes x = b
     gettimeofday(&mat_start, NULL);
-    mat(*r, b, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    mat(*r, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // Switching to a zero source would get rid of this operation. 
     // Will it affect the number of iterations
     // => r = A*x;
@@ -77,7 +77,7 @@ namespace quda {
 
 
     mat(*Ar, *r, *y);
-    double2 Ar2 = reDotProductNormA(Ar,r); 
+    double2 Ar2 = reDotProductNormACuda(*Ar,*r); 
     alpha = Ar2.x/Ar2.y;
     // x = b + alpha*r;
     // r = b - alpha*Ar;
@@ -88,16 +88,15 @@ namespace quda {
     while(k < invParam.maxiter-1){
 
       mat(*Ar, *r, *y);
-      Ar2 = reDotProductNormA(Ar,r); 
-      Ar_r = reDotProductNormA(Ar, r);
+      Ar2 = reDotProductNormACuda(*Ar, *r); 
       alpha = Ar2.x/Ar2.y;
-      axpyCuda(alpha, *r, x);
+      axpyCuda(alpha, *r, x); // better way to do this!
       axpyCuda(-alpha, *Ar, *r);
       ++k;
     }
 
-    mat(*Ar, r, *y);
-    Ar2 = reDotProductNormA(Ar,r);
+    mat(*Ar, *r, *y);
+    Ar2 = reDotProductNormACuda(*Ar, *r);
     alpha = Ar2.x/Ar2.y;
     axpyCuda(alpha, *r, x);
     // x += alpha*r

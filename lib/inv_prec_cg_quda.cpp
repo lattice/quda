@@ -76,7 +76,8 @@ namespace quda {
 
     // Can switch off the preconditioning by choosing the number of preconditioner 
     // iterations to be negative
-    if(Kparam.maxiter >= 0) K = new SimpleCG(matPrecon, Kparam, innerProfile);
+    //if(Kparam.maxiter >= 0) K = new SimpleCG(matPrecon, Kparam, innerProfile);
+    if(Kparam.maxiter >= 0) K = new SimpleMR(matPrecon, Kparam, innerProfile);
   }
 
 

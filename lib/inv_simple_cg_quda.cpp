@@ -70,7 +70,7 @@ namespace quda {
 
     // Assumes x = b
     gettimeofday(&mat_start, NULL);
-    mat(*p, b, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    mat(*p, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
                   // Switching to a zero source would get rid of this operation. 
                   // Will it affect the number of iterations
                   // => r = A*x;
