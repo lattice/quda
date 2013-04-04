@@ -33,6 +33,7 @@ namespace quda {
   double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 
+  double2 reDotProductNormACuda(cudaColorSpinorField&, cudaColorSpinorField&);
 
   // Single-precision operations
   void axpyCuda(const float &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
