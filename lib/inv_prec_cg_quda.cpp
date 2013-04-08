@@ -109,7 +109,7 @@ namespace quda {
     return;
   }
 
-  void setPreconditionParams(ColorSpinorParam* param,  
+  static void setPreconditionParams(ColorSpinorParam* param,  
       const QudaPrecision& precision,
       const int padding,
       const int* const dims)
@@ -207,25 +207,15 @@ namespace quda {
     prec_param.precision = invParam.cuda_prec_precondition;
 
     if(K){
-      prec_param.create     = QUDA_ZERO_FIELD_CREATE;
-      prec_param.precision  = invParam.cuda_prec_precondition;
-      prec_param.nColor     = 3;
-      prec_param.nDim       = 4;
-      prec_param.pad        = r.Pad(); // Not sure if this will cause a problem
-      prec_param.nSpin      = 1;
-      prec_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      prec_param.siteOrder  = QUDA_EVEN_ODD_SITE_ORDER;
-      prec_param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      for(int dir=0; dir<4; ++dir) prec_param.x[dir] = Y[dir];
-      prec_param.x[0] /= 2; // since QUDA_PARITY_SITE_SUBSET
-
+      setPreconditionParams(&prec_param, 
+                            invParam.cuda_prec_precondition, 
+                            r.Pad(),
+                            Y);
 
       rPre_ptr = new cudaColorSpinorField(prec_param);
       // HACK!!!
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
-
-
       gettimeofday(&pcstart, NULL);
 
       if(max_overlap){
@@ -237,8 +227,6 @@ namespace quda {
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
 
       printfQuda("minvrPre_ptr->Precision() = %d\n", minvrPre_ptr->Precision());
-
-
       globalReduce = false;
       gettimeofday(&precon_start, NULL); 
       (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);  
@@ -246,7 +234,6 @@ namespace quda {
       accumulate_time(&precon_time, precon_start, precon_stop);
       printfQuda("Time: %lf, %lf\n", simple_time[2], precon_time);
       globalReduce = true;
-
 
       if(max_overlap){
         cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
