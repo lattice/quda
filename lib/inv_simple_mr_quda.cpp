@@ -67,10 +67,13 @@ namespace quda {
 
     // Assumes x = b
     gettimeofday(&mat_start, NULL);
-    mat(*r, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    //mat(*r, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // Switching to a zero source would get rid of this operation. 
     // Will it affect the number of iterations
     // => r = A*x;
+    // I can make this much more efficient!
+    zeroCuda(*r);
+    zeroCuda(x); 
     double r2 = xmyNormCuda(b,*r);
 
     double alpha = 0.0, beta=0.0;
@@ -81,8 +84,8 @@ namespace quda {
     alpha = Ar2.x/Ar2.y;
     // x = b + alpha*r;
     // r = b - alpha*Ar;
-    axpyzCuda(alpha, *r, b, x);
-    axpyzCuda(-alpha, *Ar, b, *r);
+    axpyzCuda(alpha, *r, x, x);
+    axpyzCuda(-alpha, *Ar, *r, *r);
     int k=1;
 
     while(k < invParam.maxiter-1){

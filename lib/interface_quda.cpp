@@ -717,11 +717,14 @@ namespace quda {
  //                         // but setting Nface = 0 causes problems 
  //                         // Fix this!
     //diracParam.hasNaik = inv_param->hasNaik ? true : false;
+    //diracParam.hasNaik = true;
     diracParam.hasNaik = false;
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 0; // comms are always off
+      //diracParam.commDim[i] = 1; // comms are always off
     }
+    //diracParam.commDim[3] = 1; // communicate in time
 
   }
 

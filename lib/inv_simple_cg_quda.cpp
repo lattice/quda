@@ -70,6 +70,7 @@ namespace quda {
 
     // Assumes x = b
     gettimeofday(&mat_start, NULL);
+/*
     mat(*p, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
                   // Switching to a zero source would get rid of this operation. 
                   // Will it affect the number of iterations
@@ -95,6 +96,15 @@ namespace quda {
     // x = x + alpha*p
     // p = r + beta*p
     int k=1;
+*/
+   zeroCuda(x);
+   zeroCuda(*r);
+   double r2 = xmyNormCuda(b,*r);
+   double alpha = 0.0, beta = 0.0;
+   double pAp, r2_old;
+   *p = *r; 
+
+   int k=0;
     while( k < invParam.maxiter-1 ){
       gettimeofday(&mat_start, NULL);
       mat(*Ap, *p, *y);

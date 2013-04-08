@@ -97,15 +97,35 @@ namespace quda {
   {
     timeval tstart, tstop;
     gettimeofday(&tstart, NULL);
-   
-//    ColorSpinorParam param(*b);
-//    param.create = QUDA_COPY_FIELD_CREATE;
-    cudaColorSpinorField r(*b);
-//    cudaColorSpinorField y(*x);
 
-  //  cudaDeviceSynchronize();
+    //    ColorSpinorParam param(*b);
+    //    param.create = QUDA_COPY_FIELD_CREATE;
+    cudaColorSpinorField r(*b);
+    //    cudaColorSpinorField y(*x);
+
+    //  cudaDeviceSynchronize();
     gettimeofday(&tstop, NULL);
     accumulate_time(&(time[2]), tstart, tstop);
+    return;
+  }
+
+  void setPreconditionParams(ColorSpinorParam* param,  
+      const QudaPrecision& precision,
+      const int padding,
+      const int* const dims)
+  {
+    param->create = QUDA_ZERO_FIELD_CREATE;
+    param->precision = precision;
+    param->nColor = 3;
+    param->nDim = 4;
+    param->pad = padding;
+    param->nSpin = 1;
+    param->siteSubset = QUDA_PARITY_SITE_SUBSET;
+    param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+    param->fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    for(int dir=0; dir<4; ++dir) param->x[dir] = dims[dir];
+    param->x[0] /= 2;
+
     return;
   }
 
@@ -116,7 +136,7 @@ namespace quda {
 
     printfQuda("Calling preconditioned solver\n");  
 
-    
+
     timeval precon_start, precon_stop;
     double precon_time = 0.0;
     timeval pcstart, pcstop;
@@ -130,6 +150,7 @@ namespace quda {
     cudaColorSpinorField* rPre_ptr;
     cudaColorSpinorField* minvr_ptr;
     cudaColorSpinorField* p_ptr;
+
 
     // Find the maximum domain overlap.
     // This will determine the number of faces needed by the vector r.
@@ -158,8 +179,6 @@ namespace quda {
 
     DecompParam dparam;
     initDecompParam(&dparam,X,Y);
-    DecompParam param2;
-    initDecompParam(&param2,X,X);
     int domain_overlap[4];
     for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
@@ -206,7 +225,7 @@ namespace quda {
       int domain_overlap[4];
       for(int dir=0; dir<4; ++dir) domain_overlap[dir] = invParam.domain_overlap[dir];
 
-   
+
       gettimeofday(&pcstart, NULL);
 
       if(max_overlap){
@@ -227,7 +246,7 @@ namespace quda {
       accumulate_time(&precon_time, precon_start, precon_stop);
       printfQuda("Time: %lf, %lf\n", simple_time[2], precon_time);
       globalReduce = true;
-      
+
 
       if(max_overlap){
         cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
@@ -287,7 +306,7 @@ namespace quda {
           *rPre_ptr = r;
         }
 
-//        *minvrPre_ptr = *rPre_ptr;
+        //        *minvrPre_ptr = *rPre_ptr;
 
         globalReduce = false;
         gettimeofday(&precon_start,NULL);
@@ -347,10 +366,10 @@ namespace quda {
     }
     delete p_ptr;
     profile[QUDA_PROFILE_FREE].Stop();
-   
- 
 
-    
+
+
+
     innerProfile.Print();
 #ifdef PRECON_TIME
     printfQuda("SimpleCG matrix time : %lf seconds\n", simple_time[0]);
