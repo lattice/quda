@@ -146,9 +146,13 @@ namespace quda {
     int k=0;
     int rUpdate;
 
+  
+    
+    
     cudaColorSpinorField* minvrPre_ptr;
     cudaColorSpinorField* rPre_ptr;
     cudaColorSpinorField* minvr_ptr;
+    cudaColorSpinorField* minvrSloppy_ptr;
     cudaColorSpinorField* p_ptr;
 
 
@@ -187,21 +191,42 @@ namespace quda {
     param.create = QUDA_COPY_FIELD_CREATE; 
     cudaColorSpinorField r(b,param);
 
-    Extender extendCuda(r); // function object used to implement overlapping domains
 
+
+    Extender extendCuda(r); // function object used to implement overlapping domains
     param.nFace  = b.Nface();
     param.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField tmp(b,param);
     if(K) minvr_ptr = new cudaColorSpinorField(b,param);
+    cudaColorSpinorField y(b,param);
 
-    mat(r, x, tmp); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
-
     double r2 = xmyNormCuda(b,r);
-    rUpdate++;
 
     param.precision = invParam.cuda_prec_sloppy;
+    cudaColorSpinorField tmpSloppy(x,param);
+    param.create = QUDA_COPY_FIELD_CREATE;
     cudaColorSpinorField Ap(x,param);
+
+    cudaColorSpinorField *x_sloppy, *r_sloppy;
+    if(x.Precision()  == invParam.cuda_prec_sloppy)
+    {
+      x_sloppy = &x;
+      r_sloppy = &r;
+      minvrSloppy_ptr = minvr_ptr;
+    }else{
+      x_sloppy = new cudaColorSpinorField(x, param);
+      param.nFace = max_overlap;
+      r_sloppy = new cudaColorSpinorField(r, param);
+      param.nFace = b.Nface();
+      minvrSloppy_ptr = new cudaColorSpinorField(*minvr_ptr, param);
+    }
+    cudaColorSpinorField &xSloppy = *x_sloppy;
+    cudaColorSpinorField &rSloppy = *r_sloppy;
+
+    
+
+
     ColorSpinorParam prec_param(x);
     prec_param.create = QUDA_COPY_FIELD_CREATE;
     prec_param.precision = invParam.cuda_prec_precondition;
@@ -209,7 +234,7 @@ namespace quda {
     if(K){
       setPreconditionParams(&prec_param, 
                             invParam.cuda_prec_precondition, 
-                            r.Pad(),
+                            rSloppy.Pad(),
                             Y);
 
       rPre_ptr = new cudaColorSpinorField(prec_param);
@@ -219,9 +244,9 @@ namespace quda {
       gettimeofday(&pcstart, NULL);
 
       if(max_overlap){
-        extendCuda(*rPre_ptr,r,dparam,domain_overlap);
+        extendCuda(*rPre_ptr,rSloppy,dparam,domain_overlap);
       }else{
-        *rPre_ptr = r;
+        *rPre_ptr = rSloppy;
       }
       // Create minvrPre_ptr 
       minvrPre_ptr = new cudaColorSpinorField(*rPre_ptr);
@@ -236,17 +261,17 @@ namespace quda {
       globalReduce = true;
 
       if(max_overlap){
-        cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
+        cropCuda(*minvrSloppy_ptr, *minvrPre_ptr, dparam);
       }else{
-        *minvr_ptr = *minvrPre_ptr;
+        *minvrSloppy_ptr = *minvrPre_ptr;
       }
 
       gettimeofday(&pcstop, NULL);
       accumulate_time(&pctime, pcstart, pcstop);
 
-      p_ptr = new cudaColorSpinorField(*minvr_ptr);
+      p_ptr = new cudaColorSpinorField(*minvrSloppy_ptr);
     }else{
-      p_ptr = new cudaColorSpinorField(r);
+      p_ptr = new cudaColorSpinorField(rSloppy);
     }
 
     profile[QUDA_PROFILE_INIT].Stop();
@@ -262,7 +287,7 @@ namespace quda {
     double r2_old = 0;
     r2 = norm2(r);
 
-    if(K) rMinvr = reDotProductCuda(r,*minvr_ptr);
+    if(K) rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
@@ -270,30 +295,27 @@ namespace quda {
     while(r2 > stop && k < invParam.maxiter){
 
       gettimeofday(&common_start, NULL);
-      mat(Ap, *p_ptr, tmp);
+      matSloppy(Ap, *p_ptr, tmpSloppy);
       pAp   = reDotProductCuda(*p_ptr,Ap);
 
+
       alpha = (K) ? rMinvr/pAp : r2/pAp;
-      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r); 
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy); 
       // r --> r - alpha*A*p
       gettimeofday(&common_stop, NULL);
       accumulate_time(&common_time, common_start, common_stop);
 
       if(K){
         rMinvr_old = rMinvr;
-        r_new_Minvr_old = reDotProductCuda(r,*minvr_ptr);
-        //  zeroCuda(*rPre_ptr);
-
+        r_new_Minvr_old = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
         gettimeofday(&pcstart, NULL);
 
         if(max_overlap){       
-          extendCuda(*rPre_ptr,r,dparam,domain_overlap);
+          extendCuda(*rPre_ptr,rSloppy,dparam,domain_overlap);
         }else{
-          *rPre_ptr = r;
+          *rPre_ptr = rSloppy;
         }
-
-        //        *minvrPre_ptr = *rPre_ptr;
 
         globalReduce = false;
         gettimeofday(&precon_start,NULL);
@@ -303,25 +325,25 @@ namespace quda {
         globalReduce = true;
 
         if(max_overlap){
-          cropCuda(*minvr_ptr, *minvrPre_ptr, dparam);
+          cropCuda(*minvrSloppy_ptr, *minvrPre_ptr, dparam);
         }else{
-          *minvr_ptr = *minvrPre_ptr;
+          *minvrSloppy_ptr = *minvrPre_ptr;
         }
         gettimeofday(&pcstop, NULL);
         accumulate_time(&pctime, pcstart, pcstop);
 
-        rMinvr = reDotProductCuda(r,*minvr_ptr);
+        rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
         beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
         r2 = real(cg_norm);
         // x = x + alpha*p, p = Minvr + beta*p
-        axpyZpbxCuda(alpha, *p_ptr, x, *minvr_ptr, beta);
+        axpyZpbxCuda(alpha, *p_ptr, xSloppy, *minvrSloppy_ptr, beta);
       }else{
         r2_old = r2;
         r2 = real(cg_norm);
 
         beta = r2/r2_old;
-        axpyZpbxCuda(alpha, *p_ptr, x, r, beta);
+        axpyZpbxCuda(alpha, *p_ptr, xSloppy, rSloppy, beta);
       }
       if(k%100 == 0) printfQuda("r2 = %e\n", r2);
       // update x and p
@@ -335,9 +357,11 @@ namespace quda {
     profile[QUDA_PROFILE_COMPUTE].Stop();
 
     profile[QUDA_PROFILE_EPILOGUE].Start();
+  
+    if(x.Precision() != invParam.cuda_prec_sloppy) copyCuda(x, xSloppy);
 
     // compute the true residual 
-    mat(r, x, tmp);
+    mat(r, x, y);
     double true_res = xmyNormCuda(b, r);
     invParam.true_res = sqrt(true_res / src_norm);
     printfQuda("true_res = %e\n", invParam.true_res);
@@ -350,10 +374,18 @@ namespace quda {
       delete minvrPre_ptr;
       delete rPre_ptr;
       delete minvr_ptr;
+      if(x.Precision() != invParam.cuda_prec_sloppy)  delete minvrSloppy_ptr;
     }
     delete p_ptr;
-    profile[QUDA_PROFILE_FREE].Stop();
 
+
+    if(x.Precision() != invParam.cuda_prec_sloppy){
+      delete x_sloppy;
+      delete r_sloppy;
+    }
+
+
+    profile[QUDA_PROFILE_FREE].Stop();
 
 
 
