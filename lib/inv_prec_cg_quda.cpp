@@ -286,6 +286,13 @@ namespace quda {
     double r_new_Minvr_old = 0.0;
     double r2_old = 0;
     r2 = norm2(r);
+    
+    double rNorm = sqrt(r2);
+    double r0Norm = rNorm;
+    double maxrx = rNorm;
+    double maxrr = rNorm;
+    double delta = invParam.reliable_delta;   
+ 
 
     if(K) rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
@@ -308,8 +315,16 @@ namespace quda {
       // r --> r - alpha*A*p
       gettimeofday(&common_stop, NULL);
       accumulate_time(&common_time, common_start, common_stop);
-
+      r2 = real(cg_norm);
       rMinvr_old = rMinvr;
+
+      rNorm = sqrt(r2);
+      if(rNorm > maxrx) maxrx = rNorm;
+      if(rNorm > maxrr) maxrr = rNorm;
+      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+
+
 
       if(standard_update){
         r_new_Minvr_old = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
@@ -340,7 +355,6 @@ namespace quda {
         rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
         beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
-        r2 = real(cg_norm);
         // x = x + alpha*p, p = Minvr + beta*p
         axpyZpbxCuda(alpha, *p_ptr, xSloppy, *minvrSloppy_ptr, beta);
         if(k%100 == 0) printfQuda("r2 = %e\n", r2);
