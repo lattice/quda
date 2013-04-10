@@ -49,7 +49,7 @@ namespace quda {
     cudaColorSpinorField y(b, param); 
   
     mat(r, x, y);
-    zeroCuda(y);
+//    zeroCuda(y);
 
     double r2 = xmyNormCuda(b, r);
   
@@ -79,6 +79,13 @@ namespace quda {
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
     cudaColorSpinorField p(rSloppy);
+
+    if(&x != &xSloppy){
+      copyCuda(y,x);
+      zeroCuda(xSloppy);
+    }else{
+      zeroCuda(y);
+    }
     
     const bool use_heavy_quark_res = 
       (invParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
