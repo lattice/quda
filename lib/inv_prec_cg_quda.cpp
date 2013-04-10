@@ -146,9 +146,9 @@ namespace quda {
     int k=0;
     int rUpdate;
 
-  
-    
-    
+
+
+
     cudaColorSpinorField* minvrPre_ptr;
     cudaColorSpinorField* rPre_ptr;
     cudaColorSpinorField* minvr_ptr;
@@ -224,7 +224,7 @@ namespace quda {
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
 
-    
+
 
 
     ColorSpinorParam prec_param(x);
@@ -233,9 +233,9 @@ namespace quda {
 
     if(K){
       setPreconditionParams(&prec_param, 
-                            invParam.cuda_prec_precondition, 
-                            rSloppy.Pad(),
-                            Y);
+          invParam.cuda_prec_precondition, 
+          rSloppy.Pad(),
+          Y);
 
       rPre_ptr = new cudaColorSpinorField(prec_param);
       // HACK!!!
@@ -292,6 +292,10 @@ namespace quda {
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
 
+    bool standard_update = true;
+    bool reliable_update = false;
+
+
     while(r2 > stop && k < invParam.maxiter){
 
       gettimeofday(&common_start, NULL);
@@ -305,8 +309,9 @@ namespace quda {
       gettimeofday(&common_stop, NULL);
       accumulate_time(&common_time, common_start, common_stop);
 
-      if(K){
-        rMinvr_old = rMinvr;
+      rMinvr_old = rMinvr;
+
+      if(standard_update){
         r_new_Minvr_old = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
         gettimeofday(&pcstart, NULL);
@@ -338,17 +343,43 @@ namespace quda {
         r2 = real(cg_norm);
         // x = x + alpha*p, p = Minvr + beta*p
         axpyZpbxCuda(alpha, *p_ptr, xSloppy, *minvrSloppy_ptr, beta);
-      }else{
-        r2_old = r2;
-        r2 = real(cg_norm);
+        if(k%100 == 0) printfQuda("r2 = %e\n", r2);
+        // update x and p
+        // x = x + alpha*p
+        // p = Minv_r + beta*p
+      } else if(reliable_update){
 
-        beta = r2/r2_old;
-        axpyZpbxCuda(alpha, *p_ptr, xSloppy, rSloppy, beta);
-      }
-      if(k%100 == 0) printfQuda("r2 = %e\n", r2);
-      // update x and p
-      // x = x + alpha*p
-      // p = Minv_r + beta*p
+        axpyCuda(alpha, *p_ptr, xSloppy); // xSloppy += alpha*p
+        copyCuda(x, xSloppy);
+        xpyCuda(x, y); // y += x
+        // Now compute r 
+        mat(r, y, x); // x is just a temporary here
+        r2 = xmyNormCuda(b, r);
+        copyCuda(rSloppy, r); // copy r to rSloppy
+        zeroCuda(xSloppy);
+
+        if(max_overlap) 
+          extendCuda(*rPre_ptr, rSloppy, dparam, domain_overlap); 
+        else
+          *rPre_ptr = rSloppy;
+
+        globalReduce = false;
+        (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);
+        globalReduce = true;
+
+        if(max_overlap)
+          cropCuda(*minvrSloppy_ptr, *minvrPre_ptr, dparam);
+        else
+          *minvrSloppy_ptr = *minvrPre_ptr;
+
+        rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
+        beta = rMinvr/rMinvr_old;        
+
+        xpayCuda(*minvrSloppy_ptr, beta, *p_ptr); // p = minvrSloppy + beta*p
+
+      }      
+
+
       ++k;
     }
     printfQuda("Number of outer-solver iterations = %d\n",k);
@@ -357,7 +388,7 @@ namespace quda {
     profile[QUDA_PROFILE_COMPUTE].Stop();
 
     profile[QUDA_PROFILE_EPILOGUE].Start();
-  
+
     if(x.Precision() != invParam.cuda_prec_sloppy) copyCuda(x, xSloppy);
 
     // compute the true residual 
