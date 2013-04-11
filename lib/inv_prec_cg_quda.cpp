@@ -144,7 +144,7 @@ namespace quda {
     timeval common_start, common_stop;
     double common_time = 0.0;
     int k=0;
-    int rUpdate;
+    int rUpdate=0;
 
 
 
@@ -224,6 +224,12 @@ namespace quda {
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
 
+    if(&x != &xSloppy){
+      copyCuda(y, x); // copy x to y
+      zeroCuda(xSloppy);
+    }else{
+      zeroCuda(x);
+    }
 
 
 
@@ -319,14 +325,16 @@ namespace quda {
       rMinvr_old = rMinvr;
 
       rNorm = sqrt(r2);
+
       if(rNorm > maxrx) maxrx = rNorm;
       if(rNorm > maxrr) maxrr = rNorm;
+    
+
       int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
 
 
-
-      if(standard_update){
+      if( !(updateR || updateX) ){
         r_new_Minvr_old = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
         gettimeofday(&pcstart, NULL);
@@ -357,11 +365,10 @@ namespace quda {
         beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
         // x = x + alpha*p, p = Minvr + beta*p
         axpyZpbxCuda(alpha, *p_ptr, xSloppy, *minvrSloppy_ptr, beta);
-        if(k%100 == 0) printfQuda("r2 = %e\n", r2);
         // update x and p
         // x = x + alpha*p
         // p = Minv_r + beta*p
-      } else if(reliable_update){
+      } else { // reliable update
 
         axpyCuda(alpha, *p_ptr, xSloppy); // xSloppy += alpha*p
         copyCuda(x, xSloppy);
@@ -371,6 +378,17 @@ namespace quda {
         r2 = xmyNormCuda(b, r);
         copyCuda(rSloppy, r); // copy r to rSloppy
         zeroCuda(xSloppy);
+
+        if(sqrt(r2) > r0Norm && updateX) { 
+          // reuse r0Norm for this
+          warningQuda("Precon CG: new reliable norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
+        }
+
+        rNorm = sqrt(r2);
+        maxrr = rNorm;
+        maxrx = rNorm;
+        r0Norm = rNorm;
+        ++rUpdate;
 
         if(max_overlap) 
           extendCuda(*rPre_ptr, rSloppy, dparam, domain_overlap); 
@@ -390,9 +408,10 @@ namespace quda {
         beta = rMinvr/rMinvr_old;        
 
         xpayCuda(*minvrSloppy_ptr, beta, *p_ptr); // p = minvrSloppy + beta*p
-
+    
       }      
 
+      if(k%100 == 0) printfQuda("r2 = %e\n", r2);
 
       ++k;
     }
@@ -404,6 +423,7 @@ namespace quda {
     profile[QUDA_PROFILE_EPILOGUE].Start();
 
     if(x.Precision() != invParam.cuda_prec_sloppy) copyCuda(x, xSloppy);
+    xpyCuda(y, x); // x += y
 
     // compute the true residual 
     mat(r, x, y);
@@ -433,6 +453,7 @@ namespace quda {
     profile[QUDA_PROFILE_FREE].Stop();
 
 
+    printfQuda("PreconCG: Reliable updates = %d\n", rUpdate);
 
     innerProfile.Print();
 #ifdef PRECON_TIME
