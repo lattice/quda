@@ -76,8 +76,8 @@ namespace quda {
 
     // Can switch off the preconditioning by choosing the number of preconditioner 
     // iterations to be negative
-    //if(Kparam.maxiter >= 0) K = new SimpleCG(matPrecon, Kparam, innerProfile);
-    if(Kparam.maxiter >= 0) K = new SimpleMR(matPrecon, Kparam, innerProfile);
+    if(Kparam.maxiter >= 0) K = new SimpleCG(matPrecon, Kparam, innerProfile);
+    //if(Kparam.maxiter >= 0) K = new SimpleMR(matPrecon, Kparam, innerProfile);
   }
 
 
@@ -332,6 +332,8 @@ namespace quda {
 
       int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+
+      if(r2 <= stop) updateX = 1; // Force a reliable update in the final iteration 
 
 
       if( !(updateR || updateX) ){
