@@ -20,6 +20,8 @@
 
 namespace quda {
 
+
+  int cudaColorSpinorField::nFace_max = 0;
   void* cudaColorSpinorField::buffer_h = 0;
   void* cudaColorSpinorField::buffer_d = 0;
   bool cudaColorSpinorField::bufferInit = false;
@@ -602,8 +604,12 @@ namespace quda {
     int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
     if (nSpin == 4) Nint /= 2; // spin projection for Wilson
 
-    if(this->initGhostFaceBuffer == 0 || precision > facePrecision || nface > nFace){   
-			  nFace = nface; 
+    nFace = nface;
+    
+    if(this->initGhostFaceBuffer == 0 || precision*nface > facePrecision*nFace_max){   
+    
+      if(nFace_max > nface) nFace_max = nface;
+
       for (int i=0; i<4; i++) {
 	if(!commDimPartitioned(i)){
 	  continue;

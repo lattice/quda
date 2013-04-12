@@ -278,6 +278,9 @@ namespace quda {
 
     bool reference; // whether the field is a reference or not
 
+    static int nFace_max;
+
+
     static void *buffer_h;// pinned memory
     static void *buffer_d;// device_mapped pointer to buffer
     static bool bufferInit;
