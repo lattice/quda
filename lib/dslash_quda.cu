@@ -1179,6 +1179,7 @@ namespace quda {
 
           private:
             const size_t bytes, norm_bytes;
+            const size_t out_bytes, out_norm_bytes;
             sFloat *out;
             float *outNorm;
             char *saveOut, *saveOutNorm;
@@ -1208,14 +1209,15 @@ namespace quda {
                 const QudaReconstructType reconstruct, const sFloat *in, 
                 const float *inNorm, const sFloat *x, const float *xNorm, const double a,
                 const int dagger, const size_t bytes, const size_t norm_bytes,
+                const size_t out_bytes, const size_t out_norm_bytes,
                 const KernelParams& kernel_params,
                 const int nFace,
                 const bool hasNaik)
-              : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
+              : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes),  out_bytes(out_bytes), out_norm_bytes(out_norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
               in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace),
               kernel_params(kernel_params)
           { 
-            bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
+            bindSpinorTex(bytes, norm_bytes, out_bytes, out_norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
           }
 
             StaggeredDslashCuda(sFloat *out, float *outNorm, 
@@ -1225,18 +1227,20 @@ namespace quda {
                 const longGFloat *xlong0, const longGFloat *xlong1, // extended long field for border region
                 const QudaReconstructType reconstruct, const sFloat *in, 
                 const float *inNorm, const sFloat *x, const float *xNorm, const double a,
-                const int dagger, const size_t bytes, const size_t norm_bytes,
+                const int dagger, 
+                const size_t bytes, const size_t norm_bytes,
+                const size_t out_bytes, const size_t out_norm_bytes,
                 const KernelParams& kernel_params,
                 const int nFace,
                 const bool hasNaik)
 
 
-              : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
+              : DslashCuda(), bytes(bytes), norm_bytes(norm_bytes), out_bytes(out_bytes), out_norm_bytes(out_norm_bytes), out(out), outNorm(outNorm), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
               xfat0(xfat0), xfat1(xfat1), xlong0(xlong0), xlong1(xlong1),
               in(in), inNorm(inNorm), reconstruct(reconstruct), dagger(dagger), x(x), xNorm(xNorm), a(a), hasNaik(hasNaik), nFace(nFace),
               kernel_params(kernel_params)
               { 
-                bindSpinorTex(bytes, norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
+                bindSpinorTex(bytes, norm_bytes, out_bytes, out_norm_bytes, in, inNorm, out, outNorm, x, xNorm); 
               }
 
             virtual ~StaggeredDslashCuda() { unbindSpinorTex(in, inNorm, out, outNorm, x, xNorm); }
@@ -1277,11 +1281,11 @@ namespace quda {
             void preTune()
             {
               if (dslashParam.kernel_type < 5) { // exterior kernel
-                saveOut = new char[bytes];
-                cudaMemcpy(saveOut, out, bytes, cudaMemcpyDeviceToHost);
+                saveOut = new char[out_bytes];
+                cudaMemcpy(saveOut, out, out_bytes, cudaMemcpyDeviceToHost);
                 if (typeid(sFloat) == typeid(short2)) {
-                  saveOutNorm = new char[norm_bytes];
-                  cudaMemcpy(saveOutNorm, outNorm, norm_bytes, cudaMemcpyDeviceToHost);
+                  saveOutNorm = new char[out_norm_bytes];
+                  cudaMemcpy(saveOutNorm, outNorm, out_norm_bytes, cudaMemcpyDeviceToHost);
                 }
               }
             }
@@ -1289,10 +1293,10 @@ namespace quda {
             void postTune()
             {
               if (dslashParam.kernel_type < 5) { // exterior kernel
-                cudaMemcpy(out, saveOut, bytes, cudaMemcpyHostToDevice);
+                cudaMemcpy(out, saveOut, out_bytes, cudaMemcpyHostToDevice);
                 delete[] saveOut;
                 if (typeid(sFloat) == typeid(short2)) {
-                  cudaMemcpy(outNorm, saveOutNorm, norm_bytes, cudaMemcpyHostToDevice);
+                  cudaMemcpy(outNorm, saveOutNorm, out_norm_bytes, cudaMemcpyHostToDevice);
                   delete[] saveOutNorm;
                 }
               }
@@ -2010,6 +2014,7 @@ namespace quda {
               longGauge.Reconstruct(), (double2*)in->V(), 
               (float*)in->Norm(), (double2*)xv, (float*)xn, 
               k, dagger, in->Bytes(), in->NormBytes(),
+              out->Bytes(), out->NormBytes(),
               kernel_params,
               nFace,
               hasNaik);
@@ -2024,6 +2029,7 @@ namespace quda {
               longGauge.Reconstruct(), (float2*)in->V(),
               (float*)in->Norm(), (float2*)xv, (float*)xn, 
               k, dagger, in->Bytes(), in->NormBytes(),
+              out->Bytes(), out->NormBytes(),
               kernel_params,
               nFace,
               hasNaik);
@@ -2034,6 +2040,7 @@ namespace quda {
               longGauge.Reconstruct(), (short2*)in->V(), 
               (float*)in->Norm(), (short2*)xv, (float*)xn, 
               k, dagger,  in->Bytes(), in->NormBytes(), 
+              out->Bytes(), out->NormBytes(),
               kernel_params, 
               nFace,
               hasNaik);

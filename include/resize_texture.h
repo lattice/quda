@@ -18,7 +18,7 @@ class Texture {
   public:
     Texture() : spinor(0) { }   
     Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
-    Texture(const InputType *inspinor) : spinor(inspinor) { printfQuda("Calling Texture::Texture(const Input *inspinor)\n"); }
+    Texture(const InputType *inspinor) : spinor(inspinor) { }
     Texture(const Texture &tex) : spinor(tex.spinor) { }
     ~Texture() { }
 
