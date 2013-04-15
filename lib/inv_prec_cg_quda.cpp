@@ -76,8 +76,17 @@ namespace quda {
 
     // Can switch off the preconditioning by choosing the number of preconditioner 
     // iterations to be negative
-    if(Kparam.maxiter >= 0) K = new SimpleCG(matPrecon, Kparam, innerProfile);
-    //if(Kparam.maxiter >= 0) K = new SimpleMR(matPrecon, Kparam, innerProfile);
+    if(Kparam.maxiter >= 0){
+      if (invParam.inv_type_precondition == QUDA_CG_INVERTER) 
+        K = new SimpleCG(matPrecon, Kparam, innerProfile);
+      else if (invParam.inv_type_precondition == QUDA_MR_INVERTER)
+        K = new SimpleMR(matPrecon, Kparam, innerProfile);
+      else if (invParam.inv_type_precondition == QUDA_SD_INVERTER)
+        K = new SD(matPrecon, Kparam, innerProfile);
+      else if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
+        errorQuda("Unknown inner solver %d", invParam.inv_type_precondition);
+    }
+
   }
 
 
@@ -233,11 +242,9 @@ namespace quda {
 
 
 
-    ColorSpinorParam prec_param(x);
-    prec_param.create = QUDA_COPY_FIELD_CREATE;
-    prec_param.precision = invParam.cuda_prec_precondition;
 
     if(K){
+      ColorSpinorParam prec_param(x);
       setPreconditionParams(&prec_param, 
           invParam.cuda_prec_precondition, 
           rSloppy.Pad(),
@@ -292,13 +299,13 @@ namespace quda {
     double r_new_Minvr_old = 0.0;
     double r2_old = 0;
     r2 = norm2(r);
-    
+
     double rNorm = sqrt(r2);
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
     double delta = invParam.reliable_delta;   
- 
+
 
     if(K) rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
@@ -328,7 +335,7 @@ namespace quda {
 
       if(rNorm > maxrx) maxrx = rNorm;
       if(rNorm > maxrr) maxrr = rNorm;
-    
+
 
       int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
@@ -410,7 +417,7 @@ namespace quda {
         beta = rMinvr/rMinvr_old;        
 
         xpayCuda(*minvrSloppy_ptr, beta, *p_ptr); // p = minvrSloppy + beta*p
-    
+
       }      
 
       if(k%100 == 0) printfQuda("r2 = %e\n", r2);

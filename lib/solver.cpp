@@ -30,6 +30,10 @@ namespace quda {
       report("GCR");
       solver = new GCR(mat, matSloppy, matPrecon, param, profile);
       break;
+    case QUDA_PGCR_INVERTER:
+      report("PGCR");
+      solver = new PreconGCR(mat, matSloppy, matPrecon, param, profile); 
+      break;
     case QUDA_MR_INVERTER:
       report("MR");
       solver = new MR(mat, param, profile);

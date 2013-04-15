@@ -60,7 +60,7 @@ namespace quda {
 
   };
 
-  // Stripped down version of the CG solver used as a preconditioner
+  // Stripped down version of the MR solver used as a preconditioner
   class SimpleMR : public Solver {
 
     private: 
@@ -75,11 +75,24 @@ namespace quda {
       virtual ~SimpleMR();
 
       void operator()(cudaColorSpinorField& out, cudaColorSpinorField& in, double* time);
-
   };
 
+  // Steepest descent solver used as a preconditioner
+  class SD : public Solver {
 
+    private: 
+      const DiracMatrix &mat;
+      cudaColorSpinorField* Ar;
+      cudaColorSpinorField* r;
+      cudaColorSpinorField* y;
+      bool init;
 
+    public:
+      SD(const DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile);
+      virtual ~SD();
+
+      void operator()(cudaColorSpinorField& out, cudaColorSpinorField& in, double* time);
+  };
 
 
 
@@ -98,6 +111,26 @@ namespace quda {
     public:
       PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaInvertParam &invParam, TimeProfile &profile);
       virtual ~PreconCG();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
+
+
+  class PreconGCR : public Solver {
+
+    private:
+      const DiracMatrix &mat;
+      const DiracMatrix &matSloppy;
+      const DiracMatrix &matPrecon;
+
+      Solver *K;
+      QudaInvertParam Kparam; // parameters for preconditioner solve
+
+    public:
+      PreconGCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
+          QudaInvertParam &invParam, TimeProfile &profile);
+      virtual ~PreconGCR();
 
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
@@ -142,6 +175,8 @@ namespace quda {
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
+
+
   class MR : public Solver {
 
     private:
@@ -185,6 +220,7 @@ namespace quda {
 
       virtual void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in) = 0;
   };
+
 
   class MultiShiftCG : public MultiShiftSolver {
 

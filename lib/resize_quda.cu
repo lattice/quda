@@ -250,7 +250,7 @@ namespace quda {
         void apply(const cudaStream_t &stream){
 
           int parity = 0;
-          const unsigned int blockX = 128;
+          const unsigned int blockX = 256;
           const unsigned int gridX = (length + (blockX-1))/blockX;
 
           dim3 blockDim(blockX,1,1); // warp size on GK110
@@ -284,7 +284,7 @@ namespace quda {
 
         void apply(const cudaStream_t &stream){
           // Need to set gridDim and blockDim
-          const unsigned int blockX = 128;
+          const unsigned int blockX = 256;
           const unsigned int gridX = (length + (blockX-1))/blockX;
           dim3 blockDim(blockX,1,1); // Warp size on the GK110
           dim3 gridDim(gridX,1,1);

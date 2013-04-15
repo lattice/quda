@@ -44,7 +44,7 @@ namespace quda {
       printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
 
     if(nFace < 1 || nFace > 4){
-      errorQuda("Only nFace 1, 2, 3, 4 is currently supported\n");   
+      errorQuda("nFace %d is not supported. Only nFace 1, 2, 3, 4 is currently supported\n",nFace);   
     }
 
 
