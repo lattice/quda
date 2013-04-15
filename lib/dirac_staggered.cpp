@@ -71,8 +71,11 @@ namespace quda {
 
     staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, kernel_params, Nface, hasNaik);
     //staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, Nface, hasNaik);
-  
-    flops += 1146ll*in.Volume();
+ 
+    if(hasNaik) 
+      flops += 1152ll*in.Volume();
+    else
+      flops += 576ll*in.Volume();
   }
 
   void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -91,8 +94,11 @@ namespace quda {
 
     staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, kernel_params, Nface, hasNaik);
     //staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, Nface, hasNaik);
-  
-    flops += 1158ll*in.Volume();
+ 
+    if(hasNaik) 
+      flops += 1164ll*in.Volume();
+    else
+      flops += 588ll*in.Volume();
   }
 
   // Full staggered operator
