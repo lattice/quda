@@ -1257,14 +1257,10 @@ namespace quda {
 
             void apply(const cudaStream_t &stream)
             {
-              checkCudaError();
               TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
-              checkCudaError();
               dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-              checkCudaError();
               STAGGERED_DSLASH(hasNaik, nFace, gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
                   out, outNorm, fat0, fat1, long0, long1, in, inNorm, x, xNorm, a, kernel_params);
-              checkCudaError();
             }
 
             /*
@@ -1494,7 +1490,6 @@ namespace quda {
           errorQuda("faceVolumeCB == NULL");
         }
 
-        checkCudaError();
 
 
         dslashParam.parity = parity;
@@ -1535,14 +1530,11 @@ namespace quda {
           }
         }
 #endif
-        checkCudaError();
 
         CUDA_EVENT_RECORD(kernelStart[Nstream-1], streams[Nstream-1]);
         dslash.apply(streams[Nstream-1]);
         CUDA_EVENT_RECORD(kernelEnd[Nstream-1], streams[Nstream-1]);
 
-
-        checkCudaError();
 
 #ifdef MULTI_GPU
         initDslashCommsPattern();
@@ -1561,29 +1553,22 @@ namespace quda {
                   completeSum++;
                   gettimeofday(&commsStart[2*i+dir], NULL);
                   face->commsStart(2*i+dir);
-                  checkCudaError();
                 }
               }
-              checkCudaError();
 
               // Query if comms has finished
               if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
                   gatherCompleted[2*i+dir]) {
                 if (face->commsQuery(2*i+dir)) { 
                   commsCompleted[2*i+dir] = 1;
-                  checkCudaError();
                   completeSum++;
-                  checkCudaError();
                   gettimeofday(&commsEnd[2*i+dir], NULL);
-                  checkCudaError();
 
-                  checkCudaError();
                   // Record the end of the scattering
                   CUDA_EVENT_RECORD(scatterStart[2*i+dir], streams[2*i+dir]);
 
                   // Scatter into the end zone
                   face->scatter(*inSpinor, dagger, 2*i+dir);	    
-                  checkCudaError();
                 }
               }
 
@@ -1593,21 +1578,16 @@ namespace quda {
             if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
               // Record the end of the scattering
               cudaEventRecord(scatterEnd[2*i], streams[2*i]);
-              checkCudaError();
 
               dslashParam.kernel_type = static_cast<KernelType>(i);
-              checkCudaError();
               dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-              checkCudaError();
 
               // wait for scattering to finish and then launch dslash
               cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0);
-              checkCudaError();
 
               CUDA_EVENT_RECORD(kernelStart[2*i], streams[Nstream-1]);
               dslash.apply(streams[Nstream-1]); // all faces use this stream
               cudaDeviceSynchronize();
-              checkCudaError();
               CUDA_EVENT_RECORD(kernelEnd[2*i], streams[Nstream-1]);	  
 
               dslashCompleted[2*i] = 1;
@@ -1621,7 +1601,6 @@ namespace quda {
         DSLASH_TIME_PROFILE();
 
 #endif // MULTI_GPU
-        checkCudaError();
       }
 
       // Wilson wrappers
