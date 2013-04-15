@@ -6,6 +6,7 @@
 tests/*_test
 make.inc
 milc_interface
+milc_interface_old
 *.log
 out
 include/quda_milc_interface.h

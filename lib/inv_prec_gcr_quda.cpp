@@ -356,7 +356,9 @@ namespace quda {
 
           // rPre needs to be extended and pPre needs to be contracted
           if(K){
+            globalReduce = false;
             (*K)(pPre, rPre, simple_time);
+            globalReduce = true;
           }else{
             copyCuda(pPre, rPre);
           }
