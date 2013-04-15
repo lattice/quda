@@ -46,16 +46,6 @@ namespace quda {
 
   void SimpleMR::operator()(cudaColorSpinorField& x, cudaColorSpinorField& b,  double* time)
   {
-#ifdef PRECON_TIME
-    timeval tstart, tstop;
-    gettimeofday(&tstart, NULL);
-#endif
-
-    // profile[QUDA_PROFILE_INIT].Start();
-    timeval mat_start, mat_stop;
-    timeval start1, stop1;
-
-
 
     if(!init){
       r = new cudaColorSpinorField(b);
@@ -64,9 +54,10 @@ namespace quda {
       init = true;                        
     }
 
+    double b2;
+    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE) b2 = norm2(b);
 
     // Assumes x = b
-    gettimeofday(&mat_start, NULL);
     //mat(*r, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // Switching to a zero source would get rid of this operation. 
     // Will it affect the number of iterations
@@ -75,19 +66,10 @@ namespace quda {
     zeroCuda(*r);
     zeroCuda(x); 
     double r2 = xmyNormCuda(b,*r);
-
     double alpha = 0.0, beta=0.0;
+    double2 Ar2;
 
-
-    mat(*Ar, *r, *y);
-    double2 Ar2 = reDotProductNormACuda(*Ar,*r); 
-    alpha = Ar2.x/Ar2.y;
-    // x = b + alpha*r;
-    // r = b - alpha*Ar;
-    axpyzCuda(alpha, *r, x, x);
-    axpyzCuda(-alpha, *Ar, *r, *r);
-    int k=1;
-
+    int k=0;
     while(k < invParam.maxiter-1){
 
       mat(*Ar, *r, *y);
@@ -95,6 +77,11 @@ namespace quda {
       alpha = Ar2.x/Ar2.y;
       axpyCuda(alpha, *r, x); // better way to do this!
       axpyCuda(-alpha, *Ar, *r);
+
+      if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
+        printfQuda("Hermitian MR: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
+      }
+
       ++k;
     }
 
@@ -103,12 +90,15 @@ namespace quda {
     alpha = Ar2.x/Ar2.y;
     axpyCuda(alpha, *r, x);
     // x += alpha*r
+    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
+      axpyCuda(-alpha, *Ar, *r);
+      r2 = norm2(*r);
+      // Compute the true residual
+      mat(*r, x, *y);
+      double true_r2 = xmyNormCuda(b,*r);
+      printfQuda("Hermitian MR: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
+    }
 
-#ifdef PRECON_TIME    
-    cudaDeviceSynchronize();
-    gettimeofday(&tstop, NULL);
-    accumulate_time(&(time[2]), tstart, tstop);
-#endif 
     return;
   }
 

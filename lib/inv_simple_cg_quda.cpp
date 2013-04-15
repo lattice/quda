@@ -48,17 +48,9 @@ namespace quda {
   //void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField &b, double* time)
   void SimpleCG::operator()(cudaColorSpinorField& x, cudaColorSpinorField& b,  double* time)
   {
-#ifdef PRECON_TIME
-    timeval tstart, tstop;
-    gettimeofday(&tstart, NULL);
-#endif
+    globalReduce = false;
 
     // profile[QUDA_PROFILE_INIT].Start();
-    timeval mat_start, mat_stop;
-    timeval start1, stop1;
-
-
-
     if(!init){
       r = new cudaColorSpinorField(b);
       p = new cudaColorSpinorField(b);
@@ -69,20 +61,15 @@ namespace quda {
 
 
     // Assumes x = b
-    gettimeofday(&mat_start, NULL);
-/*
-    mat(*p, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
-                  // Switching to a zero source would get rid of this operation. 
-                  // Will it affect the number of iterations
-                  // => r = A*x;
+    /*
+       mat(*p, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
+    // Switching to a zero source would get rid of this operation. 
+    // Will it affect the number of iterations
+    // => r = A*x;
     double r2 = xmyNormCuda(b,*p);
-
-
-
     double alpha = 0.0, beta=0.0;
     double pAp;
     double r2_old;
-
     mat(*Ap, *p, *y);
     pAp = reDotProductCuda(*p, *Ap);
     alpha = r2/pAp;
@@ -90,24 +77,28 @@ namespace quda {
     r2_old = r2;
     r2 = norm2(*r);
     beta = r2/r2_old;
- //  axpyZpbxCuda(alpha, *p, x, *r, beta);
     axpyzCuda(alpha, *p, b, x);   // This will do away with an additional copy
     axpyzCuda(beta, *p, *r, *p);  // Will it work.
     // x = x + alpha*p
     // p = r + beta*p
     int k=1;
-*/
-   zeroCuda(x);
-   zeroCuda(*r);
-   double r2 = xmyNormCuda(b,*r);
-   double alpha = 0.0, beta = 0.0;
-   double pAp, r2_old;
-   *p = *r; 
+    */
 
-   int k=0;
+//    quda::blas_flops = 0; // start fresh
 
+    zeroCuda(x);
+    zeroCuda(*r);
+    double r2 = xmyNormCuda(b,*r);
+    double alpha = 0.0, beta = 0.0;
+    double pAp, r2_old;
+    *p = *r; 
+
+    double b2;
+    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE) b2 = norm2(b);
+
+
+    int k=0;
     while( k < invParam.maxiter-1 ){
-      gettimeofday(&mat_start, NULL);
       mat(*Ap, *p, *y);
       pAp = reDotProductCuda(*p, *Ap);
       alpha = r2/pAp; 
@@ -118,17 +109,34 @@ namespace quda {
       axpyZpbxCuda(alpha, *p, x, *r, beta);
       // x = x + alpha*p
       // p = r + beta*p
+      if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
+        printfQuda("Inner CG: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
+      } 
       ++k;
     }
     mat(*Ap, *p, *y);
     pAp = reDotProductCuda(*p, *Ap);
     alpha  = r2/pAp;
     axpyCuda(alpha, *p, x); // x --> x + alpha*p
-#ifdef PRECON_TIME    
-    cudaDeviceSynchronize();
-    gettimeofday(&tstop, NULL);
-    accumulate_time(&(time[2]), tstart, tstop);
-#endif 
+
+/*
+    double gflops = (quda::blas_flops + mat.flops())*1e-9;
+    reduceDouble(gflops);
+    invParam.gflops += gflops;
+
+    quda::blas_flops = 0;
+    mat.flops();
+*/
+    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
+      axpyCuda(-alpha, *Ap, *r); 
+      r2 = norm2(*r);
+      // Compute the true residual
+      mat(*r, x, *y);
+      double true_r2 = xmyNormCuda(b,*r);
+      printfQuda("Inner CG: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
+    } 
+
+    globalReduce = true;
     return;
   }
 
