@@ -232,6 +232,7 @@ namespace quda {
       }else{
 	printfQuda("CG: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 		   k, sqrt(r2/b2), invParam.true_res);
+        printfQuda("Gflops: %e\n", gflops/invParam.secs);
       }
 
     }

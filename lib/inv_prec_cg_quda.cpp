@@ -208,7 +208,7 @@ namespace quda {
     if(K) minvr_ptr = new cudaColorSpinorField(b,param);
     cudaColorSpinorField y(b,param);
 
-    
+
 
     mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
@@ -230,7 +230,7 @@ namespace quda {
       param.nFace = max_overlap;
       r_sloppy = new cudaColorSpinorField(r, param);
       param.nFace = b.Nface();
-      minvrSloppy_ptr = new cudaColorSpinorField(*minvr_ptr, param);
+      if(K) minvrSloppy_ptr = new cudaColorSpinorField(*minvr_ptr, param);
     }
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
@@ -329,6 +329,7 @@ namespace quda {
       // r --> r - alpha*A*p
       gettimeofday(&common_stop, NULL);
       accumulate_time(&common_time, common_start, common_stop);
+      r2_old = r2;
       r2 = real(cg_norm);
       rMinvr_old = rMinvr;
 
@@ -345,39 +346,45 @@ namespace quda {
 
 
       if( !(updateR || updateX) ){
-        r_new_Minvr_old = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
-        gettimeofday(&pcstart, NULL);
+        if(K){
+          r_new_Minvr_old = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
 
-        if(max_overlap){       
-          extendCuda(*rPre_ptr,rSloppy,dparam,domain_overlap);
+          gettimeofday(&pcstart, NULL);
+
+          if(max_overlap){       
+            extendCuda(*rPre_ptr,rSloppy,dparam,domain_overlap);
+          }else{
+            *rPre_ptr = rSloppy;
+          }
+
+          globalReduce = false;
+          gettimeofday(&precon_start,NULL);
+          (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);
+          gettimeofday(&precon_stop,NULL);
+          accumulate_time(&precon_time, precon_start, precon_stop);
+          globalReduce = true;
+
+          if(max_overlap){
+            cropCuda(*minvrSloppy_ptr, *minvrPre_ptr, dparam);
+          }else{
+            *minvrSloppy_ptr = *minvrPre_ptr;
+          }
+          gettimeofday(&pcstop, NULL);
+          accumulate_time(&pctime, pcstart, pcstop);
+
+          rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
+
+          beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
+          // x = x + alpha*p, p = Minvr + beta*p
+          axpyZpbxCuda(alpha, *p_ptr, xSloppy, *minvrSloppy_ptr, beta);
+          // update x and p
+          // x = x + alpha*p
+          // p = Minv_r + beta*p
         }else{
-          *rPre_ptr = rSloppy;
+          beta = imag(cg_norm)/r2_old;
+          axpyZpbxCuda(alpha, *p_ptr, xSloppy, rSloppy, beta);
         }
-
-        globalReduce = false;
-        gettimeofday(&precon_start,NULL);
-        (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);
-        gettimeofday(&precon_stop,NULL);
-        accumulate_time(&precon_time, precon_start, precon_stop);
-        globalReduce = true;
-
-        if(max_overlap){
-          cropCuda(*minvrSloppy_ptr, *minvrPre_ptr, dparam);
-        }else{
-          *minvrSloppy_ptr = *minvrPre_ptr;
-        }
-        gettimeofday(&pcstop, NULL);
-        accumulate_time(&pctime, pcstart, pcstop);
-
-        rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
-
-        beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
-        // x = x + alpha*p, p = Minvr + beta*p
-        axpyZpbxCuda(alpha, *p_ptr, xSloppy, *minvrSloppy_ptr, beta);
-        // update x and p
-        // x = x + alpha*p
-        // p = Minv_r + beta*p
       } else { // reliable update
 
         axpyCuda(alpha, *p_ptr, xSloppy); // xSloppy += alpha*p
@@ -400,25 +407,29 @@ namespace quda {
         r0Norm = rNorm;
         ++rUpdate;
 
-        if(max_overlap) 
-          extendCuda(*rPre_ptr, rSloppy, dparam, domain_overlap); 
-        else
-          *rPre_ptr = rSloppy;
+        if(K){
+          if(max_overlap) 
+            extendCuda(*rPre_ptr, rSloppy, dparam, domain_overlap); 
+          else
+            *rPre_ptr = rSloppy;
 
-        globalReduce = false;
-        (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);
-        globalReduce = true;
+          globalReduce = false;
+          (*K)(*minvrPre_ptr, *rPre_ptr, simple_time);
+          globalReduce = true;
 
-        if(max_overlap)
-          cropCuda(*minvrSloppy_ptr, *minvrPre_ptr, dparam);
-        else
-          *minvrSloppy_ptr = *minvrPre_ptr;
+          if(max_overlap)
+            cropCuda(*minvrSloppy_ptr, *minvrPre_ptr, dparam);
+          else
+            *minvrSloppy_ptr = *minvrPre_ptr;
 
-        rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
-        beta = rMinvr/rMinvr_old;        
+          rMinvr = reDotProductCuda(rSloppy,*minvrSloppy_ptr);
+          beta = rMinvr/rMinvr_old;        
 
-        xpayCuda(*minvrSloppy_ptr, beta, *p_ptr); // p = minvrSloppy + beta*p
-
+          xpayCuda(*minvrSloppy_ptr, beta, *p_ptr); // p = minvrSloppy + beta*p
+        }else{ // standard CG - no preconditioning
+          beta = r2/r2_old;
+          xpayCuda(rSloppy, beta, *p_ptr);
+        }
       }      
 
       if(k%100 == 0) printfQuda("r2 = %e\n", r2);
