@@ -47,6 +47,8 @@ namespace quda {
   void SimpleMR::operator()(cudaColorSpinorField& x, cudaColorSpinorField& b,  double* time)
   {
 
+    globalReduce = false;
+
     if(!init){
       r = new cudaColorSpinorField(b);
       Ar = new cudaColorSpinorField(b); 
@@ -99,6 +101,7 @@ namespace quda {
       printfQuda("Hermitian MR: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
     }
 
+    globalReduce = true;
     return;
   }
 

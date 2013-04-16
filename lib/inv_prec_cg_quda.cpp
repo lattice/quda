@@ -208,6 +208,8 @@ namespace quda {
     if(K) minvr_ptr = new cudaColorSpinorField(b,param);
     cudaColorSpinorField y(b,param);
 
+    
+
     mat(r, x, y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
     // => r = A*x;
     double r2 = xmyNormCuda(b,r);
@@ -312,8 +314,7 @@ namespace quda {
     profile[QUDA_PROFILE_PREAMBLE].Stop();
     profile[QUDA_PROFILE_COMPUTE].Start();
 
-    bool standard_update = true;
-    bool reliable_update = false;
+    quda::blas_flops = 0;
 
 
     while(r2 > stop && k < invParam.maxiter){
@@ -434,11 +435,29 @@ namespace quda {
     if(x.Precision() != invParam.cuda_prec_sloppy) copyCuda(x, xSloppy);
     xpyCuda(y, x); // x += y
 
+
+    // Compute flops
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    reduceDouble(gflops);
+
+    invParam.secs = profile[QUDA_PROFILE_COMPUTE].Last();
+
+    if(invParam.verbosity >= QUDA_SUMMARIZE){
+      printfQuda("Operations = %e*1e9, gflops = %f, time = %e\n", gflops, gflops/invParam.secs, invParam.secs);
+    }
+
+
     // compute the true residual 
     mat(r, x, y);
     double true_res = xmyNormCuda(b, r);
     invParam.true_res = sqrt(true_res / src_norm);
     printfQuda("true_res = %e\n", invParam.true_res);
+
+    // reset the flops counters
+    quda::blas_flops = 0;
+    mat.flops();
+    matSloppy.flops();
+    matPrecon.flops();
 
     profile[QUDA_PROFILE_EPILOGUE].Stop();
     profile[QUDA_PROFILE_FREE].Start();
