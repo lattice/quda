@@ -608,7 +608,7 @@ namespace quda {
     
     if(this->initGhostFaceBuffer == 0 || precision*nface > facePrecision*nFace_max){   
     
-      if(nFace_max > nface) nFace_max = nface;
+      if(nface > nFace_max) nFace_max = nface;
 
       for (int i=0; i<4; i++) {
 	if(!commDimPartitioned(i)){
