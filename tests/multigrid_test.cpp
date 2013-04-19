@@ -32,7 +32,7 @@ extern int gridsize_from_cmdline[];
     
 extern int nvec;
 extern char vecfile[];
-//Test
+//Test2
 cpuColorSpinorField **W; // array of bad guys
 int Nvec; // number of bad guys for the transfer operator
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
