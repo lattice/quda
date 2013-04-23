@@ -80,7 +80,7 @@ namespace quda {
   // twisted mass Dslash  
   void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
 			     const int parity, const int dagger, const cudaColorSpinorField *x, 
-			     const double &kappa, const double &mu, const double &epsilon, const int *commDim);
+			     const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim);
 
 //!ndeg tm:
   // solo twist term
