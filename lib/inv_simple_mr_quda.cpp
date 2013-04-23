@@ -58,6 +58,7 @@ namespace quda {
 
     double b2;
     if(invParam.verbosity >= QUDA_DEBUG_VERBOSE) b2 = norm2(b);
+    //b2 = norm2(b);
 
     // Assumes x = b
     //mat(*r, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,

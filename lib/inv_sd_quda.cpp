@@ -55,7 +55,8 @@ namespace quda {
     }
 
     double b2;
-    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE) b2 = norm2(b);
+    //if(invParam.verbosity >= QUDA_DEBUG_VERBOSE) b2 = norm2(b);
+    b2 = norm2(b);
 
     // Assumes x = b
     //mat(*r, b, *y); // operator()(cudaColorSpinorField& out, cudaColorSpinorField& in,
@@ -90,14 +91,14 @@ namespace quda {
     alpha = Ar2.y/Ar2.x;
     axpyCuda(alpha, *r, x);
     // x += alpha*r
-    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
+//    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
       axpyCuda(-alpha, *Ar, *r);
       r2 = norm2(*r);
       // Compute the true residual
       mat(*r, x, *y);
       double true_r2 = xmyNormCuda(b,*r);
       printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
-    }
+//    }
 
     globalReduce = true;
     return;

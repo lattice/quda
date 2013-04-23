@@ -94,7 +94,8 @@ namespace quda {
     *p = *r; 
 
     double b2;
-    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE) b2 = norm2(b);
+    //if(invParam.verbosity >= QUDA_DEBUG_VERBOSE) b2 = norm2(b);
+    b2 = norm2(b);
 
 
     int k=0;
@@ -109,9 +110,9 @@ namespace quda {
       axpyZpbxCuda(alpha, *p, x, *r, beta);
       // x = x + alpha*p
       // p = r + beta*p
-      if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
+//      if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
         printfQuda("Inner CG: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
-      } 
+//      } 
       ++k;
     }
     mat(*Ap, *p, *y);
@@ -127,14 +128,14 @@ namespace quda {
     quda::blas_flops = 0;
     mat.flops();
 */
-    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
+//    if(invParam.verbosity >= QUDA_DEBUG_VERBOSE){
       axpyCuda(-alpha, *Ap, *r); 
       r2 = norm2(*r);
       // Compute the true residual
       mat(*r, x, *y);
       double true_r2 = xmyNormCuda(b,*r);
       printfQuda("Inner CG: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
-    } 
+//    } 
 
     globalReduce = true;
     return;

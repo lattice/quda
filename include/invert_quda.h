@@ -270,6 +270,8 @@ namespace quda {
       const QudaInvertParam& param,
       int idx);
 
+  void maxEigenValue(double* max_eval, const DiracMatrix& mat, const cudaColorSpinorField& b, int max_iter);
+
 
 
 } // namespace quda
