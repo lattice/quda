@@ -61,10 +61,23 @@ static int *mcoord;
 // MAC this function assumes that the QMP geometry has been predetermined
 static void setup_qmp_fixed(int len[], int nd, int numnodes) {
   int i;
+  printf("setup_qmp_fixed\n");
 
-  for (i=0; i<ndim; i++) {
-    nsquares[i] = QMP_get_logical_dimensions()[i];
-    squaresize[i] = len[i]/nsquares[i];
+  //Added by M. Cheng to fix seg fault on single-node case where
+  //QMP topology is not yet declared.
+
+  if(QMP_get_number_of_nodes() == 1) {
+    for (i=0; i<ndim; i++) {
+      nsquares[i] = 1;
+      squaresize[i] = len[i]/nsquares[i];
+    }
+    
+  }
+  else {
+    for (i=0; i<ndim; i++) {
+      nsquares[i] = QMP_get_logical_dimensions()[i];
+      squaresize[i] = len[i]/nsquares[i];
+    }
   }
 
 }

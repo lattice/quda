@@ -14,6 +14,13 @@
 #include <qio_field.h>
 #include <transfer.h>
 
+#if defined(QMP_COMMS)
+#include <qmp.h>
+#elif defined(MPI_COMMS)
+#include <mpi.h>
+#endif
+
+
 using namespace quda;
 
 ColorSpinorParam csParam;
@@ -32,7 +39,7 @@ extern int gridsize_from_cmdline[];
     
 extern int nvec;
 extern char vecfile[];
-//Test2
+
 cpuColorSpinorField **W; // array of bad guys
 int Nvec; // number of bad guys for the transfer operator
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
@@ -63,7 +70,12 @@ void init() {
 
   Nvec = nvec;
   W = new cpuColorSpinorField*[Nvec];
-  for (int i=0; i<Nvec; i++) W[i] = new cpuColorSpinorField(csParam);
+  for (int i=0; i<Nvec; i++) {
+    W[i] = new cpuColorSpinorField(csParam);
+    if (W[i] == NULL) {
+      printf("Could not allocate W[%d]\n", i);      
+    }
+  }
 
   initQuda(device);
 }
@@ -80,7 +92,12 @@ void end() {
 void loadTest() {
 
   void **V = new void*[Nvec];
-  for (int i=0; i<Nvec; i++) V[i] = W[i]->V();
+  for (int i=0; i<Nvec; i++) { 
+    V[i] = W[i]->V();
+    if (V[i] == NULL) {
+      printf("Could not allocate V[%d]\n", i);      
+    }
+  }
     //supports seperate reading or single file read
 
   if (strcmp(vecfile,"")!=0) {
@@ -91,6 +108,7 @@ void loadTest() {
     for (int i=0; i<Nvec; i++) {
       char filename[256];
       sprintf(filename, "%s.%d", vecfile, i);
+      printf("Reading vector %d from file %s\n", i, filename);
       read_spinor_field(filename, &V[i], W[i]->Precision(), W[i]->X(), 
 			W[i]->Ncolor(), W[i]->Nspin(), 1, 0,  (char**)0);
     }
@@ -111,6 +129,7 @@ void loadTest() {
 extern void usage(char**);
 
 int main(int argc, char **argv) {
+
   for (int i=1; i<argc; i++){    
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -120,12 +139,16 @@ int main(int argc, char **argv) {
     usage(argv);
   }
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+
+  initComms(argc, argv, gridsize_from_cmdline);
 
   init();
   loadTest();
   end();
 
-  endCommsQuda();
+  finalizeComms();
+
+
+  return 0;
 }
 
