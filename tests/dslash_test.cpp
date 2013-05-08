@@ -126,7 +126,7 @@ void init(int argc, char **argv) {
 
   inv_param.Ls = Ls;
   
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   inv_param.dagger = dagger;
 
   inv_param.cpu_prec = cpu_prec;
@@ -499,6 +499,7 @@ void dslashRef() {
       }
       else
       {
+	errorQuda("Twisted mass solution type not supported");
       }
       break;
     case 4:
@@ -510,6 +511,7 @@ void dslashRef() {
       }
       else
       {
+	errorQuda("Twisted mass solution type not supported");
       }
       break;
     default:

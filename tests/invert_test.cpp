@@ -165,7 +165,15 @@ int main(int argc, char **argv)
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
   inv_param.solution_type = multi_shift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+
+  if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+    inv_param.solution_type = QUDA_MAT_SOLUTION;
+  } else {
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+    inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  }
+
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
@@ -372,6 +380,8 @@ int main(int argc, char **argv)
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
+	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         tm_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
@@ -435,6 +445,8 @@ int main(int argc, char **argv)
     } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
+	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
                  inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_WILSON_DSLASH || dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
