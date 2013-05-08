@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.5.0                           20 March 2013
+Release Notes for QUDA v0.5.1                           xx May 2013
 -----------------------------
 
 Overview:
@@ -10,7 +10,7 @@ the following fermion actions:
 
 * Wilson
 * Clover-improved Wilson
-* Twisted mass
+* Twisted mass (including non-degenerate pairs)
 * Improved staggered (asqtad or HISQ)
 * Domain wall
 
@@ -186,7 +186,7 @@ Authors:
 Ronald Babich (NVIDIA)
 Kipton Barros (Los Alamos National Laboratory)
 Richard Brower (Boston University)
-Michael Clark (NVIDIA)
+Mike Clark (NVIDIA)
 Justin Foley (University of Utah)
 Joel Giedt (Rensselaer Polytechnic Institute)
 Steven Gottlieb (Indiana University)

@@ -1,4 +1,9 @@
 
+Version 0.5.1 - xx May 2013
+
+- Significantly improved performance of non-degenerate twisted-mass CG
+  solver.
+
 Version 0.5.0 - 20 March 2013
 
 - Added full support for CUDA 5.0, including the Tesla K20 and other
