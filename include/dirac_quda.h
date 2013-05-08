@@ -292,6 +292,7 @@ namespace quda {
 		      const QudaTwistGamma5Type twistType) const;
 
     static int initTMFlag;
+    void initConstants(const cudaColorSpinorField &in) const;
 
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
