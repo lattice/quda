@@ -232,6 +232,7 @@ namespace quda {
     int TotalLength() const { return total_length; }
     int Stride() const { return stride; }
     int Volume() const { return volume; }
+    int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
