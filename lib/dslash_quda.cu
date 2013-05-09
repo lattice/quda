@@ -123,10 +123,10 @@ namespace quda {
   static int accountCount = 0;				\
   gettimeofday(&dslashProfile0, NULL);
 
-#define HOST_PROFILE_PRINT(timer)				\
-  printf("HOST_PROFILE: %16s = %e %8.5f with %8d calls at %e us per call\n",		\
-	 #timer, timer##Profile, timer##Profile/totalTime,	\
-    timer##Count, 1e3 * timer##Profile / timer##Count );
+#define HOST_PROFILE_PRINT(timer)					\
+  printf("HOST_PROFILE: %16s = %e %8.5f with %8d calls at %e us per call\n", \
+	 #timer, timer##Profile, timer##Profile/totalTime,		\
+	 timer##Count, 1e3 * timer##Profile / ((timer##Count > 0) ? timer##Count : 1) );
 
 #define HOST_PROFILE_END						\
   struct timeval dslashProfile1;					\
