@@ -472,8 +472,8 @@ void packSpinor(dstFloat *Dst, srcFloat *Src, ColorSpinorField &dst, const Color
   int V = dst.Volume();
   QudaSiteSubset subset = dst.SiteSubset();
   QudaSiteOrder siteOrder = dst.SiteOrder();
-  int dstLength = dst.TotalLength();
-  int srcLength = src.TotalLength();
+  int dstLength = dst.Bytes() / dst.Precision(); // cannot use total_length since ALIGNMENT_ADJUST 
+  int srcLength = src.Bytes() / src.Precision(); // changes position of odd field
   QudaGammaBasis dstBasis = dst.GammaBasis();
   QudaGammaBasis srcBasis = src.GammaBasis();
   QudaFieldOrder dstOrder = dst.FieldOrder();

@@ -1,57 +1,45 @@
 /**
-   Dummy communications layer for single GPU backend.
+ * Dummy communications layer for single-GPU backend.
  */
 
 #include <stdlib.h>
 #include <comm_quda.h>
 
-static char hostname[128] = "undetermined";
+void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
+{
+  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
+  comm_set_default_topology(topo);
+}
 
-void comm_create(int argc, char **argv);
+int comm_rank(void) { return 0; }
 
-void comm_init() { ; }
+int comm_size(void) { return 1; }
 
-void comm_cleanup() { ; }
+int comm_gpuid(void) { return 0; }
 
-void comm_exit() { ; }
+MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes) { return NULL; }
 
-char *comm_hostname(void) { return hostname; }
+MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes) { return NULL; }
 
-int comm_rank() { return 0; }
+void comm_free(MsgHandle *mh) {}
 
-int comm_size() { return 1; }
+void comm_start(MsgHandle *mh) {}
 
-void* comm_declare_send_relative(void *buffer, int i, int dir, size_t bytes) 
-{ return (void*)0; }
-void* comm_declare_receive_relative(void *buffer, int i, int dir, size_t bytes) 
-{ return (void*)0; }
+void comm_wait(MsgHandle *mh) {}
 
-void comm_free(void *comm) { ; }
+int comm_query(MsgHandle *mh) { return 1; }
 
-void comm_start(void *comm) { ; }
+void comm_allreduce(double* data) {}
 
-void comm_wait(void *comm) { ; }
+void comm_allreduce_max(double* data) {}
 
-int comm_query(void *comm) { return 1; }
+void comm_allreduce_array(double* data, size_t size) {}
 
-int comm_dim_partitioned(int dir) { return 0;} 
+void comm_allreduce_int(int* data) {}
 
-void comm_dim_partitioned_set(int dir) { ; }
+void comm_broadcast(void *data, size_t nbytes) {}
 
-int comm_dim(int dir) { return 1; }
+void comm_barrier(void) {}
 
-int comm_coords(int dir) { return 0; }
+void comm_abort(int status) { exit(status); }
 
-void comm_allreduce(double* data) { ; } 
-
-void comm_allreduce_int(int* data) { ; }
-
-void comm_allreduce_array(double* data, size_t size) { ; }
-
-void comm_allreduce_max(double* data) { ; } 
-
-void comm_barrier(void) { ; }
-
-void comm_broadcast(void *data, size_t nbytes) { ; }
-
-void comm_set_gridsize(const int *X, int nDim) { ; }

@@ -65,7 +65,6 @@ namespace quda {
       axCuda(1/sqrt(b2), r); // can merge this with the prior copy
       r2 = 1.0; // by definition by this is now true
     }
-    double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
 
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
       quda::blas_flops = 0;
@@ -82,7 +81,7 @@ namespace quda {
 		 k, Ar3.x, Ar3.y, Ar3.z, x2);
     }
 
-    while (r2 > stop && k < invParam.maxiter) {
+    while (k < invParam.maxiter) {
     
       mat(Ar, r, tmp);
 

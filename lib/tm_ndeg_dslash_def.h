@@ -31,6 +31,7 @@
 #define DD_LOOP
 #define DD_DAG 0
 #define DD_XPAY 0
+#define DD_TWIST 0
 #define DD_RECON 0
 #define DD_PREC 0
 #endif
@@ -52,12 +53,21 @@
 #define DD_XPAY_F Xpay
 #endif
 
-#if (DD_PREC == 0)
-#define DD_PARAM4 const double a, const double b, const double c, const double2 *x, const float *xNorm, const DslashParam param
-#elif (DD_PREC == 1) 
-#define DD_PARAM4 const float a, const float b, const float c, const float4 *x, const float *xNorm, const DslashParam param
+//!
+#if (DD_TWIST==0) // no twist 
+#define DD_TWIST_F 
 #else
-#define DD_PARAM4 const float a, const float b, const float c, const short4 *x, const float *xNorm, const DslashParam param
+#define DSLASH_TWIST
+#define DD_TWIST_F Twist
+#endif
+//!
+
+#if (DD_PREC == 0)
+#define DD_PARAM4 const double a, const double b, const double c, const double k, const double2 *x, const float *xNorm, const DslashParam param
+#elif (DD_PREC == 1) 
+#define DD_PARAM4 const float a, const float b, const float c, const float k, const float4 *x, const float *xNorm, const DslashParam param
+#else
+#define DD_PARAM4 const float a, const float b, const float c, const float k, const short4 *x, const float *xNorm, const DslashParam param
 #endif
 
 #if (DD_RECON==0) // reconstruct from 8 reals
@@ -207,6 +217,9 @@
 #if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_DOUBLE
+//!
+#define ASSN_ACCUM ASSN_ACCUM_DOUBLE
+#define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_DOUBLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define ACCUMTEX param.xTex
@@ -214,6 +227,9 @@
 #define ACCUMTEX accumTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_DOUBLE_TEX
+//!
+#define ASSN_ACCUM ASSN_ACCUM_DOUBLE_TEX
+#define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_DOUBLE_TEX
 #endif
 
 #endif
@@ -278,6 +294,9 @@
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_SINGLE
+//!
+#define ASSN_ACCUM ASSN_ACCUM_SINGLE
+#define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_SINGLE
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define ACCUMTEX param.xTex
@@ -285,6 +304,9 @@
 #define ACCUMTEX accumTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_SINGLE_TEX
+//!
+#define ASSN_ACCUM ASSN_ACCUM_SINGLE_TEX
+#define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_SINGLE_TEX
 #endif
 #endif
 
@@ -348,6 +370,9 @@
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_HALF
+//!
+#define ASSN_ACCUM ASSN_ACCUM_HALF
+#define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_HALF
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define ACCUMTEX param.xTex
@@ -355,6 +380,9 @@
 #define ACCUMTEX accumTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_HALF_TEX
+//!
+#define ASSN_ACCUM ASSN_ACCUM_HALF_TEX
+#define READ_ACCUM_FLAVOR READ_ACCUM_FLAVOR_HALF_TEX
 #endif
 
 #endif
@@ -366,13 +394,13 @@
 // only build double precision if supported
 #if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
 
-#define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
-#define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
+#define DD_CONCAT(n,r,d,t,x) n ## r ## d ## t ## x ## Kernel
+#define DD_FUNC(n,r,d,t,x) DD_CONCAT(n,r,d,t,x)
 
 // define the kernel
 
 template <KernelType kernel_type>
-__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_TWIST_F, DD_XPAY_F)
      (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
@@ -393,6 +421,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_RECON_F
 #undef DD_DAG_F
 #undef DD_XPAY_F
+#undef DD_TWIST_F
 #undef DD_PARAM1
 #undef DD_PARAM2
 #undef DD_PARAM3
@@ -401,6 +430,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_FUNC
 
 #undef DSLASH_XPAY
+#undef DSLASH_TWIST
 #undef READ_GAUGE_MATRIX
 #undef RECONSTRUCT_GAUGE_MATRIX
 #undef GAUGE0TEX
@@ -412,6 +442,9 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef READ_INTERMEDIATE_SPINOR
 #undef INTERTEX
 #undef READ_ACCUM
+//!
+#undef ASSN_ACCUM
+#undef READ_ACCUM_FLAVOR
 #undef ACCUMTEX
 #undef WRITE_FLAVOR_SPINOR
 #undef GAUGE_FLOAT2
@@ -437,6 +470,15 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_XPAY
 #define DD_XPAY 0
 
+//!
+#if (DD_TWIST==0)
+#undef DD_TWIST
+#define DD_TWIST 1
+#else
+#undef DD_TWIST
+#define DD_TWIST 0
+//!
+
 #if (DD_RECON==0)
 #undef DD_RECON
 #define DD_RECON 1
@@ -459,11 +501,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_LOOP
 #undef DD_DAG
 #undef DD_XPAY
+#undef DD_TWIST //!
 #undef DD_RECON
 #undef DD_PREC
 
 #endif // DD_PREC
 #endif // DD_RECON
+#endif // DD_TWIST
 #endif // DD_XPAY
 #endif // DD_DAG
 

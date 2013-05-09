@@ -202,12 +202,12 @@ int main(int argc, char **argv) {
     usage(argv);
   }
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
 
   init();
   packTest();
   end();
 
-  endCommsQuda();
+  finalizeComms();
 }
 

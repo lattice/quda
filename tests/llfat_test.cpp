@@ -377,10 +377,10 @@ display_test_info(int test)
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n",
-             commDimPartitioned(0),
-             commDimPartitioned(1),
-             commDimPartitioned(2),
-             commDimPartitioned(3));
+             dimPartitioned(0),
+             dimPartitioned(1),
+             dimPartitioned(2),
+             dimPartitioned(3));
 #endif
 
   return ;
@@ -452,18 +452,15 @@ main(int argc, char **argv)
   }
 #endif
 
-
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
-
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info(test);
-  
     
   int accuracy_level = llfat_test(test);
   
   printfQuda("accuracy_level=%d\n", accuracy_level);
   
-  endCommsQuda();
+  finalizeComms();
 
   int ret;
   if(accuracy_level >=3 ){

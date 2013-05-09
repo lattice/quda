@@ -29,9 +29,14 @@ extern "C" {
   
   extern int mySpinorSiteSize;
 
+  void initComms(int argc, char **argv, const int *commDims);
+  void finalizeComms();
+  void initRand();
+
   void setDims(int *X);
   void dw_setDims(int *X, const int L5);
   void setSpinorSiteSize(int n);
+  int dimPartitioned(int dim);
 
   int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) ;

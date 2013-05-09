@@ -4,6 +4,7 @@
 #include <map>
 #include <quda_internal.h>
 #include <color_spinor_field.h>
+#include <comm_quda.h>
 
 namespace quda {
   class FaceBuffer {
@@ -36,12 +37,12 @@ namespace quda {
     void* ib_from_back_face[QUDA_MAX_DIM];
     void* ib_from_fwd_face[QUDA_MAX_DIM];
     
-    // Abstracted communicators
-    void* comm_recv_fwd[QUDA_MAX_DIM];
-    void* comm_recv_back[QUDA_MAX_DIM];
-    void* comm_send_fwd[QUDA_MAX_DIM];
-    void* comm_send_back[QUDA_MAX_DIM];
-    
+    // Message handles
+    MsgHandle* mh_recv_fwd[QUDA_MAX_DIM];
+    MsgHandle* mh_recv_back[QUDA_MAX_DIM];
+    MsgHandle* mh_send_fwd[QUDA_MAX_DIM];
+    MsgHandle* mh_send_back[QUDA_MAX_DIM];
+   
     int Ninternal; // number of internal degrees of freedom (12 for spin projected Wilson, 6 for staggered)
     QudaPrecision precision;
     
@@ -88,21 +89,12 @@ int commCoords(int);
 int commDimPartitioned(int dir);
 void commDimPartitionedSet(int dir);
 
-  //void transferGaugeFaces(void *gauge, void *gauge_face, QudaPrecision precision,
-  //			int veclength, QudaReconstructType reconstruct, int V, int Vs);
-
-#define XUP 0
-#define YUP 1
-#define ZUP 2
-#define TUP 3
-#define TDOWN 4
-#define ZDOWN 5
-#define YDOWN 6
-#define XDOWN 7
-
 #ifdef __cplusplus
   extern "C" {
 #endif
+
+    // implemented in face_gauge.cpp
+
     void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
 			       void** ghost_sitelink_diag, 
 			       QudaPrecision gPrecision, QudaGaugeParam* param, int optflag); 

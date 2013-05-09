@@ -725,18 +725,15 @@ main(int argc, char **argv)
     
     
     link_prec = prec;
-#ifdef MULTI_GPU
-    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
-#endif
+
+    initComms(argc, argv, gridsize_from_cmdline);
 
     display_test_info();
     
     int accuracy_level = gauge_force_test();
     printfQuda("accuracy_level=%d\n", accuracy_level);
 
-#ifdef MULTI_GPU
-    endCommsQuda();
-#endif
+    finalizeComms();
     
     int ret;
     if(accuracy_level >=3 ){

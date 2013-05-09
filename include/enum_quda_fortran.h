@@ -100,8 +100,8 @@
 #define QUDA_INVALID_SCHWARZ QUDA_INVALID_ENUM
 
 #define QudaResidualType integer(4)
-#define QUDA_L2_RELATIVE_RESIDUAL 0
-#define QUDA_HEAVY_QUARK_RESIDUAL 1
+#define QUDA_L2_RELATIVE_RESIDUAL 1
+#define QUDA_HEAVY_QUARK_RESIDUAL 2
 #define QUDA_INVALID_RESIDUAL QUDA_INVALID_ENUM
 
 #/*
@@ -239,9 +239,11 @@
 #define QUDA_INVALID_SOURCE QUDA_INVALID_ENUM
   
 #define QudaTwistFlavorType integer(4)
-#define QUDA_TWIST_NO  0
 #define QUDA_TWIST_MINUS -1
 #define QUDA_TWIST_PLUS +1
+#define QUDA_TWIST_NONDEG_DOUBLET +2
+#define QUDA_TWIST_DEG_DOUBLET -2
+#define QUDA_TWIST_NO  0
 #define QUDA_TWIST_INVALID QUDA_INVALID_ENUM
 
 #define QudaTwistGamma5Type integer(4)
@@ -255,8 +257,8 @@
 #define QUDA_USE_INIT_GUESS_INVALID QUDA_INVALID_ENUM
 
 #define QudaDirection integer(4)
-#define QUDA_BACKWARDS 0
-#define QUDA_FORWARDS  1
+#define QUDA_BACKWARDS -1
+#define QUDA_FORWARDS  +1
   
 #define QudaComputeFatMethod integer(4)
 #define QUDA_COMPUTE_FAT_STANDARD 0
@@ -272,6 +274,6 @@
 #define QUDA_SCALAR_GEOMETRY 0
 #define QUDA_VECTOR_GEOMETRY 1
 #define QUDA_TENSOR_GEOMETRY 2
-#define QUDA_INVALID_GEOMETRY 3
+#define QUDA_INVALID_GEOMETRY QUDA_INVALID_ENUM
 
 #endif 

@@ -1,15 +1,18 @@
+#ifndef _FORCE_COMMON_H
+#define _FORCE_COMMON_H
 
-#ifndef __KERNEL_COMMOM_MACRO_H__
-#define __KERNEL_COMMOM_MACRO_H__
+enum {
+  XUP = 0,
+  YUP = 1,
+  ZUP = 2,
+  TUP = 3,
+  TDOWN = 4,
+  ZDOWN = 5,
+  YDOWN = 6,
+  XDOWN = 7
+};
 
-#define XUP 0
-#define YUP 1
-#define ZUP 2
-#define TUP 3
-#define TDOWN 4
-#define ZDOWN 5
-#define YDOWN 6
-#define XDOWN 7
+
 #define OPP_DIR(dir)	(7-(dir))
 #define GOES_FORWARDS(dir) (dir<=3)
 #define GOES_BACKWARDS(dir) (dir>3)
@@ -717,4 +720,4 @@
     }while(0)
 
 
-#endif
+#endif // _FORCE_COMMON_H

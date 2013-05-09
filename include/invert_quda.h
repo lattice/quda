@@ -23,6 +23,23 @@ namespace quda {
     // solver factory
     static Solver* create(QudaInvertParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			  DiracMatrix &matPrecon, TimeProfile &profile);
+
+    bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
+		     const double &hq_tol);
+ 
+    /**
+       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
+     */
+    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
+
+    /** 
+	Prints out the summary of the solver convergence (requires a
+	versbosity of QUDA_SUMMARIZE).  Assumes
+	QudaInvertParam.true_res and QudaInvertParam.true_res_hq has
+	been set
+    */
+    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
+
   };
 
   class CG : public Solver {

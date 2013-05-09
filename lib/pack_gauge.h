@@ -189,6 +189,16 @@ inline void pack18(short2 *res, Float *g, int dir, int V)
   }
 }
 
+template <typename Float>
+inline void pack18(short2 *res, Float *g, int dir, int V, Float scale_factor) 
+{
+  short2 *r = res + dir*9*V;
+  for (int j=0; j<9; j++) {
+    r[j*V].x = FloatToShort(g[j*2+0]*scale_factor); 
+    r[j*V].y = FloatToShort(g[j*2+1]*scale_factor); 
+  }
+}
+
 template<typename Float>
 inline void fatlink_short_pack18(short2 *d_gauge, Float *h_gauge, int dir, int V) 
 {
@@ -479,6 +489,18 @@ inline void unpack18(Float *h_gauge, short2 *d_gauge, int dir, int V) {
   }
 }
 
+template <typename Float>
+inline void unpack18(Float *h_gauge, short2 *d_gauge, int dir, int V, Float scale_factor) {
+  short2 *dg = d_gauge + dir*9*V;
+  for (int j=0; j<9; j++) {
+    ShortToFloat(h_gauge[j*2+0], dg[j*V].x); 
+    ShortToFloat(h_gauge[j*2+1], dg[j*V].y);
+    h_gauge[j*2] *= scale_factor;
+    h_gauge[j*2+1] *= scale_factor;
+  }
+}
+
+
 
 
 // Assume the gauge field is "QDP" ordered: directions outside of
@@ -490,7 +512,7 @@ inline void unpack18(Float *h_gauge, short2 *d_gauge, int dir, int V) {
 template <typename Float, typename FloatN>
 static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit, 
 			      QudaReconstructType reconstruct, int Vh, int *voxels,
-			      int pad, int offset, int nFace, QudaLinkType type) {
+			      int pad, int offset, int nFace, const QudaLinkType& type) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       int nMat = nFace*voxels[dir];
@@ -507,10 +529,8 @@ static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit,
     for (int dir = 0; dir < 4; dir++) {
       int nMat = nFace*voxels[dir];
       Float *g = h_gauge[dir] + oddBit*nMat*18;
-      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2) ){
-	  //we know it is half precison with fatlink at this stage
-	for (int i = 0; i < nMat; i++) 
-	  fatlink_short_pack18((short2*)(d_gauge+offset+i), g+i*18, dir, Vh+pad);
+      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
+	for (int i = 0; i < nMat; i++) pack18((short2*)(d_gauge+offset+i), g+i*18, dir, Vh+pad, static_cast<Float>(1.f/fat_link_max_));
       }else{
 	for (int i = 0; i < nMat; i++) pack18(d_gauge+offset+i, g+i*18, dir, Vh+pad);
       }
@@ -522,7 +542,7 @@ static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit,
 // space-time, row-column ordering, even-odd space-time
 template <typename Float, typename FloatN>
 static void unpackQDPGaugeField(Float **h_gauge, FloatN *d_gauge, int oddBit, 
-				QudaReconstructType reconstruct, int V, int pad) {
+				QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge[dir] + oddBit*V*18;
@@ -536,7 +556,11 @@ static void unpackQDPGaugeField(Float **h_gauge, FloatN *d_gauge, int oddBit,
   } else {
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge[dir] + oddBit*V*18;
-      for (int i = 0; i < V; i++) unpack18(g+i*18, d_gauge+i, dir, V+pad);
+      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
+        for (int i = 0; i < V; i++) unpack18(g+i*18, (short2*)d_gauge+i, dir, V+pad, static_cast<Float>(fat_link_max_));
+      }else{
+        for (int i = 0; i < V; i++) unpack18(g+i*18, d_gauge+i, dir, V+pad);
+      }
     }
   }
 }
@@ -552,7 +576,7 @@ static void transposeScale(Float *gT, Float *g, const Float2 &a) {
 // space-time column-row ordering even-odd space-time
 template <typename Float, typename FloatN>
 static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit, 
-			      QudaReconstructType reconstruct, int V, int pad) {
+			      QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
   Float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
@@ -571,22 +595,24 @@ static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit,
       }
     }
   } else {
+    Float scale_factor = 1.0/anisotropy_;
+    if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) scale_factor /= fat_link_max_;
     for (int dir = 0; dir < 4; dir++) {
       Float *g = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
-	transposeScale(gT, g+4*i*18, 1.0 / anisotropy_);
+	transposeScale(gT, g+4*i*18, scale_factor);
 	pack18(d_gauge+i, gT, dir, V+pad);
       }
     }
   }
-
 }
+
 
 // Assume the gauge field is "Wilson" ordered directions inside of
 // space-time column-row ordering even-odd space-time
 template <typename Float, typename FloatN>
 static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
-				QudaReconstructType reconstruct, int V, int pad) {
+				QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
   Float gT[18];
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
@@ -605,11 +631,13 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       }
     }
   } else {
+    Float scale_factor = anisotropy_;
+    if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) scale_factor *= fat_link_max_;
     for (int dir = 0; dir < 4; dir++) {
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
       for (int i = 0; i < V; i++) {
 	unpack18(gT, d_gauge+i, dir, V+pad);
-	transposeScale(hg+4*i*18, gT, anisotropy_);
+	transposeScale(hg+4*i*18, gT, scale_factor);
       }
     }
   }
@@ -621,7 +649,7 @@ static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
 // space-time row-column ordering even-odd space-time
 template <typename Float, typename FloatN>
 void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit, 
-			QudaReconstructType reconstruct, int Vh, int pad)
+			QudaReconstructType reconstruct, int Vh, int pad, const QudaLinkType& type)
 {
   int dir, i;
   if (reconstruct == QUDA_RECONSTRUCT_12) {
@@ -641,8 +669,10 @@ void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit,
   }else{
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
-      for (i = 0; i < Vh; i++) {
-	pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
+      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
+        for (i = 0; i < Vh; i++) pack18((short2*)res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad, static_cast<Float>(1.f/fat_link_max_));
+      }else{
+        for (i = 0; i < Vh; i++) pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
       }
     }
   }
@@ -652,7 +682,7 @@ void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit,
 // space-time row-column ordering even-odd space-time
 template <typename Float, typename FloatN>
 static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
-				 QudaReconstructType reconstruct, int V, int pad) {
+				 QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
   if (reconstruct == QUDA_RECONSTRUCT_12) {
     for (int dir = 0; dir < 4; dir++) {
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
@@ -670,8 +700,10 @@ static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
   } else {
     for (int dir = 0; dir < 4; dir++) {
       Float *hg = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	unpack18(hg+4*i*18, d_gauge+i, dir, V+pad);
+      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
+        for (int i = 0; i < V; i++) unpack18(hg+4*i*18, (short2*)d_gauge+i, dir, V+pad, static_cast<Float>(fat_link_max_));
+      }else{
+        for (int i = 0; i < V; i++) unpack18(hg+4*i*18, d_gauge+i, dir, V+pad);
       }
     }
   }
@@ -682,7 +714,7 @@ static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
 // [mu][even-odd][spacetime+halos][column][row]
 template <typename Float, typename FloatN>
 void packBQCDGaugeField(FloatN *res, Float *gauge, int oddBit, 
-			QudaReconstructType reconstruct, int Vh, int pad)
+			QudaReconstructType reconstruct, int Vh, int pad, const QudaLinkType& type)
 {
 
   // need to add on halo region
@@ -709,12 +741,13 @@ void packBQCDGaugeField(FloatN *res, Float *gauge, int oddBit,
       }
     }
   }else{
+    const Float scale_factor = (type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) ? 1.f/fat_link_max_ : 1.0;
     // FIXME - need to workout row-col order
     for (dir = 0; dir < 4; dir++) {
       Float *g = gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
       //Float *g = gauge + (dir*2+oddBit)*Vh*gaugeSiteSize;
       for (i = 0; i < Vh; i++) {
-	transposeScale(gT, g+i*18, 1.0);
+	transposeScale(gT, g+i*18, scale_factor);
 	pack18(res+i, gT, dir, Vh+pad);
 	//pack18(res+i, g+i*gaugeSiteSize, dir, Vh+pad);
       }
@@ -726,7 +759,7 @@ void packBQCDGaugeField(FloatN *res, Float *gauge, int oddBit,
 // [mu][even-odd][spacetime+halos][column][row]
 template <typename Float, typename FloatN>
 static void unpackBQCDGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
-				 QudaReconstructType reconstruct, int V, int pad) {
+				 QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
   // need to add on halo region
   int mu_offset = X_[0]/2 + 2;
   for (int i=1; i<4; i++) mu_offset *= (X_[i] + 2);
@@ -749,11 +782,12 @@ static void unpackBQCDGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       }
     }
   } else {
+    const Float scale_factor = (type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) ? fat_link_max_ : 1.0;
     for (int dir = 0; dir < 4; dir++) {
       Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
       for (int i = 0; i < V; i++) {
 	unpack18(gT, d_gauge+i, dir, V+pad);
-	transposeScale(hg+i*18, gT, 1.0);
+	transposeScale(hg+i*18, gT, fat_link_max_);
       }
     }
   }
