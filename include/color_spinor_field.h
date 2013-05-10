@@ -296,8 +296,21 @@ namespace quda {
     void zeroPad();
   
     void resizeBuffer(size_t bytes) const;
+
+    /**
+       This function is responsible for calling the correct copy kernel
+       given the nature of the source field and the desired destination.
+    */
+    void copySpinorField(const ColorSpinorField &src);
+
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
+
+    /**
+       This function returns true if the field is stored in an internal
+       field order, given the precision and the length of the spin
+       dimension.
+    */ 
     bool isNative() const;
 
   public:

@@ -62,12 +62,12 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false) {
     create(QUDA_COPY_FIELD_CREATE);
-    if (isNative() && src.isNative()) copy(src);
-    else errorQuda("Cannot copy using non-native fields");
+    copySpinorField(src);
   }
 
   // creates a copy of src, any differences defined in param
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
+					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false) {  
 
     // can only overide if we are not using a reference or parity special case
@@ -98,12 +98,7 @@ namespace quda {
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
     } else if (param.create == QUDA_COPY_FIELD_CREATE) {
-      if (typeid(src) == typeid(cudaColorSpinorField) && 
-	  isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
-	copy(dynamic_cast<const cudaColorSpinorField&>(src));
-      } else {
-	loadSpinorField(src);
-      }
+      copySpinorField(src);
     } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else {
@@ -116,15 +111,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false) {
     create(QUDA_COPY_FIELD_CREATE);
-    if (typeid(src) == typeid(cudaColorSpinorField) && 
-	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
-      copy(dynamic_cast<const cudaColorSpinorField&>(src));
-    } else if (typeid(src) == typeid(cpuColorSpinorField) || typeid(src) == typeid(cudaColorSpinorField)) {
-      loadSpinorField(src);
-    } else {
-      errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
-    }
-
+    copySpinorField(src);
     clearGhostPointers();
   }
 
@@ -168,7 +155,6 @@ namespace quda {
     destroy();
   }
 
-  // return true if the field is a native field (ordering, precision, spin)
   bool cudaColorSpinorField::isNative() const {
 
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -477,9 +463,33 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
+  void cudaColorSpinorField::copySpinorField(const ColorSpinorField &src) {
+    
+    // src is on the device and is native
+    if (typeid(src) == typeid(cudaColorSpinorField) && 
+	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
+      copy(dynamic_cast<const cudaColorSpinorField&>(src));
+    } else if (typeid(src) == typeid(cudaColorSpinorField)) {
 
-    if (nColor != 3) errorQuda("Nc != 3 not yet supported");
+      // both on the device but at least one of the src/dst fields is not native
+      if (precision == QUDA_HALF_PRECISION || src.Precision() == QUDA_HALF_PRECISION) 
+	errorQuda("Half precision is not supported here");
+      if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER || 
+	  src.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER)
+	errorQuda("QUDA_QOP_DOMAIN_WALL_FIELD_ORDER not supported here");      
+
+      REORDER_SPINOR_FIELD(dynamic_cast<const cudaColorSpinorField&>(*this).V(),
+			   dynamic_cast<const cudaColorSpinorField&>(src).V(), 
+			   *this, src, nSpin, QUDA_CUDA_FIELD_LOCATION);
+
+    } else if (typeid(src) == typeid(cpuColorSpinorField)) { // src is on the host
+      loadSpinorField(src);
+    } else {
+      errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
+    }
+  } 
+
+  void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
     if (precision == QUDA_HALF_PRECISION) {
       ColorSpinorParam param(*this); // acquire all attributes of this
@@ -510,12 +520,12 @@ namespace quda {
       cudaMemcpy(v, buffer_h, bytes, cudaMemcpyHostToDevice);
 
     } else {
-      // (temporary?) bug fix for padding
-      cudaMemset(v, 0, bytes);
+      cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
 
       if (typeid(src) == typeid(cpuColorSpinorField)) {
 	resizeBuffer(src.Bytes());
-	cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).V(), src.Bytes(), cudaMemcpyHostToDevice);
+	cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
+		   src.Bytes(), cudaMemcpyHostToDevice);
       }
 
       const void *source = typeid(src) == typeid(cudaColorSpinorField) ?
@@ -531,8 +541,6 @@ namespace quda {
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
-    if (nColor != 3) errorQuda("Nc != 3 not yet supported");
-
     if (precision == QUDA_HALF_PRECISION) {
       ColorSpinorParam param(*this); // acquire all attributes of this
       param.precision = QUDA_SINGLE_PRECISION; // change precision
@@ -544,7 +552,8 @@ namespace quda {
 
     // no native support for this yet - copy to a native supported order
     if (dest.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-      if (typeid(dest) == typeid(cudaColorSpinorField)) errorQuda("Must use a cpuColorSpinorField here");
+      if (typeid(dest) == typeid(cudaColorSpinorField)) 
+	errorQuda("Must use a cpuColorSpinorField here");
       ColorSpinorParam param(dest); // acquire all attributes of this
       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       param.create = QUDA_NULL_FIELD_CREATE;
@@ -562,7 +571,8 @@ namespace quda {
 
       if (typeid(dest)==typeid(cpuColorSpinorField)) resizeBuffer(dest.Bytes());
 
-      void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
+      void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? 
+	dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
 
       REORDER_SPINOR_FIELD(dst, v, dest, *this, nSpin, QUDA_CUDA_FIELD_LOCATION); 
 
