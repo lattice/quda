@@ -533,7 +533,8 @@ hisq_force_test(void)
 
   hisq_force_init();
 
-  initLatticeConstants(*cpuMom);
+  TimeProfile profile("dummy");
+  initLatticeConstants(*cpuMom, profile);
   fermion_force::hisqForceInitCuda(&qudaGaugeParam);
 
 

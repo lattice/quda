@@ -147,13 +147,14 @@ hisq_force_test()
   hisq_force_init();
   fermion_force::hisqForceInitCuda(&gaugeParam);
 
+  TimeProfile profile("dummy");
 #define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
 #if (QUDA_VER > 400)
-  initLatticeConstants(*cudaFatLink);
+  initLatticeConstants(*cudaFatLink, profile);
 #else
-  initCommonConstants(*cudaFatLink);
+  initCommonConstants(*cudaFatLink, profile);
 #endif
-  initGaugeConstants(*cudaFatLink);
+  initGaugeConstants(*cudaFatLink, profile);
 
 
   double unitarize_eps = 1e-5;

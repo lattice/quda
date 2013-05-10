@@ -37,8 +37,6 @@ static bool reunit_svd_only  = false;
 static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-5;
 static double max_allowed_error = 1e-11;
-static bool check_unitarization = true;
-
 
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
@@ -114,11 +112,13 @@ unitarize_link_test()
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
 
+  TimeProfile profile("dummy");
+
 #define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
 #if (QUDA_VER > 400)
-  quda::initLatticeConstants(*cudaFatLink);
+  quda::initLatticeConstants(*cudaFatLink, profile);
 #else
-  quda::initCommonConstants(*cudaFatLink);
+  quda::initCommonConstants(*cudaFatLink, profile);
 #endif
 
 
@@ -269,7 +269,7 @@ main(int argc, char **argv)
 
   printfQuda("Number of failures = %d\n", num_failures);
   if(num_failures > 0){
-    printfQuda("Failure rate = %lf%\n", num_failures/(4.0*V*num_procs));
+    printfQuda("Failure rate = %lf\n", num_failures/(4.0*V*num_procs));
     printfQuda("You may want to increase your error tolerance or vary the unitarization parameters\n");
   }else{
     printfQuda("Unitarization successfull!\n");

@@ -107,6 +107,9 @@ static TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
 //!< Profiler for computeFatLinkQuda
 static TimeProfile profileFatLink("computeFatLinkQuda");
 
+//!< Profiler for computeGaugeForceQuda
+static TimeProfile profileGaugeForce("computeGaugeForceQuda");
+
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
@@ -613,6 +616,8 @@ void endQuda(void)
     profileInvert.Print();
     profileMulti.Print();
     profileMultiMixed.Print();
+    profileFatLink.Print();
+    profileGaugeForce.Print();
     profileEnd.Print();
 
     printfQuda("\n");
@@ -1692,7 +1697,6 @@ namespace quda {
       for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
     }
     
-    
     static cudaGaugeField* cudaStapleField=NULL, *cudaStapleField1=NULL;
     if (cudaStapleField == NULL || cudaStapleField1 == NULL) {
       gParam.pad    = qudaGaugeParam->staple_pad;
@@ -1721,8 +1725,7 @@ namespace quda {
     profile[QUDA_PROFILE_FREE].Stop();
 
     
-  return;
-  
+    return;
   }
 } // namespace quda
 
@@ -1842,9 +1845,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     profileFatLink[QUDA_PROFILE_H2D].Stop();
   }
 
-  // time the subroutines in computeFatLinkCore
-  struct timeval time_array[4];
-  
   // Actually do the fattening
   computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, cudaFatLink, profileFatLink);
 
@@ -1864,13 +1864,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   }
   profileFatLink[QUDA_PROFILE_FREE].Stop();
   
-#ifdef DSLASH_PROFILING 
-  printfQuda("total time: %f ms, init(cuda/cpu gauge field creation,etc)=%f ms,"
-	     " sitelink cpu->gpu=%f ms, computation in gpu =%f ms, fatlink gpu->cpu=%f ms\n",
-	     TDIFF_MS(t0, t11), TDIFF_MS(t0, t7) + TDIFF_MS(time_array[0],time_array[1]), TDIFF_MS(t7, t8), TDIFF_MS(time_array[1], time_array[2]), TDIFF_MS(t9,t10));
-  printfQuda("finally cleanup =%f ms\n", TDIFF_MS(t10, t11) + TDIFF_MS(time_array[2],time_array[3]));
-#endif
-
   profileFatLink[QUDA_PROFILE_TOTAL].Stop();
 
   return 0;
@@ -1883,10 +1876,9 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
                       void* loop_coeff, int num_paths, int max_length, double eb3,
                       QudaGaugeParam* qudaGaugeParam, double* timeinfo)
 {
-  struct timeval t0, t1, t2, t3;
-  
-  gettimeofday(&t0,NULL);
+  profileGaugeForce[QUDA_PROFILE_TOTAL].Start();
 
+  profileGaugeForce[QUDA_PROFILE_INIT].Start();
 #ifdef MULTI_GPU
   int E[4];
   QudaGaugeParam qudaGaugeParam_ex_buf;
@@ -1898,7 +1890,6 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   E[3] = qudaGaugeParam_ex->X[3] = qudaGaugeParam->X[3] + 4;
 #endif
 
-  int* X = qudaGaugeParam->X;
   GaugeFieldParam gParam(0, *qudaGaugeParam);
 #ifdef MULTI_GPU
   GaugeFieldParam gParam_ex(0, *qudaGaugeParam_ex);
@@ -1906,6 +1897,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   int pad = E[2]*E[1]*E[0]/2;
 #else
   GaugeFieldParam& gParamSL = gParam;
+  int* X = qudaGaugeParam->X;
   int pad = X[2]*X[1]*X[0]/2;
 #endif
   
@@ -1932,7 +1924,6 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
 
-
   gParamMom.pad = pad;
   gParamMom.create =QUDA_NULL_FIELD_CREATE;  
   gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
@@ -1940,43 +1931,55 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
+  profileGaugeForce[QUDA_PROFILE_INIT].Stop();
   
-  initLatticeConstants(*cudaMom);
-  checkCudaError();
+  initLatticeConstants(*cudaMom, profileGaugeForce);
+
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
 #ifdef MULTI_GPU
+  profileGaugeForce[QUDA_PROFILE_COMMS].Start();
   int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
   exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
 			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
+  profileGaugeForce[QUDA_PROFILE_COMMS].Stop();
+
+  profileGaugeForce[QUDA_PROFILE_H2D].Start();
   loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
+  profileGaugeForce[QUDA_PROFILE_H2D].Stop();
 #else  
+  profileGaugeForce[QUDA_PROFILE_H2D].Start();
   loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
+  profileGaugeForce[QUDA_PROFILE_H2D].Stop();
 #endif
 
+  profileGaugeForce[QUDA_PROFILE_H2D].Start();
   cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  profileGaugeForce[QUDA_PROFILE_H2D].Stop();
 
-  gettimeofday(&t1,NULL);  
-
+  // actually do the computation
+  profileGaugeForce[QUDA_PROFILE_COMPUTE].Start();
   gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, 
 		   path_length, loop_coeff, num_paths, max_length);
+  profileGaugeForce[QUDA_PROFILE_COMPUTE].Stop();
 
-  gettimeofday(&t2,NULL);
 
+  profileGaugeForce[QUDA_PROFILE_D2H].Start();
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  profileGaugeForce[QUDA_PROFILE_D2H].Stop();
   
+  profileGaugeForce[QUDA_PROFILE_FREE].Start();
   delete cpuSiteLink;
   delete cpuMom;
   
   delete cudaSiteLink;
   delete cudaMom;
+  profileGaugeForce[QUDA_PROFILE_FREE].Stop();
   
-  gettimeofday(&t3,NULL); 
-
   if(timeinfo){
-    timeinfo[0] = TDIFF(t0, t1);
-    timeinfo[1] = TDIFF(t1, t2);
-    timeinfo[2] = TDIFF(t2, t3);
+    timeinfo[0] = profileGaugeForce[QUDA_PROFILE_H2D].time;
+    timeinfo[1] = profileGaugeForce[QUDA_PROFILE_COMPUTE].time;
+    timeinfo[2] = profileGaugeForce[QUDA_PROFILE_D2H].time;
   }
 
   checkCudaError();
