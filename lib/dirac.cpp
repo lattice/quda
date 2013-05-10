@@ -14,8 +14,6 @@ namespace quda {
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
       verbose(param.verbose), profile("Dirac")
   {
-    profile[QUDA_PROFILE_TOTAL].Start();
-
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
     initLatticeConstants(gauge, profile);
     initGaugeConstants(gauge, profile);
@@ -34,7 +32,6 @@ namespace quda {
   }
 
   Dirac::~Dirac() {   
-    profile[QUDA_PROFILE_TOTAL].Stop();
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
   }
 

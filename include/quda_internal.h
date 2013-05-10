@@ -161,13 +161,36 @@ namespace quda {
     Timer profile[QUDA_PROFILE_COUNT];
     static std::string pname[];
 
-    TimeProfile(std::string fname) : fname(fname) { ; }
+    bool switchOff;
+    
+    TimeProfile(std::string fname) : fname(fname), switchOff(false) { ; }
 
     /**< Print out the profile information */
     void Print();
 
     /**< Return the profile[idx] */
     Timer& operator[](int idx) { return profile[idx]; }
+
+    void Start(QudaProfileType idx) { 
+      // if total timer isn't running, then start it running
+      if (!profile[QUDA_PROFILE_TOTAL].running) {
+	profile[QUDA_PROFILE_TOTAL].Start(); 
+	switchOff = true;
+      }
+
+      profile[idx].Start(); 
+    }
+
+    void Stop(QudaProfileType idx) { 
+      profile[idx].Stop(); 
+
+      // switch off total timer if we need to
+      if (switchOff) {
+	profile[QUDA_PROFILE_TOTAL].Stop(); 
+	switchOff = false;
+      }
+    }
+
   };
 
 #ifdef MULTI_GPU

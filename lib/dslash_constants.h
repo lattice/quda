@@ -114,7 +114,7 @@ __constant__ int fl_stride;
 
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 {
-  profile[QUDA_PROFILE_CONSTANT].Start();
+  profile.Start(QUDA_PROFILE_CONSTANT);
 
   checkCudaError();
 
@@ -292,13 +292,13 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 
   checkCudaError();
 
-  profile[QUDA_PROFILE_CONSTANT].Stop();
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
 void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile) 
 {
-  profile[QUDA_PROFILE_CONSTANT].Start();
+  profile.Start(QUDA_PROFILE_CONSTANT);
 
   int ga_stride_h = gauge.Stride();
   cudaMemcpyToSymbol(ga_stride, &ga_stride_h, sizeof(int));  
@@ -334,7 +334,7 @@ void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile)
 
   checkCudaError();
 
-  profile[QUDA_PROFILE_CONSTANT].Stop();
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
@@ -349,16 +349,16 @@ void initSpinorConstants(const cudaColorSpinorField &spinor, TimeProfile &profil
 
   int sp_stride_h = spinor.Stride();
   if (sp_stride_h != last_sp_stride) {
-    profile[QUDA_PROFILE_CONSTANT].Start();
+    profile.Start(QUDA_PROFILE_CONSTANT);
     cudaMemcpyToSymbol(sp_stride, &sp_stride_h, sizeof(int));
     checkCudaError();
     last_sp_stride = sp_stride_h;
-    profile[QUDA_PROFILE_CONSTANT].Stop();
+    profile.Stop(QUDA_PROFILE_CONSTANT);
   }
   
   // for domain wall:
   if (spinor.Ndim() == 5) {
-    profile[QUDA_PROFILE_CONSTANT].Start();
+    profile.Start(QUDA_PROFILE_CONSTANT);
     int Ls_h = spinor.X(4);
     if (Ls_h != last_Ls) {
       cudaMemcpyToSymbol(Ls, &Ls_h, sizeof(int));  
@@ -366,7 +366,7 @@ void initSpinorConstants(const cudaColorSpinorField &spinor, TimeProfile &profil
       checkCudaError();
       last_Ls = Ls_h;
     }
-    profile[QUDA_PROFILE_CONSTANT].Stop();
+    profile.Stop(QUDA_PROFILE_CONSTANT);
   }
 
 }
@@ -374,7 +374,7 @@ void initSpinorConstants(const cudaColorSpinorField &spinor, TimeProfile &profil
 
 void initDslashConstants(TimeProfile &profile)
 {
-  profile[QUDA_PROFILE_CONSTANT].Start();
+  profile.Start(QUDA_PROFILE_CONSTANT);
 
   float pi_f_h = M_PI;
   cudaMemcpyToSymbol(pi_f, &pi_f_h, sizeof(float));
@@ -389,27 +389,27 @@ void initDslashConstants(TimeProfile &profile)
 
   checkCudaError();
 
-  profile[QUDA_PROFILE_CONSTANT].Stop();
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
 void initCloverConstants (const cudaCloverField &clover, TimeProfile &profile)
 {
-  profile[QUDA_PROFILE_CONSTANT].Start();
+  profile.Start(QUDA_PROFILE_CONSTANT);
 
   int cl_stride_h = clover.Stride();
   cudaMemcpyToSymbol(cl_stride, &cl_stride_h, sizeof(int));  
 
   checkCudaError();
 
-  profile[QUDA_PROFILE_CONSTANT].Stop();
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
 void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge,
 			    TimeProfile &profile)
 {
-  profile[QUDA_PROFILE_CONSTANT].Start();
+  profile.Start(QUDA_PROFILE_CONSTANT);
 
   int fat_ga_stride_h = fatgauge.Stride();
   int long_ga_stride_h = longgauge.Stride();
@@ -421,15 +421,15 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
 
   checkCudaError();
 
-  profile[QUDA_PROFILE_CONSTANT].Stop();
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 //!ndeg tm: 
 void initTwistedMassConstants(const int fl_stride_h, TimeProfile &profile)
 {
-  profile[QUDA_PROFILE_CONSTANT].Start();
+  profile.Start(QUDA_PROFILE_CONSTANT);
   cudaMemcpyToSymbol(fl_stride, &fl_stride_h, sizeof(int));    
 
   checkCudaError();
-  profile[QUDA_PROFILE_CONSTANT].Stop();
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }

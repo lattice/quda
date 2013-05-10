@@ -1171,6 +1171,7 @@ namespace quda {
 
   void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+    profile[QUDA_PROFILE_TOTAL].Start();
 
     dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1274,9 +1275,9 @@ namespace quda {
       }
     
     }
-    //cudaEventRecord(dslashEnd, streams[Nstream-1]);
-
 #endif // MULTI_GPU
+
+    profile[QUDA_PROFILE_TOTAL].Stop();
   }
 
   // Wilson wrappers
