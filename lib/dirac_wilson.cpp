@@ -27,13 +27,13 @@ namespace quda {
   void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			   const QudaParity parity) const
   {
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim);
+    wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim, profile);
 
     flops += 1320ll*in.Volume();
   }
@@ -42,13 +42,13 @@ namespace quda {
 			       const QudaParity parity, const cudaColorSpinorField &x,
 			       const double &k) const
   {
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim);
+    wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim, profile);
 
     flops += 1368ll*in.Volume();
   }

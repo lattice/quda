@@ -98,7 +98,10 @@ namespace quda {
     /**< Are we currently timing? */
     bool running;
     
-  Timer() : time(0.0), last(0.0), running(false) { ; } 
+    /**< Keep track of number of calls */
+    int count;
+
+  Timer() : time(0.0), last(0.0), running(false), count(0) { ; } 
 
     void Start() {
       if (running) errorQuda("Cannot start an already running timer");
@@ -114,6 +117,7 @@ namespace quda {
       long dus = stop.tv_usec - start.tv_usec;
       last = ds + 0.000001*dus;
       time += last;
+      count++;
 
       running = false;
     }
@@ -131,6 +135,20 @@ namespace quda {
     QUDA_PROFILE_COMPUTE, /**< The time in seconds taken for the actual computation */
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
+
+    // lower level counters used in the dslash
+    QUDA_PROFILE_PACK_KERNEL, /**< face packing kernel */
+    QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
+    QUDA_PROFILE_GATHER, /**< gather (device -> host) */
+    QUDA_PROFILE_SCATTER, /**< scatter (host -> device) */
+    QUDA_PROFILE_EVENT_RECORD, /**< cuda event record  */
+    QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
+    QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
+    QUDA_PROFILE_COMMS_START, /**< initiating communication */
+    QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
+
+    QUDA_PROFILE_CONSTANT, /**< time spent setting CUDA constant parameters */
+
     QUDA_PROFILE_TOTAL, /**< The total time in seconds for the algorithm. Must be the penultimate type. */
     QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
   };

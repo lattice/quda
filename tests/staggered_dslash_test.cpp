@@ -398,10 +398,6 @@ static int dslashTest()
     printfQuda("Executing %d kernel loops...", loops);	
     double secs = dslashCUDA(loops);
 
-#ifdef DSLASH_PROFILING
-    printDslashProfile();
-#endif
-    
     if (!transfer) *spinorOut = *cudaSpinorOut;
       
     printfQuda("\n%fms per loop\n", 1000*secs);

@@ -98,6 +98,8 @@ namespace quda {
 
     int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
+    mutable TimeProfile profile;
+
   public:
     Dirac(const DiracParam &param);
     Dirac(const Dirac &dirac);

@@ -107,7 +107,6 @@ static TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
-
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
 {
   setVerbosity(verbosity);

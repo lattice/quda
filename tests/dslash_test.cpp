@@ -608,10 +608,6 @@ int main(int argc, char **argv)
     double secs = dslashCUDA(niter);
     printfQuda("done.\n\n");
 
-#ifdef DSLASH_PROFILING
-    printDslashProfile();
-#endif
-
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
     // print timing information

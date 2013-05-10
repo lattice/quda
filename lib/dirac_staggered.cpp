@@ -8,13 +8,13 @@ namespace quda {
     face(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
-    initStaggeredConstants(fatGauge, longGauge);
+    initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
 								fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face)
   {
-    initStaggeredConstants(fatGauge, longGauge);
+    initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracStaggered::~DiracStaggered() { }
@@ -57,9 +57,9 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim);
+    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, profile);
   
     flops += 1146ll*in.Volume();
   }
@@ -70,9 +70,9 @@ namespace quda {
   {    
     checkParitySpinor(in, out);
 
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim);
+    staggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, profile);
   
     flops += 1158ll*in.Volume();
   }

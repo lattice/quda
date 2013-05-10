@@ -24,13 +24,13 @@ namespace quda {
 
     if (a.SiteSubset() == QUDA_PARITY_SITE_SUBSET && initTMFlag != 1) {
       int stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/2 : a.VolumeCB();
-      initSpinorConstants(a);
-      initTwistedMassConstants(stride);
+      initSpinorConstants(a, profile);
+      initTwistedMassConstants(stride, profile);
       initTMFlag = 1;
     } else if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET && initTMFlag != 2) {
       int stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/2 : a.VolumeCB();
-      initSpinorConstants(a);
-      initTwistedMassConstants(stride);
+      initSpinorConstants(a, profile);
+      initTwistedMassConstants(stride, profile);
       initTMFlag = 2;
     }
 
@@ -96,8 +96,8 @@ namespace quda {
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda      
       initConstants(in);
 
-      twistedMassDslashCuda(&out.Odd(), gauge, &in.Even(), QUDA_ODD_PARITY, dagger, &in.Odd(), a, b, c, -kappa, commDim);      
-      twistedMassDslashCuda(&out.Even(), gauge, &in.Odd(), QUDA_EVEN_PARITY, dagger, &in.Even(), a, b, c, -kappa, commDim);      
+      twistedMassDslashCuda(&out.Odd(), gauge, &in.Even(), QUDA_ODD_PARITY, dagger, &in.Odd(), a, b, c, -kappa, commDim, profile);      
+      twistedMassDslashCuda(&out.Even(), gauge, &in.Odd(), QUDA_EVEN_PARITY, dagger, &in.Even(), a, b, c, -kappa, commDim, profile);      
 
       flops += (1320+72+24)*in.Volume();
     }
@@ -176,7 +176,7 @@ namespace quda {
 	setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 	initConstants(in);
 
-	twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, flavor_mu, 0.0, 0.0, commDim);
+	twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, kappa, flavor_mu, 0.0, 0.0, commDim, profile);
 	flops += 1392ll*in.Volume();
       } else { // safe to use tmp2 here which may alias in
         bool reset = newTmp(&tmp2, in);	
@@ -204,7 +204,8 @@ namespace quda {
       initConstants(in);
     
       if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, /*'kappa' = */a, /*mu = */b, /*epsilon = */c, 0.0, commDim);//need to set 2km 2ke and c 
+        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, /*'kappa' = */a, /*mu = */b, 
+			      /*epsilon = */c, 0.0, commDim, profile);//need to set 2km 2ke and c 
         flops += (1320+72+24)*in.Volume();
       } else {
         cudaColorSpinorField *doubletTmp=0; 
@@ -212,7 +213,8 @@ namespace quda {
       
         a *= -1.0;      
         twistGamma5Cuda(doubletTmp, &in, dagger, a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//??      
-        twistedMassDslashCuda(&out, gauge, doubletTmp, parity, dagger, 0, /*kappa = */0.0, /*mu = */0.0, /*epsilon = */1.0, 0.0, commDim);      
+        twistedMassDslashCuda(&out, gauge, doubletTmp, parity, dagger, 0, /*kappa = */0.0, 
+			      /*mu = */0.0, /*epsilon = */1.0, 0.0, commDim, profile);      
 
         flops += 1416ll*in.Volume();
 
@@ -238,7 +240,7 @@ namespace quda {
         setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 	initConstants(in);
 
-        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, flavor_mu, k, 0.0, commDim);
+        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, kappa, flavor_mu, k, 0.0, commDim, profile);
         flops += 1416ll*in.Volume();
       } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
         bool reset = newTmp(&tmp1, in);
@@ -268,7 +270,7 @@ namespace quda {
 		
       if (!dagger) {	
         c *= k;//(-kappa*kappa)	  
-        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, a, b, c, 0.0, commDim);
+        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, a, b, c, 0.0, commDim, profile);
         flops += 1440ll*in.Volume();
       } else {
         cudaColorSpinorField *doubletTmp=0; 
@@ -277,7 +279,7 @@ namespace quda {
         a *= -1.0;
         twistGamma5Cuda(doubletTmp, &in, dagger, a, b, c, QUDA_TWIST_GAMMA5_INVERSE);
         c = k;	  
-        twistedMassDslashCuda(&out, gauge, doubletTmp, parity, dagger, &x, 0.0, 0.0, c, 0.0, commDim);
+        twistedMassDslashCuda(&out, gauge, doubletTmp, parity, dagger, &x, 0.0, 0.0, c, 0.0, commDim, profile);
         flops += 1440ll*in.Volume();
         deleteTmp(&doubletTmp, reset);	  
       }
@@ -329,10 +331,10 @@ namespace quda {
 	
         if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 	  Dslash(*tmp1, in, QUDA_ODD_PARITY);
-          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_EVEN_PARITY, dagger, &in, a, b, c, kappa2, commDim); 	 
+          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_EVEN_PARITY, dagger, &in, a, b, c, kappa2, commDim, profile);
         } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
           Dslash(*tmp1, in, QUDA_EVEN_PARITY); // fused kernel
-          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_ODD_PARITY, dagger, &in, a, b, c, kappa2, commDim);	 
+          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_ODD_PARITY, dagger, &in, a, b, c, kappa2, commDim, profile);
         } 
 
 	flops += 1416ll*in.Volume();
@@ -413,7 +415,7 @@ namespace quda {
 	initConstants(*src);
 	
         twistGamma5Cuda(src, &b.Odd(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack! 
-        twistedMassDslashCuda(tmp1, gauge, src, QUDA_EVEN_PARITY, dagger, &b.Even(), 0.0, 0.0, kappa, 0.0, commDim);
+        twistedMassDslashCuda(tmp1, gauge, src, QUDA_EVEN_PARITY, dagger, &b.Even(), 0.0, 0.0, kappa, 0.0, commDim, profile);
         twistGamma5Cuda(src, tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!
 
         sol = &(x.Even()); 
@@ -425,7 +427,7 @@ namespace quda {
         initConstants(*src);
 	
         twistGamma5Cuda(src, &b.Even(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!                     
-        twistedMassDslashCuda(tmp1, gauge, src, QUDA_ODD_PARITY, dagger, &b.Odd(), 0.0, 0.0, kappa, 0.0, commDim); 
+        twistedMassDslashCuda(tmp1, gauge, src, QUDA_ODD_PARITY, dagger, &b.Odd(), 0.0, 0.0, kappa, 0.0, commDim, profile); 
         twistGamma5Cuda(src, tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!
     
         sol = &(x.Odd());
@@ -436,7 +438,7 @@ namespace quda {
 	initConstants(*src);
 
         twistGamma5Cuda(tmp1, &b.Odd(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!                           
-        twistedMassDslashCuda(src, gauge, tmp1, QUDA_EVEN_PARITY, dagger, &b.Even(), 0.0, 0.0, kappa, 0.0, commDim);       
+        twistedMassDslashCuda(src, gauge, tmp1, QUDA_EVEN_PARITY, dagger, &b.Even(), 0.0, 0.0, kappa, 0.0, commDim, profile);
 
         sol = &(x.Even());
     
@@ -447,7 +449,7 @@ namespace quda {
 	initConstants(*src);
 
         twistGamma5Cuda(tmp1, &b.Even(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!                           
-        twistedMassDslashCuda(src, gauge, tmp1, QUDA_ODD_PARITY, dagger, &b.Odd(), 0.0, 0.0, kappa, 0.0, commDim);       
+        twistedMassDslashCuda(src, gauge, tmp1, QUDA_ODD_PARITY, dagger, &b.Odd(), 0.0, 0.0, kappa, 0.0, commDim, profile);
     
         sol = &(x.Odd());
       } else {
@@ -496,7 +498,7 @@ namespace quda {
         setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
 	initConstants(x.Even());
 
-        twistedMassDslashCuda(tmp1, gauge, &x.Even(), QUDA_ODD_PARITY, dagger, &b.Odd(), 0.0, 0.0, kappa, 0.0, commDim);             
+        twistedMassDslashCuda(tmp1, gauge, &x.Even(), QUDA_ODD_PARITY, dagger, &b.Odd(), 0.0, 0.0, kappa, 0.0, commDim, profile);
         twistGamma5Cuda(&x.Odd(), tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);
  
       } else if (matpcType == QUDA_MATPC_ODD_ODD ||  matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
@@ -504,7 +506,7 @@ namespace quda {
         setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
 	initConstants(x.Odd());
 	
-        twistedMassDslashCuda(tmp1, gauge, &x.Odd(), QUDA_EVEN_PARITY, dagger, &b.Even(), 0.0, 0.0, kappa, 0.0, commDim);                   
+        twistedMassDslashCuda(tmp1, gauge, &x.Odd(), QUDA_EVEN_PARITY, dagger, &b.Even(), 0.0, 0.0, kappa, 0.0, commDim, profile);                   
         twistGamma5Cuda(&x.Even(), tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);      
       } else {
         errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);

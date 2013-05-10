@@ -31,9 +31,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim);   
+    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, profile);   
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -50,9 +50,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim);
+    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
