@@ -104,6 +104,9 @@ static TimeProfile profileMulti("invertMultiShiftQuda");
 //!< Profiler for invertMultiShiftMixedQuda
 static TimeProfile profileMultiMixed("invertMultiShiftMixedQuda");
 
+//!< Profiler for computeFatLinkQuda
+static TimeProfile profileFatLink("computeFatLinkQuda");
+
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
@@ -1676,22 +1679,22 @@ void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param)
 namespace quda {
   void computeFatLinkCore(cudaGaugeField* cudaSiteLink, double* act_path_coeff,
 			  QudaGaugeParam* qudaGaugeParam, QudaComputeFatMethod method,
-			  cudaGaugeField* cudaFatLink, struct timeval time_array[])
+			  cudaGaugeField* cudaFatLink, TimeProfile &profile)
   {
-    gettimeofday(&time_array[0], NULL);
     
+    profile[QUDA_PROFILE_INIT].Start();
     const int flag = qudaGaugeParam->preserve_gauge;
     GaugeFieldParam gParam(0,*qudaGaugeParam);
     
-    if(method == QUDA_COMPUTE_FAT_STANDARD){
+    if (method == QUDA_COMPUTE_FAT_STANDARD) {
       for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir];
-    }else{
+    } else {
       for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
     }
     
     
     static cudaGaugeField* cudaStapleField=NULL, *cudaStapleField1=NULL;
-    if(cudaStapleField == NULL || cudaStapleField1 == NULL){
+    if (cudaStapleField == NULL || cudaStapleField1 == NULL) {
       gParam.pad    = qudaGaugeParam->staple_pad;
       gParam.create = QUDA_NULL_FIELD_CREATE;
       gParam.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -1699,21 +1702,24 @@ namespace quda {
       cudaStapleField  = new cudaGaugeField(gParam);
       cudaStapleField1 = new cudaGaugeField(gParam);
     }
+    profile[QUDA_PROFILE_INIT].Stop();
     
-    gettimeofday(&time_array[1], NULL);
-    
-    if(method == QUDA_COMPUTE_FAT_STANDARD){
+    profile[QUDA_PROFILE_COMPUTE].Start();
+    if (method == QUDA_COMPUTE_FAT_STANDARD) {
       llfat_cuda(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
-    }else{ //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
+    } else { //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
       llfat_cuda_ex(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
     }
-    gettimeofday(&time_array[2], NULL);
+    profile[QUDA_PROFILE_COMPUTE].Stop();
+
     
+    profile[QUDA_PROFILE_FREE].Start();
     if (!(flag & QUDA_FAT_PRESERVE_GPU_GAUGE) ){
       delete cudaStapleField; cudaStapleField = NULL;
       delete cudaStapleField1; cudaStapleField1 = NULL;
     }
-    gettimeofday(&time_array[3], NULL);
+    profile[QUDA_PROFILE_FREE].Stop();
+
     
   return;
   
@@ -1727,12 +1733,10 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 		   QudaGaugeParam* qudaGaugeParam, 
 		   QudaComputeFatMethod method)
 {
-#define TDIFF_MS(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))*1000
 
-  struct timeval t0;
-  struct timeval t7, t8, t9, t10, t11;
+  profileFatLink[QUDA_PROFILE_TOTAL].Start();
 
-  gettimeofday(&t0, NULL);
+  profileFatLink[QUDA_PROFILE_INIT].Start();
 
   static cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL;
   static cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL;
@@ -1758,7 +1762,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
   GaugeFieldParam gParam(0, *qudaGaugeParam);
 
   // create the host fatlink
-  if(cpuFatLink == NULL){
+  if (cpuFatLink == NULL) {
     gParam.create = QUDA_REFERENCE_FIELD_CREATE;
     gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
     gParam.order = QUDA_MILC_GAUGE_ORDER;
@@ -1767,7 +1771,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     if(cpuFatLink == NULL){
       errorQuda("ERROR: Creating cpuFatLink failed\n");
     }
-  }else{
+  } else {
     cpuFatLink->setGauge((void**)fatlink);
   }
   
@@ -1780,8 +1784,6 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     cudaFatLink = new cudaGaugeField(gParam);
   }
-
-
 
   // create the host sitelink	
   if(cpuSiteLink == NULL){
@@ -1808,46 +1810,50 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     gParam.reconstruct = qudaGaugeParam->reconstruct;      
     cudaSiteLink = new cudaGaugeField(gParam);
   }
+  profileFatLink[QUDA_PROFILE_INIT].Stop();
   
-  initLatticeConstants(*cudaFatLink);  
+  initLatticeConstants(*cudaFatLink, profileFatLink);  
   
-  if(method == QUDA_COMPUTE_FAT_STANDARD){
+  if (method == QUDA_COMPUTE_FAT_STANDARD) {
     llfat_init_cuda(qudaGaugeParam);
-    gettimeofday(&t7, NULL);
     
 #ifdef MULTI_GPU
     if(qudaGaugeParam->gauge_order == QUDA_MILC_GAUGE_ORDER){
       errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
     }
 #endif
+    profileFatLink[QUDA_PROFILE_H2D].Start();
     loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
+    profileFatLink[QUDA_PROFILE_H2D].Stop();
     
-    gettimeofday(&t8, NULL);
-  }else{
+  } else {
     llfat_init_cuda_ex(qudaGaugeParam_ex);
+
 #ifdef MULTI_GPU
+    profileFatLink[QUDA_PROFILE_COMMS].Start();
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
     exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
 			     cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0);
+    profileFatLink[QUDA_PROFILE_COMMS].Stop();
 #endif
-    gettimeofday(&t7, NULL);
+
+    profileFatLink[QUDA_PROFILE_H2D].Start();
     loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
-    gettimeofday(&t8, NULL);
+    profileFatLink[QUDA_PROFILE_H2D].Stop();
   }
 
   // time the subroutines in computeFatLinkCore
   struct timeval time_array[4];
   
   // Actually do the fattening
-  computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, cudaFatLink, time_array);
- 
+  computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, cudaFatLink, profileFatLink);
 
-  gettimeofday(&t9, NULL);
-
+  // Transfer back to the host
+  profileFatLink[QUDA_PROFILE_D2H].Start();
   storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
+  profileFatLink[QUDA_PROFILE_D2H].Stop();
   
-  gettimeofday(&t10, NULL);
-  
+  profileFatLink[QUDA_PROFILE_FREE].Start();
   if (!(flag & QUDA_FAT_PRESERVE_CPU_GAUGE) ){
     delete cpuFatLink; cpuFatLink = NULL;
     delete cpuSiteLink; cpuSiteLink = NULL;
@@ -1856,14 +1862,16 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     delete cudaFatLink; cudaFatLink = NULL;
     delete cudaSiteLink; cudaSiteLink = NULL;
   }
+  profileFatLink[QUDA_PROFILE_FREE].Stop();
   
-  gettimeofday(&t11, NULL);
 #ifdef DSLASH_PROFILING 
   printfQuda("total time: %f ms, init(cuda/cpu gauge field creation,etc)=%f ms,"
 	     " sitelink cpu->gpu=%f ms, computation in gpu =%f ms, fatlink gpu->cpu=%f ms\n",
 	     TDIFF_MS(t0, t11), TDIFF_MS(t0, t7) + TDIFF_MS(time_array[0],time_array[1]), TDIFF_MS(t7, t8), TDIFF_MS(time_array[1], time_array[2]), TDIFF_MS(t9,t10));
   printfQuda("finally cleanup =%f ms\n", TDIFF_MS(t10, t11) + TDIFF_MS(time_array[2],time_array[3]));
 #endif
+
+  profileFatLink[QUDA_PROFILE_TOTAL].Stop();
 
   return 0;
 }
