@@ -302,7 +302,7 @@ void initQudaMemory() {
 
 void initQuda(int dev)
 {
-  profileInit[QUDA_PROFILE_TOTAL].Start();
+  profileInit.Start(QUDA_PROFILE_TOTAL);
 
   // set the device that QUDA uses
   initQudaDevice(dev);
@@ -310,13 +310,13 @@ void initQuda(int dev)
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
 
-  profileInit[QUDA_PROFILE_TOTAL].Stop();
+  profileInit.Stop(QUDA_PROFILE_TOTAL);
 }
 
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  profileGauge[QUDA_PROFILE_TOTAL].Start();
+  profileGauge.Start(QUDA_PROFILE_TOTAL);
 
   if (!initialized) errorQuda("QUDA not initialized");
   if (getVerbosity() == QUDA_DEBUG_VERBOSE) printQudaGaugeParam(param);
@@ -328,7 +328,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   cpuGaugeField cpu(gauge_param);
 
-  profileGauge[QUDA_PROFILE_INIT].Start();  
+  profileGauge.Start(QUDA_PROFILE_INIT);  
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
   gauge_param.precision = param->cuda_prec;
@@ -338,9 +338,9 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 		       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField *precise = new cudaGaugeField(gauge_param);
-  profileGauge[QUDA_PROFILE_INIT].Stop();  
+  profileGauge.Stop(QUDA_PROFILE_INIT);  
 
-  profileGauge[QUDA_PROFILE_H2D].Start();  
+  profileGauge.Start(QUDA_PROFILE_H2D);  
   precise->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
 
   param->gaugeGiB += precise->GBytes();
@@ -374,7 +374,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   } else {
     precondition = sloppy;
   }
-  profileGauge[QUDA_PROFILE_H2D].Stop();  
+  profileGauge.Stop(QUDA_PROFILE_H2D);  
   
   switch (param->type) {
   case QUDA_WILSON_LINKS:
@@ -405,12 +405,12 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
-  profileGauge[QUDA_PROFILE_TOTAL].Stop();
+  profileGauge.Stop(QUDA_PROFILE_TOTAL);
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  profileGauge[QUDA_PROFILE_TOTAL].Start();
+  profileGauge.Start(QUDA_PROFILE_TOTAL);
 
   if (!initialized) errorQuda("QUDA not initialized");
   checkGaugeParam(param);
@@ -433,17 +433,17 @@ void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
-  profileGauge[QUDA_PROFILE_D2H].Start();  
+  profileGauge.Start(QUDA_PROFILE_D2H);  
   cudaGauge->saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
-  profileGauge[QUDA_PROFILE_D2H].Stop();  
+  profileGauge.Stop(QUDA_PROFILE_D2H);  
 
-  profileGauge[QUDA_PROFILE_TOTAL].Stop();
+  profileGauge.Stop(QUDA_PROFILE_TOTAL);
 }
 
 
 void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
-  profileClover[QUDA_PROFILE_TOTAL].Start();
+  profileClover.Start(QUDA_PROFILE_TOTAL);
 
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
@@ -498,7 +498,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.precision = inv_param->clover_cuda_prec;
   clover_param.pad = inv_param->cl_pad;
 
-  profileClover[QUDA_PROFILE_H2D].Start();
+  profileClover.Start(QUDA_PROFILE_H2D);
 
   cloverPrecise = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
 				      inv_param->clover_order, clover_param);
@@ -524,11 +524,11 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   } else {
     cloverPrecondition = cloverSloppy;
   }
-  profileClover[QUDA_PROFILE_H2D].Stop();
+  profileClover.Stop(QUDA_PROFILE_H2D);
 
   popVerbosity();
 
-  profileClover[QUDA_PROFILE_TOTAL].Stop();
+  profileClover.Stop(QUDA_PROFILE_TOTAL);
 }
 
 void freeGaugeQuda(void) 
@@ -575,7 +575,7 @@ void freeCloverQuda(void)
 
 void endQuda(void)
 {
-  profileEnd[QUDA_PROFILE_TOTAL].Start();
+  profileEnd.Start(QUDA_PROFILE_TOTAL);
 
   if (!initialized) return;
 
@@ -606,7 +606,7 @@ void endQuda(void)
   comm_finalize();
   comms_initialized = false;
 
-  profileEnd[QUDA_PROFILE_TOTAL].Stop();
+  profileEnd.Stop(QUDA_PROFILE_TOTAL);
 
   // print out the profile information of the lifetime of the library
   if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -1147,7 +1147,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
 
-  profileInvert[QUDA_PROFILE_TOTAL].Start();
+  profileInvert.Start(QUDA_PROFILE_TOTAL);
 
   if (!initialized) errorQuda("QUDA not initialized");
 
@@ -1192,7 +1192,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPre = *dPre;
 
-  profileInvert[QUDA_PROFILE_H2D].Start();
+  profileInvert.Start(QUDA_PROFILE_H2D);
 
   cudaColorSpinorField *b = NULL;
   cudaColorSpinorField *x = NULL;
@@ -1228,7 +1228,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = new cudaColorSpinorField(cudaParam); // solution
   }
 
-  profileInvert[QUDA_PROFILE_H2D].Stop();
+  profileInvert.Stop(QUDA_PROFILE_H2D);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
@@ -1314,9 +1314,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
-  profileInvert[QUDA_PROFILE_D2H].Start();
+  profileInvert.Start(QUDA_PROFILE_D2H);
   *h_x = *x;
-  profileInvert[QUDA_PROFILE_D2H].Stop();
+  profileInvert.Stop(QUDA_PROFILE_D2H);
   
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = norm2(*x);
@@ -1338,7 +1338,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
-  profileInvert[QUDA_PROFILE_TOTAL].Stop();
+  profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
 
 
@@ -1352,7 +1352,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
-  profileMulti[QUDA_PROFILE_TOTAL].Start();
+  profileMulti.Start(QUDA_PROFILE_TOTAL);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
 
@@ -1466,13 +1466,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
 
-  profileMulti[QUDA_PROFILE_H2D].Start();
+  profileMulti.Start(QUDA_PROFILE_H2D);
   // Now I need a colorSpinorParam for the device
   ColorSpinorParam cudaParam(cpuParam, *param);
   // This setting will download a host vector
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
-  profileMulti[QUDA_PROFILE_H2D].Stop();
+  profileMulti.Stop(QUDA_PROFILE_H2D);
 
   // Create the solution fields filled with zero
   x = new cudaColorSpinorField* [ param->num_offset ];
@@ -1588,7 +1588,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   delete [] unscaled_shifts;
 
-  profileMulti[QUDA_PROFILE_D2H].Start();
+  profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
     if (getVerbosity() >= QUDA_VERBOSE){
       double nx = norm2(*x[i]);
@@ -1597,7 +1597,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
     *h_x[i] = *x[i];
   }
-  profileMulti[QUDA_PROFILE_D2H].Stop();
+  profileMulti.Stop(QUDA_PROFILE_D2H);
 
   for(int i=0; i < param->num_offset; i++){ 
     delete h_x[i];
@@ -1621,7 +1621,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
-  profileMulti[QUDA_PROFILE_TOTAL].Stop();
+  profileMulti.Stop(QUDA_PROFILE_TOTAL);
 }
 
 
@@ -1687,7 +1687,7 @@ namespace quda {
 			  cudaGaugeField* cudaFatLink, TimeProfile &profile)
   {
     
-    profile[QUDA_PROFILE_INIT].Start();
+    profile.Start(QUDA_PROFILE_INIT);
     const int flag = qudaGaugeParam->preserve_gauge;
     GaugeFieldParam gParam(0,*qudaGaugeParam);
     
@@ -1706,23 +1706,23 @@ namespace quda {
       cudaStapleField  = new cudaGaugeField(gParam);
       cudaStapleField1 = new cudaGaugeField(gParam);
     }
-    profile[QUDA_PROFILE_INIT].Stop();
+    profile.Stop(QUDA_PROFILE_INIT);
     
-    profile[QUDA_PROFILE_COMPUTE].Start();
+    profile.Start(QUDA_PROFILE_COMPUTE);
     if (method == QUDA_COMPUTE_FAT_STANDARD) {
       llfat_cuda(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
     } else { //method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME
       llfat_cuda_ex(*cudaFatLink, *cudaSiteLink, *cudaStapleField, *cudaStapleField1, qudaGaugeParam, act_path_coeff);
     }
-    profile[QUDA_PROFILE_COMPUTE].Stop();
+    profile.Stop(QUDA_PROFILE_COMPUTE);
 
     
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Start(QUDA_PROFILE_FREE);
     if (!(flag & QUDA_FAT_PRESERVE_GPU_GAUGE) ){
       delete cudaStapleField; cudaStapleField = NULL;
       delete cudaStapleField1; cudaStapleField1 = NULL;
     }
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
 
     
     return;
@@ -1737,9 +1737,9 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
 		   QudaComputeFatMethod method)
 {
 
-  profileFatLink[QUDA_PROFILE_TOTAL].Start();
+  profileFatLink.Start(QUDA_PROFILE_TOTAL);
 
-  profileFatLink[QUDA_PROFILE_INIT].Start();
+  profileFatLink.Start(QUDA_PROFILE_INIT);
 
   static cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL;
   static cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL;
@@ -1813,7 +1813,7 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     gParam.reconstruct = qudaGaugeParam->reconstruct;      
     cudaSiteLink = new cudaGaugeField(gParam);
   }
-  profileFatLink[QUDA_PROFILE_INIT].Stop();
+  profileFatLink.Stop(QUDA_PROFILE_INIT);
   
   initLatticeConstants(*cudaFatLink, profileFatLink);  
   
@@ -1825,35 +1825,35 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
       errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
     }
 #endif
-    profileFatLink[QUDA_PROFILE_H2D].Start();
+    profileFatLink.Start(QUDA_PROFILE_H2D);
     loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
-    profileFatLink[QUDA_PROFILE_H2D].Stop();
+    profileFatLink.Stop(QUDA_PROFILE_H2D);
     
   } else {
     llfat_init_cuda_ex(qudaGaugeParam_ex);
 
 #ifdef MULTI_GPU
-    profileFatLink[QUDA_PROFILE_COMMS].Start();
+    profileFatLink.Start(QUDA_PROFILE_COMMS);
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
     exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
 			     cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0);
-    profileFatLink[QUDA_PROFILE_COMMS].Stop();
+    profileFatLink.Stop(QUDA_PROFILE_COMMS);
 #endif
 
-    profileFatLink[QUDA_PROFILE_H2D].Start();
+    profileFatLink.Start(QUDA_PROFILE_H2D);
     loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
-    profileFatLink[QUDA_PROFILE_H2D].Stop();
+    profileFatLink.Stop(QUDA_PROFILE_H2D);
   }
 
   // Actually do the fattening
   computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, cudaFatLink, profileFatLink);
 
   // Transfer back to the host
-  profileFatLink[QUDA_PROFILE_D2H].Start();
+  profileFatLink.Start(QUDA_PROFILE_D2H);
   storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
-  profileFatLink[QUDA_PROFILE_D2H].Stop();
+  profileFatLink.Stop(QUDA_PROFILE_D2H);
   
-  profileFatLink[QUDA_PROFILE_FREE].Start();
+  profileFatLink.Start(QUDA_PROFILE_FREE);
   if (!(flag & QUDA_FAT_PRESERVE_CPU_GAUGE) ){
     delete cpuFatLink; cpuFatLink = NULL;
     delete cpuSiteLink; cpuSiteLink = NULL;
@@ -1862,9 +1862,9 @@ computeFatLinkQuda(void* fatlink, void** sitelink, double* act_path_coeff,
     delete cudaFatLink; cudaFatLink = NULL;
     delete cudaSiteLink; cudaSiteLink = NULL;
   }
-  profileFatLink[QUDA_PROFILE_FREE].Stop();
+  profileFatLink.Stop(QUDA_PROFILE_FREE);
   
-  profileFatLink[QUDA_PROFILE_TOTAL].Stop();
+  profileFatLink.Stop(QUDA_PROFILE_TOTAL);
 
   return 0;
 }
@@ -1876,9 +1876,9 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
                       void* loop_coeff, int num_paths, int max_length, double eb3,
                       QudaGaugeParam* qudaGaugeParam, double* timeinfo)
 {
-  profileGaugeForce[QUDA_PROFILE_TOTAL].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
 
-  profileGaugeForce[QUDA_PROFILE_INIT].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_INIT);
 #ifdef MULTI_GPU
   int E[4];
   QudaGaugeParam qudaGaugeParam_ex_buf;
@@ -1931,55 +1931,55 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
   cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
-  profileGaugeForce[QUDA_PROFILE_INIT].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_INIT);
   
   initLatticeConstants(*cudaMom, profileGaugeForce);
 
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
 #ifdef MULTI_GPU
-  profileGaugeForce[QUDA_PROFILE_COMMS].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_COMMS);
   int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
   exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
 			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
-  profileGaugeForce[QUDA_PROFILE_COMMS].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
 
-  profileGaugeForce[QUDA_PROFILE_H2D].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_H2D);
   loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
-  profileGaugeForce[QUDA_PROFILE_H2D].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 #else  
-  profileGaugeForce[QUDA_PROFILE_H2D].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_H2D);
   loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
-  profileGaugeForce[QUDA_PROFILE_H2D].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 #endif
 
-  profileGaugeForce[QUDA_PROFILE_H2D].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_H2D);
   cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
-  profileGaugeForce[QUDA_PROFILE_H2D].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 
   // actually do the computation
-  profileGaugeForce[QUDA_PROFILE_COMPUTE].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_COMPUTE);
   gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, 
 		   path_length, loop_coeff, num_paths, max_length);
-  profileGaugeForce[QUDA_PROFILE_COMPUTE].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_COMPUTE);
 
 
-  profileGaugeForce[QUDA_PROFILE_D2H].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_D2H);
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
-  profileGaugeForce[QUDA_PROFILE_D2H].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_D2H);
   
-  profileGaugeForce[QUDA_PROFILE_FREE].Start();
+  profileGaugeForce.Start(QUDA_PROFILE_FREE);
   delete cpuSiteLink;
   delete cpuMom;
   
   delete cudaSiteLink;
   delete cudaMom;
-  profileGaugeForce[QUDA_PROFILE_FREE].Stop();
+  profileGaugeForce.Stop(QUDA_PROFILE_FREE);
   
   if(timeinfo){
-    timeinfo[0] = profileGaugeForce[QUDA_PROFILE_H2D].time;
-    timeinfo[1] = profileGaugeForce[QUDA_PROFILE_COMPUTE].time;
-    timeinfo[2] = profileGaugeForce[QUDA_PROFILE_D2H].time;
+    timeinfo[0] = profileGaugeForce.Last(QUDA_PROFILE_H2D);
+    timeinfo[1] = profileGaugeForce.Last(QUDA_PROFILE_COMPUTE);
+    timeinfo[2] = profileGaugeForce.Last(QUDA_PROFILE_D2H);
   }
 
   checkCudaError();

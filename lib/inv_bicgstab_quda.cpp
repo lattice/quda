@@ -32,7 +32,7 @@ namespace quda {
   }
 
   BiCGstab::~BiCGstab() {
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Start(QUDA_PROFILE_FREE);
 
     if(init) {
       if (wp && wp != pp) delete wp;
@@ -45,12 +45,12 @@ namespace quda {
       delete tp;
     }
 
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
   }
 
   void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
-    profile[QUDA_PROFILE_PREAMBLE].Start();
+    profile.Start(QUDA_PROFILE_PREAMBLE);
 
     if (!init) {
       ColorSpinorParam csParam(x);
@@ -103,7 +103,7 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if(b2 == 0){
-      profile[QUDA_PROFILE_INIT].Stop();
+      profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       invParam.true_res = 0.0;
@@ -167,8 +167,8 @@ namespace quda {
       quda::blas_flops = 0;    
     }
 
-    profile[QUDA_PROFILE_PREAMBLE].Stop();
-    profile[QUDA_PROFILE_COMPUTE].Start();
+    profile.Stop(QUDA_PROFILE_PREAMBLE);
+    profile.Start(QUDA_PROFILE_COMPUTE);
 
     while ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && 
 	    k < invParam.maxiter) {
@@ -264,10 +264,10 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
 
-    profile[QUDA_PROFILE_COMPUTE].Stop();
-    profile[QUDA_PROFILE_EPILOGUE].Start();
+    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.Start(QUDA_PROFILE_EPILOGUE);
 
-    invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
+    invParam.secs += profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
@@ -297,15 +297,15 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
-    profile[QUDA_PROFILE_EPILOGUE].Stop();
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
 
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Start(QUDA_PROFILE_FREE);
     if (invParam.cuda_prec_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
       delete x_sloppy;
     }
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
     
     return;
   }

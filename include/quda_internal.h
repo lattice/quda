@@ -168,9 +168,6 @@ namespace quda {
     /**< Print out the profile information */
     void Print();
 
-    /**< Return the profile[idx] */
-    Timer& operator[](int idx) { return profile[idx]; }
-
     void Start(QudaProfileType idx) { 
       // if total timer isn't running, then start it running
       if (!profile[QUDA_PROFILE_TOTAL].running) {
@@ -189,6 +186,10 @@ namespace quda {
 	profile[QUDA_PROFILE_TOTAL].Stop(); 
 	switchOff = false;
       }
+    }
+
+    double Last(QudaProfileType idx) { 
+      return profile[idx].last;
     }
 
   };

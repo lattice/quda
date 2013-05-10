@@ -151,16 +151,16 @@ namespace quda {
   }
 
   GCR::~GCR() {
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Start(QUDA_PROFILE_FREE);
 
     if (K) delete K;
 
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
   }
 
   void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
-    profile[QUDA_PROFILE_INIT].Start();
+    profile.Start(QUDA_PROFILE_INIT);
 
     int Nkrylov = invParam.gcrNkrylov; // size of Krylov space
 
@@ -230,8 +230,8 @@ namespace quda {
     cudaColorSpinorField rM(rSloppy);
     cudaColorSpinorField xM(rSloppy);
 
-    profile[QUDA_PROFILE_INIT].Stop();
-    profile[QUDA_PROFILE_PREAMBLE].Start();
+    profile.Stop(QUDA_PROFILE_INIT);
+    profile.Start(QUDA_PROFILE_PREAMBLE);
 
     blas_flops = 0;
 
@@ -246,8 +246,8 @@ namespace quda {
     double r2_old = r2;
     bool l2_converge = false;
 
-    profile[QUDA_PROFILE_PREAMBLE].Stop();
-    profile[QUDA_PROFILE_COMPUTE].Start();
+    profile.Stop(QUDA_PROFILE_PREAMBLE);
+    profile.Start(QUDA_PROFILE_COMPUTE);
 
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && 
@@ -335,10 +335,10 @@ namespace quda {
 
     if (total_iter > 0) copyCuda(x, y);
 
-    profile[QUDA_PROFILE_COMPUTE].Stop();
-    profile[QUDA_PROFILE_EPILOGUE].Start();
+    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.Start(QUDA_PROFILE_EPILOGUE);
 
-    invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
+    invParam.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
     double gflops = (blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
@@ -367,8 +367,8 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
-    profile[QUDA_PROFILE_EPILOGUE].Stop();
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.Start(QUDA_PROFILE_FREE);
 
     PrintSummary("GCR", total_iter, r2, b2);
 
@@ -394,7 +394,7 @@ namespace quda {
     delete []beta;
     delete []gamma;
 
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
 
     return;
   }

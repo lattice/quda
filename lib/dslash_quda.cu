@@ -1164,14 +1164,14 @@ namespace quda {
     commDimTotal *= 4; // 2 from pipe length, 2 from direction
   }
 
-#define PROFILE(f, profile) 			\
-  profile.Start();				\
+#define PROFILE(f, profile, idx)		\
+  profile.Start(idx);				\
   f;						\
-  profile.Stop(); 
+  profile.Stop(idx); 
 
   void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
-    profile[QUDA_PROFILE_TOTAL].Start();
+    profile.Start(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1179,18 +1179,21 @@ namespace quda {
 
 #ifdef MULTI_GPU
     // Record the start of the dslash
-    PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), profile[QUDA_PROFILE_EVENT_RECORD]);
+    PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
+	    profile, QUDA_PROFILE_EVENT_RECORD);
 
     bool pack = false;
     for (int i=3; i>=0; i--) 
       if (dslashParam.commDim[i] && (i!=3 || kernelPackT)) { pack = true; break; }
 
     // Initialize pack from source spinor
-    PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), profile[QUDA_PROFILE_PACK_KERNEL]);
+    PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), 
+	    profile, QUDA_PROFILE_PACK_KERNEL, );
 
     if (pack) {
       // Record the end of the packing
-      PROFILE(cudaEventRecord(packEnd[0], streams[Nstream-1]), profile[QUDA_PROFILE_EVENT_RECORD]);
+      PROFILE(cudaEventRecord(packEnd[0], streams[Nstream-1]), 
+	      profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
     for(int i = 3; i >=0; i--){
@@ -1200,19 +1203,19 @@ namespace quda {
 	cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[0] : dslashStart;
 
 	PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), 
-		profile[QUDA_PROFILE_STREAM_WAIT_EVENT]);
+		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
 	// Initialize host transfer from source spinor
-	PROFILE(face->gather(*inSpinor, dagger, 2*i+dir), profile[QUDA_PROFILE_GATHER]);
+	PROFILE(face->gather(*inSpinor, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
 
 	// Record the end of the gathering
 	PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), 
-		profile[QUDA_PROFILE_EVENT_RECORD]);
+		profile, QUDA_PROFILE_EVENT_RECORD);
       }
     }
 #endif
 
-    PROFILE(dslash.apply(streams[Nstream-1]), profile[QUDA_PROFILE_DSLASH_KERNEL]);
+    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
 #ifdef MULTI_GPU
     initDslashCommsPattern();
@@ -1227,7 +1230,7 @@ namespace quda {
 	  // Query if gather has completed
 	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
 	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
-		    profile[QUDA_PROFILE_EVENT_QUERY]);
+		    profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    //CUresult event_test;
 	    //event_test = cuEventQuery(gatherEnd[2*i+dir]);
@@ -1235,20 +1238,22 @@ namespace quda {
 	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
-	      PROFILE(face->commsStart(2*i+dir), profile[QUDA_PROFILE_COMMS_START]);
+	      PROFILE(face->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
 	    }
 	  }
 	
 	  // Query if comms has finished
 	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
 	      gatherCompleted[2*i+dir]) {
-	    PROFILE(int comms_test = face->commsQuery(2*i+dir), profile[QUDA_PROFILE_COMMS_QUERY]);
+	    PROFILE(int comms_test = face->commsQuery(2*i+dir), 
+		    profile, QUDA_PROFILE_COMMS_QUERY);
 	    if (comms_test) { 
 	      commsCompleted[2*i+dir] = 1;
 	      completeSum++;
 	    
 	      // Scatter into the end zone
-	      PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), profile[QUDA_PROFILE_SCATTER]);
+	      PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), 
+		      profile, QUDA_PROFILE_SCATTER);
 	    }
 	  }
 
@@ -1257,17 +1262,18 @@ namespace quda {
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
 	if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
 	  // Record the end of the scattering
-	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), profile[QUDA_PROFILE_EVENT_RECORD]);
+	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
+		  profile, QUDA_PROFILE_EVENT_RECORD);
 
 	  dslashParam.kernel_type = static_cast<KernelType>(i);
 	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 	  
 	  // wait for scattering to finish and then launch dslash
 	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
-		  profile[QUDA_PROFILE_STREAM_WAIT_EVENT]);
+		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	  
 	  // all faces use this stream
-	  PROFILE(dslash.apply(streams[Nstream-1]), profile[QUDA_PROFILE_DSLASH_KERNEL]);
+	  PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
 	  dslashCompleted[2*i] = 1;
 	}
@@ -1277,7 +1283,7 @@ namespace quda {
     }
 #endif // MULTI_GPU
 
-    profile[QUDA_PROFILE_TOTAL].Stop();
+    profile.Stop(QUDA_PROFILE_TOTAL);
   }
 
   // Wilson wrappers

@@ -28,12 +28,12 @@ namespace quda {
 
   void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
-    profile[QUDA_PROFILE_INIT].Start();
+    profile.Start(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
     if(b2 == 0){
-      profile[QUDA_PROFILE_INIT].Stop();
+      profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
       invParam.true_res = 0.0;
@@ -90,8 +90,8 @@ namespace quda {
     const bool use_heavy_quark_res = 
       (invParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     
-    profile[QUDA_PROFILE_INIT].Stop();
-    profile[QUDA_PROFILE_PREAMBLE].Start();
+    profile.Stop(QUDA_PROFILE_INIT);
+    profile.Start(QUDA_PROFILE_PREAMBLE);
 
     double r2_old;
     double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
@@ -110,8 +110,8 @@ namespace quda {
     double maxrr = rNorm;
     double delta = invParam.reliable_delta;
 
-    profile[QUDA_PROFILE_PREAMBLE].Stop();
-    profile[QUDA_PROFILE_COMPUTE].Start();
+    profile.Stop(QUDA_PROFILE_PREAMBLE);
+    profile.Start(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
 
     int k=0;
@@ -225,10 +225,10 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
 
-    profile[QUDA_PROFILE_COMPUTE].Stop();
-    profile[QUDA_PROFILE_EPILOGUE].Start();
+    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.Start(QUDA_PROFILE_EPILOGUE);
 
-    invParam.secs = profile[QUDA_PROFILE_COMPUTE].Last();
+    invParam.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
       invParam.gflops = gflops;
@@ -256,8 +256,8 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
 
-    profile[QUDA_PROFILE_EPILOGUE].Stop();
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.Start(QUDA_PROFILE_FREE);
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
@@ -266,7 +266,7 @@ namespace quda {
       delete x_sloppy;
     }
 
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
 
     return;
   }
