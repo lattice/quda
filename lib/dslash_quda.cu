@@ -1188,7 +1188,7 @@ namespace quda {
 
     // Initialize pack from source spinor
     PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), 
-	    profile, QUDA_PROFILE_PACK_KERNEL, );
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing

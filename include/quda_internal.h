@@ -170,7 +170,7 @@ namespace quda {
 
     void Start(QudaProfileType idx) { 
       // if total timer isn't running, then start it running
-      if (!profile[QUDA_PROFILE_TOTAL].running) {
+      if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
 	profile[QUDA_PROFILE_TOTAL].Start(); 
 	switchOff = true;
       }
@@ -182,7 +182,7 @@ namespace quda {
       profile[idx].Stop(); 
 
       // switch off total timer if we need to
-      if (switchOff) {
+      if (switchOff && idx != QUDA_PROFILE_TOTAL) {
 	profile[QUDA_PROFILE_TOTAL].Stop(); 
 	switchOff = false;
       }
