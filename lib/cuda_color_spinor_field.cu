@@ -403,33 +403,40 @@ namespace quda {
 
 #include <pack_spinor.h>
 
+  // FIXME this is a hacky way to have a field that it isn't FLOATN ordered
 #define REORDER_SPINOR_FIELD_NS(DST, SRC, dst, src, myNs, loc)		\
   if ((dst).Precision() == QUDA_DOUBLE_PRECISION) {			\
     if ((src).Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<myNs,1>((double*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,1>((double*)DST, (double*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<myNs,2>((double*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,2>((double*)DST, (double*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<myNs,4>((double*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,4>((double*)DST, (double*)SRC, dst, src, loc);	\
+      }	else {								\
+	packSpinor<myNs,0>((double*)DST, (double*)SRC, dst, src, loc);	\
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<myNs,1>((double*)DST, (float*)SRC, dst, src, loc); \
+	packSpinor<myNs,1>((double*)DST, (float*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<myNs,2>((double*)DST, (float*)SRC, dst, src, loc); \
+	packSpinor<myNs,2>((double*)DST, (float*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<myNs,4>((double*)DST, (float*)SRC, dst, src, loc); \
+	packSpinor<myNs,4>((double*)DST, (float*)SRC, dst, src, loc);	\
+      } else {								\
+      	packSpinor<myNs,0>((double*)DST, (float*)SRC, dst, src, loc);	\
       }									\
     }									\
   } else {								\
     if ((src).Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<myNs,1>((float*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,1>((float*)DST, (double*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<myNs,2>((float*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,2>((float*)DST, (double*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<myNs,4>((float*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,4>((float*)DST, (double*)SRC, dst, src, loc);	\
+      }	else {								\
+	packSpinor<myNs,0>((float*)DST, (double*)SRC, dst, src, loc);	\
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
@@ -438,6 +445,8 @@ namespace quda {
 	packSpinor<myNs,2>((float*)DST, (float*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
 	packSpinor<myNs,4>((float*)DST, (float*)SRC, dst, src, loc);	\
+      }	else {								\
+	packSpinor<myNs,0>((float*)DST, (float*)SRC, dst, src, loc);	\
       }									\
     }									\
   }
