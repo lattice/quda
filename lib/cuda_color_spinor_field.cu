@@ -417,45 +417,56 @@ namespace quda {
 
 #include <pack_spinor.h>
 
-#define REORDER_SPINOR_FIELD(DST, SRC, dst, src, myNs, loc)		\
+#define REORDER_SPINOR_FIELD_NS(DST, SRC, dst, src, myNs, loc)		\
   if ((dst).Precision() == QUDA_DOUBLE_PRECISION) {			\
     if ((src).Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,1>((double*)DST, (double*)SRC, dst, src, loc); \
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,2>((double*)DST, (double*)SRC, dst, src, loc); \
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((double*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,4>((double*)DST, (double*)SRC, dst, src, loc); \
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (float*)SRC, dst, src, loc); \
+	packSpinor<myNs,1>((double*)DST, (float*)SRC, dst, src, loc); \
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (float*)SRC, dst, src, loc); \
+	packSpinor<myNs,2>((double*)DST, (float*)SRC, dst, src, loc); \
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((double*)DST, (float*)SRC, dst, src, loc); \
+	packSpinor<myNs,4>((double*)DST, (float*)SRC, dst, src, loc); \
       }									\
     }									\
   } else {								\
     if ((src).Precision() == QUDA_DOUBLE_PRECISION) {			\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,1>((float*)DST, (double*)SRC, dst, src, loc); \
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,2>((float*)DST, (double*)SRC, dst, src, loc); \
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (double*)SRC, dst, src, loc); \
+	packSpinor<myNs,4>((float*)DST, (double*)SRC, dst, src, loc); \
       }									\
     } else {								\
       if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (float*)SRC, dst, src, loc);	\
+	packSpinor<myNs,1>((float*)DST, (float*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (float*)SRC, dst, src, loc);	\
+	packSpinor<myNs,2>((float*)DST, (float*)SRC, dst, src, loc);	\
       } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (float*)SRC, dst, src, loc);	\
+	packSpinor<myNs,4>((float*)DST, (float*)SRC, dst, src, loc);	\
       }									\
     }									\
   }
 
+#define REORDER_SPINOR_FIELD(out, in, dst, src, nSpin, location)	\
+  switch(nSpin){							\
+  case 1:								\
+    REORDER_SPINOR_FIELD_NS(out, in, dst, src, 1, location);		\
+    break;								\
+  case 4:								\
+    REORDER_SPINOR_FIELD_NS(out, in, dst, src, 4, location);		\
+    break;								\
+  default:								\
+    errorQuda("invalid number of spinors");				\
+  }  
 
   void cudaColorSpinorField::resizeBuffer(size_t bytes) const {
     if (bytes > bufferBytes) {
@@ -490,22 +501,12 @@ namespace quda {
       return;
     }
 
-    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuColorSpinorField)) {
-      // (temporary?) bug fix for padding
-      memset(buffer_h, 0, bytes);
+    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
+	typeid(src) == typeid(cpuColorSpinorField)) {
 
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
-			     *this, src, 1, QUDA_CPU_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
-			     *this, src, 4, QUDA_CPU_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors");
-      }  
+      memset(buffer_h, 0, bytes); // FIXME (temporary?) bug fix for padding
+      REORDER_SPINOR_FIELD(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
+			   *this, src, nSpin, QUDA_CPU_FIELD_LOCATION); 
       cudaMemcpy(v, buffer_h, bytes, cudaMemcpyHostToDevice);
 
     } else {
@@ -520,17 +521,7 @@ namespace quda {
       const void *source = typeid(src) == typeid(cudaColorSpinorField) ?
 	dynamic_cast<const cudaColorSpinorField&>(src).V() : buffer_d;
 
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(v, source, *this, src, 1, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(v, source, *this, src, 4, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors");
-      }  
-
+      REORDER_SPINOR_FIELD(v, source, *this, src, nSpin, QUDA_CUDA_FIELD_LOCATION);
     }
 
     checkCudaError();
@@ -565,35 +556,15 @@ namespace quda {
 
     if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       cudaMemcpy(buffer_h, v, bytes, cudaMemcpyDeviceToHost);
-    
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 
-			     dest, *this, 1, QUDA_CPU_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 
-			     dest, *this, 4, QUDA_CPU_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors in function");
-      }
+      REORDER_SPINOR_FIELD(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 
+			   dest, *this, nSpin, QUDA_CPU_FIELD_LOCATION); 
     } else {
 
       if (typeid(dest)==typeid(cpuColorSpinorField)) resizeBuffer(dest.Bytes());
 
       void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
 
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(dst, v, dest, *this, 1, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(dst, v, dest, *this, 4, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors in function");
-      }
+      REORDER_SPINOR_FIELD(dst, v, dest, *this, nSpin, QUDA_CUDA_FIELD_LOCATION); 
 
       if (typeid(dest) == typeid(cpuColorSpinorField)) {
 	cudaMemcpy(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
