@@ -787,7 +787,7 @@ static void unpackBQCDGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit,
       Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
       for (int i = 0; i < V; i++) {
 	unpack18(gT, d_gauge+i, dir, V+pad);
-	transposeScale(hg+i*18, gT, fat_link_max_);
+	transposeScale(hg+i*18, gT, scale_factor);
       }
     }
   }
