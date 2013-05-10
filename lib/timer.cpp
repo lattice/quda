@@ -38,7 +38,7 @@ namespace quda {
 				       "epilogue", "free", "pack kernel", "dslash kernel", 
 				       "gather", "scatter", "event record", 
 				       "event query", "stream wait event", 
-				       "comms start", "comms query", "constant", 
+				       "comms", "comms start", "comms query", "constant", 
 				       "total" };
   
 }

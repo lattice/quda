@@ -144,6 +144,8 @@ namespace quda {
     QUDA_PROFILE_EVENT_RECORD, /**< cuda event record  */
     QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
     QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
+
+    QUDA_PROFILE_COMMS, /**< synchronous communication */
     QUDA_PROFILE_COMMS_START, /**< initiating communication */
     QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
 
