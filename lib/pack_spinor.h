@@ -1,35 +1,11 @@
 /*
-  MAC:
-
-  On my mark, unleash template hell
-
-  Here we are templating on the following
+   Spinor reordering routines.  These are implemented to un on both
+   CPU and GPU.  Here we are templating on the following: 
   - input precision
   - output precision
   - number of colors
   - number of spins
-  - short vector lengh (float, float2, float4 etc.)
-  
-  This is still quite a mess.  Options to reduce to the amount of code
-  bloat here include:
-
-  1. Using functors to define arbitrary ordering
-  2. Use class inheritance to the same effect
-  3. Abuse the C preprocessor to define arbitrary mappings
-  4. Something else
-
-  Solution is to use class inheritance to defined different mappings,
-  and combine it with templating on the return type.  Initial attempt
-  at this is in the cpuColorSpinorField, but this will eventually roll
-  out here too.
-
-*/
-
-
-/*
-
-  Packing routines
-
+  - field ordering
 */
 
 #define PRESERVE_SPINOR_NORM
@@ -75,7 +51,6 @@ struct FloatNOrder {
     }
   }
 
-  void setField(Float *field_) { field = field_; }
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
@@ -128,7 +103,6 @@ struct SpaceColorSpinorOrder {
     }
   }
 
-  void setField(Float *field_) { field = field_; }
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
@@ -266,7 +240,6 @@ struct SpaceSpinorColorOrder {
     }
   }
 
-  void setField(Float *field_) { field = field_; }
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
@@ -483,31 +456,26 @@ void packParitySpinor(FloatOut *Out, FloatIn *In, ColorSpinorField &out, const C
   if (in.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
     FloatNOrder<FloatIn, Ns, Nc, 4> 
       inOrder(In, in.VolumeCB(), in.Stride());
-    packParitySpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, Out, out, in.GammaBasis(), location);
-    
+    packParitySpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, Out, out, in.GammaBasis(), location);    
   } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
     FloatNOrder<FloatIn, Ns, Nc, 2> 
       inOrder(In, in.VolumeCB(), in.Stride());
     packParitySpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, Out, out, in.GammaBasis(), location);
-    
   } else if (in.FieldOrder() == QUDA_FLOAT_FIELD_ORDER) { 
     FloatNOrder<FloatIn, Ns, Nc, 1> 
 	inOrder(In, in.VolumeCB(), in.Stride());
     packParitySpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, Out, out, in.GammaBasis(), location);
-    
   } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
     SpaceSpinorColorOrder<FloatIn, Ns, Nc>    
       inOrder(In, in.VolumeCB(), in.Stride());
     packParitySpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, Out, out, in.GammaBasis(), location);
-    
   } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
     SpaceColorSpinorOrder<FloatIn, Ns, Nc>    
       inOrder(In, in.VolumeCB(), in.Stride());
     packParitySpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, Out, out, in.GammaBasis(), location);
-    
-    } else {
-      errorQuda("Order not defined");
-    }
+  } else {
+    errorQuda("Order not defined");
+  }
 
 }
 

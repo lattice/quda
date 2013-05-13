@@ -519,7 +519,7 @@ namespace quda {
 
     if (precision == QUDA_HALF_PRECISION) {
       ColorSpinorParam param(*this); // acquire all attributes of this
-      param.precision = QUDA_SINGLE_PRECISION; // change precision
+      param.setPrecision(QUDA_SINGLE_PRECISION); // change precision
       param.create = QUDA_COPY_FIELD_CREATE; 
       cudaColorSpinorField tmp(*this, param);
       tmp.saveSpinorField(dest);
