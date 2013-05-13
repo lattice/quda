@@ -238,6 +238,11 @@ namespace quda {
     size_t NormBytes() const { return norm_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
   
+    void* V() {return v;}
+    const void* V() const {return v;}
+    void* Norm(){return norm;}
+    const void* Norm() const {return norm;}
+
     virtual QudaFieldLocation Location() const = 0;
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
@@ -334,11 +339,6 @@ namespace quda {
     void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		     const int dagger, cudaStream_t* stream);
 
-    void* V() {return v;}
-    const void* V() const {return v;}
-    void* Norm(){return norm;}
-    const void* Norm() const {return norm;}
-
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
@@ -417,9 +417,6 @@ namespace quda {
     void unpackGhost(void* ghost_spinor, const int dim, 
 		     const QudaDirection dir, const int dagger);
   
-    void* V() { return v; }
-    const void * V() const { return v; }
-
     void copy(const cpuColorSpinorField&);
     void zero();
 
