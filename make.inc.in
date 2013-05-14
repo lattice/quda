@@ -187,6 +187,16 @@ ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
 endif
 
+ifeq ($(strip $(BUILD_CONTRACT)), yes)
+  LOOPVV_TEST=vvTrickLoops
+  LOOPTD_TEST=tDilutionLoops
+  LPTDHP_TEST=tDilHPELoops
+  LOOPCV_TEST=loopsPlain
+  LOOPHP_TEST=loopsHPE
+  NVCCOPT += -DGPU_CONTRACT
+  COPT += -DGPU_CONTRACT
+endif
+
 ifeq ($(strip $(HOST_DEBUG)), yes)
   NVCCOPT += -g -DHOST_DEBUG
   COPT += -g -fno-inline -DHOST_DEBUG

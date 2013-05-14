@@ -1920,3 +1920,8 @@ namespace quda {
 #include "unitarize_force_quda.cu"
 #endif
 
+#ifdef GPU_CONTRACT
+#include "covDev.cu"
+#include "contract.cu"
+//#include "random.cu"
+#endif

@@ -10,7 +10,9 @@ HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h  
 TESTS = su3_test blas_test dslash_test invert_test $(DIRAC_TEST)			\
 	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)     \
 	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
-	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)
+	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)		\
+	$(LOOPVV_TEST) $(LOOPTD_TEST) $(LPTDHP_TEST) $(LOOPCV_TEST)	\
+	$(LOOPHP_TEST)
 
 all: $(TESTS)
 
@@ -53,11 +55,26 @@ hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force
 hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
+vvTrickLoops: vvTrickLoops.o test_util.o wilson_dslash_reference.o blas_reference.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS) 
+
+tDilutionLoops: tDilutionLoops.o test_util.o wilson_dslash_reference.o blas_reference.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS) 
+
+tDilHPELoops: tDilHPELoops.o test_util.o wilson_dslash_reference.o blas_reference.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS) 
+
+loopsHPE: loopsHPE.o test_util.o wilson_dslash_reference.o blas_reference.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS) 
+
+loopsPlain: loopsPlain.o test_util.o wilson_dslash_reference.o blas_reference.o misc.o $(QUDA)
+	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS) 
 clean:
 	-rm -f *.o dslash_test invert_test staggered_dslash_test	\
 	staggered_invert_test su3_test pack_test blas_test llfat_test	\
 	gauge_force_test fermion_force_test hisq_paths_force_test	\
-	hisq_unitarize_force_test unitarize_link_test
+	hisq_unitarize_force_test unitarize_link_test vvTrickLoops	\
+	tDilutionLoops loopsPlain loopsHPE tDilHPELoops
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

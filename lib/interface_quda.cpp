@@ -98,6 +98,9 @@ static TimeProfile profileClover("loadCloverQuda");
 //!< Profiler for invertQuda
 static TimeProfile profileInvert("invertQuda");
 
+//!< Profiler for contractions
+static TimeProfile profileContract("contractQuda");
+
 //!< Profiler for invertMultiShiftQuda
 static TimeProfile profileMulti("invertMultiShiftQuda");
 
@@ -2038,3 +2041,5 @@ void comm_set_gridsize_(int *grid)
   initCommsGridQuda(4, grid, bqcd_rank_from_coords, static_cast<void *>(grid));
 #endif
 }
+
+#include"contractions.cpp"
