@@ -13,6 +13,8 @@
 extern "C" {
 #endif
 
+  int read_custom_binary_gauge_field (double **gauge, char *fname, QudaGaugeParam *param, QudaInvertParam *inv_param, int gridSize[4]);
+
   extern int Z[4];
   extern int V;
   extern int Vh;
