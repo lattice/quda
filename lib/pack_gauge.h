@@ -210,7 +210,7 @@ inline void fatlink_short_pack18(short2 *d_gauge, Float *h_gauge, int dir, int V
 }
 
 
-
+/*
 // a += b*c
 template <typename Float>
 inline void accumulateComplexProduct(Float *a, Float *b, Float *c, Float sign) {
@@ -238,7 +238,7 @@ inline void complexConjugateProduct(Float *a, Float *b, Float *c) {
     a[0] = b[0]*c[0] - b[1]*c[1];
     a[1] = -b[0]*c[1] - b[1]*c[0];
 }
-
+*/
 
 // Routines used to unpack the gauge field matrices
 template <typename Float>
