@@ -113,6 +113,9 @@ namespace quda {
       // For a given dst precision, there are two non-trivial possibilities for the
       // src precision.
 
+      // FIXME: use traits to encapsulate register type for shorts -
+      // will reduce template type parameters from 3 to 2
+
       blas_bytes += (unsigned long long)src.RealLength()*(src.Precision() + dst.Precision());
       
       if (dst.Precision() == src.Precision()) {
