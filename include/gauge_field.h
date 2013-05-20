@@ -120,6 +120,13 @@ namespace quda {
 
     const size_t& Bytes() const { return bytes; }
 
+    virtual void* Gauge_p() { errorQuda("Not implemented"); }
+    virtual void* Even_p() { errorQuda("Not implemented"); }
+    virtual void* Odd_p() { errorQuda("Not implemented"); }
+
+    virtual const void* Gauge_p() const { errorQuda("Not implemented"); }
+    virtual const void* Even_p() const { errorQuda("Not implemented"); }
+    virtual const void* Odd_p() const { errorQuda("Not implemented"); }
   };
 
   class cudaGaugeField : public GaugeField {
@@ -199,6 +206,7 @@ namespace quda {
     const void** Ghost() const { return (const void**)ghost; }
 
     void* Gauge_p() { return gauge; }
+    const void* Gauge_p() const { return gauge; }
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
   };
 
