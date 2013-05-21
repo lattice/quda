@@ -1381,7 +1381,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   for (int i=0; i<momSiteSize; i++) printfQuda("%d fails = %d\n", i, iter[i]);
   
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*momSiteSize, fail[f] / (double)(len*6));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*9, fail[f]/(double)(len*9));
   }
   
   return accuracy_level;
