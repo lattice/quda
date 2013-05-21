@@ -123,13 +123,15 @@ namespace quda {
 
     const size_t& Bytes() const { return bytes; }
 
-    virtual void* Gauge_p() { errorQuda("Not implemented"); }
-    virtual void* Even_p() { errorQuda("Not implemented"); }
-    virtual void* Odd_p() { errorQuda("Not implemented"); }
+    virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
+    virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
+    virtual void* Odd_p() { errorQuda("Not implemented"); return (void*)0;}
 
-    virtual const void* Gauge_p() const { errorQuda("Not implemented"); }
-    virtual const void* Even_p() const { errorQuda("Not implemented"); }
-    virtual const void* Odd_p() const { errorQuda("Not implemented"); }
+    virtual const void* Gauge_p() const { errorQuda("Not implemented"); return (void*)0;}
+    virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
+    virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
+
+    virtual const void** Ghost() const { errorQuda("Not implemented"); return (void**)0; }
   };
 
   class cudaGaugeField : public GaugeField {
@@ -193,7 +195,6 @@ namespace quda {
 
   private:
     void **gauge; // the actual gauge field
-
     mutable void **ghost; // stores the ghost zone of the gauge field
     int pinned;
   
