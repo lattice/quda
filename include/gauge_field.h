@@ -97,9 +97,10 @@ namespace quda {
 
     double anisotropy;
     double tadpole;
-
+    double fat_link_max;
+    
     QudaFieldCreate create; // used to determine the type of field created
-  
+
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
@@ -115,6 +116,8 @@ namespace quda {
     QudaGaugeFixed GaugeFixed() const { return fixed; }
     QudaGaugeFieldOrder FieldOrder() const { return order; }
     QudaFieldGeometry Geometry() const { return geometry; }
+
+    const double& LinkMax() const { return fat_link_max; }
   
     void checkField(const GaugeField &);
 
@@ -146,8 +149,6 @@ namespace quda {
     void *even;
     void *odd;
 
-    double fat_link_max;
-  
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t evenTex;
     cudaTextureObject_t oddTex;
@@ -161,8 +162,6 @@ namespace quda {
 
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
     void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
-
-    double LinkMax() const { return fat_link_max; }
 
     // (ab)use with care
     void* Gauge_p() { return gauge; }
