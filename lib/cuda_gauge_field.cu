@@ -183,21 +183,6 @@ namespace quda {
     checkCudaError();
   }
 
-
-  /*template <typename Float, typename Float2>
-  void loadMomField(Float2 *even, Float2 *odd, Float *mom, int bytes, int Vh, int pad, void *buffer) 
-  {  
-    Float2 *packedEven = (Float2*)buffer;
-    Float2 *packedOdd = (Float2*)((char*)buffer + bytes/2);
-    
-    packMomField(packedEven, (Float*)mom, 0, Vh, pad);
-    packMomField(packedOdd,  (Float*)mom, 1, Vh, pad);
-    
-    cudaMemcpy(even, packedEven, bytes/2, cudaMemcpyHostToDevice);
-    cudaMemcpy(odd,  packedOdd, bytes/2, cudaMemcpyHostToDevice); 
-    }*/
-
-
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
   {
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
@@ -208,11 +193,6 @@ namespace quda {
       errorQuda("Not implemented"); // awaiting Guochun's new gauge packing
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) {
 
-#ifdef MULTI_GPU
-      //FIXME: if this is MOM field, we don't need exchange data
-      if(link_type != QUDA_ASQTAD_MOM_LINKS) cpu.exchangeGhost();
-#endif
-    
       if (precision == QUDA_HALF_PRECISION && link_type == QUDA_ASQTAD_FAT_LINKS) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
 	  fat_link_max = maxGauge<double>(cpu);
@@ -225,23 +205,48 @@ namespace quda {
 
       if (precision == QUDA_DOUBLE_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((double*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu);
+	  packGauge((double*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 0);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((double*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu);
+	  packGauge((double*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 0);
 	}
       } else if (precision == QUDA_SINGLE_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((float*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu);
+	  packGauge((float*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 0);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu);
+	  packGauge((float*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 0);
 	}
       } else if (precision == QUDA_HALF_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
-	  packGauge((short*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu);
+	  packGauge((short*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 0);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((short*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu);
+	  packGauge((short*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 0);
 	}
       } 
+
+#ifdef MULTI_GPU
+      //FIXME: if this is MOM field, we don't need exchange data
+      if(link_type != QUDA_ASQTAD_MOM_LINKS) cpu.exchangeGhost();
+
+      if (precision == QUDA_DOUBLE_PRECISION) {
+	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
+	  packGauge((double*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 1);
+	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
+	  packGauge((double*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 1);
+	}
+      } else if (precision == QUDA_SINGLE_PRECISION) {
+	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
+	  packGauge((float*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 1);
+	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
+	  packGauge((float*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 1);
+	}
+      } else if (precision == QUDA_HALF_PRECISION) {
+	if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
+	  packGauge((short*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 1);
+	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
+	  packGauge((short*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 1);
+	}
+      } 
+#endif
 
       // this copies over both even and odd
       cudaMemcpy(gauge, LatticeField::bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -377,21 +382,21 @@ namespace quda {
 
       if (precision == QUDA_DOUBLE_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((double*)cpu.gauge, (double*)bufferPinned, cpu, *this);
+	  packGauge((double*)cpu.gauge, (double*)bufferPinned, cpu, *this, 0);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)cpu.gauge, (double*)bufferPinned, cpu, *this);
+	  packGauge((float*)cpu.gauge, (double*)bufferPinned, cpu, *this, 0);
 	}
       } else if (precision == QUDA_SINGLE_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((double*)cpu.gauge, (float*)bufferPinned, cpu, *this);
+	  packGauge((double*)cpu.gauge, (float*)bufferPinned, cpu, *this, 0);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)cpu.gauge, (float*)bufferPinned, cpu, *this);
+	  packGauge((float*)cpu.gauge, (float*)bufferPinned, cpu, *this, 0);
 	}
       } else if (precision == QUDA_HALF_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
-	  packGauge((double*)cpu.gauge, (short*)bufferPinned, cpu, *this);
+	  packGauge((double*)cpu.gauge, (short*)bufferPinned, cpu, *this, 0);
 	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)cpu.gauge, (short*)bufferPinned, cpu, *this);
+	  packGauge((float*)cpu.gauge, (short*)bufferPinned, cpu, *this, 0);
 	}
       }
     } else {
