@@ -90,62 +90,21 @@ namespace quda {
       errorQuda("Not implemented"); // awaiting Guochun's new gauge packing
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) {
 
-      if (precision == QUDA_HALF_PRECISION && link_type == QUDA_ASQTAD_FAT_LINKS) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  fat_link_max = maxGauge<double>(cpu);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  fat_link_max = maxGauge<float>(cpu);
-	}
-      }
+      if (precision == QUDA_HALF_PRECISION && link_type == QUDA_ASQTAD_FAT_LINKS) 
+	fat_link_max = maxGauge(cpu);
 
       LatticeField::resizeBuffer(bytes);
 
-      if (precision == QUDA_DOUBLE_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((double*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 0);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((double*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 0);
-	}
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((float*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 0);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 0);
-	}
-      } else if (precision == QUDA_HALF_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
-	  packGauge((short*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 0);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((short*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 0);
-	}
-      } 
+      packGauge(bufferPinned, cpu.gauge, *this, cpu);
 
 #ifdef MULTI_GPU
       //FIXME: if this is MOM field, we don't need exchange data
       if(link_type != QUDA_ASQTAD_MOM_LINKS) cpu.exchangeGhost();
-      if (precision == QUDA_DOUBLE_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((double*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 1);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((double*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 1);
-	}
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((float*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 1);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 1);
-	}
-      } else if (precision == QUDA_HALF_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
-	  packGauge((short*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 1);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((short*)LatticeField::bufferPinned, (float*)cpu.gauge, *this, cpu, 1);
-	}
-      } 
+      packGhost(bufferPinned, cpu.gauge, *this, cpu);
 #endif
 
       // this copies over both even and odd
-      cudaMemcpy(gauge, LatticeField::bufferPinned, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
       checkCudaError();
     } else {
       errorQuda("Invalid pack location %d", pack_location);
@@ -228,25 +187,7 @@ namespace quda {
       cudaMemcpy(bufferPinned, gauge, bytes, cudaMemcpyDeviceToHost);
       checkCudaError();
 
-      if (precision == QUDA_DOUBLE_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((double*)cpu.gauge, (double*)bufferPinned, cpu, *this, 0);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)cpu.gauge, (double*)bufferPinned, cpu, *this, 0);
-	}
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
-	  packGauge((double*)cpu.gauge, (float*)bufferPinned, cpu, *this, 0);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)cpu.gauge, (float*)bufferPinned, cpu, *this, 0);
-	}
-      } else if (precision == QUDA_HALF_PRECISION) {
-	if (cpu.Precision() == QUDA_DOUBLE_PRECISION){
-	  packGauge((double*)cpu.gauge, (short*)bufferPinned, cpu, *this, 0);
-	} else if (cpu.Precision() == QUDA_SINGLE_PRECISION) {
-	  packGauge((float*)cpu.gauge, (short*)bufferPinned, cpu, *this, 0);
-	}
-      }
+      packGauge(cpu.gauge, bufferPinned, cpu, *this);
     } else {
       errorQuda("Invalid pack location %d", pack_location);
     }

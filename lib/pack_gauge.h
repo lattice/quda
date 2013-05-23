@@ -751,6 +751,32 @@ namespace quda {
     }
   }
 
+  // this is the function that is actually called, from here on down we instantiate all required templates
+  void packGauge(void *Out, void *In, GaugeField &out, const GaugeField &in, int ghost=0) {
+    if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+	packGauge((double*)Out, (double*)In, out, in, ghost);
+      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+	packGauge((double*)Out, (float*)In, out, in, ghost);
+      }
+    } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+	packGauge((float*)Out, (double*)In, out, in, ghost);
+      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+	packGauge((float*)Out, (float*)In, out, in, ghost);
+      }
+    } else if (out.Precision() == QUDA_HALF_PRECISION) {
+      if (in.Precision() == QUDA_DOUBLE_PRECISION){
+	packGauge((short*)Out, (double*)In, out, in, ghost);
+      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+	packGauge((short*)Out, (float*)In, out, in, ghost);
+      }
+    } 
+  }
+
+  // this is just a wrapper to packGauge - reuse all of its template instantiation
+  void packGhost(void *Out, void *In, GaugeField &out, const GaugeField &in) { packGauge(Out, In, out, in); }
+
   /**
      Generic CPU function find the gauge maximum
   */
@@ -801,6 +827,17 @@ namespace quda {
     return max;
   }
 
+  double maxGauge(const GaugeField &u) {
+    double max = 0;
+    if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+      max = maxGauge<double>(u);
+    } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+      max = maxGauge<float>(u);
+    } else {
+      errorQuda("Precision %d undefined", u.Precision());
+    }
+    return max;
+  }
 
 }
 
