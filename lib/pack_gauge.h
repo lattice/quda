@@ -1,847 +1,806 @@
-// Routines used to pack the gauge field matrices
+#include <tune_quda.h>
 
-#include <math.h>
+namespace quda {
 
-#define SHORT_LENGTH 65536
-#define SCALE_FLOAT ((SHORT_LENGTH-1) / 2.f)
-#define SHIFT_FLOAT (-1.f / (SHORT_LENGTH-1))
+  /*
+    Here we use traits to define the mapping between storage type and
+    register type:
+    double -> double
+    float -> float
+    short -> float
+    This allows us to wrap the encapsulate the register type into the storage template type
+   */
+  template<typename> struct mapper { };
+  template<> struct mapper<double> { typedef double type; };
+  template<> struct mapper<float> { typedef float type; };
+  template<> struct mapper<short> { typedef float type; };
 
-template <typename Float>
-inline short FloatToShort(const Float &a) {
-  return (short)((a+SHIFT_FLOAT)*SCALE_FLOAT);
-}
+  /* Traits used to determine if a variable is half precision or not */
+  template< typename T > struct isHalf{ static const bool value = false; };
+  template<> struct isHalf<short>{ static const bool value = true; };
 
-template <typename Float>
-inline void ShortToFloat(Float &a, const short &b) {
-  a = ((Float)b/SCALE_FLOAT-SHIFT_FLOAT);
-}
+  template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
+  template<> __host__ __device__ inline void copy(float &a, const short &b) { a = (float)b/MAX_SHORT; }
+  template<> __host__ __device__ inline void copy(short &a, const float &b) { a = (short)(b*MAX_SHORT); }
 
-/*template <int N, typename FloatN, typename Float>
-inline void pack8(FloatN *res, Float *g, int dir, int V) {
-  Float *r = res + N*dir*4*V;
-  r[0] = atan2(g[1], g[0]);
-  r[1] = atan2(g[13], g[12]);
-}*/
+  /**
+     Generic wrapper for Trig functions
+  */
+  template <bool isHalf>
+    struct Trig {
+      template<typename T> 
+      __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
+      template<typename T> 
+      __device__ __host__ static T Sin( const T &a ) { return sin(a); }
+      template<typename T> 
+      __device__ __host__ static T Cos( const T &a ) { return cos(a); }
+    };
+  
+  /**
+     Specialization of Trig functions using shorts
+   */
+  template <>
+    struct Trig<true> {
+    template<typename T> 
+      __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b)/M_PI; }
+    template<typename T> 
+      __device__ __host__ static T Sin( const T &a ) { return sin(a*M_PI); }
+    template<typename T> 
+      __device__ __host__ static T Cos( const T &a ) { return cos(a*M_PI); }
+  };
+  
 
-template <typename Float>
-inline void pack8(double2 *res, Float *g, int dir, int V) {
-  double2 *r = res + dir*4*V;
-  r[0].x = atan2(g[1], g[0]);
-  r[0].y = atan2(g[13], g[12]);
-  for (int j=1; j<4; j++) {
-    r[j*V].x = g[2*j+0];
-    r[j*V].y = g[2*j+1];
+
+  // a += b*c
+  template <typename Float>
+    __device__ __host__ inline void accumulateComplexProduct(Float *a, Float *b, Float *c, Float sign) {
+    a[0] += sign*(b[0]*c[0] - b[1]*c[1]);
+    a[1] += sign*(b[0]*c[1] + b[1]*c[0]);
   }
-}
 
-template <typename Float>
-inline void pack8(float4 *res, Float *g, int dir, int V) {
-  float4 *r = res + dir*2*V;
-  r[0].x = atan2(g[1], g[0]);
-  r[0].y = atan2(g[13], g[12]);
-  r[0].z = g[2];
-  r[0].w = g[3];
-  r[V].x = g[4];
-  r[V].y = g[5];
-  r[V].z = g[6];
-  r[V].w = g[7];
-}
-
-template <typename Float>
-inline void pack8(float2 *res, Float *g, int dir, int V) {
-  float2 *r = res + dir*4*V;
-  r[0].x = atan2(g[1], g[0]);
-  r[0].y = atan2(g[13], g[12]);
-  for (int j=1; j<4; j++) {
-    r[j*V].x = g[2*j+0];
-    r[j*V].y = g[2*j+1];
-  }
-}
-
-template <typename Float>
-inline void pack8(short4 *res, Float *g, int dir, int V) {
-  short4 *r = res + dir*2*V;
-  r[0].x = FloatToShort(atan2(g[1], g[0]) / M_PI);
-  r[0].y = FloatToShort(atan2(g[13], g[12]) / M_PI);
-  r[0].z = FloatToShort(g[2]);
-  r[0].w = FloatToShort(g[3]);
-  r[V].x = FloatToShort(g[4]);
-  r[V].y = FloatToShort(g[5]);
-  r[V].z = FloatToShort(g[6]);
-  r[V].w = FloatToShort(g[7]);
-}
-
-template <typename Float>
-inline void pack8(short2 *res, Float *g, int dir, int V) {
-  short2 *r = res + dir*4*V;
-  r[0].x = FloatToShort(atan2(g[1], g[0]) / M_PI);
-  r[0].y = FloatToShort(atan2(g[13], g[12]) / M_PI);
-  for (int j=1; j<4; j++) {
-    r[j*V].x = FloatToShort(g[2*j+0]);
-    r[j*V].y = FloatToShort(g[2*j+1]);
-  }
-}
-
-template <typename Float>
-inline void pack12(double2 *res, Float *g, int dir, int V) {
-  double2 *r = res + dir*6*V;
-  for (int j=0; j<6; j++) {
-    r[j*V].x = g[j*2+0];
-    r[j*V].y = g[j*2+1];
-  }
-}
-
-template <typename Float>
-inline void pack12(float4 *res, Float *g, int dir, int V) {
-  float4 *r = res + dir*3*V;
-  for (int j=0; j<3; j++) {
-    r[j*V].x = g[j*4+0]; 
-    r[j*V].y = g[j*4+1];
-    r[j*V].z = g[j*4+2]; 
-    r[j*V].w = g[j*4+3];
-  }
-}
-
-template <typename Float>
-inline void pack12(float2 *res, Float *g, int dir, int V) {
-  float2 *r = res + dir*6*V;
-  for (int j=0; j<6; j++) {
-    r[j*V].x = g[j*2+0];
-    r[j*V].y = g[j*2+1];
-  }
-}
-
-template <typename Float>
-inline void pack12(short4 *res, Float *g, int dir, int V) {
-  short4 *r = res + dir*3*V;
-  for (int j=0; j<3; j++) {
-    r[j*V].x = FloatToShort(g[j*4+0]); 
-    r[j*V].y = FloatToShort(g[j*4+1]);
-    r[j*V].z = FloatToShort(g[j*4+2]);
-    r[j*V].w = FloatToShort(g[j*4+3]);
-  }
-}
-
-template <typename Float>
-inline void pack12(short2 *res, Float *g, int dir, int V) {
-  short2 *r = res + dir*6*V;
-  for (int j=0; j<6; j++) {
-    r[j*V].x = FloatToShort(g[j*2+0]);
-    r[j*V].y = FloatToShort(g[j*2+1]);
-  }
-}
-
-template <typename Float>
-inline void pack18(double2 *res, Float *g, int dir, int V) {
-  double2 *r = res + dir*9*V;
-  for (int j=0; j<9; j++) {
-    r[j*V].x = g[j*2+0]; 
-    r[j*V].y = g[j*2+1]; 
-  }
-}
-
-template <typename Float>
-inline void pack18(float4 *res, Float *g, int dir, int V) {
-  float4 *r = res + dir*5*V;
-  for (int j=0; j<4; j++) {
-    r[j*V].x = g[j*4+0]; 
-    r[j*V].y = g[j*4+1]; 
-    r[j*V].z = g[j*4+2]; 
-    r[j*V].w = g[j*4+3]; 
-  }
-  r[4*V].x = g[16]; 
-  r[4*V].y = g[17]; 
-  r[4*V].z = 0.0;
-  r[4*V].w = 0.0;
-}
-
-template <typename Float>
-inline void pack18(float2 *res, Float *g, int dir, int V) {
-  float2 *r = res + dir*9*V;
-  for (int j=0; j<9; j++) {
-    r[j*V].x = g[j*2+0]; 
-    r[j*V].y = g[j*2+1]; 
-  }
-}
-
-template <typename Float>
-inline void pack18(short4 *res, Float *g, int dir, int V) {
-  short4 *r = res + dir*5*V;
-  for (int j=0; j<4; j++) {
-    r[j*V].x = FloatToShort(g[j*4+0]); 
-    r[j*V].y = FloatToShort(g[j*4+1]); 
-    r[j*V].z = FloatToShort(g[j*4+2]); 
-    r[j*V].w = FloatToShort(g[j*4+3]); 
-  }
-  r[4*V].x = FloatToShort(g[16]); 
-  r[4*V].y = FloatToShort(g[17]); 
-  r[4*V].z = (short)0;
-  r[4*V].w = (short)0;
-}
-
-template <typename Float>
-inline void pack18(short2 *res, Float *g, int dir, int V) 
-{
-  short2 *r = res + dir*9*V;
-  for (int j=0; j<9; j++) {
-    r[j*V].x = FloatToShort(g[j*2+0]); 
-    r[j*V].y = FloatToShort(g[j*2+1]); 
-  }
-}
-
-template <typename Float>
-inline void pack18(short2 *res, Float *g, int dir, int V, Float scale_factor) 
-{
-  short2 *r = res + dir*9*V;
-  for (int j=0; j<9; j++) {
-    r[j*V].x = FloatToShort(g[j*2+0]*scale_factor); 
-    r[j*V].y = FloatToShort(g[j*2+1]*scale_factor); 
-  }
-}
-
-template<typename Float>
-inline void fatlink_short_pack18(short2 *d_gauge, Float *h_gauge, int dir, int V) 
-{
-  short2 *dg = d_gauge + dir*9*V;
-  for (int j=0; j<9; j++) {
-    dg[j*V].x = FloatToShort((h_gauge[j*2+0]/fat_link_max_)); 
-    dg[j*V].y = FloatToShort((h_gauge[j*2+1]/fat_link_max_)); 
-  }
-}
-
-
-/*
-// a += b*c
-template <typename Float>
-inline void accumulateComplexProduct(Float *a, Float *b, Float *c, Float sign) {
-  a[0] += sign*(b[0]*c[0] - b[1]*c[1]);
-  a[1] += sign*(b[0]*c[1] + b[1]*c[0]);
-}
-
-// a = conj(b)*c
-template <typename Float>
-inline void complexDotProduct(Float *a, Float *b, Float *c) {
+  // a = conj(b)*c
+  template <typename Float>
+    __device__ __host__ inline void complexDotProduct(Float *a, Float *b, Float *c) {
     a[0] = b[0]*c[0] + b[1]*c[1];
     a[1] = b[0]*c[1] - b[1]*c[0];
-}
+  }
 
-// a += conj(b) * conj(c)
-template <typename Float>
-inline void accumulateConjugateProduct(Float *a, Float *b, Float *c, int sign) {
-  a[0] += sign * (b[0]*c[0] - b[1]*c[1]);
-  a[1] -= sign * (b[0]*c[1] + b[1]*c[0]);
-}
+  // a += conj(b) * conj(c)
+  template <typename Float>
+    __device__ __host__ inline void accumulateConjugateProduct(Float *a, Float *b, Float *c, int sign) {
+    a[0] += sign * (b[0]*c[0] - b[1]*c[1]);
+    a[1] -= sign * (b[0]*c[1] + b[1]*c[0]);
+  }
 
-// a = conj(b)*conj(c)
-template <typename Float>
-inline void complexConjugateProduct(Float *a, Float *b, Float *c) {
+  // a = conj(b)*conj(c)
+  template <typename Float>
+    __device__ __host__ inline void complexConjugateProduct(Float *a, Float *b, Float *c) {
     a[0] = b[0]*c[0] - b[1]*c[1];
     a[1] = -b[0]*c[1] - b[1]*c[0];
-}
-*/
-
-// Routines used to unpack the gauge field matrices
-template <typename Float>
-inline void reconstruct8(Float *mat, int dir, int idx) {
-  // First reconstruct first row
-  Float row_sum = 0.0;
-  row_sum += mat[2]*mat[2];
-  row_sum += mat[3]*mat[3];
-  row_sum += mat[4]*mat[4];
-  row_sum += mat[5]*mat[5];
-  Float u0 = (dir < 3 ? anisotropy_ : (idx >= (X_[3]-1)*X_[0]*X_[1]*X_[2]/2 ? t_boundary_ : 1));
-  Float diff = 1.f/(u0*u0) - row_sum;
-  Float U00_mag = sqrt(diff >= 0 ? diff : 0.0);
-
-  mat[14] = mat[0];
-  mat[15] = mat[1];
-
-  mat[0] = U00_mag * cos(mat[14]);
-  mat[1] = U00_mag * sin(mat[14]);
-
-  Float column_sum = 0.0;
-  for (int i=0; i<2; i++) column_sum += mat[i]*mat[i];
-  for (int i=6; i<8; i++) column_sum += mat[i]*mat[i];
-  diff = 1.f/(u0*u0) - column_sum;
-  Float U20_mag = sqrt(diff >= 0 ? diff : 0.0);
-
-  mat[12] = U20_mag * cos(mat[15]);
-  mat[13] = U20_mag * sin(mat[15]);
-
-  // First column now restored
-
-  // finally reconstruct last elements from SU(2) rotation
-  Float r_inv2 = 1.0/(u0*row_sum);
-
-  // U11
-  Float A[2];
-  complexDotProduct(A, mat+0, mat+6);
-  complexConjugateProduct(mat+8, mat+12, mat+4);
-  accumulateComplexProduct(mat+8, A, mat+2, u0);
-  mat[8] *= -r_inv2;
-  mat[9] *= -r_inv2;
-
-  // U12
-  complexConjugateProduct(mat+10, mat+12, mat+2);
-  accumulateComplexProduct(mat+10, A, mat+4, -u0);
-  mat[10] *= r_inv2;
-  mat[11] *= r_inv2;
-
-  // U21
-  complexDotProduct(A, mat+0, mat+12);
-  complexConjugateProduct(mat+14, mat+6, mat+4);
-  accumulateComplexProduct(mat+14, A, mat+2, -u0);
-  mat[14] *= r_inv2;
-  mat[15] *= r_inv2;
-
-  // U12
-  complexConjugateProduct(mat+16, mat+6, mat+2);
-  accumulateComplexProduct(mat+16, A, mat+4, u0);
-  mat[16] *= -r_inv2;
-  mat[17] *= -r_inv2;
-}
-
-template <typename Float>
-inline void unpack8(Float *h_gauge, double2 *d_gauge, int dir, int V, int idx) {
-  double2 *dg = d_gauge + dir*4*V;
-  for (int j=0; j<4; j++) {
-    h_gauge[2*j+0] = dg[j*V].x;
-    h_gauge[2*j+1] = dg[j*V].y;
   }
-  reconstruct8(h_gauge, dir, idx);
-}
 
-template <typename Float>
-inline void unpack8(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
-  float4 *dg = d_gauge + dir*2*V;
-  h_gauge[0] = dg[0].x;
-  h_gauge[1] = dg[0].y;
-  h_gauge[2] = dg[0].z;
-  h_gauge[3] = dg[0].w;
-  h_gauge[4] = dg[V].x;
-  h_gauge[5] = dg[V].y;
-  h_gauge[6] = dg[V].z;
-  h_gauge[7] = dg[V].w;
-  reconstruct8(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack8(Float *h_gauge, float2 *d_gauge, int dir, int V, int idx) {
-  float2 *dg = d_gauge + dir*4*V;
-  for (int j=0; j<4; j++) {
-    h_gauge[2*j+0] = dg[j*V].x;
-    h_gauge[2*j+1] = dg[j*V].y;
-  }
-  reconstruct8(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack8(Float *h_gauge, short4 *d_gauge, int dir, int V, int idx) {
-  short4 *dg = d_gauge + dir*2*V;
-  ShortToFloat(h_gauge[0], dg[0].x);
-  ShortToFloat(h_gauge[1], dg[0].y);
-  ShortToFloat(h_gauge[2], dg[0].z);
-  ShortToFloat(h_gauge[3], dg[0].w);
-  ShortToFloat(h_gauge[4], dg[V].x);
-  ShortToFloat(h_gauge[5], dg[V].y);
-  ShortToFloat(h_gauge[6], dg[V].z);
-  ShortToFloat(h_gauge[7], dg[V].w);
-  h_gauge[0] *= M_PI;
-  h_gauge[1] *= M_PI;
-  reconstruct8(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack8(Float *h_gauge, short2 *d_gauge, int dir, int V, int idx) {
-  short2 *dg = d_gauge + dir*4*V;
-  for (int j=0; j<4; j++) {
-    ShortToFloat(h_gauge[2*j+0], dg[j*V].x);
-    ShortToFloat(h_gauge[2*j+1], dg[j*V].y);
-  }
-  h_gauge[0] *= M_PI;
-  h_gauge[1] *= M_PI;
-  reconstruct8(h_gauge, dir, idx);
-}
-
-// do this using complex numbers (simplifies)
-template <typename Float>
-inline void reconstruct12(Float *mat, int dir, int idx) {
-  Float *u = &mat[0*(3*2)];
-  Float *v = &mat[1*(3*2)];
-  Float *w = &mat[2*(3*2)];
-  w[0] = 0.0; w[1] = 0.0; w[2] = 0.0; w[3] = 0.0; w[4] = 0.0; w[5] = 0.0;
-  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-  Float u0 = (dir < 3 ? anisotropy_ :
-	      (idx >= (X_[3]-1)*X_[0]*X_[1]*X_[2]/2 ? t_boundary_ : 1));
-  w[0]*=u0; w[1]*=u0; w[2]*=u0; w[3]*=u0; w[4]*=u0; w[5]*=u0;
-}
-
-template <typename Float>
-inline void unpack12(Float *h_gauge, double2 *d_gauge, int dir, int V, int idx) {
-  double2 *dg = d_gauge + dir*6*V;
-  for (int j=0; j<6; j++) {
-    h_gauge[j*2+0] = dg[j*V].x;
-    h_gauge[j*2+1] = dg[j*V].y; 
-  }
-  reconstruct12(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack12(Float *h_gauge, float4 *d_gauge, int dir, int V, int idx) {
-  float4 *dg = d_gauge + dir*3*V;
-  for (int j=0; j<3; j++) {
-    h_gauge[j*4+0] = dg[j*V].x;
-    h_gauge[j*4+1] = dg[j*V].y; 
-    h_gauge[j*4+2] = dg[j*V].z;
-    h_gauge[j*4+3] = dg[j*V].w; 
-  }
-  reconstruct12(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack12(Float *h_gauge, float2 *d_gauge, int dir, int V, int idx) {
-  float2 *dg = d_gauge + dir*6*V;
-  for (int j=0; j<6; j++) {
-    h_gauge[j*2+0] = dg[j*V].x;
-    h_gauge[j*2+1] = dg[j*V].y; 
-  }
-  reconstruct12(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack12(Float *h_gauge, short4 *d_gauge, int dir, int V, int idx) {
-  short4 *dg = d_gauge + dir*3*V;
-  for (int j=0; j<3; j++) {
-    ShortToFloat(h_gauge[j*4+0], dg[j*V].x);
-    ShortToFloat(h_gauge[j*4+1], dg[j*V].y);
-    ShortToFloat(h_gauge[j*4+2], dg[j*V].z);
-    ShortToFloat(h_gauge[j*4+3], dg[j*V].w);
-  }
-  reconstruct12(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack12(Float *h_gauge, short2 *d_gauge, int dir, int V, int idx) {
-  short2 *dg = d_gauge + dir*6*V;
-  for (int j=0; j<6; j++) {
-    ShortToFloat(h_gauge[j*2+0], dg[j*V].x);
-    ShortToFloat(h_gauge[j*2+1], dg[j*V].y); 
-  }
-  reconstruct12(h_gauge, dir, idx);
-}
-
-template <typename Float>
-inline void unpack18(Float *h_gauge, double2 *d_gauge, int dir, int V) {
-  double2 *dg = d_gauge + dir*9*V;
-  for (int j=0; j<9; j++) {
-    h_gauge[j*2+0] = dg[j*V].x; 
-    h_gauge[j*2+1] = dg[j*V].y;
-  }
-}
-
-template <typename Float>
-inline void unpack18(Float *h_gauge, float4 *d_gauge, int dir, int V) {
-  float4 *dg = d_gauge + dir*5*V;
-  for (int j=0; j<4; j++) {
-    h_gauge[j*4+0] = dg[j*V].x; 
-    h_gauge[j*4+1] = dg[j*V].y;
-    h_gauge[j*4+2] = dg[j*V].z; 
-    h_gauge[j*4+3] = dg[j*V].w;
-  }
-  h_gauge[16] = dg[4*V].x; 
-  h_gauge[17] = dg[4*V].y;
-}
-
-template <typename Float>
-inline void unpack18(Float *h_gauge, float2 *d_gauge, int dir, int V) {
-  float2 *dg = d_gauge + dir*9*V;
-  for (int j=0; j<9; j++) {
-    h_gauge[j*2+0] = dg[j*V].x; 
-    h_gauge[j*2+1] = dg[j*V].y;
-  }
-}
-
-template <typename Float>
-inline void unpack18(Float *h_gauge, short4 *d_gauge, int dir, int V) {
-  short4 *dg = d_gauge + dir*5*V;
-  for (int j=0; j<4; j++) {
-    ShortToFloat(h_gauge[j*4+0], dg[j*V].x);
-    ShortToFloat(h_gauge[j*4+1], dg[j*V].y);
-    ShortToFloat(h_gauge[j*4+2], dg[j*V].z);
-    ShortToFloat(h_gauge[j*4+3], dg[j*V].w);
-  }
-  ShortToFloat(h_gauge[16],dg[4*V].x);
-  ShortToFloat(h_gauge[17],dg[4*V].y);
-
-}
-
-template <typename Float>
-inline void unpack18(Float *h_gauge, short2 *d_gauge, int dir, int V) {
-  short2 *dg = d_gauge + dir*9*V;
-  for (int j=0; j<9; j++) {
-    ShortToFloat(h_gauge[j*2+0], dg[j*V].x); 
-    ShortToFloat(h_gauge[j*2+1], dg[j*V].y);
-  }
-}
-
-template <typename Float>
-inline void unpack18(Float *h_gauge, short2 *d_gauge, int dir, int V, Float scale_factor) {
-  short2 *dg = d_gauge + dir*9*V;
-  for (int j=0; j<9; j++) {
-    ShortToFloat(h_gauge[j*2+0], dg[j*V].x); 
-    ShortToFloat(h_gauge[j*2+1], dg[j*V].y);
-    h_gauge[j*2] *= scale_factor;
-    h_gauge[j*2+1] *= scale_factor;
-  }
-}
-
-
-
-
-// Assume the gauge field is "QDP" ordered: directions outside of
-// space-time, row-column ordering, even-odd space-time
-// offset = 0 for body
-// offset = Vh for face
-// voxels = Vh for body
-// voxels[i] = face volume[i]
-template <typename Float, typename FloatN>
-static void packQDPGaugeField(FloatN *d_gauge, Float **h_gauge, int oddBit, 
-			      QudaReconstructType reconstruct, int Vh, int *voxels,
-			      int pad, int offset, int nFace, const QudaLinkType& type) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      int nMat = nFace*voxels[dir];
-      Float *g = h_gauge[dir] + oddBit*nMat*18;
-      for (int i = 0; i < nMat; i++) pack12(d_gauge+offset+i, g+i*18, dir, Vh+pad);
+  /** Generic reconstruction is no reconstruction */
+  template <int N, typename Float> 
+    struct Reconstruct {
+    typedef typename mapper<Float>::type RegType;
+    Reconstruct(const GaugeField &u) { ; }
+    
+    __device__ __host__ inline void Pack(RegType out[N], const RegType in[N]) const {
+      for (int i=0; i<N; i++) out[i] = in[i];
     }
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    for (int dir = 0; dir < 4; dir++) {
-      int nMat = nFace*voxels[dir];
-      Float *g = h_gauge[dir] + oddBit*nMat*18;
-      for (int i = 0; i < nMat; i++) pack8(d_gauge+offset+i, g+i*18, dir, Vh+pad);
+    __device__ __host__ inline void Unpack(RegType out[N], const RegType in[N], int idx, int dir) const {
+      for (int i=0; i<N; i++) out[i] = in[i];
     }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      int nMat = nFace*voxels[dir];
-      Float *g = h_gauge[dir] + oddBit*nMat*18;
-      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
-	for (int i = 0; i < nMat; i++) pack18((short2*)(d_gauge+offset+i), g+i*18, dir, Vh+pad, static_cast<Float>(1.f/fat_link_max_));
-      }else{
-	for (int i = 0; i < nMat; i++) pack18(d_gauge+offset+i, g+i*18, dir, Vh+pad);
+  };
+
+  /** No reconstruction but we scale the result. This is used for
+      half-precision non-unitary fields, e.g., staggered fat link */
+  template <typename Float>
+    struct Reconstruct<19,Float> {
+    typedef typename mapper<Float>::type RegType;
+    RegType scale;
+    Reconstruct(const GaugeField &u) : scale(u.LinkMax()) { ; }
+
+    __device__ __host__ inline void Pack(RegType out[18], const RegType in[18]) const {
+      for (int i=0; i<18; i++) out[i] = in[i] / scale;
+    }
+    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[18],
+					   int idx, int dir) const {
+      for (int i=0; i<18; i++) out[i] = scale * in[i];
+    }
+  };
+
+  template <typename Float>
+    struct Reconstruct<12,Float> {
+      typedef typename mapper<Float>::type RegType;
+      int X[QUDA_MAX_DIM];
+      const RegType anisotropy;
+      const QudaTboundary tBoundary;
+
+      Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()) 
+      {	for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
+
+      __device__ __host__ inline void Pack(RegType out[12], const RegType in[12]) const {
+	for (int i=0; i<12; i++) out[i] = in[i];
       }
-    }
-  }
-}
 
-// Assume the gauge field is "QDP" ordered: directions outside of
-// space-time, row-column ordering, even-odd space-time
-template <typename Float, typename FloatN>
-static void unpackQDPGaugeField(Float **h_gauge, FloatN *d_gauge, int oddBit, 
-				QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge[dir] + oddBit*V*18;
-      for (int i = 0; i < V; i++) unpack12(g+i*18, d_gauge+i, dir, V+pad, i);
-    }
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge[dir] + oddBit*V*18;
-      for (int i = 0; i < V; i++) unpack8(g+i*18, d_gauge+i, dir, V+pad, i);
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge[dir] + oddBit*V*18;
-      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
-        for (int i = 0; i < V; i++) unpack18(g+i*18, (short2*)d_gauge+i, dir, V+pad, static_cast<Float>(fat_link_max_));
-      }else{
-        for (int i = 0; i < V; i++) unpack18(g+i*18, d_gauge+i, dir, V+pad);
+      __device__ __host__ inline void Unpack(RegType out[12], const RegType in[12],
+					     int idx, int dir) const {
+	for (int i=0; i<12; i++) out[i] = in[i];
+	for (int i=12; i<18; i++) out[i] = 0.0;
+	accumulateConjugateProduct(&out[12], &out[2], &out[10], +1);
+	accumulateConjugateProduct(&out[12], &out[4], &out[8], -1);
+	accumulateConjugateProduct(&out[14], &out[4], &out[6], +1);
+	accumulateConjugateProduct(&out[14], &out[0], &out[10], -1);
+	accumulateConjugateProduct(&out[16], &out[0], &out[8], +1);
+	accumulateConjugateProduct(&out[16], &out[2], &out[6], -1);
+	RegType u0 = (dir < 3 ? anisotropy :
+		    (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
+	for (int i=12; i<18; i++) out[i]*=u0;
       }
-    }
-  }
-}
+    };
 
-// transpose and scale the matrix
-template <typename Float, typename Float2>
-static void transposeScale(Float *gT, Float *g, const Float2 &a) {
-  for (int ic=0; ic<3; ic++) for (int jc=0; jc<3; jc++) for (int r=0; r<2; r++)
-    gT[(ic*3+jc)*2+r] = a*g[(jc*3+ic)*2+r];
-}
+  template <typename Float>
+    struct Reconstruct<8,Float> {
+      typedef typename mapper<Float>::type RegType;
+      int X[QUDA_MAX_DIM];
+      const RegType anisotropy;
+      const QudaTboundary tBoundary;
 
-// Assume the gauge field is "Wilson" ordered directions inside of
-// space-time column-row ordering even-odd space-time
-template <typename Float, typename FloatN>
-static void packCPSGaugeField(FloatN *d_gauge, Float *h_gauge, int oddBit, 
-			      QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
-  Float gT[18];
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	transposeScale(gT, g+4*i*18, 1.0 / anisotropy_);
-	pack12(d_gauge+i, gT, dir, V+pad);
+      Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()) 
+      {	for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
+
+      __device__ __host__ inline void Pack(RegType out[8], const RegType in[18]) const {
+	out[0] = Trig<isHalf<Float>::value>::Atan2(in[1], in[0]);
+	out[1] = Trig<isHalf<Float>::value>::Atan2(in[13], in[12]);
+	for (int i=2; i<8; i++) out[i] = in[i];
       }
-    } 
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	transposeScale(gT, g+4*i*18, 1.0 / anisotropy_);
-	pack8(d_gauge+i, gT, dir, V+pad);
+
+      __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8],
+					     int idx, int dir) const {
+	// First reconstruct first row
+	RegType row_sum = 0.0;
+	for (int i=2; i<6; i++) {
+	  out[i] = in[i];
+	  row_sum += in[i]*in[i];
+	}
+
+	RegType u0 = (dir < 3 ? anisotropy :
+		    (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
+	RegType diff = 1.0/(u0*u0) - row_sum;
+	RegType U00_mag = sqrt(diff >= 0 ? diff : 0.0);
+    
+	out[0] = U00_mag * Trig<isHalf<Float>::value>::Cos(in[0]);
+	out[1] = U00_mag * Trig<isHalf<Float>::value>::Sin(in[0]);
+	  
+	// Now reconstruct first column
+	RegType column_sum = 0.0;
+	for (int i=0; i<2; i++) column_sum += out[i]*out[i];
+	for (int i=6; i<8; i++) {
+	  out[i] = in[i];
+	  column_sum += in[i]*in[i];
+	}
+	diff = 1.f/(u0*u0) - column_sum;
+	RegType U20_mag = sqrt(diff >= 0 ? diff : 0.0);
+	
+	out[12] = U20_mag * Trig<isHalf<Float>::value>::Cos(in[1]);
+	out[13] = U20_mag * Trig<isHalf<Float>::value>::Sin(in[1]);
+	// First column now restored
+	
+	// finally reconstruct last elements from SU(2) rotation
+	RegType r_inv2 = 1.0/(u0*row_sum);
+	
+	// U11
+	RegType A[2];
+	complexDotProduct(A, out+0, out+6);
+	complexConjugateProduct(out+8, out+12, out+4);
+	accumulateComplexProduct(out+8, A, out+2, u0);
+	out[8] *= -r_inv2;
+	out[9] *= -r_inv2;
+	
+	// U12
+	complexConjugateProduct(out+10, out+12, out+2);
+	accumulateComplexProduct(out+10, A, out+4, -u0);
+	out[10] *= r_inv2;
+	out[11] *= r_inv2;
+	
+	// U21
+	complexDotProduct(A, out+0, out+12);
+	complexConjugateProduct(out+14, out+6, out+4);
+	accumulateComplexProduct(out+14, A, out+2, -u0);
+	out[14] *= r_inv2;
+	out[15] *= r_inv2;
+	
+	// U12
+	complexConjugateProduct(out+16, out+6, out+2);
+	accumulateComplexProduct(out+16, A, out+4, u0);
+	out[16] *= -r_inv2;
+	out[17] *= -r_inv2;
       }
-    }
-  } else {
-    Float scale_factor = 1.0/anisotropy_;
-    if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) scale_factor /= fat_link_max_;
-    for (int dir = 0; dir < 4; dir++) {
-      Float *g = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	transposeScale(gT, g+4*i*18, scale_factor);
-	pack18(d_gauge+i, gT, dir, V+pad);
-      }
-    }
-  }
-}
+    };
 
+  template <typename Float, int length, int N, int reconLen>
+    struct FloatNOrder {
+      typedef typename mapper<Float>::type RegType;
+      Reconstruct<reconLen,Float> reconstruct;
+      Float *gauge[2];
+      int volumeCB;
+      int stride;
 
-// Assume the gauge field is "Wilson" ordered directions inside of
-// space-time column-row ordering even-odd space-time
-template <typename Float, typename FloatN>
-static void unpackCPSGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
-				QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
-  Float gT[18];
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	unpack12(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg+4*i*18, gT, anisotropy_);
-      }
-    } 
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	unpack8(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg+4*i*18, gT, anisotropy_);
-      }
-    }
-  } else {
-    Float scale_factor = anisotropy_;
-    if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) scale_factor *= fat_link_max_;
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	unpack18(gT, d_gauge+i, dir, V+pad);
-	transposeScale(hg+4*i*18, gT, scale_factor);
-      }
-    }
-  }
-
-}
-
-
-// Assume the gauge field is MILC ordered: directions inside of
-// space-time row-column ordering even-odd space-time
-template <typename Float, typename FloatN>
-void packMILCGaugeField(FloatN *res, Float *gauge, int oddBit, 
-			QudaReconstructType reconstruct, int Vh, int pad, const QudaLinkType& type)
-{
-  int dir, i;
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (dir = 0; dir < 4; dir++) {
-      Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
-      for (i = 0; i < Vh; i++) {
-	pack12(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
-      }
-    }
-  } else if (reconstruct == QUDA_RECONSTRUCT_8){
-    for (dir = 0; dir < 4; dir++) {
-      Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
-      for (i = 0; i < Vh; i++) {
-	pack8(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
-      }
-    }
-  }else{
-    for (dir = 0; dir < 4; dir++) {
-      Float *g = gauge + oddBit*Vh*gaugeSiteSize*4;
-      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
-        for (i = 0; i < Vh; i++) pack18((short2*)res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad, static_cast<Float>(1.f/fat_link_max_));
-      }else{
-        for (i = 0; i < Vh; i++) pack18(res+i, g+(4*i+dir)*gaugeSiteSize, dir, Vh+pad);
-      }
-    }
-  }
-}
-
-// Assume the gauge field is MILC ordered: directions inside of
-// space-time row-column ordering even-odd space-time
-template <typename Float, typename FloatN>
-static void unpackMILCGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
-				 QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	unpack12(hg+4*i*18, d_gauge+i, dir, V+pad, i);
-      }
-    } 
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
-      for (int i = 0; i < V; i++) {
-	unpack8(hg+4*i*18, d_gauge+i, dir, V+pad, i);
-      }
-    }
-  } else {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (oddBit*V*4+dir)*18;
-      if(type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)){
-        for (int i = 0; i < V; i++) unpack18(hg+4*i*18, (short2*)d_gauge+i, dir, V+pad, static_cast<Float>(fat_link_max_));
-      }else{
-        for (int i = 0; i < V; i++) unpack18(hg+4*i*18, d_gauge+i, dir, V+pad);
-      }
-    }
-  }
-
-}
-
-// Assume the gauge field is BQCD ordered: 1-d array with
-// [mu][even-odd][spacetime+halos][column][row]
-template <typename Float, typename FloatN>
-void packBQCDGaugeField(FloatN *res, Float *gauge, int oddBit, 
-			QudaReconstructType reconstruct, int Vh, int pad, const QudaLinkType& type)
-{
-
-  // need to add on halo region
-  int mu_offset = X_[0]/2 + 2;
-  for (int i=1; i<4; i++) mu_offset *= (X_[i] + 2);
-  Float gT[18];
-
-  int dir, i;
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (dir = 0; dir < 4; dir++) {
-      Float *g = gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
-      for (i = 0; i < Vh; i++) {
-	transposeScale(gT, g+i*18, 1.0);
-	pack12(res+i, gT, dir, Vh+pad);
-      }
-    }
-  } else if (reconstruct == QUDA_RECONSTRUCT_8){
-    for (dir = 0; dir < 4; dir++) {
-      Float *g = gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
-      //Float *g = gauge + (dir*2+oddBit)*Vh*gaugeSiteSize;
-      for (i = 0; i < Vh; i++) {
-	transposeScale(gT, g+i*18, 1.0);
-	pack8(res+i, gT, dir, Vh+pad);
-      }
-    }
-  }else{
-    const Float scale_factor = (type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) ? 1.f/fat_link_max_ : 1.0;
-    // FIXME - need to workout row-col order
-    for (dir = 0; dir < 4; dir++) {
-      Float *g = gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
-      //Float *g = gauge + (dir*2+oddBit)*Vh*gaugeSiteSize;
-      for (i = 0; i < Vh; i++) {
-	transposeScale(gT, g+i*18, scale_factor);
-	pack18(res+i, gT, dir, Vh+pad);
-	//pack18(res+i, g+i*gaugeSiteSize, dir, Vh+pad);
-      }
-    }
-  }
-}
-
-// Assume the gauge field is BQCD ordered: 1-d array with
-// [mu][even-odd][spacetime+halos][column][row]
-template <typename Float, typename FloatN>
-static void unpackBQCDGaugeField(Float *h_gauge, FloatN *d_gauge, int oddBit, 
-				 QudaReconstructType reconstruct, int V, int pad, const QudaLinkType& type) {
-  // need to add on halo region
-  int mu_offset = X_[0]/2 + 2;
-  for (int i=1; i<4; i++) mu_offset *= (X_[i] + 2);
-  Float gT[18];
-
-  if (reconstruct == QUDA_RECONSTRUCT_12) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
-      for (int i = 0; i < V; i++) {
-	unpack12(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg+i*18, gT, 1.0);
-      }
-    } 
-  } else if (reconstruct == QUDA_RECONSTRUCT_8) {
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
-      for (int i = 0; i < V; i++) {
-	unpack8(gT, d_gauge+i, dir, V+pad, i);
-	transposeScale(hg+i*18, gT, 1.0);
-      }
-    }
-  } else {
-    const Float scale_factor = (type == QUDA_ASQTAD_FAT_LINKS && typeid(FloatN) == typeid(short2)) ? fat_link_max_ : 1.0;
-    for (int dir = 0; dir < 4; dir++) {
-      Float *hg = h_gauge + (dir*2+oddBit)*mu_offset*gaugeSiteSize;
-      for (int i = 0; i < V; i++) {
-	unpack18(gT, d_gauge+i, dir, V+pad);
-	transposeScale(hg+i*18, gT, scale_factor);
-      }
-    }
-  }
-
-}
-
-/*
-  Momentum packing/unpacking routines: these are for length 10
-  vectors, stored in Float2 format.
- */
-
-template <typename Float, typename Float2>
-  inline void pack10(Float2 *res, Float *m, int dir, int Vh, int pad) 
-{
-  int stride = Vh + pad;
-  Float2 *r = res + dir*5*stride;
-  for (int j=0; j<5; j++) {
-    r[j*stride].x = m[j*2+0]; 
-    r[j*stride].y = m[j*2+1]; 
-  }
-}
-
-template <typename Float, typename Float2>
-  void packMomField(Float2 *res, Float *mom, int oddBit, int Vh, int pad) 
-{    
-  for (int dir = 0; dir < 4; dir++) {
-    Float *g = mom + (oddBit*Vh*4 + dir)*10;
-    for (int i = 0; i < Vh; i++) {
-      pack10(res+i, g + 4*i*10, dir, Vh, pad);
-    }
-  }      
-}
-
-template <typename Float, typename Float2>
-  inline void unpack10(Float* m, Float2 *res, int dir, int Vh, int pad) 
-{
-  int stride = Vh + pad;
-  Float2 *r = res + dir*5*stride;
-  for (int j=0; j<5; j++) {
-    m[j*2+0] = r[j*stride].x;
-    m[j*2+1] = r[j*stride].y;
-  }    
-}
-
-template <typename Float, typename Float2>
-  void unpackMomField(Float* mom, Float2 *res, int oddBit, int Vh, int pad) 
-{
-  int dir, i;
-  Float *m = mom + oddBit*Vh*10*4;
+    FloatNOrder(Float *gauge_, const GaugeField &u) : 
+      reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()) 
+      { gauge[0] = gauge_; gauge[1] = (Float*)((char*)gauge_ + u.Bytes()/2); }
+      virtual ~FloatNOrder() { ; }
   
-  for (i = 0; i < Vh; i++) {
-    for (dir = 0; dir < 4; dir++) {	
-      Float* thismom = m + (4*i+dir)*10;
-      unpack10(thismom, res+i, dir, Vh, pad);
+      __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+	const int M = reconLen / N;
+	RegType tmp[reconLen];
+	for (int i=0; i<M; i++) {
+	  for (int j=0; j<N; j++) {
+	    int intIdx = i*N + j; // internal dof index
+	    int padIdx = intIdx / N;
+	    copy(tmp[i*N+j], gauge[parity][dir*stride*M*N + (padIdx*stride + x)*N + intIdx%N]);
+	  }
+	}
+	reconstruct.Unpack(v, tmp, x, dir);
+      }
+  
+      __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+	const int M = reconLen / N;
+	RegType tmp[reconLen];
+	reconstruct.Pack(tmp, v);
+	for (int i=0; i<M; i++) {
+	  for (int j=0; j<N; j++) {
+	    int intIdx = i*N + j;
+	    int padIdx = intIdx / N;
+	    copy(gauge[parity][dir*stride*M*N + (padIdx*stride + x)*N + intIdx%N], tmp[i*N+j]);
+	  }
+	}
+      }
+
+      __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
+	load(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+      }
+      
+      __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
+	save(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+      }
+
+      size_t Bytes() const { return 4 * 2 * volumeCB * reconLen * sizeof(Float); }
+    };
+
+  /** 
+      The LegacyOrder defines the ghost zone storage and ordering for
+      all cpuGaugeFields, which use the same ghost zone storage.
+  */
+  template <typename Float, int length> 
+    struct LegacyOrder {
+      typedef typename mapper<Float>::type RegType;
+      Float *ghost[QUDA_MAX_DIM];
+      int surfaceCB[QUDA_MAX_DIM];
+      int volumeCB;
+      LegacyOrder(const GaugeField &u) : volumeCB(u.VolumeCB()) {
+	for (int i=0; i<4; i++) {
+	  ghost[i] = (Float*)(u.Ghost()[i]);
+	  surfaceCB[i] = u.SurfaceCB(i);
+	}
+      }
+      virtual ~LegacyOrder() { ; }
+      
+      __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
+	for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*surfaceCB[dir] + x)*length + i];
+      }
+      
+      __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
+	for (int i=0; i<length; i++) ghost[dir][(parity*surfaceCB[dir] + x)*length + i] = v[i];
+      }
+      
+      virtual size_t Bytes() const { 
+	size_t bytes = 0;
+	for (int d=0; d<4; d++) bytes += 2 * surfaceCB[d] * length * sizeof(Float);
+	return bytes;
+      }
+    };
+
+  /**
+     struct to define QDP ordered gauge fields: 
+     [[dim]] [[parity][volumecb][row][col]]
+   */
+    template <typename Float, int length> struct QDPOrder : public LegacyOrder<Float,length> {
+    typedef typename mapper<Float>::type RegType;
+    Float *gauge[QUDA_MAX_DIM];
+    int volumeCB;
+    QDPOrder(void *gauge_, const GaugeField &u) : LegacyOrder<Float,length>(u), volumeCB(u.VolumeCB())
+      { for (int i=0; i<4; i++) gauge[i] = ((Float**)gauge_)[i]; }
+    virtual ~QDPOrder() { ; }
+    
+    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+      for (int i=0; i<length; i++) {
+	v[i] = (RegType)gauge[dir][(parity*volumeCB + x)*length + i];
+      }
+    }
+  
+    __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+      for (int i=0; i<length; i++) {
+	gauge[dir][(parity*volumeCB + x)*length + i] = (Float)v[i];
+      }
+    }
+
+    size_t Bytes() const { return 4 * 2 * volumeCB * length * sizeof(Float); }
+  };
+
+  /**
+     struct to define MILC ordered gauge fields: 
+     [parity][dim][volumecb][row][col]
+   */
+    template <typename Float, int length> struct MILCOrder : public LegacyOrder<Float,length> {
+    typedef typename mapper<Float>::type RegType;
+    Float *gauge;
+    int volumeCB;
+  MILCOrder(void *gauge, const GaugeField &u) : LegacyOrder<Float,length>(u), gauge((Float*)gauge), volumeCB(u.VolumeCB()) { ; }
+    virtual ~MILCOrder() { ; }
+    
+    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+      for (int i=0; i<length; i++) {
+	v[i] = (RegType)gauge[((parity*volumeCB+x)*4 + dir)*length + i];
+      }
+    }
+  
+    __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+      for (int i=0; i<length; i++) {
+	gauge[((parity*volumeCB+x)*4 + dir)*length + i] = (Float)v[i];
+      }
+    }
+
+    size_t Bytes() const { return 4 * 2 * volumeCB * length * sizeof(Float); }
+  };
+  
+  /**
+     struct to define CPS ordered gauge fields: 
+     [parity][dim][volumecb][col][row]
+   */
+    template <typename Float, int length> struct CPSOrder : LegacyOrder<Float,length> {
+    typedef typename mapper<Float>::type RegType;
+    Float *gauge;
+    int volumeCB;
+    Float anisotropy;
+    const int Nc;
+  CPSOrder(void *gauge, const GaugeField &u) : LegacyOrder<Float,length>(u), gauge((Float*)gauge), volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3) 
+    { if (length != 18) errorQuda("Gauge length %d not supported", length); }
+    virtual ~CPSOrder() { ; }
+    
+    // we need to transpose and scale for CPS ordering
+    __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+      for (int i=0; i<Nc; i++) {
+	for (int j=0; j<Nc; j++) {
+	  for (int z=0; z<2; z++) {
+	    v[(i*Nc+j)*2+z] = 
+	      (RegType)(gauge[((((parity*volumeCB+x)*4 + dir)*Nc + j)*Nc + i)*2 + z] / anisotropy);
+	  }
+	}
+      }
+    }
+  
+    __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+      for (int i=0; i<Nc; i++) {
+	for (int j=0; j<Nc; j++) {
+	  for (int z=0; z<2; z++) {
+	    gauge[((((parity*volumeCB+x)*4 + dir)*Nc + j)*Nc + i)*2 + z] = 
+	      (Float)(anisotropy * v[(i*Nc+j)*2+z]);
+	  }
+	}
+      }
+    }
+
+    size_t Bytes() const { return 4 * 2 * volumeCB * Nc * Nc * 2 * sizeof(Float); }
+  };
+  
+  /**
+     struct to define BQCD ordered gauge fields: 
+     [mu][parity][volumecb+halos][col][row]
+   */
+    template <typename Float, int length> struct BQCDOrder : LegacyOrder<Float,length> {
+    typedef typename mapper<Float>::type RegType;
+    Float *gauge;
+    int volumeCB;
+    int exVolumeCB; // extended checkerboard volume
+    const int Nc;
+  BQCDOrder(void *gauge, const GaugeField &u) : LegacyOrder<Float,length>(u), gauge((Float*)gauge), volumeCB(u.VolumeCB()), Nc(3) { 
+      if (length != 18) errorQuda("Gauge length %d not supported", length);
+      // compute volumeCB + halo region
+      exVolumeCB = u.X()[0]/2 + 2;
+      for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2; 
+    }
+    virtual ~BQCDOrder() { ; }
+    
+    // we need to transpose for BQCD ordering
+    __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity) const {
+      for (int i=0; i<Nc; i++) {
+	for (int j=0; j<Nc; j++) {
+	  for (int z=0; z<2; z++) {
+	    v[(i*Nc+j)*2+z] = (RegType)gauge[((((dir*2+parity)*exVolumeCB + x)*Nc + j)*Nc + i)*2 + z];
+	  }
+	}
+      }
+    }
+  
+    __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
+      for (int i=0; i<Nc; i++) {
+	for (int j=0; j<Nc; j++) {
+	  for (int z=0; z<2; z++) {
+	    gauge[((((dir*2+parity)*exVolumeCB + x)*Nc + j)*Nc + i)*2 + z] = (Float)v[(i*Nc+j)*2+z];
+	  }
+	}
+      }
+    }
+
+    size_t Bytes() const { return 4 * 2 * volumeCB * Nc * Nc * 2 * sizeof(Float); }
+  };
+
+  /**
+     Generic CPU gauge reordering and packing 
+  */
+  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+    void packGauge(OutOrder outOrder, const InOrder inOrder, int volume, int nDim) {  
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+
+    for (int parity=0; parity<2; parity++) {
+
+      for (int d=0; d<nDim; d++) {
+	for (int x=0; x<volume/2; x++) {
+	  RegTypeIn in[length];
+	  RegTypeOut out[length];
+	  inOrder.load(in, x, d, parity);
+	  for (int i=0; i<length; i++) out[i] = in[i];
+	  outOrder.save(out, x, d, parity);
+	}
+      }
+
     }
   }
+
+  /** 
+      Generic CUDA gauge reordering and packing.  Adopts a similar form as
+      the CPU version, using the same inlined functions.
+  */
+  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+    __global__ void packGaugeKernel(OutOrder outOrder, const InOrder inOrder, int volume, int nDim) {  
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+
+    for (int parity=0; parity<2; parity++) {
+
+      for (int d=0; d<nDim; d++) {
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	if (x >= volume/2) return;
+
+	RegTypeIn in[length];
+	RegTypeOut out[length];
+	inOrder.load(in, x, d, parity);
+	for (int i=0; i<length; i++) out[i] = in[i];
+	outOrder.save(out, x, d, parity);
+      }
+    }
+  }
+
+  /**
+     Generic CPU gauge ghost reordering and packing 
+  */
+  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+    void packGhost(OutOrder outOrder, const InOrder inOrder, const int *surfaceCB, int nDim) {  
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+
+    for (int parity=0; parity<2; parity++) {
+
+      for (int d=0; d<nDim; d++) {
+	for (int x=0; x<surfaceCB[d]; x++) {
+	  RegTypeIn in[length];
+	  RegTypeOut out[length];
+	  inOrder.loadGhost(in, x, d, parity); // assumes we are loading 
+	  for (int i=0; i<length; i++) out[i] = in[i];
+	  outOrder.saveGhost(out, x, d, parity); // just need to add on volume offset for FloatN gauge
+	}
+      }
+
+    }
+  }
+
+  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+    class PackGauge : Tunable {
+    const InOrder &in;
+    OutOrder &out;
+    const int volume;
+    const int nDim;
+
+  private:
+    int sharedBytesPerThread() const { return 0; }
+    int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
+
+    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+    bool advanceBlockDim(TuneParam &param) const {
+      bool advance = Tunable::advanceBlockDim(param);
+      if (advance) param.grid = dim3( (volume/2+param.block.x-1) / param.block.x, 1, 1);
+      return advance;
+    }
+
+  public:
+  PackGauge(OutOrder &out, const InOrder &in, int volume, int nDim) 
+    : out(out), in(in), volume(volume), nDim(nDim) { ; }
+    virtual ~PackGauge() { ; }
+  
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_DEBUG_VERBOSE);
+      packGaugeKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
+	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(out, in, volume, nDim);
+    }
+
+    TuneKey tuneKey() const {
+      std::stringstream vol, aux;
+      vol << in.volume; 
+      aux << "out_stride=" << out.stride << ",in_stride=" << in.stride;
+      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+    }
+
+    std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
+      std::stringstream ps;
+      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+      ps << "shared=" << param.shared_bytes;
+      return ps.str();
+    }
+
+    virtual void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      param.grid = dim3( (volume/2+param.block.x-1) / param.block.x, 1, 1);
+    }
+
+    /** sets default values for when tuning is disabled */
+    virtual void defaultTuneParam(TuneParam &param) const {
+      Tunable::defaultTuneParam(param);
+      param.grid = dim3( (volume/2+param.block.x-1) / param.block.x, 1, 1);
+    }
+
+    long long flops() const { return 0; } 
+    long long bytes() const { return in.Bytes() + out.Bytes(); } 
+  };
+
+  // FIXME add support for multi-GPU
+  // ghost zone when doing D2D
+
+  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+    void packGauge(OutOrder outOrder, const InOrder inOrder, int volume, const int *surfaceCB, int nDim, int ghost) {
+
+    if (!ghost) {
+      packGauge<FloatOut, FloatIn, length>(outOrder, inOrder, volume, nDim);
+    } else {
+      packGhost<FloatOut, FloatIn, length>(outOrder, inOrder, surfaceCB, nDim);
+    }
+
+  }
+
+  template <typename FloatOut, typename FloatIn, int length, typename InOrder>
+    void packGauge(const InOrder &inOrder, FloatOut *Out, GaugeField &out, int ghost) {
+    if (out.Order() == QUDA_FLOAT_GAUGE_ORDER) {
+      if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  packGauge<FloatOut,FloatIn,length, FloatNOrder<FloatOut,length,1,19>, InOrder>
+	    (FloatNOrder<FloatOut,length,1,19>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+	} else {
+	  packGauge<FloatOut,FloatIn,length>
+	    (FloatNOrder<FloatOut,length,1,18>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+	}
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	packGauge<FloatOut,FloatIn,length> 
+	  (FloatNOrder<FloatOut,length,1,12>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	packGauge<FloatOut,FloatIn,length>
+	  (FloatNOrder<FloatOut,length,1,8>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+      }
+    } else if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+      if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  packGauge<FloatOut,FloatIn,length>
+	    (FloatNOrder<FloatOut,length,2,19>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+	} else {
+	  packGauge<FloatOut,FloatIn,length>
+	    (FloatNOrder<FloatOut,length,2,18>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+	}
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	packGauge<FloatOut,FloatIn,length> 
+	  (FloatNOrder<FloatOut,length,2,12>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);	   
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	packGauge<FloatOut,FloatIn,length> 
+	  (FloatNOrder<FloatOut,length,2,8>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);	   
+      }
+    } else if (out.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
+      if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  packGauge<FloatOut,FloatIn,length>
+	    (FloatNOrder<FloatOut,length,1,19>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+	} else {
+	  packGauge<FloatOut,FloatIn,length>
+	    (FloatNOrder<FloatOut,length,1,18>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+	}
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	packGauge<FloatOut,FloatIn,length> 
+	  (FloatNOrder<FloatOut,length,4,12>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	packGauge<FloatOut,FloatIn,length> 
+	  (FloatNOrder<FloatOut,length,4,8>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+      }
+    } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>
+	(QDPOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+    } else if (out.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>
+	(CPSOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+    } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>
+	(MILCOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+    } else if (out.Order() == QUDA_BQCD_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>
+	(BQCDOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), out.SurfaceCB(), out.Ndim(), ghost);
+    } else {
+      errorQuda("Gauge field %d order not supported", out.Order());
+    }
+
+  }
+
+  template <typename FloatOut, typename FloatIn, int length>
+    void packGauge(FloatOut *Out, FloatIn *In, GaugeField &out, const GaugeField &in, int ghost) {
+
+    // reconstruction only supported on FloatN fields currently
+    if (in.Order() == QUDA_FLOAT_GAUGE_ORDER) {
+      if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,19>(In, in), Out, out, ghost);
+	} else {
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,18>(In, in), Out, out, ghost);
+	}
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,12>(In, in), Out, out, ghost);
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,8>(In, in), Out, out, ghost);
+      }
+    } else if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+      if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,19>(In, in), Out, out, ghost);
+	} else {
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,18>(In, in), Out, out, ghost);
+	}
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,12>(In, in), Out, out, ghost);
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,8>(In, in), Out, out, ghost);
+      }      
+    } else if (in.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
+      if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,19>(In, in), Out, out, ghost);
+	} else {
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,18>(In, in), Out, out, ghost);
+	}
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,12>(In, in), Out, out, ghost);
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,8>(In, in), Out, out, ghost);
+      }
+    } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(In, in), Out, out, ghost);
+    } else if (in.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>(CPSOrder<FloatIn,length>(In, in), Out, out, ghost);
+    } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(In, in), Out, out, ghost);
+    } else if (in.Order() == QUDA_BQCD_GAUGE_ORDER) {
+      packGauge<FloatOut,FloatIn,length>(BQCDOrder<FloatIn,length>(In, in), Out, out, ghost);
+    } else {
+      errorQuda("Gauge field %d order not supported", in.Order());
+    }
+
+  }
+
+  template <typename FloatOut, typename FloatIn>
+    void packGauge(FloatOut *Out, FloatIn *In, GaugeField &out, const GaugeField &in, int ghost) {
+
+    if (in.Ncolor() != 3 && out.Ncolor() != 3) {
+      errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
+    }
+    
+    if (out.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
+      // we are doing gauge field packing
+      packGauge<FloatOut,FloatIn,18>(Out, In, out, in, ghost);
+    } else {
+      // we are doing momentum field packing
+      if (in.Reconstruct() != QUDA_RECONSTRUCT_10 && out.Reconstruct() != 10) {
+	errorQuda("Unsupported reconstruction types out=%d in=%d for momentum field", 
+		  out.Reconstruct(), in.Reconstruct());
+      }
+    
+      const int length = 10;
+      
+      // momentum only currently supported on MILC and Float2 fields currently
+      if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	  packGauge<FloatOut,FloatIn,10> 
+	    (FloatNOrder<FloatOut,10,2,10>(Out, out), FloatNOrder<FloatIn,10,2,10>(In, in), 
+	     out.Volume(), out.Ndim());
+	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+	  packGauge<FloatOut,FloatIn,length> 
+	    (FloatNOrder<FloatOut,10,2,10>(Out, out), MILCOrder<FloatIn,10>(In, in), 
+	     out.Volume(), out.Ndim());
+	} else {
+	  errorQuda("Gauge field orders %d not supported", in.Order());
+	}
+      } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
+	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	  packGauge<FloatOut,FloatIn,length> 
+	    (MILCOrder<FloatOut,10>(Out, out), FloatNOrder<FloatIn,10,2,10>(In, in), 
+	     out.Volume(), out.Ndim());
+	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+	  packGauge<FloatOut,FloatIn,length> 
+	    (MILCOrder<FloatOut,10>(Out, out), MILCOrder<FloatIn,10>(In, in), 
+	     out.Volume(), out.Ndim());
+	} else {
+	  errorQuda("Gauge field orders %d not supported", in.Order());
+	}
+      } else {
+	errorQuda("Gauge field orders %d not supported", out.Order());
+      }
+    }
+  }
+
+  /**
+     Generic CPU function find the gauge maximum
+  */
+  template <typename Float, int Nc, typename Order>
+    double maxGauge(const Order order, int volume, int nDim) {  
+    typedef typename mapper<Float>::type RegType;
+    RegType max = 0.0;
+
+    for (int parity=0; parity<2; parity++) {
+
+      for (int d=0; d<nDim; d++) {
+	for (int x=0; x<volume/2; x++) {
+	  RegType v[Nc*Nc*2];
+	  order.load(v, x, d, parity);
+	  for (int i=0; i<Nc*Nc*2; i++) if (abs(v[i]) > max) { max = v[i]; }
+	}
+      }
+
+    }
+
+    return max;
+  }
+
+  template <typename Float>
+    double maxGauge(const GaugeField &u) {
+
+    if (u.Ncolor() != 3) {
+      errorQuda("Unsupported number of colors; Nc=%d", u.Ncolor());
+    }
+
+    const int Nc = 3;
+
+    double max;
+    // max only supported on external fields currently
+    if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+      max = maxGauge<Float,Nc>(QDPOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+    } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+      max = maxGauge<Float,Nc>(CPSOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+    } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+      max = maxGauge<Float,Nc>(MILCOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+    } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
+      max = maxGauge<Float,Nc>(BQCDOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+    } else {
+      errorQuda("Gauge field %d order not supported", u.Order());
+    }
+
+    reduceMaxDouble(max);
+    return max;
+  }
+
+
 }
+

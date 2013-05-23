@@ -5,7 +5,7 @@
 #include <misc_helpers.h>
 #include <blas_quda.h>
 
-#include <pack_gauge_new.h>
+#include <pack_gauge.h>
 
 namespace quda {
 
@@ -16,11 +16,8 @@ namespace quda {
       errorQuda("ERROR: create type(%d) not supported yet\n", create);
     }
   
-    gauge = device_malloc(bytes);
-  
-    if(create == QUDA_ZERO_FIELD_CREATE){
-      cudaMemset(gauge, 0, bytes);
-    }
+    gauge = device_malloc(bytes);  
+    if(create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
     even = gauge;
     odd = (char*)gauge + bytes/2; 
 
@@ -32,9 +29,7 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field) {
-
     // create the texture for the field components
-
     cudaChannelFormatDesc desc;
     memset(&desc, 0, sizeof(cudaChannelFormatDesc));
     if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
@@ -85,104 +80,6 @@ namespace quda {
     if (gauge) device_free(gauge);
   }
 
-  // FIXME temporary hack 
-  static double anisotropy_;
-  static double fat_link_max_;
-  static const int *X_;
-  static QudaTboundary t_boundary_;
-
-#include <pack_gauge.h>
-
-  template <typename Float, typename FloatN>
-  static void loadGaugeField(FloatN *even, FloatN *odd, Float *cpuGauge, Float **cpuGhost,
-			     GaugeFieldOrder cpu_order, QudaReconstructType reconstruct, 
-			     size_t bytes, int volumeCB, int *surfaceCB, int pad, int nFace,
-			     QudaLinkType type, double &fat_link_max, void *buffer)
-  {
-    // Use pinned memory
-    FloatN *packedEven = (FloatN*)buffer;
-    FloatN *packedOdd = (FloatN*)((char*)buffer+ bytes/2);
-
-    if( ! packedEven ) errorQuda( "packedEven is borked\n");
-    if( ! packedOdd ) errorQuda( "packedOdd is borked\n");
-    if( ! even ) errorQuda( "even is borked\n");
-    if( ! odd ) errorQuda( "odd is borked\n");
-    if( ! cpuGauge ) errorQuda( "cpuGauge is borked\n");
-
-#ifdef MULTI_GPU
-    if (cpu_order != QUDA_QDP_GAUGE_ORDER && cpu_order != QUDA_BQCD_GAUGE_ORDER &&
-	cpu_order != QUDA_CPS_WILSON_GAUGE_ORDER && cpu_order != QUDA_MILC_GAUGE_ORDER)
-      errorQuda("Gauge order %d is not supported for multi-gpu\n", cpu_order);
-#endif
-
-    //for QUDA_ASQTAD_FAT_LINKS, need to find out the max value
-    //fat_link_max will be used in encoding half precision fat link
-    if(type == QUDA_ASQTAD_FAT_LINKS){
-      fat_link_max = 0.0;
-      if(cpu_order == QUDA_QDP_GAUGE_ORDER){
-        for(int dir=0; dir < 4; dir++){
-	  for(int i=0;i < 2*volumeCB*gaugeSiteSize; i++){
-	    Float** tmp = (Float**)cpuGauge;
-	    if( tmp[dir][i] > fat_link_max ){
-	      fat_link_max = tmp[dir][i];
-	    }
-	  }
-	}
-      }else if(cpu_order == QUDA_MILC_GAUGE_ORDER || cpu_order == QUDA_CPS_WILSON_GAUGE_ORDER){
-        for(int i=0; i<8*volumeCB*gaugeSiteSize; ++i){
-	  if(cpuGauge[i] > fat_link_max){ fat_link_max = cpuGauge[i]; }
-	}
-      }else{
-	errorQuda("Gauge ordering scheme not supported\n");
-      }
-    } 
-
-    double fat_link_max_double = fat_link_max;
-#ifdef MULTI_GPU
-    reduceMaxDouble(fat_link_max_double);
-#endif
-
-    fat_link_max = fat_link_max_double;
-    
-    int voxels[] = {volumeCB, volumeCB, volumeCB, volumeCB};
-    
-    // FIXME - hack for the moment
-    fat_link_max_ = fat_link_max;
-    
-    int nFaceLocal = 1;
-    if (cpu_order == QUDA_QDP_GAUGE_ORDER) {
-      packQDPGaugeField(packedEven, (Float**)cpuGauge, 0, reconstruct, volumeCB, 
-			voxels, pad, 0, nFaceLocal, type);
-      packQDPGaugeField(packedOdd,  (Float**)cpuGauge, 1, reconstruct, volumeCB, 
-			voxels, pad, 0, nFaceLocal, type);
-    } else if (cpu_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
-      packCPSGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad, type);
-      packCPSGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad, type);    
-    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
-      packMILCGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad, type);
-      packMILCGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad, type);    
-    } else if (cpu_order == QUDA_BQCD_GAUGE_ORDER) {
-      packBQCDGaugeField(packedEven, (Float*)cpuGauge, 0, reconstruct, volumeCB, pad, type);
-      packBQCDGaugeField(packedOdd,  (Float*)cpuGauge, 1, reconstruct, volumeCB, pad, type);    
-    } else {
-      errorQuda("Invalid gauge_order %d", cpu_order);
-    }
-
-#ifdef MULTI_GPU
-    if(type != QUDA_ASQTAD_MOM_LINKS){
-      // pack into the padded regions
-      packQDPGaugeField(packedEven, (Float**)cpuGhost, 0, reconstruct, volumeCB,
-			surfaceCB, pad, volumeCB, nFace, type);
-      packQDPGaugeField(packedOdd,  (Float**)cpuGhost, 1, reconstruct, volumeCB, 
-			surfaceCB, pad, volumeCB, nFace, type);
-    }
-#endif
-
-    // this copies over both even and odd
-    cudaMemcpy(even, packedEven, bytes, cudaMemcpyHostToDevice);
-    checkCudaError();
-  }
-
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
   {
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
@@ -226,7 +123,6 @@ namespace quda {
 #ifdef MULTI_GPU
       //FIXME: if this is MOM field, we don't need exchange data
       if(link_type != QUDA_ASQTAD_MOM_LINKS) cpu.exchangeGhost();
-
       if (precision == QUDA_DOUBLE_PRECISION) {
 	if (cpu.Precision() == QUDA_DOUBLE_PRECISION) {
 	  packGauge((double*)LatticeField::bufferPinned, (double*)cpu.gauge, *this, cpu, 1);
@@ -257,41 +153,6 @@ namespace quda {
 
   }
   
-  /* 
-     Generic gauge field retrieval.  Copies the cuda gauge field into a
-     cpu gauge field.  The reordering takes place on the host and
-     supports most gauge field options.
-  */
-  template <typename Float, typename FloatN>
-  static void storeGaugeField(Float *cpuGauge, FloatN *gauge, GaugeFieldOrder cpu_order,
-			      QudaReconstructType reconstruct, QudaLinkType link_type, int bytes, int volumeCB, int pad, void *buffer)
-  {
-    // Use pinned memory
-    FloatN *packedEven = (FloatN*)buffer;
-    FloatN *packedOdd = (FloatN*)((char*)buffer + bytes/2);
-
-    cudaMemcpy(buffer, gauge, bytes, cudaMemcpyDeviceToHost);
-    
-    if (cpu_order == QUDA_QDP_GAUGE_ORDER) {
-      unpackQDPGaugeField((Float**)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad, link_type);
-      unpackQDPGaugeField((Float**)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad, link_type);
-    } else if (cpu_order == QUDA_CPS_WILSON_GAUGE_ORDER) {
-      unpackCPSGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad, link_type);
-      unpackCPSGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad, link_type);
-    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
-      unpackMILCGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad, link_type);
-      unpackMILCGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad, link_type);
-    } else if (cpu_order == QUDA_BQCD_GAUGE_ORDER) {
-      unpackBQCDGaugeField((Float*)cpuGauge, packedEven, 0, reconstruct, volumeCB, pad, link_type);
-      unpackBQCDGaugeField((Float*)cpuGauge, packedOdd, 1, reconstruct, volumeCB, pad, link_type);
-    } else {
-      errorQuda("Invalid gauge_order");
-    }
-    
-  }
-
-
-
   /*
     Copies the device gauge field to the host.
     - no reconstruction support
@@ -334,19 +195,6 @@ namespace quda {
   
     device_free(unpacked);
     for(int i=0; i<2; i++) cudaStreamDestroy(streams[i]);
-  }
-
-  template <typename Float, typename Float2>
-  void storeMomToCPUArray(Float* mom, Float2 *even, Float2 *odd, int bytes, int V, int pad, void *buffer) 
-  {    
-    Float2 *packedEven = (Float2*)buffer;
-    Float2 *packedOdd = (Float2*)((char*)buffer + bytes/2);
-
-    cudaMemcpy(packedEven, even, bytes/2, cudaMemcpyDeviceToHost); 
-    cudaMemcpy(packedOdd, odd, bytes/2, cudaMemcpyDeviceToHost);  
-  
-    unpackMomField((Float*)mom, packedEven,0, V/2, pad);
-    unpackMomField((Float*)mom, packedOdd, 1, V/2, pad);  
   }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const
