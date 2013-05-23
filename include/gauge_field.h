@@ -131,7 +131,7 @@ namespace quda {
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
 
-    virtual const void** Ghost() const { errorQuda("Not implemented"); return (void**)0; }
+    virtual const void** Ghost() const { errorQuda("Not implemented"); return (const void**)0; }
   };
 
   class cudaGaugeField : public GaugeField {
