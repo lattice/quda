@@ -628,6 +628,16 @@ namespace quda {
 #endif
 
   }
+
+  void cudaColorSpinorField::packTwistedGhost(const QudaParity parity, const int dagger, double a, double b, cudaStream_t *stream) 
+  {
+#ifdef MULTI_GPU
+    packTwistedFace(ghostFaceBuffer, *this, dagger, parity, a, b, *stream); 
+#else
+    errorQuda("packTwistedGhost not built on single-GPU build");
+#endif
+
+  }
  
   // send the ghost zone to the host
   void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
@@ -638,7 +648,7 @@ namespace quda {
     int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
-    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+    if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
       if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);

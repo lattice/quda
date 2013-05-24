@@ -68,6 +68,8 @@ namespace quda {
     virtual ~FaceBuffer();
     
     void pack(quda::cudaColorSpinorField &in, int parity, int dagger, cudaStream_t *stream);
+//!0513:
+    void pack(quda::cudaColorSpinorField &in, int parity, int dagger, double a, double b, cudaStream_t *stream);
     void gather(quda::cudaColorSpinorField &in, int dagger, int dir);
     void commsStart(int dir);
     int  commsQuery(int dir);
