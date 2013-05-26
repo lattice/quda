@@ -98,9 +98,11 @@ namespace quda {
       packGauge(bufferPinned, cpu.gauge, *this, cpu);
 
 #ifdef MULTI_GPU
-      //FIXME: if this is MOM field, we don't need exchange data
-      if(link_type != QUDA_ASQTAD_MOM_LINKS) cpu.exchangeGhost();
-      packGhost(bufferPinned, cpu.gauge, *this, cpu);
+      // no need to exchange data if this is a momentum field
+      if(link_type != QUDA_ASQTAD_MOM_LINKS) {
+	cpu.exchangeGhost();
+	packGhost(bufferPinned, cpu.gauge, *this, cpu);
+      }
 #endif
 
       // this copies over both even and odd
@@ -203,7 +205,7 @@ namespace quda {
   }
 
   void cudaGaugeField::restore() {
-    if (!backed_up) errorQuda("Cannot retore since not backed up");
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
     cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
     delete []backup_h;
     checkCudaError();
