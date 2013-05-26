@@ -118,6 +118,7 @@ namespace quda {
     QudaFieldGeometry Geometry() const { return geometry; }
 
     const double& LinkMax() const { return fat_link_max; }
+    int Nface() const { return nFace; }
   
     void checkField(const GaugeField &);
 
