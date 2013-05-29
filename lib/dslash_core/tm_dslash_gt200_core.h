@@ -2041,33 +2041,10 @@ if (!incomplete)
   READ_ACCUM(ACCUMTEX, sp_stride)
   
 #ifndef TWIST_XPAY
-#ifdef TWIST_INV_DSLASH
-  o00_re = c*o00_re+acc00_re;
-  o00_im = c*o00_im+acc00_im;
-  o01_re = c*o01_re+acc01_re;
-  o01_im = c*o01_im+acc01_im;
-  o02_re = c*o02_re+acc02_re;
-  o02_im = c*o02_im+acc02_im;
-  o10_re = c*o10_re+acc10_re;
-  o10_im = c*o10_im+acc10_im;
-  o11_re = c*o11_re+acc11_re;
-  o11_im = c*o11_im+acc11_im;
-  o12_re = c*o12_re+acc12_re;
-  o12_im = c*o12_im+acc12_im;
-  o20_re = c*o20_re+acc20_re;
-  o20_im = c*o20_im+acc20_im;
-  o21_re = c*o21_re+acc21_re;
-  o21_im = c*o21_im+acc21_im;
-  o22_re = c*o22_re+acc22_re;
-  o22_im = c*o22_im+acc22_im;
-  o30_re = c*o30_re+acc30_re;
-  o30_im = c*o30_im+acc30_im;
-  o31_re = c*o31_re+acc31_re;
-  o31_im = c*o31_im+acc31_im;
-  o32_re = c*o32_re+acc32_re;
-  o32_im = c*o32_im+acc32_im;
-#else
+#ifndef TWIST_INV_DSLASH
+  //perform invert twist first:
   APPLY_TWIST_INV( a, b, o);
+#endif
   o00_re += acc00_re;
   o00_im += acc00_im;
   o01_re += acc01_re;
@@ -2092,7 +2069,6 @@ if (!incomplete)
   o31_im += acc31_im;
   o32_re += acc32_re;
   o32_im += acc32_im;
-#endif
 #else
   APPLY_TWIST( a, acc);
   //warning! b is unrelated to the twisted mass parameter in this case!

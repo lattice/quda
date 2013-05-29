@@ -1114,10 +1114,9 @@
 
 #define ASSN_ACCUM_HALF_TEX(spinor, stride, fl_stride) ASSN_ACCUM_HALF_TEX_(spinor, stride, fl_stride)
 
-//!0513
 //! **************************only for deg tm:*******************************
 
-//apply (1 + i*a*gamma_5) to the input spinor and then add to (b * output spinor)
+//apply b*(1 + i*a*gamma_5) to the input spinor
 #define APPLY_TWIST_INV(a, b, reg)\
 {\
    spinorFloat tmp_re, tmp_im;\

@@ -745,24 +745,18 @@ def twisted_xpay():
     str += "#ifdef DSLASH_XPAY\n"
     str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
     str += "#ifndef TWIST_XPAY\n"
-    str += "#ifdef TWIST_INV_DSLASH\n"
-    for s in range(0,4):
-        for c in range(0,3):
-            i = 3*s+c
-            str += out_re(s,c) +" = c*"+out_re(s,c)+"+"+acc_re(s,c)+";\n"
-
-            str += out_im(s,c) +" = c*"+out_im(s,c)+"+"+acc_im(s,c)+";\n"
-    str += "#else\n"
+    str += "#ifndef TWIST_INV_DSLASH\n"
+    str += "//perform invert twist first:\n"
     if not dagger:
         str += "APPLY_TWIST_INV( a, b, o);\n"
     else:
         str += "APPLY_TWIST_INV(-a, b, o);\n"
+    str += "#endif\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             str += out_re(s,c) +" += "+acc_re(s,c)+";\n"
             str += out_im(s,c) +" += "+acc_im(s,c)+";\n"
-    str += "#endif\n"
     str += "#else\n"
     if not dagger:
            str += "APPLY_TWIST( a, acc);\n"
