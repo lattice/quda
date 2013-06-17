@@ -214,13 +214,23 @@ namespace quda {
   /**
      This is a debugging function, where we cast a gauge field into a
      spinor field so we can compute its L2 norm.
-     @param a The gauge field that we want the norm of
+     @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const cudaGaugeField &a);
+  double norm2(const cudaGaugeField &u);
+
+  /**
+     This function is used for  extracting the gauge ghost zone from a
+     gauge field array.  Defined in pack_gauge.h.
+     @param u The gauge field from which we want to extract the ghost zone
+     @param ghost The array where we want to pack the ghost zone into
+  */
+  void extractGhost(const GaugeField &u, void **ghost);
 
 } // namespace quda
 
+
+//FIXME remove this legacy macro
 #define gaugeSiteSize 18 // real numbers per gauge field
   
 #endif // _GAUGE_QUDA_H
