@@ -1,4 +1,5 @@
 #include <tune_quda.h>
+#include <assert.h>
 
 namespace quda {
 
@@ -227,7 +228,9 @@ namespace quda {
       int volumeCB;
       int stride;
 
-    FloatNOrder(Float *gauge_, const GaugeField &u) : 
+      // fo setting the ghost need to add last arg here
+      // for using internal field need to move volume adder to here and only ask for surface location
+    FloatNOrder(const GaugeField &u, Float *gauge_) : 
       reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()) 
       { gauge[0] = gauge_; gauge[1] = (Float*)((char*)gauge_ + u.Bytes()/2); }
       virtual ~FloatNOrder() { ; }
@@ -279,9 +282,9 @@ namespace quda {
       Float *ghost[QUDA_MAX_DIM];
       int faceVolumeCB[QUDA_MAX_DIM];
       int volumeCB;
-      LegacyOrder(const GaugeField &u) : volumeCB(u.VolumeCB()) {
+    LegacyOrder(const GaugeField &u, Float **ghost_) : volumeCB(u.VolumeCB()) {
 	for (int i=0; i<4; i++) {
-	  ghost[i] = (Float*)(u.Ghost()[i]);
+	  ghost[i] = (ghost_) ? ghost_[i] : (Float*)(u.Ghost()[i]);
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
 	}
       }
@@ -310,8 +313,9 @@ namespace quda {
     typedef typename mapper<Float>::type RegType;
     Float *gauge[QUDA_MAX_DIM];
     int volumeCB;
-    QDPOrder(void *gauge_, const GaugeField &u) : LegacyOrder<Float,length>(u), volumeCB(u.VolumeCB())
-      { for (int i=0; i<4; i++) gauge[i] = ((Float**)gauge_)[i]; }
+    QDPOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
+      : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
+      { for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
     virtual ~QDPOrder() { ; }
     
     __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
@@ -337,7 +341,8 @@ namespace quda {
     typedef typename mapper<Float>::type RegType;
     Float *gauge;
     int volumeCB;
-  MILCOrder(void *gauge, const GaugeField &u) : LegacyOrder<Float,length>(u), gauge((Float*)gauge), volumeCB(u.VolumeCB()) { ; }
+    MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
+    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()) { ; }
     virtual ~MILCOrder() { ; }
     
     __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
@@ -365,7 +370,8 @@ namespace quda {
     int volumeCB;
     Float anisotropy;
     const int Nc;
-  CPSOrder(void *gauge, const GaugeField &u) : LegacyOrder<Float,length>(u), gauge((Float*)gauge), volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3) 
+    CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
+      : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3) 
     { if (length != 18) errorQuda("Gauge length %d not supported", length); }
     virtual ~CPSOrder() { ; }
     
@@ -405,7 +411,8 @@ namespace quda {
     int volumeCB;
     int exVolumeCB; // extended checkerboard volume
     const int Nc;
-  BQCDOrder(void *gauge, const GaugeField &u) : LegacyOrder<Float,length>(u), gauge((Float*)gauge), volumeCB(u.VolumeCB()), Nc(3) { 
+    BQCDOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
+      : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()), Nc(3) { 
       if (length != 18) errorQuda("Gauge length %d not supported", length);
       // compute volumeCB + halo region
       exVolumeCB = u.X()[0]/2 + 2;
@@ -507,6 +514,181 @@ namespace quda {
     }
   }
 
+  /**
+     Generic CPU gauge ghost extraction and packing
+     NB This routines is specialized to four dimensions
+
+     FIXME - need to ensure that saveGhost is pointing to the send
+     buffer not the ghost zone per se
+  */
+  template <typename Float, int length, int nDim, typename Order>
+    void extractGhost(Order order, int nFace, const int surfaceCB[nDim], const int X[nDim],
+		      const int A[nDim], const int B[nDim], const int C[nDim], 
+		      const int f[nDim][nDim], const int localParity[nDim]) {  
+    typedef typename mapper<Float>::type RegType;
+
+    for (int parity=0; parity<2; parity++) {
+
+      for (int dim=0; dim<nDim; dim++) {
+
+	// linear index used for writing into ghost buffer
+	int indexDst = 0;
+	// the following 4-way loop means this is specialized for 4 dimensions 
+
+	for (int d=X[dim]-nFace; d<X[dim]; d++) { // loop over last nFace faces in this dimension
+	  for (int a=0; a<A[dim]; a++) { // loop over the surface elements of this face
+	    for (int b=0; b<B[dim]; b++) { // loop over the surface elements of this face
+	      for (int c=0; c<C[dim]; c++) { // loop over the surface elements of this face
+		// index is a checkboarded spacetime coordinate
+		int indexCB = (a*f[dim][0] + b*f[dim][1]+ c*f[dim][2] + d*f[dim][3]) >> 1;
+		// we only do the extraction for parity we are currently working on
+		int oddness = (a+b+c+d)%2;
+		if (oddness == parity) {
+		  RegType u[length];
+		  order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
+		  order.saveGhost(u, indexDst, dim, (parity+localParity[dim])%2);
+		  indexDst++;
+		} // oddness == parity
+	      } // c
+	    } // b
+	  } // a
+	} // d
+
+	assert(indexDst == nFace*surfaceCB[dim]);
+      } // dim
+
+    } // parity
+
+  }
+
+  /** This is the template driver for extractGhost */
+  template <typename Float>
+    void extractGhost(const GaugeField &u, Float **Ghost) {
+
+    const int nDim = 4;
+    const int length = 18;
+    const int *X = u.X();
+
+    //loop variables: a, b, c with a the most signifcant and c the least significant
+    //A, B, C the maximum value
+    //we need to loop in d as well, d's vlaue dims[dir]-3, dims[dir]-2, dims[dir]-1
+    int A[nDim], B[nDim], C[nDim];
+    A[0] = X[3]; B[0] = X[2]; C[0] = X[1]; // X dimension face
+    A[1] = X[3]; B[1] = X[2]; C[1] = X[0]; // Y dimension face
+    A[2] = X[3]; B[2] = X[1]; C[2] = X[0]; // Z dimension face
+    A[3] = X[2]; B[3] = X[1]; C[3] = X[0]; // T dimension face    
+
+    //multiplication factor to compute index in original cpu memory
+    int f[4][4]={
+      {X[0]*X[1]*X[2],  X[0]*X[1], X[0],               1},
+      {X[0]*X[1]*X[2],  X[0]*X[1],    1,            X[0]},
+      {X[0]*X[1]*X[2],       X[0],    1,       X[0]*X[1]},
+      {     X[0]*X[1],       X[0],    1,  X[0]*X[1]*X[2]}
+    };
+
+    //set the local processor parity 
+    //switching odd and even ghost gauge when that dimension size is odd
+    //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
+    // FIXME - I don't understand this, shouldn't it be commDim(dim) == 0 ?
+    int localParity[nDim];
+    for (int dim=0; dim<nDim; dim++) {
+      localParity[dim] = ((X[dim] % 2 ==0) || (commDim(dim) == 1)) ? 0 : 1;
+    }
+
+    if (u.Order() == QUDA_FLOAT_GAUGE_ORDER) {
+      /*if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,19>(U, u), 
+					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					  A, B, C, f, localParity);
+	} else {
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,18>(U, u),
+					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					  A, B, C, f, localParity);
+	}
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,12>(U, u), 
+					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					A, B, C, f, localParity);
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,8>(U, u), 
+					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					A, B, C, f, localParity);
+					}*/
+    } else if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+      /*if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,19>(U, u), 
+					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					  A, B, C, f, localParity);
+	} else {
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,18>(U, u),
+					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					  A, B, C, f, localParity);
+	}
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,12>(U, u),
+					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					A, B, C, f, localParity);
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,8>(U, u), 
+					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					A, B, C, f, localParity);
+					}*/
+    } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
+      /*if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,19>(U, u),
+					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					  A, B, C, f, localParity);
+	} else {
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,18>(U, u),
+					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					  A, B, C, f, localParity);
+	}
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,4,12>(U, u),
+					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					A, B, C, f, localParity);
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,4,8>(U, u),
+					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+					A, B, C, f, localParity);
+					}*/
+    } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+      extractGhost<Float,length,nDim>(QDPOrder<Float,length>(u, 0, Ghost),
+				      u.Nface(), u.SurfaceCB(), u.X(), 
+				      A, B, C, f, localParity);
+    } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+      extractGhost<Float,length,nDim>(CPSOrder<Float,length>(u, 0, Ghost),
+				      u.Nface(), u.SurfaceCB(), u.X(), 
+				      A, B, C, f, localParity);
+    } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+      extractGhost<Float,length,nDim>(MILCOrder<Float,length>(u, 0, Ghost),
+				      u.Nface(), u.SurfaceCB(), u.X(), 
+				      A, B, C, f, localParity);
+    } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
+      extractGhost<Float,length,nDim>(BQCDOrder<Float,length>(u, 0, Ghost),
+				      u.Nface(), u.SurfaceCB(), u.X(), 
+				      A, B, C, f, localParity);
+    } else {
+      errorQuda("Gauge field %d order not supported", u.Order());
+    }
+
+  }
+
+  void extractGhost(const GaugeField &u, void **ghost) {
+    if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+      extractGhost(u, (double**)ghost);
+    } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+      extractGhost(u, (float**)ghost);
+    } else if (u.Precision() == QUDA_HALF_PRECISION) {
+      extractGhost(u, (short**)ghost);      
+    } else {
+      errorQuda("Unknown precision type %d", u.Precision());
+    }
+  }
+
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
     class PackGauge : Tunable {
     const InOrder &in;
@@ -587,62 +769,62 @@ namespace quda {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  packGauge<FloatOut,FloatIn,length, FloatNOrder<FloatOut,length,1,19>, InOrder>
-	    (FloatNOrder<FloatOut,length,1,19>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	    (FloatNOrder<FloatOut,length,1,19>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
 	} else {
 	  packGauge<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,1,18>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	    (FloatNOrder<FloatOut,length,1,18>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	packGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,1,12>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	  (FloatNOrder<FloatOut,length,1,12>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	packGauge<FloatOut,FloatIn,length>
-	  (FloatNOrder<FloatOut,length,1,8>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	  (FloatNOrder<FloatOut,length,1,8>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
       }
     } else if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  packGauge<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,2,19>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	    (FloatNOrder<FloatOut,length,2,19>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
 	} else {
 	  packGauge<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,2,18>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	    (FloatNOrder<FloatOut,length,2,18>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	packGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,2,12>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);	   
+	  (FloatNOrder<FloatOut,length,2,12>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);	   
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	packGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,2,8>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);	   
+	  (FloatNOrder<FloatOut,length,2,8>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);	   
       }
     } else if (out.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  packGauge<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,1,19>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	    (FloatNOrder<FloatOut,length,1,19>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
 	} else {
 	  packGauge<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,1,18>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	    (FloatNOrder<FloatOut,length,1,18>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	packGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,12>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	  (FloatNOrder<FloatOut,length,4,12>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	packGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,8>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	  (FloatNOrder<FloatOut,length,4,8>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
       }
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
       packGauge<FloatOut,FloatIn,length>
-	(QDPOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	(QDPOrder<FloatOut,length>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
     } else if (out.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
       packGauge<FloatOut,FloatIn,length>
-	(CPSOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	(CPSOrder<FloatOut,length>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
       packGauge<FloatOut,FloatIn,length>
-	(MILCOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	(MILCOrder<FloatOut,length>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
     } else if (out.Order() == QUDA_BQCD_GAUGE_ORDER) {
       packGauge<FloatOut,FloatIn,length>
-	(BQCDOrder<FloatOut,length>(Out, out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
+	(BQCDOrder<FloatOut,length>(out, Out), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), ghost);
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
     }
@@ -656,47 +838,47 @@ namespace quda {
     if (in.Order() == QUDA_FLOAT_GAUGE_ORDER) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,19>(In, in), Out, out, ghost);
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,19>(in, In), Out, out, ghost);
 	} else {
-	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,18>(In, in), Out, out, ghost);
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,18>(in, In), Out, out, ghost);
 	}
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,12>(In, in), Out, out, ghost);
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,12>(in, In), Out, out, ghost);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,8>(In, in), Out, out, ghost);
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,1,8>(in, In), Out, out, ghost);
       }
     } else if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,19>(In, in), Out, out, ghost);
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,19>(in, In), Out, out, ghost);
 	} else {
-	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,18>(In, in), Out, out, ghost);
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,18>(in, In), Out, out, ghost);
 	}
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,12>(In, in), Out, out, ghost);
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,12>(in, In), Out, out, ghost);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,8>(In, in), Out, out, ghost);
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,8>(in, In), Out, out, ghost);
       }      
     } else if (in.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,19>(In, in), Out, out, ghost);
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,19>(in, In), Out, out, ghost);
 	} else {
-	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,18>(In, in), Out, out, ghost);
+	  packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,18>(in, In), Out, out, ghost);
 	}
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,12>(In, in), Out, out, ghost);
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,12>(in, In), Out, out, ghost);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,8>(In, in), Out, out, ghost);
+	packGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,8>(in, In), Out, out, ghost);
       }
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
-      packGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(In, in), Out, out, ghost);
+      packGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In), Out, out, ghost);
     } else if (in.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
-      packGauge<FloatOut,FloatIn,length>(CPSOrder<FloatIn,length>(In, in), Out, out, ghost);
+      packGauge<FloatOut,FloatIn,length>(CPSOrder<FloatIn,length>(in, In), Out, out, ghost);
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-      packGauge<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(In, in), Out, out, ghost);
+      packGauge<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(in, In), Out, out, ghost);
     } else if (in.Order() == QUDA_BQCD_GAUGE_ORDER) {
-      packGauge<FloatOut,FloatIn,length>(BQCDOrder<FloatIn,length>(In, in), Out, out, ghost);
+      packGauge<FloatOut,FloatIn,length>(BQCDOrder<FloatIn,length>(in, In), Out, out, ghost);
     } else {
       errorQuda("Gauge field %d order not supported", in.Order());
     }
@@ -726,11 +908,11 @@ namespace quda {
       if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  packGauge<FloatOut,FloatIn,10> 
-	    (FloatNOrder<FloatOut,10,2,10>(Out, out), FloatNOrder<FloatIn,10,2,10>(In, in), 
+	    (FloatNOrder<FloatOut,10,2,10>(out, Out), FloatNOrder<FloatIn,10,2,10>(in, In), 
 	     out.Volume(), out.Ndim());
 	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	  packGauge<FloatOut,FloatIn,length> 
-	    (FloatNOrder<FloatOut,10,2,10>(Out, out), MILCOrder<FloatIn,10>(In, in), 
+	    (FloatNOrder<FloatOut,10,2,10>(out, Out), MILCOrder<FloatIn,10>(in, In), 
 	     out.Volume(), out.Ndim());
 	} else {
 	  errorQuda("Gauge field orders %d not supported", in.Order());
@@ -738,11 +920,11 @@ namespace quda {
       } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  packGauge<FloatOut,FloatIn,length> 
-	    (MILCOrder<FloatOut,10>(Out, out), FloatNOrder<FloatIn,10,2,10>(In, in), 
+	    (MILCOrder<FloatOut,10>(out, Out), FloatNOrder<FloatIn,10,2,10>(in, In), 
 	     out.Volume(), out.Ndim());
 	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	  packGauge<FloatOut,FloatIn,length> 
-	    (MILCOrder<FloatOut,10>(Out, out), MILCOrder<FloatIn,10>(In, in), 
+	    (MILCOrder<FloatOut,10>(out, Out), MILCOrder<FloatIn,10>(in, In), 
 	     out.Volume(), out.Ndim());
 	} else {
 	  errorQuda("Gauge field orders %d not supported", in.Order());
@@ -814,13 +996,13 @@ namespace quda {
     double max;
     // max only supported on external fields currently
     if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
-      max = maxGauge<Float,Nc>(QDPOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+      max = maxGauge<Float,Nc>(QDPOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
-      max = maxGauge<Float,Nc>(CPSOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+      max = maxGauge<Float,Nc>(CPSOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
-      max = maxGauge<Float,Nc>(MILCOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+      max = maxGauge<Float,Nc>(MILCOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
-      max = maxGauge<Float,Nc>(BQCDOrder<Float,2*Nc*Nc>((Float*)u.Gauge_p(), u),u.Volume(),4);
+      max = maxGauge<Float,Nc>(BQCDOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }
