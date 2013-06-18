@@ -225,14 +225,21 @@ namespace quda {
       typedef typename mapper<Float>::type RegType;
       Reconstruct<reconLen,Float> reconstruct;
       Float *gauge[2];
+      Float *ghost[4];
+      int faceVolumeCB[QUDA_MAX_DIM];
       int volumeCB;
       int stride;
 
-      // fo setting the ghost need to add last arg here
-      // for using internal field need to move volume adder to here and only ask for surface location
-    FloatNOrder(const GaugeField &u, Float *gauge_) : 
-      reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()) 
-      { gauge[0] = gauge_; gauge[1] = (Float*)((char*)gauge_ + u.Bytes()/2); }
+    FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
+      reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()) {
+	if (gauge_) { gauge[0] = gauge_; gauge[1] = (Float*)((char*)gauge_ + u.Bytes()/2);
+	} else { gauge[0] = (Float*)u.Gauge_p(); gauge[1] = (Float*)((char*)u.Gauge_p() + u.Bytes()/2);	}
+
+	for (int i=0; i<4; i++) {
+	  ghost[i] = ghost_ ? ghost_[i] : 0; 
+	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth	  
+	}
+      }
       virtual ~FloatNOrder() { ; }
   
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
@@ -262,11 +269,38 @@ namespace quda {
       }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
-	load(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+	if (!ghost[dir]) { // load from main field not separate array
+	  load(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+	} else {
+	  const int M = reconLen / N;
+	  RegType tmp[reconLen];
+	  for (int i=0; i<M; i++) {
+	    for (int j=0; j<N; j++) {
+	      int intIdx = i*N + j; // internal dof index
+	      int padIdx = intIdx / N;
+	      copy(tmp[i*N+j], ghost[dir][(parity*faceVolumeCB[dir]*M + padIdx*faceVolumeCB[dir]+x)*N + intIdx%N]);
+	    }
+	  }
+	  reconstruct.Unpack(v, tmp, x, dir);	 
+	  for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
+	}
       }
       
       __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
-	save(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+	if (!ghost[dir]) { // store in main field not separate array
+	  save(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+	} else {
+	  const int M = reconLen / N;
+	  RegType tmp[reconLen];
+	  reconstruct.Pack(tmp, v);
+	  for (int i=0; i<M; i++) {
+	    for (int j=0; j<N; j++) {
+	      int intIdx = i*N + j;
+	      int padIdx = intIdx / N;
+	      copy(ghost[dir][(parity*faceVolumeCB[dir]*M + padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
+	    }
+	  }
+	}
       }
 
       size_t Bytes() const { return 4 * 2 * volumeCB * reconLen * sizeof(Float); }
@@ -596,65 +630,65 @@ namespace quda {
     }
 
     if (u.Order() == QUDA_FLOAT_GAUGE_ORDER) {
-      /*if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,19>(U, u), 
-					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,19>(u, 0, Ghost), 
+					  u.Nface(), u.SurfaceCB(), u.X(), 
 					  A, B, C, f, localParity);
 	} else {
-	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,18>(U, u),
-					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,18>(u, 0, Ghost),
+					  u.Nface(), u.SurfaceCB(), u.X(), 
 					  A, B, C, f, localParity);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,12>(U, u), 
-					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,12>(u, 0, Ghost), 
+					u.Nface(), u.SurfaceCB(), u.X(), 
 					A, B, C, f, localParity);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,8>(U, u), 
-					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,8>(u, 0, Ghost), 
+					u.Nface(), u.SurfaceCB(), u.X(), 
 					A, B, C, f, localParity);
-					}*/
+      }
     } else if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      /*if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,19>(U, u), 
-					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,19>(u, 0, Ghost), 
+					  u.Nface(), u.SurfaceCB(), u.X(), 
 					  A, B, C, f, localParity);
 	} else {
-	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,18>(U, u),
-					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,18>(u, 0, Ghost),
+					  u.Nface(), u.SurfaceCB(), u.X(), 
 					  A, B, C, f, localParity);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,12>(U, u),
-					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,12>(u, 0, Ghost),
+					u.Nface(), u.SurfaceCB(), u.X(), 
 					A, B, C, f, localParity);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,8>(U, u), 
-					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), 
+					u.Nface(), u.SurfaceCB(), u.X(), 
 					A, B, C, f, localParity);
-					}*/
+					}
     } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      /*if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,19>(U, u),
-					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,19>(u, 0, Ghost),
+					  u.Nface(), u.SurfaceCB(), u.X(), 
 					  A, B, C, f, localParity);
 	} else {
-	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,18>(U, u),
-					  u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	  extractGhost<Float,length,nDim>(FloatNOrder<Float,length,1,18>(u, 0, Ghost),
+					  u.Nface(), u.SurfaceCB(), u.X(), 
 					  A, B, C, f, localParity);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,4,12>(U, u),
-					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,4,12>(u, 0, Ghost),
+					u.Nface(), u.SurfaceCB(), u.X(), 
 					A, B, C, f, localParity);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,4,8>(U, u),
-					u.Nface(), u.Volume(), u.SurfaceCB(), u.X(), 
+	extractGhost<Float,length,nDim>(FloatNOrder<Float,length,4,8>(u, 0, Ghost),
+					u.Nface(), u.SurfaceCB(), u.X(), 
 					A, B, C, f, localParity);
-					}*/
+					}
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       extractGhost<Float,length,nDim>(QDPOrder<Float,length>(u, 0, Ghost),
 				      u.Nface(), u.SurfaceCB(), u.X(), 
