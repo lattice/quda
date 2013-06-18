@@ -90,51 +90,21 @@ namespace quda {
     if (ghost) host_free(ghost);
   }
 
-  
-  // transpose the matrix
-  template <typename Float>
-  inline void transpose(Float *gT, const Float *g) {
-    for (int ic=0; ic<3; ic++) {
-      for (int jc=0; jc<3; jc++) { 
-	for (int r=0; r<2; r++) {
-	  gT[(ic*3+jc)*2+r] = g[(jc*3+ic)*2+r];
-	}
-      }
-    }
-  }
-
-  // FIXME declare here for prototyping
-  void extractGhost(const GaugeField &, void **);
-
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
   // This should be optimized so it is reused if called multiple times
   void cpuGaugeField::exchangeGhost() const {
-    void **send = (void **) safe_malloc(QUDA_MAX_DIM*sizeof(void *));
-
-    for (int d=0; d<nDim; d++) {
-      send[d] = safe_malloc(nFace * surface[d] * reconstruct * precision);
-    }
+    void *send[QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace * surface[d] * reconstruct * precision);
 
     // get the links into contiguous buffers
     extractGhost(*this, send);
-
-    /*
-    // get the links into a contiguous buffer
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      packGhost((double**)send, (const double**)gauge, nFace, x, volumeCB, surfaceCB, order);
-    } else {
-      packGhost((float**)send, (const float**)gauge, nFace, x, volumeCB, surfaceCB, order);
-      }*/
 
     // communicate between nodes
     FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
     faceBuf.exchangeCpuLink(ghost, send);
 
-    for (int d=0; d<nDim; d++) {
-      host_free(send[d]);
-    }
-    host_free(send);
+    for (int d=0; d<nDim; d++) host_free(send[d]);
   }
 
   void cpuGaugeField::setGauge(void **_gauge)
