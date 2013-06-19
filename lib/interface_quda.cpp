@@ -195,10 +195,29 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
   comms_initialized = true;
 }
 
+
+static void init_default_comms()
+{
+#if defined(QMP_COMMS)
+    if (QMP_logical_topology_is_declared()) {
+      int ndim = QMP_get_logical_number_of_dimensions();
+      const int *dims = QMP_get_logical_dimensions();
+      initCommsGridQuda(ndim, dims, NULL, NULL);
+    } else {
+      errorQuda("initQuda() called without prior call to initCommsGridQuda(),"
+		" and QMP logical topology has not been declared");
+    }
+#elif defined(MPI_COMMS)
+    errorQuda("When using MPI for communications, initCommsGridQuda() must be called before initQuda()");
+#else // single-GPU
+    const int dims[4] = {1, 1, 1, 1};
+    initCommsGridQuda(4, dims, NULL, NULL);
+#endif
+}
+
+
 /*
-  Set the device that QUDA uses.  At this point we also have to set
-  the communications topology since this is used to determine the
-  device number if a negative device number is given.
+ * Set the device that QUDA uses.
  */
 void initQudaDevice(int dev) {
 
@@ -211,11 +230,11 @@ void initQudaDevice(int dev) {
   // not needed for CUDA >= 4.1
   char* cni_str = getenv("CUDA_NIC_INTEROP");
   if(cni_str == NULL){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set\n");
+    errorQuda("Environment variable CUDA_NIC_INTEROP is not set");
   }
   int cni_int = atoi(cni_str);
   if (cni_int != 1){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1\n");    
+    errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1");    
   }
 #endif
 
@@ -233,26 +252,13 @@ void initQudaDevice(int dev) {
     }
   }
 
-  if (!comms_initialized) {
-#if defined(QMP_COMMS)
-    if (QMP_logical_topology_is_declared()) {
-      int ndim = QMP_get_logical_number_of_dimensions();
-      const int *dims = QMP_get_logical_dimensions();
-      initCommsGridQuda(ndim, dims, NULL, NULL);
-    } else {
-      errorQuda("initQuda() called without prior call to initCommsGridQuda(),"
-		" and QMP logical topology has not been declared");
-    }
-#elif defined(MPI_COMMS)
-    errorQuda("When using MPI for communications, initCommsGridQuda() must be called before initQuda()");
-#else // single-GPU
-    const int dims[4] = {1, 1, 1, 1};
-    initCommsGridQuda(4, dims, NULL, NULL);
-#endif
-  }
-
 #ifdef MULTI_GPU
-  if (dev < 0) dev = comm_gpuid();
+  if (dev < 0) {
+    if (!comms_initialized) {
+      errorQuda("initDeviceQuda() called with a negative device ordinal, but comms have not been initialized");
+    }
+    dev = comm_gpuid();
+  }
 #else
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
@@ -284,10 +290,14 @@ void initQudaDevice(int dev) {
   cudaGetDeviceProperties(&deviceProp, dev);
 }
 
+
 /*
-  Any persistent memory allocations that QUDA uses are done here.
+ * Any persistent memory allocations that QUDA uses are done here.
  */
-void initQudaMemory() {
+void initQudaMemory()
+{
+  if (!comms_initialized) init_default_comms();
+
   streams = new cudaStream_t[Nstream];
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
@@ -300,9 +310,13 @@ void initQudaMemory() {
   loadTuneCache(getVerbosity());
 }
 
+
 void initQuda(int dev)
 {
   profileInit.Start(QUDA_PROFILE_TOTAL);
+
+  // initialize communications topology, if not already done explicitly via initCommsGridQuda()
+  if (!comms_initialized) init_default_comms();
 
   // set the device that QUDA uses
   initQudaDevice(dev);
