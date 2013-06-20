@@ -154,9 +154,9 @@ namespace quda {
     cudaDestroyTextureObject(oddInvTex);
     if (precision == QUDA_HALF_PRECISION) {
       cudaDestroyTextureObject(evenNormTex);
-      cudaDestroyTextureObject(evenNormTex);
+      cudaDestroyTextureObject(oddNormTex);
       cudaDestroyTextureObject(evenInvNormTex);
-      cudaDestroyTextureObject(evenInvNormTex);
+      cudaDestroyTextureObject(oddInvNormTex);
     }
     checkCudaError();
   }
