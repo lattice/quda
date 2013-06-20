@@ -64,6 +64,10 @@ namespace quda {
       size_t nbytes = nFace * surface[i] * reconstruct * precision;
       ghost[i] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
     }  
+
+    // exchange the boundaries
+    // no need to exchange data if this is a momentum field
+    if(link_type != QUDA_ASQTAD_MOM_LINKS) exchangeGhost();
   }
 
 
@@ -93,18 +97,22 @@ namespace quda {
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
   // This should be optimized so it is reused if called multiple times
-  void cpuGaugeField::exchangeGhost() const {
+  void cpuGaugeField::exchangeGhost() {
+    if (ghostExchange) return;
+
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace * surface[d] * reconstruct * precision);
 
     // get the links into contiguous buffers
-    extractGhost(*this, send);
+    extractGaugeGhost(*this, send);
 
     // communicate between nodes
     FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
     faceBuf.exchangeCpuLink(ghost, send);
 
     for (int d=0; d<nDim; d++) host_free(send[d]);
+
+    ghostExchange = true;
   }
 
   void cpuGaugeField::setGauge(void **_gauge)

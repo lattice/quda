@@ -5,8 +5,6 @@
 #include <misc_helpers.h>
 #include <blas_quda.h>
 
-#include <pack_gauge.h>
-
 namespace quda {
 
   cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
@@ -80,6 +78,30 @@ namespace quda {
     if (gauge) device_free(gauge);
   }
 
+  void cudaGaugeField::copy(const GaugeField &src) {
+
+    if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
+    checkField(src);
+    
+    if (typeid(src) == typeid(cudaGaugeField)) {
+      // copy field and ghost zone into this field
+      copyGenericGauge(gauge, static_cast<const cudaGaugeField&>(src).gauge, *this, src, QUDA_CUDA_FIELD_LOCATION);
+
+    } else if (typeid(src) == typeid(cpuGaugeField)) {
+      LatticeField::resizeBuffer(bytes);
+
+      // copy field and ghost zone into bufferPinned
+      copyGenericGauge(bufferPinned, static_cast<const cpuGaugeField&>(src).gauge, *this, src, QUDA_CPU_FIELD_LOCATION);
+
+      // this copies over both even and odd
+      cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
+    } else {
+      errorQuda("Invalid gauge field type");
+    }
+
+    checkCudaError();
+  }
+
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
   {
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
@@ -95,15 +117,8 @@ namespace quda {
 
       LatticeField::resizeBuffer(bytes);
 
-      packGauge(bufferPinned, cpu.gauge, *this, cpu);
-
-#ifdef MULTI_GPU
-      // no need to exchange data if this is a momentum field
-      if(link_type != QUDA_ASQTAD_MOM_LINKS) {
-	cpu.exchangeGhost();
-	packGhost(bufferPinned, cpu.gauge, *this, cpu);
-      }
-#endif
+      // copy field and ghost zone into bufferPinned
+      copyGenericGauge(bufferPinned, cpu.gauge, *this, cpu, QUDA_CPU_FIELD_LOCATION);
 
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -189,7 +204,7 @@ namespace quda {
       cudaMemcpy(bufferPinned, gauge, bytes, cudaMemcpyDeviceToHost);
       checkCudaError();
 
-      packGauge(cpu.gauge, bufferPinned, cpu, *this);
+      copyGenericGauge(cpu.gauge, bufferPinned, cpu, *this, QUDA_CPU_FIELD_LOCATION);
     } else {
       errorQuda("Invalid pack location %d", pack_location);
     }

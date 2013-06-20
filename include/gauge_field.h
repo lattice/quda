@@ -101,6 +101,8 @@ namespace quda {
     
     QudaFieldCreate create; // used to determine the type of field created
 
+    bool ghostExchange; // whether we have exchanged the ghost or not
+
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
@@ -163,6 +165,7 @@ namespace quda {
     cudaGaugeField(const GaugeFieldParam &);
     virtual ~cudaGaugeField();
 
+    void copy(const GaugeField &);     // generic gauge field copy
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
     void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
 
@@ -191,6 +194,7 @@ namespace quda {
 
   class cpuGaugeField : public GaugeField {
 
+    friend void cudaGaugeField::copy(const GaugeField &cpu);
     friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &);
     friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &) const;
 
@@ -203,7 +207,7 @@ namespace quda {
     cpuGaugeField(const GaugeFieldParam &);
     virtual ~cpuGaugeField();
 
-    void exchangeGhost() const;
+    void exchangeGhost();
     const void** Ghost() const { return (const void**)ghost; }
 
     void* Gauge_p() { return gauge; }
@@ -221,11 +225,30 @@ namespace quda {
 
   /**
      This function is used for  extracting the gauge ghost zone from a
-     gauge field array.  Defined in pack_gauge.h.
+     gauge field array.  Defined in extract_gauge_ghost.cu.
+     @param Out The output buffer
+     @param In The input buffer
+     @param out The output field to which we are copying
+     @param in The input field from which we are copying
+     @param location The location of where we are doing the copying (CPU or CUDA)
+  */
+  // this is the function that is actually called, from here on down we instantiate all required templates
+  void copyGenericGauge(void *Out, void *In, GaugeField &out, const GaugeField &in, QudaFieldLocation location);
+  /**
+     This function is used for  extracting the gauge ghost zone from a
+     gauge field array.  Defined in extract_gauge_ghost.cu.
      @param u The gauge field from which we want to extract the ghost zone
      @param ghost The array where we want to pack the ghost zone into
   */
-  void extractGhost(const GaugeField &u, void **ghost);
+  void extractGaugeGhost(const GaugeField &u, void **ghost);
+
+  /**
+     This function is used to calculate the maximum absolute value of
+     a gauge field array.  Defined in pack_gauge.h.  
+
+     @param u The gauge field from which we want to compute the max
+  */
+  double maxGauge(const GaugeField &u);
 
 } // namespace quda
 

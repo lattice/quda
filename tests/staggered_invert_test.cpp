@@ -245,13 +245,11 @@ invert_test(void)
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   cpuFat = new cpuGaugeField(cpuFatParam);
-  cpuFat->exchangeGhost();
   ghost_fatlink = (void**)cpuFat->Ghost();
   
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
   cpuLong = new cpuGaugeField(cpuLongParam);
-  cpuLong->exchangeGhost();
   ghost_longlink = (void**)cpuLong->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
