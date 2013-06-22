@@ -674,7 +674,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
 //      pack_ghost(gauge, sendGauge, 1, precision);
 //      int nFace = 1;
 //      FaceBuffer faceBuf(Z, 4, gaugeSiteSize, nFace, precision);
-//      faceBuf.exchangeCpuLink(ghostGauge, sendGauge);
+//      faceBuf.exchangeLink(ghostGauge, sendGauge, QUDA_CPU_FIELD_LOCATION);
 //    }
     
 //BEGINOFNEW    

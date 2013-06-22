@@ -10,12 +10,20 @@ namespace quda {
   cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
     GaugeField(param), gauge(0), even(0), odd(0), backed_up(false)
   {
-    if(create != QUDA_NULL_FIELD_CREATE &&  create != QUDA_ZERO_FIELD_CREATE){
+    if(create != QUDA_NULL_FIELD_CREATE &&  
+       create != QUDA_ZERO_FIELD_CREATE && 
+       create != QUDA_REFERENCE_FIELD_CREATE){
       errorQuda("ERROR: create type(%d) not supported yet\n", create);
     }
   
-    gauge = device_malloc(bytes);  
-    if(create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
+    if (create != QUDA_REFERENCE_FIELD_CREATE) {
+      gauge = device_malloc(bytes);  
+      if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
+    } else { // for reference fields (e.g., external fields) we need to do the ghost exchange
+      gauge = param.gauge;
+      exchangeGhost();
+    }
+
     even = gauge;
     odd = (char*)gauge + bytes/2; 
 
@@ -75,7 +83,48 @@ namespace quda {
     destroyTexObject();
 #endif
 
-    if (gauge) device_free(gauge);
+    if (create != QUDA_REFERENCE_FIELD_CREATE) {
+      if (gauge) device_free(gauge);
+    }
+  }
+
+  // This does the exchange of the gauge field ghost zone and places it
+  // into the ghost array.
+  void cudaGaugeField::exchangeGhost() {
+    if (ghostExchange) return;
+
+    void *ghost[QUDA_MAX_DIM];
+    void *send[QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) {
+      ghost[d] = device_malloc(nFace*surface[d]*reconstruct*precision);
+      send[d] = device_malloc(nFace*surface[d]*reconstruct*precision);
+    }
+
+    // get the links into contiguous buffers
+    extractGaugeGhost(*this, send);
+
+    // communicate between nodes
+    FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
+    faceBuf.exchangeLink(ghost, send, QUDA_CUDA_FIELD_LOCATION);
+
+    // copy from ghost into the padded region in gauge
+    copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost);
+
+    for (int d=0; d<nDim; d++) {
+      device_free(send[d]);
+      device_free(ghost[d]);
+    }
+
+    ghostExchange = true;
+  }
+
+  void cudaGaugeField::setGauge(void *gauge_)
+  {
+    if(create != QUDA_REFERENCE_FIELD_CREATE) {
+      errorQuda("Setting gauge pointer is only allowed when create="
+		"QUDA_REFERENCE_FIELD_CREATE type\n");
+    }
+    gauge = gauge_;
   }
 
   void cudaGaugeField::copy(const GaugeField &src) {
@@ -85,13 +134,13 @@ namespace quda {
     
     if (typeid(src) == typeid(cudaGaugeField)) {
       // copy field and ghost zone into this field
-      copyGenericGauge(gauge, static_cast<const cudaGaugeField&>(src).gauge, *this, src, QUDA_CUDA_FIELD_LOCATION);
+      copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, static_cast<const cudaGaugeField&>(src).gauge);
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       LatticeField::resizeBuffer(bytes);
 
       // copy field and ghost zone into bufferPinned
-      copyGenericGauge(bufferPinned, static_cast<const cpuGaugeField&>(src).gauge, *this, src, QUDA_CPU_FIELD_LOCATION);
+      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -118,7 +167,7 @@ namespace quda {
       LatticeField::resizeBuffer(bytes);
 
       // copy field and ghost zone into bufferPinned
-      copyGenericGauge(bufferPinned, cpu.gauge, *this, cpu, QUDA_CPU_FIELD_LOCATION);
+      copyGenericGauge(*this, cpu, QUDA_CPU_FIELD_LOCATION, bufferPinned, cpu.gauge);
 
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -204,7 +253,7 @@ namespace quda {
       cudaMemcpy(bufferPinned, gauge, bytes, cudaMemcpyDeviceToHost);
       checkCudaError();
 
-      copyGenericGauge(cpu.gauge, bufferPinned, cpu, *this, QUDA_CPU_FIELD_LOCATION);
+      copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, bufferPinned);
     } else {
       errorQuda("Invalid pack location %d", pack_location);
     }

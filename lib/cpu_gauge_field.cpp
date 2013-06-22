@@ -96,32 +96,31 @@ namespace quda {
 
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
-  // This should be optimized so it is reused if called multiple times
   void cpuGaugeField::exchangeGhost() {
     if (ghostExchange) return;
 
     void *send[QUDA_MAX_DIM];
-    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace * surface[d] * reconstruct * precision);
+    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*reconstruct*precision);
 
     // get the links into contiguous buffers
     extractGaugeGhost(*this, send);
 
     // communicate between nodes
     FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
-    faceBuf.exchangeCpuLink(ghost, send);
+    faceBuf.exchangeLink(ghost, send, QUDA_CPU_FIELD_LOCATION);
 
     for (int d=0; d<nDim; d++) host_free(send[d]);
 
     ghostExchange = true;
   }
 
-  void cpuGaugeField::setGauge(void **_gauge)
+  void cpuGaugeField::setGauge(void **gauge_)
   {
     if(create != QUDA_REFERENCE_FIELD_CREATE) {
-      errorQuda("Setting gauge pointer is only allowed when cpu gauge"
-		"is of QUDA_REFERENCE_FIELD_CREATE type\n");
+      errorQuda("Setting gauge pointer is only allowed when create="
+		"QUDA_REFERENCE_FIELD_CREATE type\n");
     }
-    gauge = _gauge;
+    gauge = gauge_;
   }
 
 /*template <typename Float>

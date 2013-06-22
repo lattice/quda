@@ -370,8 +370,10 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
 }
 
 
-void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf)
+void FaceBuffer::exchangeLink(void** ghost_link, void** link_sendbuf, QudaFieldLocation location)
 {
+  if(location != QUDA_CPU_FIELD_LOCATION) error("Only implemented for CPU link fields");
+
   MsgHandle *mh_from_back[4];
   MsgHandle *mh_send_fwd[4];
 

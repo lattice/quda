@@ -165,6 +165,8 @@ namespace quda {
     cudaGaugeField(const GaugeFieldParam &);
     virtual ~cudaGaugeField();
 
+    void exchangeGhost(); // exchange the ghost and store store in the padded region
+
     void copy(const GaugeField &);     // generic gauge field copy
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
     void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
@@ -190,6 +192,7 @@ namespace quda {
     // restores the cudaGaugeField to CUDA memory
     void restore();
 
+    void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
   };
 
   class cpuGaugeField : public GaugeField {
@@ -226,14 +229,18 @@ namespace quda {
   /**
      This function is used for  extracting the gauge ghost zone from a
      gauge field array.  Defined in extract_gauge_ghost.cu.
-     @param Out The output buffer
-     @param In The input buffer
      @param out The output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
+     @param Out The output buffer (optional)
+     @param In The input buffer (optional)
+     @param ghostOut The output ghost buffer (optional)
+     @param ghostIn The input ghost buffer (optional)
+     @param type The type of copy we doing (0 body and ghost else ghost only)
   */
   // this is the function that is actually called, from here on down we instantiate all required templates
-  void copyGenericGauge(void *Out, void *In, GaugeField &out, const GaugeField &in, QudaFieldLocation location);
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
+			void *Out=0, void *In=0, void **ghostOut=0, void **ghostIn=0, int type=0);
   /**
      This function is used for  extracting the gauge ghost zone from a
      gauge field array.  Defined in extract_gauge_ghost.cu.

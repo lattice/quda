@@ -75,8 +75,7 @@ namespace quda {
     
     void exchangeCpuSpinor(quda::cpuColorSpinorField &in, int parity, int dagger);
     
-    void exchangeCpuLink(void** ghost_link, void** link_sendbuf);
-    void exchangeCudaLink(void** ghost_link, void** link_sendbuf);
+    void exchangeLink(void** ghost_link, void** link_sendbuf, QudaFieldLocation location);
     
     static void flushPinnedCache();
   };
