@@ -82,18 +82,8 @@ void init(int argc, char **argv) {
     setKernelPackT(true);
   } else {
     setDims(gauge_param.X);
-    if (dslash_type == QUDA_TWISTED_MASS_DSLASH)
-    {
-       Ls = 2;
-       setKernelPackT(true);
-       //!Ls = 1;
-       //setKernelPackT(false);
-    }
-    else
-    {
-       Ls = 1;
-       setKernelPackT(false);
-    }
+    setKernelPackT(false);
+    Ls = 1;
   }
 
   setSpinorSiteSize(24);
@@ -124,7 +114,7 @@ void init(int argc, char **argv) {
     kappa5 = 0.5/(5 + inv_param.m5);
   }
 
-  inv_param.Ls = Ls;
+  inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 1;
   
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
   inv_param.dagger = dagger;

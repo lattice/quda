@@ -375,7 +375,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   //sp_idx = face_idx + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
+  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)] + face_num*ghostFace[static_cast<int>(kernel_type)];
 #endif
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
@@ -552,7 +552,7 @@ def gen(dir, pack_only=False):
           load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
     else: 
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
     load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[static_cast<int>(kernel_type)];\n"
@@ -562,7 +562,7 @@ def gen(dir, pack_only=False):
           load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
     else: 
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+FLAVORS*ghostFace[static_cast<int>(kernel_type)]);\n\n"
+          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
 
 
     project = "// project spinor into half spinors\n"
@@ -641,8 +641,10 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         for c in range(0, 3):
             #copy_half += h1_re(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_re(h,c)+";  "
             #copy_half += h1_im(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_im(h,c)+";\n"
-            copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
-            copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
+            #copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
+            #copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
+            copy_half += h1_re(h,c)+" = "+("2*" if (dir >= 6) else "")+in_re(h,c)+";  "
+            copy_half += h1_im(h,c)+" = "+("2*" if (dir >= 6) else "")+in_im(h,c)+";\n"
 
     copy_half += "\n"
 

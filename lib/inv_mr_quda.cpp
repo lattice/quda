@@ -78,10 +78,10 @@ namespace quda {
       double x2 = norm2(x);
       double3 Ar3 = cDotProductNormBCuda(Ar, r);
       printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e, %e), x2 = %e\n", 
-		 k, Ar3.x, Ar3.y, Ar3.z, x2);
+		 k, Ar3.z, Ar3.x, Ar3.y, x2);
     }
 
-    while (k < invParam.maxiter) {
+    while (k < invParam.maxiter && r2 > 0.0) {
     
       mat(Ar, r, tmp);
 

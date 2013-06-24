@@ -879,6 +879,7 @@
 
 #endif
 
+
 //! **************************only for ndeg tm:******************************
 #define READ_ACCUM_FLAVOR_DOUBLE(spinor, stride, fl_stride)     \
   double2 flv1_accum0 = spinor[sid + 0*stride];   			\
@@ -1112,5 +1113,126 @@
   }
 
 #define ASSN_ACCUM_HALF_TEX(spinor, stride, fl_stride) ASSN_ACCUM_HALF_TEX_(spinor, stride, fl_stride)
+
+//! **************************only for deg tm:*******************************
+
+//apply b*(1 + i*a*gamma_5) to the input spinor
+#define APPLY_TWIST_INV(a, b, reg)\
+{\
+   spinorFloat tmp_re, tmp_im;\
+   tmp_re = reg##00_re - a * reg##20_im;\
+   tmp_im = reg##00_im + a * reg##20_re;\
+   reg##20_re -= a * reg##00_im;\
+   reg##20_im += a * reg##00_re;\
+   \
+   reg##00_re = b * tmp_re;\
+   reg##00_im = b * tmp_im;\
+   reg##20_re *= b;\
+   reg##20_im *= b;\
+   \
+   tmp_re = reg##10_re - a * reg##30_im;\
+   tmp_im = reg##10_im + a * reg##30_re;\
+   reg##30_re -= a * reg##10_im;\
+   reg##30_im += a * reg##10_re;\
+   \
+   reg##10_re = b * tmp_re;\
+   reg##10_im = b * tmp_im;\
+   reg##30_re *= b;\
+   reg##30_im *= b;\
+   \
+   tmp_re = reg##01_re - a * reg##21_im;\
+   tmp_im = reg##01_im + a * reg##21_re;\
+   reg##21_re -= a * reg##01_im;\
+   reg##21_im += a * reg##01_re;\
+   \
+   reg##01_re = b * tmp_re;\
+   reg##01_im = b * tmp_im;\
+   reg##21_re *= b;\
+   reg##21_im *= b;\
+   \
+   tmp_re = reg##11_re - a * reg##31_im;\
+   tmp_im = reg##11_im + a * reg##31_re;\
+   reg##31_re -= a * reg##11_im;\
+   reg##31_im += a * reg##11_re;\
+   \
+   reg##11_re = b * tmp_re;\
+   reg##11_im = b * tmp_im;\
+   reg##31_re *= b;\
+   reg##31_im *= b;\
+   \
+   tmp_re = reg##02_re - a * reg##22_im;\
+   tmp_im = reg##02_im + a * reg##22_re;\
+   reg##22_re -= a * reg##02_im;\
+   reg##22_im += a * reg##02_re;\
+   \
+   reg##02_re = b * tmp_re;\
+   reg##02_im = b * tmp_im;\
+   reg##22_re *= b;\
+   reg##22_im *= b;\
+   \
+   tmp_re = reg##12_re - a * reg##32_im;\
+   tmp_im = reg##12_im + a * reg##32_re;\
+   reg##32_re -= a * reg##12_im;\
+   reg##32_im += a * reg##12_re;\
+   \
+   reg##12_re = b * tmp_re;\
+   reg##12_im = b * tmp_im;\
+   reg##32_re *= b;\
+   reg##32_im *= b;\
+}
+
+
+#define APPLY_TWIST(a, reg)\
+{\
+   spinorFloat tmp_re, tmp_im;\
+   tmp_re = reg##00_re - a * reg##20_im;\
+   tmp_im = reg##00_im + a * reg##20_re;\
+   reg##20_re -= a * reg##00_im;\
+   reg##20_im += a * reg##00_re;\
+   \
+   reg##00_re = tmp_re;\
+   reg##00_im = tmp_im;\
+   \
+   tmp_re = reg##10_re - a * reg##30_im;\
+   tmp_im = reg##10_im + a * reg##30_re;\
+   reg##30_re -= a * reg##10_im;\
+   reg##30_im += a * reg##10_re;\
+   \
+   reg##10_re = tmp_re;\
+   reg##10_im = tmp_im;\
+   \
+   tmp_re = reg##01_re - a * reg##21_im;\
+   tmp_im = reg##01_im + a * reg##21_re;\
+   reg##21_re -= a * reg##01_im;\
+   reg##21_im += a * reg##01_re;\
+   \
+   reg##01_re = tmp_re;\
+   reg##01_im = tmp_im;\
+   \
+   tmp_re = reg##11_re - a * reg##31_im;\
+   tmp_im = reg##11_im + a * reg##31_re;\
+   reg##31_re -= a * reg##11_im;\
+   reg##31_im += a * reg##11_re;\
+   \
+   reg##11_re = tmp_re;\
+   reg##11_im = tmp_im;\
+   \
+   tmp_re = reg##02_re - a * reg##22_im;\
+   tmp_im = reg##02_im + a * reg##22_re;\
+   reg##22_re -= a * reg##02_im;\
+   reg##22_im += a * reg##02_re;\
+   \
+   reg##02_re = tmp_re;\
+   reg##02_im = tmp_im;\
+   \
+   tmp_re = reg##12_re - a * reg##32_im;\
+   tmp_im = reg##12_im + a * reg##32_re;\
+   reg##32_re -= a * reg##12_im;\
+   reg##32_im += a * reg##12_re;\
+   \
+   reg##12_re = tmp_re;\
+   reg##12_im = tmp_im;\
+}
+
 
 

@@ -195,10 +195,29 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
   comms_initialized = true;
 }
 
+
+static void init_default_comms()
+{
+#if defined(QMP_COMMS)
+    if (QMP_logical_topology_is_declared()) {
+      int ndim = QMP_get_logical_number_of_dimensions();
+      const int *dims = QMP_get_logical_dimensions();
+      initCommsGridQuda(ndim, dims, NULL, NULL);
+    } else {
+      errorQuda("initQuda() called without prior call to initCommsGridQuda(),"
+		" and QMP logical topology has not been declared");
+    }
+#elif defined(MPI_COMMS)
+    errorQuda("When using MPI for communications, initCommsGridQuda() must be called before initQuda()");
+#else // single-GPU
+    const int dims[4] = {1, 1, 1, 1};
+    initCommsGridQuda(4, dims, NULL, NULL);
+#endif
+}
+
+
 /*
-  Set the device that QUDA uses.  At this point we also have to set
-  the communications topology since this is used to determine the
-  device number if a negative device number is given.
+ * Set the device that QUDA uses.
  */
 void initQudaDevice(int dev) {
 
@@ -211,11 +230,11 @@ void initQudaDevice(int dev) {
   // not needed for CUDA >= 4.1
   char* cni_str = getenv("CUDA_NIC_INTEROP");
   if(cni_str == NULL){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set\n");
+    errorQuda("Environment variable CUDA_NIC_INTEROP is not set");
   }
   int cni_int = atoi(cni_str);
   if (cni_int != 1){
-    errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1\n");    
+    errorQuda("Environment variable CUDA_NIC_INTEROP is not set to 1");    
   }
 #endif
 
@@ -233,26 +252,13 @@ void initQudaDevice(int dev) {
     }
   }
 
-  if (!comms_initialized) {
-#if defined(QMP_COMMS)
-    if (QMP_logical_topology_is_declared()) {
-      int ndim = QMP_get_logical_number_of_dimensions();
-      const int *dims = QMP_get_logical_dimensions();
-      initCommsGridQuda(ndim, dims, NULL, NULL);
-    } else {
-      errorQuda("initQuda() called without prior call to initCommsGridQuda(),"
-		" and QMP logical topology has not been declared");
-    }
-#elif defined(MPI_COMMS)
-    errorQuda("When using MPI for communications, initCommsGridQuda() must be called before initQuda()");
-#else // single-GPU
-    const int dims[4] = {1, 1, 1, 1};
-    initCommsGridQuda(4, dims, NULL, NULL);
-#endif
-  }
-
 #ifdef MULTI_GPU
-  if (dev < 0) dev = comm_gpuid();
+  if (dev < 0) {
+    if (!comms_initialized) {
+      errorQuda("initDeviceQuda() called with a negative device ordinal, but comms have not been initialized");
+    }
+    dev = comm_gpuid();
+  }
 #else
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
@@ -284,10 +290,14 @@ void initQudaDevice(int dev) {
   cudaGetDeviceProperties(&deviceProp, dev);
 }
 
+
 /*
-  Any persistent memory allocations that QUDA uses are done here.
+ * Any persistent memory allocations that QUDA uses are done here.
  */
-void initQudaMemory() {
+void initQudaMemory()
+{
+  if (!comms_initialized) init_default_comms();
+
   streams = new cudaStream_t[Nstream];
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
@@ -300,9 +310,13 @@ void initQudaMemory() {
   loadTuneCache(getVerbosity());
 }
 
+
 void initQuda(int dev)
 {
   profileInit.Start(QUDA_PROFILE_TOTAL);
+
+  // initialize communications topology, if not already done explicitly via initCommsGridQuda()
+  if (!comms_initialized) init_default_comms();
 
   // set the device that QUDA uses
   initQudaDevice(dev);
@@ -844,7 +858,7 @@ namespace quda {
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
@@ -911,7 +925,7 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
@@ -981,7 +995,6 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   pushVerbosity(inv_param->verbosity);
 
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
-  if (inv_param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
 
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
@@ -1145,7 +1158,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
 
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
 
@@ -1230,14 +1243,18 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
+  double nb = norm2(*b);
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
-    double nb = norm2(*b);
     double nh_x = norm2(*h_x);
     double nx = norm2(*x);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
     printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
   }
+
+  // rescale the source and solution vectors to help prevent the onset of underflow
+  axCuda(1.0/sqrt(nb), *b);
+  axCuda(1.0/sqrt(nb), *x);
 
   setDslashTuning(param->tune, getVerbosity());
   setBlasTuning(param->tune, getVerbosity());
@@ -1314,6 +1331,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
+  // rescale the solution
+  axCuda(sqrt(nb), *x);
+
   profileInvert.Start(QUDA_PROFILE_D2H);
   *h_x = *x;
   profileInvert.Stop(QUDA_PROFILE_D2H);
@@ -1354,7 +1374,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
   profileMulti.Start(QUDA_PROFILE_TOTAL);
 
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) setKernelPackT(true);
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created
@@ -1482,11 +1502,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   // Check source norms
+  double nb = norm2(*b);
   if(getVerbosity() >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
-    double nb = norm2(*b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
+  // rescale the source vector to help prevent the onset of underflow
+  axCuda(1.0/sqrt(nb), *b);
 
   setDslashTuning(param->tune, getVerbosity());
   setBlasTuning(param->tune, getVerbosity());
@@ -1590,6 +1612,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
+    // rescale the solution 
+    axCuda(sqrt(nb), *x[i]);
+
     if (getVerbosity() >= QUDA_VERBOSE){
       double nx = norm2(*x[i]);
       printfQuda("Solution %d = %g\n", i, nx);

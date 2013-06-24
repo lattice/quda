@@ -164,14 +164,12 @@ int main(int argc, char **argv)
   double offset[4] = {0.01, 0.02, 0.03, 0.04};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
-  inv_param.solution_type = multi_shift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
-
   if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-    inv_param.solution_type = QUDA_MATPC_SOLUTION;
+    inv_param.solution_type = multi_shift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
   }
 
   inv_param.dagger = QUDA_DAG_NO;
