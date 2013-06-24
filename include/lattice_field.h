@@ -29,13 +29,23 @@ namespace quda {
     QudaPrecision precision;
     QudaVerbosity verbosity;
 
-    LatticeFieldParam() { ; }
+    LatticeFieldParam() 
+    : nDim(0), pad(0), precision(QUDA_INVALID_PRECISION), verbosity(QUDA_SILENT) { 
+      for (int i=0; i<nDim; i++) x[i] = 0; 
+    }
 
+    LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision, 
+		      QudaVerbosity verbosity) 
+    : nDim(nDim), pad(pad), precision(precision), verbosity(verbosity) { 
+      if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
+      for (int i=0; i<nDim; i++) this->x[i] = x[i]; 
+    }
+    
     // constructor for creating a cpuGaugeField only
-  LatticeFieldParam(const QudaGaugeParam &param) : nDim(4), pad(0), 
-      precision(param.cpu_prec), verbosity(QUDA_SILENT)  {
-    for (int i=0; i<nDim; i++) x[i] = param.X[i];
-  }
+    LatticeFieldParam(const QudaGaugeParam &param) 
+    : nDim(4), pad(0), precision(param.cpu_prec), verbosity(QUDA_SILENT)  {
+      for (int i=0; i<nDim; i++) this->x[i] = param.X[i];
+    }
   };
 
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param);

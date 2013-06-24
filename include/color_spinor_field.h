@@ -14,14 +14,10 @@ namespace quda {
 
   struct FullClover;
 
-  class ColorSpinorParam {
+  class ColorSpinorParam : public LatticeFieldParam {
   public:
     int nColor; // Number of colors of the field
     int nSpin; // =1 for staggered, =2 for coarse Dslash, =4 for 4d spinor
-    int nDim; // number of spacetime dimensions
-    int x[QUDA_MAX_DIM]; // size of each dimension
-    QudaPrecision precision; // Precision of the field
-    int pad; // volumetric padding
 
     QudaTwistFlavorType twistFlavor; // used by twisted mass
 
@@ -37,34 +33,21 @@ namespace quda {
 
     ColorSpinorParam(const ColorSpinorField &a);
 
-    QudaVerbosity verbose;
-
   ColorSpinorParam()
-    : nColor(0), nSpin(0), nDim(0), precision(QUDA_INVALID_PRECISION), pad(0), 
-      twistFlavor(QUDA_TWIST_INVALID), siteSubset(QUDA_INVALID_SITE_SUBSET), 
-      siteOrder(QUDA_INVALID_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
-      gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE), 
-      verbose(QUDA_SILENT)
-      { 
-	for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0; 
-      }
+    : LatticeFieldParam(), nColor(0), nSpin(0), twistFlavor(QUDA_TWIST_INVALID), 
+      siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
+      fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
+      create(QUDA_INVALID_FIELD_CREATE) { ; }
   
     // used to create cpu params
   ColorSpinorParam(void *V, QudaFieldLocation location, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
-    : nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
-      pad(0), twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
+    : LatticeFieldParam(4, X, 0, location == QUDA_CPU_FIELD_LOCATION ? inv_param.cpu_prec : inv_param.cuda_prec, inv_param.verbosity), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
+      twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
-      create(QUDA_REFERENCE_FIELD_CREATE), v(V), verbose(inv_param.verbosity)
-      { 
+      create(QUDA_REFERENCE_FIELD_CREATE), v(V) { 
 
-	if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
+        if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
 	for (int d=0; d<nDim; d++) x[d] = X[d];
-
-	if (location == QUDA_CPU_FIELD_LOCATION) {
-	  precision = inv_param.cpu_prec;
-	} else {
-	  precision = inv_param.cuda_prec;
-	}
 
 	if (!pc_solution) {
 	  siteSubset = QUDA_FULL_SITE_SUBSET;;
@@ -102,16 +85,13 @@ namespace quda {
 
     // used to create cuda param from a cpu param
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
-    : nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), 
-      nDim(cpuParam.nDim), precision(inv_param.cuda_prec), pad(inv_param.sp_pad),  
-      twistFlavor(cpuParam.twistFlavor), siteSubset(cpuParam.siteSubset), 
-      siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
+    : LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec, cpuParam.verbosity),
+      nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor), 
+      siteSubset(cpuParam.siteSubset), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), 
+      fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-      create(QUDA_COPY_FIELD_CREATE), v(0), verbose(cpuParam.verbose)
+      create(QUDA_COPY_FIELD_CREATE), v(0)
       {
-	if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
-	for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
-
 	fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
 	  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
       }

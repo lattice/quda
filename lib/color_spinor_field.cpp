@@ -19,7 +19,7 @@ namespace quda {
     field.fill(*this);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbose), init(false), 
+  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbosity), init(false), 
 								     v(0), norm(0), even(0), odd(0) 
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
@@ -258,7 +258,7 @@ namespace quda {
     param.fieldOrder = fieldOrder;
     param.gammaBasis = gammaBasis;
     param.create = QUDA_INVALID_FIELD_CREATE;
-    param.verbose = verbose;
+    param.verbosity = verbose;
   }
 
   // For kernels with precision conversion built in
