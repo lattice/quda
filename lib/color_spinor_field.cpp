@@ -20,18 +20,18 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbose), init(false), 
-								      even(0), odd(0) 
+								     v(0), norm(0), even(0), odd(0) 
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
-	   param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis);
+	   param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.PCtype);
 
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
-								      even(0), odd(0)
+								     v(0), norm(0), even(0), odd(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
-	   field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis);
+	   field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.PCtype);
 
   }
 
@@ -53,10 +53,9 @@ namespace quda {
 
     // calculate size of ghost zone required
     int ghostVolume = 0;
-    //BEGIN NEW:  
     //temporal hack
     int dims = nDim == 5 ? (nDim - 1) : nDim;
-    int x5   = nDim == 5 ? x[4] : 1; ///includes DW ghosts
+    int x5   = nDim == 5 ? x[4] : 1; ///includes DW  and non-degenerate TM ghosts
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
       if (commDimPartitioned(i)) {
@@ -84,7 +83,6 @@ namespace quda {
 		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
 #endif
     }//end of outmost for loop
-    //END NEW  
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
@@ -114,12 +112,24 @@ namespace quda {
       printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
-  }
+
+    // initialize the ghost pointers 
+    if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      for(int i=0; i<dims; ++i){
+        if(commDimPartitioned(i)){
+          ghost[i] = (char*)v + (stride + ghostOffset[i])*nColor*nSpin*2*precision;
+          if(precision == QUDA_HALF_PRECISION)
+            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
+        }
+      }
+    }
+
+  } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
-				QudaGammaBasis gammaBasis) {
+				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -133,12 +143,17 @@ namespace quda {
     nSpin = Ns;
     twistFlavor = Twistflavor;
 
+    PCtype = DWFPC;
+
     precision = Prec;
     volume = 1;
     for (int d=0; d<nDim; d++) {
       x[d] = X[d];
       volume *= x[d];
     }
+
+   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
+
     pad = Pad;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       stride = volume/2 + pad; // padding is based on half volume
@@ -153,11 +168,14 @@ namespace quda {
     createGhostZone();
 
     bytes = total_length * precision; // includes pads and ghost zones
-    bytes = ALIGNMENT_ADJUST(bytes);
+    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+
     norm_bytes = total_norm_length * sizeof(float);
-    norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
+    norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+
     init = true;
 
+    clearGhostPointers();
   }
 
   void ColorSpinorField::destroy() {
@@ -168,7 +186,7 @@ namespace quda {
     if (&src != this) {
       create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
 	     src.precision, src.pad, src.siteSubset, 
-	     src.siteOrder, src.fieldOrder, src.gammaBasis);    
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);    
     }
     return *this;
   }
@@ -179,6 +197,8 @@ namespace quda {
     if (param.nColor != 0) nColor = param.nColor;
     if (param.nSpin != 0) nSpin = param.nSpin;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
+    
+    if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
 
     if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
     if (param.nDim != 0) nDim = param.nDim;
@@ -188,6 +208,8 @@ namespace quda {
       if (param.x[0] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
+  if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
+
   
     if (param.pad != 0) pad = param.pad;
 
@@ -211,10 +233,12 @@ namespace quda {
 
     real_length = volume*nColor*nSpin*2;
 
-    bytes = total_length * precision;
-    bytes = ALIGNMENT_ADJUST(bytes);
+    bytes = total_length * precision; // includes pads and ghost zones
+    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+
     norm_bytes = total_norm_length * sizeof(float);
-    norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
+    norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 
     if (verbose >= QUDA_DEBUG_VERBOSE) {
@@ -237,6 +261,7 @@ namespace quda {
     param.siteOrder = siteOrder;
     param.fieldOrder = fieldOrder;
     param.gammaBasis = gammaBasis;
+    param.PCtype = PCtype;
     param.create = QUDA_INVALID_FIELD_CREATE;
     param.verbose = verbose;
   }
@@ -258,6 +283,38 @@ namespace quda {
     if (a.TwistFlavor() != b.TwistFlavor()) {
       errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
     }
+  }
+
+  // Set the ghost pointers to NULL.
+  // This is a private initialisation routine. 
+  void ColorSpinorField::clearGhostPointers() 
+  {
+    for(int dim=0; dim<QUDA_MAX_DIM; ++dim){
+      ghost[dim] = NULL;
+      ghostNorm[dim] = NULL;
+    }
+  }
+
+
+  void* ColorSpinorField::Ghost(const int i) {
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghost[i];
+  }
+  
+  const void* ColorSpinorField::Ghost(const int i) const {
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghost[i];
+  }
+
+
+  void* ColorSpinorField::GhostNorm(const int i){
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghostNorm[i];
+  }
+
+  const void* ColorSpinorField::GhostNorm(const int i) const{
+    if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
+    return ghostNorm[i];
   }
 
   double norm2(const ColorSpinorField &a) {
@@ -291,10 +348,13 @@ namespace quda {
     out << "total_length = " << a.total_length << std::endl;
     out << "ghost_norm_length = " << a.ghost_norm_length << std::endl;
     out << "total_norm_length = " << a.total_norm_length << std::endl;
+    out << "bytes = " << a.bytes << std::endl;
+    out << "norm_bytes = " << a.norm_bytes << std::endl;
     out << "siteSubset = " << a.siteSubset << std::endl;
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
+    out << "PC type = " << a.PCtype << std::endl;
     return out;
   }
 

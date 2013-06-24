@@ -97,12 +97,10 @@ __shared__ bool isLastBlockDone;
    Generic reduction kernel with up to four loads and three saves.
  */
 template <int block_size, typename ReduceType, typename ReduceSimpleType, 
-	  typename FloatN, int M, int writeX, int writeY, int writeZ,
-	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
-	  typename OutputX, typename OutputY, typename OutputZ, typename Reducer>
-__global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
-			     ReduceType *partial, ReduceType *complete,
-			     OutputX XX, OutputY YY, OutputZ ZZ, int length) {
+  typename FloatN, int M, typename SpinorX, typename SpinorY, 
+  typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+__global__ void reduceKernel(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
+			     ReduceType *partial, ReduceType *complete, int length) {
   unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
@@ -121,7 +119,6 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
     r.pre();
 #endif
 
-
 #pragma unroll
     for (int j=0; j<M; j++) r(sum, x[j], y[j], z[j], w[j], v[j]);
 
@@ -129,9 +126,11 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
     r.post(sum);
 #endif
 
-    if (writeX) XX.save(x, i);
-    if (writeY) YY.save(y, i);
-    if (writeZ) ZZ.save(z, i);
+    X.save(x, i);
+    Y.save(y, i);
+    Z.save(z, i);
+    W.save(w, i);
+    V.save(v, i);
 
     i += gridSize;
   }
@@ -229,124 +228,123 @@ __global__ void reduceKernel(InputX X, InputY Y, InputZ Z, InputW W, InputV V, R
    Generic reduction kernel launcher
 */
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
-	  int M, int writeX, int writeY, int writeZ, 
-	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
-	  typename Reducer, typename OutputX, typename OutputY, typename OutputZ>
-doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r, 
-		     OutputX XX, OutputY YY, OutputZ ZZ, int length, const TuneParam &tp,
-		     const cudaStream_t &stream) {
-  ReduceType *partial = (ReduceType*)d_reduce;
-  ReduceType *complete = (ReduceType*)hd_reduce;
+  int M, typename SpinorX, typename SpinorY, typename SpinorZ,  
+  typename SpinorW, typename SpinorV, typename Reducer>
+doubleN reduceLaunch(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
+		     int len, const TuneParam &tp, const cudaStream_t &stream) {
+  ReduceType *part = (ReduceType*)d_reduce;
+  ReduceType *full = (ReduceType*)hd_reduce;
 
   if (tp.grid.x > REDUCE_MAX_BLOCKS) 
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
   if (tp.block.x == 32) {
-    reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 64) {
-    reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 96) {
-    reduceKernel<96,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<96,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 128) {
-    reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 160) {
-    reduceKernel<160,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<160,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 192) {
-    reduceKernel<192,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<192,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 224) {
-    reduceKernel<224,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<224,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 256) {
-    reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 288) {
-    reduceKernel<288,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<288,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 320) {
-    reduceKernel<320,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<320,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 352) {
-    reduceKernel<352,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<352,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 384) {
-    reduceKernel<384,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<384,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 416) {
-    reduceKernel<416,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<416,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 448) {
-    reduceKernel<448,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<448,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 480) {
-    reduceKernel<480,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<480,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 512) {
-    reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 544) {
-    reduceKernel<544,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<544,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 576) {
-    reduceKernel<576,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<576,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 608) {
-    reduceKernel<608,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<608,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 640) {
-    reduceKernel<640,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<640,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 672) {
-    reduceKernel<672,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<672,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 704) {
-    reduceKernel<704,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<704,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 736) {
-    reduceKernel<736,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<736,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 768) {
-    reduceKernel<768,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<768,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 800) {
-    reduceKernel<800,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<800,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 832) {
-    reduceKernel<832,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<832,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 864) {
-    reduceKernel<864,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<864,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 896) {
-    reduceKernel<896,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<896,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 928) {
-    reduceKernel<928,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<928,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 960) {
-    reduceKernel<960,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<960,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 992) {
-    reduceKernel<992,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<992,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else if (tp.block.x == 1024) {
-    reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, partial, complete, XX, YY, ZZ, length);
+    reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M>
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
   } else {
     errorQuda("Reduction not implemented for %d threads", tp.block.x);
   }
 
+#if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
   if(deviceProp.canMapHostMemory) {
     cudaEventRecord(reduceEnd, stream);
     while (cudaSuccess != cudaEventQuery(reduceEnd)) { ; }
-  } else {
-    cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost);
-  }
+  } else 
+#endif
+    { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
 
   doubleN cpu_sum;
   zero(cpu_sum);
@@ -360,28 +358,24 @@ doubleN reduceLaunch(InputX X, InputY Y, InputZ Z, InputW W, InputV V, Reducer r
 
 
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
-	  int M, int writeX, int writeY, int writeZ, 
-	  typename InputX, typename InputY, typename InputZ, typename InputW, typename InputV,
-	  typename Reducer, typename OutputX, typename OutputY, typename OutputZ>
+  int M, typename SpinorX, typename SpinorY, typename SpinorZ,  
+  typename SpinorW, typename SpinorV, typename Reducer>
 class ReduceCuda : public Tunable {
 
 private:
-  InputX &X;
-  InputY &Y;
-  InputZ &Z;
-  InputW &W;
-  InputV &V;
-  OutputX &XX;
-  OutputY &YY;
-  OutputZ &ZZ;
+  SpinorX &X;
+  SpinorY &Y;
+  SpinorZ &Z;
+  SpinorW &W;
+  SpinorV &V;
   Reducer &r;
   const int length;
   doubleN &result;
 
   // host pointers used for backing up fields when tuning
   // these can't be curried into the Spinors because of Tesla argument length restriction
-  char *X_h, *Y_h, *Z_h;
-  char *Xnorm_h, *Ynorm_h, *Znorm_h;
+  char *X_h, *Y_h, *Z_h, *W_h, *V_h;
+  char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
 
   int sharedBytesPerThread() const { return sizeof(ReduceType); }
 
@@ -403,10 +397,11 @@ private:
   }
 
 public:
-  ReduceCuda(doubleN &result, InputX &X, InputY &Y, InputZ &Z, InputW &W, InputV &V, Reducer &r, 
-	     OutputX &XX, OutputY &YY, OutputZ &ZZ, int length) :
-    result(result), X(X), Y(Y), Z(Z), W(W), V(V), r(r), XX(XX), YY(YY), ZZ(ZZ), 
-    X_h(0), Y_h(0), Z_h(0), Xnorm_h(0), Ynorm_h(0), Znorm_h(0), length(length)
+  ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, 
+	     SpinorW &W, SpinorV &V, Reducer &r, int length) :
+    result(result), X(X), Y(Y), Z(Z), W(W), V(V), r(r), 
+      X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
+      Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0), length(length)
     { ; }
   virtual ~ReduceCuda() { }
 
@@ -416,36 +411,40 @@ public:
     vol << blasConstants.x[1] << "x";
     vol << blasConstants.x[2] << "x";
     vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << XX.Precision();
+    aux << "stride=" << blasConstants.stride << ",prec=" << X.Precision();
     return TuneKey(vol.str(), typeid(r).name(), aux.str());
   }  
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
-    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M,writeX,writeY,writeZ>
-      (X, Y, Z, W, V, r, XX, YY, ZZ, length, tp, stream);
+    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>
+      (X, Y, Z, W, V, r, length, tp, stream);
   }
 
   void preTune() { 
-    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*XX.Stride();
-    size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
-    if (writeX) XX.save(&X_h, &Xnorm_h, bytes, norm_bytes);
-    if (writeY) YY.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    if (writeZ) ZZ.save(&Z_h, &Znorm_h, bytes, norm_bytes);
+    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*X.Stride();
+    size_t norm_bytes = (X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
+    X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
+    Y.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
+    W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
+    V.save(&V_h, &Vnorm_h, bytes, norm_bytes);
   }
 
   void postTune() {
-    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*XX.Stride();
-    size_t norm_bytes = (XX.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
-    if (writeX) XX.load(&X_h, &Xnorm_h, bytes, norm_bytes);
-    if (writeY) YY.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    if (writeZ) ZZ.load(&Z_h, &Znorm_h, bytes, norm_bytes);
+    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*X.Stride();
+    size_t norm_bytes = (X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
+    X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
+    Y.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
+    W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
+    V.load(&V_h, &Vnorm_h, bytes, norm_bytes);
   }
 
   long long flops() const { return r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
   long long bytes() const { 
-    size_t bytes = XX.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
-    if (XX.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
+    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    if (X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
     return r.streams()*bytes*length; }
 };
 
@@ -469,16 +468,18 @@ public:
  */
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType,
 	  template <typename ReducerType, typename Float, typename FloatN> class Reducer,
-  int writeX, int writeY, int writeZ, bool siteUnroll>
+  int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
 doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x, 
 		   cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w,
 		   cudaColorSpinorField &v) {
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     doubleN even =
-      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,writeY,writeZ,siteUnroll>
+      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,
+      writeY,writeZ,writeW,writeV,siteUnroll>
       (a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even());
     doubleN odd = 
-      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,writeY,writeZ,siteUnroll>
+      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,
+      writeY,writeZ,writeW,writeV,siteUnroll>
       (a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd());
     return even + odd;
   }
@@ -497,143 +498,95 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
       const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
-      SpinorTexture<double2,double2,double2,M,0> xTex(x);
-      SpinorTexture<double2,double2,double2,M,1> yTex;
-      if (x.V() != y.V()) yTex = SpinorTexture<double2,double2,double2,M,1>(y);    
-      SpinorTexture<double2,double2,double2,M,2> zTex;
-      if (x.V() != z.V()) zTex = SpinorTexture<double2,double2,double2,M,2>(z);    
-      Spinor<double2,double2,double2,M> X(x);
-      Spinor<double2,double2,double2,M> Y(y);
-      Spinor<double2,double2,double2,M> Z(z);
-      Spinor<double2,double2,double2,M> W(w);
-      Spinor<double2,double2,double2,M> V(v);
+      Spinor<double2,double2,double2,M,writeX> X(x);
+      Spinor<double2,double2,double2,M,writeY> Y(y);
+      Spinor<double2,double2,double2,M,writeZ> Z(z);
+      Spinor<double2,double2,double2,M,writeW> W(w);
+      Spinor<double2,double2,double2,M,writeV> V(v);
       Reducer<ReduceType, double2, double2> r(a,b);
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ,
-	SpinorTexture<double2,double2,double2,M,0>, SpinorTexture<double2,double2,double2,M,1>,
-	SpinorTexture<double2,double2,double2,M,2>, Spinor<double2,double2,double2,M>,
-	Spinor<double2,double2,double2,M>, Reducer<ReduceType, double2, double2>, 
-	Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M> >
-	reduce(value, xTex, yTex, zTex, W, V, r, X, Y, Z, reduce_length/(2*M));
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
+	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
+	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
+	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
       reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1){ //staggered
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-      SpinorTexture<double2,double2,double2,M,0> xTex(x);
-      SpinorTexture<double2,double2,double2,M,1> yTex;
-      if (x.V() != y.V()) yTex = SpinorTexture<double2,double2,double2,M,1>(y);    
-      SpinorTexture<double2,double2,double2,M,2> zTex;
-      if (x.V() != z.V()) zTex = SpinorTexture<double2,double2,double2,M,2>(z);    
-      Spinor<double2,double2,double2,M> X(x);
-      Spinor<double2,double2,double2,M> Y(y);
-      Spinor<double2,double2,double2,M> Z(z);
-      Spinor<double2,double2,double2,M> W(w);
-      Spinor<double2,double2,double2,M> V(v);
+      Spinor<double2,double2,double2,M,writeX> X(x);
+      Spinor<double2,double2,double2,M,writeY> Y(y);
+      Spinor<double2,double2,double2,M,writeZ> Z(z);
+      Spinor<double2,double2,double2,M,writeW> W(w);
+      Spinor<double2,double2,double2,M,writeV> V(v);
       Reducer<ReduceType, double2, double2> r(a,b);
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,writeX,writeY,writeZ,
-	SpinorTexture<double2,double2,double2,M,0>, SpinorTexture<double2,double2,double2,M,1>,
-	SpinorTexture<double2,double2,double2,M,2>, Spinor<double2,double2,double2,M>,
-	Spinor<double2,double2,double2,M>, Reducer<ReduceType, double2, double2>, 
-	Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M>, Spinor<double2,double2,double2,M> >
-	reduce(value, xTex, yTex, zTex, W, V, r, X, Y, Z, reduce_length/(2*M));
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
+	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
+	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
+	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
       reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
       const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-      SpinorTexture<float4,float4,float4,M,0> xTex(x);
-      SpinorTexture<float4,float4,float4,M,1> yTex;
-      if (x.V() != y.V()) yTex = SpinorTexture<float4,float4,float4,M,1>(y);
-      SpinorTexture<float4,float4,float4,M,2> zTex;
-      if (x.V() != z.V()) zTex = SpinorTexture<float4,float4,float4,M,2>(z);
-      SpinorTexture<float4,float4,float4,M,3> wTex;
-      if (x.V() != w.V()) wTex = SpinorTexture<float4,float4,float4,M,3>(w);
-      SpinorTexture<float4,float4,float4,M,4> vTex;
-      if (x.V() != v.V()) vTex = SpinorTexture<float4,float4,float4,M,4>(v);
-      Spinor<float4,float4,float4,M> X(x);
-      Spinor<float4,float4,float4,M> Y(y);
-      Spinor<float4,float4,float4,M> Z(z);
-      Spinor<float4,float4,float4,M> W(w);
-      Spinor<float4,float4,float4,M> V(v);
+      Spinor<float4,float4,float4,M,writeX,0> X(x);
+      Spinor<float4,float4,float4,M,writeY,1> Y(y);
+      Spinor<float4,float4,float4,M,writeZ,2> Z(z);
+      Spinor<float4,float4,float4,M,writeW,3> W(w);
+      Spinor<float4,float4,float4,M,writeV,4> V(v);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,M,writeX,writeY,writeZ,
-	SpinorTexture<float4,float4,float4,M,0>,  SpinorTexture<float4,float4,float4,M,1>,
-	SpinorTexture<float4,float4,float4,M,2>,  SpinorTexture<float4,float4,float4,M,3>,
-	SpinorTexture<float4,float4,float4,M,4>, Reducer<ReduceType, float2, float4>,
-	Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M>, Spinor<float4,float4,float4,M> >
-	reduce(value, xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, reduce_length/(4*M));
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,M,
+	Spinor<float4,float4,float4,M,writeX,0>,  Spinor<float4,float4,float4,M,writeY,1>,
+	Spinor<float4,float4,float4,M,writeZ,2>,  Spinor<float4,float4,float4,M,writeW,3>,
+	Spinor<float4,float4,float4,M,writeV,4>, Reducer<ReduceType, float2, float4> >
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M));
       reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1) {
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-      SpinorTexture<float2,float2,float2,M,0> xTex(x);
-      SpinorTexture<float2,float2,float2,M,1> yTex;
-      if (x.V() != y.V()) yTex = SpinorTexture<float2,float2,float2,M,1>(y);
-      SpinorTexture<float2,float2,float2,M,2> zTex;
-      if (x.V() != z.V()) zTex = SpinorTexture<float2,float2,float2,M,2>(z);
-      SpinorTexture<float2,float2,float2,M,3> wTex;
-      if (x.V() != w.V()) wTex = SpinorTexture<float2,float2,float2,M,3>(w);
-      SpinorTexture<float2,float2,float2,M,4> vTex;
-      if (x.V() != v.V()) vTex = SpinorTexture<float2,float2,float2,M,4>(v);
-      Spinor<float2,float2,float2,M> X(x);
-      Spinor<float2,float2,float2,M> Y(y);
-      Spinor<float2,float2,float2,M> Z(z);
-      Spinor<float2,float2,float2,M> W(w);
-      Spinor<float2,float2,float2,M> V(v);
+      Spinor<float2,float2,float2,M,writeX,0> X(x);
+      Spinor<float2,float2,float2,M,writeY,1> Y(y);
+      Spinor<float2,float2,float2,M,writeZ,2> Z(z);
+      Spinor<float2,float2,float2,M,writeW,3> W(w);
+      Spinor<float2,float2,float2,M,writeV,4> V(v);
       Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,writeX,writeY,writeZ,
-	SpinorTexture<float2,float2,float2,M,0>,  SpinorTexture<float2,float2,float2,M,1>,
-	SpinorTexture<float2,float2,float2,M,2>,  SpinorTexture<float2,float2,float2,M,3>,
-	SpinorTexture<float2,float2,float2,M,4>, Reducer<ReduceType, float2, float2>,
-	Spinor<float2,float2,float2,M>, Spinor<float2,float2,float2,M>, Spinor<float2,float2,float2,M> >
-	reduce(value, xTex, yTex, zTex, wTex, vTex, r, X, Y, Z, reduce_length/(2*M));
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,
+	Spinor<float2,float2,float2,M,writeX,0>,  Spinor<float2,float2,float2,M,writeY,1>,
+	Spinor<float2,float2,float2,M,writeZ,2>,  Spinor<float2,float2,float2,M,writeW,3>,
+	Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
       reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else {
     if (x.Nspin() == 4){ //wilson
-      SpinorTexture<float4,float4,short4,6,0> xTex(x);
-      SpinorTexture<float4,float4,short4,6,1> yTex;
-      if (x.V() != y.V()) yTex = SpinorTexture<float4,float4,short4,6,1>(y);
-      SpinorTexture<float4,float4,short4,6,2> zTex;
-      if (x.V() != z.V()) zTex = SpinorTexture<float4,float4,short4,6,2>(z);
-      SpinorTexture<float4,float4,short4,6,3> wTex;
-      if (x.V() != w.V()) wTex = SpinorTexture<float4,float4,short4,6,3>(w);
-      SpinorTexture<float4,float4,short4,6,4> vTex;
-      if (x.V() != v.V()) vTex = SpinorTexture<float4,float4,short4,6,4>(v);
-      Spinor<float4,float4,short4,6> xOut(x);
-      Spinor<float4,float4,short4,6> yOut(y);
-      Spinor<float4,float4,short4,6> zOut(z);
+      Spinor<float4,float4,short4,6,writeX,0> X(x);
+      Spinor<float4,float4,short4,6,writeY,1> Y(y);
+      Spinor<float4,float4,short4,6,writeZ,2> Z(z);
+      Spinor<float4,float4,short4,6,writeW,3> W(w);
+      Spinor<float4,float4,short4,6,writeV,4> V(v);
       Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,writeX,writeY,writeZ,
-	SpinorTexture<float4,float4,short4,6,0>, SpinorTexture<float4,float4,short4,6,1>,
-	SpinorTexture<float4,float4,short4,6,2>, SpinorTexture<float4,float4,short4,6,3>,
-	SpinorTexture<float4,float4,short4,6,4>, Reducer<ReduceType, float2, float4>,
-	Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6>, Spinor<float4,float4,short4,6> >
-	reduce(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,
+	Spinor<float4,float4,short4,6,writeX,0>, Spinor<float4,float4,short4,6,writeY,1>,
+	Spinor<float4,float4,short4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>,
+	Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
+	reduce(value, X, Y, Z, W, V, r, y.Volume());
       reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1) {//staggered
-      SpinorTexture<float2,float2,short2,3,0> xTex(x);
-      SpinorTexture<float2,float2,short2,3,1> yTex;
-      if (x.V() != y.V()) yTex = SpinorTexture<float2,float2,short2,3,1>(y);
-      SpinorTexture<float2,float2,short2,3,2> zTex;
-      if (x.V() != z.V()) zTex = SpinorTexture<float2,float2,short2,3,2>(z);
-      SpinorTexture<float2,float2,short2,3,3> wTex;
-      if (x.V() != w.V()) wTex = SpinorTexture<float2,float2,short2,3,3>(w);
-      SpinorTexture<float2,float2,short2,3,4> vTex;
-      if (x.V() != v.V()) vTex = SpinorTexture<float2,float2,short2,3,4>(v);
-      Spinor<float2,float2,short2,3> xOut(x);
-      Spinor<float2,float2,short2,3> yOut(y);
-      Spinor<float2,float2,short2,3> zOut(z);
+      Spinor<float2,float2,short2,3,writeX,0> X(x);
+      Spinor<float2,float2,short2,3,writeY,1> Y(y);
+      Spinor<float2,float2,short2,3,writeZ,2> Z(z);
+      Spinor<float2,float2,short2,3,writeW,3> W(w);
+      Spinor<float2,float2,short2,3,writeV,4> V(v);
       Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,writeX,writeY,writeZ,
-	SpinorTexture<float2,float2,short2,3,0>, SpinorTexture<float2,float2,short2,3,1>,
-	SpinorTexture<float2,float2,short2,3,2>, SpinorTexture<float2,float2,short2,3,3>,
-	SpinorTexture<float2,float2,short2,3,4>, Reducer<ReduceType, float2, float2>,
-	Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3>, Spinor<float2,float2,short2,3> >
-	reduce(value,xTex,yTex,zTex,wTex,vTex,r,xOut,yOut,zOut,y.Volume());
+      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,
+	Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
+	Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
+	Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
+	reduce(value, X, Y, Z, W, V, r, y.Volume());
       reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.Volume()*sizeof(float);
+    blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
   }
-  blas_bytes += Reducer<ReduceType,double2,double2>::streams()*x.RealLength()*x.Precision();
-  blas_flops += Reducer<ReduceType,double2,double2>::flops()*x.RealLength();
+  blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
+  blas_flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x.RealLength();
 
   checkCudaError();
 

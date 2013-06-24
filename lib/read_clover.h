@@ -73,7 +73,7 @@
   C8.x *= K; C8.y *= K;	C8.z *= K; C8.w *= K;		 
 
 #define READ_CLOVER_DOUBLE_TEX(clover, chi)			       \
-  double2 C0 = fetch_double2((clover), sid + (18*chi+0)*cl_stride);    \
+  double2 C0 = fetch_double2((clover), sid + (18*chi+0)*cl_stride);	\
   double2 C1 = fetch_double2((clover), sid + (18*chi+1)*cl_stride);    \
   double2 C2 = fetch_double2((clover), sid + (18*chi+2)*cl_stride);    \
   double2 C3 = fetch_double2((clover), sid + (18*chi+3)*cl_stride);    \
@@ -92,28 +92,30 @@
   double2 C16 = fetch_double2((clover), sid + (18*chi+16)*cl_stride);  \
   double2 C17 = fetch_double2((clover), sid + (18*chi+17)*cl_stride);
 
+//#endif // USE_TEXTURE_OBJECTS
+
 #define READ_CLOVER_SINGLE_TEX(clover, chi)			\
-  float4 C0 = tex1Dfetch((clover), sid + (9*chi+0)*cl_stride);  \
-  float4 C1 = tex1Dfetch((clover), sid + (9*chi+1)*cl_stride);  \
-  float4 C2 = tex1Dfetch((clover), sid + (9*chi+2)*cl_stride);  \
-  float4 C3 = tex1Dfetch((clover), sid + (9*chi+3)*cl_stride);  \
-  float4 C4 = tex1Dfetch((clover), sid + (9*chi+4)*cl_stride);  \
-  float4 C5 = tex1Dfetch((clover), sid + (9*chi+5)*cl_stride);  \
-  float4 C6 = tex1Dfetch((clover), sid + (9*chi+6)*cl_stride);  \
-  float4 C7 = tex1Dfetch((clover), sid + (9*chi+7)*cl_stride);  \
-  float4 C8 = tex1Dfetch((clover), sid + (9*chi+8)*cl_stride);
+  float4 C0 = TEX1DFETCH(float4, (clover), sid + (9*chi+0)*cl_stride);	\
+  float4 C1 = TEX1DFETCH(float4, (clover), sid + (9*chi+1)*cl_stride);  \
+  float4 C2 = TEX1DFETCH(float4, (clover), sid + (9*chi+2)*cl_stride);  \
+  float4 C3 = TEX1DFETCH(float4, (clover), sid + (9*chi+3)*cl_stride);  \
+  float4 C4 = TEX1DFETCH(float4, (clover), sid + (9*chi+4)*cl_stride);  \
+  float4 C5 = TEX1DFETCH(float4, (clover), sid + (9*chi+5)*cl_stride);  \
+  float4 C6 = TEX1DFETCH(float4, (clover), sid + (9*chi+6)*cl_stride);  \
+  float4 C7 = TEX1DFETCH(float4, (clover), sid + (9*chi+7)*cl_stride);	\
+  float4 C8 = TEX1DFETCH(float4, (clover), sid + (9*chi+8)*cl_stride);
 
 #define READ_CLOVER_HALF_TEX(clover, chi)			\
-  float4 C0 = tex1Dfetch((clover), sid + (9*chi+0)*cl_stride);  \
-  float4 C1 = tex1Dfetch((clover), sid + (9*chi+1)*cl_stride);  \
-  float4 C2 = tex1Dfetch((clover), sid + (9*chi+2)*cl_stride);  \
-  float4 C3 = tex1Dfetch((clover), sid + (9*chi+3)*cl_stride);  \
-  float4 C4 = tex1Dfetch((clover), sid + (9*chi+4)*cl_stride);  \
-  float4 C5 = tex1Dfetch((clover), sid + (9*chi+5)*cl_stride);  \
-  float4 C6 = tex1Dfetch((clover), sid + (9*chi+6)*cl_stride);  \
-  float4 C7 = tex1Dfetch((clover), sid + (9*chi+7)*cl_stride);  \
-  float4 C8 = tex1Dfetch((clover), sid + (9*chi+8)*cl_stride);  \
-  float K = tex1Dfetch((cloverTexNorm), sid + chi*cl_stride);   \
+  float4 C0 = TEX1DFETCH(float4, (clover), sid + (9*chi+0)*cl_stride);  \
+  float4 C1 = TEX1DFETCH(float4, (clover), sid + (9*chi+1)*cl_stride);  \
+  float4 C2 = TEX1DFETCH(float4, (clover), sid + (9*chi+2)*cl_stride);  \
+  float4 C3 = TEX1DFETCH(float4, (clover), sid + (9*chi+3)*cl_stride);  \
+  float4 C4 = TEX1DFETCH(float4, (clover), sid + (9*chi+4)*cl_stride);  \
+  float4 C5 = TEX1DFETCH(float4, (clover), sid + (9*chi+5)*cl_stride);  \
+  float4 C6 = TEX1DFETCH(float4, (clover), sid + (9*chi+6)*cl_stride);  \
+  float4 C7 = TEX1DFETCH(float4, (clover), sid + (9*chi+7)*cl_stride);  \
+  float4 C8 = TEX1DFETCH(float4, (clover), sid + (9*chi+8)*cl_stride);  \
+  float K = TEX1DFETCH(float, (CLOVERTEXNORM), sid + chi*cl_stride); \
   C0.x *= K; C0.y *= K;	C0.z *= K; C0.w *= K;		        \
   C1.x *= K; C1.y *= K;	C1.z *= K; C1.w *= K;		        \
   C2.x *= K; C2.y *= K;	C2.z *= K; C2.w *= K;		        \

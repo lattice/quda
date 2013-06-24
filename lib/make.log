@@ -1,0 +1,1053 @@
+mpicxx             -Wall -O3 -DPOINTER_SIZE=8 -D__COMPUTE_CAPABILITY__=200 -DMULTI_GPU -DGPU_WILSON_DIRAC -DGPU_DOMAIN_WALL_DIRAC -DGPU_DIRECT -DNUMA_AFFINITY -I/usr/local/cuda-4.2/include -DQMP_COMMS -I/home/hjkim/SciDAC/SSE/install/include -DHAVE_QIO -I/home/hjkim/SciDAC/scidac/install/qio-BGPU/include -I../include -Idslash_core -I. dirac_domain_wall.cpp -c -o dirac_domain_wall.o
+dirac_domain_wall.cpp:1:1: error: ‘include’ does not name a type
+In file included from /usr/local/cuda-4.2/include/cuda.h:53:0,
+                 from ../include/quda_internal.h:4,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/stdlib.h:140:8: error: ‘size_t’ does not name a type
+In file included from /usr/local/cuda-4.2/include/cuda.h:53:0,
+                 from ../include/quda_internal.h:4,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/stdlib.h:337:4: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:367:4: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:471:22: error: ‘size_t’ was not declared in this scope
+/usr/include/stdlib.h:471:37: error: expected ‘,’ or ‘;’ before ‘throw’
+/usr/include/stdlib.h:473:22: error: ‘size_t’ was not declared in this scope
+/usr/include/stdlib.h:473:38: error: ‘size_t’ was not declared in this scope
+/usr/include/stdlib.h:473:51: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/include/stdlib.h:474:6: error: expected ‘,’ or ‘;’ before ‘throw’
+/usr/include/stdlib.h:485:36: error: ‘size_t’ has not been declared
+In file included from /usr/include/stdlib.h:497:0,
+                 from /usr/local/cuda-4.2/include/cuda.h:53,
+                 from ../include/quda_internal.h:4,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/alloca.h:33:22: error: ‘size_t’ was not declared in this scope
+/usr/include/alloca.h:33:37: error: expected ‘,’ or ‘;’ before ‘throw’
+In file included from /usr/local/cuda-4.2/include/cuda.h:53:0,
+                 from ../include/quda_internal.h:4,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/stdlib.h:503:22: error: ‘size_t’ was not declared in this scope
+/usr/include/stdlib.h:503:37: error: expected ‘,’ or ‘;’ before ‘throw’
+/usr/include/stdlib.h:508:45: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:508:65: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:756:9: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:756:25: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:761:34: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:761:50: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:764:36: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:764:52: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:840:6: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:843:6: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:847:31: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:851:31: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:860:38: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:864:36: error: ‘size_t’ has not been declared
+/usr/include/stdlib.h:871:8: error: ‘size_t’ does not name a type
+/usr/include/stdlib.h:874:8: error: ‘size_t’ does not name a type
+/usr/include/stdlib.h:937:46: error: ‘size_t’ has not been declared
+In file included from /usr/include/stdlib.h:955:0,
+                 from /usr/local/cuda-4.2/include/cuda.h:53,
+                 from ../include/quda_internal.h:4,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:26:9: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:30:14: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h: In function ‘char* realpath(const char*, char*)’:
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:40:30: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/stdlib.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:53:52: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:54:8: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:55:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:58:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:58:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:65:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h: In function ‘int ptsname_r(int, char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:67:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/stdlib.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:78:54: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdlib.h: In function ‘int wctomb(char*, wchar_t)’:
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:93:23: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/stdlib.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:99:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:102:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:106:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:113:24: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:131:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:134:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:138:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:144:24: error: ‘size_t’ does not name a type
+In file included from ../include/quda_internal.h:4:0,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/local/cuda-4.2/include/cuda.h:970:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:971:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:977:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:979:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:980:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:986:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:988:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:989:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:996:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:997:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:998:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:999:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1005:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1006:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1008:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1009:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1010:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1011:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1017:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1018:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1020:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1021:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1022:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1029:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1030:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1031:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1032:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1038:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1039:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1041:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1042:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1043:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1044:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1050:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1051:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1053:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1054:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1055:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1063:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1064:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1075:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1076:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1077:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/cuda.h:1386:35: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:1386:43: error: ‘bytes’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:1386:59: error: expected primary-expression before ‘dev’
+/usr/local/cuda-4.2/include/cuda.h:1386:62: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda.h:2067:47: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:2100:32: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:2100:40: error: ‘pvalue’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:2100:56: error: expected primary-expression before ‘limit’
+/usr/local/cuda-4.2/include/cuda.h:2100:61: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda.h:2611:55: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:2719:31: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:2719:45: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:2719:53: error: ‘total’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:2719:58: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda.h:2752:48: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:2813:53: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:2813:69: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:2813:90: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:2875:59: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:2921:44: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3033:44: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3407:45: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3466:61: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3499:121: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3535:75: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3568:69: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3601:77: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3635:49: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3635:90: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3671:72: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3671:90: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3705:49: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3705:88: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3739:64: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3739:82: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3777:49: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3777:85: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:3777:103: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4333:66: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4364:126: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4406:80: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4446:74: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4483:82: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4525:54: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4525:93: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4567:69: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4567:87: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:4976:70: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5012:72: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5048:70: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5089:54: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5089:89: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5089:103: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5131:55: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5131:91: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5131:105: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5173:55: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5173:89: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5173:103: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5210:75: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5247:77: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5283:75: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5325:59: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5325:94: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5325:108: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5368:60: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5368:96: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5368:110: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5411:60: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5411:94: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:5411:108: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:7110:37: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:7110:45: error: ‘ByteOffset’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:7110:66: error: expected primary-expression before ‘hTexRef’
+/usr/local/cuda-4.2/include/cuda.h:7110:87: error: expected primary-expression before ‘dptr’
+/usr/local/cuda-4.2/include/cuda.h:7110:93: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda.h:7110:105: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda.h:7162:110: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda.h:7786:75: error: ‘size_t’ has not been declared
+In file included from /usr/local/cuda-4.2/include/builtin_types.h:57:0,
+                 from /usr/local/cuda-4.2/include/cuda_runtime.h:67,
+                 from ../include/quda_internal.h:5,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/local/cuda-4.2/include/driver_types.h:636:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:637:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:638:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:647:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:648:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:649:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:658:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:659:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:660:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:783:4: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:789:4: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:794:4: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:881:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:882:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:885:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:890:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:893:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:894:5: error: ‘size_t’ does not name a type
+/usr/local/cuda-4.2/include/driver_types.h:918:5: error: ‘size_t’ does not name a type
+In file included from /usr/local/cuda-4.2/include/channel_descriptor.h:62:0,
+                 from /usr/local/cuda-4.2/include/cuda_runtime.h:68,
+                 from ../include/quda_internal.h:5,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:269:80: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:293:58: warning: ‘cudaDeviceGetLimit’ initialized and declared ‘extern’ [enabled by default]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:293:58: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:293:66: error: ‘pValue’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:293:74: error: expected primary-expression before ‘enum’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:293:94: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:794:80: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:825:58: warning: ‘cudaThreadGetLimit’ initialized and declared ‘extern’ [enabled by default]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:825:58: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:825:66: error: ‘pValue’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:825:74: error: expected primary-expression before ‘enum’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:825:94: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:1786:86: error: ‘size_t’ has not been declared
+In file included from /usr/local/cuda-4.2/include/channel_descriptor.h:62:0,
+                 from /usr/local/cuda-4.2/include/cuda_runtime.h:68,
+                 from ../include/quda_internal.h:5,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:1813:74: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:1813:87: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2055:65: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2084:66: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2123:70: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2123:85: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2123:99: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2165:123: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2165:137: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2290:67: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2343:67: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2814:54: warning: ‘cudaMemGetInfo’ initialized and declared ‘extern’ [enabled by default]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2814:54: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2814:68: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2814:76: error: ‘total’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2814:81: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2870:78: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2902:112: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2936:80: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2936:96: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2936:129: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2970:99: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2970:115: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:2970:131: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3005:85: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3005:104: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3005:152: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3005:171: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3005:190: error: ‘size_t’ has not been declared
+In file included from /usr/local/cuda-4.2/include/channel_descriptor.h:62:0,
+                 from /usr/local/cuda-4.2/include/cuda_runtime.h:68,
+                 from ../include/quda_internal.h:5,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3047:63: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3047:95: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3047:110: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3047:124: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3089:82: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3089:98: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3089:131: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3089:146: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3089:160: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3131:72: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3131:116: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3131:132: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3131:148: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3131:162: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3171:87: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3171:106: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3171:154: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3171:173: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3171:192: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3171:206: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3206:95: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3206:109: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3241:91: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3241:105: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3283:83: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3314:117: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3355:85: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3355:101: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3355:134: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3396:104: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3396:120: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3396:136: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3447:68: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3447:100: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3447:115: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3447:129: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3497:87: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3497:103: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3497:136: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3497:151: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3497:165: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3546:77: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3546:121: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3546:137: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3546:153: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3546:167: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3588:100: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3588:114: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3630:96: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3630:110: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3653:75: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3680:66: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3680:91: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3680:105: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3748:80: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3781:71: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3781:96: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3781:110: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3876:57: warning: ‘cudaGetSymbolSize’ initialized and declared ‘extern’ [enabled by default]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3876:57: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3876:65: error: ‘size’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3876:71: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:3876:89: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4294:91: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:55: warning: ‘cudaBindTexture’ initialized and declared ‘extern’ [enabled by default]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:55: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:63: error: ‘offset’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:71: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:110: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:130: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:172: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4443:198: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:57: warning: ‘cudaBindTexture2D’ initialized and declared ‘extern’ [enabled by default]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:57: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:65: error: ‘offset’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:73: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:112: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:132: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:174: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:188: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:203: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4494:215: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4568:69: warning: ‘cudaGetTextureAlignmentOffset’ initialized and declared ‘extern’ [enabled by default]
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4568:69: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4568:77: error: ‘offset’ was not declared in this scope
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4568:85: error: expected primary-expression before ‘const’
+/usr/local/cuda-4.2/include/cuda_runtime_api.h:4568:122: error: expression list treated as compound expression in initializer [-fpermissive]
+In file included from /usr/local/cuda-4.2/include/cuda_runtime.h:70:0,
+                 from ../include/quda_internal.h:5,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/local/cuda-4.2/include/driver_functions.h:79:79: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/driver_functions.h:79:89: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/driver_functions.h:79:101: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/driver_functions.h: In function ‘cudaPitchedPtr make_cudaPitchedPtr(void*, int, int, int)’:
+/usr/local/cuda-4.2/include/driver_functions.h:84:5: error: ‘struct cudaPitchedPtr’ has no member named ‘pitch’
+/usr/local/cuda-4.2/include/driver_functions.h:85:5: error: ‘struct cudaPitchedPtr’ has no member named ‘xsize’
+/usr/local/cuda-4.2/include/driver_functions.h:86:5: error: ‘struct cudaPitchedPtr’ has no member named ‘ysize’
+/usr/local/cuda-4.2/include/driver_functions.h: At global scope:
+/usr/local/cuda-4.2/include/driver_functions.h:106:56: error: ‘make_cudaPos’ declared as an ‘inline’ variable
+/usr/local/cuda-4.2/include/driver_functions.h:106:56: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/driver_functions.h:106:66: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/driver_functions.h:106:76: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/driver_functions.h:107:1: error: expected ‘,’ or ‘;’ before ‘{’ token
+/usr/local/cuda-4.2/include/driver_functions.h:132:62: error: ‘make_cudaExtent’ declared as an ‘inline’ variable
+/usr/local/cuda-4.2/include/driver_functions.h:132:62: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/driver_functions.h:132:72: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/driver_functions.h:132:82: error: ‘size_t’ was not declared in this scope
+/usr/local/cuda-4.2/include/driver_functions.h:133:1: error: expected ‘,’ or ‘;’ before ‘{’ token
+In file included from ../include/quda_internal.h:5:0,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/local/cuda-4.2/include/cuda_runtime.h:123:3: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime.h:224:3: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime.h:234:3: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime.h:254:3: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime.h:263:3: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime.h:273:3: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime.h:274:3: error: ‘size_t’ has not been declared
+/usr/local/cuda-4.2/include/cuda_runtime.h:275:3: error: ‘size_t’ has not been declared
+In file included from /usr/include/c++/4.6/cwchar:46:0,
+                 from /usr/include/c++/4.6/bits/postypes.h:42,
+                 from /usr/include/c++/4.6/bits/char_traits.h:42,
+                 from /usr/include/c++/4.6/string:42,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/wchar.h:148:40: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:156:40: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:163:67: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:173:4: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:183:6: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:193:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:209:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:249:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:253:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:284:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:303:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:311:59: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:314:12: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:322:67: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:327:39: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:331:65: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:335:53: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:342:40: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:362:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:367:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:371:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:373:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:395:17: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:405:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:411:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:420:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:426:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:440:44: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:569:40: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:577:53: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:601:47: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:622:48: error: ‘size_t’ has not been declared
+/usr/include/wchar.h:852:8: error: ‘size_t’ does not name a type
+/usr/include/wchar.h:862:8: error: ‘size_t’ does not name a type
+In file included from /usr/include/wchar.h:881:0,
+                 from /usr/include/c++/4.6/cwchar:46,
+                 from /usr/include/c++/4.6/bits/postypes.h:42,
+                 from /usr/include/c++/4.6/bits/char_traits.h:42,
+                 from /usr/include/c++/4.6/string:42,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:26:45: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:27:11: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:28:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:32:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:32:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:40:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wmemcpy(wchar_t*, const wchar_t*, int)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:43:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:43:25: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:58:5: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:58:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:59:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:62:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:62:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:69:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wmemmove(wchar_t*, const wchar_t*, int)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:71:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:71:25: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:87:39: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:88:5: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:89:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:93:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:93:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:101:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wmempcpy(wchar_t*, const wchar_t*, int)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:104:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:104:25: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:119:59: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:120:11: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:121:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:123:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:123:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:130:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wmemset(wchar_t*, wchar_t, int)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:132:24: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:132:24: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:147:10: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wcscpy(wchar_t*, const wchar_t*)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:155:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:155:26: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:163:10: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wcpcpy(wchar_t*, const wchar_t*)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:171:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:171:26: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:178:46: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:179:11: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:180:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:184:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:184:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:192:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wcsncpy(wchar_t*, const wchar_t*, int)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:195:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:195:26: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:209:46: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:210:11: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:211:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:215:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:215:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:223:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wcpncpy(wchar_t*, const wchar_t*, int)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:226:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:226:26: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:241:10: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wcscat(wchar_t*, const wchar_t*)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:249:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:249:26: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:257:11: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:257:23: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:258:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:264:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* wcsncat(wchar_t*, const wchar_t*, int)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:267:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:267:26: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:274:53: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:275:19: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:279:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:286:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘int swprintf(wchar_t*, int, const wchar_t*, ...)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:289:23: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:289:23: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:304:54: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:305:20: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:310:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:316:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘int vswprintf(wchar_t*, int, const wchar_t*, __va_list_tag*)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:319:23: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:319:23: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:373:56: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:378:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* fgetws(wchar_t*, int, __FILE*)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:387:23: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:387:23: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:393:20: error: expected ‘)’ before ‘__n’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:401:65: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:408:17: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: In function ‘wchar_t* fgetws_unlocked(wchar_t*, int, __FILE*)’:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:418:23: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:418:23: note: suggested alternative:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:424:20: error: expected ‘)’ before ‘__n’
+/usr/include/x86_64-linux-gnu/bits/wchar2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:433:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:436:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:440:30: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:457:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:461:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:466:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:474:24: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:492:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:496:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:501:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:508:24: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:525:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:529:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:534:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:542:24: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:560:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:565:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:570:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:578:24: error: ‘size_t’ does not name a type
+In file included from /usr/include/c++/4.6/bits/postypes.h:42:0,
+                 from /usr/include/c++/4.6/bits/char_traits.h:42,
+                 from /usr/include/c++/4.6/string:42,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/c++/4.6/cwchar:153:11: error: ‘::mbrlen’ has not been declared
+/usr/include/c++/4.6/cwchar:154:11: error: ‘::mbrtowc’ has not been declared
+/usr/include/c++/4.6/cwchar:156:11: error: ‘::mbsrtowcs’ has not been declared
+/usr/include/c++/4.6/cwchar:178:11: error: ‘::wcrtomb’ has not been declared
+/usr/include/c++/4.6/cwchar:183:11: error: ‘::wcscspn’ has not been declared
+/usr/include/c++/4.6/cwchar:184:11: error: ‘::wcsftime’ has not been declared
+/usr/include/c++/4.6/cwchar:185:11: error: ‘::wcslen’ has not been declared
+/usr/include/c++/4.6/cwchar:189:11: error: ‘::wcsrtombs’ has not been declared
+/usr/include/c++/4.6/cwchar:190:11: error: ‘::wcsspn’ has not been declared
+/usr/include/c++/4.6/cwchar:198:11: error: ‘::wcsxfrm’ has not been declared
+In file included from /usr/include/c++/4.6/string:42:0,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/c++/4.6/bits/char_traits.h: In static member function ‘static std::size_t std::char_traits<wchar_t>::length(const char_type*)’:
+/usr/include/c++/4.6/bits/char_traits.h:332:26: error: ‘wcslen’ was not declared in this scope
+In file included from /usr/include/sched.h:43:0,
+                 from /usr/include/pthread.h:25,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:41,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/x86_64-linux-gnu/bits/sched.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/sched.h:205:30: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/sched.h:205:30: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/sched.h:205:48: error: expected primary-expression before ‘const’
+/usr/include/x86_64-linux-gnu/bits/sched.h:205:71: error: expression list treated as compound expression in initializer [-fpermissive]
+/usr/include/x86_64-linux-gnu/bits/sched.h:206:3: error: expected ‘,’ or ‘;’ before ‘throw’
+/usr/include/x86_64-linux-gnu/bits/sched.h:207:37: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/sched.h:207:37: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/sched.h:207:53: error: expected ‘,’ or ‘;’ before ‘throw’
+In file included from /usr/include/pthread.h:25:0,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:41,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/sched.h:118:46: error: ‘size_t’ has not been declared
+/usr/include/sched.h:122:46: error: ‘size_t’ has not been declared
+In file included from /usr/include/pthread.h:26:0,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:41,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/time.h:199:8: error: ‘size_t’ does not name a type
+/usr/include/time.h:217:8: error: ‘size_t’ does not name a type
+In file included from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:41:0,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/pthread.h:297:11: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:302:11: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:361:19: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:368:11: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:375:7: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:382:7: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:389:6: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:396:6: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:431:11: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:458:52: error: ‘size_t’ has not been declared
+/usr/include/pthread.h:463:52: error: ‘size_t’ has not been declared
+In file included from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:42:0,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/unistd.h:361:45: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:367:54: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:377:46: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:385:55: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:405:48: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:409:57: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:512:35: error: ‘size_t’ has not been declared
+In file included from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:42:0,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/unistd.h:624:8: error: ‘size_t’ does not name a type
+/usr/include/unistd.h:797:46: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:833:29: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:844:31: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:880:38: error: ‘size_t’ has not been declared
+In file included from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:42:0,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/unistd.h:902:39: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:909:47: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:920:41: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:922:49: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:940:57: error: ‘size_t’ has not been declared
+/usr/include/unistd.h:941:6: error: ‘size_t’ has not been declared
+In file included from /usr/include/unistd.h:1171:0,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr-default.h:42,
+                 from /usr/include/c++/4.6/x86_64-linux-gnu/./bits/gthr.h:170,
+                 from /usr/include/c++/4.6/ext/atomicity.h:34,
+                 from /usr/include/c++/4.6/bits/basic_string.h:41,
+                 from /usr/include/c++/4.6/string:54,
+                 from ../include/quda_internal.h:7,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:24:51: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:25:7: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:26:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:28:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:28:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:35:30: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘ssize_t read(int, void*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:37:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:37:26: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:49:52: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:50:26: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:51:54: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:52:30: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:53:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:56:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:59:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:59:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:64:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:64:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:73:31: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘ssize_t pread(int, void*, int, __off_t)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:75:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:75:26: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:106:33: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘ssize_t pread64(int, void*, int, __off64_t)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:108:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:108:26: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:125:35: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:126:11: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:128:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:132:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:132:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:140:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘ssize_t readlink(const char*, char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:143:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:143:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:157:30: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:158:6: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:160:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:165:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:165:16: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:174:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘ssize_t readlinkat(int, const char*, char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:177:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:177:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:190:41: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:190:56: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:192:14: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:194:14: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:194:14: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:201:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘char* getcwd(char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:203:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:203:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:215:40: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘char* getwd(char*)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:224:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:224:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:230:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/unistd.h:232:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/unistd.h:234:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/unistd.h:240:24: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/unistd.h:255:59: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:259:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘int getgroups(int, __gid_t*)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:268:26: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:268:26: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:280:52: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:281:8: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:282:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:285:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:285:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:292:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘int ttyname_r(int, char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:294:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:294:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:307:43: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:307:60: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:309:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:311:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:311:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:318:26: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘int getlogin_r(char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:320:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:320:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:334:44: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:334:61: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:336:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:338:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:338:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:345:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘int gethostname(char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:347:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:347:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/unistd.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:361:46: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:361:63: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:363:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:366:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:366:12: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h:374:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/unistd.h: In function ‘int getdomainname(char*, int)’:
+/usr/include/x86_64-linux-gnu/bits/unistd.h:376:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/unistd.h:376:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+In file included from /usr/include/stdio.h:75:0,
+                 from /home/hjkim/SciDAC/SSE/install/include/qmp.h:99,
+                 from ../include/quda_internal.h:14,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/libio.h: At global scope:
+/usr/include/libio.h:334:3: error: ‘size_t’ does not name a type
+/usr/include/libio.h:338:67: error: ‘size_t’ was not declared in this scope
+/usr/include/libio.h:338:67: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/libio.h:366:62: error: ‘size_t’ has not been declared
+/usr/include/libio.h:375:6: error: ‘size_t’ has not been declared
+/usr/include/libio.h:497:8: error: ‘size_t’ does not name a type
+In file included from /home/hjkim/SciDAC/SSE/install/include/qmp.h:99:0,
+                 from ../include/quda_internal.h:14,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/stdio.h:320:35: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:326:47: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:338:20: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:345:10: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:387:44: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:391:45: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:663:11: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:666:9: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:676:8: error: ‘size_t’ has not been declared
+/usr/include/stdio.h:706:8: error: ‘size_t’ does not name a type
+/usr/include/stdio.h:712:8: error: ‘size_t’ does not name a type
+/usr/include/stdio.h:734:8: error: ‘size_t’ does not name a type
+/usr/include/stdio.h:736:8: error: ‘size_t’ does not name a type
+In file included from /usr/include/stdio.h:931:0,
+                 from /home/hjkim/SciDAC/SSE/install/include/qmp.h:99,
+                 from ../include/quda_internal.h:14,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/x86_64-linux-gnu/bits/stdio.h:116:28: error: ‘size_t’ has not been declared
+In file included from /usr/include/stdio.h:934:0,
+                 from /home/hjkim/SciDAC/SSE/install/include/qmp.h:99,
+                 from ../include/quda_internal.h:14,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:24:61: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:26:62: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:53:50: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:7: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:56:51: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:57:8: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:62:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:75:1: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:220:39: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h: In function ‘char* gets(char*)’:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:228:25: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:228:25: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/stdio2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:233:49: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:238:14: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h: In function ‘char* fgets(char*, int, FILE*)’:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:247:23: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:247:23: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:252:20: error: expected ‘)’ before ‘__n’
+/usr/include/x86_64-linux-gnu/bits/stdio2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:258:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:261:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:265:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:273:30: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:291:58: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:296:14: error: ‘size_t’ has not been declared
+/usr/include/x86_64-linux-gnu/bits/stdio2.h: In function ‘char* fgets_unlocked(char*, int, FILE*)’:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:305:23: error: ‘size_t’ was not declared in this scope
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:305:23: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:310:20: error: expected ‘)’ before ‘__n’
+/usr/include/x86_64-linux-gnu/bits/stdio2.h: At global scope:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:319:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:322:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:326:8: error: ‘size_t’ does not name a type
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:334:30: error: ‘size_t’ does not name a type
+In file included from ../include/quda_internal.h:14:0,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:428:48: warning: ‘QMP_allocate_memory’ initialized and declared ‘extern’ [enabled by default]
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:428:48: error: ‘size_t’ was not declared in this scope
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:428:48: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:437:56: warning: ‘QMP_allocate_aligned_memory’ initialized and declared ‘extern’ [enabled by default]
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:437:56: error: ‘size_t’ was not declared in this scope
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:437:56: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:438:14: error: ‘size_t’ was not declared in this scope
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:438:14: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:439:14: error: expected primary-expression before ‘int’
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:439:23: error: expression list treated as compound expression in initializer [-fpermissive]
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:463:64: error: ‘size_t’ has not been declared
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:469:13: error: ‘size_t’ has not been declared
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:477:8: error: ‘size_t’ has not been declared
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:655:56: error: ‘size_t’ has not been declared
+/home/hjkim/SciDAC/SSE/install/include/qmp.h:742:64: error: ‘size_t’ has not been declared
+In file included from ../include/util_quda.h:7:0,
+                 from ../include/quda_internal.h:34,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+../include/comm_quda.h:40:44: error: ‘size_t’ has not been declared
+../include/comm_quda.h:43:74: error: ‘size_t’ has not been declared
+../include/comm_quda.h:44:77: error: ‘size_t’ has not been declared
+../include/comm_quda.h:55:42: error: ‘size_t’ has not been declared
+In file included from ../include/malloc_quda.h:4:0,
+                 from ../include/quda_internal.h:35,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+/usr/include/c++/4.6/cstdlib:122:11: error: ‘::mbstowcs’ has not been declared
+/usr/include/c++/4.6/cstdlib:134:11: error: ‘::wcstombs’ has not been declared
+In file included from ../include/quda_internal.h:35:0,
+                 from ../include/dirac_quda.h:4,
+                 from dirac_domain_wall.cpp:2:
+../include/malloc_quda.h:15:70: error: ‘size_t’ has not been declared
+../include/malloc_quda.h:16:68: error: ‘size_t’ has not been declared
+../include/malloc_quda.h:17:70: error: ‘size_t’ has not been declared
+../include/malloc_quda.h:18:70: error: ‘size_t’ has not been declared
+In file included from ../include/dirac_quda.h:4:0,
+                 from dirac_domain_wall.cpp:2:
+../include/quda_internal.h:45:5: error: ‘size_t’ does not name a type
+In file included from ../include/color_spinor_field.h:13:0,
+                 from ../include/dirac_quda.h:5,
+                 from dirac_domain_wall.cpp:2:
+../include/lattice_field.h:51:5: error: ‘size_t’ does not name a type
+../include/lattice_field.h:72:12: error: ‘size_t’ does not name a type
+../include/lattice_field.h:75:23: error: ‘size_t’ has not been declared
+../include/lattice_field.h:95:5: error: ‘size_t’ does not name a type
+In file included from ../include/dirac_quda.h:5:0,
+                 from dirac_domain_wall.cpp:2:
+../include/color_spinor_field.h:192:5: error: ‘size_t’ does not name a type
+../include/color_spinor_field.h:193:5: error: ‘size_t’ does not name a type
+../include/color_spinor_field.h:233:5: error: ‘size_t’ does not name a type
+../include/color_spinor_field.h:234:5: error: ‘size_t’ does not name a type
+../include/color_spinor_field.h:279:12: error: ‘size_t’ does not name a type
+../include/color_spinor_field.h:292:23: error: ‘size_t’ has not been declared
+In file included from ../include/dirac_quda.h:6:0,
+                 from dirac_domain_wall.cpp:2:
+../include/gauge_field.h:85:5: error: ‘size_t’ does not name a type
+../include/gauge_field.h:121:11: error: ‘size_t’ does not name a type
+In file included from ../include/dirac_quda.h:7:0,
+                 from dirac_domain_wall.cpp:2:
+../include/clover_field.h:16:5: error: ‘size_t’ does not name a type
+../include/clover_field.h:17:5: error: ‘size_t’ does not name a type
+../include/clover_field.h:79:5: error: ‘size_t’ does not name a type
+../include/clover_field.h:80:5: error: ‘size_t’ does not name a type
+In file included from ../include/dslash_quda.h:6:0,
+                 from ../include/dirac_quda.h:8,
+                 from dirac_domain_wall.cpp:2:
+../include/face_quda.h:15:26: error: ‘size_t’ was not declared in this scope
+../include/face_quda.h:15:26: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+../include/face_quda.h:15:40: error: template argument 1 is invalid
+../include/face_quda.h:15:40: error: template argument 3 is invalid
+../include/face_quda.h:15:40: error: template argument 4 is invalid
+../include/face_quda.h:18:29: error: ‘size_t’ was not declared in this scope
+../include/face_quda.h:18:29: note: suggested alternatives:
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+/usr/include/c++/4.6/x86_64-linux-gnu/./bits/c++config.h:155:26: note:   ‘std::size_t’
+../include/face_quda.h:18:35: error: template argument 2 is invalid
+../include/face_quda.h:18:35: error: template argument 4 is invalid
+../include/face_quda.h:56:5: error: ‘size_t’ does not name a type
+../include/face_quda.h:60:11: error: expected ‘;’ at end of member declaration
+../include/face_quda.h:60:33: error: expected ‘)’ before ‘nbytes’
+make: *** [dirac_domain_wall.o] Error 1

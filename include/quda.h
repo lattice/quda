@@ -28,7 +28,7 @@
  * @brief Maximum number of dimensions supported by QUDA.  In practice, no
  *        routines make use of more than 5.
  */
-#define QUDA_MAX_DIM 6
+#define QUDA_MAX_DIM 5
 
 /**
  * @def QUDA_MAX_MULTI_SHIFT
@@ -103,10 +103,16 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
+    double *b_5;  /**< MDWF coefficients */
+    double *c_5;  /**< will be used only for the mobius type of Fermion */
+
     double mu;    /**< Twisted mass parameter */
+    double epsilon; /**< Twisted mass parameter */
+    
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
+    double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */
     double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
     int maxiter;
@@ -192,7 +198,6 @@ extern "C" {
     /** Maximum number of iterations allowed in the inner solver */
     int maxiter_precondition;
 
-
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
     double omega;
 
@@ -202,7 +207,14 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
-    /** Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence */
+    /**
+     * Whether to use the L2 relative residual, Fermilab heavy-quark
+     * residual, or both to determine convergence.  To require that both
+     * stopping conditions are satisfied, use a bitwise OR as follows:
+     *
+     * p.residual_type = (QudaResidualType) (QUDA_L2_RELATIVE_RESIDUAL
+     *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
+     */
     QudaResidualType residual_type;
 
   } QudaInvertParam;
@@ -241,10 +253,71 @@ extern "C" {
 			FILE *outfile);
 
   /**
-   * Initialize the library.
+   * initCommsGridQuda() takes an optional "rank_from_coords" argument that
+   * should be a pointer to a user-defined function with this prototype.  
+   *
+   * @param coords  Node coordinates
+   * @param fdata   Any auxiliary data needed by the function
+   * @return        MPI rank or QMP node ID cooresponding to the node coordinates
+   *
+   * @see initCommsGridQuda
+   */
+  typedef int (*QudaCommsMap)(const int *coords, void *fdata);
+
+  /**
+   * Declare the grid mapping ("logical topology" in QMP parlance)
+   * used for communications in a multi-GPU grid.  This function
+   * should be called prior to initQuda().  The only case in which
+   * it's optional is when QMP is used for communication and the
+   * logical topology has already been declared by the application.
+   *
+   * @param nDim   Number of grid dimensions.  "4" is the only supported
+   *               value currently.
+   *
+   * @param dims   Array of grid dimensions.  dims[0]*dims[1]*dims[2]*dims[3]
+   *               must equal the total number of MPI ranks or QMP nodes.
+   *
+   * @param func   Pointer to a user-supplied function that maps coordinates
+   *               in the communication grid to MPI ranks (or QMP node IDs).
+   *               If the pointer is NULL, the default mapping depends on
+   *               whether QMP or MPI is being used for communication.  With
+   *               QMP, the existing logical topology is used if it's been
+   *               declared.  With MPI or as a fallback with QMP, the default
+   *               ordering is lexicographical with the fourth ("t") index
+   *               varying fastest.
+   *
+   * @param fdata  Pointer to any data required by "func" (may be NULL)               
+   *
+   * @see QudaCommsMap
+   */
+  void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
+
+  /**
+   * Initialize the library.  This is a low-level interface that is
+   * called by initQuda.  Calling initQudaDevice requires that the
+   * user also call initQudaMemory before using QUDA.
+   *
+   * @param device CUDA device number to use.  In a multi-GPU build,
+   *               this parameter may either be set explicitly on a
+   *               per-process basis or set to -1 to enable a default
+   *               allocation of devices to processes.  
+   */
+  void initQudaDevice(int device);
+
+  /**
+   * Initialize the library persistant memory allocations (both host
+   * and device).  This is a low-level interface that is called by
+   * initQuda.  Calling initQudaMemory requires that the user has
+   * previously called initQudaDevice.
+   */
+  void initQudaMemory();
+
+  /**
+   * Initialize the library.  This function is actually a wrapper
+   * around calls to initQudaDevice() and initQudaMemory().
    *
    * @param device  CUDA device number to use.  In a multi-GPU build,
-   *                this parameter may be either set explicitly on a
+   *                this parameter may either be set explicitly on a
    *                per-process basis or set to -1 to enable a default
    *                allocation of devices to processes.
    */
@@ -400,13 +473,6 @@ extern "C" {
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 			    void* loop_coeff, int num_paths, int max_length, double eb3,
 			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
-  
-  /*
-   * The following routines are only used by the examples in tests/ .
-   * They should not be called in a typical application.
-   */  
-  void initCommsQuda(int argc, char **argv, const int *X, int nDim);
-  void endCommsQuda();
 
 #ifdef __cplusplus
 }

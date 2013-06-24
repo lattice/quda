@@ -9,7 +9,7 @@
 #include <sstream>
 
 #define DEVICEHOST __device__ __host__
-#define SVDPREC 1e-10
+#define SVDPREC 1e-11
 #define LOG2 0.69314718055994530942
 
 
@@ -649,7 +649,7 @@ namespace quda{
         }
       }
 
-      bdSVD(u_real, v_real, bd, 40);
+      bdSVD(u_real, v_real, bd, 500);
       for(int i=0; i<3; ++i){
         singular_values[i] = bd(i,i);
       }

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 #include <quda_internal.h>
@@ -37,7 +38,6 @@ namespace quda {
     : CloverField(param), clover(0), norm(0), cloverInv(0), invNorm(0)
   {
     if (h_clov) {
-
       clover = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
 	norm = device_malloc(norm_bytes);
@@ -82,10 +82,92 @@ namespace quda {
       }
     } 
 
+#ifdef USE_TEXTURE_OBJECTS
+    createTexObject(evenTex, evenNormTex, even, evenNorm);
+    createTexObject(oddTex, oddNormTex, odd, oddNorm);
+    createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm);
+    createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm);
+#endif
+    
   }
+
+#ifdef USE_TEXTURE_OBJECTS
+  void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
+					void *field, void *norm) {
+
+    // create the texture for the field components
+
+    cudaChannelFormatDesc desc;
+    memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+    if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
+    else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+
+    // always four components regardless of precision
+    desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+    desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+    desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+    desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
+
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeLinear;
+    resDesc.res.linear.devPtr = field;
+    resDesc.res.linear.desc = desc;
+    resDesc.res.linear.sizeInBytes = bytes/2;
+
+    cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+    else texDesc.readMode = cudaReadModeElementType;
+
+    cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+    checkCudaError();
+
+    // create the texture for the norm components
+    if (precision == QUDA_HALF_PRECISION) {
+      cudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+      desc.f = cudaChannelFormatKindFloat;
+      desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
+
+      cudaResourceDesc resDesc;
+      memset(&resDesc, 0, sizeof(resDesc));
+      resDesc.resType = cudaResourceTypeLinear;
+      resDesc.res.linear.devPtr = norm;
+      resDesc.res.linear.desc = desc;
+      resDesc.res.linear.sizeInBytes = norm_bytes/2;
+
+      cudaTextureDesc texDesc;
+      memset(&texDesc, 0, sizeof(texDesc));
+      texDesc.readMode = cudaReadModeElementType;
+
+      cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+      checkCudaError();
+    }
+
+  }
+
+  void cudaCloverField::destroyTexObject() {
+    cudaDestroyTextureObject(evenTex);
+    cudaDestroyTextureObject(oddTex);
+    cudaDestroyTextureObject(evenInvTex);
+    cudaDestroyTextureObject(oddInvTex);
+    if (precision == QUDA_HALF_PRECISION) {
+      cudaDestroyTextureObject(evenNormTex);
+      cudaDestroyTextureObject(evenNormTex);
+      cudaDestroyTextureObject(evenInvNormTex);
+      cudaDestroyTextureObject(evenInvNormTex);
+    }
+    checkCudaError();
+  }
+#endif
 
   cudaCloverField::~cudaCloverField()
   {
+#ifdef USE_TEXTURE_OBJECTS
+    destroyTexObject();
+#endif
+
     if (clover != cloverInv) {
       if (clover) device_free(clover);
       if (norm) device_free(norm);

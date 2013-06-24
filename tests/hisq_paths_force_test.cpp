@@ -533,7 +533,8 @@ hisq_force_test(void)
 
   hisq_force_init();
 
-  initLatticeConstants(*cpuMom);
+  TimeProfile profile("dummy");
+  initLatticeConstants(*cpuMom, profile);
   fermion_force::hisqForceInitCuda(&qudaGaugeParam);
 
 
@@ -754,7 +755,7 @@ main(int argc, char **argv)
     errorQuda("Multi-gpu for milc order is not supported\n");
   }
 
-    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
 #endif
 
   setPrecision(prec);
@@ -763,10 +764,7 @@ main(int argc, char **argv)
     
   int accuracy_level = hisq_force_test();
 
-
-#ifdef MULTI_GPU
-  endCommsQuda();
-#endif
+  finalizeComms();
 
   if(accuracy_level >=3 ){
     return EXIT_SUCCESS;

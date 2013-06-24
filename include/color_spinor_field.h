@@ -1,14 +1,11 @@
+#ifndef _COLOR_SPINOR_FIELD_H
+#define _COLOR_SPINOR_FIELD_H
+
 #include <quda_internal.h>
 #include <quda.h>
 
 #include <iostream>
 #include <complex>
-
-#ifndef _COLOR_SPINOR_FIELD_H
-#define _COLOR_SPINOR_FIELD_H
-
-// Probably want some checking for this limit
-#define QUDA_MAX_DIM 6
 
 #include <lattice_field.h>
 
@@ -33,8 +30,10 @@ namespace quda {
   
     QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
     QudaGammaBasis gammaBasis;
-    QudaFieldCreate create; // 
+    QudaFieldCreate create; //
 
+    QudaDWFPCType PCtype; // used to select preconditioning method in DWF
+    
     void *v; // pointer to field
     void *norm;
 
@@ -47,7 +46,7 @@ namespace quda {
       twistFlavor(QUDA_TWIST_INVALID), siteSubset(QUDA_INVALID_SITE_SUBSET), 
       siteOrder(QUDA_INVALID_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE), 
-      verbose(QUDA_SILENT)
+      PCtype(QUDA_PC_INVALID), verbose(QUDA_SILENT)
       { 
 	for(int d=0; d<QUDA_MAX_DIM; d++) x[d] = 0; 
       }
@@ -57,7 +56,9 @@ namespace quda {
     : nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), nDim(4), 
       pad(0), twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
-      create(QUDA_REFERENCE_FIELD_CREATE), v(V), verbose(inv_param.verbosity)
+      create(QUDA_REFERENCE_FIELD_CREATE), 
+	  PCtype(((inv_param.solve_type==QUDA_NORMEQ_4DPC_SOLVE)||(inv_param.solve_type==QUDA_MDWF_EQ_PC_SOLVE))?QUDA_4D_PC:QUDA_5D_PC ),
+      v(V), verbose(inv_param.verbosity)
       { 
 
 	if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
@@ -80,6 +81,10 @@ namespace quda {
 	  nDim++;
 	  x[4] = inv_param.Ls;
 	}
+	else if(inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)){
+	  nDim++;
+	  x[4] = 2;//for two flavors
+    	}
 
 	if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
 	  fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
@@ -106,7 +111,7 @@ namespace quda {
       twistFlavor(cpuParam.twistFlavor), siteSubset(cpuParam.siteSubset), 
       siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-      create(QUDA_COPY_FIELD_CREATE), v(0), verbose(cpuParam.verbose)
+      create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), verbose(cpuParam.verbose)
       {
 	if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
 	for (int d=0; d<nDim; d++) x[d] = cpuParam.x[d];
@@ -150,7 +155,8 @@ namespace quda {
   private:
     void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 		QudaPrecision precision, int pad, QudaSiteSubset subset, 
-		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
+		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
+    	QudaDWFPCType PCtype);
     void destroy();  
 
     QudaVerbosity verbose;
@@ -170,11 +176,19 @@ namespace quda {
     int stride;
 
     QudaTwistFlavorType twistFlavor;
+    
+    QudaDWFPCType PCtype; // used to select preconditioning method in DWF
   
     int real_length; // physical length only
     int length; // length including pads, but not ghost zone - used for BLAS
 
+    void *v; // the field elements
+    void *norm; // the normalization field
+
     // multi-GPU parameters
+    void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
+    void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
+    
     int ghostFace[QUDA_MAX_DIM];// the size of each face
     int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
     int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
@@ -202,6 +216,7 @@ namespace quda {
     void reset(const ColorSpinorParam &);
     void fill(ColorSpinorParam &) const;
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
+    void clearGhostPointers();
 
   public:
     //ColorSpinorField();
@@ -215,7 +230,7 @@ namespace quda {
     QudaPrecision Precision() const { return precision; }
     int Ncolor() const { return nColor; } 
     int Nspin() const { return nSpin; } 
-    int TwistFlavor() const { return twistFlavor; } 
+    QudaTwistFlavorType TwistFlavor() const { return twistFlavor; }  
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
     int X(int d) const { return x[d]; }
@@ -224,11 +239,19 @@ namespace quda {
     int TotalLength() const { return total_length; }
     int Stride() const { return stride; }
     int Volume() const { return volume; }
+    int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
-  
+
+    void* V() {return v;}
+    const void* V() const {return v;}
+    void* Norm(){return norm;}
+    const void* Norm() const {return norm;}
+
+    QudaDWFPCType DWFPCtype() const { return PCtype; }
+
     virtual QudaFieldLocation Location() const = 0;
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
@@ -239,6 +262,10 @@ namespace quda {
     const int *GhostFace() const { return ghostFace; }  
     int GhostOffset(const int i) const { return ghostOffset[i]; }  
     int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
+    void* Ghost(const int i);
+    const void* Ghost(const int i) const;
+    void* GhostNorm(const int i);
+    const void* GhostNorm(const int i) const;
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
@@ -250,13 +277,13 @@ namespace quda {
     friend class cpuColorSpinorField;
 
   private:
-    void *v; // the field elements
-    void *norm; // the normalization field
+    //void *v; // the field elements
+    //void *norm; // the normalization field
     bool alloc; // whether we allocated memory
     bool init;
 
     bool texInit; // whether a texture object has been created or not
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
     void createTexObject();
@@ -270,8 +297,9 @@ namespace quda {
     static bool bufferInit;
     static size_t bufferBytes;
 
-    static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
-    static void* backGhostFaceBuffer[QUDA_MAX_DIM]; //gpu memory
+    static void* ghostFaceBuffer; // gpu memory
+    static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static void* backGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static int initGhostFaceBuffer;
     static QudaPrecision facePrecision;
 
@@ -282,8 +310,21 @@ namespace quda {
     void zeroPad();
   
     void resizeBuffer(size_t bytes) const;
+
+    /**
+       This function is responsible for calling the correct copy kernel
+       given the nature of the source field and the desired destination.
+    */
+    void copySpinorField(const ColorSpinorField &src);
+
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
+
+    /**
+       This function returns true if the field is stored in an internal
+       field order, given the precision and the length of the spin
+       dimension.
+    */ 
     bool isNative() const;
 
   public:
@@ -301,18 +342,14 @@ namespace quda {
     void allocateGhostBuffer(void);
     static void freeGhostBuffer(void);
 
-    void packGhost(const int dim, const QudaParity parity, const int dagger, cudaStream_t* stream);
+    void packGhost(const QudaParity parity, const int dagger, cudaStream_t* stream);
+    void packTwistedGhost(const QudaParity parity, const int dagger, double a, double b, cudaStream_t *stream);
     void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
 		   const int dagger, cudaStream_t *stream);
     void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		     const int dagger, cudaStream_t* stream);
 
-    void* V() {return v;}
-    const void* V() const {return v;}
-    void* Norm(){return norm;}
-    const void* Norm() const {return norm;}
-
-#ifdef TEXTURE_OBJECT
+#ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
 #endif
@@ -352,8 +389,8 @@ namespace quda {
     static int initGhostFaceBuffer;
 
   private:
-    void *v; // the field elements
-    void *norm; // the normalization field
+    //void *v; // the field elements
+    //void *norm; // the normalization field
     bool init;
     bool reference; // whether the field is a reference or not
 
@@ -390,9 +427,6 @@ namespace quda {
     void unpackGhost(void* ghost_spinor, const int dim, 
 		     const QudaDirection dir, const int dagger);
   
-    void* V() { return v; }
-    const void * V() const { return v; }
-
     void copy(const cpuColorSpinorField&);
     void zero();
 

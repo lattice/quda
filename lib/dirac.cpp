@@ -12,26 +12,28 @@ namespace quda {
   Dirac::Dirac(const DiracParam &param) 
     : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
-      verbose(param.verbose)
+      verbose(param.verbose), profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
-    initLatticeConstants(gauge);
-    initGaugeConstants(gauge);
-    initDslashConstants();
+    initLatticeConstants(gauge, profile);
+    initGaugeConstants(gauge, profile);
+    initDslashConstants(profile);
   }
 
   Dirac::Dirac(const Dirac &dirac) 
     : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
       dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
-      verbose(dirac.verbose)
+      verbose(dirac.verbose), profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
-    initLatticeConstants(gauge);
-    initGaugeConstants(gauge);
-    initDslashConstants();
+    initLatticeConstants(gauge, profile);
+    initGaugeConstants(gauge, profile);
+    initDslashConstants(profile);
   }
 
-  Dirac::~Dirac() { }
+  Dirac::~Dirac() {   
+    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
+  }
 
   Dirac& Dirac::operator=(const Dirac &dirac)
   {
@@ -48,6 +50,8 @@ namespace quda {
       tune = dirac.tune;
 
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
+
+      profile = dirac.profile;
     }
     return *this;
   }
@@ -148,6 +152,12 @@ namespace quda {
     } else if (param.type == QUDA_DOMAIN_WALLPC_DIRAC) {
       if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
       return new DiracDomainWallPC(param);
+    } else if (param.type == QUDA_DOMAIN_WALL_4DPC_DIRAC) {
+      if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWall4DPC operator\n");
+      return new DiracDomainWall4DPC(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
+      if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracMobiusDomainWallPC operator\n");
+      return new DiracMobiusDomainWallPC(param);
     } else if (param.type == QUDA_ASQTAD_DIRAC) {
       if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);
@@ -155,11 +165,13 @@ namespace quda {
       if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
       return new DiracStaggeredPC(param);    
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
-      if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator\n");
-      return new DiracTwistedMass(param);
-    } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
-      if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator\n");
-      return new DiracTwistedMassPC(param);    
+      if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
+        if (param.Ls == 1) return new DiracTwistedMass(param, 4);
+        else return new DiracTwistedMass(param, 5);
+      } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
+        if (param.verbose >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
+        if (param.Ls == 1) return new DiracTwistedMassPC(param, 4);
+        else return new DiracTwistedMassPC(param, 5);
     } else {
       return 0;
     }

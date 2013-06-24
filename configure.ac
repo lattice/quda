@@ -1,4 +1,4 @@
-AC_INIT([quda],[0.4],[quda-developers@googlegroups.com])
+AC_INIT([quda],[0.5],[quda-developers@googlegroups.com])
 
 
 dnl Specify CUDA Location
@@ -17,9 +17,9 @@ AC_ARG_ENABLE(cpu-arch,
 
 dnl Specify GPU Arch
 AC_ARG_ENABLE(gpu-arch,
- AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, sm_35 (default: sm_20)]),
+ AC_HELP_STRING([--enable-gpu-arch=arch], [ Set GPU arch: sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, sm_35 (default: sm_35)]),
  [ gpu_arch=${enableval} ],
- [ gpu_arch="sm_20" ]
+ [ gpu_arch="sm_35" ]
 )
 
 AC_ARG_ENABLE(os, 
@@ -50,12 +50,6 @@ AC_ARG_ENABLE(verbose-build,
    AC_HELP_STRING([--enable-verbose-build], [ Display kernel register usage]),
    [ quda_verbose_build=${enableval} ], 
    [ quda_verbose_build="no" ]
-)
-
-AC_ARG_ENABLE(dslash-profiling, 
-  AC_HELP_STRING([--enable-dslash-profiling], [ Enable profiling of multi-GPU Dslash]),
-  [ quda_dslash_profiling=${enableval} ], 
-  [ quda_dslash_profiling="no" ]
 )
 
 AC_ARG_ENABLE(wilson-dirac,
@@ -200,13 +194,6 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
 fi
 
 
-
-AC_ARG_ENABLE(tex-object,
- AC_HELP_STRING([--enable-tex-object], [ Enable texture objects for blas (Kepler only, default: disabled)]),
- [ tex_object=${enableval}],
- [ tex_object="no" ]
-)
-
 AC_ARG_ENABLE(blas-tex,
  AC_HELP_STRING([--enable-blas-tex], [ Enable texture reads for blas (default: enabled)]),
  [ blas_tex=${enableval}],
@@ -271,14 +258,6 @@ case ${quda_verbose_build} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-quda-verbose-build ])
-  ;;
-esac
-
-dnl DSLASH_PROFILING
-case ${quda_dslash_profiling} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-dslash-profiling ])
   ;;
 esac
 
@@ -431,14 +410,6 @@ if test "X${build_qio}X" = "XyesX"; then
   fi	
 fi
  
-dnl Enables texture objects for Kepler
-case ${tex_object} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-tex-object ])
-  ;;
-esac
-
 dnl Enables textures for blas functions
 case ${blas_tex} in
 yes|no);;
@@ -486,9 +457,6 @@ AC_SUBST( DEVICE_DEBUG,  [${quda_device_debug}] )
 
 AC_MSG_NOTICE([Setting VERBOSE = ${quda_verbose_build} ])
 AC_SUBST( VERBOSE,	 [${quda_verbose_build}] )
-
-AC_MSG_NOTICE([Setting DSLASH_PROFILING = ${quda_dslash_profiling} ])
-AC_SUBST( DSLASH_PROFILING,	 [${quda_dslash_profiling}] )
 
 AC_MSG_NOTICE([Setting BUILD_WILSON_DIRAC = ${build_wilson_dirac} ])
 AC_SUBST( BUILD_WILSON_DIRAC, [${build_wilson_dirac}])
@@ -555,9 +523,6 @@ AC_SUBST( QMP_HOME, [${qmp_home}] )
 
 AC_MSG_NOTICE([Setting QIO_HOME=${qio_home}])
 AC_SUBST( QIO_HOME, [${qio_home}] )
-
-AC_MSG_NOTICE([Setting TEX_OBJECT= ${tex_object}])
-AC_SUBST( TEX_OBJECT, [${tex_object}])
 
 AC_MSG_NOTICE([Setting BLAS_TEX= ${blas_tex}])
 AC_SUBST( BLAS_TEX, [${blas_tex}])

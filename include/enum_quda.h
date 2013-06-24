@@ -99,19 +99,21 @@ extern "C" {
     QUDA_NORMOP_PC_SOLVE,
     QUDA_NORMEQ_SOLVE = QUDA_NORMOP_SOLVE, // deprecated
     QUDA_NORMEQ_PC_SOLVE = QUDA_NORMOP_PC_SOLVE, // deprecated
+    QUDA_NORMEQ_4DPC_SOLVE,  // for 4D preconditioned domain wall dirac operator
+    QUDA_MDWF_EQ_PC_SOLVE,  // for 4D preconditioned mobius domain wall dirac operator
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
 
   typedef enum QudaSchwarzType_s {
     QUDA_ADDITIVE_SCHWARZ,
     QUDA_MULTIPLICATIVE_SCHWARZ,
-    QUDA_INVALID_SCHWARZ
+    QUDA_INVALID_SCHWARZ = QUDA_INVALID_ENUM
   } QudaSchwarzType;
 
   typedef enum QudaResidualType_s {
-    QUDA_L2_RELATIVE_RESIDUAL, // the default
-    QUDA_HEAVY_QUARK_RESIDUAL, // Fermilab heavy quark residual
-    QUDA_INVALID_RESIDUAL
+    QUDA_L2_RELATIVE_RESIDUAL = 1, // the default
+    QUDA_HEAVY_QUARK_RESIDUAL = 2, // Fermilab heavy quark residual
+    QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
@@ -208,6 +210,8 @@ extern "C" {
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
+    QUDA_DOMAIN_WALL_4DPC_DIRAC,// 4D preconditioned domain wall dirac operator
+    QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
     QUDA_ASQTAD_DIRAC,
     QUDA_ASQTADPC_DIRAC,
     QUDA_TWISTED_MASS_DIRAC,
@@ -268,12 +272,29 @@ extern "C" {
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
+  // used to select preconditioning method in domain-wall fermion
+  typedef enum QudaDWFPCType_s {
+    QUDA_5D_PC,
+    QUDA_4D_PC,
+    QUDA_PC_INVALID
+  } QudaDWFPCType;  
+  
   typedef enum QudaTwistFlavorType_s {
-    QUDA_TWIST_NO  = 0,
     QUDA_TWIST_MINUS = -1,
     QUDA_TWIST_PLUS = +1,
+    QUDA_TWIST_NONDEG_DOUBLET = +2,
+    QUDA_TWIST_DEG_DOUBLET = -2,    
+    QUDA_TWIST_NO  = 0,
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
-  } QudaTwistFlavorType;  
+  } QudaTwistFlavorType; 
+
+  typedef enum QudaTwistDslashType_s {
+    QUDA_DEG_TWIST_INV_DSLASH,
+    QUDA_DEG_DSLASH_TWIST_INV,
+    QUDA_DEG_DSLASH_TWIST_XPAY,
+    QUDA_NONDEG_DSLASH,
+    QUDA_DSLASH_INVALID = QUDA_INVALID_ENUM
+  } QudaTwistDslashType;
 
   typedef enum QudaTwistGamma5Type_s {
     QUDA_TWIST_GAMMA5_DIRECT,
@@ -288,8 +309,8 @@ extern "C" {
   } QudaUseInitGuess;
 
   typedef enum QudaDirection_s {
-    QUDA_BACKWARDS,
-    QUDA_FORWARDS
+    QUDA_BACKWARDS = -1,
+    QUDA_FORWARDS = +1
   } QudaDirection;
   
   typedef enum QudaComputeFatMethod_s {
@@ -308,7 +329,7 @@ extern "C" {
     QUDA_SCALAR_GEOMETRY,
     QUDA_VECTOR_GEOMETRY,
     QUDA_TENSOR_GEOMETRY,
-    QUDA_INVALID_GEOMETRY
+    QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
 
 #ifdef __cplusplus

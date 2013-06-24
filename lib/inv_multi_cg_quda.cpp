@@ -56,7 +56,7 @@ namespace quda {
 
   void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
   {
-    profile[QUDA_PROFILE_INIT].Start();
+    profile.Start(QUDA_PROFILE_INIT);
 
     int num_offset = invParam.num_offset;
     double *offset = invParam.offset;
@@ -66,7 +66,7 @@ namespace quda {
     const double b2 = normCuda(b);
     // Check to see that we're not trying to invert on a zero-field source
     if(b2 == 0){
-      profile[QUDA_PROFILE_INIT].Stop();
+      profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       for(int i=0; i<num_offset; ++i){
         *(x[i]) = b;
@@ -136,9 +136,8 @@ namespace quda {
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
-    profile[QUDA_PROFILE_INIT].Stop();
-    profile[QUDA_PROFILE_PREAMBLE].Start();
-
+    profile.Stop(QUDA_PROFILE_INIT);
+    profile.Start(QUDA_PROFILE_PREAMBLE);
 
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
@@ -167,8 +166,8 @@ namespace quda {
     int rUpdate = 0;
     quda::blas_flops = 0;
 
-    profile[QUDA_PROFILE_PREAMBLE].Stop();
-    profile[QUDA_PROFILE_COMPUTE].Start();
+    profile.Stop(QUDA_PROFILE_PREAMBLE);
+    profile.Start(QUDA_PROFILE_COMPUTE);
 
     if (invParam.verbosity >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
@@ -220,6 +219,8 @@ namespace quda {
 	}
 
 	mat(*r, *y[0], *x[0]); // here we can use x as tmp
+	if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) axpyCuda(offset[0], *y[0], *r);
+
 	r2[0] = xmyNormCuda(b, *r);
 	for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
 	for (int j=0; j<num_offset_now; j++) zeroCuda(*x_sloppy[j]);
@@ -274,12 +275,12 @@ namespace quda {
       if (reliable) xpyCuda(*y[i], *x[i]);
     }
 
-    profile[QUDA_PROFILE_COMPUTE].Stop();
-    profile[QUDA_PROFILE_EPILOGUE].Start();
+    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.Start(QUDA_PROFILE_EPILOGUE);
 
     if (k==invParam.maxiter) warningQuda("Exceeded maximum iterations %d\n", invParam.maxiter);
     
-    invParam.secs = profile[QUDA_PROFILE_COMPUTE].Last();
+    invParam.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
     invParam.gflops = gflops;
@@ -314,8 +315,8 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
 
-    profile[QUDA_PROFILE_EPILOGUE].Stop();
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.Start(QUDA_PROFILE_FREE);
 
     if (&tmp2 != &tmp1) delete tmp2_p;
 
@@ -332,16 +333,16 @@ namespace quda {
   
     if (invParam.cuda_prec_sloppy != x[0]->Precision()) {
       for (int i=0; i<num_offset; i++) delete x_sloppy[i];
-      delete []x_sloppy;
       delete r_sloppy;
     }
+    delete []x_sloppy;
   
     delete []zeta_old;
     delete []zeta;
     delete []alpha;
     delete []beta;
 
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
 
     return;
   }

@@ -398,10 +398,6 @@ static int dslashTest()
     printfQuda("Executing %d kernel loops...", loops);	
     double secs = dslashCUDA(loops);
 
-#ifdef DSLASH_PROFILING
-    printDslashProfile();
-#endif
-    
     if (!transfer) *spinorOut = *cudaSpinorOut;
       
     printfQuda("\n%fms per loop\n", 1000*secs);
@@ -452,10 +448,10 @@ void display_test_info()
 	     test_type, dagger, xdim, ydim, zdim, tdim);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     commDimPartitioned(0),
-	     commDimPartitioned(1),
-	     commDimPartitioned(2),
-	     commDimPartitioned(3));
+	     dimPartitioned(0),
+	     dimPartitioned(1),
+	     dimPartitioned(2),
+	     dimPartitioned(3));
 
   return ;
     
@@ -486,7 +482,7 @@ int main(int argc, char **argv)
     usage(argv);
   }
   
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
   
   display_test_info();
 
@@ -496,7 +492,9 @@ int main(int argc, char **argv)
   printfQuda("accuracy_level =%d\n", accuracy_level);
 
   if (accuracy_level >= 1) ret = 0;    //probably no error, -1 means no matching  
-  endCommsQuda();
+
+  finalizeComms();
+
   return ret;
 }
 

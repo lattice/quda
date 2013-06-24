@@ -150,7 +150,8 @@ fermion_force_test(void)
 {
  
   fermion_force_init();
-  initLatticeConstants(*cudaGauge);
+  TimeProfile profile("dummy");
+  initLatticeConstants(*cudaGauge, profile);
   fermion_force_init_cuda(&gaugeParam);
 
     
@@ -263,9 +264,7 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-#ifdef MULTI_GPU
-    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
-#endif
+  initComms(argc, argv, gridsize_from_cmdline);
 
   link_prec = prec;
 
@@ -274,18 +273,14 @@ main(int argc, char **argv)
   int accuracy_level = fermion_force_test();
   printfQuda("accuracy_level=%d\n", accuracy_level);
     
-
-#ifdef MULTI_GPU
-    endCommsQuda();
-#endif
+  finalizeComms();
     
-    int ret;
-    if(accuracy_level >=3 ){
-      ret = 0;
-    }else{
-      ret = 1; //we delclare the test failed
-    }
-
-    
+  int ret;
+  if(accuracy_level >=3 ){
+    ret = 0;
+  }else{
+    ret = 1; //we delclare the test failed
+  }
+  
   return ret;
 }

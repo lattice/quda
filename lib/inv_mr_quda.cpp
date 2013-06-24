@@ -23,13 +23,13 @@ namespace quda {
   }
 
   MR::~MR() {
-    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile[QUDA_PROFILE_FREE].Start();
+    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile.Start(QUDA_PROFILE_FREE);
     if (init) {
       if (allocate_r) delete rp;
       delete Arp;
       delete tmpp;
     }
-    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile[QUDA_PROFILE_FREE].Stop();
+    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
   }
 
   void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
@@ -65,11 +65,10 @@ namespace quda {
       axCuda(1/sqrt(b2), r); // can merge this with the prior copy
       r2 = 1.0; // by definition by this is now true
     }
-    double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
 
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
       quda::blas_flops = 0;
-      profile[QUDA_PROFILE_COMPUTE].Start();
+      profile.Start(QUDA_PROFILE_COMPUTE);
     }
 
     double omega = 1.0;
@@ -82,7 +81,7 @@ namespace quda {
 		 k, Ar3.x, Ar3.y, Ar3.z, x2);
     }
 
-    while (r2 > stop && k < invParam.maxiter) {
+    while (k < invParam.maxiter) {
     
       mat(Ar, r, tmp);
 
@@ -118,9 +117,9 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
   
     if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
-        profile[QUDA_PROFILE_COMPUTE].Stop();
-        profile[QUDA_PROFILE_EPILOGUE].Start();
-	invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
+        profile.Stop(QUDA_PROFILE_COMPUTE);
+        profile.Start(QUDA_PROFILE_EPILOGUE);
+	invParam.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
 	double gflops = (quda::blas_flops + mat.flops())*1e-9;
 	reduceDouble(gflops);
@@ -142,7 +141,7 @@ namespace quda {
 	// reset the flops counters
 	quda::blas_flops = 0;
 	mat.flops();
-        profile[QUDA_PROFILE_EPILOGUE].Stop();
+        profile.Stop(QUDA_PROFILE_EPILOGUE);
     }
 
     globalReduce = true; // renable global reductions for outer solver

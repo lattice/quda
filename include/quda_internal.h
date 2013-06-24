@@ -34,6 +34,12 @@
 #include <util_quda.h>
 #include <malloc_quda.h>
 
+// Use bindless texture on Kepler
+#if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
+#define USE_TEXTURE_OBJECTS
+#endif
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -92,7 +98,10 @@ namespace quda {
     /**< Are we currently timing? */
     bool running;
     
-  Timer() : time(0.0), last(0.0), running(false) { ; } 
+    /**< Keep track of number of calls */
+    int count;
+
+  Timer() : time(0.0), last(0.0), running(false), count(0) { ; } 
 
     void Start() {
       if (running) errorQuda("Cannot start an already running timer");
@@ -108,6 +117,7 @@ namespace quda {
       long dus = stop.tv_usec - start.tv_usec;
       last = ds + 0.000001*dus;
       time += last;
+      count++;
 
       running = false;
     }
@@ -125,6 +135,22 @@ namespace quda {
     QUDA_PROFILE_COMPUTE, /**< The time in seconds taken for the actual computation */
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
+
+    // lower level counters used in the dslash
+    QUDA_PROFILE_PACK_KERNEL, /**< face packing kernel */
+    QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
+    QUDA_PROFILE_GATHER, /**< gather (device -> host) */
+    QUDA_PROFILE_SCATTER, /**< scatter (host -> device) */
+    QUDA_PROFILE_EVENT_RECORD, /**< cuda event record  */
+    QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
+    QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
+
+    QUDA_PROFILE_COMMS, /**< synchronous communication */
+    QUDA_PROFILE_COMMS_START, /**< initiating communication */
+    QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
+
+    QUDA_PROFILE_CONSTANT, /**< time spent setting CUDA constant parameters */
+
     QUDA_PROFILE_TOTAL, /**< The total time in seconds for the algorithm. Must be the penultimate type. */
     QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
   };
@@ -135,13 +161,37 @@ namespace quda {
     Timer profile[QUDA_PROFILE_COUNT];
     static std::string pname[];
 
-    TimeProfile(std::string fname) : fname(fname) { ; }
+    bool switchOff;
+    
+    TimeProfile(std::string fname) : fname(fname), switchOff(false) { ; }
 
     /**< Print out the profile information */
     void Print();
 
-    /**< Return the profile[idx] */
-    Timer& operator[](int idx) { return profile[idx]; }
+    void Start(QudaProfileType idx) { 
+      // if total timer isn't running, then start it running
+      if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
+	profile[QUDA_PROFILE_TOTAL].Start(); 
+	switchOff = true;
+      }
+
+      profile[idx].Start(); 
+    }
+
+    void Stop(QudaProfileType idx) { 
+      profile[idx].Stop(); 
+
+      // switch off total timer if we need to
+      if (switchOff && idx != QUDA_PROFILE_TOTAL) {
+	profile[QUDA_PROFILE_TOTAL].Stop(); 
+	switchOff = false;
+      }
+    }
+
+    double Last(QudaProfileType idx) { 
+      return profile[idx].last;
+    }
+
   };
 
 #ifdef MULTI_GPU

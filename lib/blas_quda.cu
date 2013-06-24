@@ -435,4 +435,27 @@ namespace quda {
 				make_double2(0.0, 0.0), x, y, z, x);
   }
 
+  /**
+     double tripleCGUpdate(d a, d b, V x, V y, V z, V w){}
+   
+     First performs the operation y[i] = y[i] - a*x[i] 
+     Second performs the operatio z[i] = z[i] + a*w[i]
+     Third performs the operation w[i] = y[i] + b*w[i]
+  */
+  template <typename Float2, typename FloatN>
+  struct tripleCGUpdate {
+    Float2 a, b;
+    tripleCGUpdate(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
+    __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w) 
+    { y -= a.x*x; z += a.x*w; w = y + b.x*w; }
+    static int streams() { return 7; } //! total number of input and output streams
+    static int flops() { return 6; } //! flops per element
+  };
+
+  void tripleCGUpdateCuda(const double &a, const double &b, cudaColorSpinorField &x, 
+		      cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w) {
+    blasCuda<tripleCGUpdate,0,1,1,1>(make_double2(a, 0.0), make_double2(b, 0.0), 
+				     make_double2(0.0, 0.0), x, y, z, w);
+  }
+
 } // namespace quda

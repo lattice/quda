@@ -92,6 +92,8 @@
 #define QUDA_NORMOP_PC_SOLVE 3
 #define QUDA_NORMEQ_SOLVE QUDA_NORMOP_SOLVE // deprecated
 #define QUDA_NORMEQ_PC_SOLVE QUDA_NORMOP_PC_SOLVE // deprecated
+#define QUDA_NORMEQ_4DPC_SOLVE 4 // for 4D preconditioned domain wall dirac operator
+#define QUDA_MDWF_EQ_PC_SOLVE 5 // for 4D preconditioned mobius domain wall dirac operator
 #define QUDA_INVALID_SOLVE QUDA_INVALID_ENUM
 
 #define QudaSchwarzType integer(4)
@@ -100,8 +102,8 @@
 #define QUDA_INVALID_SCHWARZ QUDA_INVALID_ENUM
 
 #define QudaResidualType integer(4)
-#define QUDA_L2_RELATIVE_RESIDUAL 0
-#define QUDA_HEAVY_QUARK_RESIDUAL 1
+#define QUDA_L2_RELATIVE_RESIDUAL 1
+#define QUDA_HEAVY_QUARK_RESIDUAL 2
 #define QUDA_INVALID_RESIDUAL QUDA_INVALID_ENUM
 
 #/*
@@ -186,6 +188,8 @@
 #define QUDA_CLOVERPC_DIRAC 3
 #define QUDA_DOMAIN_WALL_DIRAC 4
 #define QUDA_DOMAIN_WALLPC_DIRAC 5
+#define QUDA_DOMAIN_WALL_4DPC_DIRAC 10
+#define QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC 11
 #define QUDA_ASQTAD_DIRAC 6
 #define QUDA_ASQTADPC_DIRAC 7
 #define QUDA_TWISTED_MASS_DIRAC 8
@@ -239,9 +243,11 @@
 #define QUDA_INVALID_SOURCE QUDA_INVALID_ENUM
   
 #define QudaTwistFlavorType integer(4)
-#define QUDA_TWIST_NO  0
 #define QUDA_TWIST_MINUS -1
 #define QUDA_TWIST_PLUS +1
+#define QUDA_TWIST_NONDEG_DOUBLET +2
+#define QUDA_TWIST_DEG_DOUBLET -2
+#define QUDA_TWIST_NO  0
 #define QUDA_TWIST_INVALID QUDA_INVALID_ENUM
 
 #define QudaTwistGamma5Type integer(4)
@@ -255,8 +261,8 @@
 #define QUDA_USE_INIT_GUESS_INVALID QUDA_INVALID_ENUM
 
 #define QudaDirection integer(4)
-#define QUDA_BACKWARDS 0
-#define QUDA_FORWARDS  1
+#define QUDA_BACKWARDS -1
+#define QUDA_FORWARDS  +1
   
 #define QudaComputeFatMethod integer(4)
 #define QUDA_COMPUTE_FAT_STANDARD 0
@@ -272,6 +278,6 @@
 #define QUDA_SCALAR_GEOMETRY 0
 #define QUDA_VECTOR_GEOMETRY 1
 #define QUDA_TENSOR_GEOMETRY 2
-#define QUDA_INVALID_GEOMETRY 3
+#define QUDA_INVALID_GEOMETRY QUDA_INVALID_ENUM
 
 #endif 

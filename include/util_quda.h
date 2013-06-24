@@ -39,7 +39,7 @@ char *getPrintBuffer();
   fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n", \
           comm_rank(), comm_hostname(), __LINE__, __func__);                 \
   fflush(getOutputFile());                                                   \
-  comm_exit(1);                                                              \
+  comm_abort(1);                                                             \
 } while (0)
 
 #define warningQuda(...) do {                                   \

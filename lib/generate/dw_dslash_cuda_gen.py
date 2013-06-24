@@ -349,8 +349,8 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
 int sp_norm_idx;
 #endif // MULTI_GPU half precision
 
-int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if (sid >= param.threads) return;
+int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
+if (sid >= param.threads*Ls) return;
 
 int X, x1, x2, x3, x4, xs;
 
@@ -406,7 +406,7 @@ X += aux1;
 } else { // exterior kernel
 
 const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads >> 1); // volume of one face
+const int face_volume = (param.threads*Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 

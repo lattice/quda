@@ -10,8 +10,8 @@ QUDA_OBJS = timer.o malloc.o solver.o inv_bicgstab_quda.o		\
 	cuda_gauge_field.o dirac_clover.o dirac_wilson.o		\
 	dirac_staggered.o dirac_domain_wall.o dirac_twisted_mass.o	\
 	tune.o fat_force_quda.o llfat_quda_itf.o clover_quda.o		\
-	dslash_quda.o blas_quda.o copy_quda.o reduce_quda.o face_buffer.o ${FACE_COMMS_OBJS}	\
-	${NUMA_AFFINITY_OBJS}
+	dslash_quda.o blas_quda.o copy_quda.o reduce_quda.o face_buffer.o \
+	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -22,7 +22,10 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h
 
 # These are only inlined into blas_quda.cu
-BLAS_INLN = blas_core.h reduce_core.h
+BLAS_INLN = blas_core.h 
+
+# These are only inlined into reduce_quda.cu
+REDUCE_INLN = reduce_core.h
 
 # These are only inlined into cuda_color_spinor_field.cu
 CSF_INLN = pack_spinor.h
@@ -30,7 +33,7 @@ CSF_INLN = pack_spinor.h
 # These are only inlined into dslash_quda.cu
 DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h \
 	io_spinor.h staggered_dslash_def.h wilson_dslash_def.h \
-	dw_dslash_def.h tm_dslash_def.h pack_face_def.h hisq_force_macros.h  \
+	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h pack_face_def.h hisq_force_macros.h  \
         llfat_quda.cu unitarize_links_quda.cu fermion_force_quda.cu          \
 	gauge_force_quda.cu hisq_paths_force_quda.cu unitarize_force_quda.cu    \
 	gauge_force_core.h hisq_paths_force_core.h  llfat_core.h svd_quda.h \
@@ -51,7 +54,8 @@ QUDA_CORE = clover_core.h staggered_dslash_core.h			\
 	tm_dslash_gt200_core.h tm_dslash_dagger_gt200_core.h		\
 	wilson_dslash_g80_core.h wilson_dslash_dagger_g80_core.h 	\
 	tm_dslash_g80_core.h tm_dslash_dagger_g80_core.h		\
-	wilson_pack_face_core.h wilson_pack_face_dagger_core.h		
+	wilson_pack_face_core.h wilson_pack_face_dagger_core.h		\
+	tm_ndeg_dslash_core.h tm_ndeg_dslash_dagger_core.h	
 
 INC += -I../include -Idslash_core -I.
 
@@ -82,6 +86,9 @@ $(QUDA): $(QUDA_OBJS) ../make.inc
 gen:
 	$(PYTHON) generate/dslash_cuda_gen.py
 	$(PYTHON) generate/dw_dslash_cuda_gen.py
+	$(PYTHON) generate/ndeg_tm_dslash_cuda_gen.py
+	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
+	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
 
 clean:
 	-rm -f *.o $(QUDA)
@@ -90,6 +97,9 @@ tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+
+reduce_quda.o: reduce_quda.cu $(HDRS) $(REDUCE_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)

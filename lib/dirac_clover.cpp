@@ -7,13 +7,13 @@ namespace quda {
   DiracClover::DiracClover(const DiracParam &param)
     : DiracWilson(param), clover(*(param.clover))
   {
-    initCloverConstants(clover);
+    initCloverConstants(clover, profile);
   }
 
   DiracClover::DiracClover(const DiracClover &dirac) 
     : DiracWilson(dirac), clover(dirac.clover)
   {
-    initCloverConstants(clover);
+    initCloverConstants(clover, profile);
   }
 
   DiracClover::~DiracClover() { }
@@ -42,16 +42,14 @@ namespace quda {
 			       const QudaParity parity, const cudaColorSpinorField &x,
 			       const double &k) const
   {
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    FullClover cs;
-    cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
-    asymCloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim);
+    FullClover cs(clover);
+    asymCloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim, profile);
 
     flops += 1872ll*in.Volume();
   }
@@ -59,13 +57,11 @@ namespace quda {
   // Public method to apply the clover term only
   void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
   {
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
 
     // regular clover term
-    FullClover cs;
-    cs.even = clover.even; cs.odd = clover.odd; cs.evenNorm = clover.evenNorm; cs.oddNorm = clover.oddNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+    FullClover cs(clover);
     cloverCuda(&out, gauge, cs, &in, parity);
 
     flops += 504ll*in.Volume();
@@ -132,13 +128,11 @@ namespace quda {
   void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 				const QudaParity parity) const
   {
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
 
     // needs to be cloverinv
-    FullClover cs;
-    cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
+    FullClover cs(clover, true);
     cloverCuda(&out, gauge, cs, &in, parity);
 
     flops += 504ll*in.Volume();
@@ -150,16 +144,14 @@ namespace quda {
   void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			     const QudaParity parity) const
   {
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    FullClover cs;
-    cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
-    cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, 0, 0.0, commDim);
+    FullClover cs(clover, true);
+    cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, 0, 0.0, commDim, profile);
 
     flops += 1824ll*in.Volume();
   }
@@ -169,16 +161,14 @@ namespace quda {
 				 const QudaParity parity, const cudaColorSpinorField &x,
 				 const double &k) const
   {
-    initSpinorConstants(in);
+    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
-    FullClover cs;
-    cs.even = clover.evenInv; cs.odd = clover.oddInv; cs.evenNorm = clover.evenInvNorm; cs.oddNorm = clover.oddInvNorm;
-    cs.precision = clover.precision; cs.bytes = clover.bytes, cs.norm_bytes = clover.norm_bytes;
-    cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim);
+    FullClover cs(clover, true);
+    cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim, profile);
 
     flops += 1872ll*in.Volume();
   }

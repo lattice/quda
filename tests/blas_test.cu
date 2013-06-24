@@ -26,7 +26,11 @@ extern bool tune;
 
 extern void usage(char** );
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
 const int Nkernels = 32;
+#else // exclude Heavy Quark Norm if on Tesla architecture
+const int Nkernels = 31;
+#endif
 
 using namespace quda;
 
@@ -54,10 +58,10 @@ display_test_info()
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     commDimPartitioned(0),
-	     commDimPartitioned(1),
-	     commDimPartitioned(2),
-	     commDimPartitioned(3)); 
+	     dimPartitioned(0),
+	     dimPartitioned(1),
+	     dimPartitioned(2),
+	     dimPartitioned(3)); 
   
   return;  
 }
@@ -636,7 +640,7 @@ int main(int argc, char** argv)
   }
 
   setSpinorSiteSize(24);
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
   initQuda(device);
 
@@ -732,5 +736,5 @@ int main(int argc, char** argv)
 
   endQuda();
 
-  endCommsQuda();
+  finalizeComms();
 }

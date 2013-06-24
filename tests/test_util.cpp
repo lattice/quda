@@ -2,8 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
 #include <short.h>
+
+#if defined(QMP_COMMS)
+#include <qmp.h>
+#elif defined(MPI_COMMS)
+#include <mpi.h>
+#endif
 
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
@@ -18,6 +23,7 @@ using namespace std;
 #define YUP 1
 #define ZUP 2
 #define TUP 3
+
 
 int Z[4];
 int V;
@@ -38,6 +44,43 @@ int V5h;
 int mySpinorSiteSize;
 
 extern float fat_link_max;
+
+
+void initComms(int argc, char **argv, const int *commDims)
+{
+#if defined(QMP_COMMS)
+  QMP_thread_level_t tl;
+  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+#elif defined(MPI_COMMS)
+  MPI_Init(&argc, &argv);
+#endif
+  initCommsGridQuda(4, commDims, NULL, NULL);
+  initRand();
+}
+
+
+void finalizeComms()
+{
+#if defined(QMP_COMMS)
+  QMP_finalize_msg_passing();
+#elif defined(MPI_COMMS)
+  MPI_Finalize();
+#endif
+}
+
+
+void initRand()
+{
+  int rank = 0;
+
+#if defined(QMP_COMMS)
+  rank = QMP_get_node_number();
+#elif defined(MPI_COMMS)
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+
+  srand(17*rank + 137);
+}
 
 
 void setDims(int *X) {
@@ -1159,7 +1202,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   int iter[18];
   for (int i=0; i<18; i++) iter[i] = 0;
   
-  for(int dir=0;dir<4; dir++){
+  for(int dir=0;dir < 4; dir++){
     for (int i=0; i<len; i++) {
       for (int j=0; j<18; j++) {
 	int is = i*18+j;
@@ -1412,13 +1455,22 @@ int xdim = 24;
 int ydim = 24;
 int zdim = 24;
 int tdim = 24;
+int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
-int gridsize_from_cmdline[4]={1,1,1,1};
+int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 bool tune = true;
 int niter = 10;
 int test_type = 0;
+
+static int dim_partitioned[4] = {0,0,0,0};
+
+int dimPartitioned(int dim)
+{
+  return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]);
+}
+
 
 void __attribute__((weak)) usage_extra(char** argv){};
 
@@ -1439,6 +1491,7 @@ void usage(char** argv )
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
+  printf("    --Lsdim <n>                                # Set Ls dimension size(default 16)\n");  
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1603,6 +1656,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--Lsdim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+    int Ls =  atoi(argv[i+1]);
+    if (Ls < 0 || Ls > 128){
+      printfQuda("ERROR: invalid Ls dimension\n");
+    }
+    Lsdim=Ls;
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--dagger") == 0){
     dagger = QUDA_DAG_YES;
     ret = 0;
@@ -1618,6 +1685,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     for(int j=0; j < 4;j++){
       if (value &  (1 << j)){
 	commDimPartitionedSet(j);
+	dim_partitioned[j] = 1;
       }
     }
 #else
@@ -1782,3 +1850,5 @@ double stopwatchReadSeconds() {
   long dus = endTime.tv_usec - startTime.tv_usec;
   return ds + 0.000001*dus;
 }
+
+

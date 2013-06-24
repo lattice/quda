@@ -141,6 +141,13 @@ namespace quda {
 
     double fat_link_max;
   
+#ifdef USE_TEXTURE_OBJECTS
+    cudaTextureObject_t evenTex;
+    cudaTextureObject_t oddTex;
+    void createTexObject(cudaTextureObject_t &tex, void *gauge);
+    void destroyTexObject();
+#endif
+
   public:
     cudaGaugeField(const GaugeFieldParam &);
     virtual ~cudaGaugeField();
@@ -158,6 +165,11 @@ namespace quda {
     const void* Gauge_p() const { return gauge; }
     const void* Even_p() const { return even; }
     const void* Odd_p() const { return odd; }	
+
+#ifdef USE_TEXTURE_OBJECTS
+    const cudaTextureObject_t& EvenTex() const { return evenTex; }
+    const cudaTextureObject_t& OddTex() const { return oddTex; }
+#endif
 
     mutable char *backup_h;
     mutable bool backed_up;

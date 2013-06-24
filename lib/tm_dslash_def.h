@@ -11,7 +11,7 @@
 //
 // twistedMassDslash12DaggerXpayKernel(float4* out, ...).
 //
-// This is a twisted mass Dslash^dagger kernel where the result is
+// This is a twisted mass Dslash^ger kernel where the result is
 // multiplied by "a" and summed with an input vector (Xpay), and the
 // gauge matrix is reconstructed from 12 real numbers.  More
 // generally, each function name is given by the concatenation of the
@@ -31,13 +31,15 @@
 #define DD_LOOP
 #define DD_DAG 0
 #define DD_XPAY 0
+//!
+#define DD_TWIST 0
 #define DD_RECON 0
 #define DD_PREC 0
 #endif
 
 // set options for current iteration
 
-#define DD_NAME_F twistedMassDslash
+//#define DD_NAME_F twistedMassDslash
 
 #if (DD_DAG==0) // no dagger
 #define DD_DAG_F
@@ -45,12 +47,21 @@
 #define DD_DAG_F Dagger
 #endif
 
+//!
 #if (DD_XPAY==0) // no xpay 
 #define DD_XPAY_F 
-#else
+#elif (DD_XPAY==1)
 #define DSLASH_XPAY
 #define DD_XPAY_F Xpay
 #endif
+
+#if (DD_TWIST==0) // twisted input 
+#define DD_NAME_F twistedMassTwistInvDslash
+#define TWIST_INV_DSLASH
+#else
+#define DD_NAME_F twistedMassDslash
+#endif
+//!
 
 #if (DD_PREC == 0)
 #define DD_PARAM4 const double a, const double b, const double2 *x, const float *xNorm, const DslashParam param
@@ -154,16 +165,21 @@
 
 #if (DD_PREC==0) // double-precision fields
 
-#define TPROJSCALE tProjScale
+//#define TPROJSCALE tProjScale
 
 // double-precision gauge field
 #if (defined DIRECT_ACCESS_LINK) || (defined FERMI_NO_DBLE_TEX)
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
+#else
 #define GAUGE0TEX gauge0TexDouble2
 #define GAUGE1TEX gauge1TexDouble2
-#endif
+#endif // USE_TEXTURE_OBJECTS
+#endif 
 
 #define GAUGE_FLOAT2
 
@@ -179,23 +195,35 @@
 #define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_DOUBLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexDouble
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_DOUBLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexDouble
+#endif
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_DOUBLE2
 #define SPINOR_DOUBLE
-#if (DD_XPAY==1)
+#if (DD_XPAY!=0)
 #if (defined DIRECT_ACCESS_WILSON_ACCUM) || (defined FERMI_NO_DBLE_TEX)
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_DOUBLE
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexDouble
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_DOUBLE_TEX
 #endif
 
@@ -205,12 +233,16 @@
 
 #elif (DD_PREC==1) // single-precision fields
 
-#define TPROJSCALE tProjScale_f
+//#define TPROJSCALE tProjScale_f
 
 // single-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
+#else
+#ifdef USE_TEXTURE_OBJECTS
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
 #else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexSingle2
@@ -219,6 +251,7 @@
 #define GAUGE0TEX gauge0TexSingle4
 #define GAUGE1TEX gauge1TexSingle4
 #endif
+#endif // USE_TEXTURE_OBJECTS
 #endif
 
 
@@ -234,22 +267,34 @@
 #define READ_SPINOR READ_SPINOR_SINGLE_TEX
 #define READ_SPINOR_UP READ_SPINOR_SINGLE_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexSingle
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_SINGLE_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexSingle
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define WRITE_SPINOR WRITE_SPINOR_FLOAT4
-#if (DD_XPAY==1)
+#if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_SINGLE
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexSingle
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_SINGLE_TEX
 #endif
 #endif
@@ -258,12 +303,16 @@
 
 #else             // half-precision fields
 
-#define TPROJSCALE tProjScale_f
+//#define TPROJSCALE tProjScale_f
 
 // half-precision gauge field
 #ifdef DIRECT_ACCESS_LINK
 #define GAUGE0TEX gauge0
 #define GAUGE1TEX gauge1
+#else
+#ifdef USE_TEXTURE_OBJECTS
+#define GAUGE0TEX param.gauge0Tex
+#define GAUGE1TEX param.gauge1Tex
 #else
 #if (DD_RECON_F == 18)
 #define GAUGE0TEX gauge0TexHalf2
@@ -272,6 +321,7 @@
 #define GAUGE0TEX gauge0TexHalf4
 #define GAUGE1TEX gauge1TexHalf4
 #endif
+#endif // USE_TEXTURE_OBJECTS
 #endif
 
 
@@ -285,24 +335,37 @@
 #define READ_SPINOR READ_SPINOR_HALF_TEX
 #define READ_SPINOR_UP READ_SPINOR_HALF_UP_TEX
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
 #define SPINORTEX spinorTexHalf
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF
 #define INTERTEX out
 #else
 #define READ_INTERMEDIATE_SPINOR READ_SPINOR_HALF_TEX
+#ifdef USE_TEXTURE_OBJECTS
+#define INTERTEX param.outTex
+#else
 #define INTERTEX interTexHalf
+#endif // USE_TEXTURE_OBJECTS
 #endif
 #define DD_PARAM1 short4* out, float *outNorm
 #define DD_PARAM3 const short4* in, const float *inNorm
 #define WRITE_SPINOR WRITE_SPINOR_SHORT4
-#if (DD_XPAY==1)
+//!0513
+#if (DD_XPAY!=0)
 #ifdef DIRECT_ACCESS_WILSON_ACCUM
 #define ACCUMTEX x
 #define READ_ACCUM READ_ACCUM_HALF
 #else
+#ifdef USE_TEXTURE_OBJECTS
+#define ACCUMTEX param.xTex
+#else
 #define ACCUMTEX accumTexHalf
+#endif // USE_TEXTURE_OBJECTS
 #define READ_ACCUM READ_ACCUM_HALF_TEX
 #endif
 
@@ -319,7 +382,7 @@
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
 // define the kernel
-
+//!051013
 template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
      (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
@@ -356,6 +419,74 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 }
 
+//NEW
+#if (DD_XPAY==1) && (DD_TWIST==1)
+#define TWIST_XPAY
+
+//redefine kernel name:
+#undef DD_NAME_F 
+#define DD_NAME_F twistedMassDslashTwist
+  
+template <KernelType kernel_type>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+
+#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+
+#if DD_DAG
+#include "tm_dslash_dagger_gt200_core.h"
+#else
+#include "tm_dslash_gt200_core.h"
+#endif
+
+#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+
+#if DD_DAG
+#include "tm_dslash_dagger_gt200_core.h"
+#else
+#include "tm_dslash_gt200_core.h"
+#endif
+
+#else  // fall-back is original G80 
+
+#if DD_DAG
+#include "tm_dslash_dagger_g80_core.h"
+#else
+#include "tm_dslash_g80_core.h"
+#endif
+
+#endif
+
+#endif
+
+}
+#undef TWIST_XPAY
+#endif //(DD_XPAY==0) && (DD_TWIST==1)
+
+
+//BEGIN DUMMY KERNEL (remove it later)
+#if (DD_XPAY==0) && (DD_TWIST==1)
+#define TWIST_XPAY
+
+//redefine kernel name:
+#undef DD_NAME_F 
+#define DD_NAME_F twistedMassDslashTwist
+  
+template <KernelType kernel_type>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+
+#endif
+
+}
+#undef TWIST_XPAY
+#endif //(DD_XPAY==0) && (DD_TWIST==1)
+//END DUMMY KERNEL
+
 #endif
 
 // clean up
@@ -372,6 +503,10 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_FUNC
 
 #undef DSLASH_XPAY
+
+//!
+#undef TWIST_INV_DSLASH
+//!
 #undef READ_GAUGE_MATRIX
 #undef RECONSTRUCT_GAUGE_MATRIX
 #undef GAUGE0TEX
@@ -390,7 +525,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #undef SPINOR_HOP
 
-#undef TPROJSCALE
+//#undef TPROJSCALE
 
 // prepare next set of options, or clean up after final iteration
 
@@ -400,6 +535,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #else
 #undef DD_DAG
 #define DD_DAG 0
+
+#if (DD_TWIST==0)
+#undef DD_TWIST
+#define DD_TWIST 1
+#else
+#undef DD_TWIST
+#define DD_TWIST 0
 
 #if (DD_XPAY==0)
 #undef DD_XPAY
@@ -429,6 +571,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #undef DD_LOOP
 #undef DD_DAG
+#undef DD_TWIST
 #undef DD_XPAY
 #undef DD_RECON
 #undef DD_PREC
@@ -436,6 +579,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_XPAY
+#endif // DD_TWIST
 #endif // DD_DAG
 
 #ifdef DD_LOOP

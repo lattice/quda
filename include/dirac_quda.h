@@ -8,6 +8,7 @@
 #include <dslash_quda.h>
 
 #include <face_quda.h>
+#include <blas_quda.h>
 
 #include <typeinfo>
 
@@ -21,7 +22,10 @@ namespace quda {
     double kappa;
     double mass;
     double m5; // used by domain wall only
-    int Ls;    //!NEW: used by domain wall only  
+    int Ls;    //!NEW: used by domain wall and twisted mass
+    double *b_5;    //!NEW: used by mobius domain wall only  
+    double *c_5;    //!NEW: used by mobius domain wall only
+
     MatPCType matpcType;
     DagType dagger;
     cudaGaugeField *gauge;
@@ -30,6 +34,7 @@ namespace quda {
     cudaCloverField *clover;
   
     double mu; // used by twisted mass only
+    double epsilon; //2nd tm parameter (used by twisted mass only)
 
     cudaColorSpinorField *tmp1;
     cudaColorSpinorField *tmp2; // used by Wilson-like kernels only
@@ -40,7 +45,7 @@ namespace quda {
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), 
+      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0),
       tmp1(0), tmp2(0), verbose(QUDA_SILENT)
     {
 
@@ -56,7 +61,9 @@ namespace quda {
       printfQuda("matpcType = %d\n", matpcType);
       printfQuda("dagger = %d\n", dagger);
       printfQuda("mu = %g\n", mu);
+      printfQuda("epsilon = %g\n", epsilon);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
+      for (int i=0; i<Ls; i++) printfQuda("b_5[%d] = %e\t c_5[%d] = %e\n", i,b_5[i],i,c_5[i]);
     }
   };
 
@@ -94,6 +101,8 @@ namespace quda {
     QudaVerbosity verbose;  
 
     int commDim[QUDA_MAX_DIM]; // whether do comms or not
+
+    mutable TimeProfile profile;
 
   public:
     Dirac(const DiracParam &param);
@@ -137,9 +146,7 @@ namespace quda {
   public:
     DiracWilson(const DiracParam &param);
     DiracWilson(const DiracWilson &dirac);
-    //BEGIN NEW
-    DiracWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW
-    //END NEW    
+    DiracWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW and non-deg twisted mass   
   
     virtual ~DiracWilson();
     DiracWilson& operator=(const DiracWilson &dirac);
@@ -281,17 +288,85 @@ namespace quda {
 		     const QudaSolutionType) const;
   };
 
+// 4d Even-odd preconditioned domain wall
+  class DiracDomainWall4DPC : public DiracDomainWallPC {
+
+  private:
+
+  public:
+    DiracDomainWall4DPC(const DiracParam &param);
+    DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
+    virtual ~DiracDomainWall4DPC();
+    DiracDomainWall4DPC& operator=(const DiracDomainWall4DPC &dirac);
+    void Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		const QudaParity parity) const;
+    void Dslash5(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5inv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity, const double &k) const;
+    void Dslash4Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+
+    void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+    void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+		 cudaColorSpinorField &x, cudaColorSpinorField &b, 
+		 const QudaSolutionType) const;
+    void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+		     const QudaSolutionType) const;
+  };
+
+
+// 4d Even-odd preconditioned Mobius domain wall
+  class DiracMobiusDomainWallPC : public DiracDomainWallPC {
+    
+  protected:
+    //Mobius coefficients
+    double *b_5;
+    double *c_5;
+
+  private:
+
+  public:
+    DiracMobiusDomainWallPC(const DiracParam &param);
+    DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac);
+    virtual ~DiracMobiusDomainWallPC();
+    DiracMobiusDomainWallPC& operator=(const DiracMobiusDomainWallPC &dirac);
+    void Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		const QudaParity parity) const;
+    void Dslash4pre(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		const QudaParity parity) const;
+    void Dslash5(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5inv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity, const double &k) const;
+    void Dslash4Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+
+    void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol, cudaColorSpinorField &x, 
+		 cudaColorSpinorField &b, const QudaSolutionType) const;
+    void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b, const QudaSolutionType) const;
+  };
+
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {
 
   protected:
     double mu;
+    double epsilon;
     void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaTwistGamma5Type twistType) const;
 
+    static int initTMFlag;
+    void initConstants(const cudaColorSpinorField &in) const;
+
   public:
-    DiracTwistedMass(const DiracParam &param);
     DiracTwistedMass(const DiracTwistedMass &dirac);
+    DiracTwistedMass(const DiracParam &param, const int nDim);
     virtual ~DiracTwistedMass();
     DiracTwistedMass& operator=(const DiracTwistedMass &dirac);
 
@@ -311,8 +386,9 @@ namespace quda {
   class DiracTwistedMassPC : public DiracTwistedMass {
 
   public:
-    DiracTwistedMassPC(const DiracParam &param);
     DiracTwistedMassPC(const DiracTwistedMassPC &dirac);
+    DiracTwistedMassPC(const DiracParam &param, const int nDim);
+
     virtual ~DiracTwistedMassPC();
     DiracTwistedMassPC& operator=(const DiracTwistedMassPC &dirac);
 
@@ -442,18 +518,23 @@ namespace quda {
   class DiracMdagM : public DiracMatrix {
 
   public:
-  DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
-  DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
+    DiracMdagM(const Dirac &d) : DiracMatrix(d), shift(0.0) { }
+    DiracMdagM(const Dirac *d) : DiracMatrix(d), shift(0.0) { }
+
+    //! Shift term added onto operator (M^dag M + shift)
+    double shift;
 
     void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
     }
 
     void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, cudaColorSpinorField &tmp) const
     {
       dirac->tmp1 = &tmp;
       dirac->MdagM(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
       dirac->tmp1 = NULL;
     }
 
@@ -463,6 +544,7 @@ namespace quda {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
       dirac->MdagM(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }

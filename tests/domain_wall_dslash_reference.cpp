@@ -242,7 +242,6 @@ Float *gaugeLink_mgpu(int i, int dir, int oddBit, Float **gaugeEven, Float **gau
 template <typename Float>
 Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Float** fwd_nbr_spinor, Float** back_nbr_spinor, int neighbor_distance, int nFace)
 {
-//int mpi_rank = comm_rank();
   int j;
   int nb = neighbor_distance;
   int Y = fullLatticeIndex_5d(i, oddBit);

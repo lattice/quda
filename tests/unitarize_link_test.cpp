@@ -37,8 +37,6 @@ static bool reunit_svd_only  = false;
 static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-5;
 static double max_allowed_error = 1e-11;
-static bool check_unitarization = true;
-
 
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
@@ -114,11 +112,13 @@ unitarize_link_test()
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
 
+  TimeProfile profile("dummy");
+
 #define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
 #if (QUDA_VER > 400)
-  quda::initLatticeConstants(*cudaFatLink);
+  quda::initLatticeConstants(*cudaFatLink, profile);
 #else
-  quda::initCommonConstants(*cudaFatLink);
+  quda::initCommonConstants(*cudaFatLink, profile);
 #endif
 
 
@@ -171,6 +171,8 @@ unitarize_link_test()
 
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
 
+  delete cpuOutLink;
+
   setUnitarizeLinksConstants(unitarize_eps,
 				   max_allowed_error,
 				   reunit_allow_svd,
@@ -196,6 +198,7 @@ unitarize_link_test()
   int num_failures=0;
   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
+ delete cpuOutLink;
  delete cudaFatLink;
  delete cudaULink;
  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
@@ -225,10 +228,10 @@ display_test_info()
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n",
-             commDimPartitioned(0),
-             commDimPartitioned(1),
-             commDimPartitioned(2),
-             commDimPartitioned(3));
+             dimPartitioned(0),
+             dimPartitioned(1),
+             dimPartitioned(2),
+             dimPartitioned(3));
 #endif
 
   return ;
@@ -254,7 +257,7 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-  initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
   int num_failures = unitarize_link_test();
@@ -266,12 +269,12 @@ main(int argc, char **argv)
 
   printfQuda("Number of failures = %d\n", num_failures);
   if(num_failures > 0){
-    printfQuda("Failure rate = %lf%\n", num_failures/(4.0*V*num_procs));
+    printfQuda("Failure rate = %lf\n", num_failures/(4.0*V*num_procs));
     printfQuda("You may want to increase your error tolerance or vary the unitarization parameters\n");
   }else{
     printfQuda("Unitarization successfull!\n");
   }
-  endCommsQuda();
+  finalizeComms();
 
   return EXIT_SUCCESS;
 }

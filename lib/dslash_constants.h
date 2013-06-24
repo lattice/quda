@@ -63,7 +63,7 @@ __constant__ int Vsh;
 __constant__ int sp_stride;
 __constant__ int ga_stride;
 __constant__ int cl_stride;
-__constant__ int ghostFace[QUDA_MAX_DIM];
+__constant__ int ghostFace[QUDA_MAX_DIM+1];
 
 __constant__ int fat_ga_stride;
 __constant__ int long_ga_stride;
@@ -73,6 +73,7 @@ __constant__ int gauge_fixed;
 
 // domain wall constants
 __constant__ int Ls;
+__constant__ double m5;
 
 // single precision constants
 __constant__ float anisotropy_f;
@@ -109,9 +110,13 @@ __constant__ fat_force_const_t fl; //fatlink
 __constant__ fat_force_const_t gf; //gauge force
 __constant__ fat_force_const_t hf; //hisq force
 
+//!ndeg tm:
+__constant__ int fl_stride;
 
-void initLatticeConstants(const LatticeField &lat)
+void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 {
+  profile.Start(QUDA_PROFILE_CONSTANT);
+
   checkCudaError();
 
   int volumeCB = lat.VolumeCB();
@@ -287,11 +292,15 @@ void initLatticeConstants(const LatticeField &lat)
   dslashConstants.x[3] = L4;
 
   checkCudaError();
+
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
-void initGaugeConstants(const cudaGaugeField &gauge) 
+void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile) 
 {
+  profile.Start(QUDA_PROFILE_CONSTANT);
+
   int ga_stride_h = gauge.Stride();
   cudaMemcpyToSymbol(ga_stride, &ga_stride_h, sizeof(int));  
 
@@ -325,6 +334,8 @@ void initGaugeConstants(const cudaGaugeField &gauge)
   cudaMemcpyToSymbol(No2, &(No2_h), sizeof(float2));
 
   checkCudaError();
+
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
@@ -332,20 +343,23 @@ void initGaugeConstants(const cudaGaugeField &gauge)
  * This routine gets called often, so be sure not to set any constants unnecessarily
  * or introduce synchronization (e.g., via checkCudaError()).
  */
-void initSpinorConstants(const cudaColorSpinorField &spinor)
+void initSpinorConstants(const cudaColorSpinorField &spinor, TimeProfile &profile)
 {
   static int last_sp_stride = -1;
   static int last_Ls = -1;
 
   int sp_stride_h = spinor.Stride();
   if (sp_stride_h != last_sp_stride) {
+    profile.Start(QUDA_PROFILE_CONSTANT);
     cudaMemcpyToSymbol(sp_stride, &sp_stride_h, sizeof(int));
     checkCudaError();
     last_sp_stride = sp_stride_h;
+    profile.Stop(QUDA_PROFILE_CONSTANT);
   }
   
   // for domain wall:
   if (spinor.Ndim() == 5) {
+    profile.Start(QUDA_PROFILE_CONSTANT);
     int Ls_h = spinor.X(4);
     if (Ls_h != last_Ls) {
       cudaMemcpyToSymbol(Ls, &Ls_h, sizeof(int));  
@@ -353,12 +367,15 @@ void initSpinorConstants(const cudaColorSpinorField &spinor)
       checkCudaError();
       last_Ls = Ls_h;
     }
+    profile.Stop(QUDA_PROFILE_CONSTANT);
   }
 }
 
 
-void initDslashConstants()
+void initDslashConstants(TimeProfile &profile)
 {
+  profile.Start(QUDA_PROFILE_CONSTANT);
+
   float pi_f_h = M_PI;
   cudaMemcpyToSymbol(pi_f, &pi_f_h, sizeof(float));
 
@@ -371,20 +388,29 @@ void initDslashConstants()
   cudaMemcpyToSymbol(tProjScale_f, &tProjScale_fh, sizeof(float));
 
   checkCudaError();
+
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
-void initCloverConstants (const cudaCloverField &clover)
+void initCloverConstants (const cudaCloverField &clover, TimeProfile &profile)
 {
+  profile.Start(QUDA_PROFILE_CONSTANT);
+
   int cl_stride_h = clover.Stride();
   cudaMemcpyToSymbol(cl_stride, &cl_stride_h, sizeof(int));  
 
   checkCudaError();
+
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 
-void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge)
+void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField &longgauge,
+			    TimeProfile &profile)
 {
+  profile.Start(QUDA_PROFILE_CONSTANT);
+
   int fat_ga_stride_h = fatgauge.Stride();
   int long_ga_stride_h = longgauge.Stride();
   float fat_link_max_h = fatgauge.LinkMax();
@@ -394,4 +420,41 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
   cudaMemcpyToSymbol(fat_ga_max, &fat_link_max_h, sizeof(float));
 
   checkCudaError();
+
+  profile.Stop(QUDA_PROFILE_CONSTANT);
+}
+
+//For initializing the coefficients used in MDWF
+__constant__ double *mdwf_b5;
+__constant__ double *mdwf_c5;
+double *Tmp_b5;
+double *Tmp_c5;
+void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h)
+{
+  Tmp_b5 = (double*)device_malloc(sizeof(double)*dim_s);
+  Tmp_c5 = (double*)device_malloc(sizeof(double)*dim_s);
+
+  cudaMemcpy(Tmp_b5, b_5, sizeof(double)*dim_s, cudaMemcpyHostToDevice);
+  cudaMemcpy(Tmp_c5, c_5, sizeof(double)*dim_s, cudaMemcpyHostToDevice);
+
+  cudaMemcpyToSymbol(mdwf_b5, &Tmp_b5, sizeof(Tmp_b5));
+  cudaMemcpyToSymbol(mdwf_c5, &Tmp_c5, sizeof(Tmp_c5));
+ 
+  cudaMemcpyToSymbol(m5, &m5h, sizeof(double));
+
+  checkCudaError();
+}
+void deleteMDWFConstants()
+{
+  device_free(Tmp_b5);
+  device_free(Tmp_c5);
+}
+//!ndeg tm: 
+void initTwistedMassConstants(const int fl_stride_h, TimeProfile &profile)
+{
+  profile.Start(QUDA_PROFILE_CONSTANT);
+  cudaMemcpyToSymbol(fl_stride, &fl_stride_h, sizeof(int));    
+
+  checkCudaError();
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }

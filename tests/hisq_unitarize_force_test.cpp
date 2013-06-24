@@ -147,13 +147,14 @@ hisq_force_test()
   hisq_force_init();
   fermion_force::hisqForceInitCuda(&gaugeParam);
 
+  TimeProfile profile("dummy");
 #define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
 #if (QUDA_VER > 400)
-  initLatticeConstants(*cudaFatLink);
+  initLatticeConstants(*cudaFatLink, profile);
 #else
-  initCommonConstants(*cudaFatLink);
+  initCommonConstants(*cudaFatLink, profile);
 #endif
-  initGaugeConstants(*cudaFatLink);
+  initGaugeConstants(*cudaFatLink, profile);
 
 
   double unitarize_eps = 1e-5;
@@ -243,9 +244,7 @@ main(int argc, char **argv)
     usage(argv);
   }
 
-#ifdef MULTI_GPU
-    initCommsQuda(argc, argv, gridsize_from_cmdline, 4);
-#endif
+  initComms(argc, argv, gridsize_from_cmdline);
 
   setPrecision(prec);
 
@@ -253,12 +252,8 @@ main(int argc, char **argv)
     
   hisq_force_test();
 
+  finalizeComms();
 
-#ifdef MULTI_GPU
-    endCommsQuda();
-#endif
-    
-    
   return EXIT_SUCCESS;
 }
 

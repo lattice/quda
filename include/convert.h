@@ -25,11 +25,14 @@ template<> int vecLength<short4>() { return 4; }
 template<> int vecLength<float4>() { return 4; }
 template<> int vecLength<double4>() { return 4; }
 
-static inline __device__ float s2f(const short &a) { return static_cast<float>(a)/MAX_SHORT; }
+// MAX_SHORT 32767
+#define MAX_SHORT_INV 3.051850948e-5
+static inline __device__ float s2f(const short &a) { return static_cast<float>(a) * MAX_SHORT_INV; }
 
 template <typename FloatN>
 __device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }
 
+// This is emulating the texture normalized return
 __device__ inline void copyFloatN(float2 &a, const short2 &b) { a = make_float2(s2f(b.x), s2f(b.y)); }
 __device__ inline void copyFloatN(float4 &a, const short4 &b) { a = make_float4(s2f(b.x), s2f(b.y), s2f(b.z), s2f(b.w)); }
 
@@ -38,12 +41,19 @@ __device__ inline void copyFloatN(double2 &a, const float2 &b) { a = make_double
 __device__ inline void copyFloatN(float4 &a, const double4 &b) { a = make_float4(b.x, b.y, b.z, b.w); }
 __device__ inline void copyFloatN(double4 &a, const float4 &b) { a = make_double4(b.x, b.y, b.z, b.w); }
 
+/* Here we assume that the input data has already been normalized and shifted. */
+__device__ inline void copyFloatN(short2 &a, const float2 &b) { a = make_short2(b.x, b.y); }
+__device__ inline void copyFloatN(short4 &a, const float4 &b) { a = make_short4(b.x, b.y, b.z, b.w); }
+__device__ inline void copyFloatN(short2 &a, const double2 &b) { a = make_short2(b.x, b.y); }
+__device__ inline void copyFloatN(short4 &a, const double4 &b) { a = make_short4(b.x, b.y, b.z, b.w); }
+
+
 /**
  Convert a vector of type InputType to type OutputType.
 
- The main current limitation is that there is an implicit asumption
+ The main current limitation is that there is an implicit assumption
  that N * sizeof(OutputType) / sizeof(InputType) is an integer.  E.g.,
- you can convert a vector 9 float2s into a vector of 5 float4s.
+ you cannot convert a vector 9 float2s into a vector of 5 float4s.
 
  @param x Output vector.
  @param y Input vector.
