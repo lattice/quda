@@ -81,7 +81,7 @@ namespace quda {
 		 k, Ar3.x, Ar3.y, Ar3.z, x2);
     }
 
-    while (k < invParam.maxiter) {
+    while (k < invParam.maxiter && r2 > 0.0) {
     
       mat(Ar, r, tmp);
 
