@@ -135,7 +135,7 @@ namespace quda {
       for (int d=0; d<arg.nDim; d++) {
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
       }
-      size = isGhost ? faceMax : arg.volume;
+      size = isGhost ? faceMax : arg.volume/2;
     }
     virtual ~CopyGauge() { ; }
   
