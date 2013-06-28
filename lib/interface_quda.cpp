@@ -514,15 +514,29 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   profileClover.Start(QUDA_PROFILE_H2D);
 
-  cloverPrecise = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
-				      inv_param->clover_order, clover_param);
+  // create a param for the cpu clover field
+  CloverFieldParam cpuParam;
+  cpuParam.nDim = 4;
+  for (int i=0; i<4; i++) cpuParam.x[i] = gaugePrecise->X()[i];
+  cpuParam.precision = inv_param->clover_cuda_prec;
+  cpuParam.pad = inv_param->cl_pad;
+  cpuParam.precision = inv_param->clover_cpu_prec;
+  cpuParam.order = inv_param->clover_order;
+  cpuParam.clover = h_clover;
+  cpuParam.norm = 0;
+  cpuParam.cloverInv = h_clovinv;
+  cpuParam.invNorm = 0;
+  cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  cpuCloverField cpu(cpuParam);
+    
+  cloverPrecise = new cudaCloverField(clover_param);
   inv_param->cloverGiB = cloverPrecise->GBytes();
 
   // create the mirror sloppy clover field
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-    clover_param.precision = inv_param->clover_cuda_prec_sloppy;
-    cloverSloppy = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
-				       inv_param->clover_order, clover_param); 
+    clover_param.setPrecision(inv_param->clover_cuda_prec_sloppy);
+    cloverSloppy = new cudaCloverField(clover_param); 
+    cloverSloppy->loadCPUField(cpu);
     inv_param->cloverGiB += cloverSloppy->GBytes();
   } else {
     cloverSloppy = cloverPrecise;
@@ -531,9 +545,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   // create the mirror preconditioner clover field
   if (inv_param->clover_cuda_prec_sloppy != inv_param->clover_cuda_prec_precondition &&
       inv_param->clover_cuda_prec_precondition != QUDA_INVALID_PRECISION) {
-    clover_param.precision = inv_param->clover_cuda_prec_precondition;
-    cloverPrecondition = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
-					     inv_param->clover_order, clover_param); 
+    clover_param.setPrecision(inv_param->clover_cuda_prec_precondition);
+    cloverPrecondition = new cudaCloverField(clover_param);
+    cloverPrecondition->loadCPUField(cpu);
     inv_param->cloverGiB += cloverPrecondition->GBytes();
   } else {
     cloverPrecondition = cloverSloppy;

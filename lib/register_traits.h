@@ -1,3 +1,5 @@
+#include <quda_internal.h>
+
 namespace quda {
 
   /*

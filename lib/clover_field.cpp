@@ -10,7 +10,8 @@
 namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
-    LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4)
+    LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
+    clover(0), norm(0), cloverInv(0), invNorm(0), order(param.order), create(param.create)
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -23,25 +24,19 @@ namespace quda {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
       norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
     }
-
-    total_bytes = bytes + norm_bytes;
   }
 
   CloverField::~CloverField() {
 
   }
 
-  cudaCloverField::cudaCloverField(const void *h_clov, const void *h_clov_inv, 
-				   const QudaPrecision cpu_prec, 
-				   const QudaCloverFieldOrder cpu_order,
-				   const CloverFieldParam &param)
-    : CloverField(param), clover(0), norm(0), cloverInv(0), invNorm(0)
-  {
-    if (h_clov) {
+  cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
+
+    if (create != QUDA_NULL_FIELD_CREATE) errorQuda("Create type %d not supported", create);
+
+    if (param.direct) {
       clover = device_malloc(bytes);
-      if (precision == QUDA_HALF_PRECISION) {
-	norm = device_malloc(norm_bytes);
-      }
+      if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
 
       even = clover;
       odd = (char*)clover + bytes/2;
@@ -49,14 +44,12 @@ namespace quda {
       evenNorm = norm;
       oddNorm = (char*)norm + norm_bytes/2;
 
-      loadCPUField(clover, norm, h_clov, cpu_prec, cpu_order);
+      total_bytes += bytes + norm_bytes;
     } 
 
-    if (h_clov_inv) {
+    if (param.inverse) {
       cloverInv = device_malloc(bytes);
-      if (precision == QUDA_HALF_PRECISION) {
-	invNorm = device_malloc(bytes);
-      }
+      if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(bytes);
 
       evenInv = cloverInv;
       oddInv = (char*)cloverInv + bytes/2;
@@ -66,16 +59,12 @@ namespace quda {
 
       total_bytes += bytes + norm_bytes;
 
-      loadCPUField(cloverInv, invNorm, h_clov_inv, cpu_prec, cpu_order);
-
       // this is a hack to ensure that we can autotune the clover
       // operator when just using symmetric preconditioning
-      if (!clover) {
+      if (!param.direct) {
 	clover = cloverInv;
 	even = evenInv;
 	odd = oddInv;
-      }
-      if (!norm) {
 	norm = invNorm;
 	evenNorm = evenInvNorm;
 	oddNorm = oddInvNorm;
@@ -88,7 +77,7 @@ namespace quda {
     createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm);
     createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm);
 #endif
-    
+
   }
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -347,21 +336,43 @@ namespace quda {
     }
   }
 
-  void cudaCloverField::loadCPUField(void *clover, void *norm, const void *h_clover, 
-				     const QudaPrecision cpu_prec, const CloverFieldOrder cpu_order) {
+  void cudaCloverField::loadCPUField(const cpuCloverField &cpu) {
 
-    void *h_clover_odd = (char*)h_clover + cpu_prec*real_length/2;
-    
-    if (cpu_order == QUDA_LEX_PACKED_CLOVER_ORDER) {
-      loadFullField(clover, norm, (char*)clover+bytes/2, (char*)norm+norm_bytes/2, h_clover, cpu_prec, cpu_order);
-    } else if (cpu_order == QUDA_PACKED_CLOVER_ORDER || cpu_order == QUDA_BQCD_CLOVER_ORDER) {
-      loadParityField(clover, norm, h_clover, cpu_prec, cpu_order);
-      loadParityField((char*)clover+bytes/2, (char*)norm+norm_bytes/2, h_clover_odd, cpu_prec, cpu_order);
-    } else if(cpu_order == QUDA_INTERNAL_CLOVER_ORDER) { // No reordering necessary, just a plain copy
-      cudaMemcpy(clover, h_clover, total_bytes, cudaMemcpyHostToDevice); 
-    }else{
+#if 1
+    resizeBuffer(bytes + norm_bytes);
+    void *packClover = bufferPinned;
+    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned + bytes : 0;
+
+    if (cpu.V(false)) {
+      copyGenericClover(*this, cpu, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
+      cudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
+      if (precision == QUDA_HALF_PRECISION) 
+	cudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+    }
+
+    if (cpu.V(true)) {   // wrong answer until I fix inverse setting
+      copyGenericClover(*this, cpu, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
+      cudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
+      if (precision == QUDA_HALF_PRECISION) 
+	cudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+    }
+#else
+    if (cpu.Order() == QUDA_PACKED_CLOVER_ORDER || cpu.Order() == QUDA_BQCD_CLOVER_ORDER) {
+      if (cpu.V(false)) {
+	loadParityField(clover, norm, cpu.V(), cpu.Precision(), cpu.Order());
+	loadParityField((char*)clover+bytes/2, (char*)norm+norm_bytes/2, 
+			(char*)cpu.V() + cpu.Bytes()/2, cpu.Precision(), cpu.Order());
+      }
+      if (cpu.V(true)) {
+	loadParityField(cloverInv, invNorm, cpu.V(true), cpu.Precision(), cpu.Order());
+	loadParityField((char*)cloverInv+bytes/2, (char*)invNorm+norm_bytes/2, 
+			(char*)cpu.V(true) + cpu.Bytes()/2, cpu.Precision(), cpu.Order());
+      }      
+    } else {
       errorQuda("Invalid clover_order");
     }
+#endif
+
   }
 
   void cudaCloverField::loadParityField(void *clover, void *cloverNorm, const void *h_clover, 
@@ -403,56 +414,6 @@ namespace quda {
       cudaMemcpy(cloverNorm, packedCloverNorm, norm_bytes/2, cudaMemcpyHostToDevice);
   }
 
-  void cudaCloverField::loadFullField(void *even, void *evenNorm, void *odd, void *oddNorm, 
-				      const void *h_clover, const QudaPrecision cpu_prec, 
-				      const CloverFieldOrder cpu_order)
-  {
-    // use pinned memory                  
-    void *packedEven, *packedOdd, *packedEvenNorm=0, *packedOddNorm=0;
-
-    if (precision == QUDA_DOUBLE_PRECISION && cpu_prec != QUDA_DOUBLE_PRECISION) {
-      errorQuda("Cannot have CUDA double precision without CPU double precision");
-    }
-    if (cpu_order != QUDA_LEX_PACKED_CLOVER_ORDER) {
-      errorQuda("Invalid clover order");
-    }
-
-    resizeBuffer(bytes + norm_bytes);
-    packedEven = bufferPinned;
-    packedOdd = (char*)bufferPinned + bytes/2;
-
-    if (precision == QUDA_HALF_PRECISION) {
-      packedEvenNorm = (char*)bufferPinned + bytes;
-      packedOddNorm = (char*)bufferPinned + bytes + norm_bytes/2;
-    }
-    
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      packFullClover((double2 *)packedEven, (double2 *)packedOdd, (double *)clover, x, pad);
-    } else if (precision == QUDA_SINGLE_PRECISION) {
-      if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-	packFullClover((float4 *)packedEven, (float4 *)packedOdd, (double *)clover, x, pad);
-      } else {
-	packFullClover((float4 *)packedEven, (float4 *)packedOdd, (float *)clover, x, pad);    
-      }
-    } else {
-      if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-	packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
-			   (float *) packedOddNorm, (double *)clover, x, pad);
-      } else {
-	packFullCloverHalf((short4 *)packedEven, (float *)packedEvenNorm, (short4 *)packedOdd,
-			   (float * )packedOddNorm, (float *)clover, x, pad);    
-      }
-    }
-
-    cudaMemcpy(even, packedEven, bytes/2, cudaMemcpyHostToDevice);
-    cudaMemcpy(odd, packedOdd, bytes/2, cudaMemcpyHostToDevice);
-    if (precision == QUDA_HALF_PRECISION) {
-      cudaMemcpy(evenNorm, packedEvenNorm, norm_bytes/2, cudaMemcpyHostToDevice);
-      cudaMemcpy(oddNorm, packedOddNorm, norm_bytes/2, cudaMemcpyHostToDevice);
-    }
-  }
-
-
   /**
      Computes Fmunu given the gauge field U
   */
@@ -463,6 +424,26 @@ namespace quda {
 
     computeCloverCuda(*this, gauge);
 
+  }
+
+  cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
+    if (create != QUDA_REFERENCE_FIELD_CREATE) errorQuda("Create type %d not supported", create);
+
+    if (create == QUDA_REFERENCE_FIELD_CREATE) {
+      clover = param.norm;
+      norm = param.norm;
+      cloverInv = param.cloverInv;
+      invNorm = param.invNorm;
+    }
+  }
+
+  cpuCloverField::~cpuCloverField() { 
+    if (create != QUDA_REFERENCE_FIELD_CREATE) {
+      if (clover) host_free(clover);
+      if (norm) host_free(norm);
+      if (cloverInv) host_free(cloverInv);
+      if (invNorm) host_free(invNorm);      
+    }
   }
 
 } // namespace quda

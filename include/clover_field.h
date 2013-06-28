@@ -7,7 +7,19 @@
 namespace quda {
 
   struct CloverFieldParam : public LatticeFieldParam {
-  
+    bool direct; // whether to create the direct clover 
+    bool inverse; // whether to create the inverse clover
+    void *clover;
+    void *norm;
+    void *cloverInv;
+    void *invNorm;
+    CloverFieldOrder order;
+    QudaFieldCreate create;
+    void setPrecision(QudaPrecision precision) {
+      this->precision = precision;
+      order = (precision == QUDA_DOUBLE_PRECISION) ? 
+	QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
+    }
   };
 
   class CloverField : public LatticeField {
@@ -20,26 +32,39 @@ namespace quda {
     int nColor;
     int nSpin;
 
+    void *clover;
+    void *norm;
+    void *cloverInv;
+    void *invNorm;
+
+    CloverFieldOrder order;
+    QudaFieldCreate create;
+
   public:
     CloverField(const CloverFieldParam &param);
     virtual ~CloverField();
+
+    void* V(bool inverse=false) { return inverse ? clover : cloverInv; }
+    void* Norm(bool inverse=false) { return inverse ? norm : invNorm; }
+    const void* V(bool inverse=false) const { return inverse ? clover : cloverInv; }
+    const void* Norm(bool inverse=false) const { return inverse ? norm : invNorm; }
+    
+    CloverFieldOrder Order() const { return order; }
+    size_t Bytes() const { return bytes; }
+    size_t NormBytes() const { return norm_bytes; }
   };
 
   class cudaCloverField : public CloverField {
 
   private:
-    void *clover, *even, *odd;
-    void *norm, *evenNorm, *oddNorm;
+    void *even, *odd;
+    void *evenNorm, *oddNorm;
 
-    void *cloverInv, *evenInv, *oddInv;
-    void *invNorm, *evenInvNorm, *oddInvNorm;
+    void *evenInv, *oddInv;
+    void *evenInvNorm, *oddInvNorm;
 
-    void loadCPUField(void *d_clover, void *d_norm, const void *h_clover, 
-		      const QudaPrecision cpu_prec, const CloverFieldOrder order);
     void loadParityField(void *d_clover, void *d_norm, const void *h_clover, 
 			 const QudaPrecision cpu_prec, const CloverFieldOrder cpu_order);
-    void loadFullField(void *d_even, void *d_even_norm, void *d_odd, void *d_odd_norm, 
-		       const void *h_clover, const QudaPrecision cpu_prec, const CloverFieldOrder cpu_order);
 
     // computes the clover field given the input gauge field
     void compute(const cudaGaugeField &gauge);
@@ -58,14 +83,9 @@ namespace quda {
 #endif
 
   public:
-    // create a cudaCloverField from a cpu pointer
-    cudaCloverField(const void *h_clov, const void *h_clov_inv, 
-		    const QudaPrecision cpu_prec, 
-		    const QudaCloverFieldOrder cpu_order,
-		    const CloverFieldParam &param);
+    // create a cudaCloverField from a CloverFieldParam
+    cudaCloverField(const CloverFieldParam &param);
 
-    // create a cudaCloverField from a cudaGaugeField
-    cudaCloverField(const cudaGaugeField &gauge, const CloverFieldParam &param);
     virtual ~cudaCloverField();
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -79,19 +99,21 @@ namespace quda {
     const cudaTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
 #endif
 
+    void loadCPUField(const cpuCloverField &cpu);
+
     friend class DiracClover;
     friend class DiracCloverPC;
     friend struct FullClover;
   };
 
   // this is a place holder for a future host-side clover object
-  class cpuCloverField {
+  class cpuCloverField : public CloverField {
 
   private:
 
   public:
-    cpuCloverField();
-    virtual ~cpuCloverField() = 0;
+    cpuCloverField(const CloverFieldParam &param);
+    virtual ~cpuCloverField();
   };
 
   // lightweight struct used to send pointers to cuda driver code
@@ -140,6 +162,10 @@ namespace quda {
 
   // driver for computing the clover field from the gauge field
   void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge);
+
+  // driver for generic clover field copying
+  void copyGenericClover(CloverField &out, const CloverField &in, QudaFieldLocation location,
+			 void *Out, void *In, void *outNorm, void *inNorm);
 
 } // namespace quda
 
