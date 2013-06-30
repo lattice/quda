@@ -15,10 +15,10 @@ namespace quda {
       const int stride;
 
       // FIXME add inverse flag
-      FloatNOrder(const CloverField &clover, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V());
+      FloatNOrder(const CloverField &clover, bool inverse, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()) {
+	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
-	this->norm[0] = norm_ ? norm_ : (float*)(clover.Norm());
+	this->norm[0] = norm_ ? norm_ : (float*)(clover.Norm(inverse));
 	this->norm[1] = (float*)((char*)this->norm[0] + clover.NormBytes()/2);
       }
       
@@ -81,8 +81,8 @@ namespace quda {
       const int volumeCB;
       const int stride;
 
-    QDPOrder(const CloverField &clover, Float *clover_=0) : volumeCB(clover.VolumeCB()), stride(volumeCB) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V());
+    QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) : volumeCB(clover.VolumeCB()), stride(volumeCB) {
+	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
       }
 
@@ -110,8 +110,8 @@ namespace quda {
       const int volumeCB;
       const int stride;
 
-    BQCDOrder(const CloverField &clover, Float *clover_=0) : volumeCB(clover.Stride()), stride(volumeCB) {
-	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V());
+    BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) : volumeCB(clover.Stride()), stride(volumeCB) {
+	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
       }
 

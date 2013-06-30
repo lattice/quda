@@ -164,7 +164,7 @@ namespace quda {
   void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge);
 
   // driver for generic clover field copying
-  void copyGenericClover(CloverField &out, const CloverField &in, QudaFieldLocation location,
+  void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			 void *Out, void *In, void *outNorm, void *inNorm);
 
 } // namespace quda

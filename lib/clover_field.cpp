@@ -344,14 +344,14 @@ namespace quda {
     void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned + bytes : 0;
 
     if (cpu.V(false)) {
-      copyGenericClover(*this, cpu, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
+      copyGenericClover(*this, cpu, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
       cudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
       if (precision == QUDA_HALF_PRECISION) 
 	cudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
     }
 
-    if (cpu.V(true)) {   // wrong answer until I fix inverse setting
-      copyGenericClover(*this, cpu, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
+    if (cpu.V(true)) {
+      copyGenericClover(*this, cpu, true, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
       cudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
       if (precision == QUDA_HALF_PRECISION) 
 	cudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
