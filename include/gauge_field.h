@@ -228,7 +228,7 @@ namespace quda {
 
   /**
      This function is used for  extracting the gauge ghost zone from a
-     gauge field array.  Defined in extract_gauge_ghost.cu.
+     gauge field array.  Defined in copy_gauge.cu.
      @param out The output field to which we are copying
      @param in The input field from which we are copying
      @param location The location of where we are doing the copying (CPU or CUDA)
@@ -251,7 +251,7 @@ namespace quda {
 
   /**
      This function is used to calculate the maximum absolute value of
-     a gauge field array.  Defined in pack_gauge.h.  
+     a gauge field array.  Defined in max_gauge.cu.  
 
      @param u The gauge field from which we want to compute the max
   */
