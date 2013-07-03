@@ -99,6 +99,16 @@ namespace quda {
     const cudaTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
 #endif
 
+    /**
+       Copy into this CloverField from the generic CloverField src
+       @param src The clover field from which we want to copy
+     */
+    void copy(const CloverField &src);
+
+    /**
+       Copy into this CloverField from the cpuCloverField cpu
+       @param cpu The cpu clover field from which we want to copy
+     */
     void loadCPUField(const cpuCloverField &cpu);
 
     friend class DiracClover;
@@ -164,8 +174,20 @@ namespace quda {
   void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge);
 
   // driver for generic clover field copying
+  /**
+     This function is used for  extracting the gauge ghost zone from a
+     gauge field array.  Defined in copy_gauge.cu
+     @param out The output field to which we are copying
+     @param in The input field from which we are copying
+     @param inverse Whether we are copying the inverse term or not
+     @param location The location of where we are doing the copying (CPU or CUDA)
+     @param Out The output buffer (optional)
+     @param In The input buffer (optional)
+     @param outNorm The output norm buffer (optional)
+     @param inNorm The input norm buffer (optional)
+  */
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-			 void *Out, void *In, void *outNorm, void *inNorm);
+			 void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
 
 } // namespace quda
 

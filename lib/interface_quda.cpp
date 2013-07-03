@@ -530,13 +530,15 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   cpuCloverField cpu(cpuParam);
     
   cloverPrecise = new cudaCloverField(clover_param);
+  cloverPrecise->loadCPUField(cpu);
   inv_param->cloverGiB = cloverPrecise->GBytes();
 
   // create the mirror sloppy clover field
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
     clover_param.setPrecision(inv_param->clover_cuda_prec_sloppy);
     cloverSloppy = new cudaCloverField(clover_param); 
-    cloverSloppy->loadCPUField(cpu);
+    cloverSloppy->copy(cpu);
+    //cloverSloppy->loadCPUField(cpu);
     inv_param->cloverGiB += cloverSloppy->GBytes();
   } else {
     cloverSloppy = cloverPrecise;
@@ -547,7 +549,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
       inv_param->clover_cuda_prec_precondition != QUDA_INVALID_PRECISION) {
     clover_param.setPrecision(inv_param->clover_cuda_prec_precondition);
     cloverPrecondition = new cudaCloverField(clover_param);
-    cloverPrecondition->loadCPUField(cpu);
+    cloverPrecondition->copy(cpu);
+    //cloverPrecondition->loadCPUField(cpu);
     inv_param->cloverGiB += cloverPrecondition->GBytes();
   } else {
     cloverPrecondition = cloverSloppy;
