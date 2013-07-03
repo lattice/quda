@@ -226,6 +226,7 @@ namespace quda {
   {
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
+    // FIXME use the generic copying for the below copying
     // do device-side reordering then copy
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
       // check parameters are suitable for device-side packing
