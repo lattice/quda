@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <typeinfo>
 
 #include <quda_internal.h>
 #include <clover_field.h>
