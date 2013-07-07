@@ -323,21 +323,23 @@ int main(int argc, char **argv)
 
   // create a point source at 0 (in each subvolume...  FIXME)
   
-  memset(spinorIn, 0, Ls*V*spinorSiteSize*sSize);
-  memset(spinorCheck, 0, Ls*V*spinorSiteSize*sSize);
+  memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+  memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
   if (multi_shift) {
-    for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, Ls*V*spinorSiteSize*sSize);    
+    for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);    
   } else {
-    memset(spinorOut, 0, Ls*V*spinorSiteSize*sSize);
+    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
   }
 
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
   {
     ((float*)spinorIn)[0] = 1.0;
+    //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
   }
   else
   {
     ((double*)spinorIn)[0] = 1.0;
+    //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
   }
 
   // start the timer
@@ -394,10 +396,10 @@ int main(int argc, char **argv)
         exit(-1);
       }
 
-      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-      mxpy(spinorIn, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-      double nrm2 = norm_2(spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
-      double src2 = norm_2(spinorIn, V*spinorSiteSize, inv_param.cpu_prec);
+      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
+      mxpy(spinorIn, spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
+      double nrm2 = norm_2(spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
+      double src2 = norm_2(spinorIn, Vh*spinorSiteSize, inv_param.cpu_prec);
       double l2r = sqrt(nrm2 / src2);
 
       printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
@@ -459,18 +461,19 @@ int main(int argc, char **argv)
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
         if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-          ax(0.25/(kappa5*kappa5), spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
+          ax(0.25/(kappa5*kappa5), spinorCheck, Vh*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
         } else {
-          ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+          ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
       
 	}
       }
 
     }
 
-    mxpy(spinorIn, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-    double nrm2 = norm_2(spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-    double src2 = norm_2(spinorIn, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
+    int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
+    mxpy(spinorIn, spinorCheck, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
+    double nrm2 = norm_2(spinorCheck, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
+    double src2 = norm_2(spinorIn, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
     double l2r = sqrt(nrm2 / src2);
 
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
