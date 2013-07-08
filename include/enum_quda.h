@@ -160,9 +160,9 @@ extern "C" {
   } QudaDiracFieldOrder;  
 
   typedef enum QudaCloverFieldOrder_s {
-    QUDA_FLOAT_CLOVER_ORDER,   // even-odd float ordering 
-    QUDA_FLOAT2_CLOVER_ORDER,   // even-odd float2 ordering
-    QUDA_FLOAT4_CLOVER_ORDER,   // even-odd float4 ordering
+    QUDA_FLOAT_CLOVER_ORDER=1,   // even-odd float ordering 
+    QUDA_FLOAT2_CLOVER_ORDER=2,   // even-odd float2 ordering
+    QUDA_FLOAT4_CLOVER_ORDER=4,   // even-odd float4 ordering
     QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
     QUDA_LEX_PACKED_CLOVER_ORDER, // lexicographical order, packed FIXME delete
     QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
