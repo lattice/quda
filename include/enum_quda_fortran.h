@@ -28,7 +28,6 @@
 #define QUDA_INVALID_LINKS        QUDA_INVALID_ENUM
 
 #define QudaGaugeFieldOrder integer(4)
-
 #define QUDA_FLOAT_GAUGE_ORDER 1
 #define QUDA_FLOAT2_GAUGE_ORDER 2 //no reconstruct and double precision
 #define QUDA_FLOAT4_GAUGE_ORDER 4 //8 and 12 reconstruct half and single
@@ -147,10 +146,12 @@
 #define QUDA_INVALID_DIRAC_ORDER QUDA_INVALID_ENUM
 
 #define QudaCloverFieldOrder integer(4)
-#define QUDA_INTERNAL_CLOVER_ORDER 0  // internal clover order use by QUDA.
-#define QUDA_PACKED_CLOVER_ORDER 1    // even-odd packed
-#define QUDA_LEX_PACKED_CLOVER_ORDER 2 // lexicographical order packed
-#define QUDA_BQCD_CLOVER_ORDER 3 // BQCD order which is a packed super-diagonal form
+#define QUDA_FLOAT_CLOVER_ORDER 1   // even-odd float ordering 
+#define QUDA_FLOAT2_CLOVER_ORDER 2   // even-odd float2 ordering
+#define QUDA_FLOAT4_CLOVER_ORDER 4   // even-odd float4 ordering
+#define QUDA_PACKED_CLOVER_ORDER 5    // even-odd packed
+#define QUDA_LEX_PACKED_CLOVER_ORDER 6 // lexicographical order packed
+#define QUDA_BQCD_CLOVER_ORDER 7 // BQCD order which is a packed super-diagonal form
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
 #define QudaVerbosity integer(4)
@@ -245,6 +246,13 @@
 #define QUDA_TWIST_DEG_DOUBLET -2
 #define QUDA_TWIST_NO  0
 #define QUDA_TWIST_INVALID QUDA_INVALID_ENUM
+
+#define QudaTwistDslashType integer(4)
+#define QUDA_DEG_TWIST_INV_DSLASH 0
+#define QUDA_DEG_DSLASH_TWIST_INV 1
+#define QUDA_DEG_DSLASH_TWIST_XPAY 2
+#define QUDA_NONDEG_DSLASH 3
+#define QUDA_DSLASH_INVALID QUDA_INVALID_ENUM
 
 #define QudaTwistGamma5Type integer(4)
 #define QUDA_TWIST_GAMMA5_DIRECT 0
