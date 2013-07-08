@@ -50,7 +50,7 @@ namespace quda {
 
     if (param.inverse) {
       cloverInv = device_malloc(bytes);
-      if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(bytes);
+      if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(norm_bytes);
 
       evenInv = cloverInv;
       oddInv = (char*)cloverInv + bytes/2;
@@ -463,7 +463,7 @@ namespace quda {
     if (create != QUDA_REFERENCE_FIELD_CREATE) errorQuda("Create type %d not supported", create);
 
     if (create == QUDA_REFERENCE_FIELD_CREATE) {
-      clover = param.norm;
+      clover = param.clover;
       norm = param.norm;
       cloverInv = param.cloverInv;
       invNorm = param.invNorm;

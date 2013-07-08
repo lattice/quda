@@ -506,22 +506,15 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     warningQuda("Uninverted clover term not loaded");
   }
 
-  CloverFieldParam clover_param;
-  clover_param.nDim = 4;
-  for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
-  clover_param.precision = inv_param->clover_cuda_prec;
-  clover_param.pad = inv_param->cl_pad;
-
-  profileClover.Start(QUDA_PROFILE_H2D);
-
   // create a param for the cpu clover field
+  profileClover.Start(QUDA_PROFILE_INIT);
   CloverFieldParam cpuParam;
   cpuParam.nDim = 4;
   for (int i=0; i<4; i++) cpuParam.x[i] = gaugePrecise->X()[i];
-  cpuParam.precision = inv_param->clover_cuda_prec;
-  cpuParam.pad = inv_param->cl_pad;
   cpuParam.precision = inv_param->clover_cpu_prec;
   cpuParam.order = inv_param->clover_order;
+  cpuParam.direct = h_clover ? true : false;
+  cpuParam.inverse = h_clovinv ? true : false;
   cpuParam.clover = h_clover;
   cpuParam.norm = 0;
   cpuParam.cloverInv = h_clovinv;
@@ -529,16 +522,33 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
   cpuCloverField cpu(cpuParam);
     
+  CloverFieldParam clover_param;
+  clover_param.nDim = 4;
+  for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
+  clover_param.setPrecision(inv_param->clover_cuda_prec);
+  clover_param.pad = inv_param->cl_pad;
+  clover_param.direct = h_clover ? true : false;
+  clover_param.inverse = h_clovinv ? true : false;
+  clover_param.create = QUDA_NULL_FIELD_CREATE;
   cloverPrecise = new cudaCloverField(clover_param);
+  profileClover.Stop(QUDA_PROFILE_INIT);
+
+  profileClover.Start(QUDA_PROFILE_H2D);
   cloverPrecise->loadCPUField(cpu);
+  profileClover.Stop(QUDA_PROFILE_H2D);
+
   inv_param->cloverGiB = cloverPrecise->GBytes();
 
   // create the mirror sloppy clover field
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
+    profileClover.Start(QUDA_PROFILE_INIT);
     clover_param.setPrecision(inv_param->clover_cuda_prec_sloppy);
     cloverSloppy = new cudaCloverField(clover_param); 
-    cloverSloppy->copy(cpu);
-    //cloverSloppy->loadCPUField(cpu);
+    cloverSloppy->copy(*cloverPrecise);
+    profileClover.Stop(QUDA_PROFILE_INIT);
+    /*profileClover.Start(QUDA_PROFILE_H2D);
+    cloverSloppy->loadCPUField(cpu);
+    profileClover.Stop(QUDA_PROFILE_H2D);*/
     inv_param->cloverGiB += cloverSloppy->GBytes();
   } else {
     cloverSloppy = cloverPrecise;
@@ -547,15 +557,19 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   // create the mirror preconditioner clover field
   if (inv_param->clover_cuda_prec_sloppy != inv_param->clover_cuda_prec_precondition &&
       inv_param->clover_cuda_prec_precondition != QUDA_INVALID_PRECISION) {
+    profileClover.Start(QUDA_PROFILE_INIT);
     clover_param.setPrecision(inv_param->clover_cuda_prec_precondition);
     cloverPrecondition = new cudaCloverField(clover_param);
-    cloverPrecondition->copy(cpu);
-    //cloverPrecondition->loadCPUField(cpu);
+    cloverPrecondition->copy(*cloverSloppy);
+    profileClover.Stop(QUDA_PROFILE_INIT);
+    /*profileClover.Start(QUDA_PROFILE_H2D);
+    cloverPrecondition->loadCPUField(cpu);
+    profileClover.Stop(QUDA_PROFILE_H2D);*/
     inv_param->cloverGiB += cloverPrecondition->GBytes();
   } else {
     cloverPrecondition = cloverSloppy;
   }
-  profileClover.Stop(QUDA_PROFILE_H2D);
+
 
   popVerbosity();
 
