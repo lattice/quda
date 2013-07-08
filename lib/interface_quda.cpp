@@ -1244,7 +1244,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
   double nb = norm2(*b);
-  if (nb==0.0) errorQuda("Solution has zero norm", nb);
+  if (nb==0.0) errorQuda("Solution has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
@@ -1505,7 +1505,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // Check source norms
   double nb = norm2(*b);
-  if (nb==0.0) errorQuda("Solution has zero norm", nb);
+  if (nb==0.0) errorQuda("Solution has zero norm");
 
   if(getVerbosity() >= QUDA_VERBOSE ) {
     double nh_b = norm2(*h_b);
