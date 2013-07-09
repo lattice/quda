@@ -44,10 +44,10 @@ namespace quda {
     CloverField(const CloverFieldParam &param);
     virtual ~CloverField();
 
-    void* V(bool inverse=false) { return inverse ? clover : cloverInv; }
-    void* Norm(bool inverse=false) { return inverse ? norm : invNorm; }
-    const void* V(bool inverse=false) const { return inverse ? clover : cloverInv; }
-    const void* Norm(bool inverse=false) const { return inverse ? norm : invNorm; }
+    void* V(bool inverse=false) { return inverse ? cloverInv : clover; }
+    void* Norm(bool inverse=false) { return inverse ? invNorm : norm; }
+    const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
+    const void* Norm(bool inverse=false) const { return inverse ? invNorm : norm; }
     
     CloverFieldOrder Order() const { return order; }
     size_t Bytes() const { return bytes; }
