@@ -279,11 +279,21 @@ namespace quda {
 	} 
       
 	matSloppy(*Ap[k], *p[k], tmp);
+	if (invParam.verbosity>= QUDA_DEBUG_VERBOSE)
+	  printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, rPre2=%e\n", total_iter, norm2(*Ap[k]), norm2(*p[k]), norm2(rPre));
       }
 
       orthoDir(beta, Ap, k);
 
       double3 Apr = cDotProductNormACuda(*Ap[k], rSloppy);
+
+      if (invParam.verbosity>= QUDA_DEBUG_VERBOSE) {
+	printfQuda("GCR debug iter=%d: Apr=(%e,%e,%e)\n", total_iter, Apr.x, Apr.y, Apr.z);
+	for (int i=0; i<k; i++)
+	  for (int j=0; j<=k; j++)
+	    printfQuda("GCR debug iter=%d: beta[%d][%d] = (%e,%e)\n", 
+		       total_iter, i, j, real(beta[i][j]), imag(beta[i][j]));
+      }
 
       gamma[k] = sqrt(Apr.z); // gamma[k] = Ap[k]
       if (gamma[k] == 0.0) errorQuda("GCR breakdown\n");
