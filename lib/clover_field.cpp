@@ -385,7 +385,7 @@ namespace quda {
 
     if (cpu.V(true)) {
       copyGenericClover(*this, cpu, true, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
-      cudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(cloverInv, packClover, bytes, cudaMemcpyHostToDevice);
       if (precision == QUDA_HALF_PRECISION) 
 	cudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
     }
