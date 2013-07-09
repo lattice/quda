@@ -63,9 +63,6 @@ namespace quda {
     void *evenInv, *oddInv;
     void *evenInvNorm, *oddInvNorm;
 
-    void loadParityField(void *d_clover, void *d_norm, const void *h_clover, 
-			 const QudaPrecision cpu_prec, const CloverFieldOrder cpu_order);
-
     // computes the clover field given the input gauge field
     void compute(const cudaGaugeField &gauge);
 
