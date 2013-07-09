@@ -81,7 +81,8 @@ namespace quda {
       const int volumeCB;
       const int stride;
 
-    QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) : volumeCB(clover.VolumeCB()), stride(volumeCB) {
+      QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
+      : volumeCB(clover.VolumeCB()), stride(volumeCB) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
       }
@@ -138,7 +139,8 @@ namespace quda {
 	
 	const int M=length/2;
 	for (int chirality=0; chirality<2; chirality++) 
-	  for (int i=0; i<M; i++) v[chirality*M+i] = sign[i] * clover[parity][chirality*M+bq[i]];
+	  for (int i=0; i<M; i++) 
+	    v[chirality*M+i] = sign[i] * clover[parity][x*length+chirality*M+bq[i]];
 	
       }
   
