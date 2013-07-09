@@ -155,7 +155,7 @@ namespace quda {
     // reconstruction only supported on FloatN fields currently
     if (in.Order() == QUDA_FLOAT_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length> 
-	(FloatNOrder<FloatIn,length,1,>(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
+	(FloatNOrder<FloatIn,length,1>(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length> 
 	(FloatNOrder<FloatIn,length,2>(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
