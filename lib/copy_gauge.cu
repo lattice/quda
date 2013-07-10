@@ -355,7 +355,7 @@ namespace quda {
       if (location != QUDA_CPU_FIELD_LOCATION) errorQuda("Location %d not supported", location);
 
       // we are doing momentum field packing
-      if (in.Reconstruct() != QUDA_RECONSTRUCT_10 && out.Reconstruct() != QUDA_RECONSTRUCT_10) {
+      if (in.Reconstruct() != QUDA_RECONSTRUCT_10 || out.Reconstruct() != QUDA_RECONSTRUCT_10) {
 	errorQuda("Unsupported reconstruction types out=%d in=%d for momentum field", 
 		  out.Reconstruct(), in.Reconstruct());
       }
