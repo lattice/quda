@@ -10,6 +10,8 @@ namespace quda {
   cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
     GaugeField(param), gauge(0), even(0), odd(0), backed_up(false)
   {
+    if (order == QUDA_QDP_GAUGE_ORDER) errorQuda("QDP ordering not supported");
+    
     if(create != QUDA_NULL_FIELD_CREATE &&  
        create != QUDA_ZERO_FIELD_CREATE && 
        create != QUDA_REFERENCE_FIELD_CREATE){
@@ -131,16 +133,24 @@ namespace quda {
 
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
     checkField(src);
+
+    if (link_type == QUDA_ASQTAD_FAT_LINKS) {
+      fat_link_max = src.LinkMax();
+      if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0) 
+	errorQuda("fat_link_max has not been computed");
+    }
     
     if (typeid(src) == typeid(cudaGaugeField)) {
       // copy field and ghost zone into this field
-      copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, static_cast<const cudaGaugeField&>(src).gauge);
+      copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
+		       static_cast<const cudaGaugeField&>(src).gauge);
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       LatticeField::resizeBuffer(bytes);
 
       // copy field and ghost zone into bufferPinned
-      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, static_cast<const cpuGaugeField&>(src).gauge); 
+      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
+		       static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -156,13 +166,11 @@ namespace quda {
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
     checkField(cpu);
+    fat_link_max = cpu.LinkMax();
 
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
       errorQuda("Not implemented"); // awaiting Guochun's new gauge packing
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) {
-
-      if (precision == QUDA_HALF_PRECISION && link_type == QUDA_ASQTAD_FAT_LINKS) 
-	fat_link_max = maxGauge(cpu);
 
       LatticeField::resizeBuffer(bytes);
 
@@ -172,6 +180,7 @@ namespace quda {
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
       checkCudaError();
+
     } else {
       errorQuda("Invalid pack location %d", pack_location);
     }

@@ -68,6 +68,9 @@ namespace quda {
     // exchange the boundaries
     // no need to exchange data if this is a momentum field
     if(link_type != QUDA_ASQTAD_MOM_LINKS) exchangeGhost();
+
+    // compute the fat link max now in case it is needed later (i.e., for half precision)
+    if (link_type == QUDA_ASQTAD_FAT_LINKS) fat_link_max = maxGauge(*this);
   }
 
 

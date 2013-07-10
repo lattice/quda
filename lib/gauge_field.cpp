@@ -6,7 +6,7 @@ namespace quda {
     LatticeField(param), bytes(0), nColor(param.nColor), nFace(param.nFace),
     geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 
     fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
-    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(1.0), 
+    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), 
     create(param.create), ghostExchange(false)
   {
     if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
