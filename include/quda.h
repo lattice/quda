@@ -48,6 +48,8 @@ extern "C" {
    */
   typedef struct QudaGaugeParam_s {
 
+    QudaFieldLocation location; /**< The location of the gauge field */
+
     int X[4];             /**< The local space-time dimensions (without checkboarding) */
 
     double anisotropy;    /**< Used for Wilson and Wilson-clover */
@@ -148,6 +150,7 @@ extern "C" {
 
     QudaGammaBasis gamma_basis;            /**< Gamma basis of the input and output host fields */
 
+    QudaFieldLocation clover_location;            /**< The location of the clover field */
     QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
     QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
     QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */

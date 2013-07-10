@@ -337,11 +337,12 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   checkGaugeParam(param);
 
-  // Set the specific cpu parameters and create the cpu gauge field
+  // Set the specific input parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
-
-  cpuGaugeField cpu(gauge_param);
-
+  GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) : 
+    static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
+    
   profileGauge.Start(QUDA_PROFILE_INIT);  
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
@@ -355,7 +356,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge.Stop(QUDA_PROFILE_INIT);  
 
   profileGauge.Start(QUDA_PROFILE_H2D);  
-  precise->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+  precise->copy(*in);
 
   param->gaugeGiB += precise->GBytes();
 
@@ -419,12 +420,17 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
+  delete in;
+
   profileGauge.Stop(QUDA_PROFILE_TOTAL);
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   profileGauge.Start(QUDA_PROFILE_TOTAL);
+
+  if (param->location != QUDA_CPU_FIELD_LOCATION) 
+    errorQuda("Non-cpu output location not yet supported");
 
   if (!initialized) errorQuda("QUDA not initialized");
   checkGaugeParam(param);
@@ -520,8 +526,11 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   cpuParam.cloverInv = h_clovinv;
   cpuParam.invNorm = 0;
   cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  cpuCloverField cpu(cpuParam);
-    
+
+  CloverField *in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<CloverField*>(new cpuCloverField(cpuParam)) : 
+    static_cast<CloverField*>(new cudaCloverField(cpuParam));
+
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
@@ -534,7 +543,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   profileClover.Stop(QUDA_PROFILE_INIT);
 
   profileClover.Start(QUDA_PROFILE_H2D);
-  cloverPrecise->loadCPUField(cpu);
+  cloverPrecise->copy(*in);
   profileClover.Stop(QUDA_PROFILE_H2D);
 
   inv_param->cloverGiB = cloverPrecise->GBytes();
@@ -570,6 +579,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     cloverPrecondition = cloverSloppy;
   }
 
+  delete in; // delete object referencing input field
 
   popVerbosity();
 
