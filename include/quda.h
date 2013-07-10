@@ -28,7 +28,7 @@
  * @brief Maximum number of dimensions supported by QUDA.  In practice, no
  *        routines make use of more than 5.
  */
-#define QUDA_MAX_DIM 6
+#define QUDA_MAX_DIM 5
 
 /**
  * @def QUDA_MAX_MULTI_SHIFT
@@ -109,6 +109,7 @@ extern "C" {
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
     double tol;   /**< Solver tolerance in the L2 residual norm */
+    double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */
     double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
     int maxiter;
@@ -203,7 +204,14 @@ extern "C" {
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
-    /** Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence */
+    /**
+     * Whether to use the L2 relative residual, Fermilab heavy-quark
+     * residual, or both to determine convergence.  To require that both
+     * stopping conditions are satisfied, use a bitwise OR as follows:
+     *
+     * p.residual_type = (QudaResidualType) (QUDA_L2_RELATIVE_RESIDUAL
+     *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
+     */
     QudaResidualType residual_type;
 
   } QudaInvertParam;
@@ -282,7 +290,28 @@ extern "C" {
   void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
 
   /**
-   * Initialize the library.
+   * Initialize the library.  This is a low-level interface that is
+   * called by initQuda.  Calling initQudaDevice requires that the
+   * user also call initQudaMemory before using QUDA.
+   *
+   * @param device CUDA device number to use.  In a multi-GPU build,
+   *               this parameter may either be set explicitly on a
+   *               per-process basis or set to -1 to enable a default
+   *               allocation of devices to processes.  
+   */
+  void initQudaDevice(int device);
+
+  /**
+   * Initialize the library persistant memory allocations (both host
+   * and device).  This is a low-level interface that is called by
+   * initQuda.  Calling initQudaMemory requires that the user has
+   * previously called initQudaDevice.
+   */
+  void initQudaMemory();
+
+  /**
+   * Initialize the library.  This function is actually a wrapper
+   * around calls to initQudaDevice() and initQudaMemory().
    *
    * @param device  CUDA device number to use.  In a multi-GPU build,
    *                this parameter may either be set explicitly on a

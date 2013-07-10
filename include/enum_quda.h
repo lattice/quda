@@ -105,13 +105,13 @@ extern "C" {
   typedef enum QudaSchwarzType_s {
     QUDA_ADDITIVE_SCHWARZ,
     QUDA_MULTIPLICATIVE_SCHWARZ,
-    QUDA_INVALID_SCHWARZ
+    QUDA_INVALID_SCHWARZ = QUDA_INVALID_ENUM
   } QudaSchwarzType;
 
   typedef enum QudaResidualType_s {
-    QUDA_L2_RELATIVE_RESIDUAL, // the default
-    QUDA_HEAVY_QUARK_RESIDUAL, // Fermilab heavy quark residual
-    QUDA_INVALID_RESIDUAL
+    QUDA_L2_RELATIVE_RESIDUAL = 1, // the default
+    QUDA_HEAVY_QUARK_RESIDUAL = 2, // Fermilab heavy quark residual
+    QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
 
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
@@ -277,6 +277,14 @@ extern "C" {
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
   } QudaTwistFlavorType; 
 
+  typedef enum QudaTwistDslashType_s {
+    QUDA_DEG_TWIST_INV_DSLASH,
+    QUDA_DEG_DSLASH_TWIST_INV,
+    QUDA_DEG_DSLASH_TWIST_XPAY,
+    QUDA_NONDEG_DSLASH,
+    QUDA_DSLASH_INVALID = QUDA_INVALID_ENUM
+  } QudaTwistDslashType;
+
   typedef enum QudaTwistGamma5Type_s {
     QUDA_TWIST_GAMMA5_DIRECT,
     QUDA_TWIST_GAMMA5_INVERSE,
@@ -310,7 +318,7 @@ extern "C" {
     QUDA_SCALAR_GEOMETRY,
     QUDA_VECTOR_GEOMETRY,
     QUDA_TENSOR_GEOMETRY,
-    QUDA_INVALID_GEOMETRY
+    QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
 
 #ifdef __cplusplus

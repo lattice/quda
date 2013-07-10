@@ -12,26 +12,28 @@ namespace quda {
   Dirac::Dirac(const DiracParam &param) 
     : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
-      verbose(param.verbose)
+      verbose(param.verbose), profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
-    initLatticeConstants(gauge);
-    initGaugeConstants(gauge);
-    initDslashConstants();
+    initLatticeConstants(gauge, profile);
+    initGaugeConstants(gauge, profile);
+    initDslashConstants(profile);
   }
 
   Dirac::Dirac(const Dirac &dirac) 
     : gauge(dirac.gauge), kappa(dirac.kappa), matpcType(dirac.matpcType), 
       dagger(dirac.dagger), flops(0), tmp1(dirac.tmp1), tmp2(dirac.tmp2), tune(QUDA_TUNE_NO),
-      verbose(dirac.verbose)
+      verbose(dirac.verbose), profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
-    initLatticeConstants(gauge);
-    initGaugeConstants(gauge);
-    initDslashConstants();
+    initLatticeConstants(gauge, profile);
+    initGaugeConstants(gauge, profile);
+    initDslashConstants(profile);
   }
 
-  Dirac::~Dirac() { }
+  Dirac::~Dirac() {   
+    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
+  }
 
   Dirac& Dirac::operator=(const Dirac &dirac)
   {
@@ -48,6 +50,8 @@ namespace quda {
       tune = dirac.tune;
 
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
+
+      profile = dirac.profile;
     }
     return *this;
   }

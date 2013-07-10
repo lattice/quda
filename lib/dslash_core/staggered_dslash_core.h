@@ -408,10 +408,15 @@ if(kernel_type == INTERIOR_KERNEL){
   X = 2*sid + x1odd;
  }
 
+#if (DD_PREC == 0) // double precision
+o00_re = o00_im = 0.0;
+o01_re = o01_im = 0.0;
+o02_re = o02_im = 0.0;
+#else 
 o00_re = o00_im = 0.f;
 o01_re = o01_im = 0.f;
 o02_re = o02_im = 0.f;
-
+#endif
 
 {
     //direction: +X

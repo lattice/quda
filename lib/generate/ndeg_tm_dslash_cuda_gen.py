@@ -133,6 +133,13 @@ def a_im(b, s, c): return "a"+`(s+2*b)`+`c`+"_im"
 def tmp_re(s, c): return "tmp"+`s`+`c`+"_re"
 def tmp_im(s, c): return "tmp"+`s`+`c`+"_im"
 
+def acc_re(s, c): return "acc_"+`s`+`c`+"_re"
+def acc_im(s, c): return "acc_"+`s`+`c`+"_im"
+def acc1_re(s, c): return "acc1_"+`s`+`c`+"_re"
+def acc1_im(s, c): return "acc1_"+`s`+`c`+"_im"
+def acc2_re(s, c): return "acc2_"+`s`+`c`+"_re"
+def acc2_im(s, c): return "acc2_"+`s`+`c`+"_im"
+
 
 def def_input_spinor():
     str = ""
@@ -368,7 +375,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   //sp_idx = face_idx + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
+  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)] + face_num*ghostFace[static_cast<int>(kernel_type)];
 #endif
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
@@ -545,7 +552,7 @@ def gen(dir, pack_only=False):
           load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);\n\n"
     else: 
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
+          load_half_flv1 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);\n\n"
     
     load_half_flv2 = "// read half spinor for the second flavor from device memory\n"
     load_half_flv2 += "const int fl_idx = sp_idx + ghostFace[static_cast<int>(kernel_type)];\n"
@@ -555,7 +562,7 @@ def gen(dir, pack_only=False):
           load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
     else: 
 #flavor offset: extra ghostFace[static_cast<int>(kernel_type)]
-          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+FLAVORS*ghostFace[static_cast<int>(kernel_type)]);\n\n"
+          load_half_flv2 += "READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, fl_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx+ghostFace[static_cast<int>(kernel_type)]);\n\n"
 
 
     project = "// project spinor into half spinors\n"
@@ -634,8 +641,10 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         for c in range(0, 3):
             #copy_half += h1_re(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_re(h,c)+";  "
             #copy_half += h1_im(h,c)+" = "+("t_proj_scale*" if (dir >= 6) else "")+in_im(h,c)+";\n"
-            copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
-            copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
+            #copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
+            #copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
+            copy_half += h1_re(h,c)+" = "+("2*" if (dir >= 6) else "")+in_re(h,c)+";  "
+            copy_half += h1_im(h,c)+" = "+("2*" if (dir >= 6) else "")+in_im(h,c)+";\n"
 
     copy_half += "\n"
 
@@ -758,67 +767,11 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
         return cond + block(str)+"\n\n"
 # end def gen
 
-#fixme!
-def twisted_rotate(x):
-
-    for h in range(0, 4):
-        for c in range(0, 3):
-            strRe = ""
-            strIm = ""
-            for s in range(0, 4):
-                # identity
-                re = id[4*h+s].real
-                im = id[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re)+out1_re(s,c)
-                    strIm += sign(re)+out1_im(s,c)
-                elif re==0:
-                    strRe += sign(-im)+out1_im(s,c)
-                    strIm += sign(im)+out1_re(s,c)
-                
-                # sign(x)*i*mu*gamma_5
-                re = igamma5[4*h+s].real
-                im = igamma5[4*h+s].imag
-                if re==0 and im==0: ()
-                elif im==0:
-                    strRe += sign(re*x)+out1_re(s,c) + "*a"
-                    strIm += sign(re*x)+out1_im(s,c) + "*a"
-                elif re==0:
-                    strRe += sign(-im*x)+out1_im(s,c) + "*a"
-                    strIm += sign(im*x)+out1_re(s,c) + "*a"
-
-            str = "VOLATILE spinorFloat "+tmp_re(h,c)+" = " + strRe + ";\n"
-            str += "VOLATILE spinorFloat "+tmp_im(h,c)+" = " + strIm + ";\n"
-        str += "\n"
-    
-    return str+"\n"
-
 
 def twisted():
+
     str = ""
-    str += twisted_rotate(+1)
-
-    str += "#ifndef DSLASH_XPAY\n"
-    str += "//scale by b = 1/(1 + a*a) \n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out1_re(s,c) + " = b*" + tmp_re(s,c) + ";\n"
-            str += out1_im(s,c) + " = b*" + tmp_im(s,c) + ";\n"
-    str += "#else\n"
-    for s in range(0,4):
-        for c in range(0,3):
-            str += out1_re(s,c) + " = " + tmp_re(s,c) + ";\n"
-            str += out1_im(s,c) + " = " + tmp_im(s,c) + ";\n"
-    str += "#endif // DSLASH_XPAY\n"
-    str += "\n"
-
-    return block(str)+"\n"
-# end def twisted
-
-
-def twisted2():
-    str = ""
+    #str += "#ifdef DSLASH_TWIST\n"
     str += "//Perform twist rotation first:\n"
     if dagger :
        str += "//(1 + i*a*gamma_5 * tau_3 + b * tau_1)\n"
@@ -869,11 +822,10 @@ def twisted2():
 	    str += "\n"
             str += out2_re(h,c) + " = x2_re;  " + out2_im(h,c) + " = x2_im;\n"
             str += out2_re(h+2,c) + " = y2_re;  " + out2_im(h+2,c) + " = y2_im;\n\n"
+    #str += "#endif\n"
 
-    str += "\n"
-
-    return block(str)+"\n"
-# end def twisted2
+    return "#ifdef DSLASH_TWIST\n" + block(str) + "\n#endif\n"
+# end def twisted
 
 
 def xpay():
@@ -893,49 +845,170 @@ def xpay():
             str += out2_re(s,c) +" *= c;\n"
             str += out2_im(s,c) +" *= c;\n"
 
-
+##start here
     str += "#else\n"
-    str += "int tmp = sid;\n"
-    str += "{\n"
-    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
+
+    str += "#ifdef DSLASH_TWIST\n"
+    str += "// accum spinor\n"
     str += "#ifdef SPINOR_DOUBLE\n"
-
+    str += "\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str += out1_re(s,c) +" = c*"+out1_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-            str += out1_im(s,c) +" = c*"+out1_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
+            str += "#define "+acc_re(s,c)+" accum"+nthFloat2(2*i+0)+"\n"
+            str += "#define "+acc_im(s,c)+" accum"+nthFloat2(2*i+1)+"\n"
+    str += "\n"
     str += "#else\n"
-
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str += out1_re(s,c) +" = c*"+out1_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-            str += out1_im(s,c) +" = c*"+out1_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
-
+            str += "#define "+acc_re(s,c)+" accum"+nthFloat4(2*i+0)+"\n"
+            str += "#define "+acc_im(s,c)+" accum"+nthFloat4(2*i+1)+"\n"
+    str += "\n"
     str += "#endif // SPINOR_DOUBLE\n\n"
-    str += "}\n"
     str += "{\n"
-    str += "sid += fl_stride;\n"
-    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
-    str += "#ifdef SPINOR_DOUBLE\n"
-
+    str += "  READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str += out2_re(s,c) +" = c*"+out2_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-            str += out2_im(s,c) +" = c*"+out2_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
+            str += "  " + out1_re(s,c) +" = c*"+out1_re(s,c)+ " + "+ acc_re(s,c)+";\n"
+            str += "  " + out1_im(s,c) +" = c*"+out1_im(s,c)+ " + "+ acc_im(s,c)+";\n"
+    str += "\n"
+    str += "  ASSN_ACCUM(ACCUMTEX, sp_stride, fl_stride)\n\n"
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "  " + out2_re(s,c) +" = c*"+out2_re(s,c)+ " + "+ acc_re(s,c)+";\n"
+            str += "  " + out2_im(s,c) +" = c*"+out2_im(s,c)+ " + "+ acc_im(s,c)+";\n"
+    str += "}\n"
+    str += "\n"
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "#undef "+acc_re(s,c)+"\n"
+            str += "#undef "+acc_im(s,c)+"\n"
+    str += "\n"
     str += "#else\n"
 
+    str += "// accum spinor\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+    str += "\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
-            str += out2_re(s,c) +" = c*"+out2_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-            str += out2_im(s,c) +" = c*"+out2_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
+            str += "#define "+acc1_re(s,c)+" flv1_accum"+nthFloat2(2*i+0)+"\n"
 
+            str += "#define "+acc1_im(s,c)+" flv1_accum"+nthFloat2(2*i+1)+"\n"
+    str += "\n"
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "#define "+acc2_re(s,c)+" flv2_accum"+nthFloat2(2*i+0)+"\n"
+            str += "#define "+acc2_im(s,c)+" flv2_accum"+nthFloat2(2*i+1)+"\n"
+    str += "\n"
+    str += "#else\n"
+    str += "\n"
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "#define "+acc1_re(s,c)+" flv1_accum"+nthFloat4(2*i+0)+"\n"
+            str += "#define "+acc1_im(s,c)+" flv1_accum"+nthFloat4(2*i+1)+"\n"
+    str += "\n"
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "#define "+acc2_re(s,c)+" flv2_accum"+nthFloat4(2*i+0)+"\n"
+            str += "#define "+acc2_im(s,c)+" flv2_accum"+nthFloat4(2*i+1)+"\n"
+    str += "\n"
     str += "#endif // SPINOR_DOUBLE\n\n"
+
+    str += "{\n"
+
+    str += "  READ_ACCUM_FLAVOR(ACCUMTEX, sp_stride, fl_stride)\n\n"
+
+
+    str += "  //Perform twist rotation:\n"
+    if dagger :
+       str += "//(1 + i*a*gamma_5 * tau_3 + b * tau_1)\n"
+    else:
+       str += "//(1 - i*a*gamma_5 * tau_3 + b * tau_1)\n"
+    str += "  volatile spinorFloat x1_re, x1_im, y1_re, y1_im;\n"
+    str += "  volatile spinorFloat x2_re, x2_im, y2_re, y2_im;\n\n"
+
+    str += "  x1_re = 0.0, x1_im = 0.0;\n"
+    str += "  y1_re = 0.0, y1_im = 0.0;\n"
+    str += "  x2_re = 0.0, x2_im = 0.0;\n"
+    str += "  y2_re = 0.0, y2_im = 0.0;\n\n\n"
+
+    a1 = ""
+    a2 = ""
+
+    if dagger :
+       a1 += " - a *"
+       a2 += " + a *"
+    else:     
+       a1 += " + a *"
+       a2 += " - a *"
+
+    for c in range(0,3):
+        for h in range(0,2):
+	    #h, h+2
+	    str += "  // using acc1 regs:\n"
+	    str += "  x1_re = " + acc1_re(h,c) + a1 + acc1_im(h+2,c) + ";\n"
+	    str += "  x1_im = " + acc1_im(h,c) + a2 + acc1_re(h+2,c) + ";\n"
+	    str += "  x2_re = " + "b * " + acc1_re(h,c) + ";\n"
+	    str += "  x2_im = " + "b * " + acc1_im(h,c) + ";\n\n"
+	    str += "  y1_re = " + acc1_re(h+2,c) + a1 + acc1_im(h,c) + ";\n"
+	    str += "  y1_im = " + acc1_im(h+2,c) + a2 + acc1_re(h,c) + ";\n"
+	    str += "  y2_re = " + "b * " + acc1_re(h+2,c) + ";\n"
+	    str += "  y2_im = " + "b * " + acc1_im(h+2,c) + ";\n\n\n"
+	    str += "  // using acc2 regs:\n"
+	    str += "  x2_re += " + acc2_re(h,c) + a2 + acc2_im(h+2,c) + ";\n"
+	    str += "  x2_im += " + acc2_im(h,c) + a1 + acc2_re(h+2,c) + ";\n"
+	    str += "  x1_re += " + "b * " + acc2_re(h,c) + ";\n"
+	    str += "  x1_im += " + "b * " + acc2_im(h,c) + ";\n\n"
+	    str += "  y2_re += " + acc2_re(h+2,c) + a2 + acc2_im(h,c) + ";\n"
+	    str += "  y2_im += " + acc2_im(h+2,c) + a1 + acc2_re(h,c) + ";\n"
+	    str += "  y1_re += " + "b * " + acc2_re(h+2,c) + ";\n"
+	    str += "  y1_im += " + "b * " + acc2_im(h+2,c) + ";\n"
+	    str += "\n\n"
+            str += acc1_re(h,c) + " = x1_re;  " + acc1_im(h,c) + " = x1_im;\n"
+            str += acc1_re(h+2,c) + " = y1_re;  " + acc1_im(h+2,c) + " = y1_im;\n"
+	    str += "\n"
+            str += acc2_re(h,c) + " = x2_re;  " + acc2_im(h,c) + " = x2_im;\n"
+            str += acc2_re(h+2,c) + " = y2_re;  " + acc2_im(h+2,c) + " = y2_im;\n\n"
+
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "  " + out1_re(s,c) +" = k*"+out1_re(s,c) + " + "+ acc1_re(s,c)+";\n"
+            str += "  " + out1_im(s,c) +" = k*"+out1_im(s,c) + " + "+ acc1_im(s,c)+ ";\n"
+
+    str += "\n"
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "  " + out2_re(s,c) +" = k*"+out2_re(s,c) + " + "+ acc2_re(s,c)+ ";\n"
+            str += "  " + out2_im(s,c) +" = k*"+out2_im(s,c) + " + "+ acc2_im(s,c)+ ";\n"
+
     str += "}\n"
-    str += "sid = tmp;\n"
+    str += "\n"
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "#undef "+acc1_re(s,c)+"\n"
+            str += "#undef "+acc1_im(s,c)+"\n"
+    str += "\n"
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str += "#undef "+acc2_re(s,c)+"\n"
+            str += "#undef "+acc2_im(s,c)+"\n"
+    str += "\n"
+    str += "#endif//DSLASH_TWIST\n"
+    str += "\n"
     str += "#endif // DSLASH_XPAY\n"
 
     return str
@@ -966,8 +1039,7 @@ case EXTERIOR_KERNEL_Y:
     str += "if (!incomplete)\n"
     str += "#endif // MULTI_GPU\n"
     str += "// apply twisted mass rotation\n"
-    
-    str += block( "\n" + twisted2() + xpay() )
+    str += block( "\n" + twisted() + xpay() )
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
@@ -1010,9 +1082,11 @@ case EXTERIOR_KERNEL_Y:
 # end def epilog
 
 
-
+#####temporal
 def generate_dslash():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + epilog()
+#    return prolog() + epilog()
+
 
 # generate Wilson-like Dslash kernels
 def generate_dslash_kernels(arch):
@@ -1047,16 +1121,14 @@ def generate_dslash_kernels(arch):
 
     twist = True
     dagger = False
-    #filename = './new_tm_dslash_' + name + '_core.h'
-    filename = './dslash_core/tm_ndeg_dslash_core.h'
+    filename = 'dslash_core/tm_ndeg_dslash_core.h'
     print sys.argv[0] + ": generating " + filename;
     f = open(filename, 'w')
     f.write(generate_dslash())
     f.close()
 
     dagger = True
-    #filename = './new_tm_dslash_dagger_' + name + '_core.h'
-    filename = './dslash_core/tm_ndeg_dslash_dagger_core.h'
+    filename = 'dslash_core/tm_ndeg_dslash_dagger_core.h'
     print sys.argv[0] + ": generating " + filename + "\n";
     f = open(filename, 'w')
     f.write(generate_dslash())

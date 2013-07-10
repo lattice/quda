@@ -8,6 +8,7 @@
 #include <dslash_quda.h>
 
 #include <face_quda.h>
+#include <blas_quda.h>
 
 #include <typeinfo>
 
@@ -96,6 +97,8 @@ namespace quda {
     QudaVerbosity verbose;  
 
     int commDim[QUDA_MAX_DIM]; // whether do comms or not
+
+    mutable TimeProfile profile;
 
   public:
     Dirac(const DiracParam &param);
@@ -291,6 +294,7 @@ namespace quda {
 		      const QudaTwistGamma5Type twistType) const;
 
     static int initTMFlag;
+    void initConstants(const cudaColorSpinorField &in) const;
 
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
@@ -446,18 +450,23 @@ namespace quda {
   class DiracMdagM : public DiracMatrix {
 
   public:
-  DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
-  DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
+    DiracMdagM(const Dirac &d) : DiracMatrix(d), shift(0.0) { }
+    DiracMdagM(const Dirac *d) : DiracMatrix(d), shift(0.0) { }
+
+    //! Shift term added onto operator (M^dag M + shift)
+    double shift;
 
     void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
     }
 
     void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, cudaColorSpinorField &tmp) const
     {
       dirac->tmp1 = &tmp;
       dirac->MdagM(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
       dirac->tmp1 = NULL;
     }
 
@@ -467,6 +476,7 @@ namespace quda {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
       dirac->MdagM(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }

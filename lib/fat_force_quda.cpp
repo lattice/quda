@@ -722,7 +722,6 @@ namespace quda {
        *       mu     
        */
     
-      int ghost_diag_len[16];
       for(int nu=0;nu < 4;nu++){
 	for(int mu=0; mu < 4;mu++){
 	  if(nu == mu){
@@ -743,7 +742,6 @@ namespace quda {
 	    //int rc = posix_memalign((void**)&ghost_cpuGauge_diag[nu*4+mu], ALIGNMENT, Z[dir1]*Z[dir2]*gaugeSiteSize*prec);
 
 	    size_t nbytes = Z[dir1]*Z[dir2]*gaugeSiteSize*prec;
-	    ghost_diag_len[nu*4+mu] = nbytes;
 #ifdef GPU_DIRECT 
 	    ghost_cpuGauge_diag[nu*4+mu] = pinned_malloc(nbytes);
 #else

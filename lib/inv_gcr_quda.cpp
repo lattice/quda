@@ -151,16 +151,16 @@ namespace quda {
   }
 
   GCR::~GCR() {
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Start(QUDA_PROFILE_FREE);
 
     if (K) delete K;
 
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
   }
 
   void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
-    profile[QUDA_PROFILE_INIT].Start();
+    profile.Start(QUDA_PROFILE_INIT);
 
     int Nkrylov = invParam.gcrNkrylov; // size of Krylov space
 
@@ -214,7 +214,11 @@ namespace quda {
 
     double b2 = normCuda(b);
 
+    const bool use_heavy_quark_res = 
+      (invParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
+    double heavy_quark_res = 0.0; // heavy quark residual
+    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 
     int k = 0;
 
@@ -226,8 +230,8 @@ namespace quda {
     cudaColorSpinorField rM(rSloppy);
     cudaColorSpinorField xM(rSloppy);
 
-    profile[QUDA_PROFILE_INIT].Stop();
-    profile[QUDA_PROFILE_PREAMBLE].Start();
+    profile.Stop(QUDA_PROFILE_INIT);
+    profile.Start(QUDA_PROFILE_PREAMBLE);
 
     blas_flops = 0;
 
@@ -240,15 +244,14 @@ namespace quda {
     int total_iter = 0;
     int restart = 0;
     double r2_old = r2;
+    bool l2_converge = false;
 
-    if (invParam.verbosity >= QUDA_VERBOSE) 
-      printfQuda("GCR: %d total iterations, %d Krylov iterations, <r,r> = %e, |r|/|b| = %e\n", 
-		 total_iter+k, k, r2, sqrt(r2/b2));
+    profile.Stop(QUDA_PROFILE_PREAMBLE);
+    profile.Start(QUDA_PROFILE_COMPUTE);
 
-    profile[QUDA_PROFILE_PREAMBLE].Stop();
-    profile[QUDA_PROFILE_COMPUTE].Start();
-
-    while (r2 > stop && total_iter < invParam.maxiter) {
+    PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
+    while ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && 
+	    total_iter < invParam.maxiter) {
     
       for (int m=0; m<invParam.precondition_cycle; m++) {
 	if (invParam.inv_type_precondition != QUDA_INVALID_INVERTER) {
@@ -275,7 +278,6 @@ namespace quda {
 	  *p[k] = rSloppy;
 	} 
       
-      
 	matSloppy(*Ap[k], *p[k], tmp);
       }
 
@@ -293,12 +295,11 @@ namespace quda {
       k++;
       total_iter++;
 
-      if (invParam.verbosity >= QUDA_VERBOSE) 
-	printfQuda("GCR: %d total iterations, %d Krylov iterations, <r,r> = %e, |r|/|b| = %e\n", 
-		   total_iter, k, r2, sqrt(r2/b2));
-
+      PrintStats("GCR", total_iter, r2, b2, heavy_quark_res);
+   
       // update since Nkrylov or maxiter reached, converged or reliable update required
-      if (k==Nkrylov || total_iter==invParam.maxiter || r2 < stop || r2/r2_old < invParam.reliable_delta) { 
+      // note that the heavy quark residual will by definition only be checked every Nkrylov steps
+      if (k==Nkrylov || total_iter==invParam.maxiter || (r2 < stop && !l2_converge) || r2/r2_old < invParam.reliable_delta) { 
 
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
@@ -307,33 +308,37 @@ namespace quda {
 	copyCuda(x, xSloppy);
 	xpyCuda(x, y);
 
-	double r2Sloppy = r2;
-
 	k = 0;
 	mat(r, y, x);
 	r2 = xmyNormCuda(b, r);  
 
-	if (r2 > stop) {
-	  restart++; // restarting if residual is still too great
-
-	  if (invParam.verbosity >= QUDA_VERBOSE) 
-	    printfQuda("\nGCR: restart %d, iterated r2 = %e, true r2 = %e\n", restart, r2Sloppy, r2);
+	if (use_heavy_quark_res) { 
+	  heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
 	}
 
-	copyCuda(rSloppy, r);
-	zeroCuda(xSloppy);
+	if ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) ) {
+	  restart++; // restarting if residual is still too great
 
-	r2_old = r2;
+	  PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
+	  copyCuda(rSloppy, r);
+	  zeroCuda(xSloppy);
+
+	  r2_old = r2;
+
+	  // prevent ending the Krylov space prematurely if other convergence criteria not met 
+	  if (r2 < stop) l2_converge = true; 
+	}
+
       }
 
     }
 
     if (total_iter > 0) copyCuda(x, y);
 
-    profile[QUDA_PROFILE_COMPUTE].Stop();
-    profile[QUDA_PROFILE_EPILOGUE].Start();
+    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.Start(QUDA_PROFILE_EPILOGUE);
 
-    invParam.secs += profile[QUDA_PROFILE_COMPUTE].Last();
+    invParam.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
     double gflops = (blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
@@ -362,13 +367,10 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
-    profile[QUDA_PROFILE_EPILOGUE].Stop();
-    profile[QUDA_PROFILE_FREE].Start();
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.Start(QUDA_PROFILE_FREE);
 
-    if (invParam.verbosity >= QUDA_SUMMARIZE) {
-      printfQuda("GCR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		 total_iter, sqrt(r2/b2), sqrt(true_res / b2));    
-    }
+    PrintSummary("GCR", total_iter, r2, b2);
 
     if (invParam.cuda_prec_sloppy != invParam.cuda_prec) {
       delete x_sloppy;
@@ -392,7 +394,7 @@ namespace quda {
     delete []beta;
     delete []gamma;
 
-    profile[QUDA_PROFILE_FREE].Stop();
+    profile.Stop(QUDA_PROFILE_FREE);
 
     return;
   }

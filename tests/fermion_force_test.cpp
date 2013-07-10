@@ -150,7 +150,8 @@ fermion_force_test(void)
 {
  
   fermion_force_init();
-  initLatticeConstants(*cudaGauge);
+  TimeProfile profile("dummy");
+  initLatticeConstants(*cudaGauge, profile);
   fermion_force_init_cuda(&gaugeParam);
 
     

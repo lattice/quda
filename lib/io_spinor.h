@@ -880,3 +880,359 @@
 #endif
 
 
+//! **************************only for ndeg tm:******************************
+#define READ_ACCUM_FLAVOR_DOUBLE(spinor, stride, fl_stride)     \
+  double2 flv1_accum0 = spinor[sid + 0*stride];   			\
+  double2 flv1_accum1 = spinor[sid + 1*stride];   			\
+  double2 flv1_accum2 = spinor[sid + 2*stride];   			\
+  double2 flv1_accum3 = spinor[sid + 3*stride];   			\
+  double2 flv1_accum4 = spinor[sid + 4*stride];   			\
+  double2 flv1_accum5 = spinor[sid + 5*stride];   			\
+  double2 flv1_accum6 = spinor[sid + 6*stride];   			\
+  double2 flv1_accum7 = spinor[sid + 7*stride];   			\
+  double2 flv1_accum8 = spinor[sid + 8*stride];   			\
+  double2 flv1_accum9 = spinor[sid + 9*stride];   			\
+  double2 flv1_accum10 = spinor[sid + 10*stride]; 			\
+  double2 flv1_accum11 = spinor[sid + 11*stride];			\
+  double2 flv2_accum0 = spinor[sid + fl_stride + 0*stride];   			\
+  double2 flv2_accum1 = spinor[sid + fl_stride + 1*stride];   			\
+  double2 flv2_accum2 = spinor[sid + fl_stride + 2*stride];   			\
+  double2 flv2_accum3 = spinor[sid + fl_stride + 3*stride];   			\
+  double2 flv2_accum4 = spinor[sid + fl_stride + 4*stride];   			\
+  double2 flv2_accum5 = spinor[sid + fl_stride + 5*stride];   			\
+  double2 flv2_accum6 = spinor[sid + fl_stride + 6*stride];   			\
+  double2 flv2_accum7 = spinor[sid + fl_stride + 7*stride];   			\
+  double2 flv2_accum8 = spinor[sid + fl_stride + 8*stride];   			\
+  double2 flv2_accum9 = spinor[sid + fl_stride + 9*stride];   			\
+  double2 flv2_accum10 = spinor[sid + fl_stride + 10*stride]; 			\
+  double2 flv2_accum11 = spinor[sid + fl_stride + 11*stride];
+
+
+#define READ_ACCUM_FLAVOR_SINGLE(spinor, stride, flv_stride)			\
+  float4 flv1_accum0 = spinor[sid + 0*(stride)];       			\
+  float4 flv1_accum1 = spinor[sid + 1*(stride)];       			\
+  float4 flv1_accum2 = spinor[sid + 2*(stride)];       			\
+  float4 flv1_accum3 = spinor[sid + 3*(stride)];       			\
+  float4 flv1_accum4 = spinor[sid + 4*(stride)];       			\
+  float4 flv1_accum5 = spinor[sid + 5*(stride)];			\
+  float4 flv2_accum0 = spinor[sid + fl_stride + 0*(stride)];       			\
+  float4 flv2_accum1 = spinor[sid + fl_stride + 1*(stride)];       			\
+  float4 flv2_accum2 = spinor[sid + fl_stride + 2*(stride)];       			\
+  float4 flv2_accum3 = spinor[sid + fl_stride + 3*(stride)];       			\
+  float4 flv2_accum4 = spinor[sid + fl_stride + 4*(stride)];       			\
+  float4 flv2_accum5 = spinor[sid + fl_stride + 5*(stride)];
+
+
+#define READ_ACCUM_FLAVOR_HALF_(spinor, stride, flv_stride)			   \
+  float4 flv1_accum0 = short42float4(spinor[sid + 0*stride]);	   \
+  float4 flv1_accum1 = short42float4(spinor[sid + 1*stride]);	   \
+  float4 flv1_accum2 = short42float4(spinor[sid + 2*stride]);	   \
+  float4 flv1_accum3 = short42float4(spinor[sid + 3*stride]);	   \
+  float4 flv1_accum4 = short42float4(spinor[sid + 4*stride]);	   \
+  float4 flv1_accum5 = short42float4(spinor[sid + 5*stride]);	   \
+  float C = (spinor ## Norm)[sid];				   \
+  flv1_accum0.x *= C; flv1_accum0.y *= C;	flv1_accum0.z *= C; flv1_accum0.w *= C;      \
+  flv1_accum1.x *= C; flv1_accum1.y *= C;	flv1_accum1.z *= C; flv1_accum1.w *= C;      \
+  flv1_accum2.x *= C; flv1_accum2.y *= C;	flv1_accum2.z *= C; flv1_accum2.w *= C;      \
+  flv1_accum3.x *= C; flv1_accum3.y *= C;	flv1_accum3.z *= C; flv1_accum3.w *= C;      \
+  flv1_accum4.x *= C; flv1_accum4.y *= C;       flv1_accum4.z *= C; flv1_accum4.w *= C;      \
+  flv1_accum5.x *= C; flv1_accum5.y *= C;	flv1_accum5.z *= C; flv1_accum5.w *= C;	     \
+  float4 flv2_accum0 = short42float4(spinor[sid + fl_stride + 0*stride]);	   	\
+  float4 flv2_accum1 = short42float4(spinor[sid + fl_stride + 1*stride]);	   	\
+  float4 flv2_accum2 = short42float4(spinor[sid + fl_stride + 2*stride]);	   	\
+  float4 flv2_accum3 = short42float4(spinor[sid + fl_stride + 3*stride]);	   	\
+  float4 flv2_accum4 = short42float4(spinor[sid + fl_stride + 4*stride]);	   	\
+  float4 flv2_accum5 = short42float4(spinor[sid + fl_stride + 5*stride]);	   	\
+  C = (spinor ## Norm)[sid + fl_stride];							\
+  flv2_accum0.x *= C; flv2_accum0.y *= C;	flv2_accum0.z *= C; flv2_accum0.w *= C;      	\
+  flv2_accum1.x *= C; flv2_accum1.y *= C;	flv2_accum1.z *= C; flv2_accum1.w *= C;      	\
+  flv2_accum2.x *= C; flv2_accum2.y *= C;	flv2_accum2.z *= C; flv2_accum2.w *= C;      	\
+  flv2_accum3.x *= C; flv2_accum3.y *= C;	flv2_accum3.z *= C; flv2_accum3.w *= C;      	\
+  flv2_accum4.x *= C; flv2_accum4.y *= C;       flv2_accum4.z *= C; flv2_accum4.w *= C;      	\
+  flv2_accum5.x *= C; flv2_accum5.y *= C;	flv2_accum5.z *= C; flv2_accum5.w *= C;
+
+#define READ_ACCUM_FLAVOR_HALF(spinor, stride, flv_stride) READ_ACCUM_FLAVOR_HALF_(spinor, stride, flv_stride)
+
+
+#define READ_ACCUM_FLAVOR_DOUBLE_TEX(spinor, stride, flv_stride)			\
+  double2 flv1_accum0 = fetch_double2((spinor), sid + 0*(stride));   \
+  double2 flv1_accum1 = fetch_double2((spinor), sid + 1*(stride));   \
+  double2 flv1_accum2 = fetch_double2((spinor), sid + 2*(stride));   \
+  double2 flv1_accum3 = fetch_double2((spinor), sid + 3*(stride));   \
+  double2 flv1_accum4 = fetch_double2((spinor), sid + 4*(stride));   \
+  double2 flv1_accum5 = fetch_double2((spinor), sid + 5*(stride));   \
+  double2 flv1_accum6 = fetch_double2((spinor), sid + 6*(stride));   \
+  double2 flv1_accum7 = fetch_double2((spinor), sid + 7*(stride));   \
+  double2 flv1_accum8 = fetch_double2((spinor), sid + 8*(stride));   \
+  double2 flv1_accum9 = fetch_double2((spinor), sid + 9*(stride));   \
+  double2 flv1_accum10 = fetch_double2((spinor), sid + 10*(stride)); \
+  double2 flv1_accum11 = fetch_double2((spinor), sid + 11*(stride)); \
+  double2 flv2_accum0 = fetch_double2((spinor), sid + fl_stride + 0*(stride));   \
+  double2 flv2_accum1 = fetch_double2((spinor), sid + fl_stride + 1*(stride));   \
+  double2 flv2_accum2 = fetch_double2((spinor), sid + fl_stride + 2*(stride));   \
+  double2 flv2_accum3 = fetch_double2((spinor), sid + fl_stride + 3*(stride));   \
+  double2 flv2_accum4 = fetch_double2((spinor), sid + fl_stride + 4*(stride));   \
+  double2 flv2_accum5 = fetch_double2((spinor), sid + fl_stride + 5*(stride));   \
+  double2 flv2_accum6 = fetch_double2((spinor), sid + fl_stride + 6*(stride));   \
+  double2 flv2_accum7 = fetch_double2((spinor), sid + fl_stride + 7*(stride));   \
+  double2 flv2_accum8 = fetch_double2((spinor), sid + fl_stride + 8*(stride));   \
+  double2 flv2_accum9 = fetch_double2((spinor), sid + fl_stride + 9*(stride));   \
+  double2 flv2_accum10 = fetch_double2((spinor), sid + fl_stride + 10*(stride)); \
+  double2 flv2_accum11 = fetch_double2((spinor), sid + fl_stride + 11*(stride));
+
+
+#define READ_ACCUM_FLAVOR_SINGLE_TEX(spinor, stride, flv_stride)			\
+  float4 flv1_accum0 = TEX1DFETCH(float4, (spinor), sid + 0*(stride));			\
+  float4 flv1_accum1 = TEX1DFETCH(float4, (spinor), sid + 1*(stride));			\
+  float4 flv1_accum2 = TEX1DFETCH(float4, (spinor), sid + 2*(stride));			\
+  float4 flv1_accum3 = TEX1DFETCH(float4, (spinor), sid + 3*(stride));			\
+  float4 flv1_accum4 = TEX1DFETCH(float4, (spinor), sid + 4*(stride));			\
+  float4 flv1_accum5 = TEX1DFETCH(float4, (spinor), sid + 5*(stride));			\
+  float4 flv2_accum0 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 0*(stride));	\
+  float4 flv2_accum1 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 1*(stride));	\
+  float4 flv2_accum2 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 2*(stride));	\
+  float4 flv2_accum3 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 3*(stride));	\
+  float4 flv2_accum4 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 4*(stride));	\
+  float4 flv2_accum5 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 5*(stride));
+
+#define READ_ACCUM_HALF_FLAVOR_TEX_(spinor, stride, flv_stride)		\
+  float4 flv1_accum0 = TEX1DFETCH(float4, (spinor), sid + 0*(stride));	\
+  float4 flv1_accum1 = TEX1DFETCH(float4, (spinor), sid + 1*(stride));	\
+  float4 flv1_accum2 = TEX1DFETCH(float4, (spinor), sid + 2*(stride));	\
+  float4 flv1_accum3 = TEX1DFETCH(float4, (spinor), sid + 3*(stride));	\
+  float4 flv1_accum4 = TEX1DFETCH(float4, (spinor), sid + 4*(stride));	\
+  float4 flv1_accum5 = TEX1DFETCH(float4, (spinor), sid + 5*(stride));	\
+  float C = TEX1DFETCH(float, (spinor ## Norm), sid);			\
+  flv1_accum0.x *= C; flv1_accum0.y *= C;	flv1_accum0.z *= C; flv1_accum0.w *= C;		\
+  flv1_accum1.x *= C; flv1_accum1.y *= C;	flv1_accum1.z *= C; flv1_accum1.w *= C;		\
+  flv1_accum2.x *= C; flv1_accum2.y *= C;	flv1_accum2.z *= C; flv1_accum2.w *= C;		\
+  flv1_accum3.x *= C; flv1_accum3.y *= C;	flv1_accum3.z *= C; flv1_accum3.w *= C;		\
+  flv1_accum4.x *= C; flv1_accum4.y *= C;       flv1_accum4.z *= C; flv1_accum4.w *= C;		\
+  flv1_accum5.x *= C; flv1_accum5.y *= C;	flv1_accum5.z *= C; flv1_accum5.w *= C;	        \
+  float4 flv2_accum0 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 0*(stride));				\
+  float4 flv2_accum1 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 1*(stride));				\
+  float4 flv2_accum2 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 2*(stride));				\
+  float4 flv2_accum3 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 3*(stride));				\
+  float4 flv2_accum4 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 4*(stride));				\
+  float4 flv2_accum5 = TEX1DFETCH(float4, (spinor), sid + flv_stride + 5*(stride));				\
+  C = TEX1DFETCH(float, (spinor ## Norm), sid + flv_stride);							\
+  flv2_accum0.x *= C; flv2_accum0.y *= C;	flv2_accum0.z *= C; flv2_accum0.w *= C;		\
+  flv2_accum1.x *= C; flv2_accum1.y *= C;	flv2_accum1.z *= C; flv2_accum1.w *= C;		\
+  flv2_accum2.x *= C; flv2_accum2.y *= C;	flv2_accum2.z *= C; flv2_accum2.w *= C;		\
+  flv2_accum3.x *= C; flv2_accum3.y *= C;	flv2_accum3.z *= C; flv2_accum3.w *= C;		\
+  flv2_accum4.x *= C; flv2_accum4.y *= C;       flv2_accum4.z *= C; flv2_accum4.w *= C;		\
+  flv2_accum5.x *= C; flv2_accum5.y *= C;	flv2_accum5.z *= C; flv2_accum5.w *= C;
+
+
+#define READ_ACCUM_FLAVOR_HALF_TEX(spinor, stride, flv_stride) READ_ACCUM_HALF_FLAVOR_TEX_(spinor, stride, flv_stride)
+
+//single-flavor macros:
+
+#define ASSN_ACCUM_DOUBLE(spinor, stride, fl_stride)     \
+  accum0 = spinor[sid + fl_stride + 0*stride];   			\
+  accum1 = spinor[sid + fl_stride + 1*stride];   			\
+  accum2 = spinor[sid + fl_stride + 2*stride];   			\
+  accum3 = spinor[sid + fl_stride + 3*stride];   			\
+  accum4 = spinor[sid + fl_stride + 4*stride];   			\
+  accum5 = spinor[sid + fl_stride + 5*stride];   			\
+  accum6 = spinor[sid + fl_stride + 6*stride];   			\
+  accum7 = spinor[sid + fl_stride + 7*stride];   			\
+  accum8 = spinor[sid + fl_stride + 8*stride];   			\
+  accum9 = spinor[sid + fl_stride + 9*stride];   			\
+  accum10 = spinor[sid + fl_stride + 10*stride]; 			\
+  accum11 = spinor[sid + fl_stride + 11*stride];
+
+#define ASSN_ACCUM_SINGLE(spinor, stride, fl_stride)			\
+  accum0 = spinor[sid + fl_stride + 0*(stride)];       			\
+  accum1 = spinor[sid + fl_stride + 1*(stride)];       			\
+  accum2 = spinor[sid + fl_stride + 2*(stride)];       			\
+  accum3 = spinor[sid + fl_stride + 3*(stride)];       			\
+  accum4 = spinor[sid + fl_stride + 4*(stride)];       			\
+  accum5 = spinor[sid + fl_stride + 5*(stride)];
+
+#define ASSN_ACCUM_HALF_(spinor, stride, fl_stride)			   \
+  accum0 = short42float4(spinor[sid + fl_stride + 0*stride]);	   \
+  accum1 = short42float4(spinor[sid + fl_stride + 1*stride]);	   \
+  accum2 = short42float4(spinor[sid + fl_stride + 2*stride]);	   \
+  accum3 = short42float4(spinor[sid + fl_stride + 3*stride]);	   \
+  accum4 = short42float4(spinor[sid + fl_stride + 4*stride]);	   \
+  accum5 = short42float4(spinor[sid + fl_stride + 5*stride]);	   \
+  {\
+    float C = (spinor ## Norm)[sid + fl_stride];				   \
+    accum0.x *= C; accum0.y *= C;	accum0.z *= C; accum0.w *= C;      \
+    accum1.x *= C; accum1.y *= C;	accum1.z *= C; accum1.w *= C;      \
+    accum2.x *= C; accum2.y *= C;	accum2.z *= C; accum2.w *= C;      \
+    accum3.x *= C; accum3.y *= C;	accum3.z *= C; accum3.w *= C;      \
+    accum4.x *= C; accum4.y *= C;	accum4.z *= C; accum4.w *= C;      \
+    accum5.x *= C; accum5.y *= C;	accum5.z *= C; accum5.w *= C;	   \
+  }
+	     				     
+
+#define ASSN_ACCUM_HALF(spinor, stride, fl_stride) ASSN_ACCUM_HALF_(spinor, stride, fl_stride)
+
+//single-flavor macros:
+
+#define ASSN_ACCUM_DOUBLE_TEX(spinor, stride, fl_stride)			\
+  accum0 = fetch_double2((spinor), sid + fl_stride + 0*(stride));   \
+  accum1 = fetch_double2((spinor), sid + fl_stride + 1*(stride));   \
+  accum2 = fetch_double2((spinor), sid + fl_stride + 2*(stride));   \
+  accum3 = fetch_double2((spinor), sid + fl_stride + 3*(stride));   \
+  accum4 = fetch_double2((spinor), sid + fl_stride + 4*(stride));   \
+  accum5 = fetch_double2((spinor), sid + fl_stride + 5*(stride));   \
+  accum6 = fetch_double2((spinor), sid + fl_stride + 6*(stride));   \
+  accum7 = fetch_double2((spinor), sid + fl_stride + 7*(stride));   \
+  accum8 = fetch_double2((spinor), sid + fl_stride + 8*(stride));   \
+  accum9 = fetch_double2((spinor), sid + fl_stride + 9*(stride));   \
+  accum10 = fetch_double2((spinor), sid + fl_stride + 10*(stride)); \
+  accum11 = fetch_double2((spinor), sid + fl_stride + 11*(stride));
+
+
+#define ASSN_ACCUM_SINGLE_TEX(spinor, stride, fl_stride)			\
+  accum0 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 0*(stride));			\
+  accum1 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 1*(stride));			\
+  accum2 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 2*(stride));			\
+  accum3 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 3*(stride));			\
+  accum4 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 4*(stride));			\
+  accum5 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 5*(stride));
+
+#define ASSN_ACCUM_HALF_TEX_(spinor, stride, fl_stride)		\
+  accum0 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 0*(stride));	\
+  accum1 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 1*(stride));	\
+  accum2 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 2*(stride));	\
+  accum3 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 3*(stride));	\
+  accum4 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 4*(stride));	\
+  accum5 = TEX1DFETCH(float4, (spinor), sid + fl_stride + 5*(stride));	\
+  {\
+    float C = TEX1DFETCH(float, (spinor ## Norm), sid + fl_stride);			\
+    accum0.x *= C; accum0.y *= C;	accum0.z *= C; accum0.w *= C;		\
+    accum1.x *= C; accum1.y *= C;	accum1.z *= C; accum1.w *= C;		\
+    accum2.x *= C; accum2.y *= C;	accum2.z *= C; accum2.w *= C;		\
+    accum3.x *= C; accum3.y *= C;	accum3.z *= C; accum3.w *= C;		\
+    accum4.x *= C; accum4.y *= C;       accum4.z *= C; accum4.w *= C;		\
+    accum5.x *= C; accum5.y *= C;	accum5.z *= C; accum5.w *= C;	        \
+  }
+
+#define ASSN_ACCUM_HALF_TEX(spinor, stride, fl_stride) ASSN_ACCUM_HALF_TEX_(spinor, stride, fl_stride)
+
+//! **************************only for deg tm:*******************************
+
+//apply b*(1 + i*a*gamma_5) to the input spinor
+#define APPLY_TWIST_INV(a, b, reg)\
+{\
+   spinorFloat tmp_re, tmp_im;\
+   tmp_re = reg##00_re - a * reg##20_im;\
+   tmp_im = reg##00_im + a * reg##20_re;\
+   reg##20_re -= a * reg##00_im;\
+   reg##20_im += a * reg##00_re;\
+   \
+   reg##00_re = b * tmp_re;\
+   reg##00_im = b * tmp_im;\
+   reg##20_re *= b;\
+   reg##20_im *= b;\
+   \
+   tmp_re = reg##10_re - a * reg##30_im;\
+   tmp_im = reg##10_im + a * reg##30_re;\
+   reg##30_re -= a * reg##10_im;\
+   reg##30_im += a * reg##10_re;\
+   \
+   reg##10_re = b * tmp_re;\
+   reg##10_im = b * tmp_im;\
+   reg##30_re *= b;\
+   reg##30_im *= b;\
+   \
+   tmp_re = reg##01_re - a * reg##21_im;\
+   tmp_im = reg##01_im + a * reg##21_re;\
+   reg##21_re -= a * reg##01_im;\
+   reg##21_im += a * reg##01_re;\
+   \
+   reg##01_re = b * tmp_re;\
+   reg##01_im = b * tmp_im;\
+   reg##21_re *= b;\
+   reg##21_im *= b;\
+   \
+   tmp_re = reg##11_re - a * reg##31_im;\
+   tmp_im = reg##11_im + a * reg##31_re;\
+   reg##31_re -= a * reg##11_im;\
+   reg##31_im += a * reg##11_re;\
+   \
+   reg##11_re = b * tmp_re;\
+   reg##11_im = b * tmp_im;\
+   reg##31_re *= b;\
+   reg##31_im *= b;\
+   \
+   tmp_re = reg##02_re - a * reg##22_im;\
+   tmp_im = reg##02_im + a * reg##22_re;\
+   reg##22_re -= a * reg##02_im;\
+   reg##22_im += a * reg##02_re;\
+   \
+   reg##02_re = b * tmp_re;\
+   reg##02_im = b * tmp_im;\
+   reg##22_re *= b;\
+   reg##22_im *= b;\
+   \
+   tmp_re = reg##12_re - a * reg##32_im;\
+   tmp_im = reg##12_im + a * reg##32_re;\
+   reg##32_re -= a * reg##12_im;\
+   reg##32_im += a * reg##12_re;\
+   \
+   reg##12_re = b * tmp_re;\
+   reg##12_im = b * tmp_im;\
+   reg##32_re *= b;\
+   reg##32_im *= b;\
+}
+
+
+#define APPLY_TWIST(a, reg)\
+{\
+   spinorFloat tmp_re, tmp_im;\
+   tmp_re = reg##00_re - a * reg##20_im;\
+   tmp_im = reg##00_im + a * reg##20_re;\
+   reg##20_re -= a * reg##00_im;\
+   reg##20_im += a * reg##00_re;\
+   \
+   reg##00_re = tmp_re;\
+   reg##00_im = tmp_im;\
+   \
+   tmp_re = reg##10_re - a * reg##30_im;\
+   tmp_im = reg##10_im + a * reg##30_re;\
+   reg##30_re -= a * reg##10_im;\
+   reg##30_im += a * reg##10_re;\
+   \
+   reg##10_re = tmp_re;\
+   reg##10_im = tmp_im;\
+   \
+   tmp_re = reg##01_re - a * reg##21_im;\
+   tmp_im = reg##01_im + a * reg##21_re;\
+   reg##21_re -= a * reg##01_im;\
+   reg##21_im += a * reg##01_re;\
+   \
+   reg##01_re = tmp_re;\
+   reg##01_im = tmp_im;\
+   \
+   tmp_re = reg##11_re - a * reg##31_im;\
+   tmp_im = reg##11_im + a * reg##31_re;\
+   reg##31_re -= a * reg##11_im;\
+   reg##31_im += a * reg##11_re;\
+   \
+   reg##11_re = tmp_re;\
+   reg##11_im = tmp_im;\
+   \
+   tmp_re = reg##02_re - a * reg##22_im;\
+   tmp_im = reg##02_im + a * reg##22_re;\
+   reg##22_re -= a * reg##02_im;\
+   reg##22_im += a * reg##02_re;\
+   \
+   reg##02_re = tmp_re;\
+   reg##02_im = tmp_im;\
+   \
+   tmp_re = reg##12_re - a * reg##32_im;\
+   tmp_im = reg##12_im + a * reg##32_re;\
+   reg##32_re -= a * reg##12_im;\
+   reg##32_im += a * reg##12_re;\
+   \
+   reg##12_re = tmp_re;\
+   reg##12_im = tmp_im;\
+}
+
+
+

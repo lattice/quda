@@ -139,13 +139,13 @@ __device__ inline float4 operator*=(float4 &a, const float &b) {
   return a;
 }
 
-__device__ inline double2 operator*=(double2 &a, const float &b) {
+__device__ inline double2 operator*=(double2 &a, const double &b) {
   a.x *= b;
   a.y *= b;
   return a;
 }
 
-__device__ inline double4 operator*=(double4 &a, const float &b) {
+__device__ inline double4 operator*=(double4 &a, const double &b) {
   a.x *= b;
   a.y *= b;
   a.z *= b;

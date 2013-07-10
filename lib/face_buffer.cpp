@@ -194,6 +194,13 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, cudaStre
   in.packGhost((QudaParity)parity, dagger, &stream[Nstream-1]);
 }
 
+void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, double a, double b, cudaStream_t *stream_p)
+{
+  in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated  
+  stream = stream_p;
+  in.packTwistedGhost((QudaParity)parity, dagger, a, b, &stream[Nstream-1]);
+}
+
 
 void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
 {

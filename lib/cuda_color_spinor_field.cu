@@ -62,12 +62,12 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false) {
     create(QUDA_COPY_FIELD_CREATE);
-    if (isNative() && src.isNative()) copy(src);
-    else errorQuda("Cannot copy using non-native fields");
+    copySpinorField(src);
   }
 
   // creates a copy of src, any differences defined in param
-  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) :
+  cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
+					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false) {  
 
     // can only overide if we are not using a reference or parity special case
@@ -98,12 +98,7 @@ namespace quda {
     } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
       zero();
     } else if (param.create == QUDA_COPY_FIELD_CREATE) {
-      if (typeid(src) == typeid(cudaColorSpinorField) && 
-	  isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
-	copy(dynamic_cast<const cudaColorSpinorField&>(src));
-      } else {
-	loadSpinorField(src);
-      }
+      copySpinorField(src);
     } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       // do nothing
     } else {
@@ -116,15 +111,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false) {
     create(QUDA_COPY_FIELD_CREATE);
-    if (typeid(src) == typeid(cudaColorSpinorField) && 
-	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
-      copy(dynamic_cast<const cudaColorSpinorField&>(src));
-    } else if (typeid(src) == typeid(cpuColorSpinorField) || typeid(src) == typeid(cudaColorSpinorField)) {
-      loadSpinorField(src);
-    } else {
-      errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
-    }
-
+    copySpinorField(src);
     clearGhostPointers();
   }
 
@@ -168,7 +155,6 @@ namespace quda {
     destroy();
   }
 
-  // return true if the field is a native field (ordering, precision, spin)
   bool cudaColorSpinorField::isNative() const {
 
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -417,45 +403,32 @@ namespace quda {
 
 #include <pack_spinor.h>
 
-#define REORDER_SPINOR_FIELD(DST, SRC, dst, src, myNs, loc)		\
+#define REORDER_SPINOR_FIELD_NS(DST, SRC, dst, src, myNs, loc)		\
   if ((dst).Precision() == QUDA_DOUBLE_PRECISION) {			\
     if ((src).Precision() == QUDA_DOUBLE_PRECISION) {			\
-      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (double*)SRC, dst, src, loc); \
-      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (double*)SRC, dst, src, loc); \
-      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((double*)DST, (double*)SRC, dst, src, loc); \
-      }									\
+      packSpinor<myNs>((double*)DST, (double*)SRC, dst, src, loc);	\
     } else {								\
-      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((double*)DST, (float*)SRC, dst, src, loc); \
-      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((double*)DST, (float*)SRC, dst, src, loc); \
-      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((double*)DST, (float*)SRC, dst, src, loc); \
-      }									\
+      packSpinor<myNs>((double*)DST, (float*)SRC, dst, src, loc);	\
     }									\
   } else {								\
     if ((src).Precision() == QUDA_DOUBLE_PRECISION) {			\
-      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (double*)SRC, dst, src, loc); \
-      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (double*)SRC, dst, src, loc); \
-      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (double*)SRC, dst, src, loc); \
-      }									\
+      packSpinor<myNs>((float*)DST, (double*)SRC, dst, src, loc);	\
     } else {								\
-      if (fieldOrder == QUDA_FLOAT_FIELD_ORDER) {			\
-	packSpinor<3,myNs,1>((float*)DST, (float*)SRC, dst, src, loc);	\
-      } else if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {		\
-	packSpinor<3,myNs,2>((float*)DST, (float*)SRC, dst, src, loc);	\
-      } else if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) {		\
-	packSpinor<3,myNs,4>((float*)DST, (float*)SRC, dst, src, loc);	\
-      }									\
+      packSpinor<myNs>((float*)DST, (float*)SRC, dst, src, loc);	\
     }									\
   }
 
+#define REORDER_SPINOR_FIELD(out, in, dst, src, nSpin, location)	\
+  switch(nSpin){							\
+  case 1:								\
+    REORDER_SPINOR_FIELD_NS(out, in, dst, src, 1, location);		\
+    break;								\
+  case 4:								\
+    REORDER_SPINOR_FIELD_NS(out, in, dst, src, 4, location);		\
+    break;								\
+  default:								\
+    errorQuda("invalid number of spinors");				\
+  }  
 
   void cudaColorSpinorField::resizeBuffer(size_t bytes) const {
     if (bytes > bufferBytes) {
@@ -466,9 +439,33 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
+  void cudaColorSpinorField::copySpinorField(const ColorSpinorField &src) {
+    
+    // src is on the device and is native
+    if (typeid(src) == typeid(cudaColorSpinorField) && 
+	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
+      copy(dynamic_cast<const cudaColorSpinorField&>(src));
+    } else if (typeid(src) == typeid(cudaColorSpinorField)) {
 
-    if (nColor != 3) errorQuda("Nc != 3 not yet supported");
+      // both on the device but at least one of the src/dst fields is not native
+      if (precision == QUDA_HALF_PRECISION || src.Precision() == QUDA_HALF_PRECISION) 
+	errorQuda("Half precision is not supported here");
+      if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER || 
+	  src.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER)
+	errorQuda("QUDA_QOP_DOMAIN_WALL_FIELD_ORDER not supported here");      
+
+      REORDER_SPINOR_FIELD(dynamic_cast<const cudaColorSpinorField&>(*this).V(),
+			   dynamic_cast<const cudaColorSpinorField&>(src).V(), 
+			   *this, src, nSpin, QUDA_CUDA_FIELD_LOCATION);
+
+    } else if (typeid(src) == typeid(cpuColorSpinorField)) { // src is on the host
+      loadSpinorField(src);
+    } else {
+      errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
+    }
+  } 
+
+  void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
     if (precision == QUDA_HALF_PRECISION) {
       ColorSpinorParam param(*this); // acquire all attributes of this
@@ -490,47 +487,27 @@ namespace quda {
       return;
     }
 
-    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(src) == typeid(cpuColorSpinorField)) {
-      // (temporary?) bug fix for padding
-      memset(buffer_h, 0, bytes);
+    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
+	typeid(src) == typeid(cpuColorSpinorField)) {
 
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
-			     *this, src, 1, QUDA_CPU_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
-			     *this, src, 4, QUDA_CPU_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors");
-      }  
+      memset(buffer_h, 0, bytes); // FIXME (temporary?) bug fix for padding
+      REORDER_SPINOR_FIELD(buffer_h, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
+			   *this, src, nSpin, QUDA_CPU_FIELD_LOCATION); 
       cudaMemcpy(v, buffer_h, bytes, cudaMemcpyHostToDevice);
 
     } else {
-      // (temporary?) bug fix for padding
-      cudaMemset(v, 0, bytes);
+      cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
 
       if (typeid(src) == typeid(cpuColorSpinorField)) {
 	resizeBuffer(src.Bytes());
-	cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).V(), src.Bytes(), cudaMemcpyHostToDevice);
+	cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
+		   src.Bytes(), cudaMemcpyHostToDevice);
       }
 
       const void *source = typeid(src) == typeid(cudaColorSpinorField) ?
 	dynamic_cast<const cudaColorSpinorField&>(src).V() : buffer_d;
 
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(v, source, *this, src, 1, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(v, source, *this, src, 4, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors");
-      }  
-
+      REORDER_SPINOR_FIELD(v, source, *this, src, nSpin, QUDA_CUDA_FIELD_LOCATION);
     }
 
     checkCudaError();
@@ -540,11 +517,9 @@ namespace quda {
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
-    if (nColor != 3) errorQuda("Nc != 3 not yet supported");
-
     if (precision == QUDA_HALF_PRECISION) {
       ColorSpinorParam param(*this); // acquire all attributes of this
-      param.precision = QUDA_SINGLE_PRECISION; // change precision
+      param.setPrecision(QUDA_SINGLE_PRECISION); // change precision
       param.create = QUDA_COPY_FIELD_CREATE; 
       cudaColorSpinorField tmp(*this, param);
       tmp.saveSpinorField(dest);
@@ -553,7 +528,8 @@ namespace quda {
 
     // no native support for this yet - copy to a native supported order
     if (dest.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-      if (typeid(dest) == typeid(cudaColorSpinorField)) errorQuda("Must use a cpuColorSpinorField here");
+      if (typeid(dest) == typeid(cudaColorSpinorField)) 
+	errorQuda("Must use a cpuColorSpinorField here");
       ColorSpinorParam param(dest); // acquire all attributes of this
       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       param.create = QUDA_NULL_FIELD_CREATE;
@@ -565,35 +541,16 @@ namespace quda {
 
     if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       cudaMemcpy(buffer_h, v, bytes, cudaMemcpyDeviceToHost);
-    
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 
-			     dest, *this, 1, QUDA_CPU_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 
-			     dest, *this, 4, QUDA_CPU_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors in function");
-      }
+      REORDER_SPINOR_FIELD(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_h, 
+			   dest, *this, nSpin, QUDA_CPU_FIELD_LOCATION); 
     } else {
 
       if (typeid(dest)==typeid(cpuColorSpinorField)) resizeBuffer(dest.Bytes());
 
-      void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
+      void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? 
+	dynamic_cast<cudaColorSpinorField&>(dest).V() : buffer_d;
 
-      switch(nSpin){
-      case 1:
-	REORDER_SPINOR_FIELD(dst, v, dest, *this, 1, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      case 4:
-	REORDER_SPINOR_FIELD(dst, v, dest, *this, 4, QUDA_CUDA_FIELD_LOCATION);
-	break;
-      default:
-	errorQuda("invalid number of spinors in function");
-      }
+      REORDER_SPINOR_FIELD(dst, v, dest, *this, nSpin, QUDA_CUDA_FIELD_LOCATION); 
 
       if (typeid(dest) == typeid(cpuColorSpinorField)) {
 	cudaMemcpy(dynamic_cast<cpuColorSpinorField&>(dest).V(), buffer_d, dest.Bytes(), cudaMemcpyDeviceToHost);
@@ -671,6 +628,16 @@ namespace quda {
 #endif
 
   }
+
+  void cudaColorSpinorField::packTwistedGhost(const QudaParity parity, const int dagger, double a, double b, cudaStream_t *stream) 
+  {
+#ifdef MULTI_GPU
+    packTwistedFace(ghostFaceBuffer, *this, dagger, parity, a, b, *stream); 
+#else
+    errorQuda("packTwistedGhost not built on single-GPU build");
+#endif
+
+  }
  
   // send the ghost zone to the host
   void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
@@ -681,7 +648,7 @@ namespace quda {
     int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
-    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
+    if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
       if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
@@ -689,11 +656,10 @@ namespace quda {
 	(dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[dim] : this->fwdGhostFaceBuffer[dim];
 
       cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
-    } else { // do multiple cudaMemcpys 
+    } else if(this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET){ // do multiple cudaMemcpys
 
       int Npad = Nint / Nvec; // number Nvec buffers we have
       int Nt_minus1_offset = (volume - nFace*ghostFace[3]); // N_t -1 = Vh-Vsh
-    
       int offset = 0;
       if (nSpin == 1) {
 	offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset;
@@ -702,7 +668,7 @@ namespace quda {
 	// dagger: send upper components backwards, send lower components forwards
 	bool upper = dagger ? true : false; // Fwd is !Back  
 	if (dir == QUDA_FORWARDS) upper = !upper;
-	int lower_spin_offset = Npad*stride;	    
+	int lower_spin_offset = Npad*stride;
 	if (upper) offset = (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
 	else offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
       }
@@ -724,12 +690,58 @@ namespace quda {
 	void *src = (char*)norm + norm_offset;
 	cudaMemcpyAsync(dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToHost, *stream); 
       }
+    }else{
+      int flavorVolume = volume / 2;
+      int flavorTFace  = ghostFace[3] / 2;
+      int Npad = Nint / Nvec; // number Nvec buffers we have
+      int flavor1_Nt_minus1_offset = (flavorVolume - flavorTFace);
+      int flavor2_Nt_minus1_offset = (volume - flavorTFace);
+      int flavor1_offset = 0;
+      int flavor2_offset = 0;
+      // !dagger: send lower components backwards, send upper components forwards
+      // dagger: send upper components backwards, send lower components forwards
+      bool upper = dagger ? true : false; // Fwd is !Back
+      if (dir == QUDA_FORWARDS) upper = !upper;
+      int lower_spin_offset = Npad*stride;//ndeg tm: stride=2*flavor_volume+pad
+      if (upper){
+        flavor1_offset = (dir == QUDA_BACKWARDS ? 0 : flavor1_Nt_minus1_offset);
+        flavor2_offset = (dir == QUDA_BACKWARDS ? flavorVolume : flavor2_Nt_minus1_offset);
+      }else{
+        flavor1_offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? 0 : flavor1_Nt_minus1_offset);
+        flavor2_offset = lower_spin_offset + (dir == QUDA_BACKWARDS ? flavorVolume : flavor2_Nt_minus1_offset);
+      }
+
+      // QUDA Memcpy NPad's worth.
+      //  -- Dest will point to the right beginning PAD.
+      //  -- Each Pad has size Nvec*Vsh Floats.
+      //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
+
+      void *dst = (char*)ghost_spinor;
+      void *src = (char*)v + flavor1_offset*Nvec*precision;
+      size_t len = flavorTFace*Nvec*precision;
+      size_t spitch = stride*Nvec*precision;//ndeg tm: stride=2*flavor_volume+pad
+      size_t dpitch = 2*len;
+      cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
+      dst = (char*)ghost_spinor+len;
+      src = (char*)v + flavor2_offset*Nvec*precision;
+      cudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
+
+      if (precision == QUDA_HALF_PRECISION) {
+        int Nt_minus1_offset = (flavorVolume - flavorTFace);
+        int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset*sizeof(float);
+	void *dst = (char*)ghost_spinor + Nint*ghostFace[3]*precision;
+	void *src = (char*)norm + norm_offset;
+        size_t dpitch = flavorTFace*sizeof(float);
+        size_t spitch = flavorVolume*sizeof(float);
+	cudaMemcpy2DAsync(dst, dpitch, src, spitch, flavorTFace*sizeof(float), 2, cudaMemcpyDeviceToHost, *stream);
+      }
     }
 #else
     errorQuda("sendGhost not built on single-GPU build");
 #endif
 
   }
+
 
   void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
 					 const QudaDirection dir, 
