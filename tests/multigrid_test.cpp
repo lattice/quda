@@ -14,6 +14,8 @@
 #include <qio_field.h>
 #include <transfer.h>
 
+#include <cstring>
+
 #if defined(QMP_COMMS)
 #include <qmp.h>
 #elif defined(MPI_COMMS)
