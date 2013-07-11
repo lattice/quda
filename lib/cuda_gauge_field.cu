@@ -165,22 +165,10 @@ namespace quda {
   {
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
-    checkField(cpu);
-    fat_link_max = cpu.LinkMax();
-
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
-      errorQuda("Not implemented"); // awaiting Guochun's new gauge packing
+      errorQuda("Not implemented");
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) {
-
-      LatticeField::resizeBuffer(bytes);
-
-      // copy field and ghost zone into bufferPinned
-      copyGenericGauge(*this, cpu, QUDA_CPU_FIELD_LOCATION, bufferPinned, cpu.gauge);
-
-      // this copies over both even and odd
-      cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
-      checkCudaError();
-
+      copy(cpu);
     } else {
       errorQuda("Invalid pack location %d", pack_location);
     }
