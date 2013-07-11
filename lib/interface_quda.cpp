@@ -369,6 +369,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *sloppy = NULL;
   if (param->cuda_prec != param->cuda_prec_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
+    if (param->type == QUDA_ASQTAD_FAT_LINKS) sloppy->copy(*in); else 
     sloppy->copy(*precise);
     param->gaugeGiB += sloppy->GBytes();
   } else {
