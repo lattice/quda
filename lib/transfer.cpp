@@ -32,6 +32,32 @@ namespace quda {
     // allocate the fine-to-coarse spin map
     spin_map = new int[B[0]->Nspin()];
     createSpinMap(spin_bs);
+
+    int geo_blocksize = 1;
+    for (int d = 0; d < tmp->Ndim(); d++) {
+      geo_blocksize *= geo_bs[d];
+    }
+    int numblocks = B[0]->Volume()/geo_blocksize;
+    int fsite_length = V->Nspin()*V->Ncolor()/(spin_bs*Nvec);
+
+
+   //Orthogonalize null vectors
+    if (V->Precision() == QUDA_DOUBLE_PRECISION) {
+      std::complex<double> * Vblock;
+      Vblock = (std::complex<double> *) malloc(V->Volume()*param.nSpin*param.nColor*Nvec*sizeof(std::complex<double>));
+      blockOrderV(Vblock, *(V->order_double), geo_bs, spin_bs);
+      blockGramSchmidt(Vblock, numblocks, spin_bs*Nvec, geo_blocksize*fsite_length);  
+      undoblockOrderV(*(V->order_double), Vblock, geo_bs, spin_bs);
+      free(Vblock);
+    }
+    else {
+      std::complex<float> * Vblock;
+      Vblock = (std::complex<float> *) malloc(V->Volume()*param.nSpin*param.nColor*Nvec*sizeof(std::complex<float>));
+      blockOrderV(Vblock,*(V->order_single), geo_bs, spin_bs);
+      blockGramSchmidt(Vblock, numblocks, spin_bs*Nvec, geo_blocksize*fsite_length);      
+      undoblockOrderV(*(V->order_single), Vblock, geo_bs, spin_bs);
+      free(Vblock);
+    }
   }
 
   Transfer::~Transfer() {
@@ -63,7 +89,7 @@ namespace quda {
     } else {
       for (int v=0; v<Nvec; v++) fill(*(V->order_single), *(B[v]->order_single), v, Nvec);
     }    
-    //printfQuda("V fill check %e\n", norm2(*V));
+    printfQuda("V fill check %e\n", norm2(*V));
   }
 
   // compute the fine-to-coarse site map
@@ -86,7 +112,7 @@ namespace quda {
       // compute the lattice-site index for this offset index
       tmp->LatticeIndex(x, i);
 
-      //printf("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
+      printf("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
 
       // compute the corresponding coarse-grid index given the block size
       for (int d=0; d<tmp->Ndim(); d++) x[d] /= geo_bs[d];
@@ -96,7 +122,7 @@ namespace quda {
       coarse.OffsetIndex(k, x); // this index is parity ordered
       geo_map[i] = k;
 
-      //printf("coarse (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
+      printf("coarse (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
     }
 
   }
@@ -219,12 +245,107 @@ namespace quda {
 
   }
 
-  template <class Complex>
-  void blockOrder(Complex &out, Complex &in, int ) {
+  // Creates a block-ordered version of a ColorSpinorField
+  // N.B.: Only works for the V field, as we need to block spin.
+  template <class Complex, class FieldOrder>
+  void Transfer::blockOrderV(Complex *out, const FieldOrder &in, int *geo_bs, int spin_bs) {
 
+    //fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs) = Nc*Ns/spin_bs
+    int fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs);
 
+    //Compute the size of each block
+    int blockSize = 1;
+    for (int d=0; d<V->Ndim(); d++) {
+      blockSize *= geo_bs[d];
+    }
+    blockSize *= fsite_length;
 
+    int x[QUDA_MAX_DIM];
+    
+   // Run through the fine grid and do the block ordering
+    for (int i=0; i<V->Volume(); i++) {
+      
+      // Get fine grid coordinates
+      V->LatticeIndex(x, i);
+
+      //Take the block-ordered offset from the coarse grid offset (geo_map) 
+      int offset = geo_map[i]*blockSize;
+
+      //The coordinates within a block
+      int y[QUDA_MAX_DIM];
+
+      //Geometric Offset within a block
+      int block_offset = 0;
+
+      //Compute the offset within a block (x fastest direction, t is slowest direction, non-parity ordered)
+      for (int d=tmp->Ndim(); d>=0; d--) {
+	y[d] = x[d]%geo_bs[d];
+	block_offset *= geo_bs[d];
+	block_offset += y[d];
+      }
+
+      //Loop over spin and color indices of V field.
+      //color indices of V correspond to spin and number of null vectors, with spin component changing fastest
+      //spin indices of V correspond to fine color
+      for (int c=0; c<V->Ncolor(); c++) {
+	for (int s=0; s<V->Nspin(); s++) {
+	  out[offset + (c/spin_bs)*block_offset*fsite_length + (s*(c%spin_bs)+s)] = in(i, s, c);
+	}
+      }
+	
+    }
   }
+
+  // 
+  template <class FieldOrder, class Complex>
+  void Transfer::undoblockOrderV(FieldOrder &out, Complex *in, int *geo_bs, int spin_bs) {
+
+    //fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs) = Nc*Ns/spin_bs
+    int fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs);
+
+    //Compute the size of each block
+    int blockSize = 1;
+    for (int d=0; d<V->Ndim(); d++) {
+      blockSize *= geo_bs[d];
+    }
+    blockSize *= fsite_length;
+
+    int x[QUDA_MAX_DIM];
+    
+   // Run through the fine grid and do the block ordering
+    for (int i=0; i<V->Volume(); i++) {
+      
+      // Get fine grid coordinates
+      V->LatticeIndex(x, i);
+
+      //Take the block-ordered offset from the coarse grid offset (geo_map) 
+      int offset = geo_map[i]*blockSize;
+
+      //The coordinates within a block
+      int y[QUDA_MAX_DIM];
+
+      //Geometric Offset within a block
+      int block_offset = 0;
+
+      //Compute the offset within a block (x fastest direction, t is slowest direction, non-parity ordered)
+      for (int d=tmp->Ndim(); d>=0; d--) {
+	y[d] = x[d]%geo_bs[d];
+	block_offset *= geo_bs[d];
+	block_offset += y[d];
+      }
+
+      //Loop over spin and color indices of V field.
+      //color indices of V correspond to spin and number of null vectors, with spin component changing fastest
+      //spin indices of V correspond to fine color
+      for (int c=0; c<V->Ncolor(); c++) {
+	for (int s=0; s<V->Nspin(); s++) {
+	  out(i,s,c) = in[offset + (c/spin_bs)*block_offset*fsite_length + (s*(c%spin_bs)+s)];
+	}
+      }
+	
+    }
+  }
+
 
   // Orthogonalise the nc vectors v[] of length n
   template <class Complex>
@@ -248,6 +369,7 @@ namespace quda {
 	nrm2 = 1.0/sqrt(nrm2);
       
 	for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] = nrm2 * v[(b*Nc+jc)*blockSize+i];
+
       }
 
     }

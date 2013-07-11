@@ -61,7 +61,6 @@ static int *mcoord;
 // MAC this function assumes that the QMP geometry has been predetermined
 static void setup_qmp_fixed(int len[], int nd, int numnodes) {
   int i;
-  printf("setup_qmp_fixed\n");
 
   //Added by M. Cheng to fix seg fault on single-node case where
   //QMP topology is not yet declared.

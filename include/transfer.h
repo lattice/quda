@@ -56,6 +56,34 @@ namespace quda {
      */
     void createGeoMap(int *geo_bs);
 
+    /**
+     * Creates a block-ordered version of the color-spinor field V
+     * N.B. in must be the accessor to the color-spinor field V
+     * @param out A Complex array storing the block-ordered fields
+     * @param in  Accessor for the color-spinor field V
+     */
+  template <class Complex, class FieldOrder>
+    void blockOrderV(Complex *out, const FieldOrder &in, int *geo_bs, int spin_bs);
+
+  /**
+     * Copies elements from the block-ordered field in back to the color-spinor field V
+     * N.B. out must be the accessor to the color-spinor field V
+     * @param out The full lattice color spinor field, not block-ordered
+     * @param in  A Complex array storing the block-ordered fields
+     */
+  template <class FieldOrder, class Complex>
+    void undoblockOrderV(FieldOrder &out, Complex *in, int *geo_bs, int spin_bs);   
+
+  /**
+   * Does Gram-Schmidt orthogonalization.
+   * @param v The block-ordered vectors
+   * @param nBlocks
+   * @param Nc
+   * @param blockSize
+   */
+  template <class Complex>
+    void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize);
+
     /** 
      * Creates the map between fine and coarse spin dimensions
      * @param spin_bs The spin block size
@@ -67,6 +95,7 @@ namespace quda {
 
     /** The double-precision accessor class */
     ColorSpinorFieldOrder<float> *order_single;
+
 
   public:
 
