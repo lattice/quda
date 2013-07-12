@@ -245,7 +245,6 @@ namespace quda {
 	    }
 	  }
 	  reconstruct.Unpack(v, tmp, x, dir);	 
-	  for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
 	}
       }
       
