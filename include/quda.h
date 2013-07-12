@@ -48,38 +48,39 @@ extern "C" {
    */
   typedef struct QudaGaugeParam_s {
 
-    int X[4];
+    QudaFieldLocation location; /**< The location of the gauge field */
+
+    int X[4];             /**< The local space-time dimensions (without checkboarding) */
 
     double anisotropy;    /**< Used for Wilson and Wilson-clover */
     double tadpole_coeff; /**< Used for staggered only */
 
-    QudaLinkType type;
-    QudaGaugeFieldOrder gauge_order;
+    QudaLinkType type; /**< The link type of the gauge field (e.g., Wilson, fat, long, etc.) */
+    QudaGaugeFieldOrder gauge_order; /**< The ordering on the input gauge field */
 
-    QudaTboundary t_boundary;
+    QudaTboundary t_boundary;  /**< The temporal boundary condition that will be used for fermion fields */
 
-    QudaPrecision cpu_prec;
+    QudaPrecision cpu_prec; /**< The precision used by the caller */
 
-    QudaPrecision cuda_prec;
-    QudaReconstructType reconstruct;
+    QudaPrecision cuda_prec; /**< The precision of the cuda gauge field */
+    QudaReconstructType reconstruct; /**< The reconstruction type of the cuda gauge field */
 
-    QudaPrecision cuda_prec_sloppy;
-    QudaReconstructType reconstruct_sloppy;
+    QudaPrecision cuda_prec_sloppy; /**< The precision of the sloppy gauge field */
+    QudaReconstructType reconstruct_sloppy; /**< The recontruction type of the sloppy gauge field */
 
-    QudaPrecision cuda_prec_precondition;
-    QudaReconstructType reconstruct_precondition;
+    QudaPrecision cuda_prec_precondition; /**< The precision of the preconditioner gauge field */
+    QudaReconstructType reconstruct_precondition; /**< The recontruction type of the preconditioner gauge field */
 
-    QudaGaugeFixed gauge_fix;
+    QudaGaugeFixed gauge_fix; /**< Whether the input gauge field is in the axial gauge or not */
 
-    int ga_pad;
+    int ga_pad;       /**< The pad size that the cudaGaugeField will use (default=0) */ 
 
-    /** Used by link fattening and the gauge and fermion forces */
-    int site_ga_pad;
+    int site_ga_pad;  /**< Used by link fattening and the gauge and fermion forces */
 
     int staple_pad;   /**< Used by link fattening */
     int llfat_ga_pad; /**< Used by link fattening */
     int mom_ga_pad;   /**< Used by the gauge and fermion forces */
-    double gaugeGiB;
+    double gaugeGiB;  /**< The storage used by the gauge fields */
 
     int preserve_gauge; /**< Used by link fattening */
     
@@ -94,8 +95,8 @@ extern "C" {
     QudaFieldLocation input_location; /**< The location of the input field */
     QudaFieldLocation output_location; /**< The location of the output field */
 
-    QudaDslashType dslash_type;
-    QudaInverterType inv_type;
+    QudaDslashType dslash_type; /**< The Dirac Dslash type that is being used */
+    QudaInverterType inv_type; /**< Which linear solver to use */
 
     double mass;  /**< Used for staggered only */
     double kappa; /**< Used for Wilson and Wilson-clover */
@@ -112,7 +113,7 @@ extern "C" {
     double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */
     double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
-    int maxiter;
+    int maxiter; /**< Maximum number of iterations in the linear solver */
     double reliable_delta; /**< Reliable update tolerance */
 
     int num_offset; /**< Number of offsets in the multi-shift solver */
@@ -134,43 +135,42 @@ extern "C" {
 
     QudaSolutionType solution_type;  /**< Type of system to solve */
     QudaSolveType solve_type;        /**< How to solve it */
-    QudaMatPCType matpc_type;
-    QudaDagType dagger;
-    QudaMassNormalization mass_normalization;
+    QudaMatPCType matpc_type;        /**< The preconditioned matrix type */
+    QudaDagType dagger;              /**< Whether we are using the Hermitian conjugate system or not */
+    QudaMassNormalization mass_normalization; /**< The mass normalization is being used by the caller */
 
-    QudaPreserveSource preserve_source;
+    QudaPreserveSource preserve_source;       /**< Preserve the source or not in the linear solver (deprecated) */
 
-    QudaPrecision cpu_prec;
-    QudaPrecision cuda_prec;
-    QudaPrecision cuda_prec_sloppy;
-    QudaPrecision cuda_prec_precondition;
+    QudaPrecision cpu_prec;                /**< The precision used by the input fermion fields */
+    QudaPrecision cuda_prec;               /**< The precision used by the QUDA solver */
+    QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
+    QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
 
-    QudaDiracFieldOrder dirac_order;
+    QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
 
-    /** Gamma basis of the input and output host fields */
-    QudaGammaBasis gamma_basis;
+    QudaGammaBasis gamma_basis;            /**< Gamma basis of the input and output host fields */
 
-    QudaPrecision clover_cpu_prec;
-    QudaPrecision clover_cuda_prec;
-    QudaPrecision clover_cuda_prec_sloppy;
-    QudaPrecision clover_cuda_prec_precondition;
+    QudaFieldLocation clover_location;            /**< The location of the clover field */
+    QudaPrecision clover_cpu_prec;         /**< The precision used for the input clover field */
+    QudaPrecision clover_cuda_prec;        /**< The precision used for the clover field in the QUDA solver */
+    QudaPrecision clover_cuda_prec_sloppy; /**< The precision used for the clover field in the QUDA sloppy operator */
+    QudaPrecision clover_cuda_prec_precondition; /**< The precision used for the clover field in the QUDA preconditioner */
 
-    QudaCloverFieldOrder clover_order;
-    QudaUseInitGuess use_init_guess;
+    QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
+    QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
-    QudaVerbosity verbosity;    
+    QudaVerbosity verbosity;               /**< The verbosity setting to use in the solver */
 
-    int sp_pad;
-    int cl_pad;
+    int sp_pad;                            /**< The padding to use for the fermion fields */
+    int cl_pad;                            /**< The padding to use for the clover fields */
 
-    int iter;
-    double spinorGiB;
-    double cloverGiB;
-    double gflops;
-    double secs;
+    int iter;                              /**< The number of iterations performed by the solver */
+    double spinorGiB;                      /**< The memory footprint of the fermion fields */
+    double cloverGiB;                      /**< The memory footprint of the clover fields */
+    double gflops;                         /**< The Gflops rate of the solver */
+    double secs;                           /**< The time taken by the solver */
 
-    /** Enable auto-tuning? */
-    QudaTune tune;
+    QudaTune tune;                          /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;

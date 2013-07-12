@@ -32,7 +32,7 @@ namespace quda {
   }
 
   Dirac::~Dirac() {   
-    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
+    if (getVerbosity() > QUDA_VERBOSE) profile.Print();
   }
 
   Dirac& Dirac::operator=(const Dirac &dirac)

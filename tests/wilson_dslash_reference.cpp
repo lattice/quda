@@ -184,7 +184,6 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
 
   GaugeFieldParam gauge_field_param(gauge, gauge_param);
   cpuGaugeField cpu(gauge_field_param);
-  cpu.exchangeGhost();
   void **ghostGauge = (void**)cpu.Ghost();
 
   // Get spinor ghost fields

@@ -17,7 +17,6 @@
 #define REORDER_LOCATION QUDA_CPU_FIELD_LOCATION
 #endif
 
-
 namespace quda {
 
   void* cudaColorSpinorField::buffer_h = 0;
@@ -496,8 +495,6 @@ namespace quda {
       cudaMemcpy(v, buffer_h, bytes, cudaMemcpyHostToDevice);
 
     } else {
-      cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
-
       if (typeid(src) == typeid(cpuColorSpinorField)) {
 	resizeBuffer(src.Bytes());
 	cudaMemcpy(buffer_d, dynamic_cast<const cpuColorSpinorField&>(src).V(), 
@@ -507,8 +504,9 @@ namespace quda {
       const void *source = typeid(src) == typeid(cudaColorSpinorField) ?
 	dynamic_cast<const cudaColorSpinorField&>(src).V() : buffer_d;
 
+      cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
       REORDER_SPINOR_FIELD(v, source, *this, src, nSpin, QUDA_CUDA_FIELD_LOCATION);
-    }
+      }
 
     checkCudaError();
     return;

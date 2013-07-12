@@ -16,8 +16,8 @@
 
 namespace quda {
 
-  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam, TimeProfile &profile) :
-    Solver(invParam, profile), mat(mat), matSloppy(matSloppy)
+  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy)
   {
 
   }
@@ -36,44 +36,44 @@ namespace quda {
       profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
-      invParam.true_res = 0.0;
-      invParam.true_res_hq = 0.0;
+      param.true_res = 0.0;
+      param.true_res_hq = 0.0;
       return;
     }
 
 
     cudaColorSpinorField r(b);
 
-    ColorSpinorParam param(x);
-    param.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(b, param); 
+    ColorSpinorParam csParam(x);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    cudaColorSpinorField y(b, csParam); 
   
     mat(r, x, y);
 //    zeroCuda(y);
 
     double r2 = xmyNormCuda(b, r);
   
-    param.setPrecision(invParam.cuda_prec_sloppy);
-    cudaColorSpinorField Ap(x, param);
-    cudaColorSpinorField tmp(x, param);
+    csParam.setPrecision(param.precision_sloppy);
+    cudaColorSpinorField Ap(x, csParam);
+    cudaColorSpinorField tmp(x, csParam);
 
     cudaColorSpinorField *tmp2_p = &tmp;
     // tmp only needed for multi-gpu Wilson-like kernels
     if (mat.Type() != typeid(DiracStaggeredPC).name() && 
 	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(x, param);
+      tmp2_p = new cudaColorSpinorField(x, csParam);
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     cudaColorSpinorField *x_sloppy, *r_sloppy;
-    if (invParam.cuda_prec_sloppy == x.Precision()) {
-      param.create = QUDA_REFERENCE_FIELD_CREATE;
+    if (param.precision_sloppy == x.Precision()) {
+      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
       x_sloppy = &x;
       r_sloppy = &r;
     } else {
-      param.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = new cudaColorSpinorField(x, param);
-      r_sloppy = new cudaColorSpinorField(r, param);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      x_sloppy = new cudaColorSpinorField(x, csParam);
+      r_sloppy = new cudaColorSpinorField(r, csParam);
     }
 
     cudaColorSpinorField &xSloppy = *x_sloppy;
@@ -88,13 +88,13 @@ namespace quda {
     }
     
     const bool use_heavy_quark_res = 
-      (invParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
     double r2_old;
-    double stop = b2*invParam.tol*invParam.tol; // stopping condition of solver
+    double stop = b2*param.tol*param.tol; // stopping condition of solver
 
     double heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
@@ -108,7 +108,7 @@ namespace quda {
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
-    double delta = invParam.reliable_delta;
+    double delta = param.delta;
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
@@ -120,8 +120,8 @@ namespace quda {
 
     int steps_since_reliable = 1;
 
-    while ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && 
-	    k < invParam.maxiter) {
+    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
+	    k < param.maxiter) {
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
     
       double sigma;
@@ -161,7 +161,7 @@ namespace quda {
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if ( convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && delta >= invParam.tol) updateX = 1;
+      if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
 
       if ( !(updateR || updateX)) {
 	//beta = r2 / r2_old;
@@ -228,25 +228,25 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
-    invParam.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
-      invParam.gflops = gflops;
-    invParam.iter += k;
+      param.gflops = gflops;
+    param.iter += k;
 
-    if (k==invParam.maxiter) 
-      warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
+    if (k==param.maxiter) 
+      warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (invParam.verbosity >= QUDA_VERBOSE)
+    if (param.verbosity >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals
     mat(r, x, y);
-    invParam.true_res = sqrt(xmyNormCuda(b, r) / b2);
+    param.true_res = sqrt(xmyNormCuda(b, r) / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
-    invParam.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 #else
-    invParam.true_res_hq = 0.0;
+    param.true_res_hq = 0.0;
 #endif      
 
     PrintSummary("CG", k, r2, b2);
@@ -261,7 +261,7 @@ namespace quda {
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
-    if (invParam.cuda_prec_sloppy != x.Precision()) {
+    if (param.precision_sloppy != x.Precision()) {
       delete r_sloppy;
       delete x_sloppy;
     }

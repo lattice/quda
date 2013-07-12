@@ -151,7 +151,10 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaDiracFieldOrder_s {
-    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used by QUDA, varies depending on precision and dslash type
+    QUDA_FLOAT_DIRAC_ORDER = 1,  // even-odd, float ordering
+    QUDA_FLOAT2_DIRAC_ORDER = 2, // even-odd, float2 ordering
+    QUDA_FLOAT4_DIRAC_ORDER = 4, // even-odd, float4 ordering
+    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used, varies on precision and dslash type
     QUDA_DIRAC_ORDER,            // even-odd, color inside spin
     QUDA_QDP_DIRAC_ORDER,        // even-odd, spin inside color
     QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
@@ -160,9 +163,11 @@ extern "C" {
   } QudaDiracFieldOrder;  
 
   typedef enum QudaCloverFieldOrder_s {
-    QUDA_INTERNAL_CLOVER_ORDER,   // internal clover order use by QUDA.
-    QUDA_PACKED_CLOVER_ORDER,     // even-odd, packed
-    QUDA_LEX_PACKED_CLOVER_ORDER, // lexicographical order, packed
+    QUDA_FLOAT_CLOVER_ORDER=1,   // even-odd float ordering 
+    QUDA_FLOAT2_CLOVER_ORDER=2,   // even-odd float2 ordering
+    QUDA_FLOAT4_CLOVER_ORDER=4,   // even-odd float4 ordering
+    QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
+    QUDA_LEX_PACKED_CLOVER_ORDER, // lexicographical order, packed FIXME delete
     QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
     QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
   } QudaCloverFieldOrder;

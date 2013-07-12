@@ -1047,7 +1047,7 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%e, %e, %e, %e)\n", pow(10.0,-(f+1)), 
+    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0,-(f+1)), 
 	   fail[0][f], fail[1][f], fail[2][f], fail[3][f],
 	   fail[0][f]/(double)(V*18), fail[1][f]/(double)(V*18), fail[2][f]/(double)(V*18), fail[3][f]/(double)(V*18));
   }
@@ -1381,7 +1381,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   for (int i=0; i<momSiteSize; i++) printfQuda("%d fails = %d\n", i, iter[i]);
   
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*momSiteSize, fail[f] / (double)(len*6));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*9, fail[f]/(double)(len*9));
   }
   
   return accuracy_level;
