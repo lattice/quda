@@ -349,24 +349,26 @@ namespace quda {
 
   // Orthogonalise the nc vectors v[] of length n
   template <class Complex>
-  void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize) {
+  void Transfer::blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize) {
     
     for (int b=0; b<nBlocks; b++) {
       for (int jc=0; jc<Nc; jc++) {
       
 	for (int ic=0; ic<jc; ic++) {
-	  // Calculate dot product
-	  std::complex<double> dot = 0.0;
-	  for (int i=0; i<blockSize; i++) dot += v[(b*Nc+ic)*blockSize+i] * v[(b*Nc+jc)*blockSize+i];
+	  // Calculate dot product.
+	  // dot should be double, but doesn't play well with complex<float>.  Use Complex type instead
+	  Complex dot = 0.0;
+	  for (int i=0; i<blockSize; i++) dot += conj(v[(b*Nc+ic)*blockSize+i]) * v[(b*Nc+jc)*blockSize+i];
 	
 	  // Subtract the blocks to orthogonalise
 	  for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] -= dot * v[(b*Nc+ic)*blockSize+i];
 	}
       
 	// Normalize the block
-	double nrm2 = 0.0;
+	// Again, nrm2 is pure real, but need to use Complex because of template.
+	Complex nrm2 = 0.0;
 	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*Nc+jc)*blockSize+i]);
-	nrm2 = 1.0/sqrt(nrm2);
+	nrm2 = 1.0/sqrt(nrm2.real());
       
 	for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] = nrm2 * v[(b*Nc+jc)*blockSize+i];
 
