@@ -39,12 +39,13 @@ namespace quda {
     }
     int numblocks = B[0]->Volume()/geo_blocksize;
     int fsite_length = V->Nspin()*V->Ncolor()/(spin_bs*Nvec);
+    //printfQuda("numblocks = %d fsite_length = %d geo_blocksize = %d\n", numblocks, fsite_length, geo_blocksize);
 
 
    //Orthogonalize null vectors
     if (V->Precision() == QUDA_DOUBLE_PRECISION) {
       std::complex<double> * Vblock;
-      Vblock = (std::complex<double> *) malloc(V->Volume()*param.nSpin*param.nColor*Nvec*sizeof(std::complex<double>));
+      Vblock = (std::complex<double> *) malloc(V->Volume()*V->Nspin()*V->Ncolor()*sizeof(std::complex<double>));
       blockOrderV(Vblock, *(V->order_double), geo_bs, spin_bs);
       blockGramSchmidt(Vblock, numblocks, spin_bs*Nvec, geo_blocksize*fsite_length);  
       undoblockOrderV(*(V->order_double), Vblock, geo_bs, spin_bs);
@@ -52,12 +53,13 @@ namespace quda {
     }
     else {
       std::complex<float> * Vblock;
-      Vblock = (std::complex<float> *) malloc(V->Volume()*param.nSpin*param.nColor*Nvec*sizeof(std::complex<float>));
+      Vblock = (std::complex<float> *) malloc(V->Volume()*V->Nspin()*V->Ncolor()*sizeof(std::complex<float>));
       blockOrderV(Vblock,*(V->order_single), geo_bs, spin_bs);
       blockGramSchmidt(Vblock, numblocks, spin_bs*Nvec, geo_blocksize*fsite_length);      
       undoblockOrderV(*(V->order_single), Vblock, geo_bs, spin_bs);
       free(Vblock);
     }
+    printfQuda("V block orthonormal check %e\n", norm2(*V));
   }
 
   Transfer::~Transfer() {
@@ -112,7 +114,7 @@ namespace quda {
       // compute the lattice-site index for this offset index
       tmp->LatticeIndex(x, i);
 
-      printf("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
+      //printf("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
 
       // compute the corresponding coarse-grid index given the block size
       for (int d=0; d<tmp->Ndim(); d++) x[d] /= geo_bs[d];
@@ -122,7 +124,7 @@ namespace quda {
       coarse.OffsetIndex(k, x); // this index is parity ordered
       geo_map[i] = k;
 
-      printf("coarse (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
+      //printf("coarse (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
     }
 
   }
@@ -253,6 +255,8 @@ namespace quda {
     //fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs) = Nc*Ns/spin_bs
     int fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs);
 
+    int fspin_components = V->Ncolor()/Nvec;
+
     //Compute the size of each block
     int blockSize = 1;
     for (int d=0; d<V->Ndim(); d++) {
@@ -269,7 +273,7 @@ namespace quda {
       V->LatticeIndex(x, i);
 
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      int offset = geo_map[i]*blockSize;
+      int offset = geo_map[i]*blockSize*Nvec*spin_bs;
 
       //The coordinates within a block
       int y[QUDA_MAX_DIM];
@@ -289,7 +293,8 @@ namespace quda {
       //spin indices of V correspond to fine color
       for (int c=0; c<V->Ncolor(); c++) {
 	for (int s=0; s<V->Nspin(); s++) {
-	  out[offset + (c/spin_bs)*block_offset*fsite_length + (s*(c%spin_bs)+s)] = in(i, s, c);
+	  int ind = offset + (c*spin_bs/fspin_components)*blockSize + (block_offset*fsite_length + V->Nspin()*(c%(fspin_components/spin_bs))+s);
+	  out[ind] = in(i, s, c);
 	}
       }
 	
@@ -303,6 +308,8 @@ namespace quda {
     //fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs) = Nc*Ns/spin_bs
     int fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs);
 
+    int fspin_components = V->Ncolor()/Nvec;
+
     //Compute the size of each block
     int blockSize = 1;
     for (int d=0; d<V->Ndim(); d++) {
@@ -319,7 +326,7 @@ namespace quda {
       V->LatticeIndex(x, i);
 
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      int offset = geo_map[i]*blockSize;
+      int offset = geo_map[i]*blockSize*Nvec*spin_bs;
 
       //The coordinates within a block
       int y[QUDA_MAX_DIM];
@@ -339,7 +346,8 @@ namespace quda {
       //spin indices of V correspond to fine color
       for (int c=0; c<V->Ncolor(); c++) {
 	for (int s=0; s<V->Nspin(); s++) {
-	  out(i,s,c) = in[offset + (c/spin_bs)*block_offset*fsite_length + (s*(c%spin_bs)+s)];
+	  int ind = offset + (c*spin_bs/fspin_components)*blockSize + (block_offset*fsite_length + V->Nspin()*(c%(fspin_components/spin_bs))+s);
+	  out(i,s,c) = in[ind];
 	}
       }
 	
