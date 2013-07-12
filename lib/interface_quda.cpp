@@ -369,7 +369,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *sloppy = NULL;
   if (param->cuda_prec != param->cuda_prec_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
-    if (param->type == QUDA_ASQTAD_FAT_LINKS) sloppy->copy(*in); else 
     sloppy->copy(*precise);
     param->gaugeGiB += sloppy->GBytes();
   } else {
@@ -385,7 +384,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *precondition = NULL;
   if (param->cuda_prec_sloppy != param->cuda_prec_precondition) {
     precondition = new cudaGaugeField(gauge_param);
-    precondition->copy(*precise);
+    precondition->copy(*sloppy);
     param->gaugeGiB += precondition->GBytes();
   } else {
     precondition = sloppy;
@@ -1349,21 +1348,27 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     copyCuda(*in, *out);
+    solverParam.updateInvertParam(*param);
     delete solve;
   }
 
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
     delete solve;
   } else {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
     delete solve;
   }
 
@@ -1565,8 +1570,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // use multi-shift CG
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
-    MultiShiftCG cg_m(m, mSloppy, *param, profileMulti);
+    SolverParam solverParam(*param);
+    MultiShiftCG cg_m(m, mSloppy, solverParam, profileMulti);
     cg_m(x, *b);  
+    solverParam.updateInvertParam(*param);
   }
 
   // experimenting with Minimum residual extrapolation
@@ -1630,11 +1637,15 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	mSloppy.shift = param->offset[i];
       }
       
-      param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      param->tol = param->tol_offset[i]; // set L2 tolerance
-      param->tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
-      CG cg(m, mSloppy, *param, profileMulti);
+      SolverParam solverParam(*param);
+      solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParam.tol = param->tol_offset[i]; // set L2 tolerance
+      solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
+
+      CG cg(m, mSloppy, solverParam, profileMulti);
       cg(*x[i], *b);        
+
+      solverParam.updateInvertParam(*param);
       param->true_res_offset[i] = param->true_res;
       param->true_res_hq_offset[i] = param->true_res_hq;
       
