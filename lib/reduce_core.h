@@ -495,6 +495,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   int reduce_length = siteUnroll ? x.RealLength() : x.Length();
   doubleN value;
 
+  // FIXME: use traits to encapsulate register type for shorts -
+  // will reduce template type parameters from 3 to 2
+
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
       const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do

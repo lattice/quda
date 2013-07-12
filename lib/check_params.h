@@ -41,6 +41,12 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   printfQuda("QUDA Gauge Parameters:\n");
 #endif
 
+#if defined INIT_PARAM
+  P(location, QUDA_CPU_FIELD_LOCATION);
+#else
+  P(location, QUDA_INVALID_FIELD_LOCATION);
+#endif
+
   for (int i=0; i<4; i++) P(X[i], INVALID_INT);
 
 #if defined INIT_PARAM
@@ -173,9 +179,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(input_location, QUDA_CPU_FIELD_LOCATION);
   P(output_location, QUDA_CPU_FIELD_LOCATION);
+  P(clover_location, QUDA_CPU_FIELD_LOCATION);
 #else
   P(input_location, QUDA_INVALID_FIELD_LOCATION);
   P(output_location, QUDA_INVALID_FIELD_LOCATION);
+  P(clover_location, QUDA_INVALID_FIELD_LOCATION);
 #endif
 
 #if defined INIT_PARAM

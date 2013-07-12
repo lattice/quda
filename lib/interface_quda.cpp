@@ -337,11 +337,12 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   checkGaugeParam(param);
 
-  // Set the specific cpu parameters and create the cpu gauge field
+  // Set the specific input parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
-
-  cpuGaugeField cpu(gauge_param);
-
+  GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) : 
+    static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
+    
   profileGauge.Start(QUDA_PROFILE_INIT);  
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
@@ -355,7 +356,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge.Stop(QUDA_PROFILE_INIT);  
 
   profileGauge.Start(QUDA_PROFILE_H2D);  
-  precise->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+  precise->copy(*in);
 
   param->gaugeGiB += precise->GBytes();
 
@@ -368,7 +369,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *sloppy = NULL;
   if (param->cuda_prec != param->cuda_prec_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
-    sloppy->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+    sloppy->copy(*precise);
     param->gaugeGiB += sloppy->GBytes();
   } else {
     sloppy = precise;
@@ -383,7 +384,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   cudaGaugeField *precondition = NULL;
   if (param->cuda_prec_sloppy != param->cuda_prec_precondition) {
     precondition = new cudaGaugeField(gauge_param);
-    precondition->loadCPUField(cpu, QUDA_CPU_FIELD_LOCATION);
+    precondition->copy(*sloppy);
     param->gaugeGiB += precondition->GBytes();
   } else {
     precondition = sloppy;
@@ -419,12 +420,17 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     errorQuda("Invalid gauge type");   
   }
 
+  delete in;
+
   profileGauge.Stop(QUDA_PROFILE_TOTAL);
 }
 
 void saveGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
   profileGauge.Start(QUDA_PROFILE_TOTAL);
+
+  if (param->location != QUDA_CPU_FIELD_LOCATION) 
+    errorQuda("Non-cpu output location not yet supported");
 
   if (!initialized) errorQuda("QUDA not initialized");
   checkGaugeParam(param);
@@ -506,23 +512,52 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     warningQuda("Uninverted clover term not loaded");
   }
 
+  // create a param for the cpu clover field
+  profileClover.Start(QUDA_PROFILE_INIT);
+  CloverFieldParam cpuParam;
+  cpuParam.nDim = 4;
+  for (int i=0; i<4; i++) cpuParam.x[i] = gaugePrecise->X()[i];
+  cpuParam.precision = inv_param->clover_cpu_prec;
+  cpuParam.order = inv_param->clover_order;
+  cpuParam.direct = h_clover ? true : false;
+  cpuParam.inverse = h_clovinv ? true : false;
+  cpuParam.clover = h_clover;
+  cpuParam.norm = 0;
+  cpuParam.cloverInv = h_clovinv;
+  cpuParam.invNorm = 0;
+  cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
+
+  CloverField *in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<CloverField*>(new cpuCloverField(cpuParam)) : 
+    static_cast<CloverField*>(new cudaCloverField(cpuParam));
+
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
   for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
-  clover_param.precision = inv_param->clover_cuda_prec;
+  clover_param.setPrecision(inv_param->clover_cuda_prec);
   clover_param.pad = inv_param->cl_pad;
+  clover_param.direct = h_clover ? true : false;
+  clover_param.inverse = h_clovinv ? true : false;
+  clover_param.create = QUDA_NULL_FIELD_CREATE;
+  cloverPrecise = new cudaCloverField(clover_param);
+  profileClover.Stop(QUDA_PROFILE_INIT);
 
   profileClover.Start(QUDA_PROFILE_H2D);
+  cloverPrecise->copy(*in);
+  profileClover.Stop(QUDA_PROFILE_H2D);
 
-  cloverPrecise = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
-				      inv_param->clover_order, clover_param);
   inv_param->cloverGiB = cloverPrecise->GBytes();
 
   // create the mirror sloppy clover field
   if (inv_param->clover_cuda_prec != inv_param->clover_cuda_prec_sloppy) {
-    clover_param.precision = inv_param->clover_cuda_prec_sloppy;
-    cloverSloppy = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
-				       inv_param->clover_order, clover_param); 
+    profileClover.Start(QUDA_PROFILE_INIT);
+    clover_param.setPrecision(inv_param->clover_cuda_prec_sloppy);
+    cloverSloppy = new cudaCloverField(clover_param); 
+    cloverSloppy->copy(*cloverPrecise);
+    profileClover.Stop(QUDA_PROFILE_INIT);
+    /*profileClover.Start(QUDA_PROFILE_H2D);
+    cloverSloppy->loadCPUField(cpu);
+    profileClover.Stop(QUDA_PROFILE_H2D);*/
     inv_param->cloverGiB += cloverSloppy->GBytes();
   } else {
     cloverSloppy = cloverPrecise;
@@ -531,14 +566,20 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   // create the mirror preconditioner clover field
   if (inv_param->clover_cuda_prec_sloppy != inv_param->clover_cuda_prec_precondition &&
       inv_param->clover_cuda_prec_precondition != QUDA_INVALID_PRECISION) {
-    clover_param.precision = inv_param->clover_cuda_prec_precondition;
-    cloverPrecondition = new cudaCloverField(h_clover, h_clovinv, inv_param->clover_cpu_prec, 
-					     inv_param->clover_order, clover_param); 
+    profileClover.Start(QUDA_PROFILE_INIT);
+    clover_param.setPrecision(inv_param->clover_cuda_prec_precondition);
+    cloverPrecondition = new cudaCloverField(clover_param);
+    cloverPrecondition->copy(*cloverSloppy);
+    profileClover.Stop(QUDA_PROFILE_INIT);
+    /*profileClover.Start(QUDA_PROFILE_H2D);
+    cloverPrecondition->loadCPUField(cpu);
+    profileClover.Stop(QUDA_PROFILE_H2D);*/
     inv_param->cloverGiB += cloverPrecondition->GBytes();
   } else {
     cloverPrecondition = cloverSloppy;
   }
-  profileClover.Stop(QUDA_PROFILE_H2D);
+
+  delete in; // delete object referencing input field
 
   popVerbosity();
 
@@ -1309,21 +1350,27 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     copyCuda(*in, *out);
+    solverParam.updateInvertParam(*param);
     delete solve;
   }
 
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
     delete solve;
   } else {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    Solver *solve = Solver::create(*param, m, mSloppy, mPre, profileInvert);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
     delete solve;
   }
 
@@ -1527,8 +1574,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // use multi-shift CG
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
-    MultiShiftCG cg_m(m, mSloppy, *param, profileMulti);
+    SolverParam solverParam(*param);
+    MultiShiftCG cg_m(m, mSloppy, solverParam, profileMulti);
     cg_m(x, *b);  
+    solverParam.updateInvertParam(*param);
   }
 
   // experimenting with Minimum residual extrapolation
@@ -1592,11 +1641,15 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	mSloppy.shift = param->offset[i];
       }
       
-      param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      param->tol = param->tol_offset[i]; // set L2 tolerance
-      param->tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
-      CG cg(m, mSloppy, *param, profileMulti);
+      SolverParam solverParam(*param);
+      solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      solverParam.tol = param->tol_offset[i]; // set L2 tolerance
+      solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
+
+      CG cg(m, mSloppy, solverParam, profileMulti);
       cg(*x[i], *b);        
+
+      solverParam.updateInvertParam(*param);
       param->true_res_offset[i] = param->true_res;
       param->true_res_hq_offset[i] = param->true_res_hq;
       

@@ -168,13 +168,11 @@ void init()
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   cpuFat = new cpuGaugeField(cpuFatParam);
-  cpuFat->exchangeGhost();
   ghost_fatlink = cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
   cpuLong = new cpuGaugeField(cpuLongParam);
-  cpuLong->exchangeGhost();
   ghost_longlink = cpuLong->Ghost();
 
   int x_face_size = X[1]*X[2]*X[3]/2;

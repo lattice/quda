@@ -97,9 +97,12 @@ namespace quda {
 
     double anisotropy;
     double tadpole;
-
+    double fat_link_max;
+    
     QudaFieldCreate create; // used to determine the type of field created
-  
+
+    bool ghostExchange; // whether we have exchanged the ghost or not
+
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
@@ -115,11 +118,23 @@ namespace quda {
     QudaGaugeFixed GaugeFixed() const { return fixed; }
     QudaGaugeFieldOrder FieldOrder() const { return order; }
     QudaFieldGeometry Geometry() const { return geometry; }
+
+    const double& LinkMax() const { return fat_link_max; }
+    int Nface() const { return nFace; }
   
     void checkField(const GaugeField &);
 
     const size_t& Bytes() const { return bytes; }
 
+    virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
+    virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
+    virtual void* Odd_p() { errorQuda("Not implemented"); return (void*)0;}
+
+    virtual const void* Gauge_p() const { errorQuda("Not implemented"); return (void*)0;}
+    virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
+    virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
+
+    virtual const void** Ghost() const { errorQuda("Not implemented"); return (const void**)0; }
   };
 
   class cudaGaugeField : public GaugeField {
@@ -139,8 +154,6 @@ namespace quda {
     void *even;
     void *odd;
 
-    double fat_link_max;
-  
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t evenTex;
     cudaTextureObject_t oddTex;
@@ -152,10 +165,11 @@ namespace quda {
     cudaGaugeField(const GaugeFieldParam &);
     virtual ~cudaGaugeField();
 
+    void exchangeGhost(); // exchange the ghost and store store in the padded region
+
+    void copy(const GaugeField &);     // generic gauge field copy
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
     void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
-
-    double LinkMax() const { return fat_link_max; }
 
     // (ab)use with care
     void* Gauge_p() { return gauge; }
@@ -178,16 +192,17 @@ namespace quda {
     // restores the cudaGaugeField to CUDA memory
     void restore();
 
+    void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
   };
 
   class cpuGaugeField : public GaugeField {
 
+    friend void cudaGaugeField::copy(const GaugeField &cpu);
     friend void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &);
     friend void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &) const;
 
   private:
     void **gauge; // the actual gauge field
-
     mutable void **ghost; // stores the ghost zone of the gauge field
     int pinned;
   
@@ -195,23 +210,57 @@ namespace quda {
     cpuGaugeField(const GaugeFieldParam &);
     virtual ~cpuGaugeField();
 
-    void exchangeGhost() const;
+    void exchangeGhost();
     const void** Ghost() const { return (const void**)ghost; }
 
     void* Gauge_p() { return gauge; }
+    const void* Gauge_p() const { return gauge; }
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
   };
 
   /**
      This is a debugging function, where we cast a gauge field into a
      spinor field so we can compute its L2 norm.
-     @param a The gauge field that we want the norm of
+     @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field
   */
-  double norm2(const cudaGaugeField &a);
+  double norm2(const cudaGaugeField &u);
+
+  /**
+     This function is used for  extracting the gauge ghost zone from a
+     gauge field array.  Defined in copy_gauge.cu.
+     @param out The output field to which we are copying
+     @param in The input field from which we are copying
+     @param location The location of where we are doing the copying (CPU or CUDA)
+     @param Out The output buffer (optional)
+     @param In The input buffer (optional)
+     @param ghostOut The output ghost buffer (optional)
+     @param ghostIn The input ghost buffer (optional)
+     @param type The type of copy we doing (0 body and ghost else ghost only)
+  */
+  // this is the function that is actually called, from here on down we instantiate all required templates
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
+			void *Out=0, void *In=0, void **ghostOut=0, void **ghostIn=0, int type=0);
+  /**
+     This function is used for  extracting the gauge ghost zone from a
+     gauge field array.  Defined in extract_gauge_ghost.cu.
+     @param u The gauge field from which we want to extract the ghost zone
+     @param ghost The array where we want to pack the ghost zone into
+  */
+  void extractGaugeGhost(const GaugeField &u, void **ghost);
+
+  /**
+     This function is used to calculate the maximum absolute value of
+     a gauge field array.  Defined in max_gauge.cu.  
+
+     @param u The gauge field from which we want to compute the max
+  */
+  double maxGauge(const GaugeField &u);
 
 } // namespace quda
 
+
+//FIXME remove this legacy macro
 #define gaugeSiteSize 18 // real numbers per gauge field
   
 #endif // _GAUGE_QUDA_H

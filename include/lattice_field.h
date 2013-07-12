@@ -95,6 +95,7 @@ namespace quda {
     const int* X() const { return x; }
     int Volume() const { return volume; }
     int VolumeCB() const { return volumeCB; }
+    const int* SurfaceCB() const { return surfaceCB; }
     int SurfaceCB(const int i) const { return surfaceCB[i]; }
     int Stride() const { return stride; }
     int Pad() const { return pad; }

@@ -650,6 +650,7 @@ hisq_force_test(void)
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.pad = 0; //X1*X2*X3/2;
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaMom = new cudaGaugeField(gParam); // Are the elements initialised to zero? - No!
 
   //record the mom pad

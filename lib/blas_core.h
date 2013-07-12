@@ -128,6 +128,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     return;
   }
 
+  // FIXME: use traits to encapsulate register type for shorts -
+  // will reduce template type parameters from 3 to 2
+
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     const int M = 1;
     Spinor<double2,double2,double2,M,writeX,0> X(x);

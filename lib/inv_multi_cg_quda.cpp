@@ -22,9 +22,9 @@
 
 namespace quda {
 
-  MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, QudaInvertParam &invParam,
+  MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param,
 			     TimeProfile &profile) 
-    : MultiShiftSolver(invParam, profile), mat(mat), matSloppy(matSloppy) {
+    : MultiShiftSolver(param, profile), mat(mat), matSloppy(matSloppy) {
 
   }
 
@@ -58,8 +58,8 @@ namespace quda {
   {
     profile.Start(QUDA_PROFILE_INIT);
 
-    int num_offset = invParam.num_offset;
-    double *offset = invParam.offset;
+    int num_offset = param.num_offset;
+    double *offset = param.offset;
  
     if (num_offset == 0) return;
 
@@ -70,8 +70,8 @@ namespace quda {
       printfQuda("Warning: inverting on zero-field source\n");
       for(int i=0; i<num_offset; ++i){
         *(x[i]) = b;
-	invParam.true_res_offset[i] = 0.0;
-	invParam.true_res_hq_offset[i] = 0.0;
+	param.true_res_offset[i] = 0.0;
+	param.true_res_hq_offset[i] = 0.0;
       }
       return;
     }
@@ -93,22 +93,22 @@ namespace quda {
     // flag whether we will be using reliable updates or not
     bool reliable = false;
     for (int j=0; j<num_offset; j++) 
-      if (invParam.tol_offset[j] < invParam.reliable_delta) reliable = true;
+      if (param.tol_offset[j] < param.delta) reliable = true;
 
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
     cudaColorSpinorField *r_sloppy;
     cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset];
     cudaColorSpinorField **y = reliable ? new cudaColorSpinorField*[num_offset] : NULL;
   
-    ColorSpinorParam param(b);
-    param.create = QUDA_ZERO_FIELD_CREATE;
+    ColorSpinorParam csParam(b);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
 
     if (reliable)
-      for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, param);
+      for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, csParam);
 
-    param.setPrecision(invParam.cuda_prec_sloppy);
+    csParam.setPrecision(param.precision_sloppy);
   
-    if (invParam.cuda_prec_sloppy == x[0]->Precision()) {
+    if (param.precision_sloppy == x[0]->Precision()) {
       for (int i=0; i<num_offset; i++){
 	x_sloppy[i] = x[i];
 	zeroCuda(*x_sloppy[i]);
@@ -116,23 +116,23 @@ namespace quda {
       r_sloppy = r;
     } else {
       for (int i=0; i<num_offset; i++)
-	x_sloppy[i] = new cudaColorSpinorField(*x[i], param);
-      param.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(*r, param);
+	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      r_sloppy = new cudaColorSpinorField(*r, csParam);
     }
   
     cudaColorSpinorField **p = new cudaColorSpinorField*[num_offset];  
     for (int i=0; i<num_offset; i++) p[i]= new cudaColorSpinorField(*r_sloppy);    
   
-    param.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, param);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
   
-    cudaColorSpinorField tmp1(*Ap, param);
+    cudaColorSpinorField tmp1(*Ap, csParam);
     cudaColorSpinorField *tmp2_p = &tmp1;
     // tmp only needed for multi-gpu Wilson-like kernels
     if (mat.Type() != typeid(DiracStaggeredPC).name() && 
 	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(*Ap, param);
+      tmp2_p = new cudaColorSpinorField(*Ap, csParam);
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
@@ -144,7 +144,7 @@ namespace quda {
     double r2[QUDA_MAX_MULTI_SHIFT];
     for (int i=0; i<num_offset; i++) {
       r2[i] = b2;
-      stop[i] = r2[i] * invParam.tol_offset[i] * invParam.tol_offset[i];
+      stop[i] = r2[i] * param.tol_offset[i] * param.tol_offset[i];
     }
 
     double r2_old;
@@ -160,7 +160,7 @@ namespace quda {
       maxrx[i] = rNorm[i];
       maxrr[i] = rNorm[i];
     }
-    double delta = invParam.reliable_delta;
+    double delta = param.delta;
     
     int k = 0;
     int rUpdate = 0;
@@ -169,12 +169,13 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
 
-    if (invParam.verbosity >= QUDA_VERBOSE) 
+    if (param.verbosity >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
-    while (r2[0] > stop[0] &&  k < invParam.maxiter) {
+    while (r2[0] > stop[0] &&  k < param.maxiter) {
       matSloppy(*Ap, *p[0], tmp1, tmp2);
-      if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) axpyCuda(offset[0], *p[0], *Ap);
+      // FIXME - this should be curried into the Dirac operator
+      if (r->Nspin()==4) axpyCuda(offset[0], *p[0], *Ap); 
 
       pAp = reDotProductCuda(*p[0], *Ap);
 
@@ -219,7 +220,7 @@ namespace quda {
 	}
 
 	mat(*r, *y[0], *x[0]); // here we can use x as tmp
-	if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) axpyCuda(offset[0], *y[0], *r);
+	if (r->Nspin()==4) axpyCuda(offset[0], *y[0], *r);
 
 	r2[0] = xmyNormCuda(b, *r);
 	for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
@@ -257,7 +258,7 @@ namespace quda {
       for (int j=1; j<num_offset_now; j++) {
 	r2[j] = zeta[j] * zeta[j] * r2[0];
 	if (r2[j] < stop[j]) {
-	  if (invParam.verbosity >= QUDA_VERBOSE)
+	  if (param.verbosity >= QUDA_VERBOSE)
 	    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
 	  num_offset_now--;
 	}
@@ -265,7 +266,7 @@ namespace quda {
 
       k++;
       
-      if (invParam.verbosity >= QUDA_VERBOSE) 
+      if (param.verbosity >= QUDA_VERBOSE) 
 	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }
     
@@ -278,35 +279,35 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
-    if (k==invParam.maxiter) warningQuda("Exceeded maximum iterations %d\n", invParam.maxiter);
+    if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
     
-    invParam.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
-    invParam.gflops = gflops;
-    invParam.iter += k;
+    param.gflops = gflops;
+    param.iter += k;
 
     for(int i=0; i < num_offset; i++) { 
       mat(*r, *x[i]); 
-      if (invParam.dslash_type != QUDA_ASQTAD_DSLASH) {
+      if (r->Nspin()==4) {
 	axpyCuda(offset[i], *x[i], *r); // Offset it.
       } else if (i!=0) {
 	axpyCuda(offset[i]-offset[0], *x[i], *r); // Offset it.
       }
       double true_res = xmyNormCuda(b, *r);
-      invParam.true_res_offset[i] = sqrt(true_res/b2);
+      param.true_res_offset[i] = sqrt(true_res/b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
-      invParam.true_res_hq_offset[i] = sqrt(HeavyQuarkResidualNormCuda(*x[i], *r).z);
+      param.true_res_hq_offset[i] = sqrt(HeavyQuarkResidualNormCuda(*x[i], *r).z);
 #else
-      invParam.true_res_hq_offset[i] = 0.0;
+      param.true_res_hq_offset[i] = 0.0;
 #endif   
     }
 
-    if (invParam.verbosity >= QUDA_SUMMARIZE){
+    if (param.verbosity >= QUDA_SUMMARIZE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
       for(int i=0; i < num_offset; i++) { 
 	printfQuda(" shift=%d, relative residua: iterated = %e, true = %e\n", 
-		   i, sqrt(r2[i]/b2), invParam.true_res_offset[i]);
+		   i, sqrt(r2[i]/b2), param.true_res_offset[i]);
       }
     }      
   
@@ -331,7 +332,7 @@ namespace quda {
 
     delete Ap;
   
-    if (invParam.cuda_prec_sloppy != x[0]->Precision()) {
+    if (param.precision_sloppy != x[0]->Precision()) {
       for (int i=0; i<num_offset; i++) delete x_sloppy[i];
       delete r_sloppy;
     }

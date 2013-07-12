@@ -37,6 +37,7 @@ void init() {
   param.reconstruct_sloppy = link_recon;
   
   param.type = QUDA_WILSON_LINKS;
+  param.tadpole_coeff = 0.8;
   param.gauge_order = QUDA_QDP_GAUGE_ORDER;
 
   param.X[0] = xdim;

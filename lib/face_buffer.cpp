@@ -377,15 +377,31 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
 }
 
 
-void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf)
+void FaceBuffer::exchangeLink(void** ghost_link, void** link_sendbuf, QudaFieldLocation location)
 {
   MsgHandle *mh_from_back[4];
   MsgHandle *mh_send_fwd[4];
 
+  void *send[4];
+  void *receive[4];
+  if (location == QUDA_CPU_FIELD_LOCATION) {
+    for (int i=0; i<nDimComms; i++) {
+      send[i] = link_sendbuf[i];
+      receive[i] = ghost_link[i];
+    }
+  } else { // FIXME for CUDA field copy back to the CPU
+    for (int i=0; i<nDimComms; i++) {
+      int len = 2*nFace*faceVolumeCB[i]*Ninternal;
+      send[i] = allocatePinned(len);
+      receive[i] = allocatePinned(len);
+      cudaMemcpy(send[i], link_sendbuf[i], len, cudaMemcpyDeviceToHost);
+    }
+  }
+
   for (int i=0; i<nDimComms; i++) {
     int len = 2*nFace*faceVolumeCB[i]*Ninternal;
-    mh_send_fwd[i] = comm_declare_send_relative(link_sendbuf[i], i, +1, len*precision);
-    mh_from_back[i] = comm_declare_receive_relative(ghost_link[i], i, -1, len*precision);
+    mh_send_fwd[i] = comm_declare_send_relative(send[i], i, +1, len*precision);
+    mh_from_back[i] = comm_declare_receive_relative(receive[i], i, -1, len*precision);
   }
 
   for (int i=0; i<nDimComms; i++) {
@@ -396,6 +412,15 @@ void FaceBuffer::exchangeCpuLink(void** ghost_link, void** link_sendbuf)
   for (int i=0; i<nDimComms; i++) {
     comm_wait(mh_send_fwd[i]);
     comm_wait(mh_from_back[i]);
+  }
+
+  if (location == QUDA_CUDA_FIELD_LOCATION) {
+    for (int i=0; i<nDimComms; i++) {
+      int len = 2*nFace*faceVolumeCB[i]*Ninternal;
+      cudaMemcpy(ghost_link[i], receive[i], len, cudaMemcpyHostToDevice);
+      freePinned(send[i]);
+      freePinned(receive[i]);
+    }
   }
 
   for (int i=0; i<nDimComms; i++) {

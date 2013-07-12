@@ -16,20 +16,20 @@
 
 namespace quda {
 
-  MR::MR(DiracMatrix &mat, QudaInvertParam &invParam, TimeProfile &profile) :
-    Solver(invParam, profile), mat(mat), init(false), allocate_r(false)
+  MR::MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), init(false), allocate_r(false)
   {
  
   }
 
   MR::~MR() {
-    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile.Start(QUDA_PROFILE_FREE);
+    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Start(QUDA_PROFILE_FREE);
     if (init) {
       if (allocate_r) delete rp;
       delete Arp;
       delete tmpp;
     }
-    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
+    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
   }
 
   void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
@@ -38,19 +38,19 @@ namespace quda {
     globalReduce = false; // use local reductions for DD solver
 
     if (!init) {
-      ColorSpinorParam param(x);
-      param.create = QUDA_ZERO_FIELD_CREATE;
-      if (invParam.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
-	rp = new cudaColorSpinorField(x, param); 
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
+	rp = new cudaColorSpinorField(x, csParam); 
 	allocate_r = true;
       }
       Arp = new cudaColorSpinorField(x);
-      tmpp = new cudaColorSpinorField(x, param); //temporary for mat-vec
+      tmpp = new cudaColorSpinorField(x, csParam); //temporary for mat-vec
 
       init = true;
     }
     cudaColorSpinorField &r = 
-      (invParam.preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp : b;
+      (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp : b;
     cudaColorSpinorField &Ar = *Arp;
     cudaColorSpinorField &tmp = *tmpp;
 
@@ -66,7 +66,7 @@ namespace quda {
       r2 = 1.0; // by definition by this is now true
     }
 
-    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
+    if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
       quda::blas_flops = 0;
       profile.Start(QUDA_PROFILE_COMPUTE);
     }
@@ -74,14 +74,14 @@ namespace quda {
     double omega = 1.0;
 
     int k = 0;
-    if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
+    if (param.verbosity >= QUDA_DEBUG_VERBOSE) {
       double x2 = norm2(x);
       double3 Ar3 = cDotProductNormBCuda(Ar, r);
       printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e, %e), x2 = %e\n", 
 		 k, Ar3.z, Ar3.x, Ar3.y, x2);
     }
 
-    while (k < invParam.maxiter && r2 > 0.0) {
+    while (k < param.maxiter && r2 > 0.0) {
     
       mat(Ar, r, tmp);
 
@@ -92,19 +92,19 @@ namespace quda {
       //r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
       caxpyXmazCuda(omega*alpha, r, x, Ar);
 
-      if (invParam.verbosity >= QUDA_DEBUG_VERBOSE) {
+      if (param.verbosity >= QUDA_DEBUG_VERBOSE) {
 	double x2 = norm2(x);
 	double r2 = norm2(r);
 	printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e,%e) x2 = %e\n", 
 		   k+1, r2, Ar3.x, Ar3.y, x2);
-      } else if (invParam.verbosity >= QUDA_VERBOSE) {
+      } else if (param.verbosity >= QUDA_VERBOSE) {
 	printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, Ar3.x, Ar3.y);
       }
 
       k++;
     }
   
-    if (invParam.verbosity >= QUDA_VERBOSE) {
+    if (param.verbosity >= QUDA_VERBOSE) {
       mat(Ar, r, tmp);    
       Complex Ar2 = cDotProductCuda(Ar, r);
       printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
@@ -113,29 +113,29 @@ namespace quda {
     // Obtain global solution by rescaling
     if (b2 > 0.0) axCuda(sqrt(b2), x);
 
-    if (k>=invParam.maxiter && invParam.verbosity >= QUDA_SUMMARIZE) 
-      warningQuda("Exceeded maximum iterations %d", invParam.maxiter);
+    if (k>=param.maxiter && param.verbosity >= QUDA_SUMMARIZE) 
+      warningQuda("Exceeded maximum iterations %d", param.maxiter);
   
-    if (invParam.inv_type_precondition != QUDA_GCR_INVERTER) {
+    if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
         profile.Stop(QUDA_PROFILE_COMPUTE);
         profile.Start(QUDA_PROFILE_EPILOGUE);
-	invParam.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+	param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
 	double gflops = (quda::blas_flops + mat.flops())*1e-9;
 	reduceDouble(gflops);
 	
-	invParam.gflops += gflops;
-	invParam.iter += k;
+	param.gflops += gflops;
+	param.iter += k;
 	
 	// Calculate the true residual
 	r2 = norm2(r);
 	mat(r, x);
 	double true_res = xmyNormCuda(b, r);
-	invParam.true_res = sqrt(true_res / b2);
+	param.true_res = sqrt(true_res / b2);
 
-	if (invParam.verbosity >= QUDA_SUMMARIZE) {
+	if (param.verbosity >= QUDA_SUMMARIZE) {
 	  printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		     k, sqrt(r2/b2), invParam.true_res);    
+		     k, sqrt(r2/b2), param.true_res);    
 	}
 
 	// reset the flops counters
