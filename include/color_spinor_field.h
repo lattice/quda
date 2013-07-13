@@ -377,10 +377,6 @@ namespace quda {
     void create(const QudaFieldCreate);
     void destroy();
 
-    void createOrder(); // create the accessor for a given field ordering
-    ColorSpinorFieldOrder<double> *order_double; // accessor functor used to access fp64 elements
-    ColorSpinorFieldOrder<float> *order_single; // accessor functor used to access fp32 elements
-
   public:
     //cpuColorSpinorField();
     cpuColorSpinorField(const cpuColorSpinorField&);
@@ -412,6 +408,11 @@ namespace quda {
 
     QudaFieldLocation Location() const;
   };
+
+  void copyGenericColorSpinor(cpuColorSpinorField &out, const cpuColorSpinorField &in);
+  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
+  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
+  void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
 
 } // namespace quda
 

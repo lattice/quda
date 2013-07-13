@@ -103,4 +103,230 @@ namespace quda {
     }
   };
 
+template <typename Float, int Ns, int Nc, int N>
+struct FloatNOrder {
+  Float *field;
+  int volume;
+  int stride;
+  FloatNOrder(Float *field, int volume, int stride)
+    : field(field), volume(volume), stride(stride) { ; }
+  virtual ~FloatNOrder() { ; }
+
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  int internal_idx = (s*Nc + c)*2 + z;
+	  int pad_idx = internal_idx / N;
+	  v[(s*Nc+c)*2+z] = field[(pad_idx * stride + x)*N + internal_idx % N];
+	}
+      }
+    }
+  }
+
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  int internal_idx = (s*Nc + c)*2 + z;
+	  int pad_idx = internal_idx / N;
+	  field[(pad_idx * stride + x)*N + internal_idx % N] = v[(s*Nc+c)*2+z];
+	}
+      }
+    }
+  }
+
+  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
+};
+
+/**! float4 load specialization to obtain full coalescing. */
+template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24], int x, int volume) const {
+  //read4<4,3>(v, field, stride, x);
+#pragma unroll
+  for (int i=0; i<4*3*2; i+=4) {
+    float4 tmp = ((float4*)field)[i/4 * stride + x];
+    v[i] = tmp.x; v[i+1] = tmp.y; v[i+2] = tmp.z; v[i+3] = tmp.w;
+  }
+}
+
+/**! float4 save specialization to obtain full coalescing. */
+template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float v[24], int x, int volume) {
+#pragma unroll
+  for (int i=0; i<4*3*2; i+=4) {
+    float4 tmp = make_float4(v[i], v[i+1], v[i+2], v[i+3]);
+    ((float4*)field)[i/4 * stride + x] = tmp;
+  }
+}
+
+template <typename Float, int Ns, int Nc>
+struct SpaceColorSpinorOrder {
+  Float *field;
+  int volume;
+  int stride;
+  SpaceColorSpinorOrder(Float *field, int volume, int stride) 
+    : field(field), volume(volume), stride(stride) 
+  { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
+  virtual ~SpaceColorSpinorOrder() { ; }
+
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  v[(s*Nc+c)*2+z] = field[((x*Nc + c)*Ns + s)*2 + z]; 
+	}
+      }
+    }
+  }
+
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  field[((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
+	}
+      }
+    }
+  }
+
+  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
+};
+
+template <typename Float, int Ns, int Nc>
+  __device__ inline void load_shared(Float v[Ns*Nc*2], Float *field, int x, int volume) {
+  const int tid = threadIdx.x;
+  const int vec_length = Ns*Nc*2;
+
+  // the length of the block on the last grid site might not extend to all threads
+  const int block_dim = (blockIdx.x == gridDim.x-1) ? 
+    volume - (gridDim.x-1)*blockDim.x : blockDim.x;
+
+  extern __shared__ Float s_data[];
+
+  int x0 = x-tid;
+  int i=tid;
+  while (i<vec_length*block_dim) {
+    int space_idx = i / vec_length;
+    int internal_idx = i - space_idx*vec_length;
+    int sh_idx = internal_idx*(blockDim.x+1) + space_idx;
+    s_data[sh_idx] = field[x0*vec_length + i];
+    i += block_dim;
+  }
+
+  __syncthreads();
+
+#pragma unroll
+  for (int s=0; s<Ns; s++)
+#pragma unroll
+    for (int c=0; c<Nc; c++) 
+#pragma unroll
+      for (int z=0; z<2; z++) { // block+1 to avoid bank conflicts
+	int sh_idx = ((c*Ns+s)*2+z)*(blockDim.x+1) + tid;
+	v[(s*Nc + c)*2 + z] = s_data[sh_idx];
+      }
+
+} 
+
+template <typename Float, int Ns, int Nc>
+  __device__ inline void save_shared(Float *field, const Float v[Ns*Nc*2], int x, int volume) {
+  const int tid = threadIdx.x;
+  const int vec_length = Ns*Nc*2;
+
+  // the length of the block on the last grid site might not extend to all threads
+  const int block_dim = (blockIdx.x == gridDim.x-1) ? 
+    volume - (gridDim.x-1)*blockDim.x : blockDim.x;
+
+  extern __shared__ Float s_data[];
+
+#pragma unroll
+  for (int s=0; s<Ns; s++)
+#pragma unroll
+    for (int c=0; c<Nc; c++) 
+#pragma unroll
+      for (int z=0; z<2; z++) { // block+1 to avoid bank conflicts
+	int sh_idx = ((c*Ns+s)*2+z)*(blockDim.x+1) + tid;
+	s_data[sh_idx] = v[(s*Nc + c)*2 + z];
+      }
+
+  __syncthreads();
+
+  int x0 = x-tid;
+  int i=tid;
+  while (i<vec_length*block_dim) {
+    int space_idx = i / vec_length;
+    int internal_idx = i - space_idx*vec_length;
+    int sh_idx = internal_idx*(blockDim.x+1) + space_idx;
+    field[x0*vec_length + i] = s_data[sh_idx];
+    i += block_dim;
+  }
+
+} 
+
+/**! float load specialization to obtain full coalescing. */
+template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x, int volume) const {
+#ifdef __CUDA_ARCH__
+  load_shared<float, 4, 3>(v, field, x, volume);
+#else
+  const int Ns=4;
+  const int Nc=3;
+  for (int s=0; s<Ns; s++) {
+    for (int c=0; c<Nc; c++) {
+      for (int z=0; z<2; z++) {
+	v[(s*Nc+c)*2+z] = field[((x*Nc + c)*Ns + s)*2 + z]; 
+      }
+    }
+  }
+#endif
+}
+
+/**! float save specialization to obtain full coalescing. */
+template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x, int volume) {
+#ifdef __CUDA_ARCH__
+  save_shared<float, 4, 3>(field, v, x, volume);
+#else
+  const int Ns=4;
+  const int Nc=3;
+  for (int s=0; s<Ns; s++) {
+    for (int c=0; c<Nc; c++) {
+      for (int z=0; z<2; z++) {
+	field[((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
+      }
+    }
+  }
+#endif
+}
+
+template <typename Float, int Ns, int Nc>
+struct SpaceSpinorColorOrder {
+  Float *field;
+  int volume;
+  int stride;
+  SpaceSpinorColorOrder(Float *field, int volume, int stride) 
+   : field(field), volume(volume), stride(stride)
+  { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
+  virtual ~SpaceSpinorColorOrder() { ; }
+
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  v[(s*Nc+c)*2+z] = field[((x*Ns + s)*Nc + c)*2 + z];
+	}
+      }
+    }
+  }
+
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
+    for (int s=0; s<Ns; s++) {
+      for (int c=0; c<Nc; c++) {
+	for (int z=0; z<2; z++) {
+	  field[((x*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+	}
+      }
+    }
+  }
+
+  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
+};
+
+
 } // namespace quda

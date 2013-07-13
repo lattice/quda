@@ -11,6 +11,8 @@
 #include <face_quda.h>
 #include <dslash_quda.h>
 
+#include <pack_spinor.h>
+
 #ifdef DEVICE_PACK
 #define REORDER_LOCATION QUDA_CUDA_FIELD_LOCATION
 #else
@@ -399,8 +401,6 @@ namespace quda {
     checkField(*this, src);
     copyCuda(*this, src);
   }
-
-#include <pack_spinor.h>
 
 #define REORDER_SPINOR_FIELD_NS(DST, SRC, dst, src, myNs, loc)		\
   if ((dst).Precision() == QUDA_DOUBLE_PRECISION) {			\
