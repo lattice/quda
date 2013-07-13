@@ -14,9 +14,9 @@ namespace quda {
     cpuColorSpinorField &field;
 
   public:
-  ColorSpinorFieldOrder(cpuColorSpinorField &field) : field(field) { ; }
+    ColorSpinorFieldOrder(cpuColorSpinorField &field) : field(field) { ; }
     virtual ~ColorSpinorFieldOrder() { ; }
-
+    
     virtual const Float& operator()(const int &x, const int &s, const int &c, const int &z) const = 0;
     virtual Float& operator()(const int &x, const int &s, const int &c, const int &z) = 0;
 
@@ -112,7 +112,7 @@ struct FloatNOrder {
     : field(field), volume(volume), stride(stride) { ; }
   virtual ~FloatNOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -124,7 +124,7 @@ struct FloatNOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -136,12 +136,23 @@ struct FloatNOrder {
     }
   }
 
+  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+    int internal_idx = (s*Nc + c)*2 + z;
+    int pad_idx = internal_idx / N;    
+    return field[(pad_idx * stride + x)*N + internal_idx % N];
+  }
+
+  __device__ __host__ Float& operator()(int x, int s, int c, int z) {
+    int internal_idx = (s*Nc + c)*2 + z;
+    int pad_idx = internal_idx / N;    
+    return field[(pad_idx * stride + x)*N + internal_idx % N];
+  }
+
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };
 
 /**! float4 load specialization to obtain full coalescing. */
-template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24], int x, int volume) const {
-  //read4<4,3>(v, field, stride, x);
+template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24], int x) const {
 #pragma unroll
   for (int i=0; i<4*3*2; i+=4) {
     float4 tmp = ((float4*)field)[i/4 * stride + x];
@@ -150,7 +161,7 @@ template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24],
 }
 
 /**! float4 save specialization to obtain full coalescing. */
-template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float v[24], int x, int volume) {
+template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float v[24], int x) {
 #pragma unroll
   for (int i=0; i<4*3*2; i+=4) {
     float4 tmp = make_float4(v[i], v[i+1], v[i+2], v[i+3]);
@@ -168,7 +179,7 @@ struct SpaceColorSpinorOrder {
   { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceColorSpinorOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -178,7 +189,7 @@ struct SpaceColorSpinorOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -186,6 +197,14 @@ struct SpaceColorSpinorOrder {
 	}
       }
     }
+  }
+
+  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+    return field[((x*Nc + c)*Ns + s)*2 + z];
+  }
+
+  __device__ __host__ Float& operator()(int x, int s, int c, int z) {
+    return field[((x*Nc + c)*Ns + s)*2 + z];
   }
 
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
@@ -262,7 +281,7 @@ template <typename Float, int Ns, int Nc>
 } 
 
 /**! float load specialization to obtain full coalescing. */
-template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x, int volume) const {
+template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x) const {
 #ifdef __CUDA_ARCH__
   load_shared<float, 4, 3>(v, field, x, volume);
 #else
@@ -279,7 +298,7 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::l
 }
 
 /**! float save specialization to obtain full coalescing. */
-template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x, int volume) {
+template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x) {
 #ifdef __CUDA_ARCH__
   save_shared<float, 4, 3>(field, v, x, volume);
 #else
@@ -305,7 +324,7 @@ struct SpaceSpinorColorOrder {
   { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceSpinorColorOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x, int volume) const {
+  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -315,7 +334,7 @@ struct SpaceSpinorColorOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x, int volume) {
+  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -324,6 +343,15 @@ struct SpaceSpinorColorOrder {
       }
     }
   }
+
+  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+    return field[((x*Ns + s)*Nc + c)*2 + z];
+  }
+
+  __device__ __host__ Float& operator()(int x, int s, int c, int z) {
+    return field[((x*Ns + s)*Nc + c)*2 + z];
+  }
+
 
   size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
 };

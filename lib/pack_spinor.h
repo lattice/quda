@@ -79,9 +79,9 @@ namespace quda {
     for (int x=0; x<volume; x++) {
       FloatIn in[Ns*Nc*2];
       FloatOut out[Ns*Nc*2];
-      inOrder.load(in, x, volume);
+      inOrder.load(in, x);
       basis(out, in);
-      outOrder.save(out, x, volume);
+      outOrder.save(out, x);
     }
   }
 
@@ -92,11 +92,11 @@ namespace quda {
 
     FloatIn in[Ns*Nc*2];
     FloatOut out[Ns*Nc*2];
-    inOrder.load(in, x, volume);
+    inOrder.load(in, x);
 
     if (x >= volume) return;
     basis(out, in);
-    outOrder.save(out, x, volume);
+    outOrder.save(out, x);
   }
 
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
