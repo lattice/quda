@@ -106,10 +106,10 @@ namespace quda {
 template <typename Float, int Ns, int Nc, int N>
 struct FloatNOrder {
   Float *field;
-  int volume;
+  int volumeCB;
   int stride;
-  FloatNOrder(Float *field, int volume, int stride)
-    : field(field), volume(volume), stride(stride) { ; }
+  FloatNOrder(const ColorSpinorField &a, Float *field_=0)
+  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()) { ; }
   virtual ~FloatNOrder() { ; }
 
   __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
@@ -148,7 +148,7 @@ struct FloatNOrder {
     return field[(pad_idx * stride + x)*N + internal_idx % N];
   }
 
-  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
+  size_t Bytes() const { return volumeCB * Nc * Ns * 2 * sizeof(Float); }
 };
 
 /**! float4 load specialization to obtain full coalescing. */
@@ -172,11 +172,11 @@ template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float 
 template <typename Float, int Ns, int Nc>
 struct SpaceColorSpinorOrder {
   Float *field;
-  int volume;
+  int volumeCB;
   int stride;
-  SpaceColorSpinorOrder(Float *field, int volume, int stride) 
-    : field(field), volume(volume), stride(stride) 
-  { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
+  SpaceColorSpinorOrder(const ColorSpinorField &a, Float *field_=0) 
+  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()) 
+  { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceColorSpinorOrder() { ; }
 
   __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
@@ -207,7 +207,7 @@ struct SpaceColorSpinorOrder {
     return field[((x*Nc + c)*Ns + s)*2 + z];
   }
 
-  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
+  size_t Bytes() const { return volumeCB * Nc * Ns * 2 * sizeof(Float); }
 };
 
 template <typename Float, int Ns, int Nc>
@@ -246,13 +246,13 @@ template <typename Float, int Ns, int Nc>
 } 
 
 template <typename Float, int Ns, int Nc>
-  __device__ inline void save_shared(Float *field, const Float v[Ns*Nc*2], int x, int volume) {
+  __device__ inline void save_shared(Float *field, const Float v[Ns*Nc*2], int x, int volumeCB) {
   const int tid = threadIdx.x;
   const int vec_length = Ns*Nc*2;
 
   // the length of the block on the last grid site might not extend to all threads
   const int block_dim = (blockIdx.x == gridDim.x-1) ? 
-    volume - (gridDim.x-1)*blockDim.x : blockDim.x;
+    volumeCB - (gridDim.x-1)*blockDim.x : blockDim.x;
 
   extern __shared__ Float s_data[];
 
@@ -283,7 +283,7 @@ template <typename Float, int Ns, int Nc>
 /**! float load specialization to obtain full coalescing. */
 template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::load(float v[24], int x) const {
 #ifdef __CUDA_ARCH__
-  load_shared<float, 4, 3>(v, field, x, volume);
+  load_shared<float, 4, 3>(v, field, x, volumeCB);
 #else
   const int Ns=4;
   const int Nc=3;
@@ -300,7 +300,7 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::l
 /**! float save specialization to obtain full coalescing. */
 template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::save(const float v[24], int x) {
 #ifdef __CUDA_ARCH__
-  save_shared<float, 4, 3>(field, v, x, volume);
+  save_shared<float, 4, 3>(field, v, x, volumeCB);
 #else
   const int Ns=4;
   const int Nc=3;
@@ -317,11 +317,11 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::s
 template <typename Float, int Ns, int Nc>
 struct SpaceSpinorColorOrder {
   Float *field;
-  int volume;
+  int volumeCB;
   int stride;
-  SpaceSpinorColorOrder(Float *field, int volume, int stride) 
-   : field(field), volume(volume), stride(stride)
-  { if (volume != stride) errorQuda("Stride must equal volume for this field order"); }
+  SpaceSpinorColorOrder(const ColorSpinorField &a, Float *field_=0) 
+  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride())
+  { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceSpinorColorOrder() { ; }
 
   __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
@@ -353,7 +353,7 @@ struct SpaceSpinorColorOrder {
   }
 
 
-  size_t Bytes() const { return volume * Nc * Ns * 2 * sizeof(Float); }
+  size_t Bytes() const { return volumeCB * Nc * Ns * 2 * sizeof(Float); }
 };
 
 
