@@ -276,6 +276,8 @@ namespace quda {
     static void *buffer_d;// device_mapped pointer to buffer
     static bool bufferInit;
     static size_t bufferBytes;
+    static bool bufferInit_d;
+    static size_t bufferBytes_d;
 
     static void* ghostFaceBuffer; // gpu memory
     static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
@@ -290,6 +292,7 @@ namespace quda {
     void zeroPad();
   
     void resizeBuffer(size_t bytes) const;
+    void resizeDeviceBuffer(size_t bytes) const;
 
     /**
        This function is responsible for calling the correct copy kernel
@@ -409,7 +412,9 @@ namespace quda {
     QudaFieldLocation Location() const;
   };
 
-  void copyGenericColorSpinor(cpuColorSpinorField &out, const cpuColorSpinorField &in);
+  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
+			      QudaFieldLocation location, void *Dst=0, void *Src=0, 
+			      void *dstNorm=0, void*srcNorm=0);
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x);

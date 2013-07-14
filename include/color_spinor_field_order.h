@@ -5,6 +5,8 @@
   also.
 */
 
+#include <register_traits.h>
+
 namespace quda {
 
   template <typename Float>
@@ -105,44 +107,57 @@ namespace quda {
 
 template <typename Float, int Ns, int Nc, int N>
 struct FloatNOrder {
+  typedef typename mapper<Float>::type RegType;
   Float *field;
+  float *norm;
   int volumeCB;
   int stride;
-  FloatNOrder(const ColorSpinorField &a, Float *field_=0)
-  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()) { ; }
+  FloatNOrder(const ColorSpinorField &a, Float *field_=0, float *norm_=0)
+  : field(field_ ? field_ : (Float*)a.V()), norm(norm_ ? norm_ : (float*)a.Norm()), 
+    volumeCB(a.VolumeCB()), stride(a.Stride()) { ; }
   virtual ~FloatNOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
+  __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
 	  int internal_idx = (s*Nc + c)*2 + z;
 	  int pad_idx = internal_idx / N;
-	  v[(s*Nc+c)*2+z] = field[(pad_idx * stride + x)*N + internal_idx % N];
+	  copy(v[(s*Nc+c)*2+z], field[(pad_idx * stride + x)*N + internal_idx % N]);
+	  if (sizeof(Float)==sizeof(short)) v[(s*Nc+c)*2+z] *= norm[x];
 	}
       }
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
+  __device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+    RegType scale = 0.0;
+    if (sizeof(Float)==sizeof(short)) {
+      for (int i=0; i<2*Ns*Nc; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
+      norm[x] = scale;
+    }
+
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
 	  int internal_idx = (s*Nc + c)*2 + z;
 	  int pad_idx = internal_idx / N;
-	  field[(pad_idx * stride + x)*N + internal_idx % N] = v[(s*Nc+c)*2+z];
+	  if (sizeof(Float)==sizeof(short))
+	    copy(field[(pad_idx * stride + x)*N + internal_idx % N], v[(s*Nc+c)*2+z] / scale);
+	  else
+	    copy(field[(pad_idx * stride + x)*N + internal_idx % N], v[(s*Nc+c)*2+z]);
 	}
       }
     }
   }
 
-  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+  __device__ __host__ const RegType& operator()(int x, int s, int c, int z) const {
     int internal_idx = (s*Nc + c)*2 + z;
     int pad_idx = internal_idx / N;    
     return field[(pad_idx * stride + x)*N + internal_idx % N];
   }
 
-  __device__ __host__ Float& operator()(int x, int s, int c, int z) {
+  __device__ __host__ RegType& operator()(int x, int s, int c, int z) {
     int internal_idx = (s*Nc + c)*2 + z;
     int pad_idx = internal_idx / N;    
     return field[(pad_idx * stride + x)*N + internal_idx % N];
@@ -171,6 +186,7 @@ template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float 
 
 template <typename Float, int Ns, int Nc>
 struct SpaceColorSpinorOrder {
+  typedef typename mapper<Float>::type RegType;
   Float *field;
   int volumeCB;
   int stride;
@@ -179,7 +195,7 @@ struct SpaceColorSpinorOrder {
   { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceColorSpinorOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
+  __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -189,7 +205,7 @@ struct SpaceColorSpinorOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
+  __device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -199,11 +215,11 @@ struct SpaceColorSpinorOrder {
     }
   }
 
-  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+  __device__ __host__ const RegType& operator()(int x, int s, int c, int z) const {
     return field[((x*Nc + c)*Ns + s)*2 + z];
   }
 
-  __device__ __host__ Float& operator()(int x, int s, int c, int z) {
+  __device__ __host__ RegType& operator()(int x, int s, int c, int z) {
     return field[((x*Nc + c)*Ns + s)*2 + z];
   }
 
@@ -211,7 +227,7 @@ struct SpaceColorSpinorOrder {
 };
 
 template <typename Float, int Ns, int Nc>
-  __device__ inline void load_shared(Float v[Ns*Nc*2], Float *field, int x, int volume) {
+  __device__ inline void load_shared(typename mapper<Float>::type v[Ns*Nc*2], Float *field, int x, int volume) {
   const int tid = threadIdx.x;
   const int vec_length = Ns*Nc*2;
 
@@ -219,7 +235,7 @@ template <typename Float, int Ns, int Nc>
   const int block_dim = (blockIdx.x == gridDim.x-1) ? 
     volume - (gridDim.x-1)*blockDim.x : blockDim.x;
 
-  extern __shared__ Float s_data[];
+  extern __shared__ typename mapper<Float>::type s_data[];
 
   int x0 = x-tid;
   int i=tid;
@@ -246,7 +262,7 @@ template <typename Float, int Ns, int Nc>
 } 
 
 template <typename Float, int Ns, int Nc>
-  __device__ inline void save_shared(Float *field, const Float v[Ns*Nc*2], int x, int volumeCB) {
+  __device__ inline void save_shared(Float *field, const typename mapper<Float>::type v[Ns*Nc*2], int x, int volumeCB) {
   const int tid = threadIdx.x;
   const int vec_length = Ns*Nc*2;
 
@@ -254,7 +270,7 @@ template <typename Float, int Ns, int Nc>
   const int block_dim = (blockIdx.x == gridDim.x-1) ? 
     volumeCB - (gridDim.x-1)*blockDim.x : blockDim.x;
 
-  extern __shared__ Float s_data[];
+  extern __shared__ typename mapper<Float>::type s_data[];
 
 #pragma unroll
   for (int s=0; s<Ns; s++)
@@ -316,6 +332,7 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::s
 
 template <typename Float, int Ns, int Nc>
 struct SpaceSpinorColorOrder {
+  typedef typename mapper<Float>::type RegType;
   Float *field;
   int volumeCB;
   int stride;
@@ -324,7 +341,7 @@ struct SpaceSpinorColorOrder {
   { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
   virtual ~SpaceSpinorColorOrder() { ; }
 
-  __device__ __host__ inline void load(Float v[Ns*Nc*2], int x) const {
+  __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -334,7 +351,7 @@ struct SpaceSpinorColorOrder {
     }
   }
 
-  __device__ __host__ inline void save(const Float v[Ns*Nc*2], int x) {
+  __device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -344,11 +361,11 @@ struct SpaceSpinorColorOrder {
     }
   }
 
-  __device__ __host__ const Float& operator()(int x, int s, int c, int z) const {
+  __device__ __host__ const RegType& operator()(int x, int s, int c, int z) const {
     return field[((x*Ns + s)*Nc + c)*2 + z];
   }
 
-  __device__ __host__ Float& operator()(int x, int s, int c, int z) {
+  __device__ __host__ RegType& operator()(int x, int s, int c, int z) {
     return field[((x*Ns + s)*Nc + c)*2 + z];
   }
 

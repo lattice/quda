@@ -17,47 +17,6 @@ namespace quda {
     return ptr;
   }
 
-  template <class D, class S>
-  void genericCopy(D &dst, const S &src) {
-    
-    for (int x=0; x<dst.Volume(); x++) {
-      for (int s=0; s<dst.Nspin(); s++) {
-	for (int c=0; c<dst.Ncolor(); c++) {
-	  for (int z=0; z<2; z++) {
-	    dst(x, s, c, z) = src(x, s, c, z);
-	  }
-	}
-      }
-    }
-  
-  }
-
-  template <typename FloatOut, typename FloatIn>
-  void genericCopy(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
-    ColorSpinorFieldOrder<FloatOut> *Out = createOrder<FloatOut>(out);
-    ColorSpinorFieldOrder<FloatIn> *In = createOrder<FloatIn>(in);
-    genericCopy(*Out, *In);
-    delete Out;
-    delete In;
-  }
-
-  void copyGenericColorSpinor(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
-
-    if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-	genericCopy<double,double>(out, in);
-      } else {
-	genericCopy<double,float>(out, in);
-      }
-    } else {
-      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
-	genericCopy<float,double>(out, in);
-      } else {
-	genericCopy<float,float>(out, in);
-      }
-    }
-  }
-
   // Random number insertion over all field elements
   template <class T>
   void random(T &t) {

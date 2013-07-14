@@ -41,11 +41,11 @@ namespace quda {
 	RegType scale[2];
 	if (sizeof(Float)==sizeof(short)) {
 	  const int M = length/2;
-	  for (int chirality=0; chirality<2; chirality++) {
-	    scale[chirality] = 0.0;
+	  for (int chi=0; chi<2; chi++) { // chirality
+	    scale[chi] = 0.0;
 	    for (int i=0; i<M; i++) 
-	      if (fabs(v[chirality*M+i]) > scale[chirality]) scale[chirality] = v[chirality*M+i];
-	    norm[parity][chirality*volumeCB + x] = scale[chirality];
+	      scale[chi] = fabs(v[chi*M+i]) > scale[chi] ? fabs(v[chi*M+i]) : scale[chi];
+	    norm[parity][chi*volumeCB + x] = scale[chi];
 	  }
 	}
 

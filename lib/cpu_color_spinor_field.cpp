@@ -169,7 +169,7 @@ namespace quda {
       else 
 	memcpy(v, src.v, bytes);
     } else {
-      copyGenericColorSpinor(*this, src);
+      copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION);
     }
   }
 
