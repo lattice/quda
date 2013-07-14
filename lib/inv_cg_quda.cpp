@@ -110,6 +110,11 @@ namespace quda {
     double maxrr = rNorm;
     double delta = param.delta;
 
+    // this parameter determines how many consective reliable update
+    // reisudal increases we tolerate before terminating the solver,
+    // i.e., how long do we want to keep trying to converge
+    int maxResIncrease = 0; // 0 means we have no tolerance 
+
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
@@ -193,7 +198,7 @@ namespace quda {
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
 	  k++;
 	  rUpdate++;
-	  if (++resIncrease > 2) break; // only allowed two consecutive residual increases
+	  if (resIncrease++ > maxResIncrease) break; 
 	} else {
 	  resIncrease = 0;
 	}
