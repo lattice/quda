@@ -225,16 +225,16 @@ namespace quda {
       FloatNOrder<FloatOut, Ns, Nc, 2> outOrder(out, Out, outNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
-    } else if (out.FieldOrder() == QUDA_FLOAT_FIELD_ORDER) { 
-      FloatNOrder<FloatOut, Ns, Nc, 1> outOrder(out, Out, outNorm);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
     } else if (out.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
+	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+    } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
+      QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
     } else {
@@ -254,14 +254,14 @@ namespace quda {
     } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       FloatNOrder<FloatIn, Ns, Nc, 2> inOrder(in, In, inNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-    } else if (in.FieldOrder() == QUDA_FLOAT_FIELD_ORDER) { 
-      FloatNOrder<FloatIn, Ns, Nc, 1> inOrder(in, In, inNorm);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, In);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
+    } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
+      QDPJITDiracOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else {
       errorQuda("Order not defined");

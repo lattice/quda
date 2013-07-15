@@ -248,6 +248,7 @@ extern "C" {
     QUDA_FLOAT4_FIELD_ORDER = 4, // (spin-color-complex)/4-space-(spin-color-complex)%4
     QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, // CPS/QDP++ ordering
     QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
+    QUDA_QDPJIT_FIELD_ORDER, // QDP field ordering (complex-color-spin-spacetime)
     QUDA_QOP_DOMAIN_WALL_FIELD_ORDER, // QOP domain-wall ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;
