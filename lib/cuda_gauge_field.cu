@@ -279,6 +279,10 @@ namespace quda {
 
   // Return the L2 norm squared of the gauge field
   double norm2(const cudaGaugeField &a) {
+
+    if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
+	a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
+      errorQuda("Not implemented");
   
     int spin = 0;
     switch (a.Geometry()) {
