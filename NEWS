@@ -1,8 +1,38 @@
 
-Version 0.5.1 - xx May 2013
+Version 0.6.x - xx July 2013
 
-- Significantly improved performance of non-degenerate twisted-mass CG
-  solver.
+- Completely rewritten gauge and clover field copying routines using a
+  generic template-driven approach.
+
+- The QUDA interface (loadGaugeQuda, loadCloverQuda, invertQuda and
+  invertMultishiftQuda) now supports device-side pointers as well as
+  host-size pointers.  The location of a given pointer is set by the
+  QudaFieldLocation members of QudaGaugeParam (location) and
+  QudaInvertParam (input_location, output_location, clover_location).
+
+- When doing mixed-precision solvers, all low-precision copies of
+  gauge and clover fields are created from the pre-existing GPU copies
+  instead of re-copying from the CPU.  This lowers the PCIe overhead
+  by up to 1.75x.
+
+- Significantly improved performance of both degenerate and
+  non-degenerate twisted-mass CG solver (up to 17% and 32%, respectively).
+
+- ColorSpinorField is now derived from LatticeField, with all
+  LatticeField derivations now using common page-locked and device memory
+  buffers.  This has the effect of reducing the overall packed-locked
+  memory footprint.
+
+- The source vector is now scaled such that it is equal to unity.
+  This prevents underflow from occuring when the source vector is too
+  small.
+
+- Fixed double precision definition of *= vector operator, which caused a
+  truncation to single precision for certain solver types.
+
+- Fixed memory overalloction when doing clover fermions in half precision.
+
+- Memory leak fix to clover fermions.
 
 Version 0.5.0 - 20 March 2013
 
