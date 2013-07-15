@@ -40,8 +40,8 @@ namespace quda {
       create(QUDA_INVALID_FIELD_CREATE) { ; }
   
     // used to create cpu params
-  ColorSpinorParam(void *V, QudaFieldLocation location, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
-    : LatticeFieldParam(4, X, 0, location == QUDA_CPU_FIELD_LOCATION ? inv_param.cpu_prec : inv_param.cuda_prec, inv_param.verbosity), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
+  ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
+    : LatticeFieldParam(4, X, 0, inv_param.cpu_prec, inv_param.verbosity), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
       twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
       create(QUDA_REFERENCE_FIELD_CREATE), v(V) { 
