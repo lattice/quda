@@ -146,7 +146,7 @@ namespace quda {
 		       static_cast<const cudaGaugeField&>(src).gauge);
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
-      LatticeField::resizeBuffer(bytes);
+      LatticeField::resizeBufferPinned(bytes);
 
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
@@ -245,7 +245,7 @@ namespace quda {
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
     
-      resizeBuffer(bytes);
+      resizeBufferPinned(bytes);
 
       // this copies over both even and odd
       cudaMemcpy(bufferPinned, gauge, bytes, cudaMemcpyDeviceToHost);

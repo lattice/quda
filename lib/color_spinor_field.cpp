@@ -19,20 +19,22 @@ namespace quda {
     field.fill(*this);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) : verbose(param.verbosity), init(false), 
-								     v(0), norm(0), even(0), odd(0) 
+  ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) 
+    : LatticeField(param), verbose(param.verbosity), 
+      init(false), v(0), norm(0), even(0), odd(0) 
   {
-    create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, param.precision, param.pad, 
-	   param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis);
-
+    create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, 
+	   param.precision, param.pad, param.siteSubset, param.siteOrder, 
+	   param.fieldOrder, param.gammaBasis);
   }
 
-  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) : verbose(field.verbose), init(false),
-								     v(0), norm(0), even(0), odd(0)
+  ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) 
+    : LatticeField(field), verbose(field.verbose), init(false), 
+      v(0), norm(0), even(0), odd(0)
   {
-    create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, field.precision, field.pad,
-	   field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis);
-
+    create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, 
+	   field.precision, field.pad, field.siteSubset, field.siteOrder, 
+	   field.fieldOrder, field.gammaBasis);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -232,8 +234,12 @@ namespace quda {
     bytes = total_length * precision; // includes pads and ghost zones
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
-    norm_bytes = total_norm_length * sizeof(float);
-    norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+    if (precision == QUDA_HALF_PRECISION) {
+      norm_bytes = total_norm_length * sizeof(float);
+      norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+    } else {
+      norm_bytes = 0;
+    }
 
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 

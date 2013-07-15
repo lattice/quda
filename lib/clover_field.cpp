@@ -176,7 +176,7 @@ namespace quda {
       if (src.V(false))	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION);
       if (src.V(true)) copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION);
     } else if (typeid(src) == typeid(cpuCloverField)) {
-      resizeBuffer(bytes + norm_bytes);
+      resizeBufferPinned(bytes + norm_bytes);
       void *packClover = bufferPinned;
       void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned + bytes : 0;
       

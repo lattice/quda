@@ -119,16 +119,9 @@ namespace quda {
     total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
     bytes = total_length * precision; // includes pads and ghost zones
     bytes = ALIGNMENT_ADJUST(bytes);
-    norm_bytes = total_norm_length * sizeof(float);
-    norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
 
-    if (pad != 0) {
-      errorQuda("Non-zero pad not supported");
-    }
-  
-    if (precision == QUDA_HALF_PRECISION) {
-      errorQuda("Half precision not supported");
-    }
+    if (pad != 0) errorQuda("Non-zero pad not supported");  
+    if (precision == QUDA_HALF_PRECISION) errorQuda("Half precision not supported");
 
     if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
 	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&

@@ -135,7 +135,7 @@ namespace quda {
   class cpuColorSpinorField;
   class cudaColorSpinorField;
 
-  class ColorSpinorField {
+  class ColorSpinorField : public LatticeField {
 
   private:
     void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
@@ -272,13 +272,6 @@ namespace quda {
 
     bool reference; // whether the field is a reference or not
 
-    static void *buffer_h;// pinned memory
-    static void *buffer_d;// device_mapped pointer to buffer
-    static bool bufferInit;
-    static size_t bufferBytes;
-    static bool bufferInit_d;
-    static size_t bufferBytes_d;
-
     static void* ghostFaceBuffer; // gpu memory
     static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void* backGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
@@ -291,9 +284,6 @@ namespace quda {
 
     void zeroPad();
   
-    void resizeBuffer(size_t bytes) const;
-    void resizeDeviceBuffer(size_t bytes) const;
-
     /**
        This function is responsible for calling the correct copy kernel
        given the nature of the source field and the desired destination.
@@ -339,8 +329,6 @@ namespace quda {
 
     cudaColorSpinorField& Even() const;
     cudaColorSpinorField& Odd() const;
-
-    static void freeBuffer();
 
     void zero();
 
