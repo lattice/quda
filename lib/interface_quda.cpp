@@ -946,7 +946,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   cpuParam.v = h_out;
 
   ColorSpinorField *out_h = (inv_param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
   *out_h = out;
   
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -977,7 +978,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc);
   ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
@@ -1048,7 +1050,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), pc);
   ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));  
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));  
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
@@ -1217,10 +1220,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
   // for now, though, so here we factorize everything for convenience.
 
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
-  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
-  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || 
+    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || 
+    (param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
+    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;

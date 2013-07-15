@@ -128,8 +128,7 @@ namespace quda {
 	ColorSpinorField::operator=(src);
 	create(QUDA_COPY_FIELD_CREATE);
       }
-      if (isNative() && src.isNative()) copy(src);
-      else errorQuda("Cannot copy using non-native fields");
+      copySpinorField(src);
     }
     return *this;
   }
