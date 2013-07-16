@@ -99,7 +99,7 @@ namespace quda {
 	if (oddness == parity) {
 	  RegType u[length];
 	  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-	  arg.order.saveGhost(u, X, dim, (parity+arg.localParity[dim])%2);
+	  arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])%2);
 	} // oddness == parity
 
       } // dim
