@@ -233,70 +233,72 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
 
-    if (texInit) errorQuda("Already bound textures");
-
-    // create the texture for the field components
-
-    cudaChannelFormatDesc desc;
-    memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-    if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-    else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
-
-    // staggered fields in half and single are always two component
-    if (nSpin == 1 && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
-      desc.x = 8*precision;
-      desc.y = 8*precision;
-      desc.z = 0;
-      desc.w = 0;
-    } else { // all others are four component
-      desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-      desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-      desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-      desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
-    }
-
-    cudaResourceDesc resDesc;
-    memset(&resDesc, 0, sizeof(resDesc));
-    resDesc.resType = cudaResourceTypeLinear;
-    resDesc.res.linear.devPtr = v;
-    resDesc.res.linear.desc = desc;
-    resDesc.res.linear.sizeInBytes = bytes;
-
-    cudaTextureDesc texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
-    if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
-    else texDesc.readMode = cudaReadModeElementType;
-
-    cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-    checkCudaError();
-
-    // create the texture for the norm components
-    if (precision == QUDA_HALF_PRECISION) {
+    if (isNative()) {
+      if (texInit) errorQuda("Already bound textures");
+      
+      // create the texture for the field components
+      
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-      desc.f = cudaChannelFormatKindFloat;
-      desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
-
+      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
+      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+      
+      // staggered fields in half and single are always two component
+      if (nSpin == 1 && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
+	desc.x = 8*precision;
+	desc.y = 8*precision;
+	desc.z = 0;
+	desc.w = 0;
+      } else { // all others are four component
+	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+	desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
+      }
+      
       cudaResourceDesc resDesc;
       memset(&resDesc, 0, sizeof(resDesc));
       resDesc.resType = cudaResourceTypeLinear;
-      resDesc.res.linear.devPtr = norm;
+      resDesc.res.linear.devPtr = v;
       resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = norm_bytes;
-
+      resDesc.res.linear.sizeInBytes = bytes;
+      
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
-      texDesc.readMode = cudaReadModeElementType;
-
-      cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+      if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+      else texDesc.readMode = cudaReadModeElementType;
+      
+      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
+      
+      // create the texture for the norm components
+      if (precision == QUDA_HALF_PRECISION) {
+	cudaChannelFormatDesc desc;
+	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+	desc.f = cudaChannelFormatKindFloat;
+	desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
+	
+	cudaResourceDesc resDesc;
+	memset(&resDesc, 0, sizeof(resDesc));
+	resDesc.resType = cudaResourceTypeLinear;
+	resDesc.res.linear.devPtr = norm;
+	resDesc.res.linear.desc = desc;
+	resDesc.res.linear.sizeInBytes = norm_bytes;
+	
+	cudaTextureDesc texDesc;
+	memset(&texDesc, 0, sizeof(texDesc));
+	texDesc.readMode = cudaReadModeElementType;
+	
+	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+	checkCudaError();
+      }
+      
+      texInit = true;
     }
-
-    texInit = true;
   }
 
   void cudaColorSpinorField::destroyTexObject() {
-    if (texInit) {
+    if (isNative() && texInit) {
       cudaDestroyTextureObject(tex);
       if (precision == QUDA_HALF_PRECISION) cudaDestroyTextureObject(texNorm);
       texInit = false;
