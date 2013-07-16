@@ -16,6 +16,9 @@ namespace quda {
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
+    if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
+      errorQuda("QDPJIT ordered clover fields only supported for reference fields");
+
     real_length = 2*volumeCB*nColor*nColor*nSpin*nSpin/2;  // block-diagonal Hermitian (72 reals)
     length = 2*stride*nColor*nColor*nSpin*nSpin/2;
 
@@ -33,11 +36,17 @@ namespace quda {
 
   cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
 
-    if (create != QUDA_NULL_FIELD_CREATE) errorQuda("Create type %d not supported", create);
+    if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE) 
+      errorQuda("Create type %d not supported", create);
 
     if (param.direct) {
-      clover = device_malloc(bytes);
-      if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
+      if (create != QUDA_REFERENCE_FIELD_CREATE) {
+	clover = device_malloc(bytes);
+	if (precision == QUDA_HALF_PRECISION) norm = device_malloc(norm_bytes);
+      } else {
+	clover = param.clover;
+	norm = param.norm;
+      }
 
       even = clover;
       odd = (char*)clover + bytes/2;
@@ -49,8 +58,13 @@ namespace quda {
     } 
 
     if (param.inverse) {
-      cloverInv = device_malloc(bytes);
-      if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(norm_bytes);
+      if (create != QUDA_REFERENCE_FIELD_CREATE) {
+	cloverInv = device_malloc(bytes);
+	if (precision == QUDA_HALF_PRECISION) invNorm = device_malloc(norm_bytes);
+      } else {
+	cloverInv = param.cloverInv;
+	invNorm = param.invNorm;
+      }
 
       evenInv = cloverInv;
       oddInv = (char*)cloverInv + bytes/2;
@@ -158,12 +172,14 @@ namespace quda {
     destroyTexObject();
 #endif
 
-    if (clover != cloverInv) {
-      if (clover) device_free(clover);
-      if (norm) device_free(norm);
+    if (create != QUDA_REFERENCE_FIELD_CREATE) {
+      if (clover != cloverInv) {
+	if (clover) device_free(clover);
+	if (norm) device_free(norm);
+      }
+      if (cloverInv) device_free(cloverInv);
+      if (invNorm) device_free(invNorm);
     }
-    if (cloverInv) device_free(cloverInv);
-    if (invNorm) device_free(invNorm);
     
     checkCudaError();
   }

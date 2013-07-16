@@ -139,6 +139,9 @@ namespace quda {
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
+    } else if (out.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
+      copyClover<FloatOut,FloatIn,length>
+	(QDPJITOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
     } else if (out.Order() == QUDA_BQCD_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(BQCDOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
@@ -165,6 +168,9 @@ namespace quda {
     } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
+    } else if (in.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
+      copyClover<FloatOut,FloatIn,length>
+	(QDPJITOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_BQCD_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(BQCDOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
