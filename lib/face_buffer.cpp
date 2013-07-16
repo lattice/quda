@@ -392,9 +392,9 @@ void FaceBuffer::exchangeLink(void** ghost_link, void** link_sendbuf, QudaFieldL
   } else { // FIXME for CUDA field copy back to the CPU
     for (int i=0; i<nDimComms; i++) {
       int len = 2*nFace*faceVolumeCB[i]*Ninternal;
-      send[i] = allocatePinned(len);
-      receive[i] = allocatePinned(len);
-      cudaMemcpy(send[i], link_sendbuf[i], len, cudaMemcpyDeviceToHost);
+      send[i] = allocatePinned(len*precision);
+      receive[i] = allocatePinned(len*precision);
+      cudaMemcpy(send[i], link_sendbuf[i], len*precision, cudaMemcpyDeviceToHost);
     }
   }
 
@@ -417,7 +417,7 @@ void FaceBuffer::exchangeLink(void** ghost_link, void** link_sendbuf, QudaFieldL
   if (location == QUDA_CUDA_FIELD_LOCATION) {
     for (int i=0; i<nDimComms; i++) {
       int len = 2*nFace*faceVolumeCB[i]*Ninternal;
-      cudaMemcpy(ghost_link[i], receive[i], len, cudaMemcpyHostToDevice);
+      cudaMemcpy(ghost_link[i], receive[i], len*precision, cudaMemcpyHostToDevice);
       freePinned(send[i]);
       freePinned(receive[i]);
     }
