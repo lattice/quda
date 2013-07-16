@@ -381,8 +381,8 @@ struct QDPJITDiracOrder {
   int volumeCB;
   int parity;
   int stride;
-  QDPJITDiracOrder(const ColorSpinorField &a, Float *field_=0, int parity=1) 
-  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(stride)
+  QDPJITDiracOrder(const ColorSpinorField &a, Float *field_=0, int parity_=1) 
+  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(stride), parity(parity_)
   { if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
   virtual ~QDPJITDiracOrder() { ; }
 
