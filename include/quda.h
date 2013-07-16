@@ -54,6 +54,10 @@ extern "C" {
 
     double anisotropy;    /**< Used for Wilson and Wilson-clover */
     double tadpole_coeff; /**< Used for staggered only */
+    // some anisotropic params
+    double Xsi;
+    double Us;
+    double Vlight;
 
     QudaLinkType type; /**< The link type of the gauge field (e.g., Wilson, fat, long, etc.) */
     QudaGaugeFieldOrder gauge_order; /**< The ordering on the input gauge field */

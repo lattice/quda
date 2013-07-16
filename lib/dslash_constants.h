@@ -112,6 +112,10 @@ __constant__ fat_force_const_t hf; //hisq force
 //!ndeg tm:
 __constant__ int fl_stride;
 
+// for anisotropic lattice
+__constant__ double Eta_i;
+__constant__ double Eta_0;
+
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 {
   profile.Start(QUDA_PROFILE_CONSTANT);
@@ -332,6 +336,11 @@ void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile)
   float2 No2_h = make_float2(1.0, 1.0);
   cudaMemcpyToSymbol(No2, &(No2_h), sizeof(float2));
 
+  // init anisotropic constants
+  double L_eta_i = L_Vlight/L_us;
+  cudaMemcpyToSymbol(Eta_i, &L_eta_i, sizeof(double));
+  double L_eta_0 = L_Xsi;
+  cudaMemcpyToSymbol(Eta_0, &L_eta_0, sizeof(double));
   checkCudaError();
 
   profile.Stop(QUDA_PROFILE_CONSTANT);

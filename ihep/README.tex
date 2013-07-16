@@ -1,0 +1,132 @@
+\documentclass[12pt,fleqn]{article}
+\usepackage{amsmath}
+\def\be{\begin{equation}}
+\def\ee{\end{equation}}
+\def\bea{\begin{eqnarray}}
+\def\eea{\end{eqnarray}}
+\def\bsp{\be\begin{split}}
+\def\bes{\be  \begin{split}}
+\def\dag{\dagger}
+\begin{document}
+
+\section{INSTRUCTIONS}
+~
+
+IHEP is short for Institute of High Energy Physics, Chinese Academy of Sciences.\\
+
+Source files in this "ihep" directory are some interfaces $\&$ modules for
+lattice QCD simulation based on platform QUDA. The codes here are mainly written
+or modified by Jian Liang $\&$ Yi-Bo Yang, who are both members of CLQCD (China
+Lattice QCD collaboration).\\
+
+  The codes now mainly include:
+  \begin{verbatim}
+##  anisotropic clover action
+##  different sources (point source, wall source,
+    Jacobi smeared source & random source)
+##  gamma matrices rotation
+##  sequential source method for three point correlation functions
+##  stout smearing for gauge links (to be tested)
+##  two point & three point correlation functions from propagators
+##  effective masses & error estimation
+  \end{verbatim}
+
+All the codes are now in preliminary versions and planned to be completed to a fully
+functional LQCD package in the future.\\
+
+The codes must be maked together with QUDA. Except for the sources in
+this directory, the following QUDA files are slightly modified for passing anisotropic
+parameters to kernels:
+\begin{verbatim}
+##  /lib/dslash_quda.cu
+##  /include/dslash_quda.h
+##  /lib/dslash_constants.h
+##  /lib/read_gauge.h
+##  /include/quda.h
+##  /lib/check_params.h
+\end{verbatim}
+
+These codes are tested with QUDA v0.5.1.
+
+\section{About Make}
+~
+
+Our codes work under single GPU mode. So QUDA should be configured to disable
+multi-GPU support.\\
+
+The codes contains some fortran subroutines, set a fortran compiler when
+configuring QUDA if you want to use them.\\
+
+Although we use single GPU for inversion, We use mutiple CPUs to calculate
+contractions. So the C/C++ compiler should be MPI version.
+
+\section{How To Use}
+~
+
+All the input parameters should be in the input file. Please take \verb|../input.example|
+as an example. The primary source code is \verb|"ihep_invert.cpp"|, it contains all the
+interfaces to QUDA. Other source files used are simply listed here:
+\begin{verbatim}
+ihep_utility.cpp      -> utilities shared
+ihep_utility.h        -> shared head file
+ihep_clover.cpp       -> build the clover term
+ihep_Jacobi_smear.cpp -> set Jacobi smeared source
+ihep_stout_smear.cpp  -> smear gauge to stout links
+ihep_three_point.f90  -> contraction of three point correlation function
+ihep_two_point_B.f90  -> contraction of two point correlation function
+                          with B operator
+ihep_two_point.f90    -> contraction of two point correlation function
+ker_loop.f90          -> gauge related calculations
+\end{verbatim}
+
+\section{Some Details}
+~
+
+MPI:\\
+
+Because the computer we used has 12 CPU cores and 1 GPU on a single node. We fix
+the No. of CPU cores to be 12 and let core 0 as host to call QUDA. Other cores
+will keep waiting until the inversion is done and then join to calculate contractions.\\
+
+ACTION:
+\be
+\begin{split}
+A &= \left(\frac{1}{2\kappa}
+    + \rho_t\sum_{i=1}^3(\sigma_{0i}F_{0i})
+    + \rho_s(\sigma_{12}F_{12}+\sigma_{23}F_{23}+\sigma_{13}F_{13})\right)\delta_{x,y}\\
+    &- \sum_\mu \eta_\mu\left[(1-\gamma_\mu)U_\mu(x)\delta_{x+\hat\mu,y}
+    + (1+\gamma_\mu)U_\mu^\dagger(x-\hat\mu)\delta_{x-\hat\mu,y}\right]
+\end{split}
+\ee
+\be
+\eta_i=\frac{v}{2u_s},~\eta_0=\frac{\xi}{2},~\rho_s=\frac{v}{2u_s^4},~
+\rho_t=v\frac{1+\xi}{4u_s^2}
+\ee
+with $\xi = a_s/a_t$ being the bare aspect ratio of the asymmetric lattice, and $v$ the bare speed of light
+parameter. Another parameter $u_s$ is taken to be the fourth root of the average spatial plaquette
+value.\\
+
+We rescale $\kappa$ with $\eta_i$ in our codes so that we need not to deal with the spatial gauge links:
+\be
+\begin{split}
+A' &= \left(\frac{1}{2\kappa\eta_i}
+    + \frac{\rho_t}{\eta_i}\sum_{i=1}^3(\sigma_{0i}F_{0i})
+    + \frac{\rho_s}{\eta_i}(\sigma_{12}F_{12}+\sigma_{23}F_{23}+\sigma_{13}F_{13})\right)\delta_{x,y}\\
+    &- \sum_\mu \left[(1-\gamma_\mu){U'}_\mu(x)\delta_{x+\hat\mu,y}
+    + (1+\gamma_\mu){U'}_\mu^\dagger(x-\hat\mu)\delta_{x-\hat\mu,y}\right]
+\end{split}
+\ee
+\be
+{U'}_i = U_i,~{U'}_t = U_0\cdot\frac{\eta_0}{\eta_i}
+\ee
+But here ${U'}_t$ are no more $SU(3)$ matrices. If we use the default setting as \verb|link_recon=12|,
+we will have to pass the parameter $\frac{\eta_0}{\eta_i}$ to kernels such as \verb|read_gauge.h| to reconstruct
+them.
+
+\section{Contact Us}
+\begin{verbatim}
+Jian Liang: liangjian@ihep.ac.cn
+Yi-Bo Yang: yangyb@ihep.ac.cn
+\end{verbatim}
+
+\end{document}

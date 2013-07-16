@@ -60,6 +60,18 @@ enum KernelType {
 
 namespace quda {
 
+  // for anisotropic lattice
+  static double L_Vlight = 2;
+  static double L_us = 1;
+  static double L_Xsi = 2;
+  
+  void   setL_Vlight(double Vlight) {L_Vlight = Vlight;}
+  void   setL_us(double us) {L_us = us;}
+  void   setL_Xsi(double Xsi) {L_Xsi = Xsi;}
+  double getL_Vlight() {return L_Vlight;}
+  double getL_us() {return L_us;}
+  double getL_Xsi() {return L_Xsi;}
+
   struct DslashParam {
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even

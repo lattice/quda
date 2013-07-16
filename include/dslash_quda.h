@@ -8,6 +8,14 @@
 
 namespace quda {
 
+  // for anisotropic lattice
+  void   setL_Vlight(double Vlight);
+  void   setL_us(double us);
+  void   setL_Xsi(double Xsi);
+  double getL_Vlight();
+  double getL_us();
+  double getL_Xsi();
+
   /**
      @param tune Sets whether to tune the dslash kernels or not
      @param verbose The verbosity level to use in the dslash tuning functions

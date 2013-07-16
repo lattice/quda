@@ -365,7 +365,9 @@
   ACC_CONJ_PROD(g22, +g00, +g11);					\
   ACC_CONJ_PROD(g22, -g01, +g10);					\
   double u0 = (dir < 6 ? anisotropy : (do_boundary ? t_boundary : 1)); \
-  G6.x*=u0; G6.y*=u0; G7.x*=u0; G7.y*=u0; G8.x*=u0; G8.y*=u0;
+  G6.x*=u0; G6.y*=u0; G7.x*=u0; G7.y*=u0; G8.x*=u0; G8.y*=u0;          \
+  double eta = (dir < 6 ? 1.0 : Eta_i/Eta_0);                          \
+  G6.x*=eta; G6.y*=eta; G7.x*=eta; G7.y*=eta; G8.x*=eta; G8.y*=eta;
 
 #define RECONSTRUCT_MATRIX_12_SINGLE(dir)			\
   ACC_CONJ_PROD(g20, +g01, +g12);				\
@@ -375,7 +377,9 @@
   ACC_CONJ_PROD(g22, +g00, +g11);				\
   ACC_CONJ_PROD(g22, -g01, +g10);				\
   float u0 = (dir < 6 ? anisotropy_f : (do_boundary ? t_boundary_f : 1)); \
-  G3.x*=u0; G3.y*=u0; G3.z*=u0; G3.w*=u0; G4.x*=u0; G4.y*=u0;
+  G3.x*=u0; G3.y*=u0; G3.z*=u0; G3.w*=u0; G4.x*=u0; G4.y*=u0;   \
+  float eta = (dir < 6 ? 1.0 : Eta_i/Eta_0);                          \
+  G3.x*=eta; G3.y*=eta; G3.z*=eta; G3.w*=eta; G4.x*=eta; G4.y*=eta; 
 
 #define RECONSTRUCT_MATRIX_8_DOUBLE(dir)				\
   double row_sum = g01_re*g01_re;					\
