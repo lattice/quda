@@ -32,9 +32,10 @@
 #define QUDA_FLOAT2_GAUGE_ORDER 2 //no reconstruct and double precision
 #define QUDA_FLOAT4_GAUGE_ORDER 4 //8 and 12 reconstruct half and single
 #define QUDA_QDP_GAUGE_ORDER 5 //expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_CPS_WILSON_GAUGE_ORDER 6 //expect *gauge even-odd spacetime column-row color
-#define QUDA_MILC_GAUGE_ORDER 7 //expect *gauge even-odd mu spacetime row-column order
-#define QUDA_BQCD_GAUGE_ORDER 8 //expect *gauge mu even-odd spacetime row-column order
+#define QUDA_QDPJIT_GAUGE_ORDER 6 //expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_CPS_WILSON_GAUGE_ORDER 7 //expect *gauge even-odd spacetime column-row color
+#define QUDA_MILC_GAUGE_ORDER 8 //expect *gauge even-odd mu spacetime row-column order
+#define QUDA_BQCD_GAUGE_ORDER 9 //expect *gauge mu even-odd spacetime row-column order
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -141,8 +142,9 @@
 #define QUDA_INTERNAL_DIRAC_ORDER 0  // internal dirac order used by QUDA varies depending on precision and dslash type
 #define QUDA_DIRAC_ORDER 1           // even-odd color inside spin
 #define QUDA_QDP_DIRAC_ORDER 2       // even-odd spin inside color
-#define QUDA_CPS_WILSON_DIRAC_ORDER 3// odd-even color inside spin
-#define QUDA_LEX_DIRAC_ORDER 4       // lexicographical order color inside spin
+#define QUDA_QDPJIT_DIRAC_ORDER 3       // even-odd spin inside color
+#define QUDA_CPS_WILSON_DIRAC_ORDER 4// odd-even color inside spin
+#define QUDA_LEX_DIRAC_ORDER 5       // lexicographical order color inside spin
 #define QUDA_INVALID_DIRAC_ORDER QUDA_INVALID_ENUM
 
 #define QudaCloverFieldOrder integer(4)
@@ -150,7 +152,7 @@
 #define QUDA_FLOAT2_CLOVER_ORDER 2   // even-odd float2 ordering
 #define QUDA_FLOAT4_CLOVER_ORDER 4   // even-odd float4 ordering
 #define QUDA_PACKED_CLOVER_ORDER 5    // even-odd packed
-#define QUDA_LEX_PACKED_CLOVER_ORDER 6 // lexicographical order packed
+#define QUDA_QDPJIT_CLOVER_ORDER 6 // lexicographical order packed
 #define QUDA_BQCD_CLOVER_ORDER 7 // BQCD order which is a packed super-diagonal form
 #define QUDA_INVALID_CLOVER_ORDER QUDA_INVALID_ENUM
 
@@ -219,7 +221,8 @@
 #define QUDA_FLOAT4_FIELD_ORDER 4 // (spin-color-complex)/4-space-(spin-color-complex)%4
 #define QUDA_SPACE_SPIN_COLOR_FIELD_ORDER 5 // CPS/QDP++ ordering
 #define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 6 // QLA ordering (spin inside color)
-#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 7 // QOP domain-wall ordering
+#define QUDA_QDPJIT_FIELD_ORDER 7 // QDP field ordering (complex-color-spin-spacetime)
+#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 8 // QOP domain-wall ordering
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)

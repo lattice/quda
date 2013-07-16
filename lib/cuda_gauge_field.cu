@@ -10,7 +10,10 @@ namespace quda {
   cudaGaugeField::cudaGaugeField(const GaugeFieldParam &param) :
     GaugeField(param), gauge(0), even(0), odd(0), backed_up(false)
   {
-    if (order == QUDA_QDP_GAUGE_ORDER) errorQuda("QDP ordering not supported");
+    if ((order == QUDA_QDP_GAUGE_ORDER || order == QUDA_QDPJIT_GAUGE_ORDER) && 
+	create != QUDA_REFERENCE_FIELD_CREATE) {
+      errorQuda("QDP ordering only supported for reference fields");
+    }
     
     if(create != QUDA_NULL_FIELD_CREATE &&  
        create != QUDA_ZERO_FIELD_CREATE && 
@@ -146,7 +149,7 @@ namespace quda {
 		       static_cast<const cudaGaugeField&>(src).gauge);
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
-      LatticeField::resizeBuffer(bytes);
+      LatticeField::resizeBufferPinned(bytes);
 
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
@@ -245,7 +248,7 @@ namespace quda {
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
     
-      resizeBuffer(bytes);
+      resizeBufferPinned(bytes);
 
       // this copies over both even and odd
       cudaMemcpy(bufferPinned, gauge, bytes, cudaMemcpyDeviceToHost);
@@ -276,6 +279,10 @@ namespace quda {
 
   // Return the L2 norm squared of the gauge field
   double norm2(const cudaGaugeField &a) {
+
+    if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
+	a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
+      errorQuda("Not implemented");
   
     int spin = 0;
     switch (a.Geometry()) {

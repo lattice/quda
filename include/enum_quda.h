@@ -30,6 +30,7 @@ extern "C" {
     QUDA_FLOAT2_GAUGE_ORDER = 2, // no reconstruct and double precision
     QUDA_FLOAT4_GAUGE_ORDER = 4, // 8 and 12 reconstruct half and single
     QUDA_QDP_GAUGE_ORDER, // expect *gauge[mu], even-odd, spacetime, row-column color
+    QUDA_QDPJIT_GAUGE_ORDER, // expect *gauge[mu], even-odd, complex-column-row-spacetime
     QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, column-row color
     QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
     QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
@@ -151,12 +152,10 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaDiracFieldOrder_s {
-    QUDA_FLOAT_DIRAC_ORDER = 1,  // even-odd, float ordering
-    QUDA_FLOAT2_DIRAC_ORDER = 2, // even-odd, float2 ordering
-    QUDA_FLOAT4_DIRAC_ORDER = 4, // even-odd, float4 ordering
     QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used, varies on precision and dslash type
     QUDA_DIRAC_ORDER,            // even-odd, color inside spin
     QUDA_QDP_DIRAC_ORDER,        // even-odd, spin inside color
+    QUDA_QDPJIT_DIRAC_ORDER,     // even-odd, complex-color-spin-spacetime
     QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
     QUDA_LEX_DIRAC_ORDER,        // lexicographical order, color inside spin
     QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
@@ -167,7 +166,7 @@ extern "C" {
     QUDA_FLOAT2_CLOVER_ORDER=2,   // even-odd float2 ordering
     QUDA_FLOAT4_CLOVER_ORDER=4,   // even-odd float4 ordering
     QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
-    QUDA_LEX_PACKED_CLOVER_ORDER, // lexicographical order, packed FIXME delete
+    QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
     QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
     QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
   } QudaCloverFieldOrder;
@@ -249,6 +248,7 @@ extern "C" {
     QUDA_FLOAT4_FIELD_ORDER = 4, // (spin-color-complex)/4-space-(spin-color-complex)%4
     QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, // CPS/QDP++ ordering
     QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
+    QUDA_QDPJIT_FIELD_ORDER, // QDP field ordering (complex-color-spin-spacetime)
     QUDA_QOP_DOMAIN_WALL_FIELD_ORDER, // QOP domain-wall ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;

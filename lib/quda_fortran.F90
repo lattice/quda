@@ -22,6 +22,8 @@ module quda_fortran
   ! This corresponds to the QudaGaugeParam struct in quda.h
   type quda_gauge_param
 
+     QudaFieldLocation :: location; !The location of the gauge field
+
      integer(4), dimension(4) :: x
 
      real(8) :: anisotropy    !Used for Wilson and Wilson-clover
@@ -110,6 +112,7 @@ module quda_fortran
      ! Gamma basis of the input and output host fields 
      QudaGammaBasis :: gamma_basis
      
+     QudaFieldLocation :: clover_location            ! The location of the clover field
      QudaPrecision :: clover_cpu_prec
      QudaPrecision :: clover_cuda_prec
      QudaPrecision :: clover_cuda_prec_sloppy

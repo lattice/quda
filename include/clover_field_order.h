@@ -4,6 +4,52 @@
 namespace quda {
 
   /**
+     The internal ordering for each clover matrix has chirality as the
+     slowest running dimension, with the internal 36 degrees of
+     freedom stored as follows (s=spin, c = color)
+
+     i |  col  |  row  |
+         s   c   s   c   z
+     0   0   0   0   0   0
+     1   0   1   0   1   0
+     2   0   2   0   2   0
+     3   1   0   1   0   0
+     4   1   1   1   1   0
+     5   1   2   1   2   0
+     6   0   1   0   0   0
+     7   0   1   0   0   1
+     8   0   2   0   0   0
+     9   0   2   0   0   1
+     10  1   0   0   0   0
+     11  1   0   0   0   1
+     12  1   1   0   0   0
+     13  1   1   0   0   1
+     14  1   2   0   0   0
+     15  1   2   0   0   1
+     16  0   2   0   1   0
+     17  0   2   0   1   1
+     18  1   0   0   1   0
+     19  1   0   0   1   1
+     20  1   1   0   1   0
+     21  1   1   0   1   1
+     22  1   2   0   1   0
+     23  1   2   0   1   1
+     24  1   0   0   2   0
+     25  1   0   0   2   1
+     26  1   1   0   2   0
+     27  1   1   0   2   1
+     28  1   2   0   2   0
+     29  1   2   0   2   1
+     30  1   1   1   0   0
+     31  1   1   1   0   1
+     32  1   2   1   0   0
+     33  1   2   1   0   1
+     34  1   2   1   1   0
+     35  1   2   1   1   1
+   */
+
+
+  /**
      FloatN ordering for clover fields
    */
   template <typename Float, int length, int N>
@@ -14,7 +60,6 @@ namespace quda {
       const int volumeCB;
       const int stride;
 
-      // FIXME add inverse flag
       FloatNOrder(const CloverField &clover, bool inverse, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
@@ -41,11 +86,11 @@ namespace quda {
 	RegType scale[2];
 	if (sizeof(Float)==sizeof(short)) {
 	  const int M = length/2;
-	  for (int chirality=0; chirality<2; chirality++) {
-	    scale[chirality] = 0.0;
+	  for (int chi=0; chi<2; chi++) { // chirality
+	    scale[chi] = 0.0;
 	    for (int i=0; i<M; i++) 
-	      if (fabs(v[chirality*M+i]) > scale[chirality]) scale[chirality] = v[chirality*M+i];
-	    norm[parity][chirality*volumeCB + x] = scale[chirality];
+	      scale[chi] = fabs(v[chi*M+i]) > scale[chi] ? fabs(v[chi*M+i]) : scale[chi];
+	    norm[parity][chi*volumeCB + x] = scale[chi];
 	  }
 	}
 
@@ -99,6 +144,54 @@ namespace quda {
     };
 
   /**
+     QDPJIT ordering for clover fields
+   */
+  template <typename Float, int length>
+    struct QDPJITOrder {
+      typedef typename mapper<Float>::type RegType;
+      Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
+      Float *offdiag;   /**< Pointers to the diagonal terms (two parities) */
+      const int volumeCB;
+      const int stride;
+
+      QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
+      : volumeCB(clover.VolumeCB()), stride(volumeCB) {
+	offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
+	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
+      }
+
+      __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
+	// the factor of 0.5 comes from a basis change
+	for (int chirality=0; chirality<2; chirality++) {
+	  // set diagonal elements
+	  for (int i=0; i<6; i++)
+	    v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
+
+	  // the off diagonal elements
+	  for (int i=0; i<30; i++) 
+	    v[chirality*36 + 6 + i] = 0.5*offdiag[((i*2 + chirality)*2 + parity)*volumeCB + x];
+	}
+
+      }
+  
+      __device__ __host__ inline void save(const RegType v[length], int x, int parity) {
+	// the factor of 2.0 comes from undoing the basis change
+	for (int chirality=0; chirality<2; chirality++) {
+	  // set diagonal elements
+	  for (int i=0; i<6; i++)
+	    diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
+
+	  // the off diagonal elements
+	  for (int i=0; i<30; i++) 
+	    offdiag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
+	}
+      }
+
+      size_t Bytes() const { return length*sizeof(Float); }
+    };
+
+
+  /**
      BQCD ordering for clover fields
      struct for reordering a BQCD clover matrix into the order that is
      expected by QUDA.  As well as reordering the clover matrix
@@ -111,7 +204,8 @@ namespace quda {
       const int volumeCB;
       const int stride;
 
-    BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) : volumeCB(clover.Stride()), stride(volumeCB) {
+      BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
+      : volumeCB(clover.Stride()), stride(volumeCB) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
       }
@@ -126,7 +220,7 @@ namespace quda {
 		       28, 29, 30, 31, 6, 7,  14, 15, 22, 23,   // column 1  6
 		       34, 35, 8, 9, 16, 17, 24, 25,            // column 2  16
 		       10, 11, 18, 19, 26, 27,                  // column 3  24
-		       2,  3,  4,  5,                          // column 4  30
+		       2,  3,  4,  5,                           // column 4  30
 		       12, 13};
 	
 	// flip the sign of the imaginary components

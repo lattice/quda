@@ -40,8 +40,8 @@ namespace quda {
       create(QUDA_INVALID_FIELD_CREATE) { ; }
   
     // used to create cpu params
-  ColorSpinorParam(void *V, QudaFieldLocation location, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
-    : LatticeFieldParam(4, X, 0, location == QUDA_CPU_FIELD_LOCATION ? inv_param.cpu_prec : inv_param.cuda_prec, inv_param.verbosity), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
+  ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
+    : LatticeFieldParam(4, X, 0, inv_param.cpu_prec, inv_param.verbosity), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
       twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
       create(QUDA_REFERENCE_FIELD_CREATE), v(V) { 
@@ -65,16 +65,7 @@ namespace quda {
 	  x[4] = 2;//for two flavors
     	}
 
-	if (inv_param.dirac_order == QUDA_FLOAT_DIRAC_ORDER) {
-	  fieldOrder = QUDA_FLOAT_FIELD_ORDER;
-	  siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-	} else if (inv_param.dirac_order == QUDA_FLOAT2_DIRAC_ORDER) {
-	  fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-	  siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-	} else if (inv_param.dirac_order == QUDA_FLOAT4_DIRAC_ORDER) {
-	  fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-	  siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-	} else if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
+	if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
 	  fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
 	    QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
 	  siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -86,6 +77,9 @@ namespace quda {
 	  siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
 	} else if (inv_param.dirac_order == QUDA_DIRAC_ORDER) {
 	  fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+	  siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+	} else if (inv_param.dirac_order == QUDA_QDPJIT_DIRAC_ORDER) {
+	  fieldOrder = QUDA_QDPJIT_FIELD_ORDER;
 	  siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
 	} else {
 	  errorQuda("Dirac order %d not supported", inv_param.dirac_order);
@@ -135,7 +129,7 @@ namespace quda {
   class cpuColorSpinorField;
   class cudaColorSpinorField;
 
-  class ColorSpinorField {
+  class ColorSpinorField : public LatticeField {
 
   private:
     void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
@@ -272,11 +266,6 @@ namespace quda {
 
     bool reference; // whether the field is a reference or not
 
-    static void *buffer_h;// pinned memory
-    static void *buffer_d;// device_mapped pointer to buffer
-    static bool bufferInit;
-    static size_t bufferBytes;
-
     static void* ghostFaceBuffer; // gpu memory
     static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void* backGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
@@ -289,9 +278,6 @@ namespace quda {
 
     void zeroPad();
   
-
-    void resizeBuffer(size_t bytes) const;
-
     /**
        This function is responsible for calling the correct copy kernel
        given the nature of the source field and the desired destination.
@@ -338,8 +324,6 @@ namespace quda {
     cudaColorSpinorField& Even() const;
     cudaColorSpinorField& Odd() const;
 
-    static void freeBuffer();
-
     void zero();
 
     QudaFieldLocation Location() const;
@@ -378,10 +362,6 @@ namespace quda {
 
     void create(const QudaFieldCreate);
     void destroy();
-
-    void createOrder(); // create the accessor for a given field ordering
-    ColorSpinorFieldOrder<double> *order_double; // accessor functor used to access fp64 elements
-    ColorSpinorFieldOrder<float> *order_single; // accessor functor used to access fp32 elements
 
   public:
     //cpuColorSpinorField();
@@ -431,6 +411,13 @@ namespace quda {
      */
     void OffsetIndex(int &i, int *y) const;
   };
+
+  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
+			      QudaFieldLocation location, void *Dst=0, void *Src=0, 
+			      void *dstNorm=0, void*srcNorm=0);
+  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
+  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
+  void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
 
 } // namespace quda
 

@@ -226,23 +226,7 @@ namespace quda {
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
-    if (u.Order() == QUDA_FLOAT_GAUGE_ORDER) {
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<Float,length>(FloatNOrder<Float,length,1,19>(u, 0, Ghost), 
-				     u.Nface(), u.SurfaceCB(), u.X(), location);
-	} else {
-	  extractGhost<Float,length>(FloatNOrder<Float,length,1,18>(u, 0, Ghost),
-				     u.Nface(), u.SurfaceCB(), u.X(), location);
-	}
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhost<Float,length>(FloatNOrder<Float,length,1,12>(u, 0, Ghost), 
-				   u.Nface(), u.SurfaceCB(), u.X(), location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	extractGhost<Float,length>(FloatNOrder<Float,length,1,8>(u, 0, Ghost), 
-				   u.Nface(), u.SurfaceCB(), u.X(), location);
-      }
-    } else if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  extractGhost<Float,length>(FloatNOrder<Float,length,2,19>(u, 0, Ghost), 
@@ -276,6 +260,9 @@ namespace quda {
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       extractGhost<Float,length>(QDPOrder<Float,length>(u, 0, Ghost),
+				 u.Nface(), u.SurfaceCB(), u.X(), location);
+    } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
+      extractGhost<Float,length>(QDPJITOrder<Float,length>(u, 0, Ghost),
 				 u.Nface(), u.SurfaceCB(), u.X(), location);
     } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
       extractGhost<Float,length>(CPSOrder<Float,length>(u, 0, Ghost),
