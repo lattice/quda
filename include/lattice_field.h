@@ -76,13 +76,25 @@ namespace quda {
     static void *bufferPinned; 
 
     /** Whether the pinned-memory buffer has already been initialized or not */
-    static bool bufferInit;
+    static bool bufferPinnedInit;
 
     /** The size in bytes of pinned-memory buffer */
-    static size_t bufferBytes;
+    static size_t bufferPinnedBytes;
 
     /** Resize the pinned-memory buffer */
-    void resizeBuffer(size_t bytes) const;
+    void resizeBufferPinned(size_t bytes) const;
+
+    /** Device-memory buffer that is used by all derived classes */
+    static void *bufferDevice; 
+
+    /** Whether the device-memory buffer has already been initialized or not */
+    static bool bufferDeviceInit;
+
+    /** The size in bytes of device-memory buffer */
+    static size_t bufferDeviceBytes;
+
+    /** Resize the device-memory buffer */
+    void resizeBufferDevice(size_t bytes) const;
 
   public:
     LatticeField(const LatticeFieldParam &param);

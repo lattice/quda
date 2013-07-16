@@ -102,6 +102,13 @@ namespace quda {
     QudaFieldCreate create; // used to determine the type of field created
 
     bool ghostExchange; // whether we have exchanged the ghost or not
+    mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
+
+    /**
+       This function returns true if the field is stored in an
+       internal field order for the given precision.
+    */ 
+    bool isNative() const;
 
   public:
     GaugeField(const GaugeFieldParam &param);
@@ -134,7 +141,10 @@ namespace quda {
     virtual const void* Even_p() const { errorQuda("Not implemented"); return (void*)0;}
     virtual const void* Odd_p() const { errorQuda("Not implemented"); return (void*)0;}
 
-    virtual const void** Ghost() const { errorQuda("Not implemented"); return (const void**)0; }
+    const void** Ghost() const { 
+      if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
+      return (const void**)ghost; 
+    }
   };
 
   class cudaGaugeField : public GaugeField {
@@ -203,7 +213,6 @@ namespace quda {
 
   private:
     void **gauge; // the actual gauge field
-    mutable void **ghost; // stores the ghost zone of the gauge field
     int pinned;
   
   public:
@@ -211,7 +220,6 @@ namespace quda {
     virtual ~cpuGaugeField();
 
     void exchangeGhost();
-    const void** Ghost() const { return (const void**)ghost; }
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }

@@ -334,6 +334,41 @@ namespace quda {
   };
 
   /**
+     struct to define QDPJIT ordered gauge fields: 
+     [[dim]] [[parity][complex][row][col][volumecb]]
+   */
+    template <typename Float, int length> struct QDPJITOrder : public LegacyOrder<Float,length> {
+    typedef typename mapper<Float>::type RegType;
+    Float *gauge[QUDA_MAX_DIM];
+    const int volumeCB;
+    QDPJITOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
+      : LegacyOrder<Float,length>(u, ghost_), volumeCB(u.VolumeCB())
+      { for (int i=0; i<4; i++) gauge[i] = gauge_ ? ((Float**)gauge_)[i] : ((Float**)u.Gauge_p())[i]; }
+    QDPJITOrder(const QDPJITOrder &order) : LegacyOrder<Float,length>(order), volumeCB(order.volumeCB) {
+      for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
+    }
+    virtual ~QDPJITOrder() { ; }
+    
+    __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
+      for (int i=0; i<length; i++) {
+	int z = i%2;
+	int rolcol = i/2;
+	v[i] = (RegType)gauge[dir][((z*(length/2) + rolcol)*2 + parity)*volumeCB + x];
+      }
+    }
+  
+    __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
+      for (int i=0; i<length; i++) {
+	int z = i%2;
+	int rolcol = i/2;
+	gauge[dir][((z*(length/2) + rolcol)*2 + parity)*volumeCB + x] = (Float)v[i];
+      }
+    }
+
+    size_t Bytes() const { return length * sizeof(Float); }
+  };
+
+  /**
      struct to define MILC ordered gauge fields: 
      [parity][dim][volumecb][row][col]
    */

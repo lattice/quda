@@ -4,7 +4,6 @@
 #include <iostream>
 #include <typeinfo>
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
 #include <comm_quda.h> // for comm_drand()
 
 /*
@@ -39,7 +38,7 @@ namespace quda {
   void* cpuColorSpinorField::backGhostFaceSendBuffer[QUDA_MAX_DIM];
 
   cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
-    ColorSpinorField(param), init(false), reference(false), order_double(NULL), order_single(NULL) {
+    ColorSpinorField(param), init(false), reference(false) {
     create(param.create);
     if (param.create == QUDA_NULL_FIELD_CREATE) {
       // do nothing
@@ -54,13 +53,13 @@ namespace quda {
   }
 
   cpuColorSpinorField::cpuColorSpinorField(const cpuColorSpinorField &src) : 
-    ColorSpinorField(src), init(false), reference(false), order_double(NULL), order_single(NULL) {
+    ColorSpinorField(src), init(false), reference(false) {
     create(QUDA_COPY_FIELD_CREATE);
     memcpy(v,src.v,bytes);
   }
 
   cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src) : 
-    ColorSpinorField(src), init(false), reference(false), order_double(NULL), order_single(NULL) {
+    ColorSpinorField(src), init(false), reference(false) {
     create(QUDA_COPY_FIELD_CREATE);
     if (typeid(src) == typeid(cpuColorSpinorField)) {
       memcpy(v, dynamic_cast<const cpuColorSpinorField&>(src).v, bytes);
@@ -120,20 +119,14 @@ namespace quda {
     total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
     bytes = total_length * precision; // includes pads and ghost zones
     bytes = ALIGNMENT_ADJUST(bytes);
-    norm_bytes = total_norm_length * sizeof(float);
-    norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
 
-    if (pad != 0) {
-      errorQuda("Non-zero pad not supported");
-    }
-  
-    if (precision == QUDA_HALF_PRECISION) {
-      errorQuda("Half precision not supported");
-    }
+    if (pad != 0) errorQuda("Non-zero pad not supported");  
+    if (precision == QUDA_HALF_PRECISION) errorQuda("Half precision not supported");
 
     if (fieldOrder != QUDA_SPACE_COLOR_SPIN_FIELD_ORDER && 
 	fieldOrder != QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
-	fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+	fieldOrder != QUDA_QOP_DOMAIN_WALL_FIELD_ORDER &&
+	fieldOrder != QUDA_QDPJIT_FIELD_ORDER) {
       errorQuda("Field order %d not supported", fieldOrder);
     }
 
@@ -149,65 +142,15 @@ namespace quda {
       init = true;
     }
  
-    createOrder(); // need to do this for references?
-  }
-
-  void cpuColorSpinorField::createOrder() {
-
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (fieldOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) 
-	order_double = new SpaceSpinColorOrder<double>(*this);
-      else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
-	order_double = new SpaceColorSpinOrder<double>(*this);
-      else if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	order_double = new QOPDomainWallOrder<double>(*this);
-      else
-	errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
-    } else if (precision == QUDA_SINGLE_PRECISION) {
-      if (fieldOrder == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) 
-	order_single = new SpaceSpinColorOrder<float>(*this);
-      else if (fieldOrder == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
-	order_single = new SpaceColorSpinOrder<float>(*this);
-      else if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	order_single = new QOPDomainWallOrder<float>(*this);
-      else
-	errorQuda("Order %d not supported in cpuColorSpinorField", fieldOrder);
-    } else {
-      errorQuda("Precision %d not supported", precision);
-    }
-  
   }
 
   void cpuColorSpinorField::destroy() {
-  
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      delete order_double;
-    } else if (precision == QUDA_SINGLE_PRECISION) {
-      delete order_single;
-    } else {
-      errorQuda("Precision %d not supported", precision);
-    }
   
     if (init) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
 	for (int i=0; i<x[nDim-1]; i++) host_free(((void**)v)[i]);
       host_free(v);
       init = false;
-    }
-
-  }
-
-  template <class D, class S>
-  void genericCopy(D &dst, const S &src) {
-
-    for (int x=0; x<dst.Volume(); x++) {
-      for (int s=0; s<dst.Nspin(); s++) {
-	for (int c=0; c<dst.Ncolor(); c++) {
-	  for (int z=0; z<2; z++) {
-	    dst(x, s, c, z) = src(x, s, c, z);
-	  }
-	}
-      }
     }
 
   }
@@ -220,19 +163,7 @@ namespace quda {
       else 
 	memcpy(v, src.v, bytes);
     } else {
-      if (precision == QUDA_DOUBLE_PRECISION) {
-	if (src.precision == QUDA_DOUBLE_PRECISION) {
-	  genericCopy(*order_double, *(src.order_double));
-	} else {
-	  genericCopy(*order_double, *(src.order_single));
-	}
-      } else {
-	if (src.precision == QUDA_DOUBLE_PRECISION) {
-	  genericCopy(*order_single, *(src.order_double));
-	} else {
-	  genericCopy(*order_single, *(src.order_single));
-	}
-      }
+      copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION);
     }
   }
 
@@ -241,143 +172,18 @@ namespace quda {
     else for (int i=0; i<x[nDim-1]; i++) memset(((void**)v)[i], '\0', bytes/x[nDim-1]);
   }
 
-  // Random number insertion over all field elements
-  template <class T>
-  void random(T &t) {
-    for (int x=0; x<t.Volume(); x++) {
-      for (int s=0; s<t.Nspin(); s++) {
-	for (int c=0; c<t.Ncolor(); c++) {
-	  for (int z=0; z<2; z++) {
-	    t(x,s,c,z) = comm_drand();
-	  }
-	}
-      }
-    }
-  }
-
-  // Create a point source at spacetime point x, spin s and colour c
-  template <class T>
-  void point(T &t, const int x, const int s, const int c) { t(x, s, c, 0) = 1.0; }
-
-  void cpuColorSpinorField::Source(const QudaSourceType sourceType, const int x,
-				   const int s, const int c) {
-
-    switch(sourceType) {
-
-    case QUDA_RANDOM_SOURCE:
-      if (precision == QUDA_DOUBLE_PRECISION) random(*order_double);
-      else if (precision == QUDA_SINGLE_PRECISION) random(*order_single);
-      else errorQuda("Precision not supported");
-      break;
-
-    case QUDA_POINT_SOURCE:
-      zero();
-      if (precision == QUDA_DOUBLE_PRECISION) point(*order_double, x, s, c);
-      else if (precision == QUDA_SINGLE_PRECISION) point(*order_single, x, s, c);
-      else errorQuda("Precision not supported");
-      break;
-
-    default:
-      errorQuda("Source type %d not implemented", sourceType);
-
-    }
-
-  }
-
-  template <class U, class V>
-  int compareSpinor(const U &u, const V &v, const int tol) {
-    int fail_check = 16*tol;
-    int *fail = new int[fail_check];
-    for (int f=0; f<fail_check; f++) fail[f] = 0;
-
-    int N = 2*u.Nspin()*u.Ncolor();
-    int *iter = new int[N];
-    for (int i=0; i<N; i++) iter[i] = 0;
-
-    for (int x=0; x<u.Volume(); x++) {
-      for (int s=0; s<u.Nspin(); s++) {
-	for (int c=0; c<u.Ncolor(); c++) {
-	  for (int z=0; z<2; z++) {
-	    double diff = fabs(u(x,s,c,z) - v(x,s,c,z));
-
-	    for (int f=0; f<fail_check; f++)
-	      if (diff > pow(10.0,-(f+1)/(double)tol)) fail[f]++;
-
-	    int j = (s*u.Ncolor() + c)*2+z;
-	    if (diff > 1e-3) iter[j]++;
-	  }
-	}
-      }
-    }
-
-    for (int i=0; i<N; i++) printfQuda("%d fails = %d\n", i, iter[i]);
-    
-    int accuracy_level =0;
-    for (int f=0; f<fail_check; f++) {
-      if (fail[f] == 0) accuracy_level = f+1;
-    }
-
-    for (int f=0; f<fail_check; f++) {
-      printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)tol), 
-		 fail[f], u.Volume()*N, fail[f] / (double)(u.Volume()*N));
-    }
-  
-    delete []iter;
-    delete []fail;
-  
-    return accuracy_level;
+  void cpuColorSpinorField::Source(QudaSourceType source_type, int x, int s, int c) {
+    genericSource(*this, source_type, x, s, c);
   }
 
   int cpuColorSpinorField::Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, 
-				   const int tol) {
-    checkField(a, b);
-
-    int ret = 0;
-    if (a.precision == QUDA_DOUBLE_PRECISION) 
-      if (b.precision == QUDA_DOUBLE_PRECISION)
-	ret = compareSpinor(*(a.order_double), *(b.order_double), tol);
-      else
-	ret = compareSpinor(*(a.order_double), *(b.order_single), tol);
-    else 
-      if (b.precision == QUDA_DOUBLE_PRECISION)
-	ret = compareSpinor(*(a.order_single), *(b.order_double), tol);
-      else
-	ret = compareSpinor(*(a.order_single), *(b.order_single), tol);
-
-    return ret;
-  }
-
-
-  template <class Order>
-  void print_vector(const Order &o, unsigned int x) {
-
-    for (int s=0; s<o.Nspin(); s++) {
-      std::cout << "x = " << x << ", s = " << s << ", { ";
-      for (int c=0; c<o.Ncolor(); c++) {
-	std::cout << " ( " << o(x, s, c, 0) << " , " ;
-	if (c<o.Ncolor()-1) std::cout << o(x, s, c, 1) << " ) ," ;
-	else std::cout << o(x, s, c, 1) << " ) " ;
-      }
-      std::cout << " } " << std::endl;
-    }
-
+				   const int tol) {    
+    checkField(a,b);
+    return genericCompare(a, b, tol);
   }
 
   // print out the vector at volume point x
-  void cpuColorSpinorField::PrintVector(unsigned int x) {
-  
-    switch(precision) {
-    case QUDA_DOUBLE_PRECISION:
-      print_vector(*order_double, x);
-      break;
-    case QUDA_SINGLE_PRECISION:
-      print_vector(*order_single, x);
-      break;
-    default:
-      errorQuda("Precision %d not implemented", precision); 
-    }
-
-  }
+  void cpuColorSpinorField::PrintVector(unsigned int x) { genericPrintVector(*this, x); }
 
   void cpuColorSpinorField::allocateGhostBuffer(void)
   {

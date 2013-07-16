@@ -35,6 +35,24 @@ namespace quda {
 
   }
 
+  bool GaugeField::isNative() const {
+
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
+    } else if (precision == QUDA_SINGLE_PRECISION || 
+	       precision == QUDA_HALF_PRECISION) {
+      if (reconstruct == QUDA_RECONSTRUCT_NO) {
+	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
+      } else if (reconstruct == QUDA_RECONSTRUCT_12) {
+	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+      } else if (reconstruct == QUDA_RECONSTRUCT_8) {
+	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+      }
+    }
+
+    return false;
+  }
+
   void GaugeField::checkField(const GaugeField &a) {
     LatticeField::checkField(a);
     if (a.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, a.link_type);
