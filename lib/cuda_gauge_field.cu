@@ -107,7 +107,7 @@ namespace quda {
 
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
-	if (ghost[i]) host_free(ghost[i]);
+	if (ghost[i]) device_free(ghost[i]);
       }
     }
   }
