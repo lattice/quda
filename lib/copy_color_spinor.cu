@@ -302,6 +302,11 @@ namespace quda {
     }
 
     if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET) { // full field
+      if (src.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER ||
+	  dst.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
+	errorQuda("QDPJIT field ordering not supported for full site fields");
+      }
+
       // check what src parity ordering is
       unsigned long long evenOff, oddOff, evenNormOff, oddNormOff;
       if (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER) {

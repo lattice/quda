@@ -379,17 +379,17 @@ struct QDPJITDiracOrder {
   typedef typename mapper<Float>::type RegType;
   Float *field;
   int volumeCB;
-  int stride;
-  QDPJITDiracOrder(const ColorSpinorField &a, Float *field_=0) 
-  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride())
-  { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
+  int parity;
+  QDPJITDiracOrder(const ColorSpinorField &a, Float *field_=0, int parity=1) 
+  : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB())
+  { if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
   virtual ~QDPJITDiracOrder() { ; }
 
   __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
-	  v[(s*Nc+c)*2+z] = field[((z*Nc + c)*Ns + s)*volumeCB + x];
+	  v[(s*Nc+c)*2+z] = field[(((z*Nc + c)*Ns + s)*2 + parity)*volumeCB + x];
 	}
       }
     }
@@ -399,7 +399,7 @@ struct QDPJITDiracOrder {
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
-	  field[((z*Nc + c)*Ns + s)*volumeCB + x] = v[(s*Nc+c)*2+z];
+	  field[(((z*Nc + c)*Ns + s)*2 + parity)*volumeCB + x] = v[(s*Nc+c)*2+z];
 	}
       }
     }
