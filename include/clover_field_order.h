@@ -149,22 +149,15 @@ namespace quda {
   template <typename Float, int length>
     struct QDPJITOrder {
       typedef typename mapper<Float>::type RegType;
-      Float *diag[2]; 	   /**< Pointers to the off-diagonal terms (two parities) */
-      Float *offdiag[2];   /**< Pointers to the diagonal terms (two parities) */
+      Float *diag; 	   /**< Pointers to the off-diagonal terms (two parities) */
+      Float *offdiag;   /**< Pointers to the diagonal terms (two parities) */
       const int volumeCB;
       const int stride;
 
       QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
       : volumeCB(clover.VolumeCB()), stride(volumeCB) {
-	// offset is complexity * number of offdiagonals * chirality * spacetime
-	unsigned long long offset_offdiag = 2 * 15 * 2 * volumeCB;
-	offdiag[0] = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
-	offdiag[1] = offdiag[0] + offset_offdiag*sizeof(Float);
-
-	// offset is number of diagonals * chirality * spacetime
-	unsigned long long offset_diag = 6 * 2 * volumeCB;
-	diag[0] = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
-	diag[1] = diag[0] + offset_diag*sizeof(Float);
+	offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
+	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
       }
 
       __device__ __host__ inline void load(RegType v[length], int x, int parity) const {
@@ -172,11 +165,11 @@ namespace quda {
 	for (int chirality=0; chirality<2; chirality++) {
 	  // set diagonal elements
 	  for (int i=0; i<6; i++)
-	    v[chirality*length/2 + i] = 0.5*diag[parity][(i*2 + chirality)*volumeCB + x];
+	    v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 
 	  // the off diagonal elements
 	  for (int i=0; i<30; i++) 
-	    v[chirality*length/2 + 6 + i] = 0.5*offdiag[parity][(i*2 + chirality)*volumeCB + x];
+	    v[chirality*36 + 6 + i] = 0.5*offdiag[((i*2 + chirality)*2 + parity)*volumeCB + x];
 	}
 
       }
@@ -186,11 +179,11 @@ namespace quda {
 	for (int chirality=0; chirality<2; chirality++) {
 	  // set diagonal elements
 	  for (int i=0; i<6; i++)
-	    diag[parity][(i*2 + chirality)*volumeCB + x] = 2.0*v[chirality*length/2 + i];
-	
+	    diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
+
 	  // the off diagonal elements
 	  for (int i=0; i<30; i++) 
-	    offdiag[parity][(i*2 + chirality)*volumeCB + x] = 2.0*v[chirality*length/2 + 6 + i];
+	    offdiag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
 	}
       }
 

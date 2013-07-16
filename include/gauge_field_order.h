@@ -353,7 +353,7 @@ namespace quda {
       for (int i=0; i<length; i++) {
 	int z = i%2;
 	int rolcol = i/2;
-	v[i] = (RegType)gauge[dir][((parity*2+z)*length/2 + rolcol)*volumeCB + x];
+	v[i] = (RegType)gauge[dir][((z*(length/2) + rolcol)*2 + parity)*volumeCB + x];
       }
     }
   
@@ -361,7 +361,7 @@ namespace quda {
       for (int i=0; i<length; i++) {
 	int z = i%2;
 	int rolcol = i/2;
-	gauge[dir][((parity*2+z)*length/2 + rolcol)*volumeCB + x] = (Float)v[i];
+	gauge[dir][((z*(length/2) + rolcol)*2 + parity)*volumeCB + x] = (Float)v[i];
       }
     }
 
