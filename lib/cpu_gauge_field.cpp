@@ -59,7 +59,6 @@ namespace quda {
     }
   
     // Ghost zone is always 2-dimensional
-    ghost = (void**) safe_malloc(QUDA_MAX_DIM * sizeof(void*));
     for (int i=0; i<nDim; i++) {
       size_t nbytes = nFace * surface[i] * reconstruct * precision;
       ghost[i] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
@@ -94,7 +93,6 @@ namespace quda {
     for (int i=0; i<nDim; i++) {
       if (ghost[i]) host_free(ghost[i]);
     }
-    if (ghost) host_free(ghost);
   }
 
   // This does the exchange of the gauge field ghost zone and places it

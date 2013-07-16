@@ -221,7 +221,6 @@ namespace quda {
     void extractGhost(const GaugeField &u, Float **Ghost) {
 
     const int length = 18;
-    const int *X = u.X();
 
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
