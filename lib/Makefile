@@ -1,10 +1,11 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = transfer.o timer.o malloc.o solver.o inv_bicgstab_quda.o	\
-	inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o		\
-	inv_mr_quda.o inv_mre.o interface_quda.o util_quda.o		\
-	color_spinor_field.o color_spinor_util.o copy_color_spinor.o	\
+QUDA_OBJS = transfer.o transfer_util.o prolongator.o restrictor.o	\
+	timer.o malloc.o solver.o inv_bicgstab_quda.o inv_cg_quda.o	\
+	inv_multi_cg_quda.o inv_gcr_quda.o inv_mr_quda.o inv_mre.o	\
+	interface_quda.o util_quda.o color_spinor_field.o		\
+	color_spinor_util.o copy_color_spinor.o				\
 	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	\
 	hw_quda.o blas_cpu.o clover_field.o copy_clover.o		\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\

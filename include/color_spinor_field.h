@@ -241,6 +241,20 @@ namespace quda {
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
 
+    /** 
+     * Compute the n-dimensional site index given the 1-d offset index
+     * @param y n-dimensional site index
+     * @param i 1-dimensional site index
+     */
+    void LatticeIndex(int *y, int i) const;
+    
+    /** 
+     * Compute the 1-d offset index given the n-dimensional site index
+     * @param i 1-dimensional site index
+     * @param y n-dimensional site index
+     */
+    void OffsetIndex(int &i, int *y) const;
+
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
   };
@@ -396,20 +410,6 @@ namespace quda {
      * @return The location of the field (CUDA or CPU)
      */
     QudaFieldLocation Location() const;
-    
-    /** 
-     * Compute the n-dimensional site index given the 1-d offset index
-     * @param y n-dimensional site index
-     * @param i 1-dimensional site index
-     */
-    void LatticeIndex(int *y, int i) const;
-    
-    /** 
-     * Compute the 1-d offset index given the n-dimensional site index
-     * @param i 1-dimensional site index
-     * @param y n-dimensional site index
-     */
-    void OffsetIndex(int &i, int *y) const;
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 

@@ -11,8 +11,6 @@
  */
 
 #include <color_spinor_field.h>
-#include <color_spinor_field_order.h>
-
 #include <dirac_quda.h>
 
 namespace quda {
@@ -62,8 +60,8 @@ namespace quda {
      * @param out A Complex array storing the block-ordered fields
      * @param in  Accessor for the color-spinor field V
      */
-  template <class Complex, class FieldOrder>
-    void blockOrderV(Complex *out, const FieldOrder &in, int *geo_bs, int spin_bs);
+    //template <class Complex, class FieldOrder>
+    //void blockOrderV(Complex *out, const FieldOrder &in, int *geo_bs, int spin_bs);
 
   /**
      * Copies elements from the block-ordered field in back to the color-spinor field V
@@ -71,8 +69,8 @@ namespace quda {
      * @param out The full lattice color spinor field, not block-ordered
      * @param in  A Complex array storing the block-ordered fields
      */
-  template <class FieldOrder, class Complex>
-    void undoblockOrderV(FieldOrder &out, Complex *in, int *geo_bs, int spin_bs);   
+    //template <class FieldOrder, class Complex>
+    //void undoblockOrderV(FieldOrder &out, Complex *in, int *geo_bs, int spin_bs);   
 
   /**
    * Does Gram-Schmidt orthogonalization.
@@ -81,8 +79,8 @@ namespace quda {
    * @param Nc
    * @param blockSize
    */
-  template <class Complex>
-    void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize);
+  //template <class Complex>
+    //void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize);
 
     /** 
      * Creates the map between fine and coarse spin dimensions
@@ -127,6 +125,19 @@ namespace quda {
     void R(cpuColorSpinorField &out, const cpuColorSpinorField &in);
 
   };
+
+  void FillV(ColorSpinorField &V, const ColorSpinorField **B, int Nvec);
+
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs);
+
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, 
+		  const ColorSpinorField &v, ColorSpinorField &tmp, 
+		  const int *geo_map, const int *spin_map);
+
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, 
+		const ColorSpinorField &v, ColorSpinorField &tmp,
+		const int *geo_map, const int *spin_map);
+  
 
 } // namespace quda
 #endif // _TRANSFER_H
