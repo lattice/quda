@@ -81,7 +81,6 @@ namespace quda {
       for (int dim=0; dim<nDim; dim++) {
 
 	// linear index used for writing into ghost buffer
-	int indexDst = 0;
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
 	if (X >= arg.nFace*arg.surfaceCB[dim]) continue;
 	// X = ((d * A + a)*B + b)*C + c
@@ -100,8 +99,7 @@ namespace quda {
 	if (oddness == parity) {
 	  RegType u[length];
 	  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-	  arg.order.saveGhost(u, indexDst, dim, (parity+arg.localParity[dim])%2);
-	  indexDst++;
+	  arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])%2);
 	} // oddness == parity
 
       } // dim
@@ -221,7 +219,6 @@ namespace quda {
     void extractGhost(const GaugeField &u, Float **Ghost) {
 
     const int length = 18;
-    const int *X = u.X();
 
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;

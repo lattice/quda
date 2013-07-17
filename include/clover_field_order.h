@@ -164,12 +164,16 @@ namespace quda {
 	// the factor of 0.5 comes from a basis change
 	for (int chirality=0; chirality<2; chirality++) {
 	  // set diagonal elements
-	  for (int i=0; i<6; i++)
+	  for (int i=0; i<6; i++) {
 	    v[chirality*36 + i] = 0.5*diag[((i*2 + chirality)*2 + parity)*volumeCB + x];
+	  }
 
 	  // the off diagonal elements
-	  for (int i=0; i<30; i++) 
-	    v[chirality*36 + 6 + i] = 0.5*offdiag[((i*2 + chirality)*2 + parity)*volumeCB + x];
+	  for (int i=0; i<30; i++) {
+	    int z = i%2;
+	    int off = i/2;
+	    v[chirality*36 + 6 + i] = 0.5*offdiag[(((z*15 + off)*2 + chirality)*2 + parity)*volumeCB + x];
+	  }
 	}
 
       }
@@ -178,12 +182,16 @@ namespace quda {
 	// the factor of 2.0 comes from undoing the basis change
 	for (int chirality=0; chirality<2; chirality++) {
 	  // set diagonal elements
-	  for (int i=0; i<6; i++)
+	  for (int i=0; i<6; i++) {
 	    diag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + i];
+	  }
 
 	  // the off diagonal elements
-	  for (int i=0; i<30; i++) 
-	    offdiag[((i*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
+	  for (int i=0; i<30; i++) {
+	    int z = i%2;
+	    int off = i/2;
+	    offdiag[(((z*15 + off)*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
+	  }
 	}
       }
 

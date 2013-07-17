@@ -24,10 +24,18 @@ namespace quda {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       gauge = device_malloc(bytes);  
       if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
-    } else { // for reference fields (e.g., external fields) we need to do the ghost exchange
+    } else { 
       gauge = param.gauge;
-      exchangeGhost();
     }
+
+    if ( !isNative() ) {
+      for (int i=0; i<nDim; i++) {
+	size_t nbytes = nFace * surface[i] * reconstruct * precision;
+	ghost[i] = device_malloc(nbytes);
+      }        
+    }
+
+    if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost(); 
 
     even = gauge;
     odd = (char*)gauge + bytes/2; 
@@ -40,45 +48,50 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
   void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field) {
-    // create the texture for the field components
-    cudaChannelFormatDesc desc;
-    memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-    if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-    else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
 
-    // always four components regardless of precision
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      desc.x = 8*sizeof(int);
-      desc.y = 8*sizeof(int);
-      desc.z = 8*sizeof(int);
-      desc.w = 8*sizeof(int);
-    } else {
-      desc.x = 8*precision;
-      desc.y = 8*precision;
-      desc.z = (reconstruct == 18) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
-      desc.w = (reconstruct == 18) ? 0 : 8*precision;
+    if ( isNative() ) {
+      // create the texture for the field components
+      cudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
+      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
+      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+      
+      // always four components regardless of precision
+      if (precision == QUDA_DOUBLE_PRECISION) {
+	desc.x = 8*sizeof(int);
+	desc.y = 8*sizeof(int);
+	desc.z = 8*sizeof(int);
+	desc.w = 8*sizeof(int);
+      } else {
+	desc.x = 8*precision;
+	desc.y = 8*precision;
+	desc.z = (reconstruct == 18) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
+	desc.w = (reconstruct == 18) ? 0 : 8*precision;
+      }
+      
+      cudaResourceDesc resDesc;
+      memset(&resDesc, 0, sizeof(resDesc));
+      resDesc.resType = cudaResourceTypeLinear;
+      resDesc.res.linear.devPtr = field;
+      resDesc.res.linear.desc = desc;
+      resDesc.res.linear.sizeInBytes = bytes/2;
+      
+      cudaTextureDesc texDesc;
+      memset(&texDesc, 0, sizeof(texDesc));
+      if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+      else texDesc.readMode = cudaReadModeElementType;
+      
+      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+      checkCudaError();
     }
-
-    cudaResourceDesc resDesc;
-    memset(&resDesc, 0, sizeof(resDesc));
-    resDesc.resType = cudaResourceTypeLinear;
-    resDesc.res.linear.devPtr = field;
-    resDesc.res.linear.desc = desc;
-    resDesc.res.linear.sizeInBytes = bytes/2;
-
-    cudaTextureDesc texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
-    if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
-    else texDesc.readMode = cudaReadModeElementType;
-
-    cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-    checkCudaError();
   }
 
   void cudaGaugeField::destroyTexObject() {
-    cudaDestroyTextureObject(evenTex);
-    cudaDestroyTextureObject(oddTex);
-    checkCudaError();
+    if ( isNative() ) {
+      cudaDestroyTextureObject(evenTex);
+      cudaDestroyTextureObject(oddTex);
+      checkCudaError();
+    }
   }
 #endif
 
@@ -91,6 +104,12 @@ namespace quda {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (gauge) device_free(gauge);
     }
+
+    if ( !isNative() ) {
+      for (int i=0; i<nDim; i++) {
+	if (ghost[i]) device_free(ghost[i]);
+      }
+    }
   }
 
   // This does the exchange of the gauge field ghost zone and places it
@@ -98,10 +117,10 @@ namespace quda {
   void cudaGaugeField::exchangeGhost() {
     if (ghostExchange) return;
 
-    void *ghost[QUDA_MAX_DIM];
+    void *ghost_[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
-      ghost[d] = device_malloc(nFace*surface[d]*reconstruct*precision);
+      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*reconstruct*precision) : ghost[d];
       send[d] = device_malloc(nFace*surface[d]*reconstruct*precision);
     }
 
@@ -110,14 +129,14 @@ namespace quda {
 
     // communicate between nodes
     FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
-    faceBuf.exchangeLink(ghost, send, QUDA_CUDA_FIELD_LOCATION);
+    faceBuf.exchangeLink(ghost_, send, QUDA_CUDA_FIELD_LOCATION);
 
-    // copy from ghost into the padded region in gauge
-    copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost);
+    for (int d=0; d<nDim; d++) device_free(send[d]);
 
-    for (int d=0; d<nDim; d++) {
-      device_free(send[d]);
-      device_free(ghost[d]);
+    if (isNative()) {
+      // copy from ghost into the padded region in gauge
+      copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost);
+      for (int d=0; d<nDim; d++) device_free(ghost[d]);
     }
 
     ghostExchange = true;
@@ -147,7 +166,6 @@ namespace quda {
       // copy field and ghost zone into this field
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
 		       static_cast<const cudaGaugeField&>(src).gauge);
-
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       LatticeField::resizeBufferPinned(bytes);
 
