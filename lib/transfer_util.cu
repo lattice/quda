@@ -142,7 +142,7 @@ namespace quda {
       int block_offset = 0;
 
       //Compute the offset within a block (x fastest direction, t is slowest direction, non-parity ordered)
-      for (int d=out.Ndim(); d>=0; d--) {
+      for (int d=out.Ndim()-1; d>=0; d--) {
 	y[d] = x[d]%geo_bs[d];
 	block_offset *= geo_bs[d];
 	block_offset += y[d];
@@ -206,9 +206,9 @@ namespace quda {
       std::complex<double> *Vblock = new std::complex<double>[V.Volume()*V.Nspin()*V.Ncolor()];
       ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(V);
 
-      blockOrderV(Vblock, *vOrder, Nvec, geo_bs, geo_map, spin_bs, V);
+      blockOrderV(Vblock, *vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
       blockGramSchmidt(Vblock, numblocks, V.Ncolor()/spin_bs, geo_blocksize*fsite_length);  
-      undoblockOrderV(*vOrder, Vblock, Nvec, geo_bs, geo_map, spin_bs, V);
+      undoblockOrderV(*vOrder, Vblock, Nvec, geo_map, geo_bs, spin_bs, V);
 
       delete vOrder;
       delete []Vblock;
@@ -216,10 +216,11 @@ namespace quda {
       std::complex<float> *Vblock = new std::complex<float>[V.Volume()*V.Nspin()*V.Ncolor()];
       ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(V);
 
-      blockOrderV(Vblock, *vOrder, Nvec, geo_bs, geo_map, spin_bs, V);
+      blockOrderV(Vblock, *vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
       blockGramSchmidt(Vblock, numblocks, V.Ncolor()/spin_bs, geo_blocksize*fsite_length);  
-      undoblockOrderV(*vOrder, Vblock, Nvec, geo_bs, geo_map, spin_bs, V);
+      undoblockOrderV(*vOrder, Vblock, Nvec, geo_map, geo_bs, spin_bs, V);
 
+      delete vOrder;
       delete []Vblock;
     }
   }
