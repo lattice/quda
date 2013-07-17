@@ -3,6 +3,41 @@
 
 namespace quda {
 
+  /*template<class FO>
+  void Transfer::testOrthogonal(const FO &in, int* geo_bs, int spin_bs) {
+    int geo_blocksize = 1;
+    for (int d = 0; d < V->Ndim(); d++) {
+      geo_blocksize *= geo_bs[d];
+    }
+    int numblocks = V->Volume()*4*Nvec/(spin_bs*geo_blocksize);
+    std::complex<double> * block;
+    block = (std::complex<double> *)malloc(numblocks*sizeof(std::complex<double>));
+    int *count = (int *) malloc(numblocks*sizeof(int));
+    for(int i =0; i < numblocks; i++) {
+      block[i] = 0.0;
+      count[i] = 0;
+    }
+    for(int i = 0; i < V->Volume(); i++) {
+      for(int s = 0; s < V->Nspin(); s++) {
+	for(int c = 0; c < V->Ncolor(); c++) {
+	  int x[QUDA_MAX_DIM];
+	  V->LatticeIndex(x,i);
+	  int offset = geo_map[i]*4*Nvec/spin_bs;
+	  block[offset+(c/spin_bs)] += std::conj(in(i,s,c)) * (in(i,s,c));
+	  count[offset+(c/spin_bs)]++;
+	  
+	}
+      }
+    }
+    for(int i =0; i < numblocks; i++) {
+      printfQuda("count[%d] = %d block[%d] = %e %e\n",i,count[i],i,block[i].real(),block[i].imag());
+    }
+    free(block);
+    free(count);
+    
+  }
+  */
+
   Transfer::Transfer(cpuColorSpinorField **B, int Nvec, int *geo_bs, int spin_bs)
     : B(B), Nvec(Nvec), V(0), tmp(0), geo_map(0), spin_map(0) 
   {

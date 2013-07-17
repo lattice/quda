@@ -25,7 +25,7 @@
 
 using namespace quda;
 
-ColorSpinorParam csParam;
+ColorSpinorParam csParam, coarsecsParam;
 
 float kappa = 1.0;
 
@@ -68,7 +68,7 @@ void init() {
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  csParam.create = QUDA_NULL_FIELD_CREATE;
+  csParam.create = QUDA_ZERO_FIELD_CREATE;
 
   Nvec = nvec;
   W = new cpuColorSpinorField*[Nvec];
@@ -119,11 +119,106 @@ void loadTest() {
 
   for (int i=0; i<Nvec; i++) printfQuda("Vector %d has norm = %e\n", i, norm2(*W[i]));
 
+
   int geom_bs[] = {4, 2, 2, 2};
   int spin_bs = 2;
 
-  Transfer P(W, Nvec, geom_bs, spin_bs);
+  Transfer T(W, Nvec, geom_bs, spin_bs);
 
+  coarsecsParam.nColor = Nvec;
+  //coarsecsParam.nColor = 3;
+  coarsecsParam.nSpin = 4/spin_bs;
+  //coarsecsParam.nSpin = 4;
+  coarsecsParam.nDim = 4;
+
+  #if 1
+  coarsecsParam.x[0] = xdim/geom_bs[0];
+  coarsecsParam.x[1] = ydim/geom_bs[1];
+  coarsecsParam.x[2] = zdim/geom_bs[2];
+  coarsecsParam.x[3] = tdim/geom_bs[3];
+  #else
+  coarsecsParam.x[0] = xdim;
+  coarsecsParam.x[1] = ydim;
+  coarsecsParam.x[2] = zdim;
+  coarsecsParam.x[3] = tdim;
+  #endif
+  setDims(coarsecsParam.x);
+
+  coarsecsParam.precision = prec_cpu;
+  coarsecsParam.pad = 0;
+  coarsecsParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  coarsecsParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  coarsecsParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  coarsecsParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  coarsecsParam.create = QUDA_ZERO_FIELD_CREATE;
+
+  for (int j=0; j<3; j++) {
+
+#if 0
+    printfQuda("W[%d]\n",j);
+  for (int i = 0; i < 1;i++) {
+    W[j]->PrintVector(i);
+  }
+#endif
+
+  cpuColorSpinorField Wfine2(csParam);
+  cpuColorSpinorField Wfine(csParam);
+  cpuColorSpinorField Wcoarse2(coarsecsParam);
+  cpuColorSpinorField Wcoarse(coarsecsParam);
+
+  //T.R(Wcoarse,*W[j]);
+  //Test prolongator
+  #if 0
+  std::complex<double> *fcoarse = (std::complex<double> *)Wcoarse.V();
+  for (int i = 0; i < Wcoarse.Volume(); i++) {
+    for (int s = 0; s < Wcoarse.Nspin(); s++) {
+      fcoarse[i*Wcoarse.Nspin()*Wcoarse.Ncolor()+s*Wcoarse.Ncolor()+j] = 1.0;
+    }
+  }
+  #endif
+  //T.P(Wfine,Wcoarse);
+
+  //printfQuda("Wcoarse\n");
+#if 0
+  for (int i = 0; i < 1;i++) {
+    Wcoarse.PrintVector(i);
+  }
+  #endif
+  #if 1
+  std::complex<double> *fcoarse = (std::complex<double> *)Wfine.V();
+  for (int i = 0; i < Wfine.Volume(); i++) {
+    for (int s = 0; s < Wfine.Nspin(); s++) {
+      fcoarse[i*Wfine.Nspin()*Wfine.Ncolor()+s*Wfine.Ncolor()+j] = 1.0;
+    }
+  }
+  #endif
+
+    printfQuda("Wfine\n");
+#if 1
+  for (int i = 0; i < 1;i++) {
+    Wfine.PrintVector(i);
+  }
+  #endif
+  printfQuda("Now restrict\n");
+  T.R(Wcoarse2,Wfine);
+    printfQuda("Wcoarse2\n");
+#if 1
+  for (int i = 0; i < 1;i++) {
+    Wcoarse2.PrintVector(i);
+  }
+  #endif
+  printfQuda("now prolongate\n");
+  T.P(Wfine2,Wcoarse2);
+    printfQuda("Wfine2\n");
+#if 1
+  for (int i = 0; i < 1;i++) {
+    Wfine2.PrintVector(i);
+  }
+  #endif
+  Wfine.Compare(Wfine,Wfine2);	
+  //Wfine.Compare(*W[0],Wfine);
+  }
+      
   delete []V;
 
 }

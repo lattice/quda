@@ -57,10 +57,11 @@ namespace quda {
 		   const int *geo_map, const int *geo_bs, int spin_bs,
 		   const ColorSpinorField &V) {
 
-    //fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs) = Nc*Ns/spin_bs
-    int fsite_length = in.Nspin()*in.Ncolor()/(Nvec*spin_bs);
-
     int fspin_components = in.Ncolor()/Nvec;
+
+    //fsite_length = V->Nspin()*spin_bs
+    int fsite_length = in.Nspin()*spin_bs;
+
 
     //Compute the size of each block
     int blockSize = 1;
@@ -71,14 +72,14 @@ namespace quda {
 
     int x[QUDA_MAX_DIM];
     
-   // Run through the fine grid and do the block ordering
+    // Run through the fine grid and do the block ordering
     for (int i=0; i<in.Volume(); i++) {
       
       // Get fine grid coordinates
       V.LatticeIndex(x, i);
 
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      int offset = geo_map[i]*blockSize*Nvec*spin_bs;
+      int offset = geo_map[i]*blockSize*Nvec*fspin_components/spin_bs;
 
       //The coordinates within a block
       int y[QUDA_MAX_DIM];
@@ -87,7 +88,7 @@ namespace quda {
       int block_offset = 0;
 
       //Compute the offset within a block (x fastest direction, t is slowest direction, non-parity ordered)
-      for (int d=in.Ndim(); d>=0; d--) {
+      for (int d=in.Ndim()-1; d>=0; d--) {
 	y[d] = x[d]%geo_bs[d];
 	block_offset *= geo_bs[d];
 	block_offset += y[d];
@@ -98,7 +99,7 @@ namespace quda {
       //spin indices of V correspond to fine color
       for (int c=0; c<in.Ncolor(); c++) {
 	for (int s=0; s<in.Nspin(); s++) {
-	  int ind = offset + (c*spin_bs/fspin_components)*blockSize + (block_offset*fsite_length + in.Nspin()*(c%(fspin_components/spin_bs))+s);
+	  int ind = offset + (c*fspin_components/spin_bs)*blockSize + (block_offset*fsite_length + in.Nspin()*(c%(fspin_components/spin_bs))+s);
 	  out[ind] = in(i, s, c);
 	}
       }
@@ -111,11 +112,10 @@ namespace quda {
   void undoblockOrderV(FieldOrder &out, Complex *in, int Nvec, 
 		       const int *geo_map, const int *geo_bs, int spin_bs, 
 		       const ColorSpinorField &V) {
-
-    //fsite_length = V->Nspin()*V->Ncolor()/(Nvec*spin_bs) = Nc*Ns/spin_bs
-    int fsite_length = out.Nspin()*out.Ncolor()/(Nvec*spin_bs);
-
     int fspin_components = out.Ncolor()/Nvec;
+
+    //fsite_length = V->Nspin()*spin_bs = Nc*spin_bs
+    int fsite_length = out.Nspin()*spin_bs;
 
     //Compute the size of each block
     int blockSize = 1;
@@ -126,14 +126,14 @@ namespace quda {
 
     int x[QUDA_MAX_DIM];
     
-   // Run through the fine grid and do the block ordering
+    // Run through the fine grid and do the block ordering
     for (int i=0; i<out.Volume(); i++) {
       
       // Get fine grid coordinates
       V.LatticeIndex(x, i);
 
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      int offset = geo_map[i]*blockSize*Nvec*spin_bs;
+      int offset = geo_map[i]*blockSize*Nvec*fspin_components/spin_bs;
 
       //The coordinates within a block
       int y[QUDA_MAX_DIM];
@@ -171,7 +171,6 @@ namespace quda {
       
 	for (int ic=0; ic<jc; ic++) {
 	  // Calculate dot product.
-	  // dot should be double, but doesn't play well with complex<float>.  Use Complex type instead
 	  Complex dot = 0.0;
 	  for (int i=0; i<blockSize; i++) dot += conj(v[(b*Nc+ic)*blockSize+i]) * v[(b*Nc+jc)*blockSize+i];
 	
@@ -194,19 +193,21 @@ namespace quda {
   }
 
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs) {
-   //Orthogonalize null vectors
+
+  
+    //Orthogonalize null vectors
     
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
     int numblocks = V.Volume()/geo_blocksize;
-    int fsite_length = V.Nspin()*V.Ncolor()/(spin_bs*Nvec);
+    int fsite_length = V.Nspin()*spin_bs;
 
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
       std::complex<double> *Vblock = new std::complex<double>[V.Volume()*V.Nspin()*V.Ncolor()];
       ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(V);
 
       blockOrderV(Vblock, *vOrder, Nvec, geo_bs, geo_map, spin_bs, V);
-      blockGramSchmidt(Vblock, numblocks, spin_bs*Nvec, geo_blocksize*fsite_length);  
+      blockGramSchmidt(Vblock, numblocks, V.Ncolor()/spin_bs, geo_blocksize*fsite_length);  
       undoblockOrderV(*vOrder, Vblock, Nvec, geo_bs, geo_map, spin_bs, V);
 
       delete vOrder;
@@ -216,7 +217,7 @@ namespace quda {
       ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(V);
 
       blockOrderV(Vblock, *vOrder, Nvec, geo_bs, geo_map, spin_bs, V);
-      blockGramSchmidt(Vblock, numblocks, spin_bs*Nvec, geo_blocksize*fsite_length);  
+      blockGramSchmidt(Vblock, numblocks, V.Ncolor()/spin_bs, geo_blocksize*fsite_length);  
       undoblockOrderV(*vOrder, Vblock, Nvec, geo_bs, geo_map, spin_bs, V);
 
       delete []Vblock;
