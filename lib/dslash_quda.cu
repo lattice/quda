@@ -113,6 +113,7 @@ namespace quda {
   // dslashTuning = QUDA_TUNE_YES enables autotuning when the dslash is
   // first launched
   static QudaTune dslashTuning = QUDA_TUNE_NO;
+  static QudaTune twistedGamma5Tuning = QUDA_TUNE_NO;//twistedGamma5 is currently disabled
   static QudaVerbosity verbosity = QUDA_SILENT;
 
   void setDslashTuning(QudaTune tune, QudaVerbosity verbose)
@@ -551,6 +552,7 @@ namespace quda {
 #else
     aux << "single-GPU";
 #endif // MULTI_GPU
+
     return TuneKey(vol.str(), typeid(*this).name(), aux.str());
   }
 
@@ -922,10 +924,25 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      std::stringstream recon;
+      std::stringstream recon, dslash_type;
       recon << reconstruct;
       key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Xpay";
+
+      switch(dslashType){
+        case QUDA_DEG_TWIST_INV_DSLASH:
+        key.aux += ",TwistInvDslash";
+        break;
+        case QUDA_DEG_DSLASH_TWIST_INV:
+        key.aux += ",";
+        break;
+        case QUDA_DEG_DSLASH_TWIST_XPAY:
+        key.aux += ",DslashTwist";
+        break;
+        case QUDA_NONDEG_DSLASH:
+        key.aux += ",NdegDslash";
+        break;
+      }
+      if (x) key.aux += "Xpay";
       return key;
     }
 
@@ -1850,7 +1867,7 @@ namespace quda {
 
   void apply(const cudaStream_t &stream) 
   {
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, twistedGamma5Tuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
     {
