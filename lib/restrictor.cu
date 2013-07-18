@@ -3,20 +3,6 @@
 
 namespace quda {
 
-  template <typename Float>
-  ColorSpinorFieldOrder<Float>* createOrder(const cpuColorSpinorField &a) {
-    ColorSpinorFieldOrder<Float>* ptr=0;
-    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) 
-      ptr = new SpaceSpinColorOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
-      ptr = new SpaceColorSpinOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-      ptr = new QOPDomainWallOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else
-      errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
-    return ptr;
-  }
-
   // Applies the grid restriction operator (fine to coarse)
   template <class CoarseSpinor, class FineSpinor>
   void restrict(CoarseSpinor &out, const FineSpinor &in, const int* geo_map, const int* spin_map) {
@@ -53,7 +39,7 @@ namespace quda {
       for (int i=0; i<out.Ncolor(); i++) {
 	for (int s=0; s<out.Nspin(); s++) {
 	  for (int j=0; j<in.Ncolor(); j++) {
-	    out(x, s, i) += std::conj(V(x, j, s*out.Ncolor() + i)) * in(x, s, j);
+	    out(x, s, i) += std::conj(V(x, i, s, j)) * in(x, s, j);
 	  }
 	}
       }
@@ -62,11 +48,11 @@ namespace quda {
   }
 
   void Restrict(cpuColorSpinorField &out, const cpuColorSpinorField &in, const cpuColorSpinorField &v,
-		cpuColorSpinorField &tmp, const int *geo_map, const int *spin_map) {
+		cpuColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       ColorSpinorFieldOrder<double> *outOrder = createOrder<double>(out);
       ColorSpinorFieldOrder<double> *inOrder = createOrder<double>(in);
-      ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(v);
+      ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
       ColorSpinorFieldOrder<double> *tmpOrder = createOrder<double>(tmp);
       rotateCoarseColor(*tmpOrder, *inOrder, *vOrder);
       restrict(*outOrder, *tmpOrder, geo_map, spin_map);
@@ -77,7 +63,7 @@ namespace quda {
     } else {
       ColorSpinorFieldOrder<float> *outOrder = createOrder<float>(out);
       ColorSpinorFieldOrder<float> *inOrder = createOrder<float>(in);
-      ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(v);
+      ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
       ColorSpinorFieldOrder<float> *tmpOrder = createOrder<float>(tmp);
       rotateCoarseColor(*tmpOrder, *inOrder, *vOrder);
       restrict(*outOrder, *tmpOrder, geo_map, spin_map);

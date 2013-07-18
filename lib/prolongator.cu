@@ -3,21 +3,6 @@
 
 namespace quda {
 
-  template <typename Float>
-  ColorSpinorFieldOrder<Float>* createOrder(const cpuColorSpinorField &a) {
-    ColorSpinorFieldOrder<Float>* ptr=0;
-    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      ptr = new SpaceSpinColorOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    } else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-      ptr = new SpaceColorSpinOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    } else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-      ptr = new QOPDomainWallOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    } else {
-      errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
-    }
-    return ptr;
-  }
-
   // Applies the grid prolongation operator (coarse to fine)
   template <class FineSpinor, class CoarseSpinor>
   void prolongate(FineSpinor &out, const CoarseSpinor &in, const int *geo_map, const int *spin_map) {
@@ -46,9 +31,8 @@ namespace quda {
       for (int i=0; i<out.Ncolor(); i++) {
 	for (int s=0; s<in.Nspin(); s++) {
 	  for (int j=0; j<in.Ncolor(); j++) { 
-	    // V is a ColorMatrixField with dimension
-	    // [out.Nc][in.Ns*in.Nc] (the rotation has spin dependence)
-	    out(x, s, i) += V(x, i, s*in.Ncolor() + j) * in(x, s, j);
+	    // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
+	    out(x, s, i) += V(x, j, s, i) * in(x, s, j);
 	  }
 	}
       }
@@ -58,11 +42,11 @@ namespace quda {
   }
 
   void Prolongate(cpuColorSpinorField &out, const cpuColorSpinorField &in, const cpuColorSpinorField &v,
-		  cpuColorSpinorField &tmp, const int *geo_map, const int *spin_map) {
+		  cpuColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       ColorSpinorFieldOrder<double> *outOrder = createOrder<double>(out);
       ColorSpinorFieldOrder<double> *inOrder = createOrder<double>(in);
-      ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(v);
+      ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
       ColorSpinorFieldOrder<double> *tmpOrder = createOrder<double>(tmp);
       prolongate(*tmpOrder, *inOrder, geo_map, spin_map);
       rotateFineColor(*outOrder, *tmpOrder, *vOrder);
@@ -73,7 +57,7 @@ namespace quda {
     } else {
       ColorSpinorFieldOrder<float> *outOrder = createOrder<float>(out);
       ColorSpinorFieldOrder<float> *inOrder = createOrder<float>(in);
-      ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(v);
+      ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
       ColorSpinorFieldOrder<float> *tmpOrder = createOrder<float>(tmp);
       prolongate(*tmpOrder, *inOrder, geo_map, spin_map);
       rotateFineColor(*outOrder, *tmpOrder, *vOrder);

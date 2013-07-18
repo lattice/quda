@@ -3,29 +3,14 @@
 
 namespace quda {
 
-  template <typename Float>
-  ColorSpinorFieldOrder<Float>* createOrder(const cpuColorSpinorField &a) {
-    ColorSpinorFieldOrder<Float>* ptr=0;
-    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) 
-      ptr = new SpaceSpinColorOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
-      ptr = new SpaceColorSpinOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-      ptr = new QOPDomainWallOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else
-      errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
-    return ptr;
-  }
-
   // Random number insertion over all field elements
   template <class T>
   void random(T &t) {
     for (int x=0; x<t.Volume(); x++) {
       for (int s=0; s<t.Nspin(); s++) {
 	for (int c=0; c<t.Ncolor(); c++) {
-	  for (int z=0; z<2; z++) {
-	    t(x,s,c,z) = comm_drand();
-	  }
+	  real(t(x,s,c)) = comm_drand();
+	  imag(t(x,s,c)) = comm_drand();
 	}
       }
     }
@@ -70,7 +55,8 @@ namespace quda {
       for (int s=0; s<u.Nspin(); s++) {
 	for (int c=0; c<u.Ncolor(); c++) {
 	  for (int z=0; z<2; z++) {
-	    double diff = fabs(u(x,s,c,z) - v(x,s,c,z));
+	    double diff = z==0 ? fabs(real(u(x,s,c)) - real(v(x,s,c))) : 
+	      fabs(imag(u(x,s,c)) - imag(v(x,s,c)));
 
 	    for (int f=0; f<fail_check; f++)
 	      if (diff > pow(10.0,-(f+1)/(double)tol)) fail[f]++;

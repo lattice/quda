@@ -3,49 +3,16 @@
 
 namespace quda {
 
-  /*template<class FO>
-  void Transfer::testOrthogonal(const FO &in, int* geo_bs, int spin_bs) {
-    int geo_blocksize = 1;
-    for (int d = 0; d < V->Ndim(); d++) {
-      geo_blocksize *= geo_bs[d];
-    }
-    int numblocks = V->Volume()*4*Nvec/(spin_bs*geo_blocksize);
-    std::complex<double> * block;
-    block = (std::complex<double> *)malloc(numblocks*sizeof(std::complex<double>));
-    int *count = (int *) malloc(numblocks*sizeof(int));
-    for(int i =0; i < numblocks; i++) {
-      block[i] = 0.0;
-      count[i] = 0;
-    }
-    for(int i = 0; i < V->Volume(); i++) {
-      for(int s = 0; s < V->Nspin(); s++) {
-	for(int c = 0; c < V->Ncolor(); c++) {
-	  int x[QUDA_MAX_DIM];
-	  V->LatticeIndex(x,i);
-	  int offset = geo_map[i]*4*Nvec/spin_bs;
-	  block[offset+(c/spin_bs)] += std::conj(in(i,s,c)) * (in(i,s,c));
-	  count[offset+(c/spin_bs)]++;
-	  
-	}
-      }
-    }
-    for(int i =0; i < numblocks; i++) {
-      printfQuda("count[%d] = %d block[%d] = %e %e\n",i,count[i],i,block[i].real(),block[i].imag());
-    }
-    free(block);
-    free(count);
-    
-  }
-  */
-
   Transfer::Transfer(cpuColorSpinorField **B, int Nvec, int *geo_bs, int spin_bs)
     : B(B), Nvec(Nvec), V(0), tmp(0), geo_map(0), spin_map(0) 
   {
 
-    printf("Nvec = %d\n", Nvec);
-
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
+
+    // the ordering of the V vector is defined by these parameters and
+    // the Packed functions in ColorSpinorFieldOrder
+
     param.nSpin = B[0]->Ncolor(); // the spin dimension corresponds to fine nColor
     param.nColor = B[0]->Nspin() * Nvec; // nColor = number of spin components * number of null-space vectors
     param.create = QUDA_ZERO_FIELD_CREATE;
@@ -84,8 +51,8 @@ namespace quda {
   }
 
   void Transfer::fillV() {
-    FillV(*V, (const cpuColorSpinorField**)B, Nvec);
-    printfQuda("V fill check %e\n", norm2(*V));
+    FillV(*V, const_cast<cpuColorSpinorField**>(B), Nvec);
+    //printfQuda("V fill check %e\n", norm2(*V));
   }
 
   // compute the fine-to-coarse site map
@@ -134,12 +101,12 @@ namespace quda {
 
   // apply the prolongator
   void Transfer::P(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
-    Prolongate(out, in, *V, *tmp, geo_map, spin_map);
+    Prolongate(out, in, *V, *tmp, Nvec, geo_map, spin_map);
   }
 
   // apply the restrictor
   void Transfer::R(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
-    Restrict(out, in, *V, *tmp, geo_map, spin_map);
+    Restrict(out, in, *V, *tmp, Nvec, geo_map, spin_map);
   }
 
 } // namespace quda
