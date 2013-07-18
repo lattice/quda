@@ -13,8 +13,8 @@ namespace quda {
     // the ordering of the V vector is defined by these parameters and
     // the Packed functions in ColorSpinorFieldOrder
 
-    param.nSpin = B[0]->Ncolor(); // the spin dimension corresponds to fine nColor
-    param.nColor = B[0]->Nspin() * Nvec; // nColor = number of spin components * number of null-space vectors
+    param.nSpin = B[0]->Nspin(); // spin has direct mapping
+    param.nColor = B[0]->Ncolor()*Nvec; // nColor = number of colors * number of vectors
     param.create = QUDA_ZERO_FIELD_CREATE;
     // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
     if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {

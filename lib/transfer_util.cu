@@ -11,7 +11,7 @@ namespace quda {
     for (int x=0; x<out.Volume(); x++) {
       for (int s=0; s<in.Nspin(); s++) {
 	for (int c=0; c<in.Ncolor(); c++) {
-	  out(x, v, s, c) = in(x, s, c);
+	  out(x, s, c, v) = in(x, s, c);
 	}
       }
     }
@@ -89,8 +89,8 @@ namespace quda {
 	                                        blockSpin*in.NcolorPacked() + // block spin
 	                                                                 c;   // color
 
-	    if (toBlock) out[index] = in(i, v, s, c); // going to block order
-	    else in(i, v, s, c) = out[index]; // coming from block order
+	    if (toBlock) out[index] = in(i, s, c, v); // going to block order
+	    else in(i, s, c, v) = out[index]; // coming from block order
 	    
 	    check[count++] = index;
 	  }

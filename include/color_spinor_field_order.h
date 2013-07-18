@@ -68,33 +68,33 @@ namespace quda {
     /**
      * Specialized read-only complex-member accessor function (for mg prolongator)
      * @param x 1-d site index
-     * @param n vector number
      * @param s spin index
      * @param c color index
+     * @param n vector number
      */
-    const std::complex<Float>& operator()(int x, int n, int s, int c) const {
-      return (*this)(x, c, s*Nvec + n);
+    const std::complex<Float>& operator()(int x, int s, int c, int n) const {
+      return (*this)(x, s, c*Nvec + n);
     }
 
     /**
      * Specialized writable complex-member accessor function (for mg prolongator)
      * @param x 1-d site index
-     * @param n vector number
      * @param s spin index
      * @param c color index
+     * @param n vector number
      */
-    std::complex<Float>& operator()(int x, int n, int s, int c) {
-      return (*this)(x, c, s*Nvec + n);      
+    std::complex<Float>& operator()(int x, int s, int c, int n) {
+      return (*this)(x, s, c*Nvec + n);      
     }
 
     /** Returns the number of packed vectors (for mg prolongator) */
     int NvecPacked() const { return Nvec; }
 
     /** Returns the number of packed colors (for mg prolongator) */
-    int NcolorPacked() const { return field.Nspin(); }
+    int NcolorPacked() const { return field.Ncolor() / Nvec; }
 
     /** Returns the number of packed spins (for mg prolongator) */
-    int NspinPacked() const { return field.Ncolor() / Nvec; }    
+    int NspinPacked() const { return field.Nspin(); }    
 
   };
 

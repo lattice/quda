@@ -40,7 +40,7 @@ namespace quda {
       for (int i=0; i<out.Ncolor(); i++) {
 	for (int s=0; s<out.Nspin(); s++) {
 	  for (int j=0; j<in.Ncolor(); j++) {
-	    out(x, s, i) += std::conj(V(x, i, s, j)) * in(x, s, j);
+	    out(x, s, i) += std::conj(V(x, s, j, i)) * in(x, s, j);
 	  }
 	}
       }

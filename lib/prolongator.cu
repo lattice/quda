@@ -33,7 +33,7 @@ namespace quda {
 	for (int s=0; s<in.Nspin(); s++) {
 	  for (int j=0; j<in.Ncolor(); j++) { 
 	    // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
-	    out(x, s, i) += V(x, j, s, i) * in(x, s, j);
+	    out(x, s, i) += V(x, s, i, j) * in(x, s, j);
 	  }
 	}
       }
