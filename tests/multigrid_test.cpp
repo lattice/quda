@@ -44,7 +44,7 @@ extern char vecfile[];
 
 cpuColorSpinorField **W; // array of bad guys
 int Nvec; // number of bad guys for the transfer operator
-QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
+QudaPrecision prec_cpu = QUDA_SINGLE_PRECISION;
 
 // where is the packing / unpacking taking place
 //most orders are CPU only currently
@@ -120,7 +120,7 @@ void loadTest() {
   for (int i=0; i<Nvec; i++) printfQuda("Vector %d has norm = %e\n", i, norm2(*W[i]));
 
 
-  int geom_bs[] = {4, 2, 2, 2};
+  int geom_bs[] = {4, 4, 4, 4};
   int spin_bs = 2;
 
   Transfer T(W, Nvec, geom_bs, spin_bs);
@@ -131,17 +131,10 @@ void loadTest() {
   //coarsecsParam.nSpin = 4;
   coarsecsParam.nDim = 4;
 
-  #if 1
   coarsecsParam.x[0] = xdim/geom_bs[0];
   coarsecsParam.x[1] = ydim/geom_bs[1];
   coarsecsParam.x[2] = zdim/geom_bs[2];
   coarsecsParam.x[3] = tdim/geom_bs[3];
-  #else
-  coarsecsParam.x[0] = xdim;
-  coarsecsParam.x[1] = ydim;
-  coarsecsParam.x[2] = zdim;
-  coarsecsParam.x[3] = tdim;
-  #endif
   setDims(coarsecsParam.x);
 
   coarsecsParam.precision = prec_cpu;
@@ -152,74 +145,18 @@ void loadTest() {
   coarsecsParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   coarsecsParam.create = QUDA_ZERO_FIELD_CREATE;
 
-  for (int j=0; j<3; j++) {
-
-#if 0
-    printfQuda("W[%d]\n",j);
-  for (int i = 0; i < 1;i++) {
-    W[j]->PrintVector(i);
-  }
-#endif
-
-  cpuColorSpinorField Wfine2(csParam);
   cpuColorSpinorField Wfine(csParam);
-  cpuColorSpinorField Wcoarse2(coarsecsParam);
   cpuColorSpinorField Wcoarse(coarsecsParam);
 
-  //T.R(Wcoarse,*W[j]);
-  //Test prolongator
-  #if 0
-  std::complex<double> *fcoarse = (std::complex<double> *)Wcoarse.V();
-  for (int i = 0; i < Wcoarse.Volume(); i++) {
-    for (int s = 0; s < Wcoarse.Nspin(); s++) {
-      fcoarse[i*Wcoarse.Nspin()*Wcoarse.Ncolor()+s*Wcoarse.Ncolor()+j] = 1.0;
-    }
+  // test that the prolongator preserves the components which were
+  // used to define it
+  for (int i=0; i<Nvec; i++) {
+    T.R(Wcoarse,*W[i]);
+    T.P(Wfine, Wcoarse);
+    axpyCpu(-1.0, *W[i], Wfine);
+    printfQuda("%d Absolute Norm^2 of the difference = %e\n", i, norm2(Wfine));
+    //Wfine.Compare(Wfine,*W[i]); // strong check
   }
-  #endif
-  //T.P(Wfine,Wcoarse);
-
-  //printfQuda("Wcoarse\n");
-#if 0
-  for (int i = 0; i < 1;i++) {
-    Wcoarse.PrintVector(i);
-  }
-  #endif
-  #if 1
-  std::complex<double> *fcoarse = (std::complex<double> *)Wfine.V();
-  for (int i = 0; i < Wfine.Volume(); i++) {
-    for (int s = 0; s < Wfine.Nspin(); s++) {
-      fcoarse[i*Wfine.Nspin()*Wfine.Ncolor()+s*Wfine.Ncolor()+j] = 1.0;
-    }
-  }
-  #endif
-
-    printfQuda("Wfine\n");
-#if 1
-  for (int i = 0; i < 1;i++) {
-    Wfine.PrintVector(i);
-  }
-  #endif
-  printfQuda("Now restrict\n");
-  T.R(Wcoarse2,Wfine);
-    printfQuda("Wcoarse2\n");
-#if 1
-  for (int i = 0; i < 1;i++) {
-    Wcoarse2.PrintVector(i);
-  }
-  #endif
-  printfQuda("now prolongate\n");
-  T.P(Wfine2,Wcoarse2);
-    printfQuda("Wfine2\n");
-#if 1
-  for (int i = 0; i < 1;i++) {
-    Wfine2.PrintVector(i);
-  }
-  #endif
-  Wfine.Compare(Wfine,Wfine2);	
-  //Wfine.Compare(*W[0],Wfine);
-  }
-      
-  delete []V;
 
 }
 

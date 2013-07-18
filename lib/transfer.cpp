@@ -42,6 +42,8 @@ namespace quda {
     : B(B), Nvec(Nvec), V(0), tmp(0), geo_map(0), spin_map(0) 
   {
 
+    printf("Nvec = %d\n", Nvec);
+
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
     param.nSpin = B[0]->Ncolor(); // the spin dimension corresponds to fine nColor
@@ -53,6 +55,7 @@ namespace quda {
       param.x[0] *= 2;
     }
     V = new cpuColorSpinorField(param);
+
     fillV(); // copy the null space vectors into V
 
     // create the storage for the intermediate temporary vector
@@ -68,11 +71,9 @@ namespace quda {
     spin_map = new int[B[0]->Nspin()];
     createSpinMap(spin_bs);
 
-    //printfQuda("numblocks = %d fsite_length = %d geo_blocksize = %d\n", numblocks, fsite_length, geo_blocksize);
-
     // orthogonalize the blocks
     BlockOrthogonalize(*V, Nvec, geo_bs, geo_map, spin_bs);
-    printfQuda("V block orthonormal check %e\n", norm2(*V));
+    printfQuda("V block orthonormal check %g\n", norm2(*V));
   }
 
   Transfer::~Transfer() {
@@ -83,7 +84,7 @@ namespace quda {
   }
 
   void Transfer::fillV() {
-    FillV(*V, (const ColorSpinorField**)B, Nvec);
+    FillV(*V, (const cpuColorSpinorField**)B, Nvec);
     printfQuda("V fill check %e\n", norm2(*V));
   }
 

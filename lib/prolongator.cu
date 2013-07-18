@@ -6,14 +6,15 @@ namespace quda {
   template <typename Float>
   ColorSpinorFieldOrder<Float>* createOrder(const cpuColorSpinorField &a) {
     ColorSpinorFieldOrder<Float>* ptr=0;
-    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) 
+    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       ptr = new SpaceSpinColorOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) 
+    } else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       ptr = new SpaceColorSpinOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
+    } else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
       ptr = new QOPDomainWallOrder<Float>(const_cast<cpuColorSpinorField&>(a));
-    else
+    } else {
       errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
+    }
     return ptr;
   }
 
@@ -56,8 +57,8 @@ namespace quda {
 
   }
 
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  ColorSpinorField &tmp, const int *geo_map, const int *spin_map) {
+  void Prolongate(cpuColorSpinorField &out, const cpuColorSpinorField &in, const cpuColorSpinorField &v,
+		  cpuColorSpinorField &tmp, const int *geo_map, const int *spin_map) {
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       ColorSpinorFieldOrder<double> *outOrder = createOrder<double>(out);
       ColorSpinorFieldOrder<double> *inOrder = createOrder<double>(in);

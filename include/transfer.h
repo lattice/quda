@@ -126,16 +126,16 @@ namespace quda {
 
   };
 
-  void FillV(ColorSpinorField &V, const ColorSpinorField **B, int Nvec);
+  void FillV(cpuColorSpinorField &V, const cpuColorSpinorField **B, int Nvec);
 
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs);
+  void BlockOrthogonalize(cpuColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs);
 
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, 
-		  const ColorSpinorField &v, ColorSpinorField &tmp, 
+  void Prolongate(cpuColorSpinorField &out, const cpuColorSpinorField &in, 
+		  const cpuColorSpinorField &v, cpuColorSpinorField &tmp, 
 		  const int *geo_map, const int *spin_map);
 
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, 
-		const ColorSpinorField &v, ColorSpinorField &tmp,
+  void Restrict(cpuColorSpinorField &out, const cpuColorSpinorField &in, 
+		const cpuColorSpinorField &v, cpuColorSpinorField &tmp,
 		const int *geo_map, const int *spin_map);
   
 
