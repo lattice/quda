@@ -42,7 +42,7 @@ extern int gridsize_from_cmdline[];
 extern int nvec;
 extern char vecfile[];
 
-cpuColorSpinorField **W; // array of bad guys
+std::vector<ColorSpinorField*> W; // array of bad guys
 int Nvec; // number of bad guys for the transfer operator
 QudaPrecision prec_cpu = QUDA_SINGLE_PRECISION;
 
@@ -71,7 +71,7 @@ void init() {
   csParam.create = QUDA_ZERO_FIELD_CREATE;
 
   Nvec = nvec;
-  W = new cpuColorSpinorField*[Nvec];
+  W.resize(Nvec);
   for (int i=0; i<Nvec; i++) {
     W[i] = new cpuColorSpinorField(csParam);
     if (W[i] == NULL) {
@@ -86,7 +86,7 @@ void end() {
   // release memory
   
   for (int i=0; i<Nvec; i++) delete W[i];
-  delete []W;
+  //delete []W;
 
   endQuda();
 }

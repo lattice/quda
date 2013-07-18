@@ -1,5 +1,6 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
+#include <typeinfo>
 
 namespace quda {
 
@@ -47,8 +48,9 @@ namespace quda {
 
   }
 
-  void Restrict(cpuColorSpinorField &out, const cpuColorSpinorField &in, const cpuColorSpinorField &v,
-		cpuColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
+
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       ColorSpinorFieldOrder<double> *outOrder = createOrder<double>(out);
       ColorSpinorFieldOrder<double> *inOrder = createOrder<double>(in);

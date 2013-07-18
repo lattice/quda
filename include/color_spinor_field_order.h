@@ -10,6 +10,7 @@
  */
 
 #include <register_traits.h>
+#include <typeinfo>
 
 namespace quda {
 
@@ -178,17 +179,22 @@ namespace quda {
   };
 
   template <typename Float>
-    ColorSpinorFieldOrder<Float>* createOrder(const cpuColorSpinorField &a, int Nvec=1) {
+    ColorSpinorFieldOrder<Float>* createOrder(const ColorSpinorField &a, int Nvec=1) {
     ColorSpinorFieldOrder<Float>* ptr=0;
 
-    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      ptr = new SpaceSpinColorOrder<Float>(const_cast<cpuColorSpinorField&>(a), Nvec);
-    } else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-      ptr = new SpaceColorSpinOrder<Float>(const_cast<cpuColorSpinorField&>(a), Nvec);
-    } else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-      ptr = new QOPDomainWallOrder<Float>(const_cast<cpuColorSpinorField&>(a), Nvec);
+    if (typeid(a) == typeid(cpuColorSpinorField)) {
+      const cpuColorSpinorField &cpu = static_cast<const cpuColorSpinorField&>(a);
+      if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+	ptr = new SpaceSpinColorOrder<Float>(const_cast<cpuColorSpinorField&>(cpu), Nvec);
+      } else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
+	ptr = new SpaceColorSpinOrder<Float>(const_cast<cpuColorSpinorField&>(cpu), Nvec);
+      } else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+	ptr = new QOPDomainWallOrder<Float>(const_cast<cpuColorSpinorField&>(cpu), Nvec);
+      } else {
+	errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
+      }
     } else {
-      errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
+      errorQuda("Accessor only supports CPU fields");
     }
 
     return ptr;

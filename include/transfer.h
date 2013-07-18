@@ -12,6 +12,7 @@
 
 #include <color_spinor_field.h>
 #include <dirac_quda.h>
+#include <vector>
 
 namespace quda {
 
@@ -20,7 +21,7 @@ namespace quda {
   private:
 
     /** The raw null space components */
-    cpuColorSpinorField **B;
+    const std::vector<ColorSpinorField*> &B;
 
     /** The number of null space components */
     const int Nvec;
@@ -105,7 +106,7 @@ namespace quda {
      * @param geo_map Geometric mapping from fine grid to coarse grid 
      * @param spin_map Mapping from fine spin to coarse spin 
      */
-    Transfer(cpuColorSpinorField **B, int Nvec, int *geo_bs, int spin_bs);
+    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
@@ -126,17 +127,17 @@ namespace quda {
 
   };
 
-  void FillV(cpuColorSpinorField &V, cpuColorSpinorField **B, int Nvec);
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec);
 
-  void BlockOrthogonalize(cpuColorSpinorField &V, int Nvec, const int *geo_bs, 
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
 			  const int *geo_map, int spin_bs);
 
-  void Prolongate(cpuColorSpinorField &out, const cpuColorSpinorField &in, 
-		  const cpuColorSpinorField &v, cpuColorSpinorField &tmp, 
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, 
+		  const ColorSpinorField &v, ColorSpinorField &tmp, 
 		  int Nvec, const int *geo_map, const int *spin_map);
 
-  void Restrict(cpuColorSpinorField &out, const cpuColorSpinorField &in, 
-		const cpuColorSpinorField &v, cpuColorSpinorField &tmp,
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, 
+		const ColorSpinorField &v, ColorSpinorField &tmp,
 		int Nvec, const int *geo_map, const int *spin_map);
   
 

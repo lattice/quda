@@ -1,6 +1,7 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <typeinfo>
+#include <vector>
 
 namespace quda {
 
@@ -16,7 +17,7 @@ namespace quda {
     }
   }
 
-  void FillV(cpuColorSpinorField &V, cpuColorSpinorField **B, int Nvec) {
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
       ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
       for (int v=0; v<Nvec; v++) {
@@ -140,7 +141,7 @@ namespace quda {
   }
 
   //Orthogonalize null vectors
-  void BlockOrthogonalize(cpuColorSpinorField &V, int Nvec, 
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
   
     int geo_blocksize = 1;

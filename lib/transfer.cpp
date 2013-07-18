@@ -3,7 +3,7 @@
 
 namespace quda {
 
-  Transfer::Transfer(cpuColorSpinorField **B, int Nvec, int *geo_bs, int spin_bs)
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
     : B(B), Nvec(Nvec), V(0), tmp(0), geo_map(0), spin_map(0) 
   {
 
@@ -50,9 +50,8 @@ namespace quda {
     if (tmp) delete tmp;
   }
 
-  void Transfer::fillV() {
-    FillV(*V, const_cast<cpuColorSpinorField**>(B), Nvec);
-    //printfQuda("V fill check %e\n", norm2(*V));
+  void Transfer::fillV() { 
+    FillV(*V, B, Nvec);  //printfQuda("V fill check %e\n", norm2(*V));
   }
 
   // compute the fine-to-coarse site map
