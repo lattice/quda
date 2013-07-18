@@ -125,6 +125,12 @@ namespace quda {
      */
     void R(cpuColorSpinorField &out, const cpuColorSpinorField &in);
 
+    /**
+     * Returns a const reference to the V field
+     * @return The V field const reference
+     */
+    const ColorSpinorField& Vectors() { return *V; }
+
   };
 
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec);
