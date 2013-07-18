@@ -52,7 +52,7 @@ namespace quda {
     initSpinorConstants(in, profile);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
+    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
 
     flops += 1320LL*(long long)in.Volume();
   }
@@ -67,7 +67,7 @@ namespace quda {
     initSpinorConstants(in, profile);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 2, profile);   
+    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -86,7 +86,7 @@ namespace quda {
     initSpinorConstants(in, profile);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 3, profile);   
+    domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 2, profile);   
 
     long long Ls = in.X(4);
     flops +=  144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
@@ -103,7 +103,7 @@ namespace quda {
     initSpinorConstants(in, profile);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
 
     flops += 1320LL*(long long)in.Volume();
   }
@@ -118,7 +118,7 @@ namespace quda {
     initMDWFConstants(b_5, c_5, in.X(4), m5);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 2, profile);   
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -138,7 +138,7 @@ namespace quda {
     initMDWFConstants(b_5, c_5, in.X(4), m5);
 
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 3, profile);   
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 2, profile);   
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -159,7 +159,7 @@ namespace quda {
     initMDWFConstants(b_5, c_5, in.X(4), m5);
     
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 4, profile);   
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 3, profile);   
 
     long long Ls = in.X(4);
     flops += 144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
@@ -198,7 +198,7 @@ namespace quda {
 
     initSpinorConstants(in, profile);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 1, profile);
+    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
 
     flops += (1320LL+48LL)*(long long)in.Volume();
   }
@@ -213,7 +213,7 @@ namespace quda {
 
     initSpinorConstants(in, profile);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 2, profile);
+    domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 1, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -232,7 +232,7 @@ namespace quda {
 
     initSpinorConstants(in, profile);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 1, profile);
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
     
     flops += (1320LL+48LL)*(long long)in.Volume();
   }
@@ -247,7 +247,7 @@ namespace quda {
     initSpinorConstants(in, profile);
     initMDWFConstants(b_5, c_5, in.X(4), m5);
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 3, profile);
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 2, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -624,6 +624,8 @@ namespace quda {
     printf( "D4 time: %8.2f ms\n", elapsed_time_ms );
     cudaEventElapsedTime( &elapsed_time_ms, point5, point6 );
     printf( "M5 AXPY time: %8.2f ms\n", elapsed_time_ms );
+    cudaEventElapsedTime( &elapsed_time_ms, point0, point6 );
+    printf( "Total M time: %8.2f ms\n", elapsed_time_ms );
     cudaEventDestroy( point0 );
     cudaEventDestroy( point1 );
     cudaEventDestroy( point2 );
@@ -663,6 +665,7 @@ namespace quda {
       errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
     }
 
+//    printf( "MDag is done\n" );
     deleteTmp(&tmp1, reset1);
     flip(dagger);
   }

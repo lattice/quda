@@ -1212,21 +1212,16 @@ namespace quda {
       
       switch(DS_type){
         case 0:
-          DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-          (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-          (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
-          break;
-        case 1:
           DSLASH(domainWallDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
           (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
           (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
           break;
-        case 2:
+        case 1:
           DSLASH(domainWallDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
           (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
           (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
           break;
-        case 3:
+        case 2:
           DSLASH(domainWallDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
           (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
           (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
@@ -1242,15 +1237,12 @@ namespace quda {
       long long flops_Tmp; 
       switch(DS_type){
         case 0:
-          flops_Tmp = (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB() + 96ll*bulk + 120ll*wall;
-          break;
-        case 1:
           flops_Tmp = (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB();
           break;
-        case 2:
+        case 1:
           flops_Tmp = 96ll*bulk + 120ll*wall;
           break;
-        case 3:
+        case 2:
           flops_Tmp = 144ll*dslashConstants.VolumeCB()*dslashConstants.Ls
                     + 3ll*dslashConstants.Ls*(dslashConstants.Ls-1ll);
           break;
@@ -1378,26 +1370,21 @@ namespace quda {
       
       switch(DS_type){
         case 0:
-          DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-          (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
-          (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
-          break;
-        case 1:
           DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
           (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
           (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
           break;
-        case 2:
+        case 1:
           DSLASH(MDWFDslash4pre, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
           (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
           (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
           break;
-        case 3:
+        case 2:
           DSLASH(MDWFDslash5, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
           (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
           (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
           break;
-        case 4:
+        case 3:
           DSLASH(MDWFDslash5inv, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
           (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, (sFloat*)in->V(), 
           (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0),  (float*)(x ? x->Norm() : 0), a);
@@ -1413,18 +1400,15 @@ namespace quda {
       long long flops_Tmp; 
       switch(DS_type){
         case 0:
-          flops_Tmp = (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB() + 96ll*bulk + 120ll*wall;
-          break;
-        case 1:
           flops_Tmp = (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB();
           break;
-        case 2:
+        case 1:
           flops_Tmp = 168ll*bulk + 72ll*wall;
           break;
-        case 3:
+        case 2:
           flops_Tmp = 144ll*bulk + 72ll*wall;
           break;
-        case 4:
+        case 3:
           flops_Tmp = 144ll*dslashConstants.VolumeCB()*dslashConstants.Ls
                     + 3ll*dslashConstants.Ls*(dslashConstants.Ls-1ll);
           break;
@@ -1533,7 +1517,7 @@ namespace quda {
   profile.Stop(idx); 
 
   void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
-		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+      const int volume, const int *faceVolumeCB, TimeProfile &profile) {
     profile.Start(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
@@ -1543,7 +1527,7 @@ namespace quda {
 #ifdef MULTI_GPU
     // Record the start of the dslash
     PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
-	    profile, QUDA_PROFILE_EVENT_RECORD);
+        profile, QUDA_PROFILE_EVENT_RECORD);
 
     bool pack = false;
     for (int i=3; i>=0; i--) 
@@ -1551,34 +1535,34 @@ namespace quda {
 
     // Initialize pack from source spinor
     if(!twistPack){
-	PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), 
-	    profile, QUDA_PROFILE_PACK_KERNEL);
+      PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), 
+          profile, QUDA_PROFILE_PACK_KERNEL);
     }else{	
-        PROFILE(face->pack(*inSpinor, 1-parity, dagger, twist_a, twist_b, streams), 
-	    profile, QUDA_PROFILE_PACK_KERNEL);
+      PROFILE(face->pack(*inSpinor, 1-parity, dagger, twist_a, twist_b, streams), 
+          profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
     if (pack) {
       // Record the end of the packing
       PROFILE(cudaEventRecord(packEnd[0], streams[Nstream-1]), 
-	      profile, QUDA_PROFILE_EVENT_RECORD);
+          profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
-	cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
+        cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
 
-	PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), 
-		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+        PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), 
+            profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
-	// Initialize host transfer from source spinor
-	PROFILE(face->gather(*inSpinor, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
+        // Initialize host transfer from source spinor
+        PROFILE(face->gather(*inSpinor, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
 
-	// Record the end of the gathering
-	PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), 
-		profile, QUDA_PROFILE_EVENT_RECORD);
+        // Record the end of the gathering
+        PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), 
+            profile, QUDA_PROFILE_EVENT_RECORD);
       }
     }
 #endif
@@ -1591,65 +1575,78 @@ namespace quda {
     int completeSum = 0;
     while (completeSum < commDimTotal) {
       for (int i=3; i>=0; i--) {
-	if (!dslashParam.commDim[i]) continue;
-      
-	for (int dir=1; dir>=0; dir--) {
-	
-	  // Query if gather has completed
-	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
-	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
-		    profile, QUDA_PROFILE_EVENT_QUERY);
+        if (!dslashParam.commDim[i]) continue;
 
-	    //CUresult event_test;
-	    //event_test = cuEventQuery(gatherEnd[2*i+dir]);
-	    //if (CUDA_SUCCESS == event_test) {
-	    if (cudaSuccess == event_test) {
-	      gatherCompleted[2*i+dir] = 1;
-	      completeSum++;
-	      PROFILE(face->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
-	    }
-	  }
-	
-	  // Query if comms has finished
-	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
-	      gatherCompleted[2*i+dir]) {
-	    PROFILE(int comms_test = face->commsQuery(2*i+dir), 
-		    profile, QUDA_PROFILE_COMMS_QUERY);
-	    if (comms_test) { 
-	      commsCompleted[2*i+dir] = 1;
-	      completeSum++;
-	    
-	      // Scatter into the end zone
-	      PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), 
-		      profile, QUDA_PROFILE_SCATTER);
-	    }
-	  }
+        for (int dir=1; dir>=0; dir--) {
 
-	}
-	 
-	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-	if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
-	  // Record the end of the scattering
-	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
-		  profile, QUDA_PROFILE_EVENT_RECORD);
+          // Query if gather has completed
+          if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
+            PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
+                profile, QUDA_PROFILE_EVENT_QUERY);
 
-	  dslashParam.kernel_type = static_cast<KernelType>(i);
-	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-	  
-	  // wait for scattering to finish and then launch dslash
-	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
-		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-	  
-	  // all faces use this stream
-	  PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+            //CUresult event_test;
+            //event_test = cuEventQuery(gatherEnd[2*i+dir]);
+            //if (CUDA_SUCCESS == event_test) {
+            if (cudaSuccess == event_test) {
+              gatherCompleted[2*i+dir] = 1;
+              completeSum++;
+              PROFILE(face->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
+            }
+          }
 
-	  dslashCompleted[2*i] = 1;
-	}
+          // Query if comms has finished
+          if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
+              gatherCompleted[2*i+dir]) {
+            PROFILE(int comms_test = face->commsQuery(2*i+dir), 
+                profile, QUDA_PROFILE_COMMS_QUERY);
+            if (comms_test) { 
+              commsCompleted[2*i+dir] = 1;
+              completeSum++;
+
+              // Scatter into the end zone
+              PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), 
+                  profile, QUDA_PROFILE_SCATTER);
+            }
+          }
+
+          }
+
+          // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
+          if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
+            // Record the end of the scattering
+            PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
+                profile, QUDA_PROFILE_EVENT_RECORD);
+
+            dslashParam.kernel_type = static_cast<KernelType>(i);
+            dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
+
+            // wait for scattering to finish and then launch dslash
+            PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
+                profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+
+            // all faces use this stream
+            PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+            dslashCompleted[2*i] = 1;
+          }
+
+        }
 
       }
-    
-    }
 #endif // MULTI_GPU
+
+      profile.Stop(QUDA_PROFILE_TOTAL);
+  }
+
+  void dslashCudaNC(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
+		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+    profile.Start(QUDA_PROFILE_TOTAL);
+
+    dslashParam.parity = parity;
+    dslashParam.kernel_type = INTERIOR_KERNEL;
+    dslashParam.threads = volume;
+
+    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
     profile.Stop(QUDA_PROFILE_TOTAL);
   }
@@ -1966,10 +1963,9 @@ namespace quda {
   // Additional Arg. is added to give a function name.
   //
   // pre-defined DS_type list
-  // 0 = normal 5D dslash 
-  // 1 = dslash4
-  // 2 = dslash5
-  // 3 = dslash5inv
+  // 0 = dslash4
+  // 1 = dslash5
+  // 2 = dslash5inv
   //-----------------------------------------------------
 
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
@@ -2021,7 +2017,10 @@ namespace quda {
     // faces because Ls is added as the y-dimension in thread space
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
-    dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
+    if(DS_type != 0)
+      dslashCudaNC(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
+    else
+      dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
 
     delete dslash;
     unbindGaugeTex(gauge);
@@ -2037,11 +2036,10 @@ namespace quda {
   // Additional Arg. is added to give a function name.
   //
   // pre-defined DS_type list
-  // 0 = DWF dslash4
-  // 1 = MDWF dslash4
-  // 2 = MDWF dslash4pre
-  // 3 = MDWF dslash5
-  // 4 = MDWF dslash5inv
+  // 0 = MDWF dslash4
+  // 1 = MDWF dslash4pre
+  // 2 = MDWF dslash5
+  // 3 = MDWF dslash5inv
   //-----------------------------------------------------
 
   void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
@@ -2093,7 +2091,10 @@ namespace quda {
     // faces because Ls is added as the y-dimension in thread space
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
-    dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
+    if(DS_type !=0)
+      dslashCudaNC(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
+    else
+      dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
 
     delete dslash;
     unbindGaugeTex(gauge);

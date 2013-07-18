@@ -108,14 +108,9 @@ VOLATILE spinorFloat o32_im;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*Ls) return;
 
-int X, x1, x2, x3, x4, xs;
+int X, xs;
 
 int boundaryCrossing;
-
-#ifdef MULTI_GPU
-int face_idx;
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -123,65 +118,23 @@ if (kernel_type == INTERIOR_KERNEL) {
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-x1 = X % X1;
-x2 = (X/X1) % X2;
-x3 = (X/(X1*X2)) % X3;
-x4 = (X/(X1*X2*X3)) % X4;
 xs = X/(X1*X2*X3*X4);
 
- o00_re = 0; o00_im = 0;
- o01_re = 0; o01_im = 0;
- o02_re = 0; o02_im = 0;
- o10_re = 0; o10_im = 0;
- o11_re = 0; o11_im = 0;
- o12_re = 0; o12_im = 0;
- o20_re = 0; o20_im = 0;
- o21_re = 0; o21_im = 0;
- o22_re = 0; o22_im = 0;
- o30_re = 0; o30_im = 0;
- o31_re = 0; o31_im = 0;
- o32_re = 0; o32_im = 0;
-
-#ifdef MULTI_GPU
-} else { // exterior kernel
-
-const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads*Ls >> 1); // volume of one face
-const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
-face_idx = sid - face_num*face_volume; // index into the respective face
-
-// ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
-// face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-//sp_idx = face_idx + param.ghostOffset[dim];
-
-
-coordsFromDWFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity);
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-
-READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
- o00_re = i00_re; o00_im = i00_im;
- o01_re = i01_re; o01_im = i01_im;
- o02_re = i02_re; o02_im = i02_im;
- o10_re = i10_re; o10_im = i10_im;
- o11_re = i11_re; o11_im = i11_im;
- o12_re = i12_re; o12_im = i12_im;
- o20_re = i20_re; o20_im = i20_im;
- o21_re = i21_re; o21_im = i21_im;
- o22_re = i22_re; o22_im = i22_im;
- o30_re = i30_re; o30_im = i30_im;
- o31_re = i31_re; o31_im = i31_im;
- o32_re = i32_re; o32_im = i32_im;
-}
-#endif // MULTI_GPU
+o00_re = 0; o00_im = 0;
+o01_re = 0; o01_im = 0;
+o02_re = 0; o02_im = 0;
+o10_re = 0; o10_im = 0;
+o11_re = 0; o11_im = 0;
+o12_re = 0; o12_im = 0;
+o20_re = 0; o20_im = 0;
+o21_re = 0; o21_im = 0;
+o22_re = 0; o22_im = 0;
+o30_re = 0; o30_im = 0;
+o31_re = 0; o31_im = 0;
+o32_re = 0; o32_im = 0;
 
 
 // 5th dimension -- NB: not partitionable!
-#ifdef MULTI_GPU
-if(kernel_type == INTERIOR_KERNEL)
-#endif
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
@@ -284,16 +237,12 @@ if(kernel_type == INTERIOR_KERNEL)
   // C_5 \equiv 0.5*{c_5(s)(4+M_5)-1}/{b_5(s)(4+M_5)+1}
   // B_5 \equiv 1.0
 #ifdef MDWF_mode   // Check whether MDWF option is enabled 
+#if (MDWF_mode==1)
   VOLATILE spinorFloat C_5;
   VOLATILE spinorFloat B_5;
-#if (MDWF_mode==1)
   C_5 = (spinorFloat)mdwf_c5[xs]*0.5;
   B_5 = (spinorFloat)mdwf_b5[xs];
-#elif (MDWF_mode==2)
-  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));
-  B_5 = 1.0;
-#endif  // select MDWF mode
-
+  
   READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + B_5*i00_re;
   o00_im = C_5*o00_im + B_5*i00_im;
@@ -319,28 +268,40 @@ if(kernel_type == INTERIOR_KERNEL)
   o31_im = C_5*o31_im + B_5*i31_im;
   o32_re = C_5*o32_re + B_5*i32_re;
   o32_im = C_5*o32_im + B_5*i32_im;
+#elif (MDWF_mode==2)
+  VOLATILE spinorFloat C_5;
+  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));
+
+  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );
+  o00_re = C_5*o00_re + i00_re;
+  o00_im = C_5*o00_im + i00_im;
+  o01_re = C_5*o01_re + i01_re;
+  o01_im = C_5*o01_im + i01_im;
+  o02_re = C_5*o02_re + i02_re;
+  o02_im = C_5*o02_im + i02_im;
+  o10_re = C_5*o10_re + i10_re;
+  o10_im = C_5*o10_im + i10_im;
+  o11_re = C_5*o11_re + i11_re;
+  o11_im = C_5*o11_im + i11_im;
+  o12_re = C_5*o12_re + i12_re;
+  o12_im = C_5*o12_im + i12_im;
+  o20_re = C_5*o20_re + i20_re;
+  o20_im = C_5*o20_im + i20_im;
+  o21_re = C_5*o21_re + i21_re;
+  o21_im = C_5*o21_im + i21_im;
+  o22_re = C_5*o22_re + i22_re;
+  o22_im = C_5*o22_im + i22_im;
+  o30_re = C_5*o30_re + i30_re;
+  o30_im = C_5*o30_im + i30_im;
+  o31_re = C_5*o31_re + i31_re;
+  o31_im = C_5*o31_im + i31_im;
+  o32_re = C_5*o32_re + i32_re;
+  o32_im = C_5*o32_im + i32_im;
+#endif  // select MDWF mode
 #endif  // check MDWF on/off
 } // end 5th dimension
 
-#if defined MULTI_GPU && defined DSLASH_XPAY
-
-int incomplete = 0; // Have all 8 contributions been computed for this site?
-
-switch(kernel_type) { // intentional fall-through
-case INTERIOR_KERNEL:
-incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-case EXTERIOR_KERNEL_T:
-incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-case EXTERIOR_KERNEL_Z:
-incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-case EXTERIOR_KERNEL_Y:
-incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-}
-
-if (!incomplete)
-#endif // MULTI_GPU
 {
-
 #ifdef DSLASH_XPAY
  READ_ACCUM(ACCUMTEX, sp_stride)
  VOLATILE spinorFloat coeff;
@@ -491,7 +452,5 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
-
-
 
 #undef VOLATILE

@@ -108,14 +108,9 @@ VOLATILE spinorFloat o32_im;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*Ls) return;
 
-int X, x1, x2, x3, x4, xs;
+int X, xs;
 
 int boundaryCrossing;
-
-#ifdef MULTI_GPU
-int face_idx;
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
@@ -123,10 +118,6 @@ if (kernel_type == INTERIOR_KERNEL) {
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
-x1 = X % X1;
-x2 = (X/X1) % X2;
-x3 = (X/(X1*X2)) % X3;
-x4 = (X/(X1*X2*X3)) % X4;
 xs = X/(X1*X2*X3*X4);
 
  o00_re = 0; o00_im = 0;
@@ -141,41 +132,6 @@ xs = X/(X1*X2*X3*X4);
  o30_re = 0; o30_im = 0;
  o31_re = 0; o31_im = 0;
  o32_re = 0; o32_im = 0;
-
-#ifdef MULTI_GPU
-} else { // exterior kernel
-
-const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads*Ls >> 1); // volume of one face
-const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
-face_idx = sid - face_num*face_volume; // index into the respective face
-
-// ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
-// face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
-//sp_idx = face_idx + param.ghostOffset[dim];
-
-
-coordsFromDWFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity);
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-
-READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
- o00_re = i00_re; o00_im = i00_im;
- o01_re = i01_re; o01_im = i01_im;
- o02_re = i02_re; o02_im = i02_im;
- o10_re = i10_re; o10_im = i10_im;
- o11_re = i11_re; o11_im = i11_im;
- o12_re = i12_re; o12_im = i12_im;
- o20_re = i20_re; o20_im = i20_im;
- o21_re = i21_re; o21_im = i21_im;
- o22_re = i22_re; o22_im = i22_im;
- o30_re = i30_re; o30_im = i30_im;
- o31_re = i31_re; o31_im = i31_im;
- o32_re = i32_re; o32_im = i32_im;
-}
-#endif // MULTI_GPU
 
 VOLATILE spinorFloat kappa;
 
@@ -192,9 +148,6 @@ VOLATILE spinorFloat kappa;
 // w = M5inv * v
 // 'w' means output vector
 // 'v' means input vector
-#ifdef MULTI_GPU
-if(kernel_type == INTERIOR_KERNEL)
-#endif
 {
   int base_idx = sid%Vh;
   int sp_idx;
@@ -207,60 +160,72 @@ if(kernel_type == INTERIOR_KERNEL)
   spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,Ls)*mferm);
   spinorFloat factorR;
   spinorFloat factorL;
+  spinorFloat coeff;
 
   for(int s = 0; s < Ls; s++)
   {
     factorL = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;
     factorR = ( xs > s ? -inv_d_n*pow(kappa,Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;
+    coeff = factorR + factorL;
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
     READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
 
     //Copy input vector to output vector
-    o00_re +=  + (factorR+factorL)*i00_re + (factorR-factorL)*i20_re;
-    o00_im +=  + (factorR+factorL)*i00_im + (factorR-factorL)*i20_im;
-    o01_re +=  + (factorR+factorL)*i01_re + (factorR-factorL)*i21_re;
-    o01_im +=  + (factorR+factorL)*i01_im + (factorR-factorL)*i21_im;
-    o02_re +=  + (factorR+factorL)*i02_re + (factorR-factorL)*i22_re;
-    o02_im +=  + (factorR+factorL)*i02_im + (factorR-factorL)*i22_im;
-    o10_re +=  + (factorR+factorL)*i10_re + (factorR-factorL)*i30_re;
-    o10_im +=  + (factorR+factorL)*i10_im + (factorR-factorL)*i30_im;
-    o11_re +=  + (factorR+factorL)*i11_re + (factorR-factorL)*i31_re;
-    o11_im +=  + (factorR+factorL)*i11_im + (factorR-factorL)*i31_im;
-    o12_re +=  + (factorR+factorL)*i12_re + (factorR-factorL)*i32_re;
-    o12_im +=  + (factorR+factorL)*i12_im + (factorR-factorL)*i32_im;
-    o20_re +=  + (factorR-factorL)*i00_re + (factorR+factorL)*i20_re;
-    o20_im +=  + (factorR-factorL)*i00_im + (factorR+factorL)*i20_im;
-    o21_re +=  + (factorR-factorL)*i01_re + (factorR+factorL)*i21_re;
-    o21_im +=  + (factorR-factorL)*i01_im + (factorR+factorL)*i21_im;
-    o22_re +=  + (factorR-factorL)*i02_re + (factorR+factorL)*i22_re;
-    o22_im +=  + (factorR-factorL)*i02_im + (factorR+factorL)*i22_im;
-    o30_re +=  + (factorR-factorL)*i10_re + (factorR+factorL)*i30_re;
-    o30_im +=  + (factorR-factorL)*i10_im + (factorR+factorL)*i30_im;
-    o31_re +=  + (factorR-factorL)*i11_re + (factorR+factorL)*i31_re;
-    o31_im +=  + (factorR-factorL)*i11_im + (factorR+factorL)*i31_im;
-    o32_re +=  + (factorR-factorL)*i12_re + (factorR+factorL)*i32_re;
-    o32_im +=  + (factorR-factorL)*i12_im + (factorR+factorL)*i32_im;
+    o00_re +=  coeff*i00_re;
+    o00_im +=  coeff*i00_im;
+    o01_re +=  coeff*i01_re;
+    o01_im +=  coeff*i01_im;
+    o02_re +=  coeff*i02_re;
+    o02_im +=  coeff*i02_im;
+    o10_re +=  coeff*i10_re;
+    o10_im +=  coeff*i10_im;
+    o11_re +=  coeff*i11_re;
+    o11_im +=  coeff*i11_im;
+    o12_re +=  coeff*i12_re;
+    o12_im +=  coeff*i12_im;
+    o20_re +=  coeff*i20_re;
+    o20_im +=  coeff*i20_im;
+    o21_re +=  coeff*i21_re;
+    o21_im +=  coeff*i21_im;
+    o22_re +=  coeff*i22_re;
+    o22_im +=  coeff*i22_im;
+    o30_re +=  coeff*i30_re;
+    o30_im +=  coeff*i30_im;
+    o31_re +=  coeff*i31_re;
+    o31_im +=  coeff*i31_im;
+    o32_re +=  coeff*i32_re;
+    o32_im +=  coeff*i32_im;
+
+    coeff = factorR - factorL;
+    
+    o00_re +=  coeff*i20_re;
+    o00_im +=  coeff*i20_im;
+    o01_re +=  coeff*i21_re;
+    o01_im +=  coeff*i21_im;
+    o02_re +=  coeff*i22_re;
+    o02_im +=  coeff*i22_im;
+    o10_re +=  coeff*i30_re;
+    o10_im +=  coeff*i30_im;
+    o11_re +=  coeff*i31_re;
+    o11_im +=  coeff*i31_im;
+    o12_re +=  coeff*i32_re;
+    o12_im +=  coeff*i32_im;
+    o20_re +=  coeff*i00_re;
+    o20_im +=  coeff*i00_im;
+    o21_re +=  coeff*i01_re;
+    o21_im +=  coeff*i01_im;
+    o22_re +=  coeff*i02_re;
+    o22_im +=  coeff*i02_im;
+    o30_re +=  coeff*i10_re;
+    o30_im +=  coeff*i10_im;
+    o31_re +=  coeff*i11_re;
+    o31_im +=  coeff*i11_im;
+    o32_re +=  coeff*i12_re;
+    o32_im +=  coeff*i12_im;
   }
 } // end of M5inv dimension
 
-#if defined MULTI_GPU && defined DSLASH_XPAY
-
-int incomplete = 0; // Have all 8 contributions been computed for this site?
-
-switch(kernel_type) { // intentional fall-through
-case INTERIOR_KERNEL:
-incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-case EXTERIOR_KERNEL_T:
-incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-case EXTERIOR_KERNEL_Z:
-incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-case EXTERIOR_KERNEL_Y:
-incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-}
-
-if (!incomplete)
-#endif // MULTI_GPU
 {
 
 #ifdef DSLASH_XPAY
@@ -353,7 +318,5 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
-
-
 
 #undef VOLATILE
