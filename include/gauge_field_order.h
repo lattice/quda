@@ -17,8 +17,8 @@ namespace quda {
      * Constructor for the GaugeFieldOrder class
      * @param field The field that we are accessing
      */
-  GaugeFieldOrder(GaugeFieldOrder &U) : U(U) { 
-      if (U.reconstruct != QUDA_RECONSTRUCT_NO) 
+  GaugeFieldOrder(cpuGaugeField &U) : U(U) { 
+      if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	errorQuda("GaugeField ordering not supported with reconstruction");
     }
 

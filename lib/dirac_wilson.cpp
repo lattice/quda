@@ -1,6 +1,9 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
+#include <transfer.h>
+//#include <color_spinor_field.h>
+//#include <color_spinor_field_order.h>
 
 namespace quda {
 
@@ -90,6 +93,66 @@ namespace quda {
   {
     // do nothing
   }
+
+  /* Creates the coarse grid dirac operator
+  Takes: multigrid transfer class, which knows
+  about the coarse grid blocking, as well as
+  having prolongate and restrict member functions
+  
+  Returns: Color matrices Y[0..2*dim] corresponding
+  to the coarse grid operator.  The first 2*dim
+  matrices correspond to the forward/backward
+  hopping terms on the coarse grid.  Y[2*dim] is
+  the color matrix that is diagonal on the coarse
+  grid
+  */
+
+  void DiracWilson::createCoarseOp(Transfer &T, void *Y[], QudaPrecision precision) const {
+    //First make a cpu gauge field from
+    // the cuda gauge field
+
+    int pad = 0;
+    GaugeFieldParam gf_param(gauge.X(), precision, gauge.Reconstruct(), pad = 0, gauge.Geometry());
+    gf_param.order = QUDA_QDP_GAUGE_ORDER;
+    gf_param.fixed = gauge.GaugeFixed();
+    gf_param.link_type = gauge.LinkType();
+    gf_param.t_boundary = gauge.TBoundary();
+    gf_param.anisotropy = gauge.Anisotropy();
+    gf_param.gauge = NULL;
+    gf_param.create = QUDA_NULL_FIELD_CREATE;
+
+    cpuGaugeField g(gf_param);
+
+  //Copy the cuda gauge field to the cpu
+  gauge.saveCPUField(g, QUDA_CPU_FIELD_LOCATION);
+
+  int ndim = g.Ndim();
+  int geo_bs[QUDA_MAX_DIM];
+  int spin_bs = T.Spin_bs();
+  int nvec = T.nvec();
+  int x[QUDA_MAX_DIM];
+  int xc[QUDA_MAX_DIM];
+  for(int d = 0; d < ndim; d++) {
+    x[d] = g.X()[d];
+    geo_bs[d] = T.Geo_bs()[d];
+    xc[d] = x[d]/geo_bs[d];
+  }
+
+
+  void *vOrder;
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    vOrder = (ColorSpinorFieldOrder<double> *) createOrder<double>(T.Vectors(),nvec);
+  }
+  else {
+    vOrder = (ColorSpinorFieldOrder<float> *) createOrder<float>(T.Vectors(), nvec);
+  }
+
+  
+
+  
+  
+   
+  } 
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)
     : DiracWilson(param)

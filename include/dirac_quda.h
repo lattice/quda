@@ -6,7 +6,6 @@
 #include <gauge_field.h>
 #include <clover_field.h>
 #include <dslash_quda.h>
-
 #include <face_quda.h>
 #include <blas_quda.h>
 
@@ -133,6 +132,9 @@ namespace quda {
     QudaVerbosity Verbose() const { return verbose; }
   };
 
+  //Forward declaration of multigrid Transfer class
+  class Transfer;
+
   // Full Wilson
   class DiracWilson : public Dirac {
 
@@ -159,7 +161,11 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual void createCoarseOp(Transfer &T, void *Y[], QudaPrecision precision) const;
+
   };
+
 
   // Even-odd preconditioned Wilson
   class DiracWilsonPC : public DiracWilson {

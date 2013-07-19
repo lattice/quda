@@ -4,8 +4,14 @@
 namespace quda {
 
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
-    : B(B), Nvec(Nvec), V(0), tmp(0), geo_map(0), spin_map(0) 
+    : B(B), Nvec(Nvec), V(0), tmp(0), geo_bs(0), geo_map(0), spin_bs(spin_bs), spin_map(0)
   {
+
+    int ndim = B[0]->Ndim();
+    this->geo_bs = new int[ndim];
+    for (int d = 0; d < ndim; d++) {
+      this->geo_bs[d] = geo_bs[d];
+    }
 
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors

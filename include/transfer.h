@@ -32,8 +32,14 @@ namespace quda {
     /** A temporary field with fine geometry but coarse color */
     cpuColorSpinorField *tmp;
 
+    /** The geometrical coase grid blocking */
+    int *geo_bs;
+
     /** The mapping onto coarse sites from fine sites */
     int *geo_map;
+
+    /** The spin blocking */
+    int spin_bs;
 
     /** The mapping onto coarse spin from fine spin */
     int *spin_map;
@@ -130,6 +136,24 @@ namespace quda {
      * @return The V field const reference
      */
     const ColorSpinorField& Vectors() { return *V; }
+
+    /**
+     * Returns the number of near nullvectors
+     * @retruns Nvec
+     */
+    const int nvec() {return Nvec;}
+
+    /**
+     * Returns the amount of spin blocking
+     * @retruns spin_bs
+     */
+    const int Spin_bs() {return spin_bs;}
+
+    /**
+     * Returns the geometrical coarse grid blocking
+     * @returns geo_bs
+     */
+    const int *Geo_bs() {return geo_bs;}
 
   };
 
