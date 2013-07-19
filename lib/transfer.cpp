@@ -1,6 +1,9 @@
 #include <transfer.h>
 #include <blas_quda.h>
 
+#include <transfer.h>
+#include <multigrid.h>
+
 namespace quda {
 
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
@@ -99,12 +102,12 @@ namespace quda {
   }
 
   // apply the prolongator
-  void Transfer::P(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
+  void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
     Prolongate(out, in, *V, *tmp, Nvec, geo_map, spin_map);
   }
 
   // apply the restrictor
-  void Transfer::R(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
+  void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
     Restrict(out, in, *V, *tmp, Nvec, geo_map, spin_map);
   }
 

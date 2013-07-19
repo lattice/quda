@@ -79,6 +79,7 @@ namespace quda {
     friend class DiracM;
     friend class DiracMdagM;
     friend class DiracMdag;
+    friend class DiracCoarse;
 
   protected:
     cudaGaugeField &gauge;
@@ -411,6 +412,8 @@ namespace quda {
     unsigned long long flops() const { return dirac->Flops(); }
 
     std::string Type() const { return typeid(*dirac).name(); }
+
+    const Dirac* Expose() { return dirac; }
   };
 
   inline DiracMatrix::~DiracMatrix()

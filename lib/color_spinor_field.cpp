@@ -377,7 +377,7 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] *= 2;
   }
 
-  ColorSpinorField* ColorSpinorField::createCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec) {
+  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec) {
 
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];

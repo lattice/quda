@@ -116,14 +116,14 @@ namespace quda {
      * @param out The resulting field on the fine lattice
      * @param in The input field on the coarse lattice
      */
-    void P(cpuColorSpinorField &out, const cpuColorSpinorField &in);
+    void P(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     /** 
      * Apply the restrictor 
      * @param out The resulting field on the coarse lattice
      * @param in The input field on the fine lattice   
      */
-    void R(cpuColorSpinorField &out, const cpuColorSpinorField &in);
+    void R(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     /**
      * Returns a const reference to the V field

@@ -255,7 +255,7 @@ namespace quda {
      */
     void OffsetIndex(int &i, int *y) const;
 
-    ColorSpinorField* createCoarse(const int *geoblockSize, int spinBlockSize, int Nvec);
+    ColorSpinorField* CreateCoarse(const int *geoblockSize, int spinBlockSize, int Nvec);
     
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
