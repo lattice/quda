@@ -1,6 +1,9 @@
 #include <transfer.h>
 #include <blas_quda.h>
 
+#include <transfer.h>
+#include <multigrid.h>
+
 namespace quda {
 
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
@@ -27,14 +30,22 @@ namespace quda {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
-    V = new cpuColorSpinorField(param);
+
+    if (typeid(*B[0]) == typeid(cpuColorSpinorField)) 
+      V = new cpuColorSpinorField(param);
+    else 
+      V = new cudaColorSpinorField(param);      
 
     fillV(); // copy the null space vectors into V
 
     // create the storage for the intermediate temporary vector
     param.nSpin = B[0]->Nspin(); // tmp has same nSpin has the fine dimension
     param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
-    tmp = new cpuColorSpinorField(param);
+
+    if (typeid(*B[0]) == typeid(cpuColorSpinorField)) 
+      tmp = new cpuColorSpinorField(param);
+    else 
+      tmp = new cudaColorSpinorField(param);      
 
     // allocate and compute the fine-to-coarse site map
     geo_map = new int[B[0]->Volume()];
@@ -105,12 +116,12 @@ namespace quda {
   }
 
   // apply the prolongator
-  void Transfer::P(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
+  void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
     Prolongate(out, in, *V, *tmp, Nvec, geo_map, spin_map);
   }
 
   // apply the restrictor
-  void Transfer::R(cpuColorSpinorField &out, const cpuColorSpinorField &in) {
+  void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
     Restrict(out, in, *V, *tmp, Nvec, geo_map, spin_map);
   }
 

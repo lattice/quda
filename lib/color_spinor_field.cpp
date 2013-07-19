@@ -377,6 +377,25 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] *= 2;
   }
 
+  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec) {
+
+    ColorSpinorParam coarseParam(*this);
+    for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
+    coarseParam.nSpin = nSpin / spinBlockSize;
+    coarseParam.nColor = Nvec;
+    coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
+    coarseParam.create = QUDA_ZERO_FIELD_CREATE;
+    
+    ColorSpinorField *coarse;
+    if (typeid(*this) == typeid(cpuColorSpinorField))
+      coarse = new cpuColorSpinorField(coarseParam);
+    else 
+      coarse = new cudaColorSpinorField(coarseParam);
+
+    return coarse;
+  };
+
+
   double norm2(const ColorSpinorField &a) {
 
     double rtn = 0.0;

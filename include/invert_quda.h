@@ -127,6 +127,12 @@ namespace quda {
     QudaVerbosity verbosity_precondition;
 
     /**
+       Default constructor
+     */
+    SolverParam() { ; }
+    
+
+    /**
        Constructor that matches the initial values to that of the
        QudaInvertParam instance
        @param param The QudaInvertParam instance from which the values are copied
