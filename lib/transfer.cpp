@@ -24,14 +24,22 @@ namespace quda {
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
-    V = new cpuColorSpinorField(param);
+
+    if (typeid(*B[0]) == typeid(cpuColorSpinorField)) 
+      V = new cpuColorSpinorField(param);
+    else 
+      V = new cudaColorSpinorField(param);      
 
     fillV(); // copy the null space vectors into V
 
     // create the storage for the intermediate temporary vector
     param.nSpin = B[0]->Nspin(); // tmp has same nSpin has the fine dimension
     param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
-    tmp = new cpuColorSpinorField(param);
+
+    if (typeid(*B[0]) == typeid(cpuColorSpinorField)) 
+      tmp = new cpuColorSpinorField(param);
+    else 
+      tmp = new cudaColorSpinorField(param);      
 
     // allocate and compute the fine-to-coarse site map
     geo_map = new int[B[0]->Volume()];

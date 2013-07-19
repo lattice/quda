@@ -27,10 +27,10 @@ namespace quda {
     const int Nvec;
 
     /** The block-normalized null-space components that define the prolongator */
-    cpuColorSpinorField *V;
+    ColorSpinorField *V;
 
     /** A temporary field with fine geometry but coarse color */
-    cpuColorSpinorField *tmp;
+    ColorSpinorField *tmp;
 
     /** The mapping onto coarse sites from fine sites */
     int *geo_map;
