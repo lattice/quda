@@ -53,45 +53,45 @@ namespace quda {
     switch (type) {
     case 0: // no kernel fusion
       for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
-	beta[i][k] = cDotProductCuda(*Ap[i], *Ap[k]);
-	caxpyCuda(-beta[i][k], *Ap[i], *Ap[k]);
+	beta[i][k] = blas::cDotProduct(*Ap[i], *Ap[k]);
+	blas::caxpy(-beta[i][k], *Ap[i], *Ap[k]);
       }
       break;
     case 1: // basic kernel fusion
       if (k==0) break;
-      beta[0][k] = cDotProductCuda(*Ap[0], *Ap[k]);
+      beta[0][k] = blas::cDotProduct(*Ap[0], *Ap[k]);
       for (int i=0; i<k-1; i++) { // 4 (k-1) memory transactions here
-	beta[i+1][k] = caxpyDotzyCuda(-beta[i][k], *Ap[i], *Ap[k], *Ap[i+1]);
+	beta[i+1][k] = blas::caxpyDotzy(-beta[i][k], *Ap[i], *Ap[k], *Ap[i+1]);
       }
-      caxpyCuda(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+      blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
       break;
     case 2: // 
       for (int i=0; i<k-2; i+=3) { // 5 (k-1) memory transactions here
-	for (int j=i; j<i+3; j++) beta[j][k] = cDotProductCuda(*Ap[j], *Ap[k]);
-	caxpbypczpwCuda(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
+	for (int j=i; j<i+3; j++) beta[j][k] = blas::cDotProduct(*Ap[j], *Ap[k]);
+	blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
       }
     
       if (k%3 != 0) { // need to update the remainder
 	if ((k - 3*(k/3)) % 2 == 0) {
-	  beta[k-2][k] = cDotProductCuda(*Ap[k-2], *Ap[k]);
-	  beta[k-1][k] = cDotProductCuda(*Ap[k-1], *Ap[k]);
-	  caxpbypzCuda(beta[k-2][k], *Ap[k-2], beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  beta[k-2][k] = blas::cDotProduct(*Ap[k-2], *Ap[k]);
+	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	  blas::caxpbypz(beta[k-2][k], *Ap[k-2], beta[k-1][k], *Ap[k-1], *Ap[k]);
 	} else {
-	  beta[k-1][k] = cDotProductCuda(*Ap[k-1], *Ap[k]);
-	  caxpyCuda(beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	  blas::caxpy(beta[k-1][k], *Ap[k-1], *Ap[k]);
 	}
       }
 
       break;
     case 3:
       for (int i=0; i<k-1; i+=2) {
-	for (int j=i; j<i+2; j++) beta[j][k] = cDotProductCuda(*Ap[j], *Ap[k]);
-	caxpbypzCuda(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
+	for (int j=i; j<i+2; j++) beta[j][k] = blas::cDotProduct(*Ap[j], *Ap[k]);
+	blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
       }
     
       if (k%2 != 0) { // need to update the remainder
-	beta[k-1][k] = cDotProductCuda(*Ap[k-1], *Ap[k]);
-	caxpyCuda(beta[k-1][k], *Ap[k-1], *Ap[k]);
+	beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	blas::caxpy(beta[k-1][k], *Ap[k-1], *Ap[k]);
       }
       break;
     default:
@@ -118,14 +118,14 @@ namespace quda {
     // Update the solution vector
     backSubs(alpha, beta, gamma, delta, k);
   
-    //for (int i=0; i<k; i++) caxpyCuda(delta[i], *p[i], x);
+    //for (int i=0; i<k; i++) blas::caxpy(delta[i], *p[i], x);
   
     for (int i=0; i<k-2; i+=3) 
-      caxpbypczpwCuda(delta[i], *p[i], delta[i+1], *p[i+1], delta[i+2], *p[i+2], x); 
+      blas::caxpbypczpw(delta[i], *p[i], delta[i+1], *p[i+1], delta[i+2], *p[i+2], x); 
   
     if (k%3 != 0) { // need to update the remainder
-      if ((k - 3*(k/3)) % 2 == 0) caxpbypzCuda(delta[k-2], *p[k-2], delta[k-1], *p[k-1], x);
-      else caxpyCuda(delta[k-1], *p[k-1], x);
+      if ((k - 3*(k/3)) % 2 == 0) blas::caxpbypz(delta[k-2], *p[k-2], delta[k-1], *p[k-1], x);
+      else blas::caxpy(delta[k-1], *p[k-1], x);
     }
 
     delete []delta;
@@ -217,13 +217,13 @@ namespace quda {
     for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
     double *gamma = new double[Nkrylov];
 
-    double b2 = normCuda(b);
+    double b2 = blas::norm2(b);
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     double stop = b2*param.tol*param.tol; // stopping condition of solver
     double heavy_quark_res = 0.0; // heavy quark residual
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 
     int k = 0;
 
@@ -238,13 +238,13 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
-    blas_flops = 0;
+    blas::flops = 0;
 
     // calculate initial residual
     mat(r, x, y);
-    zeroCuda(y);
-    double r2 = xmyNormCuda(b, r);  
-    copyCuda(rSloppy, r);
+    blas::zero(y);
+    double r2 = blas::xmyNorm(b, r);  
+    blas::copy(rSloppy, r);
 
     int total_iter = 0;
     int restart = 0;
@@ -263,21 +263,21 @@ namespace quda {
 	  cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
 	
 	  if (m==0) { // residual is just source
-	    copyCuda(rPre, rSloppy);
+	    blas::copy(rPre, rSloppy);
 	  } else { // compute residual
-	    copyCuda(rM,rSloppy);
-	    axpyCuda(-1.0, *Ap[k], rM);
-	    copyCuda(rPre, rM);
+	    blas::copy(rM,rSloppy);
+	    blas::axpy(-1.0, *Ap[k], rM);
+	    blas::copy(rPre, rM);
 	  }
 	
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
-	  else copyCuda(pPre, rPre);
+	  else blas::copy(pPre, rPre);
 	
 	  // relaxation p = omega*p + (1-omega)*r
-	  //if (param.omega!=1.0) axpbyCuda((1.0-param.omega), rPre, param.omega, pPre);
+	  //if (param.omega!=1.0) blas::axpby((1.0-param.omega), rPre, param.omega, pPre);
 	
-	  if (m==0) { copyCuda(*p[k], pPre); }
-	  else { copyCuda(tmp, pPre); xpyCuda(tmp, *p[k]); }
+	  if (m==0) { blas::copy(*p[k], pPre); }
+	  else { blas::copy(tmp, pPre); blas::xpy(tmp, *p[k]); }
 
 	} else { // no preconditioner
 	  *p[k] = rSloppy;
@@ -285,12 +285,13 @@ namespace quda {
       
 	matSloppy(*Ap[k], *p[k], tmp);
 	if (param.verbosity>= QUDA_DEBUG_VERBOSE)
-	  printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, rPre2=%e\n", total_iter, norm2(*Ap[k]), norm2(*p[k]), norm2(rPre));
+	  printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, rPre2=%e\n", 
+		     total_iter, blas::norm2(*Ap[k]), blas::norm2(*p[k]), blas::norm2(rPre));
       }
 
       orthoDir(beta, Ap, k);
 
-      double3 Apr = cDotProductNormACuda(*Ap[k], rSloppy);
+      double3 Apr = blas::cDotProductNormA(*Ap[k], rSloppy);
 
       if (param.verbosity>= QUDA_DEBUG_VERBOSE) {
 	printfQuda("GCR debug iter=%d: Apr=(%e,%e,%e)\n", total_iter, Apr.x, Apr.y, Apr.z);
@@ -305,7 +306,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = cabxpyAxNormCuda(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 
+      r2 = blas::cabxpyAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], rSloppy); 
 
       k++;
       total_iter++;
@@ -320,23 +321,23 @@ namespace quda {
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
 
 	// recalculate residual in high precision
-	copyCuda(x, xSloppy);
-	xpyCuda(x, y);
+	blas::copy(x, xSloppy);
+	blas::xpy(x, y);
 
 	k = 0;
 	mat(r, y, x);
-	r2 = xmyNormCuda(b, r);  
+	r2 = blas::xmyNorm(b, r);  
 
 	if (use_heavy_quark_res) { 
-	  heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
+	  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
 	}
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
 	  restart++; // restarting if residual is still too great
 
 	  PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
-	  copyCuda(rSloppy, r);
-	  zeroCuda(xSloppy);
+	  blas::copy(rSloppy, r);
+	  blas::zero(xSloppy);
 
 	  r2_old = r2;
 
@@ -348,14 +349,14 @@ namespace quda {
 
     }
 
-    if (total_iter > 0) copyCuda(x, y);
+    if (total_iter > 0) blas::copy(x, y);
 
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
-    double gflops = (blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
     if (k>=param.maxiter && param.verbosity >= QUDA_SUMMARIZE) 
@@ -365,10 +366,10 @@ namespace quda {
   
     // Calculate the true residual
     mat(r, x);
-    double true_res = xmyNormCuda(b, r);
+    double true_res = blas::xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
-    param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 #else
     param.true_res_hq = 0.0;
 #endif   
@@ -377,7 +378,7 @@ namespace quda {
     param.iter += total_iter;
   
     // reset the flops counters
-    blas_flops = 0;
+    blas::flops = 0;
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();

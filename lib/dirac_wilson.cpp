@@ -24,43 +24,52 @@ namespace quda {
     return *this;
   }
 
-  void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void DiracWilson::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			   const QudaParity parity) const
   {
-    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-
-    wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim, profile);
+    if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+      initSpinorConstants(in, profile);
+      setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+      wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, 
+		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
+    } else {
+      errorQuda("Not supported");
+    }
 
     flops += 1320ll*in.Volume();
   }
 
-  void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			       const QudaParity parity, const cudaColorSpinorField &x,
+  void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			       const QudaParity parity, const ColorSpinorField &x,
 			       const double &k) const
   {
-    initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-
-    wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim, profile);
+    if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
+      initSpinorConstants(in, profile);
+      setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+      wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, 
+		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
+		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
+    } else {
+      errorQuda("Not supported");
+    }
 
     flops += 1368ll*in.Volume();
   }
 
-  void DiracWilson::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
     DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
     DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
   }
 
-  void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
 
@@ -73,8 +82,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracWilson::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-			    cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracWilson::prepare(ColorSpinorField* src, ColorSpinorField* sol,
+			    ColorSpinorField &x, ColorSpinorField &b, 
 			    const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -85,7 +94,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracWilson::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracWilson::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				const QudaSolutionType solType) const
   {
     // do nothing
@@ -106,48 +115,8 @@ namespace quda {
 
   void DiracWilson::createCoarseOp(Transfer &T, void *Y[], QudaPrecision precision) const {
 	CoarseOp(T, Y, precision, gauge);
-#if 0
-    //First make a cpu gauge field from
-    // the cuda gauge field
-
-    int pad = 0;
-    GaugeFieldParam gf_param(gauge.X(), precision, gauge.Reconstruct(), pad = 0, gauge.Geometry());
-    gf_param.order = QUDA_QDP_GAUGE_ORDER;
-    gf_param.fixed = gauge.GaugeFixed();
-    gf_param.link_type = gauge.LinkType();
-    gf_param.t_boundary = gauge.TBoundary();
-    gf_param.anisotropy = gauge.Anisotropy();
-    gf_param.gauge = NULL;
-    gf_param.create = QUDA_NULL_FIELD_CREATE;
-
-    cpuGaugeField g(gf_param);
-
-  //Copy the cuda gauge field to the cpu
-  gauge.saveCPUField(g, QUDA_CPU_FIELD_LOCATION);
-
-  int ndim = g.Ndim();
-  int geo_bs[QUDA_MAX_DIM];
-  int spin_bs = T.Spin_bs();
-  int nvec = T.nvec();
-  int x[QUDA_MAX_DIM];
-  int xc[QUDA_MAX_DIM];
-  for(int d = 0; d < ndim; d++) {
-    x[d] = g.X()[d];
-    geo_bs[d] = T.Geo_bs()[d];
-    xc[d] = x[d]/geo_bs[d];
   }
 
-
-  void *vOrder;
-  if (precision == QUDA_DOUBLE_PRECISION) {
-    vOrder = (ColorSpinorFieldOrder<double> *) createOrder<double>(T.Vectors(),nvec);
-  }
-  else {
-    vOrder = (ColorSpinorFieldOrder<float> *) createOrder<float>(T.Vectors(), nvec);
-  }
-
-  #endif 
-  } 
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)
     : DiracWilson(param)
@@ -174,7 +143,7 @@ namespace quda {
     return *this;
   }
 
-  void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilsonPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
 
@@ -193,7 +162,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracWilsonPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilsonPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
 #ifdef MULTI_GPU
     bool reset = newTmp(&tmp2, in);
@@ -206,8 +175,8 @@ namespace quda {
 #endif
   }
 
-  void DiracWilsonPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-			      cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracWilsonPC::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+			      ColorSpinorField &x, ColorSpinorField &b, 
 			      const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
@@ -235,7 +204,7 @@ namespace quda {
 
   }
 
-  void DiracWilsonPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracWilsonPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				  const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {

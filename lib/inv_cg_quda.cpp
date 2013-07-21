@@ -31,7 +31,7 @@ namespace quda {
     profile.Start(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
-    const double b2 = norm2(b);
+    const double b2 = blas::norm2(b);
     if(b2 == 0){
       profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
@@ -51,7 +51,7 @@ namespace quda {
     mat(r, x, y);
 //    zeroCuda(y);
 
-    double r2 = xmyNormCuda(b, r);
+    double r2 = blas::xmyNorm(b, r);
   
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField Ap(x, csParam);
@@ -81,10 +81,10 @@ namespace quda {
     cudaColorSpinorField p(rSloppy);
 
     if(&x != &xSloppy){
-      copyCuda(y,x);
-      zeroCuda(xSloppy);
+      blas::copy(y,x);
+      blas::zero(xSloppy);
     }else{
-      zeroCuda(y);
+      blas::zero(y);
     }
     
     const bool use_heavy_quark_res = 
@@ -97,7 +97,7 @@ namespace quda {
     double stop = b2*param.tol*param.tol; // stopping condition of solver
 
     double heavy_quark_res = 0.0; // heavy quark residual
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
     int heavy_quark_check = 10; // how often to check the heavy quark residual
 
     double alpha=0.0, beta=0.0;
@@ -117,7 +117,7 @@ namespace quda {
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
-    blas_flops = 0;
+    blas::flops = 0;
 
     int k=0;
     
@@ -134,14 +134,14 @@ namespace quda {
       bool breakdown = false;
       int pipeline = 0;
       if (pipeline) {
-	double3 triplet = tripleCGReductionCuda(rSloppy, Ap, p);
+	double3 triplet = blas::tripleCGReduction(rSloppy, Ap, p);
 	r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
 	r2_old = r2;
 
 	alpha = r2 / pAp;        
 	sigma = alpha*(alpha * Ap2 - pAp);
 	if (sigma < 0.0 || steps_since_reliable==0) { // sigma condition has broken down
-	  r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+	  r2 = blas::axpyNorm(-alpha, Ap, rSloppy);
 	  sigma = r2;
 	  breakdown = true;
 	}
@@ -149,11 +149,11 @@ namespace quda {
 	r2 = sigma;
       } else {
 	r2_old = r2;
-	pAp = reDotProductCuda(p, Ap);
+	pAp = blas::reDotProduct(p, Ap);
 	alpha = r2 / pAp;        
 
 	// here we are deploying the alternative beta computation 
-	Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
+	Complex cg_norm = blas::axpyCGNorm(-alpha, Ap, rSloppy);
 	r2 = real(cg_norm); // (r_new, r_new)
 	sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
       }
@@ -172,25 +172,25 @@ namespace quda {
 	//beta = r2 / r2_old;
 	beta = sigma / r2_old; // use the alternative beta computation
 
-	if (pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, rSloppy, xSloppy, p);
-	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
+	if (pipeline && !breakdown) blas::tripleCGUpdate(alpha, beta, Ap, rSloppy, xSloppy, p);
+	else blas::axpyZpbx(alpha, p, xSloppy, rSloppy, beta);
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	  copyCuda(tmp,y);
-	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	  blas::copy(tmp,y);
+	  heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
 	}
 
 	steps_since_reliable++;
       } else {
-	axpyCuda(alpha, p, xSloppy);
-	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
+	blas::axpy(alpha, p, xSloppy);
+	if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
       
-	xpyCuda(x, y); // swap these around?
+	blas::xpy(x, y); // swap these around?
 	mat(r, y, x); // here we can use x as tmp
-	r2 = xmyNormCuda(b, r);
+	r2 = blas::xmyNorm(b, r);
 
-	if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
-	zeroCuda(xSloppy);
+	if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);            
+	blas::zero(xSloppy);
 
 	// break-out check if we have reached the limit of the precision
 	static int resIncrease = 0;
@@ -210,13 +210,13 @@ namespace quda {
 	rUpdate++;
 
 	// explicitly restore the orthogonality of the gradient vector
-	double rp = reDotProductCuda(rSloppy, p) / (r2);
-	axpyCuda(-rp, rSloppy, p);
+	double rp = blas::reDotProduct(rSloppy, p) / (r2);
+	blas::axpy(-rp, rSloppy, p);
 
 	beta = r2 / r2_old; 
-	xpayCuda(rSloppy, beta, p);
+	blas::xpay(rSloppy, beta, p);
 
-	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
+	if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y,r).z);
 	
 	steps_since_reliable = 0;
       }
@@ -227,14 +227,14 @@ namespace quda {
       PrintStats("CG", k, r2, b2, heavy_quark_res);
     }
 
-    if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
-    xpyCuda(y, x);
+    if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
+    blas::xpy(y, x);
 
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
       param.gflops = gflops;
     param.iter += k;
@@ -247,9 +247,9 @@ namespace quda {
 
     // compute the true residuals
     mat(r, x, y);
-    param.true_res = sqrt(xmyNormCuda(b, r) / b2);
+    param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
-    param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 #else
     param.true_res_hq = 0.0;
 #endif      
@@ -257,7 +257,7 @@ namespace quda {
     PrintSummary("CG", k, r2, b2);
 
     // reset the flops counters
-    quda::blas_flops = 0;
+    blas::flops = 0;
     mat.flops();
     matSloppy.flops();
 

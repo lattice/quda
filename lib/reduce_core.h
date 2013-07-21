@@ -416,7 +416,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
+    TuneParam tp = tuneLaunch(*this, blas::getTuning(), blas::getVerbosity());
     result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>
       (X, Y, Z, W, V, r, length, tp, stream);
   }
@@ -448,6 +448,57 @@ public:
     return r.streams()*bytes*length; }
 };
 
+double2 make_Float2(const std::complex<double> &a) {
+  return make_double2( real(a), imag(a) );
+}
+
+float2 make_Float2(const std::complex<float> &a) {
+  return make_float2( real(a), imag(a) );
+}
+
+std::complex<double> make_Complex(const double2 &a) {
+  return std::complex<double>(a.x, a.y);
+}
+
+std::complex<float> make_Complex(const float2 &a) {
+  return std::complex<float>(a.x, a.y);
+}
+
+
+/**
+   Generic reduce kernel with four loads and up to four stores.
+
+   FIXME - this is hacky due to the lack of std::complex support in
+   CUDA.  The functors are defined in terms of FloatN vectors, whereas
+   the operator() accessor returns std::complex<Float>
+  */
+template <typename ReduceType, typename Float2, typename SpinorX, typename SpinorY, 
+	    typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer r) {
+
+  ReduceType sum;
+  zero(sum); 
+
+  for (int x=0; x<X.Volume(); x++) {
+    for (int s=0; s<X.Nspin(); s++) {
+      for (int c=0; c<X.Ncolor(); c++) {
+	Float2 X2 = make_Float2( X(x, s, c) );
+	Float2 Y2 = make_Float2( Y(x, s, c) );
+	Float2 Z2 = make_Float2( Z(x, s, c) );
+	Float2 W2 = make_Float2( W(x, s, c) );
+	Float2 V2 = make_Float2( V(x, s, c) );
+	r(sum, X2, Y2, Z2, W2, V2);
+	X(x, s, c) = make_Complex(X2);
+	Y(x, s, c) = make_Complex(Y2);
+	Z(x, s, c) = make_Complex(Z2);
+	W(x, s, c) = make_Complex(W2);
+	V(x, s, c) = make_Complex(V2);
+      }
+    }
+  }
+
+  return sum;
+}
 
 /*
   Wilson
@@ -462,16 +513,21 @@ public:
  */
 
 /**
-   Driver for generic reduction routine with two loads.
+   Driver for generic reduction routine with five loads.
    @param ReduceType 
    @param siteUnroll - if this is true, then one site corresponds to exactly one thread
  */
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType,
 	  template <typename ReducerType, typename Float, typename FloatN> class Reducer,
   int writeX, int writeY, int writeZ, int writeW, int writeV, bool siteUnroll>
-doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x, 
-		   cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w,
-		   cudaColorSpinorField &v) {
+doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x, 
+		   ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w,
+		   ColorSpinorField &v) {
+  checkSpinor(x, y);
+  checkSpinor(x, z);
+  checkSpinor(x, w);
+  checkSpinor(x, v);
+
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     doubleN even =
       reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,
@@ -484,113 +540,145 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
     return even + odd;
   }
 
-  checkSpinor(x, y);
-  checkSpinor(x, z);
-  checkSpinor(x, w);
-  checkSpinor(x, v);
-
-  for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
-  blasConstants.stride = x.Stride();
-
-  int reduce_length = siteUnroll ? x.RealLength() : x.Length();
   doubleN value;
+  if (Location(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
+    for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
+    blasConstants.stride = x.Stride();
+    
+    int reduce_length = siteUnroll ? x.RealLength() : x.Length();
 
-  // FIXME: use traits to encapsulate register type for shorts -
-  // will reduce template type parameters from 3 to 2
-
-  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-    if (x.Nspin() == 4){ //wilson
-      const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
-      Spinor<double2,double2,double2,M,writeX> X(x);
-      Spinor<double2,double2,double2,M,writeY> Y(y);
-      Spinor<double2,double2,double2,M,writeZ> Z(z);
-      Spinor<double2,double2,double2,M,writeW> W(w);
-      Spinor<double2,double2,double2,M,writeV> V(v);
-      Reducer<ReduceType, double2, double2> r(a,b);
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
-	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
-	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
-      reduce.apply(*getBlasStream());
-    } else if (x.Nspin() == 1){ //staggered
-      const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-      Spinor<double2,double2,double2,M,writeX> X(x);
-      Spinor<double2,double2,double2,M,writeY> Y(y);
-      Spinor<double2,double2,double2,M,writeZ> Z(z);
-      Spinor<double2,double2,double2,M,writeW> W(w);
-      Spinor<double2,double2,double2,M,writeV> V(v);
-      Reducer<ReduceType, double2, double2> r(a,b);
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
-	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
-	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
-      reduce.apply(*getBlasStream());
-    } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-    if (x.Nspin() == 4){ //wilson
-      const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-      Spinor<float4,float4,float4,M,writeX,0> X(x);
-      Spinor<float4,float4,float4,M,writeY,1> Y(y);
-      Spinor<float4,float4,float4,M,writeZ,2> Z(z);
-      Spinor<float4,float4,float4,M,writeW,3> W(w);
-      Spinor<float4,float4,float4,M,writeV,4> V(v);
-      Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,M,
-	Spinor<float4,float4,float4,M,writeX,0>,  Spinor<float4,float4,float4,M,writeY,1>,
-	Spinor<float4,float4,float4,M,writeZ,2>,  Spinor<float4,float4,float4,M,writeW,3>,
-	Spinor<float4,float4,float4,M,writeV,4>, Reducer<ReduceType, float2, float4> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M));
-      reduce.apply(*getBlasStream());
-    } else if (x.Nspin() == 1) {
-      const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-      Spinor<float2,float2,float2,M,writeX,0> X(x);
-      Spinor<float2,float2,float2,M,writeY,1> Y(y);
-      Spinor<float2,float2,float2,M,writeZ,2> Z(z);
-      Spinor<float2,float2,float2,M,writeW,3> W(w);
-      Spinor<float2,float2,float2,M,writeV,4> V(v);
-      Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,
-	Spinor<float2,float2,float2,M,writeX,0>,  Spinor<float2,float2,float2,M,writeY,1>,
-	Spinor<float2,float2,float2,M,writeZ,2>,  Spinor<float2,float2,float2,M,writeW,3>,
-	Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
-      reduce.apply(*getBlasStream());
-    } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-  } else {
-    if (x.Nspin() == 4){ //wilson
-      Spinor<float4,float4,short4,6,writeX,0> X(x);
-      Spinor<float4,float4,short4,6,writeY,1> Y(y);
-      Spinor<float4,float4,short4,6,writeZ,2> Z(z);
-      Spinor<float4,float4,short4,6,writeW,3> W(w);
-      Spinor<float4,float4,short4,6,writeV,4> V(v);
-      Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,
-	Spinor<float4,float4,short4,6,writeX,0>, Spinor<float4,float4,short4,6,writeY,1>,
-	Spinor<float4,float4,short4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>,
-	Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
-      reduce.apply(*getBlasStream());
-    } else if (x.Nspin() == 1) {//staggered
-      Spinor<float2,float2,short2,3,writeX,0> X(x);
-      Spinor<float2,float2,short2,3,writeY,1> Y(y);
-      Spinor<float2,float2,short2,3,writeZ,2> Z(z);
-      Spinor<float2,float2,short2,3,writeW,3> W(w);
-      Spinor<float2,float2,short2,3,writeV,4> V(v);
-      Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-      ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,
-	Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
-	Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
-	Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
-      reduce.apply(*getBlasStream());
-    } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
+    // cannot do site unrolling for arbitrary color (needs JIT)
+    if (siteUnroll && x.Ncolor()!=3) errorQuda("Not supported");
+    
+    // FIXME: use traits to encapsulate register type for shorts -
+    // will reduce template type parameters from 3 to 2
+    
+    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+      if (x.Nspin() == 4){ //wilson
+	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
+	Spinor<double2,double2,double2,M,writeX> X(x);
+	Spinor<double2,double2,double2,M,writeY> Y(y);
+	Spinor<double2,double2,double2,M,writeZ> Z(z);
+	Spinor<double2,double2,double2,M,writeW> W(w);
+	Spinor<double2,double2,double2,M,writeV> V(v);
+	Reducer<ReduceType, double2, double2> r(a,b);
+	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
+	  Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
+	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
+	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
+	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce.apply(*blas::getStream());
+      } else if (x.Nspin() == 1){ //staggered
+	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+	Spinor<double2,double2,double2,M,writeX> X(x);
+	Spinor<double2,double2,double2,M,writeY> Y(y);
+	Spinor<double2,double2,double2,M,writeZ> Z(z);
+	Spinor<double2,double2,double2,M,writeW> W(w);
+	Spinor<double2,double2,double2,M,writeV> V(v);
+	Reducer<ReduceType, double2, double2> r(a,b);
+	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
+	  Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
+	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
+	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
+	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce.apply(*blas::getStream());
+      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+    } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+      if (x.Nspin() == 4){ //wilson
+	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
+	Spinor<float4,float4,float4,M,writeX,0> X(x);
+	Spinor<float4,float4,float4,M,writeY,1> Y(y);
+	Spinor<float4,float4,float4,M,writeZ,2> Z(z);
+	Spinor<float4,float4,float4,M,writeW,3> W(w);
+	Spinor<float4,float4,float4,M,writeV,4> V(v);
+	Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
+	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,M,
+	  Spinor<float4,float4,float4,M,writeX,0>,  Spinor<float4,float4,float4,M,writeY,1>,
+	  Spinor<float4,float4,float4,M,writeZ,2>,  Spinor<float4,float4,float4,M,writeW,3>,
+	  Spinor<float4,float4,float4,M,writeV,4>, Reducer<ReduceType, float2, float4> >
+	  reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M));
+	reduce.apply(*blas::getStream());
+      } else if (x.Nspin() == 1) {
+	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+	Spinor<float2,float2,float2,M,writeX,0> X(x);
+	Spinor<float2,float2,float2,M,writeY,1> Y(y);
+	Spinor<float2,float2,float2,M,writeZ,2> Z(z);
+	Spinor<float2,float2,float2,M,writeW,3> W(w);
+	Spinor<float2,float2,float2,M,writeV,4> V(v);
+	Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
+	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,
+	  Spinor<float2,float2,float2,M,writeX,0>,  Spinor<float2,float2,float2,M,writeY,1>,
+	  Spinor<float2,float2,float2,M,writeZ,2>,  Spinor<float2,float2,float2,M,writeW,3>,
+	  Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
+	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce.apply(*blas::getStream());
+      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+    } else {
+      if (x.Ncolor()!=3) errorQuda("Not supported");
+      if (x.Nspin() == 4){ //wilson
+	Spinor<float4,float4,short4,6,writeX,0> X(x);
+	Spinor<float4,float4,short4,6,writeY,1> Y(y);
+	Spinor<float4,float4,short4,6,writeZ,2> Z(z);
+	Spinor<float4,float4,short4,6,writeW,3> W(w);
+	Spinor<float4,float4,short4,6,writeV,4> V(v);
+	Reducer<ReduceType, float2, float4> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
+	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float4,6,
+	  Spinor<float4,float4,short4,6,writeX,0>, Spinor<float4,float4,short4,6,writeY,1>,
+	  Spinor<float4,float4,short4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>,
+	  Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
+	  reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce.apply(*blas::getStream());
+      } else if (x.Nspin() == 1) {//staggered
+	Spinor<float2,float2,short2,3,writeX,0> X(x);
+	Spinor<float2,float2,short2,3,writeY,1> Y(y);
+	Spinor<float2,float2,short2,3,writeZ,2> Z(z);
+	Spinor<float2,float2,short2,3,writeW,3> W(w);
+	Spinor<float2,float2,short2,3,writeV,4> V(v);
+	Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
+	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,3,
+	  Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
+	  Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
+	  Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
+	  reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce.apply(*blas::getStream());
+      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+      blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
+    }
+  } else { // fields are on the CPU
+    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+      ColorSpinorFieldOrder<double> *X = createOrder<double>(x);
+      ColorSpinorFieldOrder<double> *Y = createOrder<double>(y);
+      ColorSpinorFieldOrder<double> *Z = createOrder<double>(z);
+      ColorSpinorFieldOrder<double> *W = createOrder<double>(w);
+      ColorSpinorFieldOrder<double> *V = createOrder<double>(v);
+      Reducer<ReduceType,double2, double2> r(a, b);
+      value = genericReduce<ReduceType,double2>(*X, *Y, *Z, *W, *V, r);
+      delete X;
+      delete Y;
+      delete Z;
+      delete W;
+      delete V;
+    } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+      ColorSpinorFieldOrder<float> *X = createOrder<float>(x);
+      ColorSpinorFieldOrder<float> *Y = createOrder<float>(y);
+      ColorSpinorFieldOrder<float> *Z = createOrder<float>(z);
+      ColorSpinorFieldOrder<float> *W = createOrder<float>(w);
+      ColorSpinorFieldOrder<float> *V = createOrder<float>(v);
+      Reducer<ReduceType,float2, float2> 
+	r(make_float2(a.x,a.y), make_float2(b.x,b.y));
+      value = genericReduce<ReduceType,float2>(*X, *Y, *Z, *W, *V, r);
+      delete X;
+      delete Y;
+      delete Z;
+      delete W;
+      delete V;
+    } else {
+      errorQuda("Not implemented");
+    }
   }
-  blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
-  blas_flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x.RealLength();
-
+  blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
+  blas::flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x.RealLength();
+    
   checkCudaError();
 
   return value;

@@ -117,7 +117,7 @@ void loadTest() {
 #endif
   }
 
-  for (int i=0; i<Nvec; i++) printfQuda("Vector %d has norm = %e\n", i, norm2(*W[i]));
+  for (int i=0; i<Nvec; i++) printfQuda("Vector %d has norm = %e\n", i, blas::norm2(*W[i]));
 
 
   int geom_bs[] = {4, 4, 4, 4};
@@ -153,8 +153,8 @@ void loadTest() {
   for (int i=0; i<Nvec; i++) {
     T.R(Wcoarse,*W[i]);
     T.P(Wfine, Wcoarse);
-    axpyCpu(-1.0, *W[i], Wfine);
-    printfQuda("%d Absolute Norm^2 of the difference = %e\n", i, norm2(Wfine));
+    blas::axpy(-1.0, *W[i], Wfine);
+    printfQuda("%d Absolute Norm^2 of the difference = %e\n", i, blas::norm2(Wfine));
     //Wfine.Compare(Wfine,*W[i]); // strong check
   }
 

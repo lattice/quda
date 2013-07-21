@@ -240,6 +240,12 @@ namespace quda {
     const void* Ghost(const int i) const;
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
+    
+    virtual const ColorSpinorField& Even() const { errorQuda("Not implemented"); return *this;}
+    virtual const ColorSpinorField& Odd() const { errorQuda("Not implemented"); return *this; }
+
+    virtual ColorSpinorField& Even() { errorQuda("Not implemented"); return *this; }
+    virtual ColorSpinorField& Odd() { errorQuda("Not implemented"); return *this; }
 
     /** 
      * Compute the n-dimensional site index given the 1-d offset index
@@ -337,8 +343,11 @@ namespace quda {
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
 #endif
 
-    cudaColorSpinorField& Even() const;
-    cudaColorSpinorField& Odd() const;
+    const ColorSpinorField& Even() const;
+    const ColorSpinorField& Odd() const;
+
+    ColorSpinorField& Even();
+    ColorSpinorField& Odd();
 
     void zero();
 
@@ -420,6 +429,30 @@ namespace quda {
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c);
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol);
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
+
+  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b) {
+    QudaFieldLocation location;
+    if (a.Location() == b.Location()) location = a.Location();
+    else errorQuda("Locations do not match");
+    return location;
+  }
+
+  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b, 
+				    const ColorSpinorField &c) {
+    return static_cast<QudaFieldLocation>(Location(a,b) & Location(b,c));
+  }
+
+  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b,
+				    const ColorSpinorField &c, const ColorSpinorField &d) {
+    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d));
+  }
+
+  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b, 
+				    const ColorSpinorField &c, const ColorSpinorField &d, 
+				    const ColorSpinorField &e) {
+    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d) & Location(a,e));
+  }
+
 
 } // namespace quda
 

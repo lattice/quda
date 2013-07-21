@@ -22,7 +22,7 @@ namespace quda {
   double resNorm(const DiracMatrix &mat, cudaColorSpinorField &b, cudaColorSpinorField &x) {  
     cudaColorSpinorField r(b);
     mat(r, x);
-    return xmyNormCuda(b, r);
+    return blas::xmyNorm(b, r);
   }
 
 
@@ -92,12 +92,12 @@ namespace quda {
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, y);
-      r2 = xmyNormCuda(b, r);
-      b2 = normCuda(b);
-      copyCuda(y, x);
+      r2 = blas::xmyNorm(b, r);
+      b2 = blas::norm2(b);
+      blas::copy(y, x);
     } else {
-      copyCuda(r, b);
-      r2 = normCuda(b);
+      blas::copy(r, b);
+      r2 = blas::norm2(b);
       b2 = r2;
     }
 
@@ -116,7 +116,7 @@ namespace quda {
       x_sloppy = &x;
       r_sloppy = &r;
       r_0 = &b;
-      zeroCuda(*x_sloppy);
+      blas::zero(*x_sloppy);
     } else {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -139,7 +139,7 @@ namespace quda {
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    double heavy_quark_res = use_heavy_quark_res ? sqrt(HeavyQuarkResidualNormCuda(x,r).z) : 0.0;
+    double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
     int heavy_quark_check = 10; // how often to check the heavy quark residual
 
     double delta = param.delta;
@@ -164,7 +164,7 @@ namespace quda {
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
     
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
-      quda::blas_flops = 0;    
+      blas::flops = 0;    
     }
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
@@ -175,12 +175,12 @@ namespace quda {
     
       if (k==0) {
 	rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
-	copyCuda(p, rSloppy);
+	blas::copy(p, rSloppy);
       } else {
 	if (abs(rho*alpha) == 0.0) beta = 0.0;
 	else beta = (rho/rho0) * (alpha/omega);
 
-	cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
+	blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
       }
     
       if (param.inv_type_precondition == QUDA_MR_INVERTER) {
@@ -192,10 +192,10 @@ namespace quda {
       }
 
       if (abs(rho) == 0.0) alpha = 0.0;
-      else alpha = rho / cDotProductCuda(r0, v);
+      else alpha = rho / blas::cDotProduct(r0, v);
 
       // r -= alpha*v
-      caxpyCuda(-alpha, v, rSloppy);
+      blas::caxpy(-alpha, v, rSloppy);
 
       if (param.inv_type_precondition == QUDA_MR_INVERTER) {
 	errorQuda("Temporary disabled");
@@ -206,18 +206,18 @@ namespace quda {
       }
     
       // omega = (t, r) / (t, t)
-      omega_t2 = cDotProductNormACuda(t, rSloppy);
+      omega_t2 = blas::cDotProductNormA(t, rSloppy);
       omega = quda::Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
       if (param.inv_type_precondition == QUDA_MR_INVERTER) {
 	//x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
-	caxpyCuda(alpha, w, xSloppy);
-	caxpyCuda(omega, z, xSloppy);
-	caxpyCuda(-omega, t, rSloppy);
-	rho_r2 = cDotProductNormBCuda(r0, rSloppy);
+	blas::caxpy(alpha, w, xSloppy);
+	blas::caxpy(omega, z, xSloppy);
+	blas::caxpy(-omega, t, rSloppy);
+	rho_r2 = blas::cDotProductNormB(r0, rSloppy);
       } else {
 	//x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
-	rho_r2 = caxpbypzYmbwcDotProductUYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
+	rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, rSloppy, xSloppy, t, r0);
       }
 
       rho0 = rho;
@@ -225,8 +225,8 @@ namespace quda {
       r2 = rho_r2.z;
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	copyCuda(tmp,y);
-	heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	blas::copy(tmp,y);
+	heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
       }
 
       // reliable updates
@@ -239,15 +239,15 @@ namespace quda {
       int updateR = (rNorm < delta*maxrr) ? 1 : 0;
 
       if (updateR) {
-	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
+	if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
       
-	xpyCuda(x, y); // swap these around?
+	blas::xpy(x, y); // swap these around?
 
 	mat(r, y, x);
-	r2 = xmyNormCuda(b, r);
+	r2 = blas::xmyNorm(b, r);
 
-	if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
-	zeroCuda(xSloppy);
+	if (x.Precision() != rSloppy.Precision()) blas::copy(rSloppy, r);            
+	blas::zero(xSloppy);
 
 	rNorm = sqrt(r2);
 	maxrr = rNorm;
@@ -261,14 +261,14 @@ namespace quda {
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
     }
 
-    if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
-    xpyCuda(y, x);
+    if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
+    blas::xpy(y, x);
 
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
     param.gflops += gflops;
@@ -281,9 +281,9 @@ namespace quda {
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
       // Calculate the true residual
       mat(r, x);
-      param.true_res = sqrt(xmyNormCuda(b, r) / b2);
+      param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
-      param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 #else
       param.true_res_hq = 0.0;
 #endif
@@ -292,7 +292,7 @@ namespace quda {
     }
 
     // reset the flops counters
-    quda::blas_flops = 0;
+    blas::flops = 0;
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();

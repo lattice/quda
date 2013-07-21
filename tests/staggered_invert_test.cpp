@@ -401,7 +401,7 @@ invert_test(void)
 	mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
 	double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
 	double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	double hqr = sqrt(HeavyQuarkResidualNormCpu(*spinorOutArray[i], *ref).z);
+	double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
 	double l2r = sqrt(nrm2/src2);
 
 	printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
@@ -425,7 +425,7 @@ invert_test(void)
     
   if (test_type <=2){
 
-    double hqr = sqrt(HeavyQuarkResidualNormCpu(*out, *ref).z);
+    double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
     double l2r = sqrt(nrm2/src2);
 
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",

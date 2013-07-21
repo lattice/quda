@@ -199,134 +199,134 @@ double benchmark(int kernel, const int niter) {
     switch (kernel) {
 
     case 0:
-      copyCuda(*yD, *hD);
+      blas::copy(*yD, *hD);
       break;
 
     case 1:
-      copyCuda(*yD, *lD);
+      blas::copy(*yD, *lD);
       break;
       
     case 2:
-      axpbyCuda(a, *xD, b, *yD);
+      blas::axpby(a, *xD, b, *yD);
       break;
 
     case 3:
-      xpyCuda(*xD, *yD);
+      blas::xpy(*xD, *yD);
       break;
 
     case 4:
-      axpyCuda(a, *xD, *yD);
+      blas::axpy(a, *xD, *yD);
       break;
 
     case 5:
-      xpayCuda(*xD, a, *yD);
+      blas::xpay(*xD, a, *yD);
       break;
 
     case 6:
-      mxpyCuda(*xD, *yD);
+      blas::mxpy(*xD, *yD);
       break;
 
     case 7:
-      axCuda(a, *xD);
+      blas::ax(a, *xD);
       break;
 
     case 8:
-      caxpyCuda(a2, *xD, *yD);
+      blas::caxpy(a2, *xD, *yD);
       break;
 
     case 9:
-      caxpbyCuda(a2, *xD, b2, *yD);
+      blas::caxpby(a2, *xD, b2, *yD);
       break;
 
     case 10:
-      cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
+      blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
       break;
 
     case 11:
-      axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
+      blas::axpyBzpcx(a, *xD, *yD, b, *zD, c);
       break;
 
     case 12:
-      axpyZpbxCuda(a, *xD, *yD, *zD, b);
+      blas::axpyZpbx(a, *xD, *yD, *zD, b);
       break;
 
     case 13:
-      caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
+      blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
       break;
       
     case 14:
-      cabxpyAxCuda(a, b2, *xD, *yD);
+      blas::cabxpyAx(a, b2, *xD, *yD);
       break;
 
     case 15:
-      caxpbypzCuda(a2, *xD, b2, *yD, *zD);
+      blas::caxpbypz(a2, *xD, b2, *yD, *zD);
       break;
 
     case 16:
-      caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
+      blas::caxpbypczpw(a2, *xD, b2, *yD, c2, *zD, *wD);
       break;
 
     case 17:
-      caxpyXmazCuda(a2, *xD, *yD, *zD);
+      blas::caxpyXmaz(a2, *xD, *yD, *zD);
       break;
 
       // double
     case 18:
-      normCuda(*xD);
+      blas::norm2(*xD);
       break;
 
     case 19:
-      reDotProductCuda(*xD, *yD);
+      blas::reDotProduct(*xD, *yD);
       break;
 
     case 20:
-      axpyNormCuda(a, *xD, *yD);
+      blas::axpyNorm(a, *xD, *yD);
       break;
 
     case 21:
-      xmyNormCuda(*xD, *yD);
+      blas::xmyNorm(*xD, *yD);
       break;
       
     case 22:
-      caxpyNormCuda(a2, *xD, *yD);
+      blas::caxpyNorm(a2, *xD, *yD);
       break;
 
     case 23:
-      caxpyXmazNormXCuda(a2, *xD, *yD, *zD);
+      blas::caxpyXmazNormX(a2, *xD, *yD, *zD);
       break;
 
     case 24:
-      cabxpyAxNormCuda(a, b2, *xD, *yD);
+      blas::cabxpyAxNorm(a, b2, *xD, *yD);
       break;
 
     // double2
     case 25:
-      cDotProductCuda(*xD, *yD);
+      blas::cDotProduct(*xD, *yD);
       break;
 
     case 26:
-      xpaycDotzyCuda(*xD, a, *yD, *zD);
+      blas::xpaycDotzy(*xD, a, *yD, *zD);
       break;
       
     case 27:
-      caxpyDotzyCuda(a2, *xD, *yD, *zD);
+      blas::caxpyDotzy(a2, *xD, *yD, *zD);
       break;
 
     // double3
     case 28:
-      cDotProductNormACuda(*xD, *yD);
+      blas::cDotProductNormA(*xD, *yD);
       break;
 
     case 29:
-      cDotProductNormBCuda(*xD, *yD);
+      blas::cDotProductNormB(*xD, *yD);
       break;
 
     case 30:
-      caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
     case 31:
-      HeavyQuarkResidualNormCuda(*xD, *yD);
+      blas::HeavyQuarkResidualNorm(*xD, *yD);
       break;
 
     default:
@@ -345,7 +345,7 @@ double benchmark(int kernel, const int niter) {
   return secs;
 }
 
-#define ERROR(a) fabs(norm2(*a##D) - norm2(*a##H)) / norm2(*a##H)
+#define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
 
 double test(int kernel) {
 
@@ -357,78 +357,78 @@ double test(int kernel) {
 
   case 0:
     *hD = *hH;
-    copyCuda(*yD, *hD);
-    yH->copy(*hH);
+    blas::copy(*yD, *hD);
+    blas::copy(*yH, *hH);
     error = ERROR(y);
     break;
 
   case 1:
     *lD = *lH;
-    copyCuda(*yD, *lD);
-    yH->copy(*lH);
+    blas::copy(*yD, *lD);
+    blas::copy(*yH, *lH);
     error = ERROR(y);
     break;
       
   case 2:
     *xD = *xH;
     *yD = *yH;
-    axpbyCuda(a, *xD, b, *yD);
-    axpbyCpu(a, *xH, b, *yH);
+    blas::axpby(a, *xD, b, *yD);
+    blas::axpby(a, *xH, b, *yH);
     error = ERROR(y);
     break;
 
   case 3:
     *xD = *xH;
     *yD = *yH;
-    xpyCuda(*xD, *yD);
-    xpyCpu(*xH, *yH);
+    blas::xpy(*xD, *yD);
+    blas::xpy(*xH, *yH);
     error = ERROR(y);
     break;
 
   case 4:
     *xD = *xH;
     *yD = *yH;
-    axpyCuda(a, *xD, *yD);
-    axpyCpu(a, *xH, *yH);
+    blas::axpy(a, *xD, *yD);
+    blas::axpy(a, *xH, *yH);
     error = ERROR(y);
     break;
 
   case 5:
     *xD = *xH;
     *yD = *yH;
-    xpayCuda(*xD, a, *yD);
-    xpayCpu(*xH, a, *yH);
+    blas::xpay(*xD, a, *yD);
+    blas::xpay(*xH, a, *yH);
     error = ERROR(y);
     break;
 
   case 6:
     *xD = *xH;
     *yD = *yH;
-    mxpyCuda(*xD, *yD);
-    mxpyCpu(*xH, *yH);
+    blas::mxpy(*xD, *yD);
+    blas::mxpy(*xH, *yH);
     error = ERROR(y);
     break;
 
   case 7:
     *xD = *xH;
-    axCuda(a, *xD);
-    axCpu(a, *xH);
+    blas::ax(a, *xD);
+    blas::ax(a, *xH);
     error = ERROR(x);
     break;
 
   case 8:
     *xD = *xH;
     *yD = *yH;
-    caxpyCuda(a2, *xD, *yD);
-    caxpyCpu(a2, *xH, *yH);
+    blas::caxpy(a2, *xD, *yD);
+    blas::caxpy(a2, *xH, *yH);
     error = ERROR(y);
     break;
 
   case 9:
     *xD = *xH;
     *yD = *yH;
-    caxpbyCuda(a2, *xD, b2, *yD);
-    caxpbyCpu(a2, *xH, b2, *yH);
+    blas::caxpby(a2, *xD, b2, *yD);
+    blas::caxpby(a2, *xH, b2, *yH);
     error = ERROR(y);
     break;
 
@@ -436,8 +436,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
-    cxpaypbzCpu(*xH, a2, *yH, b2, *zH);
+    blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
+    blas::cxpaypbz(*xH, a2, *yH, b2, *zH);
     error = ERROR(z);
     break;
 
@@ -445,8 +445,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
-    axpyBzpcxCpu(a, *xH, *yH, b, *zH, c);
+    blas::axpyBzpcx(a, *xD, *yD, b, *zD, c);
+    blas::axpyBzpcx(a, *xH, *yH, b, *zH, c);
     error = ERROR(x) + ERROR(y);
     break;
 
@@ -454,8 +454,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    axpyZpbxCuda(a, *xD, *yD, *zD, b);
-    axpyZpbxCpu(a, *xH, *yH, *zH, b);
+    blas::axpyZpbx(a, *xD, *yD, *zD, b);
+    blas::axpyZpbx(a, *xH, *yH, *zH, b);
     error = ERROR(x) + ERROR(y);
     break;
 
@@ -464,16 +464,16 @@ double test(int kernel) {
     *yD = *yH;
     *zD = *zH;
     *wD = *wH;
-    caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
-    caxpbypzYmbwCpu(a2, *xH, b2, *yH, *zH, *wH);
+    blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
+    blas::caxpbypzYmbw(a2, *xH, b2, *yH, *zH, *wH);
     error = ERROR(z) + ERROR(y);
     break;
       
   case 14:
     *xD = *xH;
     *yD = *yH;
-    cabxpyAxCuda(a, b2, *xD, *yD);
-    cabxpyAxCpu(a, b2, *xH, *yH);
+    blas::cabxpyAx(a, b2, *xD, *yD);
+    blas::cabxpyAx(a, b2, *xH, *yH);
     error = ERROR(y) + ERROR(x);
     break;
 
@@ -481,8 +481,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {caxpbypzCuda(a2, *xD, b2, *yD, *zD);
-      caxpbypzCpu(a2, *xH, b2, *yH, *zH);
+    {blas::caxpbypz(a2, *xD, b2, *yD, *zD);
+      blas::caxpbypz(a2, *xH, b2, *yH, *zH);
       error = ERROR(z); }
     break;
     
@@ -491,8 +491,8 @@ double test(int kernel) {
     *yD = *yH;
     *zD = *zH;
     *wD = *wH;
-    {caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
-      caxpbypczpwCpu(a2, *xH, b2, *yH, c2, *zH, *wH);
+    {blas::caxpbypczpw(a2, *xD, b2, *yD, c2, *zD, *wD);
+      blas::caxpbypczpw(a2, *xH, b2, *yH, c2, *zH, *wH);
       error = ERROR(w); }
     break;
 
@@ -500,44 +500,44 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {caxpyXmazCuda(a, *xD, *yD, *zD);
-     caxpyXmazCpu(a, *xH, *yH, *zH);
+    {blas::caxpyXmaz(a, *xD, *yD, *zD);
+     blas::caxpyXmaz(a, *xH, *yH, *zH);
      error = ERROR(y) + ERROR(x);}
     break;
 
     // double
   case 18:
     *xD = *xH;
-    error = fabs(normCuda(*xD) - normCpu(*xH)) / normCpu(*xH);
+    error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
     break;
     
   case 19:
     *xD = *xH;
     *yD = *yH;
-    error = fabs(reDotProductCuda(*xD, *yD) - reDotProductCpu(*xH, *yH)) / fabs(reDotProductCpu(*xH, *yH));
+    error = fabs(blas::reDotProduct(*xD, *yD) - blas::reDotProduct(*xH, *yH)) / fabs(blas::reDotProduct(*xH, *yH));
     break;
 
   case 20:
     *xD = *xH;
     *yD = *yH;
-    {double d = axpyNormCuda(a, *xD, *yD);
-    double h = axpyNormCpu(a, *xH, *yH);
+    {double d = blas::axpyNorm(a, *xD, *yD);
+    double h = blas::axpyNorm(a, *xH, *yH);
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
   case 21:
     *xD = *xH;
     *yD = *yH;
-    {double d = xmyNormCuda(*xD, *yD);
-    double h = xmyNormCpu(*xH, *yH);
+    {double d = blas::xmyNorm(*xD, *yD);
+    double h = blas::xmyNorm(*xH, *yH);
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
     
   case 22:
     *xD = *xH;
     *yD = *yH;
-    {double d = caxpyNormCuda(a, *xD, *yD);
-    double h = caxpyNormCpu(a, *xH, *yH);
+    {double d = blas::caxpyNorm(a, *xD, *yD);
+    double h = blas::caxpyNorm(a, *xH, *yH);
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
@@ -545,16 +545,16 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {double d = caxpyXmazNormXCuda(a, *xD, *yD, *zD);
-      double h = caxpyXmazNormXCpu(a, *xH, *yH, *zH);
+    {double d = blas::caxpyXmazNormX(a, *xD, *yD, *zD);
+      double h = blas::caxpyXmazNormX(a, *xH, *yH, *zH);
       error = ERROR(y) + ERROR(x) + fabs(d-h)/fabs(h);}
     break;
 
   case 24:
     *xD = *xH;
     *yD = *yH;
-    {double d = cabxpyAxNormCuda(a, b2, *xD, *yD);
-      double h = cabxpyAxNormCpu(a, b2, *xH, *yH);
+    {double d = blas::cabxpyAxNorm(a, b2, *xD, *yD);
+      double h = blas::cabxpyAxNorm(a, b2, *xH, *yH);
       error = ERROR(x) + ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
@@ -562,16 +562,16 @@ double test(int kernel) {
   case 25:
     *xD = *xH;
     *yD = *yH;
-    error = abs(cDotProductCuda(*xD, *yD) - cDotProductCpu(*xH, *yH)) / abs(cDotProductCpu(*xH, *yH));
+    error = abs(blas::cDotProduct(*xD, *yD) - blas::cDotProduct(*xH, *yH)) / abs(blas::cDotProduct(*xH, *yH));
     break;
     
   case 26:
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    { quda::Complex d = xpaycDotzyCuda(*xD, a, *yD, *zD);
-      quda::Complex h = xpaycDotzyCpu(*xH, a, *yH, *zH);
-      error =  fabs(norm2(*yD) - norm2(*yH)) / norm2(*yH) + abs(d-h)/abs(h);
+    { quda::Complex d = blas::xpaycDotzy(*xD, a, *yD, *zD);
+      quda::Complex h = blas::xpaycDotzy(*xH, a, *yH, *zH);
+      error =  fabs(blas::norm2(*yD) - blas::norm2(*yH)) / blas::norm2(*yH) + abs(d-h)/abs(h);
     }
     break;
     
@@ -579,8 +579,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {quda::Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
-      quda::Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
+    {quda::Complex d = blas::caxpyDotzy(a, *xD, *yD, *zD);
+      quda::Complex h = blas::caxpyDotzy(a, *xH, *yH, *zH);
     error = ERROR(y) + abs(d-h)/abs(h);}
     break;
 
@@ -588,16 +588,16 @@ double test(int kernel) {
   case 28:
     *xD = *xH;
     *yD = *yH;
-    { double3 d = cDotProductNormACuda(*xD, *yD);
-      double3 h = cDotProductNormACpu(*xH, *yH);
+    { double3 d = blas::cDotProductNormA(*xD, *yD);
+      double3 h = blas::cDotProductNormA(*xH, *yH);
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
     
   case 29:
     *xD = *xH;
     *yD = *yH;
-    { double3 d = cDotProductNormBCuda(*xD, *yD);
-      double3 h = cDotProductNormBCpu(*xH, *yH);
+    { double3 d = blas::cDotProductNormB(*xD, *yD);
+      double3 h = blas::cDotProductNormB(*xH, *yH);
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
     
@@ -607,8 +607,8 @@ double test(int kernel) {
     *zD = *zH;
     *wD = *wH;
     *vD = *vH;
-    { double3 d = caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
-      double3 h = caxpbypzYmbwcDotProductUYNormYCpu(a2, *xH, b2, *yH, *zH, *wH, *vH);
+    { double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xH, b2, *yH, *zH, *wH, *vH);
       error = ERROR(z) + ERROR(y) + fabs(d.x - h.x) / fabs(h.x) + 
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
@@ -616,8 +616,8 @@ double test(int kernel) {
   case 31:
     *xD = *xH;
     *yD = *yH;
-    { double3 d = HeavyQuarkResidualNormCuda(*xD, *yD);
-      double3 h = HeavyQuarkResidualNormCpu(*xH, *yH);
+    { double3 d = blas::HeavyQuarkResidualNorm(*xD, *yD);
+      double3 h = blas::HeavyQuarkResidualNorm(*xH, *yH);
       error = fabs(d.x - h.x) / fabs(h.x) + 
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
@@ -689,7 +689,7 @@ int main(int argc, char** argv)
 #endif
 
   // enable the tuning
-  quda::setBlasTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO, QUDA_SILENT);
+  quda::blas::setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO, QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
 
@@ -704,13 +704,13 @@ int main(int argc, char** argv)
       benchmark(kernel, 1);
     
       // now rerun with more iterations to get accurate speed measurements
-      quda::blas_flops = 0;
-      quda::blas_bytes = 0;
+      quda::blas::flops = 0;
+      quda::blas::bytes = 0;
       
       double secs = benchmark(kernel, niter);
       
-      double gflops = (quda::blas_flops*1e-9)/(secs);
-      double gbytes = quda::blas_bytes/(secs*1e9);
+      double gflops = (quda::blas::flops*1e-9)/(secs);
+      double gbytes = quda::blas::bytes/(secs*1e9);
     
       printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
     }
