@@ -2,6 +2,8 @@
 
 namespace quda {
 
+  using namespace gauge;
+
   /**
      Kernel argument struct
    */

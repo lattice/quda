@@ -356,21 +356,10 @@ namespace quda {
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
   };
 
-  // Forward declaration of accessor functors
-  template <typename Float> class ColorSpinorFieldOrder;
-  template <typename Float> class SpaceColorSpinOrder;
-  template <typename Float> class SpaceSpinColorOrder;
-  template <typename Float> class QOPDomainWallOrder;
-
   // CPU implementation
   class cpuColorSpinorField : public ColorSpinorField {
 
     friend class cudaColorSpinorField;
-    friend class Transfer; // to allow access to the order functors
-
-    template <typename Float> friend class SpaceColorSpinOrder;
-    template <typename Float> friend class SpaceSpinColorOrder;
-    template <typename Float> friend class QOPDomainWallOrder;
 
   public:
     static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; //cpu memory

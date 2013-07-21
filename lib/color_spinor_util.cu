@@ -3,6 +3,8 @@
 
 namespace quda {
 
+  using namespace colorspinor;
+
   // Random number insertion over all field elements
   template <class T>
   void random(T &t) {

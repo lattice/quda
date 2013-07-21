@@ -1,6 +1,9 @@
 #include <gauge_field_order.h>
 
 namespace quda {
+
+  using namespace gauge;
+
   template <typename Order, int nDim>
   struct ExtractGhostArg {
     Order order;

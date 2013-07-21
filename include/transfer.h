@@ -95,13 +95,6 @@ namespace quda {
      */
     void createSpinMap(int spin_bs);
 
-    /** The single-precision accessor class */
-    ColorSpinorFieldOrder<double> *order_double;
-
-    /** The double-precision accessor class */
-    ColorSpinorFieldOrder<float> *order_single;
-
-
   public:
 
     /** 

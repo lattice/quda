@@ -4,6 +4,8 @@
 
 namespace quda {
 
+  using namespace quda::colorspinor;
+
   // Applies the grid prolongation operator (coarse to fine)
   template <class FineSpinor, class CoarseSpinor>
   void prolongate(FineSpinor &out, const CoarseSpinor &in, const int *geo_map, const int *spin_map) {

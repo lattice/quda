@@ -24,6 +24,8 @@
 
 namespace quda {
 
+  using namespace colorspinor;
+
   /** Straight copy with no basis change */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc>
     class PreserveBasis {
