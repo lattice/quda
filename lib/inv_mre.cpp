@@ -29,11 +29,11 @@ namespace quda {
     
     // if no guess is required, then set initial guess = 0
     if (N == 0) {
-      zeroCuda(x);
+      blas::zero(x);
       return;
     }
 
-    double b2 = norm2(b);
+    double b2 = blas::norm2(b);
 
     // Array to hold the matrix elements
     Complex **G = new Complex*[N];
@@ -45,25 +45,25 @@ namespace quda {
 
     // Orthonormalise the vector basis
     for (int i=0; i<N; i++) {
-      double p2 = norm2(*p[i]);
-      axCuda(1 / sqrt(p2), *p[i]);
+      double p2 = blas::norm2(*p[i]);
+      blas::ax(1 / sqrt(p2), *p[i]);
       for (int j=i+1; j<N; j++) {
-	Complex xp = cDotProductCuda(*p[i], *p[j]);
-	caxpyCuda(-xp, *p[i], *p[j]);
+	Complex xp = blas::cDotProduct(*p[i], *p[j]);
+	blas::caxpy(-xp, *p[i], *p[j]);
       }
     }
 
     // Perform sparse matrix multiplication and construct rhs
     for (int i=0; i<N; i++) {
-      beta[i] = cDotProductCuda(*p[i], b);
+      beta[i] = blas::cDotProduct(*p[i], b);
       mat(*q[i], *p[i]);
-      G[i][i] = reDotProductCuda(*q[i], *p[i]);
+      G[i][i] = blas::reDotProduct(*q[i], *p[i]);
     }
 
     // Construct the matrix
     for (int j=0; j<N; j++) {
       for (int k=j+1; k<N; k++) {
-	G[j][k] = cDotProductCuda(*p[j], *q[k]);
+	G[j][k] = blas::cDotProduct(*p[j], *q[k]);
 	G[k][j] = conj(G[j][k]);
       }
     }
@@ -88,17 +88,17 @@ namespace quda {
     }
 
     // Use Gaussian Elimination to solve equations and calculate initial guess
-    zeroCuda(x);
+    blas::zero(x);
     for (int i=N-1; i>=0; i--) {
       alpha[i] = 0.0;
       for (int j=i+1; j<N; j++) alpha[i] += G[i][j] * alpha[j];
       alpha[i] = (beta[i]-alpha[i])/G[i][i];
-      caxpyCuda(alpha[i], *p[i], x);
-      caxpyCuda(-alpha[i], *q[i], b);
+      blas::caxpy(alpha[i], *p[i], x);
+      blas::caxpy(-alpha[i], *q[i], b);
       //printfQuda("%d %e %e\n", i, real(alpha[i]), imag(alpha[i]));
     }
 
-    double rsd = sqrt(norm2(b) / b2 );
+    double rsd = sqrt(blas::norm2(b) / b2 );
     printfQuda("MinResExt: N = %d, |res| / |src| = %e\n", N, rsd);
     
     for (int j=0; j<N; j++) delete [] G[j];

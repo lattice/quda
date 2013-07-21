@@ -305,7 +305,7 @@ void initQudaMemory()
   checkCudaError();
   createDslashEvents();
 
-  initBlas();
+  blas::init();
 
   loadTuneCache(getVerbosity());
 }
@@ -642,7 +642,7 @@ void endQuda(void)
   freeGaugeQuda();
   freeCloverQuda();
 
-  endBlas();
+  blas::end();
 
   if (streams) {
     for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
@@ -794,7 +794,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
-      double nin = norm2(b);
+      double nin = blas::norm2(b);
       printfQuda("Mass rescale: norm of source in = %g\n", nin);
     }
  
@@ -810,27 +810,27 @@ namespace quda {
     case QUDA_MAT_SOLUTION:
       if (mass_normalization == QUDA_MASS_NORMALIZATION ||
 	  mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	axCuda(2.0*kappa, b);
+	blas::ax(2.0*kappa, b);
       }
       break;
     case QUDA_MATDAG_MAT_SOLUTION:
       if (mass_normalization == QUDA_MASS_NORMALIZATION ||
 	  mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	axCuda(4.0*kappa*kappa, b);
+	blas::ax(4.0*kappa*kappa, b);
       }
       break;
     case QUDA_MATPC_SOLUTION:
       if (mass_normalization == QUDA_MASS_NORMALIZATION) {
-	axCuda(4.0*kappa*kappa, b);
+	blas::ax(4.0*kappa*kappa, b);
       } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	axCuda(2.0*kappa, b);
+	blas::ax(2.0*kappa, b);
       }
       break;
     case QUDA_MATPCDAG_MATPC_SOLUTION:
       if (mass_normalization == QUDA_MASS_NORMALIZATION) {
-	axCuda(16.0*pow(kappa,4), b);
+	blas::ax(16.0*pow(kappa,4), b);
       } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-	axCuda(4.0*kappa*kappa, b);
+	blas::ax(4.0*kappa*kappa, b);
       }
       break;
     default:
@@ -841,7 +841,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
       printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
-      double nin = norm2(b);
+      double nin = blas::norm2(b);
       printfQuda("Mass rescale: norm of source out = %g\n", nin);
     }
 
@@ -918,8 +918,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   cudaColorSpinorField in(*in_h, cudaParam);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*in_h);
-    double gpu = norm2(in);
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -932,7 +932,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     } else {
       parity = QUDA_EVEN_PARITY;
     }
-    axCuda(gaugePrecise->Anisotropy(), in);
+    blas::ax(gaugePrecise->Anisotropy(), in);
   }
   bool pc = true;
 
@@ -951,8 +951,8 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   *out_h = out;
   
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*out_h);
-    double gpu = norm2(out);
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -985,8 +985,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaColorSpinorField in(*in_h, cudaParam);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*in_h);
-    double gpu = norm2(in);
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -1003,14 +1003,14 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   double kappa = inv_param->kappa;
   if (pc) {
     if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
-      axCuda(0.25/(kappa*kappa), out);
+      blas::ax(0.25/(kappa*kappa), out);
     } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-      axCuda(0.5/kappa, out);
+      blas::ax(0.5/kappa, out);
     }
   } else {
     if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION ||
 	inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-      axCuda(0.5/kappa, out);
+      blas::ax(0.5/kappa, out);
     }
   }
 
@@ -1022,8 +1022,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   *out_h = out;
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*out_h);
-    double gpu = norm2(out);
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -1058,8 +1058,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   cudaColorSpinorField in(*in_h, cudaParam);
   
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*in_h);
-    double gpu = norm2(in);
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -1079,14 +1079,14 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   double kappa = inv_param->kappa;
   if (pc) {
     if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION) {
-      axCuda(1.0/pow(2.0*kappa,4), out);
+      blas::ax(1.0/pow(2.0*kappa,4), out);
     } else if (inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-      axCuda(0.25/(kappa*kappa), out);
+      blas::ax(0.25/(kappa*kappa), out);
     }
   } else {
     if (inv_param->mass_normalization == QUDA_MASS_NORMALIZATION ||
 	inv_param->mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-      axCuda(0.25/(kappa*kappa), out);
+      blas::ax(0.25/(kappa*kappa), out);
     }
   }
 
@@ -1098,8 +1098,8 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   *out_h = out;
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*out_h);
-    double gpu = norm2(out);
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -1153,8 +1153,8 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   cudaColorSpinorField in(*in_h, cudaParam);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*in_h);
-    double gpu = norm2(in);
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -1167,7 +1167,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
     } else {
       parity = QUDA_EVEN_PARITY;
     }
-    axCuda(gaugePrecise->Anisotropy(), in);
+    blas::ax(gaugePrecise->Anisotropy(), in);
   }
   bool pc = true;
 
@@ -1186,8 +1186,8 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   *out_h = out;
   
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double cpu = norm2(*out_h);
-    double gpu = norm2(out);
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
@@ -1296,28 +1296,28 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
-  double nb = norm2(*b);
+  double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Solution has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nh_b = norm2(*h_b);
-    double nh_x = norm2(*h_x);
-    double nx = norm2(*x);
+    double nh_b = blas::norm2(*h_b);
+    double nh_x = blas::norm2(*h_x);
+    double nx = blas::norm2(*x);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
     printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
-  axCuda(1.0/sqrt(nb), *b);
-  axCuda(1.0/sqrt(nb), *x);
+  blas::ax(1.0/sqrt(nb), *b);
+  blas::ax(1.0/sqrt(nb), *x);
 
   setDslashTuning(param->tune, getVerbosity());
-  setBlasTuning(param->tune, getVerbosity());
+  blas::setTuning(param->tune, getVerbosity());
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = norm2(*in);
-    double nout = norm2(*out);
+    double nin = blas::norm2(*in);
+    double nout = blas::norm2(*out);
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
@@ -1325,7 +1325,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = norm2(*in);
+    double nin = blas::norm2(*in);
     printfQuda("Prepared source post mass rescale = %g\n", nin);   
   }
   
@@ -1365,7 +1365,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
-    copyCuda(*in, *out);
+    blas::copy(*in, *out);
     solverParam.updateInvertParam(*param);
     delete solve;
   }
@@ -1387,21 +1387,21 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){
-   double nx = norm2(*x);
+    double nx = blas::norm2(*x);
    printfQuda("Solution = %g\n",nx);
   }
   dirac.reconstruct(*x, *b, param->solution_type);
   
   // rescale the solution
-  axCuda(sqrt(nb), *x);
+  blas::ax(sqrt(nb), *x);
 
   profileInvert.Start(QUDA_PROFILE_D2H);
   *h_x = *x;
   profileInvert.Stop(QUDA_PROFILE_D2H);
   
   if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = norm2(*x);
-    double nh_x = norm2(*h_x);
+    double nx = blas::norm2(*x);
+    double nh_x = blas::norm2(*h_x);
     printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
   }
   
@@ -1563,18 +1563,18 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   // Check source norms
-  double nb = norm2(*b);
+  double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Solution has zero norm");
 
   if(getVerbosity() >= QUDA_VERBOSE ) {
-    double nh_b = norm2(*h_b);
+    double nh_b = blas::norm2(*h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
   // rescale the source vector to help prevent the onset of underflow
-  axCuda(1.0/sqrt(nb), *b);
+  blas::ax(1.0/sqrt(nb), *b);
 
   setDslashTuning(param->tune, getVerbosity());
-  setBlasTuning(param->tune, getVerbosity());
+  blas::setTuning(param->tune, getVerbosity());
   
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];
@@ -1609,7 +1609,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     dirac.setMass(sqrt(param->offset[i]/4));  
     DiracMdagM m(dirac);
     MinResExt mre(m, profileMulti);
-    copyCuda(tmp, *b);
+    blas::copy(tmp, *b);
     mre(*x[i], tmp, z, q, param -> num_offset);
     dirac.setMass(sqrt(param->offset[0]/4));  
   }
@@ -1682,10 +1682,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
     // rescale the solution 
-    axCuda(sqrt(nb), *x[i]);
+    blas::ax(sqrt(nb), *x[i]);
 
     if (getVerbosity() >= QUDA_VERBOSE){
-      double nx = norm2(*x[i]);
+      double nx = blas::norm2(*x[i]);
       printfQuda("Solution %d = %g\n", i, nx);
     }
 

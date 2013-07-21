@@ -63,7 +63,7 @@ namespace quda {
  
     if (num_offset == 0) return;
 
-    const double b2 = normCuda(b);
+    const double b2 = blas::norm2(b);
     // Check to see that we're not trying to invert on a zero-field source
     if(b2 == 0){
       profile.Stop(QUDA_PROFILE_INIT);
@@ -111,7 +111,7 @@ namespace quda {
     if (param.precision_sloppy == x[0]->Precision()) {
       for (int i=0; i<num_offset; i++){
 	x_sloppy[i] = x[i];
-	zeroCuda(*x_sloppy[i]);
+	blas::zero(*x_sloppy[i]);
       }
       r_sloppy = r;
     } else {
@@ -164,7 +164,7 @@ namespace quda {
     
     int k = 0;
     int rUpdate = 0;
-    quda::blas_flops = 0;
+    blas::flops = 0;
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
@@ -175,15 +175,15 @@ namespace quda {
     while (r2[0] > stop[0] &&  k < param.maxiter) {
       matSloppy(*Ap, *p[0], tmp1, tmp2);
       // FIXME - this should be curried into the Dirac operator
-      if (r->Nspin()==4) axpyCuda(offset[0], *p[0], *Ap); 
+      if (r->Nspin()==4) blas::axpy(offset[0], *p[0], *Ap); 
 
-      pAp = reDotProductCuda(*p[0], *Ap);
+      pAp = blas::reDotProduct(*p[0], *Ap);
 
       // compute zeta and alpha
       updateAlphaZeta(alpha, zeta, zeta_old, r2, beta, pAp, offset, num_offset_now, j_low);
 	
       r2_old = r2[0];
-      Complex cg_norm = axpyCGNormCuda(-alpha[j_low], *Ap, *r_sloppy);
+      Complex cg_norm = blas::axpyCGNorm(-alpha[j_low], *Ap, *r_sloppy);
       r2[0] = real(cg_norm);
       double zn = imag(cg_norm);
 
@@ -205,28 +205,28 @@ namespace quda {
 	//beta[0] = r2[0] / r2_old;	
 	beta[0] = zn / r2_old;
 	// update p[0] and x[0]
-	axpyZpbxCuda(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
+	blas::axpyZpbx(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
 
 	for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
 	  // update p[i] and x[i]
-	  axpyBzpcxCuda(alpha[j], *p[j], *x_sloppy[j], zeta[j], *r_sloppy, beta[j]);
+	  blas::axpyBzpcx(alpha[j], *p[j], *x_sloppy[j], zeta[j], *r_sloppy, beta[j]);
 	}
       } else {
 	for (int j=0; j<num_offset_now; j++) {
-	  axpyCuda(alpha[j], *p[j], *x_sloppy[j]);
-	  copyCuda(*x[j], *x_sloppy[j]);
-	  xpyCuda(*x[j], *y[j]);
+	  blas::axpy(alpha[j], *p[j], *x_sloppy[j]);
+	  blas::copy(*x[j], *x_sloppy[j]);
+	  blas::xpy(*x[j], *y[j]);
 	}
 
 	mat(*r, *y[0], *x[0]); // here we can use x as tmp
-	if (r->Nspin()==4) axpyCuda(offset[0], *y[0], *r);
+	if (r->Nspin()==4) blas::axpy(offset[0], *y[0], *r);
 
-	r2[0] = xmyNormCuda(b, *r);
+	r2[0] = blas::xmyNorm(b, *r);
 	for (int j=1; j<num_offset_now; j++) r2[j] = zeta[j] * zeta[j] * r2[0];
-	for (int j=0; j<num_offset_now; j++) zeroCuda(*x_sloppy[j]);
+	for (int j=0; j<num_offset_now; j++) blas::zero(*x_sloppy[j]);
 
-	copyCuda(*r_sloppy, *r);            
+	blas::copy(*r_sloppy, *r);            
 
 	// break-out check if we have reached the limit of the precision
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
@@ -239,10 +239,10 @@ namespace quda {
 
 	// update beta and p
 	beta[0] = r2[0] / r2_old; 
-	xpayCuda(*r_sloppy, beta[0], *p[0]);
+	blas::xpay(*r_sloppy, beta[0], *p[0]);
 	for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
-	  axpbyCuda(zeta[j], *r_sloppy, beta[j], *p[j]);
+	  blas::axpby(zeta[j], *r_sloppy, beta[j], *p[j]);
 	}    
 
 	// update reliable update parameters for the system that triggered the update
@@ -272,8 +272,8 @@ namespace quda {
     
     
     for (int i=0; i<num_offset; i++) {
-      copyCuda(*x[i], *x_sloppy[i]);
-      if (reliable) xpyCuda(*y[i], *x[i]);
+      blas::copy(*x[i], *x_sloppy[i]);
+      if (reliable) blas::xpy(*y[i], *x[i]);
     }
 
     profile.Stop(QUDA_PROFILE_COMPUTE);
@@ -282,7 +282,7 @@ namespace quda {
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
     
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
@@ -290,14 +290,14 @@ namespace quda {
     for(int i=0; i < num_offset; i++) { 
       mat(*r, *x[i]); 
       if (r->Nspin()==4) {
-	axpyCuda(offset[i], *x[i], *r); // Offset it.
+	blas::axpy(offset[i], *x[i], *r); // Offset it.
       } else if (i!=0) {
-	axpyCuda(offset[i]-offset[0], *x[i], *r); // Offset it.
+	blas::axpy(offset[i]-offset[0], *x[i], *r); // Offset it.
       }
-      double true_res = xmyNormCuda(b, *r);
+      double true_res = blas::xmyNorm(b, *r);
       param.true_res_offset[i] = sqrt(true_res/b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
-      param.true_res_hq_offset[i] = sqrt(HeavyQuarkResidualNormCuda(*x[i], *r).z);
+      param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
 #else
       param.true_res_hq_offset[i] = 0.0;
 #endif   
@@ -312,7 +312,7 @@ namespace quda {
     }      
   
     // reset the flops counters
-    quda::blas_flops = 0;
+    blas::flops = 0;
     mat.flops();
     matSloppy.flops();
 

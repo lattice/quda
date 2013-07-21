@@ -334,7 +334,7 @@ namespace quda {
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.Gauge_p();
     cudaColorSpinorField b(spinor_param);
-    return norm2(b);
+    return blas::norm2(b);
   }
 
 } // namespace quda

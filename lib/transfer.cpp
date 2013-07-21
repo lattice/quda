@@ -57,7 +57,7 @@ namespace quda {
 
     // orthogonalize the blocks
     BlockOrthogonalize(*V, Nvec, geo_bs, geo_map, spin_bs);
-    printfQuda("V block orthonormal check %g\n", norm2(*V));
+    printfQuda("V block orthonormal check %g\n", blas::norm2(*V));
   }
 
   Transfer::~Transfer() {

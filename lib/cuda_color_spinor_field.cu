@@ -324,22 +324,28 @@ namespace quda {
 
   }
 
-  cudaColorSpinorField& cudaColorSpinorField::Even() const { 
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      return *(dynamic_cast<cudaColorSpinorField*>(even)); 
-    }
-
-    errorQuda("Cannot return even subset of %d subset", siteSubset);
-    exit(-1);
+  const ColorSpinorField& cudaColorSpinorField::Even() const { 
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    return *even;
   }
 
-  cudaColorSpinorField& cudaColorSpinorField::Odd() const {
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      return *(dynamic_cast<cudaColorSpinorField*>(odd)); 
-    }
+  const ColorSpinorField& cudaColorSpinorField::Odd() const {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    return *odd;
+  }
 
-    errorQuda("Cannot return odd subset of %d subset", siteSubset);
-    exit(-1);
+  ColorSpinorField& cudaColorSpinorField::Even() { 
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    return *even;
+  }
+
+  ColorSpinorField& cudaColorSpinorField::Odd() {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET) 
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    return *odd;
   }
 
   // cuda's floating point format, IEEE-754, represents the floating point
@@ -360,7 +366,7 @@ namespace quda {
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
     checkField(*this, src);
-    copyCuda(*this, src);
+    blas::copy(*this, src);
   }
 
   void cudaColorSpinorField::copySpinorField(const ColorSpinorField &src) {

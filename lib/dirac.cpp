@@ -56,15 +56,18 @@ namespace quda {
     return *this;
   }
 
-  bool Dirac::newTmp(cudaColorSpinorField **tmp, const cudaColorSpinorField &a) const {
+  bool Dirac::newTmp(ColorSpinorField **tmp, const ColorSpinorField &a) const {
     if (*tmp) return false;
     ColorSpinorParam param(a);
     param.create = QUDA_ZERO_FIELD_CREATE; // need to zero elements else padded region will be junk
-    *tmp = new cudaColorSpinorField(a, param);
+
+    if (typeid(a) == typeid(cudaColorSpinorField)) *tmp = new cudaColorSpinorField(a, param);
+    else *tmp = new cpuColorSpinorField(param);
+
     return true;
   }
 
-  void Dirac::deleteTmp(cudaColorSpinorField **a, const bool &reset) const {
+  void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
     if (reset) {
       delete *a;
       *a = NULL;
@@ -73,7 +76,7 @@ namespace quda {
 
 #define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
 
-  void Dirac::Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void Dirac::Mdag(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     flip(dagger);
     M(out, in);
@@ -82,7 +85,7 @@ namespace quda {
 
 #undef flip
 
-  void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void Dirac::checkParitySpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || 
 	out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) {
@@ -119,7 +122,7 @@ namespace quda {
     }
   }
 
-  void Dirac::checkFullSpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void Dirac::checkFullSpinor(const ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (in.SiteSubset() != QUDA_FULL_SITE_SUBSET || out.SiteSubset() != QUDA_FULL_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not full fields: in = %d, out = %d", 
@@ -127,7 +130,7 @@ namespace quda {
     } 
   }
 
-  void Dirac::checkSpinorAlias(const cudaColorSpinorField &a, const cudaColorSpinorField &b) const {
+  void Dirac::checkSpinorAlias(const ColorSpinorField &a, const ColorSpinorField &b) const {
     if (a.V() == b.V()) errorQuda("Aliasing pointers");
   }
 

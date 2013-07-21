@@ -144,7 +144,7 @@ namespace quda {
   DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2) 
     : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2) { }
 
-    void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       errorQuda("FIXME - generalize dirac operator interface");
       t->P(tmp, in);
@@ -152,7 +152,7 @@ namespace quda {
       t->R(out, tmp2);
     }
 
-    void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, cudaColorSpinorField &tmp3) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp3) const
     {
       errorQuda("FIXME - generalize dirac operator interface");
       dirac->tmp1 = &tmp3;
@@ -162,8 +162,8 @@ namespace quda {
       dirac->tmp1 = NULL;
     }
 
-    void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-		    cudaColorSpinorField &tmp3, cudaColorSpinorField &tmp4) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+		    ColorSpinorField &tmp3, ColorSpinorField &tmp4) const
     {
       errorQuda("FIXME - generalize dirac operator interface");
       dirac->tmp1 = &tmp3;

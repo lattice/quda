@@ -11,7 +11,7 @@ TESTS = su3_test blas_test dslash_test invert_test $(DIRAC_TEST)	\
 	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)     \
 	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
 	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)		\
-	multigrid_test
+	multigrid_test pack_test
 
 all: $(TESTS)
 

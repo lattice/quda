@@ -229,8 +229,8 @@ void init()
     cudaDeviceSynchronize();
     checkCudaError();
 	
-    double spinor_norm2 = norm2(*spinor);
-    double cuda_spinor_norm2=  norm2(*cudaSpinor);
+    double spinor_norm2 = blas::norm2(*spinor);
+    double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
     printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 	
     if(test_type == 2){
@@ -417,14 +417,14 @@ static int dslashTest()
     printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*1e+9));
 	
     if (!transfer) {
-      double spinor_ref_norm2 = norm2(*spinorRef);
-      double cuda_spinor_out_norm2 =  norm2(*cudaSpinorOut);
-      double spinor_out_norm2 =  norm2(*spinorOut);
+      double spinor_ref_norm2 = blas::norm2(*spinorRef);
+      double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
+      double spinor_out_norm2 =  blas::norm2(*spinorOut);
       printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n",  spinor_ref_norm2, cuda_spinor_out_norm2,
 		 spinor_out_norm2);
     } else {
-      double spinor_ref_norm2 = norm2(*spinorRef);
-      double spinor_out_norm2 =  norm2(*spinorOut);
+      double spinor_ref_norm2 = blas::norm2(*spinorRef);
+      double spinor_out_norm2 =  blas::norm2(*spinorOut);
       printfQuda("Result: CPU=%f , CPU-CUDA=%f", spinor_ref_norm2, spinor_out_norm2);
     }
     

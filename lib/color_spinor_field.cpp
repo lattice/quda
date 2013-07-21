@@ -395,21 +395,6 @@ namespace quda {
     return coarse;
   };
 
-
-  double norm2(const ColorSpinorField &a) {
-
-    double rtn = 0.0;
-    if (typeid(a) == typeid(cudaColorSpinorField)) {
-      rtn = normCuda(dynamic_cast<const cudaColorSpinorField&>(a));
-    } else if (typeid(a) == typeid(cpuColorSpinorField)) {
-      rtn = normCpu(dynamic_cast<const cpuColorSpinorField&>(a));
-    } else {
-      errorQuda("Unknown input ColorSpinorField %s", typeid(a).name());
-    }
-
-    return rtn;
-  }
-
   std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
     out << "typdid = " << typeid(a).name() << std::endl;
     out << "nColor = " << a.nColor << std::endl;

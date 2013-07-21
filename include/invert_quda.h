@@ -187,6 +187,7 @@ namespace quda {
     virtual ~Solver() { ; }
 
     virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     // solver factory
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,

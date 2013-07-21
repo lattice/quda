@@ -50,11 +50,7 @@ namespace quda {
       
       // do the pre smoothing
       param.maxiter = param.nu_pre;
-      if (typeid(x) == typeid(cudaColorSpinorField) &&
-	  typeid(b) == typeid(cudaColorSpinorField) )
-	(*smoother)(static_cast<cudaColorSpinorField&>(x), static_cast<cudaColorSpinorField&>(b));
-      else
-	errorQuda("Not implemented");
+      (*smoother)(x, b);
 
       // restrict to the coarse grid
       transfer->R(*r, *r_coarse);
@@ -67,19 +63,11 @@ namespace quda {
 
       // do the post smoothing
       param.maxiter = param.nu_post;
-      if (typeid(x) == typeid(cudaColorSpinorField) &&
-	  typeid(b) == typeid(cudaColorSpinorField) )
-	(*smoother)(static_cast<cudaColorSpinorField&>(x), static_cast<cudaColorSpinorField&>(b));
-      else
-	errorQuda("Not implemented");
+      (*smoother)(x, b);
 
     } else { // do the coarse grid solve
 
-      if (typeid(x) == typeid(cudaColorSpinorField) &&
-	  typeid(b) == typeid(cudaColorSpinorField) )
-	(*smoother)(static_cast<cudaColorSpinorField&>(x), static_cast<cudaColorSpinorField&>(b));
-      else
-	errorQuda("Not implemented");
+      (*smoother)(x, b);
 
     }
 

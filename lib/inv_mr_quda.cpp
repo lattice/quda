@@ -55,19 +55,19 @@ namespace quda {
     cudaColorSpinorField &tmp = *tmpp;
 
     // set initial guess to zero and thus the residual is just the source
-    zeroCuda(x);  // can get rid of this for a special first update kernel  
-    double b2 = normCuda(b);
-    if (&r != &b) copyCuda(r, b);
+    blas::zero(x);  // can get rid of this for a special first update kernel  
+    double b2 = blas::norm2(b);
+    if (&r != &b) blas::copy(r, b);
 
     // domain-wise normalization of the initial residual to prevent underflow
     double r2=0.0; // if zero source then we will exit immediately doing no work
     if (b2 > 0.0) {
-      axCuda(1/sqrt(b2), r); // can merge this with the prior copy
+      blas::ax(1/sqrt(b2), r); // can merge this with the prior copy
       r2 = 1.0; // by definition by this is now true
     }
 
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
-      quda::blas_flops = 0;
+      blas::flops = 0;
       profile.Start(QUDA_PROFILE_COMPUTE);
     }
 
@@ -75,8 +75,8 @@ namespace quda {
 
     int k = 0;
     if (param.verbosity >= QUDA_DEBUG_VERBOSE) {
-      double x2 = norm2(x);
-      double3 Ar3 = cDotProductNormBCuda(Ar, r);
+      double x2 = blas::norm2(x);
+      double3 Ar3 = blas::cDotProductNormB(Ar, r);
       printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e, %e), x2 = %e\n", 
 		 k, Ar3.z, Ar3.x, Ar3.y, x2);
     }
@@ -85,16 +85,16 @@ namespace quda {
     
       mat(Ar, r, tmp);
 
-      double3 Ar3 = cDotProductNormACuda(Ar, r);
+      double3 Ar3 = blas::cDotProductNormA(Ar, r);
       Complex alpha = Complex(Ar3.x, Ar3.y) / Ar3.z;
 
-      // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = norm2(r)
-      //r2 = caxpyXmazNormXCuda(omega*alpha, r, x, Ar);
-      caxpyXmazCuda(omega*alpha, r, x, Ar);
+      // x += omega*alpha*r, r -= omega*alpha*Ar, r2 = blas::norm2(r)
+      //r2 = blas::caxpyXmazNormX(omega*alpha, r, x, Ar);
+      blas::caxpyXmaz(omega*alpha, r, x, Ar);
 
       if (param.verbosity >= QUDA_DEBUG_VERBOSE) {
-	double x2 = norm2(x);
-	double r2 = norm2(r);
+	double x2 = blas::norm2(x);
+	double r2 = blas::norm2(r);
 	printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e,%e) x2 = %e\n", 
 		   k+1, r2, Ar3.x, Ar3.y, x2);
       } else if (param.verbosity >= QUDA_VERBOSE) {
@@ -106,12 +106,12 @@ namespace quda {
   
     if (param.verbosity >= QUDA_VERBOSE) {
       mat(Ar, r, tmp);    
-      Complex Ar2 = cDotProductCuda(Ar, r);
+      Complex Ar2 = blas::cDotProduct(Ar, r);
       printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
     }
 
     // Obtain global solution by rescaling
-    if (b2 > 0.0) axCuda(sqrt(b2), x);
+    if (b2 > 0.0) blas::ax(sqrt(b2), x);
 
     if (k>=param.maxiter && param.verbosity >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
@@ -121,16 +121,16 @@ namespace quda {
         profile.Start(QUDA_PROFILE_EPILOGUE);
 	param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
-	double gflops = (quda::blas_flops + mat.flops())*1e-9;
+	double gflops = (blas::flops + mat.flops())*1e-9;
 	reduceDouble(gflops);
 	
 	param.gflops += gflops;
 	param.iter += k;
 	
 	// Calculate the true residual
-	r2 = norm2(r);
+	r2 = blas::norm2(r);
 	mat(r, x);
-	double true_res = xmyNormCuda(b, r);
+	double true_res = blas::xmyNorm(b, r);
 	param.true_res = sqrt(true_res / b2);
 
 	if (param.verbosity >= QUDA_SUMMARIZE) {
@@ -139,7 +139,7 @@ namespace quda {
 	}
 
 	// reset the flops counters
-	quda::blas_flops = 0;
+	blas::flops = 0;
 	mat.flops();
         profile.Stop(QUDA_PROFILE_EPILOGUE);
     }

@@ -300,8 +300,8 @@ void init(int argc, char **argv) {
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
     
-    double cpu_norm = norm2(*spinor);
-    double cuda_norm = norm2(*cudaSpinor);
+    double cpu_norm = blas::norm2(*spinor);
+    double cuda_norm = blas::norm2(*cudaSpinor);
     printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
 
     bool pc = (test_type != 2 && test_type != 4);
@@ -313,7 +313,7 @@ void init(int argc, char **argv) {
     
     dirac = Dirac::create(diracParam);
   } else {
-    double cpu_norm = norm2(*spinor);
+    double cpu_norm = blas::norm2(*spinor);
     printfQuda("Source: CPU = %e\n", cpu_norm);
   }
     
@@ -617,13 +617,13 @@ int main(int argc, char **argv)
 	       (double)Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
     
     if (!transfer) {
-      double norm2_cpu = norm2(*spinorRef);
-      double norm2_cuda= norm2(*cudaSpinorOut);
-      double norm2_cpu_cuda= norm2(*spinorOut);
+      double norm2_cpu = blas::norm2(*spinorRef);
+      double norm2_cuda= blas::norm2(*cudaSpinorOut);
+      double norm2_cpu_cuda= blas::norm2(*spinorOut);
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
-      double norm2_cpu = norm2(*spinorRef);
-      double norm2_cpu_cuda= norm2(*spinorOut);
+      double norm2_cpu = blas::norm2(*spinorRef);
+      double norm2_cpu_cuda= blas::norm2(*spinorOut);
       printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
     
