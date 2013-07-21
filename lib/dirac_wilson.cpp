@@ -1,9 +1,6 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
-#include <transfer.h>
-//#include <color_spinor_field.h>
-//#include <color_spinor_field_order.h>
 
 namespace quda {
 
@@ -108,6 +105,8 @@ namespace quda {
   */
 
   void DiracWilson::createCoarseOp(Transfer &T, void *Y[], QudaPrecision precision) const {
+	CoarseOp(T, Y, precision, gauge);
+#if 0
     //First make a cpu gauge field from
     // the cuda gauge field
 
@@ -147,11 +146,7 @@ namespace quda {
     vOrder = (ColorSpinorFieldOrder<float> *) createOrder<float>(T.Vectors(), nvec);
   }
 
-  
-
-  
-  
-   
+  #endif 
   } 
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)

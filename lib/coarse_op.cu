@@ -23,12 +23,23 @@ int Yindex(int sites, int Ns_c, int Nc_c, int x, int parity, int s, int c) {
 	#endif
 }
 
-template<typename Float, typename Vtype>
-void calculateY(std::complex<Float> *Y[], Vtype &V, const cudaGaugeField &gauge, int ndim, int *x, int *xc, int Nc, int Nc_c, int Ns, int Ns_c, int nvec, int *geo_bs, int spin_bs, int mass) {
+template<typename Float>
+void calculateY(std::complex<Float> *Y[], ColorSpinorFieldOrder<Float> &V, const cudaGaugeField &gauge, int ndim, int *x, int *xc, int Nc, int Nc_c, int Ns, int Ns_c, int nvec, int *geo_bs, int spin_bs, int mass) {
 
 	//Number of sites on the fine and coarse grids
 	int fsize = 1;
 	int csize = 1;
+	for (int d = 0; d<ndim; d++) {
+	  fsize *= x[d];
+	  csize *= xc[d];
+	}
+	
+	//Create a field UV which holds U*V.  Has the same structure as V.
+	ColorSpinorParam UVparam(V.Field());
+	UVparam.create = QUDA_ZERO_FIELD_CREATE;
+	cpuColorSpinorField UV(UVparam);
+	ColorSpinorFieldOrder<Float> *UVorder = (ColorSpinorFieldOrder<Float> *) createOrder<Float>(UV,nvec);
+	
 	
 }
 
@@ -75,13 +86,13 @@ void CoarseOp(Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeFi
   int Nc_c = nvec;
   int Ns_c = Ns/spin_bs;
 
-  void *vOrder;
+
   if (precision == QUDA_DOUBLE_PRECISION) {
-    vOrder = (ColorSpinorFieldOrder<double> *) createOrder<double>(T.Vectors(),nvec);
+    ColorSpinorFieldOrder<double> *vOrder = (ColorSpinorFieldOrder<double> *) createOrder<double>(T.Vectors(),nvec);
     calculateY((std::complex<double> **)Y, *vOrder, gauge, ndim, x, xc, Nc, Nc_c, Ns, Ns_c, nvec, geo_bs, spin_bs, 0);
   }
   else {
-    vOrder = (ColorSpinorFieldOrder<float> *) createOrder<float>(T.Vectors(), nvec);
+    ColorSpinorFieldOrder<float> * vOrder = (ColorSpinorFieldOrder<float> *) createOrder<float>(T.Vectors(), nvec);
     calculateY((std::complex<float> **)Y, *vOrder, gauge, ndim, x, xc, Nc, Nc_c, Ns, Ns_c, nvec, geo_bs, spin_bs, 0);
   }
 

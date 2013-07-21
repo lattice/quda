@@ -1,7 +1,7 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = multigrid.o transfer.o transfer_util.o prolongator.o	\
+QUDA_OBJS = coarse_op.o multigrid.o transfer.o transfer_util.o prolongator.o	\
 	restrictor.o timer.o malloc.o solver.o inv_bicgstab_quda.o	\
 	inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o		\
 	inv_mr_quda.o inv_mre.o interface_quda.o util_quda.o		\

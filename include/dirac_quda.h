@@ -167,6 +167,7 @@ namespace quda {
 
   };
 
+  void CoarseOp(Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge);
 
   // Even-odd preconditioned Wilson
   class DiracWilsonPC : public DiracWilson {

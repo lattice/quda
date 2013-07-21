@@ -141,19 +141,19 @@ namespace quda {
      * Returns the number of near nullvectors
      * @retruns Nvec
      */
-    const int nvec() {return Nvec;}
+    int nvec() const {return Nvec;}
 
     /**
      * Returns the amount of spin blocking
      * @retruns spin_bs
      */
-    const int Spin_bs() {return spin_bs;}
+    int Spin_bs() const {return spin_bs;}
 
     /**
      * Returns the geometrical coarse grid blocking
      * @returns geo_bs
      */
-    const int *Geo_bs() {return geo_bs;}
+    const int *Geo_bs() const {return geo_bs;}
 
   };
 
