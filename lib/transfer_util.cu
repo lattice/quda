@@ -21,17 +21,17 @@ namespace quda {
 
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
+      FieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
       for (int v=0; v<Nvec; v++) {
-	ColorSpinorFieldOrder<double> *bOrder = createOrder<double>(*B[v]);
+	FieldOrder<double> *bOrder = createOrder<double>(*B[v]);
 	fill(*vOrder, *bOrder, v, Nvec);
 	delete bOrder;
       }
       delete vOrder;
     } else {
-      ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(V, Nvec);
+      FieldOrder<float> *vOrder = createOrder<float>(V, Nvec);
       for (int v=0; v<Nvec; v++) {
-	ColorSpinorFieldOrder<float> *bOrder = createOrder<float>(*B[v]);
+	FieldOrder<float> *bOrder = createOrder<float>(*B[v]);
 	fill(*vOrder, *bOrder, v, Nvec);
 	delete bOrder;
       }
@@ -151,7 +151,7 @@ namespace quda {
 
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
       std::complex<double> *Vblock = new std::complex<double>[V.Volume()*V.Nspin()*V.Ncolor()];
-      ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
+      FieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
 
       int blocksize = geo_blocksize * vOrder->NcolorPacked() * spin_bs; 
       int chiralBlocks = vOrder->NspinPacked() / spin_bs;
@@ -165,7 +165,7 @@ namespace quda {
       delete []Vblock;
     } else {
       std::complex<float> *Vblock = new std::complex<float>[V.Volume()*V.Nspin()*V.Ncolor()];
-      ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(V, Nvec);
+      FieldOrder<float> *vOrder = createOrder<float>(V, Nvec);
 
       int blocksize = geo_blocksize * vOrder->NcolorPacked() * spin_bs; 
       int chiralBlocks = vOrder->NspinPacked() / spin_bs;

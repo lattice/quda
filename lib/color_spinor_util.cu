@@ -25,13 +25,13 @@ namespace quda {
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *A = createOrder<double>(a);
+      FieldOrder<double> *A = createOrder<double>(a);
       if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
       else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
       else errorQuda("Unsupported source type %d", sourceType);
       delete A;
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      ColorSpinorFieldOrder<float> *A = createOrder<float>(a);
+      FieldOrder<float> *A = createOrder<float>(a);
       if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
       else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
       else errorQuda("Unsupported source type %d", sourceType);
@@ -91,25 +91,25 @@ namespace quda {
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
     int ret = 0;
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *A = createOrder<double>(a);
+      FieldOrder<double> *A = createOrder<double>(a);
       if (b.Precision() == QUDA_DOUBLE_PRECISION) {
-	ColorSpinorFieldOrder<double> *B = createOrder<double>(b);
+	FieldOrder<double> *B = createOrder<double>(b);
 	ret = compareSpinor(*A, *B, tol);
 	delete B;
       } else {
-	ColorSpinorFieldOrder<float> *B = createOrder<float>(b);
+	FieldOrder<float> *B = createOrder<float>(b);
 	ret = compareSpinor(*A, *B, tol);
 	delete B;
       }
       delete A;
     } else {
-      ColorSpinorFieldOrder<float> *A = createOrder<float>(a);
+      FieldOrder<float> *A = createOrder<float>(a);
       if (b.Precision() == QUDA_DOUBLE_PRECISION) {
-	ColorSpinorFieldOrder<double> *B = createOrder<double>(b);
+	FieldOrder<double> *B = createOrder<double>(b);
 	ret = compareSpinor(*A, *B, tol);
 	delete B;
       } else {
-	ColorSpinorFieldOrder<float> *B = createOrder<float>(b);
+	FieldOrder<float> *B = createOrder<float>(b);
 	ret = compareSpinor(*A, *B, tol);
 	delete B;
       }
@@ -138,11 +138,11 @@ namespace quda {
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
   
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *A = createOrder<double>(a);
+      FieldOrder<double> *A = createOrder<double>(a);
       print_vector(*A, x);
       delete A;
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      ColorSpinorFieldOrder<float> *A = createOrder<float>(a);
+      FieldOrder<float> *A = createOrder<float>(a);
       print_vector(*A, x);
       delete A;
     } else {

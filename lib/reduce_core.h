@@ -647,11 +647,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
   } else { // fields are on the CPU
     using namespace quda::colorspinor;
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *X = createOrder<double>(x);
-      ColorSpinorFieldOrder<double> *Y = createOrder<double>(y);
-      ColorSpinorFieldOrder<double> *Z = createOrder<double>(z);
-      ColorSpinorFieldOrder<double> *W = createOrder<double>(w);
-      ColorSpinorFieldOrder<double> *V = createOrder<double>(v);
+      FieldOrder<double> *X = createOrder<double>(x);
+      FieldOrder<double> *Y = createOrder<double>(y);
+      FieldOrder<double> *Z = createOrder<double>(z);
+      FieldOrder<double> *W = createOrder<double>(w);
+      FieldOrder<double> *V = createOrder<double>(v);
       Reducer<ReduceType,double2, double2> r(a, b);
       value = genericReduce<ReduceType,double2>(*X, *Y, *Z, *W, *V, r);
       delete X;
@@ -660,11 +660,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       delete W;
       delete V;
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      ColorSpinorFieldOrder<float> *X = createOrder<float>(x);
-      ColorSpinorFieldOrder<float> *Y = createOrder<float>(y);
-      ColorSpinorFieldOrder<float> *Z = createOrder<float>(z);
-      ColorSpinorFieldOrder<float> *W = createOrder<float>(w);
-      ColorSpinorFieldOrder<float> *V = createOrder<float>(v);
+      FieldOrder<float> *X = createOrder<float>(x);
+      FieldOrder<float> *Y = createOrder<float>(y);
+      FieldOrder<float> *Z = createOrder<float>(z);
+      FieldOrder<float> *W = createOrder<float>(w);
+      FieldOrder<float> *V = createOrder<float>(v);
       Reducer<ReduceType,float2, float2> 
 	r(make_float2(a.x,a.y), make_float2(b.x,b.y));
       value = genericReduce<ReduceType,float2>(*X, *Y, *Z, *W, *V, r);

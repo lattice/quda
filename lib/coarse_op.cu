@@ -7,8 +7,6 @@
 
 namespace quda {
 
-  using namespace colorspinor;
-
   //Returns the index of the coarse color matrix Y.
   //sites is the total number of sites on the coarse lattice (both parities)
   //Ns_c is the number of blocked spin components
@@ -27,73 +25,76 @@ namespace quda {
 #endif
   }
 
-//Does the heavy lifting of creating the coarse color matrices Y
-template<typename Float>
-void calculateY(std::complex<Float> *Y[], ColorSpinorFieldOrder<Float> &V, gauge::GaugeFieldOrder<Float> &G, int ndim, int *x_size, int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, int *geo_bs, int spin_bs, int mass) {
+  //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{s,c}_mu(x) * V^{s,c}_mu(x+mu)
+  //Where:
+  //mu = dir
+  //s = fine spin
+  //c' = coarse color
+  //c = fine color
+  //FIXME: N.B. Only works if color-spin field and gauge field are parity ordered in the same way.  Need LatticeIndex function for generic ordering
+  template<typename Float>
+  void UV(colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, 
+	  const gauge::FieldOrder<Float> &G, int dir, int ndim, const int *x_size, int Nc, int Nc_c, int Ns) {
 
-	//Number of sites on the fine and coarse grids
-	int fsize = 1;
-	int csize = 1;
-	for (int d = 0; d<ndim; d++) {
-	  fsize *= x_size[d];
-	  csize *= xc_size[d];
-	}
+    for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
+
+      //U connects site x to site x+mu.  Thus, V lives at site x+mu if U_mu lives at site x.
+      //FIXME: Uses LatticeIndex() for the color spinor field to determine gauge field index.
+      //This only works if sites are ordered same way in both G and V.
+
+      int coord[QUDA_MAX_DIM];
+      int coordV[QUDA_MAX_DIM];
+      V.Field().LatticeIndex(coord, i);
+
+      int parity = 0;
+      for(int d = 0; d < ndim; d++) {
+	parity += coord[d];
+      }
+      parity = parity%2;
+
+      //Shift the V field w/respect to G
+      coordV[dir] = (coord[dir]+1)%x_size[dir];
+      int i_V;
+      V.Field().OffsetIndex(i_V, coordV);
+
+      for(int s = 0; s < Ns; s++) {  //Fine Spin
+	for(int ic_c = 0; ic_c < Nc_c; ic_c++) {  //Coarse Color
+	  for(int ic = 0; ic < Nc; ic++) { //Fine Color rows of gauge field
+	    for(int jc = 0; jc < Nc; jc++) {  //Fine Color columns of gauge field
+	      UV(i, s, ic, ic_c) += G(dir, parity, i/2, ic, jc) * V(i_V, s, jc, ic_c);
+	    }  //Fine color columns
+	  }  //Fine color rows
+	}  //Coarse color
+      }  //Fine Spin
+    }  //Volume
+  }  //UV
+
+  //Does the heavy lifting of creating the coarse color matrices Y
+  // QUESTION: why is mass an integer?
+  template<typename Float>
+  void calculateY(std::complex<Float> *Y[], const colorspinor::FieldOrder<Float> &V, const gauge::FieldOrder<Float> &G, 
+		  int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, 
+		  const int *geo_bs, int spin_bs, int mass) {
+
+    //Number of sites on the fine and coarse grids
+    int fsize = 1;
+    int csize = 1;
+    for (int d = 0; d<ndim; d++) {
+      fsize *= x_size[d];
+      csize *= xc_size[d];
+    }
 	
-	//Create a field UV which holds U*V.  Has the same structure as V.
-	ColorSpinorParam UVparam(V.Field());
-	UVparam.create = QUDA_ZERO_FIELD_CREATE;
-	cpuColorSpinorField UV(UVparam);
-	ColorSpinorFieldOrder<Float> *UVorder = (ColorSpinorFieldOrder<Float> *) createOrder<Float>(UV,Nc_c);
+    //Create a field UV which holds U*V.  Has the same structure as V.
+    ColorSpinorParam UVparam(V.Field());
+    UVparam.create = QUDA_ZERO_FIELD_CREATE;
+    cpuColorSpinorField uv(UVparam);
+    colorspinor::FieldOrder<Float> *UVorder = colorspinor::createOrder<Float>(uv,Nc_c);
 
-        for(int d = 0; d < ndim; d++) {
-
-	  //First calculate UV
-	  UV(d,*UVorder, G, V, ndim, x_size, Nc, Nc_c, Ns);
-	}
-}
-
-//Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{s,c}_mu(x) * V^{s,c}_mu(x+mu)
-//Where:
-//mu = dir
-//s = fine spin
-//c' = coarse color
-//c = fine color
-//FIXME: N.B. Only works if color-spin field and gauge field are parity ordered in the same way.  Need LatticeIndex function for generic ordering
-template<typename Float>
-void UV(int dir, ColorSpinorFieldOrder<Float> &UV, ColorSpinorFieldOrder<Float> &V, gauge::GaugeFieldOrder<Float> &G, int ndim, int *x_size, int Nc, int Nc_c, int Ns) {
-
-	for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
-
-          //U connects site x to site x+mu.  Thus, V lives at site x+mu if U_mu lives at site x.
-          //FIXME: Uses LatticeIndex() for the color spinor field to determine gauge field index.
-          //This only works if sites are ordered same way in both G and V.
-
-	  int coord[QUDA_MAX_DIMENSION];
-	  int coordV[QUDA_MAX_DIMENSION];
-	  V.Field().LatticeIndex(coord, i);
-
-          parity = 0;
-          for(d = 0; d < ndim; d++) {
-            parity += coord[d];
-          }
-          parity = parity%2;
-
-	  //Shift the V field w/respect to G
-          coordV[dir] = (coord[dir]+1)%x_size[d];
-	  int i_V;
-          V.Field().OffsetIndex(i_V, coordV);
-
-         for(int s = 0; s < Ns; s++) {  //Fine Spin
-	   for(int ic_c = 0; ic_c < Nc_c; ic_c++) {  //Coarse Color
-	     for(int ic = 0; ic < Nc; ic++) { //Fine Color rows of gauge field
-	       for(int jc = 0; jc < Nc; jc++) {  //Fine Color columns of gauge field
-	  	 UV(i, s, ic, ic_c) += G(dir, parity, i/2, ic, jc) * V(i_V, s, jc, ic_c);
-	       }  //Fine color columns
-             }  //Fine color rows
-           }  //Coarse color
-         }  //Fine Spin
-       }  //Volume
-}  //UV
+    for(int d = 0; d < ndim; d++) {
+      //First calculate UV
+      UV<Float>(*UVorder, V, G, d, ndim, x_size, Nc, Nc_c, Ns);
+    }
+  }
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y has been allocated.
@@ -140,15 +141,14 @@ void UV(int dir, ColorSpinorFieldOrder<Float> &UV, ColorSpinorFieldOrder<Float> 
 
     //Switch on precision.  Create the FieldOrder objects for gauge field and color rotation field V
     if (precision == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *vOrder = (ColorSpinorFieldOrder<double> *) colorspinor::createOrder<double>(T.Vectors(),nvec);
-      gauge::GaugeFieldOrder<double> *gOrder = (gauge::GaugeFieldOrder<double> *) gauge::createOrder<float>(g);
-      //GaugeFieldOrder gOrder(g);
-      calculateY((std::complex<double> **)Y, *vOrder, gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs, 0);
+      colorspinor::FieldOrder<double> *vOrder = colorspinor::createOrder<double>(T.Vectors(),nvec);
+      gauge::FieldOrder<double> *gOrder = gauge::createOrder<double>(g);
+      calculateY<double>((std::complex<double>**)Y, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs, 0);
     }
     else {
-      ColorSpinorFieldOrder<float> * vOrder = (ColorSpinorFieldOrder<float> *) colorspinor::createOrder<float>(T.Vectors(), nvec);
-      gauge::GaugeFieldOrder<float> *gOrder = (gauge::GaugeFieldOrder<float> *) gauge::createOrder<float>(g);
-      calculateY((std::complex<float> **)Y, *vOrder, gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs, 0);
+      colorspinor::FieldOrder<float> * vOrder = colorspinor::createOrder<float>(T.Vectors(), nvec);
+      gauge::FieldOrder<float> *gOrder = gauge::createOrder<float>(g);
+      calculateY<float>((std::complex<float>**)Y, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs, 0);
     }
   }  
 

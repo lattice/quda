@@ -48,10 +48,10 @@ namespace quda {
 		  ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *outOrder = createOrder<double>(out);
-      ColorSpinorFieldOrder<double> *inOrder = createOrder<double>(in);
-      ColorSpinorFieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
-      ColorSpinorFieldOrder<double> *tmpOrder = createOrder<double>(tmp);
+      FieldOrder<double> *outOrder = createOrder<double>(out);
+      FieldOrder<double> *inOrder = createOrder<double>(in);
+      FieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
+      FieldOrder<double> *tmpOrder = createOrder<double>(tmp);
       prolongate(*tmpOrder, *inOrder, geo_map, spin_map);
       rotateFineColor(*outOrder, *tmpOrder, *vOrder);
       delete outOrder;
@@ -59,10 +59,10 @@ namespace quda {
       delete vOrder;
       delete tmpOrder;
     } else {
-      ColorSpinorFieldOrder<float> *outOrder = createOrder<float>(out);
-      ColorSpinorFieldOrder<float> *inOrder = createOrder<float>(in);
-      ColorSpinorFieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
-      ColorSpinorFieldOrder<float> *tmpOrder = createOrder<float>(tmp);
+      FieldOrder<float> *outOrder = createOrder<float>(out);
+      FieldOrder<float> *inOrder = createOrder<float>(in);
+      FieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
+      FieldOrder<float> *tmpOrder = createOrder<float>(tmp);
       prolongate(*tmpOrder, *inOrder, geo_map, spin_map);
       rotateFineColor(*outOrder, *tmpOrder, *vOrder);
       delete outOrder;

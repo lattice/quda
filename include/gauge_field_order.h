@@ -17,7 +17,7 @@ namespace quda {
   namespace gauge {
 
   template <typename Float>
-    struct GaugeFieldOrder {
+    struct FieldOrder {
 
   protected:
     /** An internal reference to the actual field we are accessing */
@@ -25,10 +25,10 @@ namespace quda {
 
   public:
     /** 
-     * Constructor for the GaugeFieldOrder class
+     * Constructor for the FieldOrder class
      * @param field The field that we are accessing
      */
-  GaugeFieldOrder(cpuGaugeField &U) : U(U) { 
+  FieldOrder(cpuGaugeField &U) : U(U) { 
       if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	errorQuda("GaugeField ordering not supported with reconstruction");
     }
@@ -36,9 +36,9 @@ namespace quda {
     cpuGaugeField& Field() { return U; }
 
     /**
-     * Destructor for the GaugeFieldOrder class
+     * Destructor for the FieldOrder class
      */
-    virtual ~GaugeFieldOrder() { ; }
+    virtual ~FieldOrder() { ; }
 
     /**
      * Read-only complex-member accessor function
@@ -74,12 +74,12 @@ namespace quda {
   };
 
   template <typename Float>
-  struct QDPGaugeFieldOrder : GaugeFieldOrder<Float> {
+  struct QDPFieldOrder : FieldOrder<Float> {
 
     cpuGaugeField &U;
 
-  QDPGaugeFieldOrder(cpuGaugeField &U) : GaugeFieldOrder<Float>(U), U(U) { ; } 
-    virtual ~QDPGaugeFieldOrder() { ; } 
+  QDPFieldOrder(cpuGaugeField &U) : FieldOrder<Float>(U), U(U) { ; } 
+    virtual ~QDPFieldOrder() { ; } 
 
     /**
      * Read-only complex-member accessor function
@@ -90,8 +90,8 @@ namespace quda {
      * @param c color index
      */
     const std::complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
-      return std::complex<Float**>
-	(U.Gauge_p())[d][ ((parity * U.VolumeCB() + x)*U.Ncolor() + row)*U.Ncolor() + col];
+      return static_cast<std::complex<Float>**>(U.Gauge_p())
+	[d][ ((parity * U.VolumeCB() + x)*U.Ncolor() + row)*U.Ncolor() + col];
     }
 
     /**
@@ -103,20 +103,20 @@ namespace quda {
      * @param c color index
      */
     std::complex<Float>& operator()(int d, int parity, int x, int row, int col) {
-      return std::complex<Float**>
-	(U.Gauge_p())[d][ ((parity * U.VolumeCB() + x)*U.Ncolor() + row)*U.Ncolor() + col];
+      return static_cast<std::complex<Float>**>(U.Gauge_p())
+	[d][ ((parity * U.VolumeCB() + x)*U.Ncolor() + row)*U.Ncolor() + col];
     }
 
   };
 
   template <typename Float>
-    GaugeFieldOrder<Float>* createOrder(const GaugeField &a) {
-    GaugeFieldOrder<Float>* ptr=0;
+    FieldOrder<Float>* createOrder(const GaugeField &a) {
+    FieldOrder<Float>* ptr=0;
 
     if (typeid(a) == typeid(cpuGaugeField)) {
       const cpuGaugeField &cpu = static_cast<const cpuGaugeField&>(a);
       if (a.Order() == QUDA_QDP_GAUGE_ORDER) {
-	ptr = new QDPGaugeFieldOrder<Float>(const_cast<cpuGaugeField&>(cpu));
+	ptr = new QDPFieldOrder<Float>(const_cast<cpuGaugeField&>(cpu));
       } else {
 	errorQuda("Order %d not supported in cpuGaugeField", a.FieldOrder());
       }

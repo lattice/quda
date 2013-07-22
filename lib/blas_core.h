@@ -244,10 +244,10 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   } else { // fields on the cpu
     using namespace quda::colorspinor;
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *X = createOrder<double>(x);
-      ColorSpinorFieldOrder<double> *Y = createOrder<double>(y);
-      ColorSpinorFieldOrder<double> *Z = createOrder<double>(z);
-      ColorSpinorFieldOrder<double> *W = createOrder<double>(w);
+      FieldOrder<double> *X = createOrder<double>(x);
+      FieldOrder<double> *Y = createOrder<double>(y);
+      FieldOrder<double> *Z = createOrder<double>(z);
+      FieldOrder<double> *W = createOrder<double>(w);
       Functor<double2, double2> f(a, b, c);
       genericBlas<double2>(*X, *Y, *Z, *W, f);
       delete X;
@@ -255,10 +255,10 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       delete Z;
       delete W;
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      ColorSpinorFieldOrder<float> *X = createOrder<float>(x);
-      ColorSpinorFieldOrder<float> *Y = createOrder<float>(y);
-      ColorSpinorFieldOrder<float> *Z = createOrder<float>(z);
-      ColorSpinorFieldOrder<float> *W = createOrder<float>(w);
+      FieldOrder<float> *X = createOrder<float>(x);
+      FieldOrder<float> *Y = createOrder<float>(y);
+      FieldOrder<float> *Z = createOrder<float>(z);
+      FieldOrder<float> *W = createOrder<float>(w);
       Functor<float2, float2> 
 	f(make_float2(a.x,a.y), make_float2(b.x,b.y), make_float2(c.x,c.y) );
       genericBlas<float2>(*X, *Y, *Z, *W, f);

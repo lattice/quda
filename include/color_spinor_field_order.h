@@ -20,7 +20,7 @@ namespace quda {
   namespace colorspinor {
 
     template <typename Float>
-      class ColorSpinorFieldOrder {
+      class FieldOrder {
 
     protected:
       /** An internal reference to the actual field we are accessing */
@@ -29,18 +29,19 @@ namespace quda {
 
     public:
       /** 
-       * Constructor for the ColorSpinorFieldOrder class
+       * Constructor for the FieldOrder class
        * @param field The field that we are accessing
        */
-    ColorSpinorFieldOrder(cpuColorSpinorField &field, int Nvec=1) 
+    FieldOrder(cpuColorSpinorField &field, int Nvec=1) 
       : field(field), Nvec(Nvec) { ; }
 
       cpuColorSpinorField& Field() { return field; }
+      const cpuColorSpinorField& Field() const { return field; }
 
       /**
-       * Destructor for the ColorSpinorFieldOrder class
+       * Destructor for the FieldOrder class
        */
-      virtual ~ColorSpinorFieldOrder() { ; }
+      virtual ~FieldOrder() { ; }
 
       /**
        * Read-only complex-member accessor function
@@ -104,14 +105,14 @@ namespace quda {
     };
 
     template <typename Float>
-      class SpaceSpinColorOrder : public ColorSpinorFieldOrder<Float> {
+      class SpaceSpinColorOrder : public FieldOrder<Float> {
 
     private:
       cpuColorSpinorField &field; // convenient to have a "local" reference for code brevity
 
     public:
     SpaceSpinColorOrder(cpuColorSpinorField &field, int Nvec=1)
-      : ColorSpinorFieldOrder<Float>(field, Nvec), field(field) 
+      : FieldOrder<Float>(field, Nvec), field(field) 
       { ; }
       virtual ~SpaceSpinColorOrder() { ; }
 
@@ -128,14 +129,14 @@ namespace quda {
     };
 
     template <typename Float>
-      class SpaceColorSpinOrder : public ColorSpinorFieldOrder<Float> {
+      class SpaceColorSpinOrder : public FieldOrder<Float> {
 
     private:
       cpuColorSpinorField &field;  // convenient to have a "local" reference for code brevity
 
     public:
     SpaceColorSpinOrder(cpuColorSpinorField &field, int Nvec=1) 
-      : ColorSpinorFieldOrder<Float>(field, Nvec), field(field)
+      : FieldOrder<Float>(field, Nvec), field(field)
       { ; }
       virtual ~SpaceColorSpinOrder() { ; }
 
@@ -151,7 +152,7 @@ namespace quda {
     };
 
     template <typename Float>
-      class QOPDomainWallOrder : public ColorSpinorFieldOrder<Float> {
+      class QOPDomainWallOrder : public FieldOrder<Float> {
 
     private:
       cpuColorSpinorField &field;  // convenient to have a "local" reference for code brevity
@@ -160,9 +161,9 @@ namespace quda {
 
     public:
     QOPDomainWallOrder(cpuColorSpinorField &field, int Nvec=1) 
-      : ColorSpinorFieldOrder<Float>(field, Nvec), field(field), volume_4d(1), Ls(0)
+      : FieldOrder<Float>(field, Nvec), field(field), volume_4d(1), Ls(0)
 	{ 
-	  if (field.Ndim() != 5) errorQuda("Error, wrong number of dimensions for this ColorSpinorFieldOrder");
+	  if (field.Ndim() != 5) errorQuda("Error, wrong number of dimensions for this FieldOrder");
 	  for (int i=0; i<4; i++) volume_4d *= field.X()[i];
 	  Ls = field.X()[4];
 	}
@@ -184,8 +185,8 @@ namespace quda {
     };
 
     template <typename Float>
-      ColorSpinorFieldOrder<Float>* createOrder(const ColorSpinorField &a, int Nvec=1) {
-      ColorSpinorFieldOrder<Float>* ptr=0;
+      FieldOrder<Float>* createOrder(const ColorSpinorField &a, int Nvec=1) {
+      FieldOrder<Float>* ptr=0;
 
       if (typeid(a) == typeid(cpuColorSpinorField)) {
 	const cpuColorSpinorField &cpu = static_cast<const cpuColorSpinorField&>(a);
