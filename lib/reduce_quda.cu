@@ -135,7 +135,7 @@ namespace quda {
       };
 
       double norm2(const ColorSpinorField &x) {
-	ColorSpinorField &y = (ColorSpinorField&)x; // FIXME
+	ColorSpinorField &y = const_cast<ColorSpinorField&>(x);
 	return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,norm2_,0,0,0,0,0,false>
 	  (make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
       }

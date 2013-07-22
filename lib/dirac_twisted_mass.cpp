@@ -145,7 +145,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedMass::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+  void DiracTwistedMass::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 				 ColorSpinorField &x, ColorSpinorField &b, 
 				 const QudaSolutionType solType) const
   {
@@ -340,7 +340,7 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracTwistedMassPC::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+  void DiracTwistedMassPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 				   ColorSpinorField &x, ColorSpinorField &b, 
 				   const QudaSolutionType solType) const
   {

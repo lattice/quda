@@ -116,7 +116,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracStaggered::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+  void DiracStaggered::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			       ColorSpinorField &x, ColorSpinorField &b, 
 			       const QudaSolutionType solType) const
   {
@@ -187,7 +187,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracStaggeredPC::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+  void DiracStaggeredPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 				 ColorSpinorField &x, ColorSpinorField &b, 
 				 const QudaSolutionType solType) const
   {

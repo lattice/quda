@@ -93,7 +93,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracDomainWall::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+  void DiracDomainWall::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 				ColorSpinorField &x, ColorSpinorField &b, 
 				const QudaSolutionType solType) const
   {
@@ -171,7 +171,7 @@ namespace quda {
 #endif
   }
 
-  void DiracDomainWallPC::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+  void DiracDomainWallPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 				  ColorSpinorField &x, ColorSpinorField &b, 
 				  const QudaSolutionType solType) const
   {

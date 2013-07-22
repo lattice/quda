@@ -789,7 +789,7 @@ namespace quda {
   }
 
   void massRescale(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
-		   QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
+		   QudaMassNormalization mass_normalization, ColorSpinorField &b)
   {   
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
@@ -1258,10 +1258,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.Start(QUDA_PROFILE_H2D);
 
-  cudaColorSpinorField *b = NULL;
-  cudaColorSpinorField *x = NULL;
-  cudaColorSpinorField *in = NULL;
-  cudaColorSpinorField *out = NULL;
+  ColorSpinorField *b = NULL;
+  ColorSpinorField *x = NULL;
+  ColorSpinorField *in = NULL;
+  ColorSpinorField *out = NULL;
 
   const int *X = cudaGauge->X();
 
@@ -1315,6 +1315,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   blas::setTuning(param->tune, getVerbosity());
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
+
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = blas::norm2(*in);
     double nout = blas::norm2(*out);

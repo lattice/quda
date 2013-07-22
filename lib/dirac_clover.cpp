@@ -98,7 +98,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracClover::prepare(ColorSpinorField *src, ColorSpinorField *sol,
+  void DiracClover::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
 			    ColorSpinorField &x, ColorSpinorField &b, 
 			    const QudaSolutionType solType) const
   {
@@ -253,7 +253,7 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracCloverPC::prepare(ColorSpinorField* src, ColorSpinorField* sol, 
+  void DiracCloverPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol, 
 			      ColorSpinorField &x, ColorSpinorField &b, 
 			      const QudaSolutionType solType) const
   {
