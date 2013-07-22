@@ -350,9 +350,6 @@ doubleN reduceLaunch(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Redu
   zero(cpu_sum);
   cpu_sum += ((ReduceType*)h_reduce)[0];
 
-  const int Nreduce = sizeof(doubleN) / sizeof(double);
-  reduceDoubleArray((double*)&cpu_sum, Nreduce);
-
   return cpu_sum;
 }
 
@@ -480,6 +477,7 @@ ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV
   zero(sum); 
 
   for (int x=0; x<X.Volume(); x++) {
+    r.pre();
     for (int s=0; s<X.Nspin(); s++) {
       for (int c=0; c<X.Ncolor(); c++) {
 	Float2 X2 = make_Float2( X(x, s, c) );
@@ -495,6 +493,7 @@ ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV
 	V(x, s, c) = make_Complex(V2);
       }
     }
+    r.post(sum);
   }
 
   return sum;
@@ -542,6 +541,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 
   doubleN value;
   if (Location(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
+
     for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
     blasConstants.stride = x.Stride();
     
@@ -582,7 +582,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
 	reduce.apply(*blas::getStream());
-      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+	} else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       if (x.Nspin() == 4){ //wilson
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
@@ -677,6 +677,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       errorQuda("Not implemented");
     }
   }
+
+  const int Nreduce = sizeof(doubleN) / sizeof(double);
+  reduceDoubleArray((double*)&value, Nreduce);
+
   blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
   blas::flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x.RealLength();
     

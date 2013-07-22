@@ -182,19 +182,19 @@ namespace quda {
        Functor to perform the operation y += a * x  (complex-valued)
     */
 
-    __device__ void _caxpy(const float2 &a, const float4 &x, float4 &y) {
+    __device__ __host__ void _caxpy(const float2 &a, const float4 &x, float4 &y) {
       y.x += a.x*x.x; y.x -= a.y*x.y;
       y.y += a.y*x.x; y.y += a.x*x.y;
       y.z += a.x*x.z; y.z -= a.y*x.w;
       y.w += a.y*x.z; y.w += a.x*x.w;
     }
 
-    __device__ void _caxpy(const float2 &a, const float2 &x, float2 &y) {
+    __device__ __host__ void _caxpy(const float2 &a, const float2 &x, float2 &y) {
       y.x += a.x*x.x; y.x -= a.y*x.y;
       y.y += a.y*x.x; y.y += a.x*x.y;
     }
 
-    __device__ void _caxpy(const double2 &a, const double2 &x, double2 &y) {
+    __device__ __host__ void _caxpy(const double2 &a, const double2 &x, double2 &y) {
       y.x += a.x*x.x; y.x -= a.y*x.y;
       y.y += a.y*x.x; y.y += a.x*x.y;
     }
@@ -218,7 +218,7 @@ namespace quda {
        Functor to perform the operation y = a*x + b*y  (complex-valued)
     */
 
-    __device__ void _caxpby(const float2 &a, const float4 &x, const float2 &b, float4 &y)					
+    __device__ __host__ void _caxpby(const float2 &a, const float4 &x, const float2 &b, float4 &y)					
     { float4 yy;								
       yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
       yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
@@ -226,13 +226,13 @@ namespace quda {
       yy.w = a.y*x.z; yy.w += a.x*x.w; yy.w += b.y*y.z; yy.w += b.x*y.w;	
       y = yy; }
 
-    __device__ void _caxpby(const float2 &a, const float2 &x, const float2 &b, float2 &y)
+    __device__ __host__ void _caxpby(const float2 &a, const float2 &x, const float2 &b, float2 &y)
     { float2 yy;								
       yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
       yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
       y = yy; }
 
-    __device__ void _caxpby(const double2 &a, const double2 &x, const double2 &b, double2 &y)				 
+    __device__ __host__ void _caxpby(const double2 &a, const double2 &x, const double2 &b, double2 &y)				 
     { double2 yy;								
       yy.x = a.x*x.x; yy.x -= a.y*x.y; yy.x += b.x*y.x; yy.x -= b.y*y.y;	
       yy.y = a.y*x.x; yy.y += a.x*x.y; yy.y += b.y*y.x; yy.y += b.x*y.y;	
@@ -258,7 +258,7 @@ namespace quda {
        Functor to performs the operation z[i] = x[i] + a*y[i] + b*z[i]
     */
 
-    __device__ void _cxpaypbz(const float4 &x, const float2 &a, const float4 &y, const float2 &b, float4 &z) {
+    __device__ __host__ void _cxpaypbz(const float4 &x, const float2 &a, const float4 &y, const float2 &b, float4 &z) {
       float4 zz;
       zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
       zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
@@ -267,14 +267,14 @@ namespace quda {
       z = zz;
     }
 
-    __device__ void _cxpaypbz(const float2 &x, const float2 &a, const float2 &y, const float2 &b, float2 &z) {
+    __device__ __host__ void _cxpaypbz(const float2 &x, const float2 &a, const float2 &y, const float2 &b, float2 &z) {
       float2 zz;
       zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
       zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;
       z = zz;
     }
 
-    __device__ void _cxpaypbz(const double2 &x, const double2 &a, const double2 &y, const double2 &b, double2 &z) {
+    __device__ __host__ void _cxpaypbz(const double2 &x, const double2 &a, const double2 &y, const double2 &b, double2 &z) {
       double2 zz;
       zz.x = x.x + a.x*y.x; zz.x -= a.y*y.y; zz.x += b.x*z.x; zz.x -= b.y*z.y;
       zz.y = x.y + a.y*y.x; zz.y += a.x*y.y; zz.y += b.y*z.x; zz.y += b.x*z.y;

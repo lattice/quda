@@ -103,23 +103,23 @@ namespace quda {
     struct ReduceFunctor {
     
       //! pre-computation routine called before the "M-loop"
-      virtual __device__ void pre() { ; }
+      virtual __device__ __host__ void pre() { ; }
     
       //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, 
+      virtual __device__ __host__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, 
 						  FloatN &z, FloatN &w, FloatN &v) = 0;
     
       //! post-computation routine called after the "M-loop"
-      virtual __device__ void post(ReduceType &sum) { ; }
+      virtual __device__ __host__ void post(ReduceType &sum) { ; }
     
     };
 
     /**
        Return the L2 norm of x
     */
-    __device__ double _norm2(const double2 &a) { return a.x*a.x + a.y*a.y; }
-    __device__ float _norm2(const float2 &a) { return a.x*a.x + a.y*a.y; }
-    __device__ float _norm2(const float4 &a) { return a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w; }
+    __device__ __host__ double _norm2(const double2 &a) { return a.x*a.x + a.y*a.y; }
+    __device__ __host__ float _norm2(const float2 &a) { return a.x*a.x + a.y*a.y; }
+    __device__ __host__ float _norm2(const float4 &a) { return a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w; }
 
     template <typename ReduceType, typename Float2, typename FloatN>
 #if (__COMPUTE_CAPABILITY__ >= 200)
@@ -143,9 +143,9 @@ namespace quda {
       /**
 	 Return the real dot product of x and y
       */
-      __device__ double _dot(const double2 &a, const double2 &b) { return a.x*b.x + a.y*b.y; }
-      __device__ float _dot(const float2 &a, const float2 &b) { return a.x*b.x + a.y*b.y; }
-      __device__ float _dot(const float4 &a, const float4 &b) { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w; }
+      __device__ __host__ double _dot(const double2 &a, const double2 &b) { return a.x*b.x + a.y*b.y; }
+      __device__ __host__ float _dot(const float2 &a, const float2 &b) { return a.x*b.x + a.y*b.y; }
+      __device__ __host__ float _dot(const float4 &a, const float4 &b) { return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w; }
 
       template <typename ReduceType, typename Float2, typename FloatN>
 #if (__COMPUTE_CAPABILITY__ >= 200)
@@ -215,19 +215,19 @@ namespace quda {
 	       Functor to perform the operation y += a * x  (complex-valued)
 	    */
 
-	    __device__ void Caxpy_(const float2 &a, const float4 &x, float4 &y) {
+	    __device__ __host__ void Caxpy_(const float2 &a, const float4 &x, float4 &y) {
 	      y.x += a.x*x.x; y.x -= a.y*x.y;
 	      y.y += a.y*x.x; y.y += a.x*x.y;
 	      y.z += a.x*x.z; y.z -= a.y*x.w;
 	      y.w += a.y*x.z; y.w += a.x*x.w;
 	    }
 
-	    __device__ void Caxpy_(const float2 &a, const float2 &x, float2 &y) {
+	    __device__ __host__ void Caxpy_(const float2 &a, const float2 &x, float2 &y) {
 	      y.x += a.x*x.x; y.x -= a.y*x.y;
 	      y.y += a.y*x.x; y.y += a.x*x.y;
 	    }
 
-	    __device__ void Caxpy_(const double2 &a, const double2 &x, double2 &y) {
+	    __device__ __host__ void Caxpy_(const double2 &a, const double2 &x, double2 &y) {
 	      y.x += a.x*x.x; y.x -= a.y*x.y;
 	      y.y += a.y*x.x; y.y += a.x*x.y;
 	    }
@@ -311,11 +311,11 @@ namespace quda {
 		  /**
 		     Returns complex-valued dot product of x and y
 		  */
-		  __device__ double2 cdot_(const double2 &a, const double2 &b) 
+		  __device__ __host__ double2 cdot_(const double2 &a, const double2 &b) 
 		  { return make_double2(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x); }
-		  __device__ double2 cdot_(const float2 &a, const float2 &b) 
+		  __device__ __host__ double2 cdot_(const float2 &a, const float2 &b) 
 		  { return make_double2(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x); }
-		  __device__ double2 cdot_(const float4 &a, const float4 &b) 
+		  __device__ __host__ double2 cdot_(const float4 &a, const float4 &b) 
 		  { return make_double2(a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z); }
 
 		  template <typename ReduceType, typename Float2, typename FloatN>
@@ -391,11 +391,11 @@ namespace quda {
 			   First returns the dot product (x,y)
 			   Returns the norm of x
 			*/
-			__device__ double3 cdotNormA_(const double2 &a, const double2 &b) 
+			__device__ __host__ double3 cdotNormA_(const double2 &a, const double2 &b) 
 			{ return make_double3(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x, a.x*a.x + a.y*a.y); }
-			__device__ double3 cdotNormA_(const float2 &a, const float2 &b) 
+			__device__ __host__ double3 cdotNormA_(const float2 &a, const float2 &b) 
 			{ return make_double3(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x, a.x*a.x + a.y*a.y); }
-			__device__ double3 cdotNormA_(const float4 &a, const float4 &b) 
+			__device__ __host__ double3 cdotNormA_(const float4 &a, const float4 &b) 
 			{ return make_double3(a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, 
 					      a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z,
 					      a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w); }
@@ -421,11 +421,11 @@ namespace quda {
 			     First returns the dot product (x,y)
 			     Returns the norm of y
 			  */
-			  __device__ double3 cdotNormB_(const double2 &a, const double2 &b) 
+			  __device__ __host__ double3 cdotNormB_(const double2 &a, const double2 &b) 
 			  { return make_double3(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x, b.x*b.x + b.y*b.y); }
-			  __device__ double3 cdotNormB_(const float2 &a, const float2 &b) 
+			  __device__ __host__ double3 cdotNormB_(const float2 &a, const float2 &b) 
 			  { return make_double3(a.x*b.x + a.y*b.y, a.x*b.y - a.y*b.x, b.x*b.x + b.y*b.y); }
-			  __device__ double3 cdotNormB_(const float4 &a, const float4 &b) 
+			  __device__ __host__ double3 cdotNormB_(const float4 &a, const float4 &b) 
 			  { return make_double3(a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, a.x*b.y - a.y*b.x + a.z*b.w - a.w*b.z,
 						b.x*b.x + b.y*b.y + b.z*b.z + b.w*b.w); }
 
@@ -524,13 +524,13 @@ namespace quda {
 				  ReduceType aux;
 				  HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
     
-				  __device__ void pre() { aux.x = 0; aux.y = 0; }
+				  __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
     
 				  __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) 
 				  { aux.x += _norm2(x); aux.y += _norm2(y); }
     
 				  //! sum the solution and residual norms, and compute the heavy-quark norm
-				  __device__ void post(ReduceType &sum) 
+				  __device__ __host__ void post(ReduceType &sum) 
 				  { 
 				    sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0; 
 				  }
@@ -564,13 +564,13 @@ namespace quda {
 				  ReduceType aux;
 				  xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
     
-				  __device__ void pre() { aux.x = 0; aux.y = 0; }
+				  __device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
     
 				  __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) 
 				  { aux.x += _norm2(x + y); aux.y += _norm2(z); }
     
 				  //! sum the solution and residual norms, and compute the heavy-quark norm
-				  __device__ void post(ReduceType &sum) 
+				  __device__ __host__ void post(ReduceType &sum) 
 				  { 
 				    sum.x += aux.x; sum.y += aux.y; sum.z += (aux.x > 0.0) ? (aux.y / aux.x) : 1.0; 
 				  }
