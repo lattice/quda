@@ -54,8 +54,11 @@ namespace quda {
     }	
   }
 
-  void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
+  void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b)
   {
+    if (Location(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
+      errorQuda("Not supported");
+
     profile.Start(QUDA_PROFILE_INIT);
 
     int num_offset = param.num_offset;
@@ -97,14 +100,17 @@ namespace quda {
 
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
     cudaColorSpinorField *r_sloppy;
-    cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset];
-    cudaColorSpinorField **y = reliable ? new cudaColorSpinorField*[num_offset] : NULL;
+    std::vector<ColorSpinorField*> x_sloppy;
+    x_sloppy.resize(num_offset);
+    std::vector<ColorSpinorField*> y;
   
     ColorSpinorParam csParam(b);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    if (reliable)
+    if (reliable) {
+      y.resize(num_offset);
       for (int i=0; i<num_offset; i++) y[i] = new cudaColorSpinorField(*r, csParam);
+    }
 
     csParam.setPrecision(param.precision_sloppy);
   
@@ -325,10 +331,7 @@ namespace quda {
     for (int i=0; i<num_offset; i++) delete p[i];
     delete []p;
 
-    if (reliable) {
-      for (int i=0; i<num_offset; i++) delete y[i];
-      delete []y;
-    }
+    if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
 
     delete Ap;
   
@@ -336,7 +339,6 @@ namespace quda {
       for (int i=0; i<num_offset; i++) delete x_sloppy[i];
       delete r_sloppy;
     }
-    delete []x_sloppy;
   
     delete []zeta_old;
     delete []zeta;

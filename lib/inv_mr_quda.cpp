@@ -32,8 +32,9 @@ namespace quda {
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
   }
 
-  void MR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
+  void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");    
 
     globalReduce = false; // use local reductions for DD solver
 
@@ -49,10 +50,10 @@ namespace quda {
 
       init = true;
     }
-    cudaColorSpinorField &r = 
+    ColorSpinorField &r = 
       (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp : b;
-    cudaColorSpinorField &Ar = *Arp;
-    cudaColorSpinorField &tmp = *tmpp;
+    ColorSpinorField &Ar = *Arp;
+    ColorSpinorField &tmp = *tmpp;
 
     // set initial guess to zero and thus the residual is just the source
     blas::zero(x);  // can get rid of this for a special first update kernel  

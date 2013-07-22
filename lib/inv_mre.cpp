@@ -12,21 +12,22 @@ namespace quda {
 
   }
 
-  void MinResExt::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, 
-			     cudaColorSpinorField **p, cudaColorSpinorField **q, int N) {
 
-    /*
-      We want to find the best initial guess of the solution of
-      A x = b, and we have N previous solutions x_i.
-      The method goes something like this:
-      
-      1. Orthonormalise the p_i and q_i
-      2. Form the matrix G_ij = x_i^dagger A x_j
-      3. Form the vector B_i = x_i^dagger b
-      4. solve A_ij a_j  = B_i
-      5. x = a_i p_i
-    */
+  /*
+    We want to find the best initial guess of the solution of
+    A x = b, and we have N previous solutions x_i.
+    The method goes something like this:
     
+    1. Orthonormalise the p_i and q_i
+    2. Form the matrix G_ij = x_i^dagger A x_j
+    3. Form the vector B_i = x_i^dagger b
+    4. solve A_ij a_j  = B_i
+    5. x = a_i p_i
+  */
+  void MinResExt::operator()(ColorSpinorField &x, ColorSpinorField &b, 
+			     std::vector<ColorSpinorField*> p, std::vector<ColorSpinorField*> q, int N) {
+    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");    
+
     // if no guess is required, then set initial guess = 0
     if (N == 0) {
       blas::zero(x);

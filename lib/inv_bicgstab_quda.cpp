@@ -19,13 +19,6 @@ namespace quda {
   // set the required parameters for the inner solver
   void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer);
 
-  double resNorm(const DiracMatrix &mat, cudaColorSpinorField &b, cudaColorSpinorField &x) {  
-    cudaColorSpinorField r(b);
-    mat(r, x);
-    return blas::xmyNorm(b, r);
-  }
-
-
   BiCGstab::BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false) {
 
@@ -48,8 +41,11 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_FREE);
   }
 
-  void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void BiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
+    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
+      errorQuda("Not supported");
+
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
     if (!init) {
@@ -75,16 +71,16 @@ namespace quda {
       init = true;
     }
 
-    cudaColorSpinorField &y = *yp;
-    cudaColorSpinorField &r = *rp; 
-    cudaColorSpinorField &p = *pp;
-    cudaColorSpinorField &v = *vp;
-    cudaColorSpinorField &tmp = *tmpp;
-    cudaColorSpinorField &t = *tp;
-    cudaColorSpinorField &w = *wp;
-    cudaColorSpinorField &z = *zp;
+    ColorSpinorField &y = *yp;
+    ColorSpinorField &r = *rp; 
+    ColorSpinorField &p = *pp;
+    ColorSpinorField &v = *vp;
+    ColorSpinorField &tmp = *tmpp;
+    ColorSpinorField &t = *tp;
+    ColorSpinorField &w = *wp;
+    ColorSpinorField &z = *zp;
 
-    cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
+    ColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
     double b2; // norm sq of source
     double r2; // norm sq of residual
@@ -113,9 +109,9 @@ namespace quda {
 
     // set field aliasing according to whether we are doing mixed precision or not
     if (param.precision_sloppy == x.Precision()) {
-      x_sloppy = &x;
+      x_sloppy = &static_cast<cudaColorSpinorField&>(x);
       r_sloppy = &r;
-      r_0 = &b;
+      r_0 = &static_cast<cudaColorSpinorField&>(b);
       blas::zero(*x_sloppy);
     } else {
       ColorSpinorParam csParam(x);
@@ -128,9 +124,9 @@ namespace quda {
     }
 
     // Syntatic sugar
-    cudaColorSpinorField &rSloppy = *r_sloppy;
-    cudaColorSpinorField &xSloppy = *x_sloppy;
-    cudaColorSpinorField &r0 = *r_0;
+    ColorSpinorField &rSloppy = *r_sloppy;
+    ColorSpinorField &xSloppy = *x_sloppy;
+    ColorSpinorField &r0 = *r_0;
 
     SolverParam solve_param_inner(param);
     fillInnerSolveParam(solve_param_inner, param);

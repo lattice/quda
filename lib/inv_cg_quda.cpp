@@ -26,8 +26,11 @@ namespace quda {
 
   }
 
-  void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
+    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
+      errorQuda("Not supported");
+
     profile.Start(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
@@ -40,7 +43,6 @@ namespace quda {
       param.true_res_hq = 0.0;
       return;
     }
-
 
     cudaColorSpinorField r(b);
 
@@ -68,7 +70,7 @@ namespace quda {
     cudaColorSpinorField *x_sloppy, *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
       csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      x_sloppy = &x;
+      x_sloppy = &static_cast<cudaColorSpinorField&>(x);
       r_sloppy = &r;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -76,8 +78,8 @@ namespace quda {
       r_sloppy = new cudaColorSpinorField(r, csParam);
     }
 
-    cudaColorSpinorField &xSloppy = *x_sloppy;
-    cudaColorSpinorField &rSloppy = *r_sloppy;
+    ColorSpinorField &xSloppy = *x_sloppy;
+    ColorSpinorField &rSloppy = *r_sloppy;
     cudaColorSpinorField p(rSloppy);
 
     if(&x != &xSloppy){

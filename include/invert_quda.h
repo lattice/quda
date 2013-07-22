@@ -5,6 +5,7 @@
 #include <quda_internal.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
+#include <vector>
 
 namespace quda {
 
@@ -186,8 +187,7 @@ namespace quda {
     Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) { ; }
     virtual ~Solver() { ; }
 
-    virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
-    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
     // solver factory
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
@@ -221,7 +221,7 @@ namespace quda {
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class BiCGstab : public Solver {
@@ -232,7 +232,7 @@ namespace quda {
     const DiracMatrix &matPrecon;
 
     // pointers to fields to avoid multiple creation overhead
-    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
+    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
     bool init;
 
   public:
@@ -240,7 +240,7 @@ namespace quda {
 	     SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstab();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class GCR : public Solver {
@@ -258,16 +258,16 @@ namespace quda {
 	SolverParam &param, TimeProfile &profile);
     virtual ~GCR();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class MR : public Solver {
 
   private:
     const DiracMatrix &mat;
-    cudaColorSpinorField *rp;
-    cudaColorSpinorField *Arp;
-    cudaColorSpinorField *tmpp;
+    ColorSpinorField *rp;
+    ColorSpinorField *Arp;
+    ColorSpinorField *tmpp;
     bool init;
     bool allocate_r;
 
@@ -275,7 +275,7 @@ namespace quda {
     MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
     virtual ~MR();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   // multigrid solver
@@ -288,7 +288,7 @@ namespace quda {
     alphaSA(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
     virtual ~alphaSA() { ; }
 
-    void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField **out, ColorSpinorField &in);
   };
 
   class MultiShiftSolver {
@@ -302,7 +302,7 @@ namespace quda {
     param(param), profile(profile) { ; }
     virtual ~MultiShiftSolver() { ; }
 
-    virtual void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in) = 0;
+    virtual void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in) = 0;
   };
 
   class MultiShiftCG : public MultiShiftSolver {
@@ -315,7 +315,7 @@ namespace quda {
     MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MultiShiftCG();
 
-    void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
+    void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in);
   };
 
   /**
@@ -344,8 +344,9 @@ namespace quda {
        param N The number of basis vectors
        return The residue of this guess.
     */  
-    void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p,
-		    cudaColorSpinorField **q, int N);
+    void operator()(ColorSpinorField &x, ColorSpinorField &b, 
+		    std::vector<ColorSpinorField*> p,
+		    std::vector<ColorSpinorField*> q, int N);
   };
 
 } // namespace quda

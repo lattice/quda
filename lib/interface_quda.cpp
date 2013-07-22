@@ -1523,7 +1523,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   Dirac &diracSloppy = *dSloppy;
 
   cudaColorSpinorField *b = NULL;   // Cuda RHS
-  cudaColorSpinorField **x = NULL;  // Cuda Solutions
+  std::vector<ColorSpinorField*> x; // Cuda Solutions
+  x.resize(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
   const int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ? 
@@ -1556,7 +1557,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.Stop(QUDA_PROFILE_H2D);
 
   // Create the solution fields filled with zero
-  x = new cudaColorSpinorField* [ param->num_offset ];
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   for(int i=0; i < param->num_offset; i++) { 
     x[i] = new cudaColorSpinorField(cudaParam);
@@ -1702,7 +1702,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   delete b;
 
   delete [] h_x;
-  delete [] x;
 
   delete [] hp_x;
 

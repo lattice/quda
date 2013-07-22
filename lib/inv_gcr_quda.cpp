@@ -47,13 +47,13 @@ namespace quda {
 
   }
 
-  void orthoDir(Complex **beta, cudaColorSpinorField *Ap[], int k) {
+  void orthoDir(Complex **beta, std::vector<ColorSpinorField*> Ap, int k) {
     int type = 1;
 
     switch (type) {
     case 0: // no kernel fusion
       for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
-	beta[i][k] = blas::cDotProduct(*Ap[i], *Ap[k]);
+	beta[i][k] = blas::cDotProduct(*(Ap[i]), *(Ap[k]));
 	blas::caxpy(-beta[i][k], *Ap[i], *Ap[k]);
       }
       break;
@@ -110,8 +110,8 @@ namespace quda {
     }
   }
 
-  void updateSolution(cudaColorSpinorField &x, const Complex *alpha, Complex** const beta, 
-		      double *gamma, int k, cudaColorSpinorField *p[]) {
+  void updateSolution(ColorSpinorField &x, const Complex *alpha, Complex** const beta, 
+		      double *gamma, int k, std::vector<ColorSpinorField*> p) {
 
     Complex *delta = new Complex[k];
 
@@ -163,8 +163,10 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_FREE);
   }
 
-  void GCR::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
+  void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
+    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");    
+
     profile.Start(QUDA_PROFILE_INIT);
 
     int Nkrylov = param.Nkrylov; // size of Krylov space
@@ -176,8 +178,10 @@ namespace quda {
 
     // create sloppy fields used for orthogonalization
     csParam.setPrecision(param.precision_sloppy);
-    cudaColorSpinorField **p = new cudaColorSpinorField*[Nkrylov];
-    cudaColorSpinorField **Ap = new cudaColorSpinorField*[Nkrylov];
+    std::vector<ColorSpinorField*> p;
+    std::vector<ColorSpinorField*> Ap;
+    p.resize(Nkrylov);
+    Ap.resize(Nkrylov);
     for (int i=0; i<Nkrylov; i++) {
       p[i] = new cudaColorSpinorField(x, csParam);
       Ap[i] = new cudaColorSpinorField(x, csParam);
@@ -185,7 +189,7 @@ namespace quda {
 
     cudaColorSpinorField tmp(x, csParam); //temporary for sloppy mat-vec
 
-    cudaColorSpinorField *x_sloppy, *r_sloppy;
+    ColorSpinorField *x_sloppy, *r_sloppy;
     if (param.precision_sloppy != param.precision) {
       csParam.setPrecision(param.precision_sloppy);
       x_sloppy = new cudaColorSpinorField(x, csParam);
@@ -195,12 +199,12 @@ namespace quda {
       r_sloppy = &r;
     }
 
-    cudaColorSpinorField &xSloppy = *x_sloppy;
-    cudaColorSpinorField &rSloppy = *r_sloppy;
+    ColorSpinorField &xSloppy = *x_sloppy;
+    ColorSpinorField &rSloppy = *r_sloppy;
 
     // these low precision fields are used by the inner solver
     bool precMatch = true;
-    cudaColorSpinorField *r_pre, *p_pre;
+    ColorSpinorField *r_pre, *p_pre;
     if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
       csParam.setPrecision(param.precision_precondition);
       p_pre = new cudaColorSpinorField(x, csParam);
@@ -210,7 +214,7 @@ namespace quda {
       p_pre = NULL;
       r_pre = r_sloppy;
     }
-    cudaColorSpinorField &rPre = *r_pre;
+    ColorSpinorField &rPre = *r_pre;
 
     Complex *alpha = new Complex[Nkrylov];
     Complex **beta = new Complex*[Nkrylov];
@@ -260,7 +264,7 @@ namespace quda {
     
       for (int m=0; m<param.precondition_cycle; m++) {
 	if (param.inv_type_precondition != QUDA_INVALID_INVERTER) {
-	  cudaColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
+	  ColorSpinorField &pPre = (precMatch ? *p[k] : *p_pre);
 	
 	  if (m==0) { // residual is just source
 	    blas::copy(rPre, rSloppy);
@@ -402,8 +406,6 @@ namespace quda {
       delete p[i];
       delete Ap[i];
     }
-    delete[] p;
-    delete[] Ap;
 
     delete []alpha;
     for (int i=0; i<Nkrylov; i++) delete []beta[i];
