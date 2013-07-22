@@ -527,20 +527,21 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
   checkSpinor(x, w);
   checkSpinor(x, v);
 
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    doubleN even =
-      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,
-      writeY,writeZ,writeW,writeV,siteUnroll>
-      (a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even());
-    doubleN odd = 
-      reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,
-      writeY,writeZ,writeW,writeV,siteUnroll>
-      (a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd());
-    return even + odd;
-  }
-
   doubleN value;
   if (Location(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
+    // FIXME this condition should be outside of the Location test but
+    // Even and Odd must be implemented for cpu fields first
+    if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+      doubleN even =
+	reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,
+	writeY,writeZ,writeW,writeV,siteUnroll>
+	(a, b, x.Even(), y.Even(), z.Even(), w.Even(), v.Even());
+      doubleN odd = 
+	reduceCuda<doubleN,ReduceType,ReduceSimpleType,Reducer,writeX,
+	writeY,writeZ,writeW,writeV,siteUnroll>
+	(a, b, x.Odd(), y.Odd(), z.Odd(), w.Odd(), v.Odd());
+      return even + odd;
+    }
 
     for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
     blasConstants.stride = x.Stride();

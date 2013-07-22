@@ -162,15 +162,17 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   checkSpinor(x, z);
   checkSpinor(x, w);
 
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    blasCuda<Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
-    blasCuda<Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd());
-    return;
-  }
-
   if (Location(x, y, z, w) == QUDA_CUDA_FIELD_LOCATION) {
+    // FIXME this condition should be outside of the Location test but
+    // Even and Odd must be implemented for cpu fields first
+    if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+      blasCuda<Functor,writeX,writeY,writeZ,writeW>
+	(a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
+      blasCuda<Functor,writeX,writeY,writeZ,writeW>
+	(a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd());
+      return;
+    }
+
     for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
     blasConstants.stride = x.Stride();
 
