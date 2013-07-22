@@ -645,6 +645,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
     }
   } else { // fields are on the CPU
+    using namespace quda::colorspinor;
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
       ColorSpinorFieldOrder<double> *X = createOrder<double>(x);
       ColorSpinorFieldOrder<double> *Y = createOrder<double>(y);

@@ -4,6 +4,8 @@
 
 namespace quda {
 
+  using namespace quda::colorspinor;
+
   // Applies the grid restriction operator (fine to coarse)
   template <class CoarseSpinor, class FineSpinor>
   void restrict(CoarseSpinor &out, const FineSpinor &in, const int* geo_map, const int* spin_map) {

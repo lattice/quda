@@ -2,6 +2,8 @@
 
 namespace quda {
 
+  using namespace gauge;
+
   /**
      Generic CPU function find the gauge maximum
   */

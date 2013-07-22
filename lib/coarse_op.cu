@@ -7,6 +7,8 @@
 
 namespace quda {
 
+  using namespace colorspinor;
+
   //Returns the index of the coarse color matrix Y.
   //sites is the total number of sites on the coarse lattice (both parities)
   //Ns_c is the number of blocked spin components

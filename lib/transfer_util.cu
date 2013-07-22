@@ -5,6 +5,8 @@
 
 namespace quda {
 
+  using namespace quda::colorspinor;
+
   // copy the null-space vectors into the V-field
   template <class V, class B>
   void fill(V &out, const B &in, int v, int Nvec) {

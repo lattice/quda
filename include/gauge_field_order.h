@@ -1,9 +1,20 @@
+#ifndef _GAUGE_ORDER_H
+#define _GAUGE_ORDER_H
+
+/**
+ * @file  gauge_field_order.h
+ * @brief Main header file for host and device accessors to GaugeFields
+ *
+ */
+
 #include <tune_quda.h>
 #include <assert.h>
 #include <register_traits.h>
 #include <complex>
 
 namespace quda {
+  
+  namespace gauge {
 
   template <typename Float>
     struct GaugeFieldOrder {
@@ -601,5 +612,7 @@ namespace quda {
     size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
   };
 
-}
+  } // namespace gauge
+} // namespace quda
 
+#endif // _GAUGE_ORDER_H

@@ -3,6 +3,8 @@
 
 namespace quda {
 
+  using namespace clover;
+
   /** 
       Kernel argument struct
   */

@@ -1,6 +1,13 @@
 #ifndef _REGISTER_TRAITS_H
 #define _REGISTER_TRAITS_H
 
+/**
+ * @file  register_traits.h
+ * @brief Provides precision abstractions and defines the register
+ * precision given the storage precision using C++ traits.
+ *
+ */
+
 #include <quda_internal.h>
 
 namespace quda {
@@ -54,4 +61,4 @@ namespace quda {
 
 } // namespace quda
 
-#endif /* _REGISTER_TRAITS_H */
+#endif // _REGISTER_TRAITS_H
