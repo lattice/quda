@@ -29,7 +29,7 @@ namespace quda {
 
 //Does the heavy lifting of creating the coarse color matrices Y
 template<typename Float>
-void calculateY(std::complex<Float> *Y[], ColorSpinorFieldOrder<Float> &V, GaugeFieldOrder<Float> &G, int ndim, int *x_size, int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, int *geo_bs, int spin_bs, int mass) {
+void calculateY(std::complex<Float> *Y[], ColorSpinorFieldOrder<Float> &V, gauge::GaugeFieldOrder<Float> &G, int ndim, int *x_size, int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, int *geo_bs, int spin_bs, int mass) {
 
 	//Number of sites on the fine and coarse grids
 	int fsize = 1;
@@ -60,7 +60,7 @@ void calculateY(std::complex<Float> *Y[], ColorSpinorFieldOrder<Float> &V, Gauge
 //c = fine color
 //FIXME: N.B. Only works if color-spin field and gauge field are parity ordered in the same way.  Need LatticeIndex function for generic ordering
 template<typename Float>
-void UV(int dir, ColorSpinorFieldOrder<Float> &UV, ColorSpinorFieldOrder<Float> &V, GaugeFieldOrder<Float> &G, int ndim, int *x_size, int Nc, int Nc_c, int Ns) {
+void UV(int dir, ColorSpinorFieldOrder<Float> &UV, ColorSpinorFieldOrder<Float> &V, gauge::GaugeFieldOrder<Float> &G, int ndim, int *x_size, int Nc, int Nc_c, int Ns) {
 
 	for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
 
@@ -73,7 +73,7 @@ void UV(int dir, ColorSpinorFieldOrder<Float> &UV, ColorSpinorFieldOrder<Float> 
 	  V.Field().LatticeIndex(coord, i);
 
           parity = 0;
-          for(d = 0; d < ndim; d++);
+          for(d = 0; d < ndim; d++) {
             parity += coord[d];
           }
           parity = parity%2;
@@ -140,14 +140,14 @@ void UV(int dir, ColorSpinorFieldOrder<Float> &UV, ColorSpinorFieldOrder<Float> 
 
     //Switch on precision.  Create the FieldOrder objects for gauge field and color rotation field V
     if (precision == QUDA_DOUBLE_PRECISION) {
-      ColorSpinorFieldOrder<double> *vOrder = (ColorSpinorFieldOrder<double> *) colorspin::createOrder<double>(T.Vectors(),nvec);
-      GaugeFieldOrder<double> *gOrder = (GaugeFieldOrder<double> *) gauge::createOrder<float>(g);
+      ColorSpinorFieldOrder<double> *vOrder = (ColorSpinorFieldOrder<double> *) colorspinor::createOrder<double>(T.Vectors(),nvec);
+      gauge::GaugeFieldOrder<double> *gOrder = (gauge::GaugeFieldOrder<double> *) gauge::createOrder<float>(g);
       //GaugeFieldOrder gOrder(g);
       calculateY((std::complex<double> **)Y, *vOrder, gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs, 0);
     }
     else {
-      ColorSpinorFieldOrder<float> * vOrder = (ColorSpinorFieldOrder<float> *) colorspin::createOrder<float>(T.Vectors(), nvec);
-      GaugeFieldOrder<float> *gOrder = (GaugeFieldOrder<float> *) gauge::createOrder<float>(g);
+      ColorSpinorFieldOrder<float> * vOrder = (ColorSpinorFieldOrder<float> *) colorspinor::createOrder<float>(T.Vectors(), nvec);
+      gauge::GaugeFieldOrder<float> *gOrder = (gauge::GaugeFieldOrder<float> *) gauge::createOrder<float>(g);
       calculateY((std::complex<float> **)Y, *vOrder, gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs, 0);
     }
   }  
