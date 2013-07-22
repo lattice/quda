@@ -6,7 +6,7 @@
 #include <sys/time.h>
 #include <string>
 
-#if (defined(QMP_COMMS) || defined(MPI_COMMS) && !defined(MULTI_GPU))
+#if ((defined(QMP_COMMS) || defined(MPI_COMMS)) && !defined(MULTI_GPU))
 #error "MULTI_GPU must be enabled to use MPI or QMP"
 #endif
 
