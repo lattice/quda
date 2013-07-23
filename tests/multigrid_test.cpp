@@ -123,40 +123,23 @@ void loadTest() {
   int geom_bs[] = {4, 4, 4, 4};
   int spin_bs = 2;
 
+  printfQuda("Creating transfer operator with Nvec=%d\n", Nvec);
   Transfer T(W, Nvec, geom_bs, spin_bs);
 
-  coarsecsParam.nColor = Nvec;
-  //coarsecsParam.nColor = 3;
-  coarsecsParam.nSpin = 4/spin_bs;
-  //coarsecsParam.nSpin = 4;
-  coarsecsParam.nDim = 4;
-
-  coarsecsParam.x[0] = xdim/geom_bs[0];
-  coarsecsParam.x[1] = ydim/geom_bs[1];
-  coarsecsParam.x[2] = zdim/geom_bs[2];
-  coarsecsParam.x[3] = tdim/geom_bs[3];
-  setDims(coarsecsParam.x);
-
-  coarsecsParam.precision = prec_cpu;
-  coarsecsParam.pad = 0;
-  coarsecsParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  coarsecsParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  coarsecsParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  coarsecsParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  coarsecsParam.create = QUDA_ZERO_FIELD_CREATE;
-
   cpuColorSpinorField Wfine(csParam);
-  cpuColorSpinorField Wcoarse(coarsecsParam);
+  ColorSpinorField *Wcoarse = W[0]->CreateCoarse(geom_bs, spin_bs, Nvec);
 
   // test that the prolongator preserves the components which were
   // used to define it
   for (int i=0; i<Nvec; i++) {
-    T.R(Wcoarse,*W[i]);
-    T.P(Wfine, Wcoarse);
+    T.R(*Wcoarse,*W[i]);
+    T.P(Wfine, *Wcoarse);
     blas::axpy(-1.0, *W[i], Wfine);
     printfQuda("%d Absolute Norm^2 of the difference = %e\n", i, blas::norm2(Wfine));
     //Wfine.Compare(Wfine,*W[i]); // strong check
   }
+
+  delete Wcoarse;
 
 }
 
