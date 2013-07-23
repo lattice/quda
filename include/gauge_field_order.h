@@ -241,7 +241,7 @@ namespace quda {
 	    for (int j=0; j<N; j++) {
 	      int intIdx = i*N + j; // internal dof index
 	      int padIdx = intIdx / N;
-	      copy(tmp[i*N+j], ghost[dir][(parity*faceVolumeCB[dir]*M + padIdx*faceVolumeCB[dir]+x)*N + intIdx%N]);
+	      copy(tmp[i*N+j], ghost[dir][((parity*M+padIdx)*faceVolumeCB[dir] + x)*N + intIdx%N]);
 	    }
 	  }
 	  reconstruct.Unpack(v, tmp, x, dir);	 
@@ -259,7 +259,7 @@ namespace quda {
 	    for (int j=0; j<N; j++) {
 	      int intIdx = i*N + j;
 	      int padIdx = intIdx / N;
-	      copy(ghost[dir][(parity*faceVolumeCB[dir]*M + padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
+	      copy(ghost[dir][((parity*M+padIdx)*faceVolumeCB[dir] + x)*N + intIdx%N], tmp[i*N+j]);
 	    }
 	  }
 	}
