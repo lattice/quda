@@ -165,28 +165,6 @@ namespace quda {
         }
   };
 
-  //Returns the index of the coarse color matrix Y.
-  //This matrix is dense in both spin and color indices, in general
-  //sites is the total number of sites on the coarse lattice (both parities)
-  //Ns_c is the number of blocked spin components
-  //Nc_c is the number of coarse colors
-  //x is the index of the site on the even-odd coarse lattice
-  //parity determines whether the site is even or odd
-  //row_s = row index for spin
-  //col_s = column index for spin
-  //row_c = row index for coarse color
-  //col_c = column index for coarse color
-  int Yindex(int sites, int Ns_c, int Nc_c, int x, int parity, int row_s, int col_s, int row_c, int col_c) {
-    int size_spin = Ns_c*Ns_c;
-    int size_color = Nc_c*Nc_c;
-    return size_spin*size_color*(parity*sites/2 + x) + size_color*(Ns_c*row_s + col_s) + Nc_c*row_c+col_c;
-#if 0
-    if((x >= sites/2) || (x < 0) || (parity < 0) || (parity > 1) || (s < 0) || (s >= Ns_c) || (c < 0) || (c > Nc_c)) {
-      printfQuda("Bad Yindex: sites=%d Ns_c=%d Nc_c=%d,x=%d,parity=%d,s=%d,c=%d\n",sites,Ns_c,Nc_c,x,parity,s,c);
-      return -1;
-    }
-#endif
-  }
 
   //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
   //Where:
@@ -244,7 +222,7 @@ namespace quda {
       int coarse_parity = 0;
       int coarse_index = 0;
       V.Field().LatticeIndex(coord, i);
-      for(int d = ndim-1; d >= 0; d++) {
+      for(int d = ndim-1; d >= 0; d--) {
 	coord_coarse[d] = coord[d]/geo_bs[d];
 	coarse_size *= xc_size[d];
 	coarse_parity += coord_coarse[d];
@@ -261,7 +239,7 @@ namespace quda {
      std::complex<Float> *M;
 
      //If adjacent site is in same block, M = X
-     if((coord[dir]+1)/geo_bs[dir] == coord_coarse[dir]) {
+     if(((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) {
 	M = X;
      }
      //If adjacent site is in different block, M = Y
