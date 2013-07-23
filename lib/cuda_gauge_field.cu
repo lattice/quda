@@ -135,8 +135,8 @@ namespace quda {
 
     if (isNative()) {
       // copy from ghost into the padded region in gauge
-      copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost);
-      for (int d=0; d<nDim; d++) device_free(ghost[d]);
+      copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost_, 1);
+      for (int d=0; d<nDim; d++) device_free(ghost_[d]);
     }
 
     ghostExchange = true;
