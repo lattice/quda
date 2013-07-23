@@ -200,7 +200,7 @@ namespace quda {
 	  errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
 	}
       } else {
-	errorQuda("Accessor only supports CPU fields");
+	errorQuda("Accessor only currently supports CPU fields");
       }
 
       return ptr;

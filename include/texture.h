@@ -5,6 +5,8 @@
 #include <color_spinor_field.h>
 #include <convert.h>
 
+// FIXME - it would be too hard to get this working on the host as well
+
 //namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -288,9 +290,10 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor() 
       : spinor(0), tex(), norm(0), stride(0) { } // default constructor
 
-    Spinor(const cudaColorSpinorField &x) 
-      : spinor((StoreType*)x.V()), tex(&x), norm((float*)x.Norm()),
-      stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+  // Spinor must only eveb called with cudaColorSpinorField references!!!!
+    Spinor(const ColorSpinorField &x) 
+     : spinor((StoreType*)x.V()), tex(&(static_cast<const cudaColorSpinorField&>(x))), norm((float*)x.Norm()),
+       stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
 
     Spinor(const Spinor &st) 
       : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }

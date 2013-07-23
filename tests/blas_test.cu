@@ -34,8 +34,8 @@ const int Nkernels = 31;
 
 using namespace quda;
 
-cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
-cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
+ColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
+ColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
 int Nspin;
 
 void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
@@ -102,13 +102,13 @@ void initFields(int prec)
   hH = new cpuColorSpinorField(param);
   lH = new cpuColorSpinorField(param);
 
-  vH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  wH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  xH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  yH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  zH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  hH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  lH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(zH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(hH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(lH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
 
   // Now set the parameters for the cuda fields
   //param.pad = xdim*ydim*zdim/2;

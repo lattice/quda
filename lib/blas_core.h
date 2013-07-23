@@ -129,8 +129,9 @@ std::complex<float> make_Complex(const float2 &a) {
    CUDA.  The functors are defined in terms of FloatN vectors, whereas
    the operator() accessor returns std::complex<Float>
   */
-template <typename Float2, typename SpinorX, typename SpinorY, typename SpinorZ, 
-	  typename SpinorW, typename Functor>
+template <typename Float2, int writeX, int writeY, int writeZ, int writeW, 
+  typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, 
+  typename Functor>
 void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
 
   for (int x=0; x<X.Volume(); x++) {
@@ -141,10 +142,10 @@ void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
 	Float2 Z2 = make_Float2( Z(x, s, c) );
 	Float2 W2 = make_Float2( W(x, s, c) );
 	f(X2, Y2, Z2, W2);
-	X(x, s, c) = make_Complex(X2);
-	Y(x, s, c) = make_Complex(Y2);
-	Z(x, s, c) = make_Complex(Z2);
-	W(x, s, c) = make_Complex(W2);
+	if (writeX) X(x, s, c) = make_Complex(X2);
+	if (writeY) Y(x, s, c) = make_Complex(Y2);
+	if (writeZ) Z(x, s, c) = make_Complex(Z2);
+	if (writeW) W(x, s, c) = make_Complex(W2);
       }
     }
   }
@@ -251,7 +252,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       FieldOrder<double> *Z = createOrder<double>(z);
       FieldOrder<double> *W = createOrder<double>(w);
       Functor<double2, double2> f(a, b, c);
-      genericBlas<double2>(*X, *Y, *Z, *W, f);
+      genericBlas<double2, writeX, writeY, writeZ, writeW>(*X, *Y, *Z, *W, f);
       delete X;
       delete Y;
       delete Z;
@@ -263,7 +264,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       FieldOrder<float> *W = createOrder<float>(w);
       Functor<float2, float2> 
 	f(make_float2(a.x,a.y), make_float2(b.x,b.y), make_float2(c.x,c.y) );
-      genericBlas<float2>(*X, *Y, *Z, *W, f);
+      genericBlas<float2, writeX, writeY, writeZ, writeW>(*X, *Y, *Z, *W, f);
       delete X;
       delete Y;
       delete Z;
