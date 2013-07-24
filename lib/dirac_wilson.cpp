@@ -114,8 +114,18 @@ namespace quda {
   */
 
   void DiracWilson::createCoarseOp(Transfer &T, void *Y[], QudaPrecision precision) const {
-	CoarseOp(T, Y, precision, gauge);
+    CoarseOp(T, Y, precision, gauge);
   }
+
+  /* Takes the coarse color matrices Y created by createCoarseOp
+     and applies the coarse dirac operator to the coarse color
+     spinor field in, putting the result in out.
+     The local color matrix is stored in Y[2*ndim]
+  */
+  void DiracWilson::applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision) const {
+      ApplyCoarse(out, in, Y, precision, kappa);
+  }
+
 
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)
