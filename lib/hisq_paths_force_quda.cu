@@ -2067,6 +2067,9 @@ namespace quda {
 	
       unbind_tex_link(link, *newOprod);
 
+      cudaEventDestroy(start);
+      cudaEventDestroy(end);
+
       return; 
     }
 

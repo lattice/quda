@@ -305,6 +305,7 @@ double dslashCUDA(int niter) {
       }
       break;
     case 2:
+      errorQuda("Staggered operator acting on full-site not supported");
       if (transfer){
 	//MatQuda(spinorGPU, spinor, &inv_param);
       } else {

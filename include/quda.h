@@ -6,7 +6,8 @@
  * @brief Main header file for the QUDA library
  *
  * Note to QUDA developers: When adding new members to QudaGaugeParam
- * and QudaInvertParam, be sure to update lib/check_params.h
+ * and QudaInvertParam, be sure to update lib/check_params.h as well
+ * as the Fortran interface in lib/quda_fortran.F90.
  */
 
 #include <enum_quda.h>

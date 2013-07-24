@@ -653,8 +653,10 @@ void endQuda(void)
 
   saveTuneCache(getVerbosity());
 
+#ifndef USE_QDPJIT
   // end this CUDA context
   cudaDeviceReset();
+#endif
 
   initialized = false;
 
