@@ -117,6 +117,11 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   checkSpinor(x, z);
   checkSpinor(x, w);
 
+  if (!x.isNative()) {
+    warningQuda("Blas on non-native fields is not supported\n");
+    return;
+  }
+
   for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
   blasConstants.stride = x.Stride();
 

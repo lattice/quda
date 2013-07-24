@@ -489,6 +489,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   checkSpinor(x, w);
   checkSpinor(x, v);
 
+  if (!x.isNative()) {
+    warningQuda("Reductions on non-native fields is not supported\n");
+    doubleN value;
+    zero(value);
+    return value;
+  }
+
   for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
   blasConstants.stride = x.Stride();
 
