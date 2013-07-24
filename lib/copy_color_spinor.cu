@@ -11,6 +11,7 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
+#include <algorithm> // for std::swap
 
 #define PRESERVE_SPINOR_NORM
 
@@ -307,26 +308,33 @@ namespace quda {
 	errorQuda("QDPJIT field ordering not supported for full site fields");
       }
 
-      // check what src parity ordering is
-      unsigned long long evenOff, oddOff, evenNormOff, oddNormOff;
-      if (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER) {
-	evenOff = 0;
-	oddOff = src.Bytes() / (src.Precision() * 2);
-	evenNormOff = 0;
-	oddNormOff = src.NormBytes() / (sizeof(float) * 2);
-      } else {
-	oddOff = 0;
-	evenOff = src.Bytes() / (src.Precision() * 2);
-	oddNormOff = 0;
-	evenNormOff = src.NormBytes() / (sizeof(float) * 2);
-      }    
+      // set for the source subset ordering
+      srcFloat *srcEven = Src ? Src : (srcFloat*)src.V();
+      srcFloat *srcOdd = (srcFloat*)((char*)srcEven + src.Bytes()/2);
+      float *srcNormEven = srcNorm ? srcNorm : (float*)src.Norm();
+      float *srcNormOdd = (float*)((char*)srcNormEven + src.NormBytes()/2);
+      if (src.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) {
+	std::swap<srcFloat*>(srcEven, srcOdd);
+	std::swap<float*>(srcNormEven, srcNormOdd);
+      }
+
+      // set for the destination subset ordering
+      dstFloat *dstEven = Dst ? Dst : (dstFloat*)dst.V();
+      dstFloat *dstOdd = (dstFloat*)((char*)dstEven + dst.Bytes()/2);
+      float *dstNormEven = dstNorm ? dstNorm : (float*)dst.Norm();
+      float *dstNormOdd = (float*)((char*)dstNormEven + dst.NormBytes()/2);
+      if (dst.SiteOrder() == QUDA_ODD_EVEN_SITE_ORDER) {
+	std::swap<dstFloat*>(dstEven, dstOdd);
+	std::swap<float*>(dstNormEven, dstNormOdd);
+      }
+
       genericCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>
-	(dst, src, location, Dst, (srcFloat*)(Src+evenOff), dstNorm, (float*)(srcNorm+evenNormOff));
+	(dst, src, location, dstEven, srcEven, dstNormEven, srcNormEven);
       genericCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>
-	(dst, src, location, (dstFloat*)((char*)Dst+dst.Bytes()/2), (srcFloat*)(Src+oddOff), 
-	(float*)((char*)dstNorm+dst.NormBytes()/2), (float*)(srcNorm+oddNormOff));
+	(dst, src, location,  dstOdd,  srcOdd,  dstNormOdd,  srcNormOdd);
     } else { // parity field
-      genericCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
+      genericCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>
+	(dst, src, location, Dst, Src, dstNorm, srcNorm);
     }
 
   }
