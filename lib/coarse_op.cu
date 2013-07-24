@@ -288,10 +288,10 @@ namespace quda {
 }
 
   //Calculate the reverse link, Y_{-\mu}(x+mu).
-  //The reverse link is almost the complex conjugate of the forward link,
-  //but with negative sign for the spin-off diagonal parts to account
+  //The reverse link is almost the Hermitian conjugate of the forward link,
+  //but with negative sign for the spin off-diagonal parts to account
   //for the forward/backward spin proejctors.
-  //Note: No shifting in site index meaning Y_{-\mu}(x+mu) lives at site x.
+  //Note: No shifting in site index, so that site x holds the matrices Y_{\pm mu}(x, x+mu)
   template<typename Float>
   void reverseY(int dir, const std::complex<Float> *Y_p, std::complex<Float> *Y_m, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
 	int csize = 1;
@@ -309,6 +309,7 @@ namespace quda {
 	      }
 	      for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
 	        for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
+	          //Flip s_row, s_col and ic_c, jc_c indices on the rhs because of Hermitian conjugation.
 		  Y_m[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] = sign*std::conj(Y_p[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_col+s_row)+Nc_c*jc_c+ic_c]);
 	        } //Color column
 	      } //Color row
@@ -338,6 +339,7 @@ namespace quda {
 	     
 	      //Copy the Hermitian conjugate term to temp location 
 	      for(int k = 0; k < local; k++) {
+	        //Flip s_col, s_row on the rhs because of Hermitian conjugation.  Color part left untransposed.
 	        Xlocal[k] = X[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_col+s_row)+k];
 	      }
 
@@ -348,6 +350,8 @@ namespace quda {
 
 	      for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
 	        for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
+	          //Flip  color indices because of Hermitian conjugation.
+	          //Spin indices already flipped while filling Xlocal.
 		  X[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] += sign*std::conj(Xlocal[Nc_c*jc_c + ic_c]);
 	        } //Color column
 	      } //Color row
@@ -357,6 +361,7 @@ namespace quda {
 	delete [] Xlocal;
 }
 
+  //Currently unusued.  Combining mass and coarse clover term moved to the application of the operator.
   template<typename Float>
   void addMass(std::complex<Float> *X, int ndim, const int *xc_size, int Nc_c, int Ns_c, double mass)  {
 	int csize = 1;
@@ -498,11 +503,9 @@ namespace quda {
 	int backward_gauge_index = 0;
         int backward_parity = 0;
 
-        //We need the coordinates of the forward site to index
-        //into the out field.
-        //We need the coordinates of the backward site to index
-        //into the out field, as well as to retrieve the gauge
-        //field there.
+        //We need the coordinates of the forward site to index into the "out" field.
+        //We need the coordinates of the backward site to index into the "out" field, \
+	//as well as to retrieve the gauge field there for parallel transport.
 	in.Field().LatticeIndex(forward,i);
         in.Field().LatticeIndex(backward,i);
 	forward[d] = (forward[d] + 1)%x_size[d];
@@ -537,10 +540,10 @@ namespace quda {
 
 }
 
-  //out(x) = (1-X)in(x), where X is the local color-spin matrix
-  //on the coarse grid.
+  //out(x) = (mass-X)in(x), where X is the local color-spin matrix on the coarse grid.
+  //For kappa normalization, mass = 1.0
   template<typename Float>
-  void coarseClover(colorspinor::FieldOrder<Float> &out, const colorspinor::FieldOrder<Float> &in, const std::complex<Float> *X) {
+  void coarseClover(colorspinor::FieldOrder<Float> &out, const colorspinor::FieldOrder<Float> &in, const std::complex<Float> *X, Float mass) {
 
     int Nc = out.Ncolor();
     int Ns = out.Nspin();
@@ -568,10 +571,10 @@ namespace quda {
 
       for(int s = 0; s < Ns; s++) { //Spin out
         for(int c = 0; c < Nc; c++) { //Color out
-	  out(i,s,c) += in(i,s,c);
+	  out(i,s,c) += mass*in(i,s,c);
 	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
 	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
-	      out(i,s,c) -= X[gauge_site_offset+Nc*Nc*(Ns*s+s_col)+Nc*c+c_col];
+	      out(i,s,c) -= X[gauge_site_offset+Nc*Nc*(Ns*s+s_col)+Nc*c+c_col]*in(i,s_col,c_col);
 	    } //Color in
           } //Spin in
         } //Color out
@@ -579,7 +582,7 @@ namespace quda {
    } //Volume
 }
 
-  //Zero out a field, using an accessor.
+  //Zero out a field, using the accessor.
   template<typename Float>
   void setZero(colorspinor::FieldOrder<Float> &f) {
     for(int i = 0; i < f.Volume(); i++) {
@@ -618,7 +621,7 @@ namespace quda {
       setZero(*outOrder);
       coarseDslash(*outOrder, *inOrder, (std::complex<double>**)Y);
       F_eq_rF(*outOrder, -2*kappa);
-      coarseClover(*outOrder, *inOrder, (std::complex<double> *)Y[2*ndim]);
+      coarseClover(*outOrder, *inOrder, (std::complex<double> *)Y[2*ndim], (double) 1.0);
     }
     else {
       colorspinor::FieldOrder<float> *inOrder = colorspinor::createOrder<float>(in);
@@ -626,7 +629,7 @@ namespace quda {
       setZero(*outOrder);
       coarseDslash(*outOrder, *inOrder, (std::complex<float>**)Y);
       F_eq_rF(*outOrder, (float) (-2*kappa));
-      coarseClover(*outOrder, *inOrder, (std::complex<float> *)Y[2*ndim]);
+      coarseClover(*outOrder, *inOrder, (std::complex<float> *)Y[2*ndim], (float) 1.0);
     }  
 
   }//ApplyCoarse
