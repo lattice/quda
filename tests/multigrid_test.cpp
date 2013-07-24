@@ -12,7 +12,9 @@
 #include <blas_quda.h>
 
 #include <qio_field.h>
+
 #include <transfer.h>
+#include <multigrid.h>
 
 #include <cstring>
 
@@ -21,7 +23,6 @@
 #elif defined(MPI_COMMS)
 #include <mpi.h>
 #endif
-
 
 using namespace quda;
 
@@ -93,30 +94,7 @@ void end() {
 
 void loadTest() {
 
-  void **V = new void*[Nvec];
-  for (int i=0; i<Nvec; i++) { 
-    V[i] = W[i]->V();
-    if (V[i] == NULL) {
-      printf("Could not allocate V[%d]\n", i);      
-    }
-  }
-    //supports seperate reading or single file read
-
-  if (strcmp(vecfile,"")!=0) {
-#if 0
-    read_spinor_field(vecfile, &V[0], W[0]->Precision(), W[0]->X(), 
-		      W[0]->Ncolor(), W[0]->Nspin(), Nvec, 0,  (char**)0);
-#else 
-    for (int i=0; i<Nvec; i++) {
-      char filename[256];
-      sprintf(filename, "%s.%d", vecfile, i);
-      printf("Reading vector %d from file %s\n", i, filename);
-      read_spinor_field(filename, &V[i], W[i]->Precision(), W[i]->X(), 
-			W[i]->Ncolor(), W[i]->Nspin(), 1, 0,  (char**)0);
-    }
-#endif
-  }
-
+  loadVectors(W);
   for (int i=0; i<Nvec; i++) printfQuda("Vector %d has norm = %e\n", i, blas::norm2(*W[i]));
 
 

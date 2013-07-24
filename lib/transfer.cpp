@@ -9,12 +9,17 @@ namespace quda {
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
     : B(B), Nvec(Nvec), V(0), tmp(0), geo_bs(0), geo_map(0), spin_bs(spin_bs), spin_map(0)
   {
+    printfQuda("Transfer: creating\n");
 
     int ndim = B[0]->Ndim();
     this->geo_bs = new int[ndim];
     for (int d = 0; d < ndim; d++) {
       this->geo_bs[d] = geo_bs[d];
     }
+
+    printfQuda("Transfer: using block size %d ", geo_bs[0]);
+    for (int d=1; d<ndim; d++) printfQuda("x %d", geo_bs[d]);
+    printfQuda("\n");
 
     // create the storage for the final block orthogonal elements
     ColorSpinorParam param(*B[0]); // takes the geometry from the null-space vectors
@@ -31,17 +36,20 @@ namespace quda {
       param.x[0] *= 2;
     }
 
+    printfQuda("Transfer: creating storage for V field\n");
     if (typeid(*B[0]) == typeid(cpuColorSpinorField)) 
       V = new cpuColorSpinorField(param);
     else 
       V = new cudaColorSpinorField(param);      
 
+    printfQuda("Transfer: filling V field with zero\n");
     fillV(); // copy the null space vectors into V
 
     // create the storage for the intermediate temporary vector
     param.nSpin = B[0]->Nspin(); // tmp has same nSpin has the fine dimension
     param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
 
+    printfQuda("Transfer: creating tmp field\n");
     if (typeid(*B[0]) == typeid(cpuColorSpinorField)) 
       tmp = new cpuColorSpinorField(param);
     else 
@@ -56,8 +64,11 @@ namespace quda {
     createSpinMap(spin_bs);
 
     // orthogonalize the blocks
+    printfQuda("Transfer: block orthogonalizing\n");
     BlockOrthogonalize(*V, Nvec, geo_bs, geo_map, spin_bs);
-    printfQuda("V block orthonormal check %g\n", blas::norm2(*V));
+    printfQuda("Transfer: V block orthonormal check %g\n", blas::norm2(*V));
+
+    printfQuda("Transfer: finished creation");
   }
 
   Transfer::~Transfer() {

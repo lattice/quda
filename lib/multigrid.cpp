@@ -1,14 +1,18 @@
 #include <multigrid.h>
+#include <qio_field.h>
 
 namespace quda {
 
   MG::MG(MGParam &param, TimeProfile &profile) 
     : Solver(param, profile), param(param), smoother(0), coarse(0), fine(param.fine) {
 
+    printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
+
     if (param.level > QUDA_MAX_MG_LEVEL)
       errorQuda("Level=%d is greater than limit of multigrid recursion depth", param.level);
 
     // create the smoother for this level
+    param.inv_type = param.smoother;
     smoother = Solver::create(param, param.matResidual, param.matSmooth, param.matSmooth, profile);
 
     // if not on the coarsest level, construct it
@@ -80,5 +84,42 @@ namespace quda {
     }
 
   }
+
+  //supports seperate reading or single file read
+  void loadVectors(std::vector<ColorSpinorField*> &B) {
+    printfQuda("Start loading %d vectors from %s\n", nvec, vecfile);
+
+    if (nvec < 1 || nvec > 20) errorQuda("nvec not set");
+
+    const int Nvec = nvec;
+
+    void **V = new void*[Nvec];
+    for (int i=0; i<Nvec; i++) { 
+      V[i] = B[i]->V();
+      if (V[i] == NULL) {
+	printf("Could not allocate V[%d]\n", i);      
+      }
+    }
+    
+    if (strcmp(vecfile,"")!=0) {
+#if 0
+      read_spinor_field(vecfile, &V[0], B[0]->Precision(), B[0]->X(), 
+			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+#else 
+      for (int i=0; i<Nvec; i++) {
+	char filename[256];
+	sprintf(filename, "%s.%d", vecfile, i);
+	printf("Reading vector %d from file %s\n", i, filename);
+	read_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(), 
+			  B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
+      }
+#endif
+    } else {
+      errorQuda("No nullspace file defined");
+    }
+
+    printfQuda("Done loading vectors\n");
+  }
+
 
 }

@@ -7,7 +7,13 @@
 
 #define QUDA_MAX_MG_LEVEL 2
 
+extern char vecfile[];
+extern int nvec; 
+  
 namespace quda {
+
+  // FIXME - these definitions are strictly temporary
+  void loadVectors(std::vector<ColorSpinorField*> &B);
 
   class MG;
 
@@ -39,7 +45,7 @@ namespace quda {
     /** This is the next lower level */
     MG *coarse;
 
-    /** This is the next coarser level */
+    /** This is the immediate finer level */
     MG *fine;
 
     /** The null space vectors */
@@ -177,7 +183,6 @@ namespace quda {
       t->R(out, tmp2);
     }
   };
-
 
 } // namespace quda
 
