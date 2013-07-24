@@ -170,7 +170,7 @@ namespace quda {
 	offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
 	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
       }
-
+	
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
 	  for (int chirality=0; chirality<2; chirality++) {
@@ -180,13 +180,14 @@ namespace quda {
 	    }
 
 	  // the off diagonal elements
-	  for (int i=0; i<30; i++) {
-	    int z = i%2;
-	    int off = i/2;
-	    const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
-	    v[chirality*36 + 6 + i] = 0.5*offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
-	  }
+	    for (int i=0; i<30; i++) {
+	      int z = i%2;
+	      int off = i/2;
+	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
+	      v[chirality*36 + 6 + i] = 0.5*offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x];
+	    }
 
+	  }
 	}
   
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
@@ -208,7 +209,7 @@ namespace quda {
 
 	size_t Bytes() const { return length*sizeof(Float); }
       };
-
+      
 
     /**
        BQCD ordering for clover fields
@@ -264,7 +265,6 @@ namespace quda {
 
 	size_t Bytes() const { return length*sizeof(Float); }
       };
-
 
   } // namespace clover
 } // namespace quda
