@@ -75,6 +75,7 @@ namespace quda {
   /**
      Generic GPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
+     FIXME this implementation will have two-way warp divergence
   */
   template <typename Float, int length, int nDim, typename Order>
   __global__ void extractGhostKernel(ExtractGhostArg<Order,nDim> arg) {  
@@ -85,7 +86,7 @@ namespace quda {
 
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
-	if (X >= arg.nFace*arg.surfaceCB[dim]) continue;
+	if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
 	// X = ((d * A + a)*B + b)*C + c
 	int dab = X/arg.C[dim];
 	int c = X - dab*arg.C[dim];
@@ -132,7 +133,7 @@ namespace quda {
       int faceMax = 0;
       for (int d=0; d<nDim; d++) 
 	faceMax = (arg.surfaceCB[d] > faceMax ) ? arg.surfaceCB[d] : faceMax;
-      size = arg.nFace * faceMax;
+      size = 2 * arg.nFace * faceMax; // factor of comes from parity
     }
     virtual ~ExtractGhost() { ; }
   
