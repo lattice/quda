@@ -17,9 +17,19 @@ namespace quda {
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize);
 
       // create coarse grid operator
-      ColorSpinorField *tmp1_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
-      ColorSpinorField *tmp2_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
-      DiracCoarse matCoarse(param.matResidual.Expose(), transfer, *tmp1_coarse, *tmp2_coarse);
+      // first two need to be cpu fields
+      ColorSpinorParam csParam(*param.B[0]);
+      ColorSpinorField *tmp1;
+      ColorSpinorField *tmp2;
+
+      // first two need to be gpu fields with native ordering basis
+      ColorSpinorField *tmp3;
+      ColorSpinorField *tmp4;
+      DiracCoarse matCoarse(param.matResidual.Expose(), transfer, *tmp1, *tmp2, *tmp3, *tmp4);
+      delete tmp1;
+      delete tmp2;
+      delete tmp3;
+      delete tmp4;
 
       // create the next multigrid level
       MGParam coarse_param = param;
@@ -36,8 +46,6 @@ namespace quda {
 
   MG::~MG() {
     if (param.level < param.Nlevel) {
-      if (tmp1_coarse) delete tmp1_coarse;
-      if (tmp2_coarse) delete tmp2_coarse;
       if (coarse) delete coarse;
       if (transfer) delete transfer;
     }

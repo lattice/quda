@@ -94,12 +94,6 @@ namespace quda {
     /** Coarse solution vector */
     ColorSpinorField *x_coarse;
 
-    /** Coarse tmp vector */
-    ColorSpinorField *tmp1_coarse;
-
-    /** Coarse tmp vector */
-    ColorSpinorField *tmp2_coarse;
-
   public:
     /** 
       Constructor for MG class
@@ -133,46 +127,54 @@ namespace quda {
 
   class DiracCoarse : public DiracMatrix {
 
-    // these are 
+    // restrictor / prolongator defined here
     const Transfer *t;
-    ColorSpinorField &tmp;
-    ColorSpinorField &tmp2;
+    /*
+      The types of these vectors is very important.  If the wrong
+      types are passed, then this will bork.  This is a hack for
+      functionality to work around to the fact that Transfer is only
+      implemented to work on CPU, whereas the Dirac operator will only
+      act on GPU fields.
+     */
+    ColorSpinorField &tmp;  // must be a cpuColorSpinorField double/single with arbitrary ordering
+    ColorSpinorField &tmp2; // must be a cpuColorSpinorField double/single with arbitrary ordering
+    ColorSpinorField &tmp3; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
+    ColorSpinorField &tmp4; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
 
   public:
-  DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2) 
-    : DiracMatrix(d), t(&t), tmp(tmp), tmp2(tmp2) { }
-  DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2) 
-    : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2) { }
+  DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4) 
+    : DiracMatrix(d), t(&t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) { }
+  DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4)
+    : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) { }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
-      errorQuda("FIXME - generalize dirac operator interface");
       t->P(tmp, in);
-      //dirac->M(tmp2, tmp);
+      tmp3 = tmp;
+      dirac->M(tmp4, tmp3);
+      tmp2 = tmp4;
       t->R(out, tmp2);
     }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp3) const
+    // FIXME - additional dummy fields not used
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
     {
-      errorQuda("FIXME - generalize dirac operator interface");
-      dirac->tmp1 = &tmp3;
       t->P(tmp, in);
-      //dirac->M(out, in);
+      tmp3 = tmp;
+      dirac->M(tmp4, tmp3);
+      tmp2 = tmp4;
       t->R(out, tmp2);
-      dirac->tmp1 = NULL;
     }
 
+    // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-		    ColorSpinorField &tmp3, ColorSpinorField &tmp4) const
+		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
     {
-      errorQuda("FIXME - generalize dirac operator interface");
-      dirac->tmp1 = &tmp3;
-      dirac->tmp2 = &tmp4;
       t->P(tmp, in);
-      //dirac->M(out, in);
+      tmp3 = tmp;
+      dirac->M(tmp4, tmp3);
+      tmp2 = tmp4;
       t->R(out, tmp2);
-      dirac->tmp2 = NULL;
-      dirac->tmp1 = NULL;
     }
   };
 
