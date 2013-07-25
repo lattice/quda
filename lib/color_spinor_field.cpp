@@ -252,6 +252,7 @@ namespace quda {
 
   // Fills the param with the contents of this field
   void ColorSpinorField::fill(ColorSpinorParam &param) const {
+    param.location = Location();
     param.nColor = nColor;
     param.nSpin = nSpin;
     param.twistFlavor = twistFlavor;
@@ -377,8 +378,22 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] *= 2;
   }
 
-  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec) {
+  ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) {
 
+   ColorSpinorField *field;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuColorSpinorField(param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaColorSpinorField(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
+  ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec, 
+						   QudaFieldLocation new_location) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
     coarseParam.nSpin = nSpin / spinBlockSize;
@@ -386,14 +401,43 @@ namespace quda {
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
     
+    // if new location is not set, use this->location
+    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
     ColorSpinorField *coarse;
-    if (typeid(*this) == typeid(cpuColorSpinorField))
+    if (new_location == QUDA_CPU_FIELD_LOCATION) {
       coarse = new cpuColorSpinorField(coarseParam);
-    else 
+    } else if (new_location== QUDA_CUDA_FIELD_LOCATION) {
       coarse = new cudaColorSpinorField(coarseParam);
+    } else {
+      errorQuda("Invalid field location %d", new_location);
+    }
 
     return coarse;
-  };
+  }
+
+  ColorSpinorField* ColorSpinorField::CreateFine(const int *geoBlockSize, int spinBlockSize, int Nvec, 
+						 QudaFieldLocation new_location) {
+    ColorSpinorParam fineParam(*this);
+    for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
+    fineParam.nSpin = nSpin * spinBlockSize;
+    fineParam.nColor = Nvec;
+    fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
+    fineParam.create = QUDA_ZERO_FIELD_CREATE;
+    
+    // if new location is not set, use this->location
+    new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
+    ColorSpinorField *fine;
+    if (new_location == QUDA_CPU_FIELD_LOCATION) {
+      fine = new cpuColorSpinorField(fineParam);
+    } else if (new_location == QUDA_CUDA_FIELD_LOCATION) {
+      fine = new cudaColorSpinorField(fineParam);
+    } else {
+      errorQuda("Invalid field location %d", new_location);
+    }
+    return fine;
+  }
 
   std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
     out << "typdid = " << typeid(a).name() << std::endl;
