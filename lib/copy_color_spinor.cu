@@ -235,9 +235,15 @@ namespace quda {
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
     } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
+
+#ifdef BUILD_QDPJIT_INTERFACE
       QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+#else
+      errorQuda("QDPJIT interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Order not defined");
     }
@@ -262,8 +268,14 @@ namespace quda {
       SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
+
+#ifdef BUILD_QDPJIT_INTERFACE
       QDPJITDiracOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
+#else
+      errorQuda("QDPJIT interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Order not defined");
     }

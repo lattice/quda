@@ -257,20 +257,50 @@ namespace quda {
 				   u.Nface(), u.SurfaceCB(), u.X(), location);
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+      
+#ifdef BUILD_QDP_INTERFACE
       extractGhost<Float,length>(QDPOrder<Float,length>(u, 0, Ghost),
 				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("QDP interface has not been built\n");
+#endif
+      
     } else if (u.Order() == QUDA_QDPJIT_GAUGE_ORDER) {
+
+#ifdef BUILD_QDPJIT_INTERFACE
       extractGhost<Float,length>(QDPJITOrder<Float,length>(u, 0, Ghost),
 				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("QDPJIT interface has not been built\n");
+#endif
+
     } else if (u.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+
+#ifdef BUILD_CPS_INTERFACE
       extractGhost<Float,length>(CPSOrder<Float,length>(u, 0, Ghost),
 				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("CPS interface has not been built\n");
+#endif
+
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+
+#ifdef BUILD_MILC_INTERFACE
       extractGhost<Float,length>(MILCOrder<Float,length>(u, 0, Ghost),
 				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("MILC interface has not been built\n");
+#endif
+
     } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
+
+#ifdef BUILD_BQCD_INTERFACE
       extractGhost<Float,length>(BQCDOrder<Float,length>(u, 0, Ghost),
 				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("BQCD interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }

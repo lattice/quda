@@ -127,10 +127,7 @@ namespace quda {
 
  template <typename FloatOut, typename FloatIn, int length, typename InOrder>
  void copyClover(const InOrder &inOrder, CloverField &out, bool inverse, QudaFieldLocation location, FloatOut *Out, float *outNorm) {
-    if (out.Order() == QUDA_FLOAT_CLOVER_ORDER) {
-      copyClover<FloatOut,FloatIn,length>
-	(FloatNOrder<FloatOut,length,1>(out, inverse, Out, outNorm), inOrder, out.Volume(), location);
-    } else if (out.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
+    if (out.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(FloatNOrder<FloatOut,length,2>(out, inverse, Out, outNorm), inOrder, out.Volume(), location);
     } else if (out.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
@@ -140,11 +137,16 @@ namespace quda {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
     } else if (out.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
+
+#ifdef BUILD_QDPJIT_INTERFACE
       copyClover<FloatOut,FloatIn,length>
 	(QDPJITOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
+#else
+      errorQuda("QDPJIT interface has not been built\n");
+#endif
+
     } else if (out.Order() == QUDA_BQCD_CLOVER_ORDER) {
-      copyClover<FloatOut,FloatIn,length>
-	(BQCDOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
+      errorQuda("BQCD output not supported");
     } else {
       errorQuda("Clover field %d order not supported", out.Order());
     }
@@ -156,10 +158,7 @@ namespace quda {
 		 FloatOut *Out, FloatIn *In, float *outNorm, float *inNorm) {
 
     // reconstruction only supported on FloatN fields currently
-    if (in.Order() == QUDA_FLOAT_CLOVER_ORDER) {
-      copyClover<FloatOut,FloatIn,length> 
-	(FloatNOrder<FloatIn,length,1>(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
-    } else if (in.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
+    if (in.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length> 
 	(FloatNOrder<FloatIn,length,2>(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
@@ -169,11 +168,23 @@ namespace quda {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
+
+#ifdef BUILD_QDPJIT_INTERFACE
       copyClover<FloatOut,FloatIn,length>
 	(QDPJITOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
+#else
+      errorQuda("QDPJIT interface has not been built\n");
+#endif
+
     } else if (in.Order() == QUDA_BQCD_CLOVER_ORDER) {
+
+#ifdef BUILD_BQCD_INTERFACE
       copyClover<FloatOut,FloatIn,length>
 	(BQCDOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
+#else
+      errorQuda("BQCD interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Clover field %d order not supported", in.Order());
     }
@@ -187,8 +198,6 @@ namespace quda {
       errorQuda("Half precision not supported for order %d", out.Order());
     if (in.Precision() == QUDA_HALF_PRECISION && in.Order() > 4) 
       errorQuda("Half precision not supported for order %d", in.Order());
-    if (out.Order() == QUDA_BQCD_CLOVER_ORDER) 
-      errorQuda("BQCD output not supported");
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {

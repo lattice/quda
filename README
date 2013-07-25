@@ -79,6 +79,14 @@ configure into thinking that it's cross-compiling by setting the
 --build=none and --host=<HOST> flags.  For the latter,
 "--host=x86_64-linux-gnu" should work on a 64-bit linux system.
 
+By default only the QDP and MILC interfaces are enabled.  For
+interfacing support with QDPJIT, BQCD or CPS; this should be enabled
+at configure time with the appropriate flag, e.g.,
+--enable-bqcd-interface.  To keep compilation time to a minimum it is
+recommended to only enable those interfaces that are used by a given
+application.  The QDP and MILC interfaces can be disabled with the,
+e.g., --disable-milc-interface flag.
+
 If Fortran interface support is desired, the F90 environment variable
 should be set when configure is invoked, and "make fortran" must be
 run explicitly, since the Fortran interface modules are not built by
