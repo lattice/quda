@@ -174,6 +174,11 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       return;
     }
 
+    if (!x.isNative()) {
+      warningQuda("Device blas on non-native fields is not supported\n");
+      return;
+    }
+
     for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
     blasConstants.stride = x.Stride();
 

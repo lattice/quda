@@ -1,14 +1,20 @@
 
-Version 0.6.x - xx July 2013
+Version 0.6.0 - xx July 2013
 
 - Completely rewritten gauge and clover field copying routines using a
-  generic template-driven approach.
+  generic template-driven approach.  Due the large number of possible
+  input / output combinations to keep the compilation time under
+  control, the different interfaces need to be opted in at configure
+  time (MILC and QDP interfaces are enabled by default).
 
 - The QUDA interface (loadGaugeQuda, loadCloverQuda, invertQuda and
   invertMultishiftQuda) now supports device-side pointers as well as
   host-size pointers.  The location of a given pointer is set by the
   QudaFieldLocation members of QudaGaugeParam (location) and
   QudaInvertParam (input_location, output_location, clover_location).
+
+- Added new interface support for QDPJIT ordered fields (dirac, clover
+  and gauge fields).
 
 - When doing mixed-precision solvers, all low-precision copies of
   gauge and clover fields are created from the pre-existing GPU copies
