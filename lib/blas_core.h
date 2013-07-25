@@ -151,6 +151,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     const int M = 1;
     if (x.Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       Spinor<float4,float4,float4,M,writeX,0> X(x);
       Spinor<float4,float4,float4,M,writeY,1> Y(y);
       Spinor<float4,float4,float4,M,writeZ,2> Z(z);
@@ -161,7 +162,11 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	Spinor<float4,float4,float4,M,writeZ,2>, Spinor<float4,float4,float4,M,writeW,3>, 
 	Functor<float2, float4> > blas(X, Y, Z, W, f, x.Length()/(4*M));
       blas.apply(*blasStream);
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else {
+#ifdef GPU_STAGGERED_DIRAC
       Spinor<float2,float2,float2,M,writeX,0> X(x);
       Spinor<float2,float2,float2,M,writeY,1> Y(y);
       Spinor<float2,float2,float2,M,writeZ,2> Z(z);
@@ -172,9 +177,13 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	Spinor<float2,float2,float2,M,writeZ,2>, Spinor<float2,float2,float2,M,writeW,3>, 
 	Functor<float2, float2> > blas(X, Y, Z, W, f, x.Length()/(2*M));
       blas.apply(*blasStream);
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     }
   } else {
     if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       Spinor<float4,float4,short4,6,writeX,0> X(x);
       Spinor<float4,float4,short4,6,writeY,1> Y(y);
       Spinor<float4,float4,short4,6,writeZ,2> Z(z);
@@ -185,7 +194,11 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	Spinor<float4,float4,short4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>, 
 	Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume());
       blas.apply(*blasStream);
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else if (x.Nspin() == 1) {//staggered
+#ifdef GPU_STAGGERED_DIRAC
       Spinor<float2,float2,short2,3,writeX,0> X(x);
       Spinor<float2,float2,short2,3,writeY,1> Y(y);
       Spinor<float2,float2,short2,3,writeZ,2> Z(z);
@@ -196,6 +209,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
 	Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume());
       blas.apply(*blasStream);
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     blas_bytes += Functor<double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
   }
