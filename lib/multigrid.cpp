@@ -101,14 +101,19 @@ namespace quda {
       std::cout << x << b;
       (*smoother)(x, b);
 
+      // FIXME - residual computation should be in the previous smoother
+      param.matResidual(*r, x);
+      double r2 = blas::xmyNorm(b, *r);
+
       // restrict to the coarse grid
       printfQuda("MG: level %d, restriction\n", param.level);
       transfer->R(*r_coarse, *r);
-      printfQuda("MG: r2 = %e r_coarse2 = %e\n", blas::norm2(*r), blas::norm2(*r_coarse));
+      printfQuda("MG: r2 = %e r_coarse2 = %e\n", r2, blas::norm2(*r_coarse));
 
       // recurse to the next lower level
       printfQuda("MG: solving coarse operator\n");
       //(*coarse)(*x_coarse, *r_coarse); 
+      blas::zero(*x_coarse);
 
       // prolongate back to this grid
       printfQuda("MG: level %d, prolongation\n", param.level);

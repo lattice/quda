@@ -45,7 +45,7 @@ extern char vecfile[];
 
 std::vector<ColorSpinorField*> W; // array of bad guys
 int Nvec; // number of bad guys for the transfer operator
-QudaPrecision prec_cpu = QUDA_SINGLE_PRECISION;
+QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
 // where is the packing / unpacking taking place
 //most orders are CPU only currently
