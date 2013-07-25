@@ -12,7 +12,9 @@
 #include <blas_quda.h>
 
 #include <qio_field.h>
+
 #include <transfer.h>
+#include <multigrid.h>
 
 #include <cstring>
 #include <wilson_dslash_reference.h>
@@ -22,7 +24,6 @@
 #elif defined(MPI_COMMS)
 #include <mpi.h>
 #endif
-
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -48,7 +49,7 @@ extern char vecfile[];
 std::vector<ColorSpinorField*> W; // array of bad guys
 cpuColorSpinorField *V1, *V2;
 int Nvec; // number of bad guys for the transfer operator
-QudaPrecision prec_cpu = QUDA_SINGLE_PRECISION;
+QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
 // where is the packing / unpacking taking place
 //most orders are CPU only currently
@@ -248,6 +249,10 @@ void loadTest() {
     }
 #endif
   }
+
+  #if 0
+  loadVectors(W);
+  #endif
 
   for (int i=0; i<Nvec; i++) printfQuda("Vector %d has norm = %e\n", i, blas::norm2(*W[i]));
 

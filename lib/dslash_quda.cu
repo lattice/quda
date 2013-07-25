@@ -113,8 +113,11 @@ namespace quda {
   // dslashTuning = QUDA_TUNE_YES enables autotuning when the dslash is
   // first launched
   static QudaTune dslashTuning = QUDA_TUNE_NO;
-  static QudaTune twistedGamma5Tuning = QUDA_TUNE_NO;//twistedGamma5 is currently disabled
   static QudaVerbosity verbosity = QUDA_SILENT;
+
+#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
+  static QudaTune twistedGamma5Tuning = QUDA_TUNE_NO;//twistedGamma5 is currently disabled
+#endif
 
   void setDslashTuning(QudaTune tune, QudaVerbosity verbose)
   {
@@ -137,8 +140,10 @@ namespace quda {
   void setTwistPack(bool flag) { twistPack = flag; }
   bool getTwistPack() { return twistPack; }
 
+#ifdef MULTI_GPU
   static double twist_a = 0.0;
   static double twist_b = 0.0;
+#endif
 
 #include <dslash_textures.h>
 #include <dslash_constants.h>
@@ -1525,11 +1530,13 @@ namespace quda {
       ghost_threads[i] = ((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) ? in->GhostFace()[i] : in->GhostFace()[i] / 2;
     }
 
+#ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
         setTwistPack(true);
         twist_a = kappa; 
         twist_b = mu;
     }
+#endif
 
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
@@ -1557,12 +1564,13 @@ namespace quda {
     dslashCuda(*dslash, regSize, parity, dagger, bulk_threads, ghost_threads, profile);
 
     delete dslash;
-
+#ifdef MULTI_GPU
     if(type == QUDA_DEG_TWIST_INV_DSLASH){
         setTwistPack(false);
         twist_a = 0.0; 
         twist_b = 0.0;
     }
+#endif
 
     unbindGaugeTex(gauge);
 
@@ -1867,6 +1875,7 @@ namespace quda {
 
   void apply(const cudaStream_t &stream) 
   {
+#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
     TuneParam tp = tuneLaunch(*this, twistedGamma5Tuning, verbosity);
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
@@ -1879,6 +1888,7 @@ namespace quda {
         twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>
 	((sFloat*)out->V(), (float*)out->Norm(), a, b, c, (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
     }
+#endif
   }
 
   void preTune() {

@@ -7,7 +7,13 @@
 
 #define QUDA_MAX_MG_LEVEL 2
 
+extern char vecfile[];
+extern int nvec; 
+  
 namespace quda {
+
+  // FIXME - these definitions are strictly temporary
+  void loadVectors(std::vector<ColorSpinorField*> &B);
 
   class MG;
 
@@ -17,9 +23,9 @@ namespace quda {
    */
   struct MGParam : SolverParam {
 
-    MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> B, 
+    MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> &B, 
 	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
-    SolverParam(), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
+    SolverParam(invParam), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
 
     /** What is the level of this instance */
     int level; 
@@ -39,7 +45,7 @@ namespace quda {
     /** This is the next lower level */
     MG *coarse;
 
-    /** This is the next coarser level */
+    /** This is the immediate finer level */
     MG *fine;
 
     /** The null space vectors */
@@ -93,6 +99,9 @@ namespace quda {
 
     /** Coarse solution vector */
     ColorSpinorField *x_coarse;
+
+    // hack vectors
+    ColorSpinorField *hack1, *hack2, *hack3, *hack4;
 
   public:
     /** 
@@ -177,7 +186,6 @@ namespace quda {
       t->R(out, tmp2);
     }
   };
-
 
 } // namespace quda
 

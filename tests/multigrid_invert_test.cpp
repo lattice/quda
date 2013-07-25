@@ -183,6 +183,10 @@ int main(int argc, char **argv)
     inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
   }
 
+  // MG only these options are supported with MG currently
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solve_type = QUDA_DIRECT_SOLVE;
+
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
 #if __COMPUTE_CAPABILITY__ >= 200
@@ -355,11 +359,13 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
   // perform the inversion
-  if (multi_shift) {
+  /*if (multi_shift) {
     invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
   } else {
     invertQuda(spinorOut, spinorIn, &inv_param);
-  }
+    }*/
+
+  multigridQuda(spinorOut, spinorIn, &inv_param);
 
   // stop the timer
   time0 += clock();

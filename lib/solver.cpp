@@ -77,16 +77,4 @@ namespace quda {
     }
   }
 
-  void Solver::operator()(ColorSpinorField &out, ColorSpinorField &in) {
-
-    if (typeid(out) == typeid(cudaColorSpinorField) &&
-	typeid(in) == typeid(cudaColorSpinorField)) {
-      (*this)(static_cast<cudaColorSpinorField&>(out), static_cast<cudaColorSpinorField&>(in));
-    } else {
-      errorQuda("Only implemented for cudaColorSpinorFields");
-    }
-
-  }
-
-
 } // namespace quda

@@ -68,7 +68,7 @@ QUDA_CORE = clover_core.h staggered_dslash_core.h			\
 	wilson_pack_face_core.h wilson_pack_face_dagger_core.h		\
 	tm_ndeg_dslash_core.h tm_ndeg_dslash_dagger_core.h	
 
-INC += -I../include -Idslash_core -I.
+INC += -I../include -Idslash_core -I. -I../tests
 
 HDRS = $(QUDA_HDRS:%=../include/%)
 HDRS += $(QUDA_INLN)

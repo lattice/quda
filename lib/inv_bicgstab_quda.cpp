@@ -138,6 +138,7 @@ namespace quda {
     double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
     int heavy_quark_check = 10; // how often to check the heavy quark residual
 
+
     double delta = param.delta;
 
     int k = 0;

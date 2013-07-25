@@ -1,6 +1,6 @@
 include ../make.inc
 
-QUDA = ../lib/libquda.a
+QUDA = ../lib/libquda.a $(QIO_UTIL)
 
 INC += -I../include -I. 
 
@@ -11,7 +11,7 @@ TESTS = su3_test blas_test dslash_test invert_test $(DIRAC_TEST)	\
 	$(STAGGERED_DIRAC_TEST) $(FATLINK_TEST) $(GAUGE_FORCE_TEST)     \
 	$(FERMION_FORCE_TEST) $(UNITARIZE_LINK_TEST)			\
 	$(HISQ_PATHS_FORCE_TEST) $(HISQ_UNITARIZE_FORCE_TEST)		\
-	multigrid_test pack_test
+	multigrid_test multigrid_invert_test pack_test
 
 all: $(TESTS)
 
@@ -21,6 +21,8 @@ dslash_test: dslash_test.o test_util.o wilson_dslash_reference.o domain_wall_dsl
 invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
+multigrid_invert_test: multigrid_invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS) 
 

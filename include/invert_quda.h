@@ -138,7 +138,7 @@ namespace quda {
        QudaInvertParam instance
        @param param The QudaInvertParam instance from which the values are copied
      */
-    SolverParam(QudaInvertParam &param) : inv_type(param.inv_type), 
+    SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type), 
       inv_type_precondition(param.inv_type_precondition), 
       residual_type(param.residual_type), delta(param.reliable_delta), 
       tol(param.tol), tol_hq(param.tol_hq), 

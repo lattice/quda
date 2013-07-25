@@ -133,10 +133,11 @@ namespace quda {
 	mat(r, x);
 	double true_res = blas::xmyNorm(b, r);
 	param.true_res = sqrt(true_res / b2);
+	printfQuda("test %10e %10e %10e\n", sqrt(blas::norm2(r)), sqrt(blas::norm2(x)), sqrt(true_res));
 
 	if (param.verbosity >= QUDA_SUMMARIZE) {
 	  printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		     k, sqrt(r2/b2), param.true_res);    
+	  k, sqrt(r2/b2), param.true_res);    
 	}
 
 	// reset the flops counters

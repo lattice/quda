@@ -309,13 +309,6 @@ namespace quda {
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
 
-    /**
-       This function returns true if the field is stored in an internal
-       field order, given the precision and the length of the spin
-       dimension.
-    */ 
-    bool isNative() const;
-
   public:
     //cudaColorSpinorField();
     cudaColorSpinorField(const cudaColorSpinorField&);
@@ -352,6 +345,13 @@ namespace quda {
     void zero();
 
     QudaFieldLocation Location() const;
+
+    /**
+       This function returns true if the field is stored in an internal
+       field order, given the precision and the length of the spin
+       dimension.
+    */ 
+    bool isNative() const;
 
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
   };

@@ -402,6 +402,18 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
+   * Perform the solve using multigrid, according to the parameters set in param.  It
+   * is assumed that the gauge field has already been loaded via
+   * loadGaugeQuda().
+   * @param h_x    Solution spinor field
+   * @param h_b    Source spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
+   */
+  void multigridQuda(void *h_x, void *h_b, QudaInvertParam *param);
+
+
+  /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
    * @param _hp_b    Array of source spinor fields

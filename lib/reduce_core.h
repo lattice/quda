@@ -530,6 +530,14 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 
   doubleN value;
   if (Location(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
+
+    if (!static_cast<cudaColorSpinorField&>(x).isNative()) {
+      warningQuda("Device reductions on non-native fields is not supported\n");
+      doubleN value;
+      zero(value);
+      return value;
+    }
+
     // FIXME this condition should be outside of the Location test but
     // Even and Odd must be implemented for cpu fields first
     if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
