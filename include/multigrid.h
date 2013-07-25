@@ -15,7 +15,9 @@ namespace quda {
   // FIXME - these definitions are strictly temporary
   void loadVectors(std::vector<ColorSpinorField*> &B);
 
+  // forward declarations
   class MG;
+  class DiracCoarse;
 
   /**
      This struct contains all the metadata required to define the
@@ -26,6 +28,14 @@ namespace quda {
     MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> &B, 
 	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
     SolverParam(invParam), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
+
+    MGParam(const MGParam &param, std::vector<ColorSpinorField*> &B, 
+	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
+    SolverParam(param), level(param.level), Nlevel(param.Nlevel), spinBlockSize(param.spinBlockSize),
+      Nvec(param.Nvec), coarse(param.coarse), fine(param.fine),  B(B), nu_pre(param.nu_pre), 
+      nu_post(param.nu_post),  matResidual(matResidual), matSmooth(matSmooth), smoother(param.smoother) { 
+      for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geoBlockSize[i];
+    }
 
     /** What is the level of this instance */
     int level; 
@@ -91,6 +101,9 @@ namespace quda {
     /** This is the next coarser level */
     MG *fine;
 
+    /** Storage for the parameter struct for the coarse grid */
+    MGParam *param_coarse;
+
     /** Residual vector */
     ColorSpinorField *r;
 
@@ -99,6 +112,9 @@ namespace quda {
 
     /** Coarse solution vector */
     ColorSpinorField *x_coarse;
+
+    /** The coarse grid operator */
+    DiracCoarse *matCoarse;
 
     // hack vectors
     ColorSpinorField *hack1, *hack2, *hack3, *hack4;
