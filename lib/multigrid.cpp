@@ -18,22 +18,20 @@ namespace quda {
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel) {
       // create transfer operator
+      printfQuda("MG: start creating transfer operator\n");
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize);
+      printfQuda("MG: end creating transfer operator\n");
 
       // create coarse grid operator
-      // first two need to be cpu fields
-      ColorSpinorParam csParam(*param.B[0]);
-      ColorSpinorField *tmp1;
-      ColorSpinorField *tmp2;
+      // these need to be cpu fields
+      ColorSpinorParam csParam(*(param.B[0]));  // FIXME this is crashing for some reason
+      ColorSpinorField *tmp1 = new cpuColorSpinorField(csParam);
+      ColorSpinorField *tmp2 = new cpuColorSpinorField(csParam);
 
-      // first two need to be gpu fields with native ordering basis
-      ColorSpinorField *tmp3;
-      ColorSpinorField *tmp4;
+      // these need to be gpu fields with native ordering basis
+      ColorSpinorField *tmp3;  // FIXME allocate cudaSpinorFields
+      ColorSpinorField *tmp4;   // FIXME allocate cudaSpinorFields
       DiracCoarse matCoarse(param.matResidual.Expose(), transfer, *tmp1, *tmp2, *tmp3, *tmp4);
-      delete tmp1;
-      delete tmp2;
-      delete tmp3;
-      delete tmp4;
 
       // create the next multigrid level
       MGParam coarse_param = param;
@@ -54,6 +52,11 @@ namespace quda {
       if (transfer) delete transfer;
     }
     if (smoother) delete smoother;
+
+    if (tmp1) delete tmp1;
+    if (tmp2) delete tmp2;
+    if (tmp3) delete tmp3;
+    if (tmp4) delete tmp4;
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {

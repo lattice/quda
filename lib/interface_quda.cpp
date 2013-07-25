@@ -1586,6 +1586,8 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
   
+  printfQuda("Creating vector of null space fields of length %d\n", nvec);
+  cpuParam.create = QUDA_NULL_FIELD_CREATE;
   std::vector<ColorSpinorField*>B;
   B.resize(nvec);
   for (int i=0; i<nvec; i++) {

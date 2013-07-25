@@ -23,7 +23,7 @@ namespace quda {
    */
   struct MGParam : SolverParam {
 
-    MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> B, 
+    MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> &B, 
 	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
     SolverParam(), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
 
