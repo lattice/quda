@@ -108,6 +108,9 @@ namespace quda {
 		in.SiteSubset(), out.SiteSubset());
     }
 
+    if (!static_cast<const cudaColorSpinorField&>(in).isNative()) errorQuda("Input field is not in native order");
+    if (!static_cast<const cudaColorSpinorField&>(out).isNative()) errorQuda("Output field is not in native order");
+
     if (out.Ndim() != 5) {
       if ((out.Volume() != gauge.Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	  (out.Volume() != gauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
