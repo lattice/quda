@@ -25,7 +25,7 @@ namespace quda {
 
     MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> &B, 
 	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
-    SolverParam(), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
+    SolverParam(invParam), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
 
     /** What is the level of this instance */
     int level; 
@@ -99,6 +99,9 @@ namespace quda {
 
     /** Coarse solution vector */
     ColorSpinorField *x_coarse;
+
+    // hack vectors
+    ColorSpinorField *hack1, *hack2, *hack3, *hack4;
 
   public:
     /** 

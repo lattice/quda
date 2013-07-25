@@ -1598,7 +1598,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // fill out the MG parameters for the fine level
   MGParam mgParam(*param, B, m, mSloppy);  
-  mgParam.level = 0;         // set this level
+  mgParam.level = 1;         // set this level
   mgParam.Nlevel = 2;        // total number of levels
   // set the block size
   for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = 4;
@@ -1606,7 +1606,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   mgParam.Nvec = nvec;       // set number of null space components
   mgParam.nu_pre = 10; // set the number of pre-smoothing applications
   mgParam.nu_post = 10; // set the number of pre-smoothing applications  
-  mgParam.smoother = QUDA_MR_INVERTER;  // set the smoother type
+  mgParam.smoother = QUDA_BICGSTAB_INVERTER;  // set the smoother type
 
   // create the MG solver
   Solver *solve = new MG(mgParam, profileInvert);

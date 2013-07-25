@@ -531,7 +531,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
   doubleN value;
   if (Location(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-    if (!x.isNative()) {
+    if (!static_cast<cudaColorSpinorField&>(x).isNative()) {
       warningQuda("Device reductions on non-native fields is not supported\n");
       doubleN value;
       zero(value);

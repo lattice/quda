@@ -4,7 +4,8 @@
 namespace quda {
 
   MG::MG(MGParam &param, TimeProfile &profile) 
-    : Solver(param, profile), param(param), smoother(0), coarse(0), fine(param.fine) {
+    : Solver(param, profile), param(param), smoother(0), coarse(0), fine(param.fine), 
+      r(0), r_coarse(0), hack1(0), hack2(0), hack3(0), hack4(0) {
 
     printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
 
@@ -22,16 +23,39 @@ namespace quda {
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize);
       printfQuda("MG: end creating transfer operator\n");
 
+      // create residual vectors
+      {
+	ColorSpinorParam csParam(*(param.B[0]));
+	csParam.create = QUDA_NULL_FIELD_CREATE;
+	if (param.level==1) {
+	  csParam.setPrecision(csParam.precision);
+	  csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+	  r = new cudaColorSpinorField(csParam);
+	} else {
+	  r = new cpuColorSpinorField(csParam);	
+	}
+      }
+
+      // create coarse residual vector
+      r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
+
+      // create coarse solution vector
+      x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
+
       // create coarse grid operator
       // these need to be cpu fields
-      ColorSpinorParam csParam(*(param.B[0]));  // FIXME this is crashing for some reason
-      ColorSpinorField *tmp1 = new cpuColorSpinorField(csParam);
-      ColorSpinorField *tmp2 = new cpuColorSpinorField(csParam);
+      ColorSpinorParam csParam(*(param.B[0]));
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      hack1 = new cpuColorSpinorField(csParam);
+      hack2 = new cpuColorSpinorField(csParam);
 
       // these need to be gpu fields with native ordering basis
-      ColorSpinorField *tmp3;  // FIXME allocate cudaSpinorFields
-      ColorSpinorField *tmp4;   // FIXME allocate cudaSpinorFields
-      DiracCoarse matCoarse(param.matResidual.Expose(), transfer, *tmp1, *tmp2, *tmp3, *tmp4);
+      csParam.setPrecision(csParam.precision);
+      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+      hack3 = new cudaColorSpinorField(csParam);  // FIXME allocate cudaSpinorFields
+      hack4 = new cudaColorSpinorField(csParam);   // FIXME allocate cudaSpinorFields
+
+      DiracCoarse matCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack4);
 
       // create the next multigrid level
       MGParam coarse_param = param;
@@ -44,6 +68,8 @@ namespace quda {
 
       coarse = new MG(coarse_param, profile);
     }
+
+    printfQuda("MG: Setup of level %d completed\n", param.level);
   }
 
   MG::~MG() {
@@ -53,30 +79,43 @@ namespace quda {
     }
     if (smoother) delete smoother;
 
-    if (tmp1) delete tmp1;
-    if (tmp2) delete tmp2;
-    if (tmp3) delete tmp3;
-    if (tmp4) delete tmp4;
+    if (r) delete r;
+    if (r_coarse) delete r_coarse;
+
+    if (hack1) delete hack1;
+    if (hack2) delete hack2;
+    if (hack3) delete hack3;
+    if (hack4) delete hack4;
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
 
+    printf("MG: level %d, entering V-cycle with x2=%e, r2=%e\n", 
+	   param.level, blas::norm2(x), blas::norm2(b));
+
     if (param.level < param.Nlevel) {
       
       // do the pre smoothing
+      printfQuda("MG: level %d, pre smoothing\n", param.level);
       param.maxiter = param.nu_pre;
+      std::cout << x << b;
       (*smoother)(x, b);
 
       // restrict to the coarse grid
-      transfer->R(*r, *r_coarse);
+      printfQuda("MG: level %d, restriction\n", param.level);
+      transfer->R(*r_coarse, *r);
+      printfQuda("MG: r2 = %e r_coarse2 = %e\n", blas::norm2(*r), blas::norm2(*r_coarse));
 
       // recurse to the next lower level
-      (*coarse)(*x_coarse, *r_coarse); 
+      printfQuda("MG: solving coarse operator\n");
+      //(*coarse)(*x_coarse, *r_coarse); 
 
       // prolongate back to this grid
+      printfQuda("MG: level %d, prolongation\n", param.level);
       transfer->P(x, *x_coarse); // FIXME: need to ensure the prolongator sums to x here
 
       // do the post smoothing
+      printfQuda("MG: level %d, post smoothing\n", param.level);
       param.maxiter = param.nu_post;
       (*smoother)(x, b);
 
@@ -85,6 +124,9 @@ namespace quda {
       (*smoother)(x, b);
 
     }
+
+    printf("MG: level %d, leaving V-cycle with x2=%e, r2=%e\n", 
+	   param.level, blas::norm2(x), blas::norm2(*r));
 
   }
 

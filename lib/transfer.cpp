@@ -126,12 +126,36 @@ namespace quda {
 
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
-    Prolongate(out, in, *V, *tmp, Nvec, geo_map, spin_map);
+    ColorSpinorField *output = &out;
+    if (out.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      ColorSpinorParam param(out);
+      param.create = QUDA_ZERO_FIELD_CREATE;
+      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      output = new cpuColorSpinorField(param);
+    }
+
+    Prolongate(*output, in, *V, *tmp, Nvec, geo_map, spin_map);
+
+    if (out.Location() == QUDA_CUDA_FIELD_LOCATION) { 
+      out = *output; // copy result to cuda field
+      delete output; 
+    }
   }
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
-    Restrict(out, in, *V, *tmp, Nvec, geo_map, spin_map);
+    ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
+    if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
+      ColorSpinorParam param(in);
+      param.create = QUDA_ZERO_FIELD_CREATE;
+      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      input = new cpuColorSpinorField(param);
+      *input = in; // copy input to cpu field
+    }
+
+    Restrict(out, *input, *V, *tmp, Nvec, geo_map, spin_map);
+
+    if (in.Location() == QUDA_CUDA_FIELD_LOCATION) { delete input; }
   }
 
 } // namespace quda

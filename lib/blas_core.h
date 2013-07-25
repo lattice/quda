@@ -174,7 +174,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       return;
     }
 
-    if (!x.isNative()) {
+    if (!static_cast<cudaColorSpinorField&>(x).isNative()) {
       warningQuda("Device blas on non-native fields is not supported\n");
       return;
     }
