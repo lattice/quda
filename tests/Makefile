@@ -54,7 +54,7 @@ hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force
 hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-multigrid_test: multigrid_test.o test_util.o misc.o $(QIO_UTIL) $(QUDA)
+multigrid_test: wilson_dslash_reference.o multigrid_test.o test_util.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 clean:
