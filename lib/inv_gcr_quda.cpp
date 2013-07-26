@@ -149,11 +149,12 @@ namespace quda {
 
   }
 
-  /*
-  GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-      SolverParam &param, TimeProfile &profile);
+  GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
+	   SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param)
+  {
 
-  */
+  }
 
   GCR::~GCR() {
     profile.Start(QUDA_PROFILE_FREE);

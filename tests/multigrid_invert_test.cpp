@@ -183,11 +183,13 @@ int main(int argc, char **argv)
     inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
   }
 
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+
   // MG only these options are supported with MG currently
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  inv_param.gcrNkrylov = 10;
+  inv_param.gcrNkrylov = 4;
   inv_param.tol = 1e-7;
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence

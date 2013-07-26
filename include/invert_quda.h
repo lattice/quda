@@ -70,8 +70,6 @@ namespace quda {
     /**< Preserve the source or not in the linear solver (deprecated?) */    
     QudaPreserveSource preserve_source;       
 
-
-
     // Multi-shift solver parameters
 
     /**< Number of offsets in the multi-shift solver */    
@@ -255,6 +253,12 @@ namespace quda {
 
   public:
     GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
+	SolverParam &param, TimeProfile &profile);
+
+    /**
+       @param K Preconditioner
+     */
+    GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
 	SolverParam &param, TimeProfile &profile);
     virtual ~GCR();
 
