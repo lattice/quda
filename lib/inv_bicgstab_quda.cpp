@@ -43,26 +43,23 @@ namespace quda {
 
   void BiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
-    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
-      errorQuda("Not supported");
-
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = new cudaColorSpinorField(x, csParam);
-      rp = new cudaColorSpinorField(x, csParam); 
+      yp = ColorSpinorField::Create(csParam);
+      rp = ColorSpinorField::Create(csParam);
       csParam.setPrecision(param.precision_sloppy);
-      pp = new cudaColorSpinorField(x, csParam);
-      vp = new cudaColorSpinorField(x, csParam);
-      tmpp = new cudaColorSpinorField(x, csParam);
-      tp = new cudaColorSpinorField(x, csParam);
+      pp = ColorSpinorField::Create(csParam);
+      vp = ColorSpinorField::Create(csParam);
+      tmpp = ColorSpinorField::Create(csParam);
+      tp = ColorSpinorField::Create(csParam);
 
       // MR preconditioner - we need extra vectors
       if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	wp = new cudaColorSpinorField(x, csParam);
-	zp = new cudaColorSpinorField(x, csParam);
+	wp = ColorSpinorField::Create(csParam);
+	zp = ColorSpinorField::Create(csParam);
       } else { // dummy assignments
 	wp = pp;
 	zp = pp;
@@ -109,18 +106,18 @@ namespace quda {
 
     // set field aliasing according to whether we are doing mixed precision or not
     if (param.precision_sloppy == x.Precision()) {
-      x_sloppy = &static_cast<cudaColorSpinorField&>(x);
+      x_sloppy = &x;
       r_sloppy = &r;
-      r_0 = &static_cast<cudaColorSpinorField&>(b);
+      r_0 = &b;
       blas::zero(*x_sloppy);
     } else {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy = new cudaColorSpinorField(x, csParam);
+      x_sloppy = ColorSpinorField::Create(csParam);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(r, csParam);
-      r_0 = new cudaColorSpinorField(b, csParam);
+      r_sloppy = ColorSpinorField::Create(csParam);
+      r_0 = ColorSpinorField::Create(csParam);
     }
 
     // Syntatic sugar
@@ -201,7 +198,7 @@ namespace quda {
       } else {
 	matSloppy(t, rSloppy, tmp);
       }
-    
+
       // omega = (t, r) / (t, t)
       omega_t2 = blas::cDotProductNormA(t, rSloppy);
       omega = quda::Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);

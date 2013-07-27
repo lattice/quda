@@ -131,8 +131,13 @@ namespace quda {
       ColorSpinorParam param(out);
       param.create = QUDA_ZERO_FIELD_CREATE;
       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      param.gammaBasis = in.GammaBasis();
       output = new cpuColorSpinorField(param);
     }
+
+    if ((output->GammaBasis() != V->GammaBasis()) || (in.GammaBasis() != V->GammaBasis()) )
+      errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
+		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
 
     Prolongate(*output, in, *V, *tmp, Nvec, geo_map, spin_map);
 
@@ -149,9 +154,14 @@ namespace quda {
       ColorSpinorParam param(in);
       param.create = QUDA_ZERO_FIELD_CREATE;
       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+      param.gammaBasis = out.GammaBasis();
       input = new cpuColorSpinorField(param);
       *input = in; // copy input to cpu field
     }
+
+    if ((out.GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))
+      errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
+		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
     Restrict(out, *input, *V, *tmp, Nvec, geo_map, spin_map);
 

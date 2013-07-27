@@ -113,9 +113,9 @@ AC_ARG_ENABLE(twisted-mass-dirac,
 )
 
 AC_ARG_ENABLE(ndeg-twisted-mass-dirac,
-  AC_HELP_STRING([--enable-ndeg-twisted-mass-dirac], [ Build non-degenerate twisted mass Dirac operator (default: enabled)]),
+  AC_HELP_STRING([--enable-ndeg-twisted-mass-dirac], [ Build non-degenerate twisted mass Dirac operator (default: disabled)]),
   [ build_ndeg_twm_dirac=${enableval} ], 
-  [ build_ndeg_twm_dirac="yes" ]
+  [ build_ndeg_twm_dirac="no" ]
 )
 
 AC_ARG_ENABLE(staggered-fatlink,

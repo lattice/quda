@@ -565,6 +565,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
     
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
       if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
 	Spinor<double2,double2,double2,M,writeX> X(x);
 	Spinor<double2,double2,double2,M,writeY> Y(y);
@@ -578,7 +579,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
 	reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
       } else if (x.Nspin() == 1){ //staggered
+#ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	Spinor<double2,double2,double2,M,writeX> X(x);
 	Spinor<double2,double2,double2,M,writeY> Y(y);
@@ -592,9 +597,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
 	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
 	reduce.apply(*blas::getStream());
-	} else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 	Spinor<float4,float4,float4,M,writeX,0> X(x);
 	Spinor<float4,float4,float4,M,writeY,1> Y(y);
@@ -608,7 +617,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<float4,float4,float4,M,writeV,4>, Reducer<ReduceType, float2, float4> >
 	  reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M));
 	reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
       } else if (x.Nspin() == 1) {
+#ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
 	Spinor<float2,float2,float2,M,writeX,0> X(x);
 	Spinor<float2,float2,float2,M,writeY,1> Y(y);
@@ -622,10 +635,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
 	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
 	reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     } else {
-      if (x.Ncolor()!=3) errorQuda("Not supported");
       if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	Spinor<float4,float4,short4,6,writeX,0> X(x);
 	Spinor<float4,float4,short4,6,writeY,1> Y(y);
 	Spinor<float4,float4,short4,6,writeZ,2> Z(z);
@@ -638,7 +654,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
 	  reduce(value, X, Y, Z, W, V, r, y.Volume());
 	reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
       } else if (x.Nspin() == 1) {//staggered
+#ifdef GPU_STAGGERED_DIRAC
 	Spinor<float2,float2,short2,3,writeX,0> X(x);
 	Spinor<float2,float2,short2,3,writeY,1> Y(y);
 	Spinor<float2,float2,short2,3,writeZ,2> Z(z);
@@ -651,6 +671,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
 	  reduce(value, X, Y, Z, W, V, r, y.Volume());
 	reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
       blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
     }
