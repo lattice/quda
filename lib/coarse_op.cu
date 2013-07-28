@@ -412,7 +412,7 @@ namespace quda {
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y has been allocated.
-  void CoarseOp(Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge) {
+  void CoarseOp(const Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge) {
 
     //First make a cpu gauge field from the cuda gauge field
 

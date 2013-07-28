@@ -128,7 +128,7 @@ namespace quda {
      * Returns a const reference to the V field
      * @return The V field const reference
      */
-    const ColorSpinorField& Vectors() { return *V; }
+    const ColorSpinorField& Vectors() const { return *V; }
 
     /**
      * Returns the number of near nullvectors

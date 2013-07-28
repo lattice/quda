@@ -149,6 +149,8 @@ namespace quda {
       operator()(static_cast<ColorSpinorField&>(out), static_cast<ColorSpinorField&>(in));
     }
   };
+  void CoarseOp(const Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge);
+  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision, double kappa);
 
   class DiracCoarse : public DiracMatrix {
 
@@ -173,12 +175,30 @@ namespace quda {
     : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) { }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
-    {
+    { 
+      #if 0
+      if(in.Precision() == QUDA_DOUBLE_PRECISION) {
+       std::complex<double> **Y;
+       int ndim = in.Ndim();
+       Y = (std::complex<double> **)malloc((2*ndim+1)*sizeof(std::complex<double>*));
+       for(int i = 0; i < (2*ndim+1); i++) {
+	Y[i] = (std::complex<double> *)malloc(in.Volume()*in.Ncolor()*in.Ncolor()*in.Nspin()*in.Nspin()*sizeof(std::complex<double>));
+       }
+       CoarseOp(*t,(void **)Y,in.Precision(),dirac->gauge);
+       ApplyCoarse(out, in, (void **)Y, in.Precision(), 1.0);
+       for(int i = 0; i < (2*ndim+1); i++) {
+         free(Y[i]);
+       }
+       free(Y);
+
+      } 
+      #else
       t->P(tmp, in);
       tmp3 = tmp;
       dirac->M(tmp4, tmp3);
       tmp2 = tmp4;
       t->R(out, tmp2);
+      #endif
     }
 
     // FIXME - additional dummy fields not used

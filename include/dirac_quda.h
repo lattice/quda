@@ -163,11 +163,11 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual void createCoarseOp(Transfer &T, void *Y[], QudaPrecision precision) const;
+    virtual void createCoarseOp(const Transfer &T, void *Y[], QudaPrecision precision) const;
     virtual void applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision) const; 
   };
 
-  void CoarseOp(Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge);
+  void CoarseOp(const Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge);
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision, double kappa);
 
   // Even-odd preconditioned Wilson

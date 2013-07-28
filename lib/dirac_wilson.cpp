@@ -113,7 +113,7 @@ namespace quda {
   grid
   */
 
-  void DiracWilson::createCoarseOp(Transfer &T, void *Y[], QudaPrecision precision) const {
+  void DiracWilson::createCoarseOp(const Transfer &T, void *Y[], QudaPrecision precision) const {
     CoarseOp(T, Y, precision, gauge);
   }
 

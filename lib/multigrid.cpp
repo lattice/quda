@@ -159,7 +159,7 @@ namespace quda {
   void loadVectors(std::vector<ColorSpinorField*> &B) {
     printfQuda("Start loading %d vectors from %s\n", nvec, vecfile);
 
-    if (nvec < 1 || nvec > 20) errorQuda("nvec not set");
+    if (nvec < 1 || nvec > 50) errorQuda("nvec not set");
 
     const int Nvec = nvec;
 
