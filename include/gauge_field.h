@@ -19,6 +19,7 @@ namespace quda {
 
     double anisotropy;
     double tadpole;
+    double scale;
 
     void *gauge; // used when we use a reference to an external field
 
@@ -38,6 +39,7 @@ namespace quda {
       t_boundary(QUDA_INVALID_T_BOUNDARY),
       anisotropy(1.0),
       tadpole(1.0),
+      scale(1.0),
       gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), 
       geometry(QUDA_VECTOR_GEOMETRY),
@@ -55,7 +57,7 @@ namespace quda {
 		  const int pad, const QudaFieldGeometry geometry) : LatticeFieldParam(), nColor(3), nFace(0), 
       reconstruct(reconstruct), order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
-      tadpole(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), pinned(0)
+      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), pinned(0)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -68,7 +70,7 @@ namespace quda {
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
       nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order), 
       fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
-      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), gauge(h_gauge), 
+      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0) {
 
       if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
@@ -83,6 +85,8 @@ namespace quda {
 
   protected:
     size_t bytes; // bytes allocated per full field 
+    int phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
+    int phase_bytes;  // bytes needed to store the phases
     int length;
     int real_length;
     int nColor;
@@ -98,6 +102,7 @@ namespace quda {
     double anisotropy;
     double tadpole;
     double fat_link_max;
+    double scale;
     
     QudaFieldCreate create; // used to determine the type of field created
 
@@ -120,6 +125,7 @@ namespace quda {
     QudaGaugeFieldOrder Order() const { return order; }
     double Anisotropy() const { return anisotropy; }
     double Tadpole() const { return tadpole; }
+    double Scale() const { return scale; }  
     QudaTboundary TBoundary() const { return t_boundary; }
     QudaLinkType LinkType() const { return link_type; }
     QudaGaugeFixed GaugeFixed() const { return fixed; }
@@ -132,6 +138,7 @@ namespace quda {
     void checkField(const GaugeField &);
 
     const size_t& Bytes() const { return bytes; }
+    size_t PhaseOffset() const { return phase_offset; }
 
     virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}
     virtual void* Even_p() { errorQuda("Not implemented"); return (void*)0;}
@@ -167,7 +174,9 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t evenTex;
     cudaTextureObject_t oddTex;
-    void createTexObject(cudaTextureObject_t &tex, void *gauge);
+    cudaTextureObject_t evenPhaseTex;
+    cudaTextureObject_t oddPhaseTex;
+    void createTexObject(cudaTextureObject_t &tex, void *gauge, int isPhase=0);
     void destroyTexObject();
 #endif
 
@@ -193,6 +202,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& EvenTex() const { return evenTex; }
     const cudaTextureObject_t& OddTex() const { return oddTex; }
+    const cudaTextureObject_t& EvenPhaseTex() const { return evenPhaseTex; }
+    const cudaTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
 #endif
 
     mutable char *backup_h;

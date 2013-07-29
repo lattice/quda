@@ -619,8 +619,12 @@ get_recon(char* s)
     
     if (strcmp(s, "8") == 0){
 	ret =  QUDA_RECONSTRUCT_8;
+    }else if (strcmp(s, "9") == 0){
+	ret =  QUDA_RECONSTRUCT_9;
     }else if (strcmp(s, "12") == 0){
 	ret =  QUDA_RECONSTRUCT_12;
+    }else if (strcmp(s, "13") == 0){
+	ret =  QUDA_RECONSTRUCT_13;
     }else if (strcmp(s, "18") == 0){
 	ret =  QUDA_RECONSTRUCT_NO;
     }else{
@@ -723,9 +727,15 @@ get_recon_str(QudaReconstructType recon)
 {
     const char* ret;
     switch(recon){
+    case QUDA_RECONSTRUCT_13:
+        ret="13";
+        break;
     case QUDA_RECONSTRUCT_12:
 	ret= "12";
 	break;
+    case QUDA_RECONSTRUCT_9:
+        ret="9";
+        break;
     case QUDA_RECONSTRUCT_8:
 	ret = "8";
 	break;

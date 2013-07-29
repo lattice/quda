@@ -312,17 +312,12 @@ void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile)
   double t_bc = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol(t_boundary, &(t_bc), sizeof(double));
 
-  double coeff_h = -24.0*gauge.Tadpole()*gauge.Tadpole();
-  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
-
   float anisotropy_fh = gauge.Anisotropy();
   cudaMemcpyToSymbol(anisotropy_f, &(anisotropy_fh), sizeof(float));
 
   float t_bc_f = (gauge.TBoundary() == QUDA_PERIODIC_T) ? 1.0 : -1.0;
   cudaMemcpyToSymbol(t_boundary_f, &(t_bc_f), sizeof(float));
 
-  float coeff_fh = -24.0*gauge.Tadpole()*gauge.Tadpole();
-  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
 
   // constants used by the READ_GAUGE() macros in read_gauge.h
   float2 An2_h = make_float2(gauge.Anisotropy(), 1.0 / (gauge.Anisotropy()*gauge.Anisotropy()));
@@ -415,6 +410,12 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
   int long_ga_stride_h = longgauge.Stride();
   float fat_link_max_h = fatgauge.LinkMax();
   
+  float coeff_fh = 1.0/longgauge.Scale();
+  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
+
+  double coeff_h = 1.0/longgauge.Scale();
+  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
+
   cudaMemcpyToSymbol(fat_ga_stride, &fat_ga_stride_h, sizeof(int));  
   cudaMemcpyToSymbol(long_ga_stride, &long_ga_stride_h, sizeof(int));  
   cudaMemcpyToSymbol(fat_ga_max, &fat_link_max_h, sizeof(float));

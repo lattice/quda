@@ -107,7 +107,7 @@
 #define fat22_re FAT8.x
 #define fat22_im FAT8.y
 
-#if (DD_RECON == 2) //18 (no) reconstruct
+#if (DD_RECON == 18) //18 (no) reconstruct
 #define long00_re LONG0.x
 #define long00_im LONG0.y
 #define long01_re LONG1.x
@@ -304,6 +304,14 @@ VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
   VOUT##2_im -= M##22_im * V##02_re;
 
 
+#if (DD_RECON==9 || DD_RECON==13)
+#if (DD_PREC==0) // double precision
+  double PHASE = 0.;
+#else
+  float PHASE = 0.f;
+#endif
+#endif
+
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if(sid >= param.threads) return;
 
@@ -417,11 +425,15 @@ o00_re = o00_im = 0.f;
 o01_re = o01_im = 0.f;
 o02_re = o02_im = 0.f;
 #endif
+#if(DD_RECON == 13 || DD_RECON == 9)
+  int sign = 1;
+#endif
 
 {
     //direction: +X
 
-#if (DD_RECON < 2)
+
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = (x4%2 == 1) ? -1 : 1;
 #endif
 
@@ -466,6 +478,7 @@ o02_re = o02_im = 0.f;
 	{
 	    int sp_idx_3rd_nbr = ((x1 >= X1m3) ? X -X1m3 : X+3) >> 1;
 	    READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx);        
+            READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx);
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -483,8 +496,9 @@ o02_re = o02_im = 0.f;
 		}
 	    }
 #endif
-	    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);   
+	    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
 	    RECONSTRUCT_GAUGE_MATRIX(0, long, ga_idx, sign);
+
 	    
 	    MAT_MUL_V(B, long, t);        
 	    o00_re += B0_re;
@@ -499,7 +513,7 @@ o02_re = o02_im = 0.f;
 
 {
     // direction: -X
-#if (DD_RECON < 2)
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = (x4%2 == 1) ? -1 : 1;
 #endif
     int dir =1;
@@ -555,6 +569,7 @@ o02_re = o02_im = 0.f;
 	    }    
 #endif
 	    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 		
+	    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx); 		
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -588,7 +603,7 @@ o02_re = o02_im = 0.f;
 
 {
     //direction: +Y
-#if (DD_RECON < 2)
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = ((x4+x1)%2 == 1) ? -1 : 1;
 #endif
    
@@ -633,6 +648,7 @@ o02_re = o02_im = 0.f;
 	{
 	    int sp_idx_3rd_nbr = ((x2 >= X2m3 ) ? X-X2m3*X1 : X+3*X1) >> 1;    
 	    READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx);
+	    READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx);
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;        
 #if (DD_PREC == 2) //half precision
@@ -664,7 +680,7 @@ o02_re = o02_im = 0.f;
 {
     //direction: -Y
 
-#if (DD_RECON < 2)
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = ((x4+x1)%2 == 1) ? -1 : 1;
 #endif
 
@@ -720,6 +736,7 @@ o02_re = o02_im = 0.f;
 	    }    
 #endif
 	    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
+	    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx); 
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -752,7 +769,7 @@ o02_re = o02_im = 0.f;
 {
     //direction: +Z
 
-#if (DD_RECON < 2)
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
 #endif
 
@@ -797,6 +814,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
     {
 	int sp_idx_3rd_nbr = ((x3>= X3m3)? X -X3m3*X2X1: X + 3*X2X1)>> 1;    
 	READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx);
+	READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx);
 	int nbr_idx3 = sp_idx_3rd_nbr;
 	int stride3 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -829,7 +847,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 {
     //direction: -Z
 
-#if (DD_RECON < 2)
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = ((x4+x1+x2)%2 == 1) ? -1 : 1;
 #endif
 
@@ -886,6 +904,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    }    
 #endif
 	    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx);         
+	    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx);         
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -917,7 +936,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 
 {
     //direction: +T
-#if (DD_RECON < 2)
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = (x4 >= (X4-3)) ? -1 : 1;
 #endif
 
@@ -963,6 +982,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	{
 	    int sp_idx_3rd_nbr = ((x4>=X4m3)? X -X4m3*X3X2X1 : X + 3*X3X2X1)>> 1;     
 	    READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx);    
+	    READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx);    
 	    int nbr_idx3 = sp_idx_3rd_nbr;
 	    int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -994,7 +1014,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 
 {
     //direction: -T
-#if (DD_RECON < 2)
+#if (DD_RECON == 12 || DD_RECON == 8)
     int sign = ( ((x4+X4m3)%X4)>= X4m3 ) ? -1 : 1;
 #endif
     
@@ -1064,6 +1084,7 @@ if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (
 	    }
 #endif	    
 	    READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx);
+	    READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx);
 	    READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);       
 	    RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
 	    ADJ_MAT_MUL_V(B, long, t);    

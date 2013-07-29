@@ -1483,8 +1483,8 @@ void usage(char** argv )
 #endif
   printf("    --prec <double/single/half>               # Precision in GPU\n"); 
   printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
-  printf("    --recon <8/12/18>                         # Link reconstruction type\n"); 
-  printf("    --recon_sloppy <8/12/18>                  # Sloppy link reconstruction type\n"); 
+  printf("    --recon <8/9/12/13/18>                         # Link reconstruction type\n"); 
+  printf("    --recon_sloppy <8/9/12/13/18>                  # Sloppy link reconstruction type\n"); 
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
   printf("    --sdim <n>                                # Set space dimention(X/Y/Z) size\n"); 
   printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     

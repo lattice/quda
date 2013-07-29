@@ -71,8 +71,8 @@ void constructSpinorField(Float *res) {
   for(int i = 0; i < Vh; i++) {
     for (int s = 0; s < 1; s++) {
       for (int m = 0; m < 3; m++) {
-	res[i*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-	res[i*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
+        res[i*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
+        res[i*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
       }
     }
   }
@@ -81,12 +81,12 @@ void constructSpinorField(Float *res) {
 
 static void
 set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
-	   int X1, int  X2, int X3, int X4,
-	   QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
-	   QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
-	   double mass, double tol, int maxiter, double reliable_delta,
-	   double tadpole_coeff
-	   )
+    int X1, int  X2, int X3, int X4,
+    QudaPrecision cpu_prec, QudaPrecision prec, QudaPrecision prec_sloppy,
+    QudaReconstructType link_recon, QudaReconstructType link_recon_sloppy,
+    double mass, double tol, int maxiter, double reliable_delta,
+    double tadpole_coeff
+    )
 {
   gaugeParam->X[0] = X1;
   gaugeParam->X[1] = X2;
@@ -101,6 +101,9 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
   gaugeParam->anisotropy = 1.0;
   gaugeParam->tadpole_coeff = tadpole_coeff;
+  gaugeParam->scale = -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+
+  std::cout << "scale = " << gaugeParam->scale << std::endl;
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = X1*X2*X3/2;
@@ -155,7 +158,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 }
 
 
-int
+  int
 invert_test(void)
 {
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
@@ -164,14 +167,14 @@ invert_test(void)
   double mass = 0.005;
 
   set_params(&gaugeParam, &inv_param,
-	     xdim, ydim, zdim, tdim,
-	     cpu_prec, prec, prec_sloppy,
-	     link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
-	     0.8);
+      xdim, ydim, zdim, tdim,
+      cpu_prec, prec, prec_sloppy,
+      link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
+      0.8);
 
   // declare the dimensions of the communication grid
   initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
-  
+
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
@@ -185,25 +188,44 @@ invert_test(void)
   }
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
-  
+
   construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
-   
+
+  const double cos_pi_3 = 0.5; // Cos(pi/3)
+  const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
 
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
       for(int j=0; j<gaugeSiteSize; ++j){
         if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
           ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j] = 0.5*rand()/RAND_MAX;
+          if(link_recon != QUDA_RECONSTRUCT_8 && link_recon != QUDA_RECONSTRUCT_12){ // incorporate non-trivial phase into long links
+            if(j%2 == 0){
+              const double real = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+              const double imag = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1];
+              ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j]     = real*cos_pi_3 - imag*sin_pi_3;
+              ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+            }
+          }
           ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
           ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
         }else{
           ((float*)qdp_fatlink[dir])[i] = 0.5*rand()/RAND_MAX;
+          if(link_recon != QUDA_RECONSTRUCT_8 && link_recon != QUDA_RECONSTRUCT_12){ // incorporate non-trivial phase into long links
+            if(j%2 == 0){
+              const float real = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+              const float imag = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1];
+              ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j]     = real*cos_pi_3 - imag*sin_pi_3;
+              ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+            }
+          }
+          ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
           ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
           ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
         }
       }
     }
-  } 
+  }
 
 
   ColorSpinorParam csParam;
@@ -214,7 +236,7 @@ invert_test(void)
     csParam.x[d] = gaugeParam.X[d];
   }
   csParam.x[0] /= 2;
-  
+
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -226,7 +248,7 @@ invert_test(void)
   out = new cpuColorSpinorField(csParam);  
   ref = new cpuColorSpinorField(csParam);  
   tmp = new cpuColorSpinorField(csParam);  
-  
+
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
     constructSpinorField((float*)in->V());    
   }else{
@@ -235,8 +257,8 @@ invert_test(void)
 
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
-   tmp_value = MAX(tmp_value, xdim*ydim*tdim/2);
-   tmp_value = MAX(tmp_value, xdim*ydim*zdim/2);
+  tmp_value = MAX(tmp_value, xdim*ydim*tdim/2);
+  tmp_value = MAX(tmp_value, xdim*ydim*zdim/2);
 
   int fat_pad = tmp_value;
   int link_pad =  3*tmp_value;
@@ -246,7 +268,7 @@ invert_test(void)
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = (void**)cpuFat->Ghost();
-  
+
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
   cpuLong = new cpuGaugeField(cpuLongParam);
@@ -256,7 +278,7 @@ invert_test(void)
   gaugeParam.ga_pad = fat_pad;
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda(fatlink, &gaugeParam);
-  
+
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   gaugeParam.ga_pad = link_pad;
   gaugeParam.reconstruct= link_recon;
@@ -266,174 +288,171 @@ invert_test(void)
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda(fatlink, &gaugeParam);
-  
+
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   gaugeParam.reconstruct = link_recon;
   gaugeParam.reconstruct_sloppy = link_recon_sloppy;
   loadGaugeQuda(longlink, &gaugeParam);
 #endif
-  
+
   double time0 = -((double)clock()); // Start the timer
-  
+
   double nrm2=0;
   double src2=0;
   int ret = 0;
 
   switch(test_type){
-  case 0: //even
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-    
-    invertQuda(out->V(), in->V(), &inv_param);
-    
-    time0 += clock(); 
-    time0 /= CLOCKS_PER_SEC;
+    case 0: //even
+      inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
+      invertQuda(out->V(), in->V(), &inv_param);
 
-    // J.F.
-    printfQuda("Calling even invert\n");
+      time0 += clock(); 
+      time0 /= CLOCKS_PER_SEC;
+
 
 
 #ifdef MULTI_GPU    
-    matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-		     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
+      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
-    matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
+      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
-    
-    mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
 
-    break;
+      mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
 
-  case 1: //odd
-	
-    inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
-    invertQuda(out->V(), in->V(), &inv_param);	
-    time0 += clock(); // stop the timer
-    time0 /= CLOCKS_PER_SEC;
-    
-#ifdef MULTI_GPU
-    matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-		     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
-#else
-    matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);	
-#endif
-    mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-	
-    break;
-    
-  case 2: //full spinor
+      break;
 
-    errorQuda("full spinor not supported\n");
-    break;
-    
-  case 3: //multi mass CG, even
-  case 4:
-    
-#define NUM_OFFSETS 12
-    
-    {    
-      double masses[NUM_OFFSETS] ={0.002, 0.0021, 0.0064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
-      inv_param.num_offset = NUM_OFFSETS;
-      // these can be set independently
-      for (int i=0; i<inv_param.num_offset; i++) {
-	inv_param.tol_offset[i] = inv_param.tol;
-	inv_param.tol_hq_offset[i] = inv_param.tol_hq;
-      }
-      void* outArray[NUM_OFFSETS];
-      int len;
-    
-      cpuColorSpinorField* spinorOutArray[NUM_OFFSETS];
-      spinorOutArray[0] = out;    
-      for(int i=1;i < inv_param.num_offset; i++){
-	spinorOutArray[i] = new cpuColorSpinorField(csParam);       
-      }
-    
-      for(int i=0;i < inv_param.num_offset; i++){
-	outArray[i] = spinorOutArray[i]->V();
-	inv_param.offset[i] = 4*masses[i]*masses[i];
-      }
-    
-      len=Vh;
+    case 1: //odd
 
-      if (test_type == 3) {
-	inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
-      } else {
-	inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
-      }
-    
-      invertMultiShiftQuda(outArray, in->V(), &inv_param);	
-
-      cudaDeviceSynchronize();
+      inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
+      invertQuda(out->V(), in->V(), &inv_param);	
       time0 += clock(); // stop the timer
       time0 /= CLOCKS_PER_SEC;
-    
-      printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n", 
-		 time0, inv_param.secs, inv_param.iter, inv_param.secs,
-		 inv_param.gflops/inv_param.secs);
-    
-    
-      printfQuda("checking the solution\n");
-      QudaParity parity = QUDA_INVALID_PARITY;
-      if (inv_param.solve_type == QUDA_NORMOP_SOLVE){
-	//parity = QUDA_EVENODD_PARITY;
-	errorQuda("full parity not supported\n");
-      }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
-	parity = QUDA_EVEN_PARITY;
-      }else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD){
-	parity = QUDA_ODD_PARITY;
-      }else{
-	errorQuda("ERROR: invalid spinor parity \n");
-	exit(1);
-      }
-      for(int i=0;i < inv_param.num_offset;i++){
-	printfQuda("%dth solution: mass=%f, ", i, masses[i]);
+
 #ifdef MULTI_GPU
-	matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-			 spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, 
-			 gaugeParam.cpu_prec, tmp, parity);
+      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
 #else
-	matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
+      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);	
 #endif
-	mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	double hqr = sqrt(HeavyQuarkResidualNormCpu(*spinorOutArray[i], *ref).z);
-	double l2r = sqrt(nrm2/src2);
+      mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
 
-	printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
-		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
+      break;
 
-	//emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-	if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
-	  ret |=1;
-	}
+    case 2: //full spinor
+
+      errorQuda("full spinor not supported\n");
+      break;
+
+    case 3: //multi mass CG, even
+    case 4:
+
+#define NUM_OFFSETS 12
+
+      {    
+        double masses[NUM_OFFSETS] ={0.002, 0.0021, 0.0064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
+        inv_param.num_offset = NUM_OFFSETS;
+        // these can be set independently
+        for (int i=0; i<inv_param.num_offset; i++) {
+          inv_param.tol_offset[i] = inv_param.tol;
+          inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+        }
+        void* outArray[NUM_OFFSETS];
+        int len;
+
+        cpuColorSpinorField* spinorOutArray[NUM_OFFSETS];
+        spinorOutArray[0] = out;    
+        for(int i=1;i < inv_param.num_offset; i++){
+          spinorOutArray[i] = new cpuColorSpinorField(csParam);       
+        }
+
+        for(int i=0;i < inv_param.num_offset; i++){
+          outArray[i] = spinorOutArray[i]->V();
+          inv_param.offset[i] = 4*masses[i]*masses[i];
+        }
+
+        len=Vh;
+
+        if (test_type == 3) {
+          inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;      
+        } else {
+          inv_param.matpc_type = QUDA_MATPC_ODD_ODD;      
+        }
+
+        invertMultiShiftQuda(outArray, in->V(), &inv_param);	
+
+        cudaDeviceSynchronize();
+        time0 += clock(); // stop the timer
+        time0 /= CLOCKS_PER_SEC;
+
+        printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n", 
+            time0, inv_param.secs, inv_param.iter, inv_param.secs,
+            inv_param.gflops/inv_param.secs);
+
+
+        printfQuda("checking the solution\n");
+        QudaParity parity = QUDA_INVALID_PARITY;
+        if (inv_param.solve_type == QUDA_NORMOP_SOLVE){
+          //parity = QUDA_EVENODD_PARITY;
+          errorQuda("full parity not supported\n");
+        }else if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN){
+          parity = QUDA_EVEN_PARITY;
+        }else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD){
+          parity = QUDA_ODD_PARITY;
+        }else{
+          errorQuda("ERROR: invalid spinor parity \n");
+          exit(1);
+        }
+        for(int i=0;i < inv_param.num_offset;i++){
+          printfQuda("%dth solution: mass=%f, ", i, masses[i]);
+#ifdef MULTI_GPU
+          matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+              spinorOutArray[i], masses[i], 0, inv_param.cpu_prec, 
+              gaugeParam.cpu_prec, tmp, parity);
+#else
+          matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
+#endif
+          mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+          double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+          double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+          double hqr = sqrt(HeavyQuarkResidualNormCpu(*spinorOutArray[i], *ref).z);
+          double l2r = sqrt(nrm2/src2);
+
+          printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+              i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
+              inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
+
+          //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+          if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
+            ret |=1;
+          }
+        }
+
+        for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
       }
+      break;
 
-      for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
-    }
-    break;
-
-  default:
-    errorQuda("Unsupported test type");
+    default:
+      errorQuda("Unsupported test type");
 
   }//switch
-    
+
   if (test_type <=2){
 
     double hqr = sqrt(HeavyQuarkResidualNormCpu(*out, *ref).z);
     double l2r = sqrt(nrm2/src2);
 
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+        inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
     printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
-	       time0, inv_param.secs, inv_param.iter, inv_param.secs,
-	       inv_param.gflops/inv_param.secs);
+        time0, inv_param.secs, inv_param.iter, inv_param.secs,
+        inv_param.gflops/inv_param.secs);
   }
 
   end();
@@ -442,7 +461,7 @@ invert_test(void)
 
 
 
-static void
+  static void
 end(void) 
 {
   for(int i=0;i < 4;i++){
@@ -457,7 +476,7 @@ end(void)
   delete out;
   delete ref;
   delete tmp;
-  
+
   if (cpuFat) delete cpuFat;
   if (cpuLong) delete cpuLong;
 
@@ -465,29 +484,29 @@ end(void)
 }
 
 
-void
+  void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
   printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n",
-	 get_prec_str(prec),get_prec_str(prec_sloppy),
-	 get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy), get_test_type(test_type), xdim, ydim, zdim, tdim);     
+      get_prec_str(prec),get_prec_str(prec_sloppy),
+      get_recon_str(link_recon), 
+      get_recon_str(link_recon_sloppy), get_test_type(test_type), xdim, ydim, zdim, tdim);     
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3)); 
-  
+      dimPartitioned(0),
+      dimPartitioned(1),
+      dimPartitioned(2),
+      dimPartitioned(3)); 
+
   return ;
-  
+
 }
 
-void
+  void
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
@@ -498,7 +517,7 @@ usage_extra(char** argv )
   printfQuda("                                                3: Even even spinor multishift CG inverter\n");
   printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
   printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
-  
+
   return ;
 }
 int main(int argc, char** argv)
@@ -508,7 +527,7 @@ int main(int argc, char** argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }   
-    
+
     if( strcmp(argv[i], "--tol") == 0){
       float tmpf;
       if (i+1 >= argc){
@@ -523,16 +542,16 @@ int main(int argc, char** argv)
       i++;
       continue;
     }
-    
+
     if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){
-	usage(argv);
+        usage(argv);
       }
       cpu_prec= get_prec(argv[i+1]);
       i++;
       continue;
     }
-       
+
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -543,6 +562,7 @@ int main(int argc, char** argv)
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
     link_recon_sloppy = link_recon;
   }
+
 
   // initialize QMP or MPI
 #if defined(QMP_COMMS)
@@ -556,8 +576,11 @@ int main(int argc, char** argv)
   initRand();
 
   display_test_info();
-  
+
   int ret = invert_test();
+
+  display_test_info();
+
 
   // finalize the communications layer
 #if defined(QMP_COMMS)

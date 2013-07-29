@@ -1,3 +1,6 @@
+#ifndef REGISTER_TRAITS_H
+#define REGISTER_TRAITS_H
+
 #include <quda_internal.h>
 
 namespace quda {
@@ -34,6 +37,9 @@ namespace quda {
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
       template<typename T> 
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
+
+      template<typename T>
+      __device__ __host__ static void SinCos(const T& a, T *s, T *c) { *s = sin(a); *c = cos(a); }
     };
   
   /**
@@ -49,4 +55,9 @@ namespace quda {
       __device__ __host__ static T Cos( const T &a ) { return cos(a*M_PI); }
   };
 
+  
+
+
 } // namespace quda
+
+#endif

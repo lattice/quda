@@ -80,6 +80,8 @@ namespace quda {
     cudaTextureObject_t gauge1Tex; // also applies to fat gauge
     cudaTextureObject_t longGauge0Tex;
     cudaTextureObject_t longGauge1Tex;
+    cudaTextureObject_t longPhase0Tex;
+    cudaTextureObject_t longPhase1Tex;
     cudaTextureObject_t cloverTex;
     cudaTextureObject_t cloverNormTex;
 #endif
@@ -245,7 +247,7 @@ namespace quda {
       FUNC ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
     } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
       FUNC ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
-    } else {								\
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {								\
       FUNC ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
     }									\
   } else {								\
@@ -258,6 +260,35 @@ namespace quda {
     }									\
   }
 
+
+#define MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
+  if (x==0) {								\
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
+      FUNC ## 18 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
+      FUNC ## 13 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
+      FUNC ## 12 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__ , param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_9) {								\
+      FUNC ## 9 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {								\
+      FUNC ## 8 ## DAG ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    }									\
+  } else {								\
+    if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
+      FUNC ## 18 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_13) {			\
+      FUNC ## 13 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_12) {			\
+      FUNC ## 12 ## DAG ## X ## Kernel<kernel_type><<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_9) {			\
+      FUNC ## 9 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    } else if (reconstruct == QUDA_RECONSTRUCT_8) {			\
+      FUNC ## 8 ## DAG ## X ## Kernel<kernel_type> <<<gridDim, blockDim, shared, stream>>> ( __VA_ARGS__, param); \
+    }                                                                   \
+  }
+
+
 #ifndef MULTI_GPU
 
 #define GENERIC_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
@@ -268,6 +299,16 @@ namespace quda {
   default:								\
     errorQuda("KernelType %d not defined for single GPU", param.kernel_type); \
   }
+
+#define GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
+  switch(param.kernel_type) {						\
+  case INTERIOR_KERNEL:							\
+    MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  default:								\
+    errorQuda("KernelType %d not defined for single GPU", param.kernel_type); \
+  }
+
 
 #else
 
@@ -290,6 +331,26 @@ namespace quda {
       break;								\
   }
 
+#define GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
+  switch(param.kernel_type) {						\
+  case INTERIOR_KERNEL:							\
+    MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, INTERIOR_KERNEL,   gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_X:						\
+    MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_X, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_Y:						\
+    MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Y, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_Z:						\
+    MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_Z, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  case EXTERIOR_KERNEL_T:						\
+    MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+      break;								\
+  }
+
+
 #endif
 
   // macro used for dslash types with dagger kernel defined (Wilson, domain wall, etc.)
@@ -302,8 +363,7 @@ namespace quda {
 
   // macro used for staggered dslash
 #define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param, ...)	\
-  GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param, __VA_ARGS__)
-
+    GENERIC_STAGGERED_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
@@ -1111,12 +1171,22 @@ namespace quda {
     }
   };
 
-  template <typename sFloat, typename fatGFloat, typename longGFloat>
+
+  template<typename T> struct RealType {};
+  template<> struct RealType<double2> { typedef double type; };
+  template<> struct RealType<float2> { typedef float type; };
+  template<> struct RealType<float4> { typedef float type; };
+  template<> struct RealType<short2> { typedef short type; };
+  template<> struct RealType<short4> { typedef short type; };
+
+  template <typename sFloat, typename fatGFloat, typename longGFloat, typename phaseFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
   private:
     const fatGFloat *fat0, *fat1;
     const longGFloat *long0, *long1;
+   // const typename RealType<longGFloat>::type *phase0, *phase1;
+    const phaseFloat *phase0, *phase1;
     const QudaReconstructType reconstruct;
     const int dagger;
     const double a;
@@ -1131,9 +1201,11 @@ namespace quda {
   public:
     StaggeredDslashCuda(cudaColorSpinorField *out, const fatGFloat *fat0, const fatGFloat *fat1,
 			const longGFloat *long0, const longGFloat *long1,
+                        const phaseFloat *phase0, 
+                        const phaseFloat *phase1, 
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x), fat0(fat0), fat1(fat1), long0(long0), long1(long1),
+      : DslashCuda(out, in, x), fat0(fat0), fat1(fat1), long0(long0), long1(long1), phase0(phase0), phase1(phase1), 
 	reconstruct(reconstruct), dagger(dagger), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
@@ -1156,7 +1228,7 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
-		       (sFloat*)out->V(), (float*)out->Norm(), fat0, fat1, long0, long1, 
+		       (sFloat*)out->V(), (float*)out->Norm(), fat0, fat1, long0, long1, phase0, phase1, 
 		       (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
     }
 
@@ -1671,7 +1743,10 @@ namespace quda {
     void* longGauge0, *longGauge1;
     bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);
     bindLongGaugeTex(longGauge, parity, &longGauge0, &longGauge1);
-    
+    void *longPhase0 = (char*)longGauge0 + longGauge.PhaseOffset();
+    void *longPhase1 = (char*)longGauge1 + longGauge.PhaseOffset();   
+
+
     if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
       errorQuda("Mixing gauge and spinor precision not supported"
 		"(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
@@ -1683,20 +1758,23 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-      dslash = new StaggeredDslashCuda<double2, double2, double2>(out, (double2*)fatGauge0, (double2*)fatGauge1,
-								  (double2*)longGauge0, (double2*)longGauge1, 
+      dslash = new StaggeredDslashCuda<double2, double2, double2, double>(out, (double2*)fatGauge0, (double2*)fatGauge1,
+								  (double2*)longGauge0, (double2*)longGauge1,
+                                                                  (double*)longPhase0, (double*)longPhase1, 
 								  longGauge.Reconstruct(), in, x, k, dagger);
       regSize = sizeof(double);
 #else
       errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new StaggeredDslashCuda<float2, float2, float4>(out, (float2*)fatGauge0, (float2*)fatGauge1,
+      dslash = new StaggeredDslashCuda<float2, float2, float4, float>(out, (float2*)fatGauge0, (float2*)fatGauge1,
 							       (float4*)longGauge0, (float4*)longGauge1, 
+                                                               (float*)longPhase0, (float*)longPhase1,
 							       longGauge.Reconstruct(), in, x, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
-      dslash = new StaggeredDslashCuda<short2, short2, short4>(out, (short2*)fatGauge0, (short2*)fatGauge1,
+      dslash = new StaggeredDslashCuda<short2, short2, short4, short>(out, (short2*)fatGauge0, (short2*)fatGauge1,
 							       (short4*)longGauge0, (short4*)longGauge1, 
+                                                               (short*)longPhase0, (short*)longPhase1,
 							       longGauge.Reconstruct(), in, x, k, dagger);
     }
 

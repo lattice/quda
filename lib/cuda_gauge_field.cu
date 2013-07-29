@@ -11,16 +11,15 @@ namespace quda {
     GaugeField(param), gauge(0), even(0), odd(0), backed_up(false)
   {
     if ((order == QUDA_QDP_GAUGE_ORDER || order == QUDA_QDPJIT_GAUGE_ORDER) && 
-	create != QUDA_REFERENCE_FIELD_CREATE) {
+        create != QUDA_REFERENCE_FIELD_CREATE) {
       errorQuda("QDP ordering only supported for reference fields");
     }
-    
     if(create != QUDA_NULL_FIELD_CREATE &&  
-       create != QUDA_ZERO_FIELD_CREATE && 
-       create != QUDA_REFERENCE_FIELD_CREATE){
+        create != QUDA_ZERO_FIELD_CREATE && 
+        create != QUDA_REFERENCE_FIELD_CREATE){
       errorQuda("ERROR: create type(%d) not supported yet\n", create);
     }
-  
+
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       gauge = device_malloc(bytes);  
       if (create == QUDA_ZERO_FIELD_CREATE) cudaMemset(gauge, 0, bytes);
@@ -30,8 +29,8 @@ namespace quda {
 
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
-	size_t nbytes = nFace * surface[i] * reconstruct * precision;
-	ghost[i] = device_malloc(nbytes);
+        size_t nbytes = nFace * surface[i] * reconstruct * precision;
+        ghost[i] = device_malloc(nbytes);
       }        
     }
 
@@ -43,53 +42,75 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     createTexObject(evenTex, even);
     createTexObject(oddTex, odd);
+    if(reconstruct == QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9)
+    {  // Create texture objects for the phases
+      const int isPhase = 1;
+      createTexObject(evenPhaseTex, (char*)even + phase_offset, isPhase);
+      createTexObject(oddPhaseTex, (char*)odd + phase_offset, isPhase);
+    }
 #endif
   }
 
 #ifdef USE_TEXTURE_OBJECTS
-  void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field) {
+  void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, int isPhase) {
 
-    if ( isNative() ) {
+    if( isNative() ){
       // create the texture for the field components
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
       if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
-      
-      // always four components regardless of precision
-      if (precision == QUDA_DOUBLE_PRECISION) {
-	desc.x = 8*sizeof(int);
-	desc.y = 8*sizeof(int);
-	desc.z = 8*sizeof(int);
-	desc.w = 8*sizeof(int);
-      } else {
-	desc.x = 8*precision;
-	desc.y = 8*precision;
-	desc.z = (reconstruct == 18) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
-	desc.w = (reconstruct == 18) ? 0 : 8*precision;
+
+      if(isPhase){
+        if(precision == QUDA_DOUBLE_PRECISION){
+          desc.x = 8*sizeof(int);
+          desc.y = 8*sizeof(int);
+          desc.z = 0;
+          desc.w = 0;
+        }else{
+          desc.x = 8*precision;
+          desc.y = desc.z = desc.w = 0;
+        }
+      }else{
+        // always four components regardless of precision
+        if (precision == QUDA_DOUBLE_PRECISION) {
+          desc.x = 8*sizeof(int);
+          desc.y = 8*sizeof(int);
+          desc.z = 8*sizeof(int);
+          desc.w = 8*sizeof(int);
+        } else {
+          desc.x = 8*precision;
+          desc.y = 8*precision;
+          desc.z = (reconstruct == 18) ? 0 : 8*precision; // float2 or short2 for 18 reconstruct
+          desc.w = (reconstruct == 18) ? 0 : 8*precision;
+        }
       }
-      
+
       cudaResourceDesc resDesc;
       memset(&resDesc, 0, sizeof(resDesc));
       resDesc.resType = cudaResourceTypeLinear;
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
-      resDesc.res.linear.sizeInBytes = bytes/2;
-      
+      resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/2 : (bytes-phase_bytes)/2;
+   
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
-      
+
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
     }
   }
 
   void cudaGaugeField::destroyTexObject() {
-    if ( isNative() ) {
+    if( isNative() ){
       cudaDestroyTextureObject(evenTex);
       cudaDestroyTextureObject(oddTex);
+      if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13){
+        cudaDestroyTextureObject(evenPhaseTex);
+        cudaDestroyTextureObject(oddPhaseTex);
+      }
       checkCudaError();
     }
   }
@@ -107,7 +128,7 @@ namespace quda {
 
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
-	if (ghost[i]) device_free(ghost[i]);
+        if (ghost[i]) device_free(ghost[i]);
       }
     }
   }
@@ -146,7 +167,7 @@ namespace quda {
   {
     if(create != QUDA_REFERENCE_FIELD_CREATE) {
       errorQuda("Setting gauge pointer is only allowed when create="
-		"QUDA_REFERENCE_FIELD_CREATE type\n");
+          "QUDA_REFERENCE_FIELD_CREATE type\n");
     }
     gauge = gauge_;
   }
@@ -159,19 +180,19 @@ namespace quda {
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
       if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0) 
-	errorQuda("fat_link_max has not been computed");
+        errorQuda("fat_link_max has not been computed");
     }
-    
+
     if (typeid(src) == typeid(cudaGaugeField)) {
       // copy field and ghost zone into this field
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
-		       static_cast<const cudaGaugeField&>(src).gauge);
+          static_cast<const cudaGaugeField&>(src).gauge);
     } else if (typeid(src) == typeid(cpuGaugeField)) {
       LatticeField::resizeBufferPinned(bytes);
 
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
-		       static_cast<const cpuGaugeField&>(src).gauge); 
+          static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -195,50 +216,50 @@ namespace quda {
     }
 
   }
-  
-  /*
-    Copies the device gauge field to the host.
-    - no reconstruction support
-    - device data is always Float2 ordered
-    - host data is a 1-dimensional array (MILC ordered)
-    - no support for half precision
-    - input and output precisions must match
-  */
-  template<typename FloatN, typename Float>
-  static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volumeCB, 
-			      int stride, QudaPrecision prec) 
-  {  
-    cudaStream_t streams[2];
-    for (int i=0; i<2; i++) cudaStreamCreate(&streams[i]);
-  
-    FloatN *even = gauge;
-    FloatN *odd = (FloatN*)((char*)gauge + bytes/2);
 
-    size_t datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
-    void *unpacked = device_malloc(datalen);
-    void *unpackedEven = unpacked;
-    void *unpackedOdd = (char*)unpacked + datalen/2;
-  
-    //unpack even data kernel
-    link_format_gpu_to_cpu((void*)unpackedEven, (void*)even, volumeCB, stride, prec, streams[0]);
+  /*
+     Copies the device gauge field to the host.
+     - no reconstruction support
+     - device data is always Float2 ordered
+     - host data is a 1-dimensional array (MILC ordered)
+     - no support for half precision
+     - input and output precisions must match
+   */
+  template<typename FloatN, typename Float>
+    static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volumeCB, 
+        int stride, QudaPrecision prec) 
+    {  
+      cudaStream_t streams[2];
+      for (int i=0; i<2; i++) cudaStreamCreate(&streams[i]);
+
+      FloatN *even = gauge;
+      FloatN *odd = (FloatN*)((char*)gauge + bytes/2);
+
+      size_t datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
+      void *unpacked = device_malloc(datalen);
+      void *unpackedEven = unpacked;
+      void *unpackedOdd = (char*)unpacked + datalen/2;
+
+      //unpack even data kernel
+      link_format_gpu_to_cpu((void*)unpackedEven, (void*)even, volumeCB, stride, prec, streams[0]);
 #ifdef GPU_DIRECT
-    cudaMemcpyAsync(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost, streams[0]);
+      cudaMemcpyAsync(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost, streams[0]);
 #else
-    cudaMemcpy(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost);
+      cudaMemcpy(cpuGauge, unpackedEven, datalen/2, cudaMemcpyDeviceToHost);
 #endif
-  
-    //unpack odd data kernel
-    link_format_gpu_to_cpu((void*)unpackedOdd, (void*)odd, volumeCB, stride, prec, streams[1]);
+
+      //unpack odd data kernel
+      link_format_gpu_to_cpu((void*)unpackedOdd, (void*)odd, volumeCB, stride, prec, streams[1]);
 #ifdef GPU_DIRECT
-    cudaMemcpyAsync(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
-    for(int i=0; i<2; i++) cudaStreamSynchronize(streams[i]);
+      cudaMemcpyAsync(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
+      for(int i=0; i<2; i++) cudaStreamSynchronize(streams[i]);
 #else
-    cudaMemcpy(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
+      cudaMemcpy(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
 #endif
-  
-    device_free(unpacked);
-    for(int i=0; i<2; i++) cudaStreamDestroy(streams[i]);
-  }
+
+      device_free(unpacked);
+      for(int i=0; i<2; i++) cudaStreamDestroy(streams[i]);
+    }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const
   {
@@ -249,23 +270,22 @@ namespace quda {
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
       // check parameters are suitable for device-side packing
       if (precision != cpu.Precision())
-	errorQuda("cpu precision %d and cuda precision %d must be the same", 
-		  cpu.Precision(), precision);
+        errorQuda("cpu precision %d and cuda precision %d must be the same", 
+            cpu.Precision(), precision);
 
       if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Only no reconstruction supported");
       if (order != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Only QUDA_FLOAT2_GAUGE_ORDER supported");
       if (cpu.Order() != QUDA_MILC_GAUGE_ORDER) errorQuda("Only QUDA_MILC_GAUGE_ORDER supported");
 
       if (precision == QUDA_DOUBLE_PRECISION){
-	storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, volumeCB, stride, precision);
+        storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, volumeCB, stride, precision);
       } else if (precision == QUDA_SINGLE_PRECISION){
-	storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, volumeCB, stride, precision);
+        storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, volumeCB, stride, precision);
       } else {
-	errorQuda("Half precision not supported");
+        errorQuda("Half precision not supported");
       }
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
-    
       resizeBufferPinned(bytes);
 
       // this copies over both even and odd
@@ -299,26 +319,31 @@ namespace quda {
   double norm2(const cudaGaugeField &a) {
 
     if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
-	a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
+        a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
       errorQuda("Not implemented");
-  
+
     int spin = 0;
     switch (a.Geometry()) {
-    case QUDA_SCALAR_GEOMETRY:
-      spin = 1;
-      break;
-    case QUDA_VECTOR_GEOMETRY:
-      spin = a.Ndim();
-      break;
-    case QUDA_TENSOR_GEOMETRY:
-      spin = a.Ndim() * (a.Ndim()-1);
-      break;
-    default:
-      errorQuda("Unsupported field geometry %d", a.Geometry());
+      case QUDA_SCALAR_GEOMETRY:
+        spin = 1;
+        break;
+      case QUDA_VECTOR_GEOMETRY:
+        spin = a.Ndim();
+        break;
+      case QUDA_TENSOR_GEOMETRY:
+        spin = a.Ndim() * (a.Ndim()-1);
+        break;
+      default:
+        errorQuda("Unsupported field geometry %d", a.Geometry());
     }
 
     if (a.Precision() == QUDA_HALF_PRECISION) 
       errorQuda("Casting a cudaGaugeField into cudaColorSpinorField not possible in half precision");
+
+    if (a.Reconstruct() == QUDA_RECONSTRUCT_13 || a.Reconstruct() == QUDA_RECONSTRUCT_9)
+      errorQuda("Unsupported field reconstruct %d", a.Reconstruct());
+
+
 
     ColorSpinorParam spinor_param;
     spinor_param.nColor = a.Reconstruct()/2;

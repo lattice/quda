@@ -358,6 +358,9 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge.Start(QUDA_PROFILE_H2D);  
   precise->copy(*in);
 
+
+
+
   param->gaugeGiB += precise->GBytes();
 
   // switch the parameters for creating the mirror sloppy cuda gauge field

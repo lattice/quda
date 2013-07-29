@@ -46,6 +46,9 @@ public:
 };
 
 #ifndef DIRECT_ACCESS_BLAS
+__device__ inline double fetch_double(int2 v)
+{ return __hiloint2double(v.y, v.x); }
+
 __device__ inline double2 fetch_double2(int4 v)
 { return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
 
@@ -61,12 +64,21 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 // legacy Texture references
 
 #if (__COMPUTE_CAPABILITY__ >= 130)
+
+  __inline__ __device__ double fetch_double(texture<int2, 1> t, int i)
+  {
+    int2 v = tex1Dfetch(t,i);
+    return __hiloint2double(v.y, v.x);
+  }
+
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
     int4 v = tex1Dfetch(t,i);
     return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
   }
 #else
+  __inline__ __device__ double fetch_double(texture<int2, 1> t, int i){ return 0.0; }
+
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
     // do nothing

@@ -239,6 +239,12 @@ namespace quda {
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	extractGhost<Float,length>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), 
 				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
+	extractGhost<Float,length>(FloatNOrder<Float,length,2,13>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
+	extractGhost<Float,length>(FloatNOrder<Float,length,2,9>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
       }
     } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
@@ -252,8 +258,14 @@ namespace quda {
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	extractGhost<Float,length>(FloatNOrder<Float,length,4,12>(u, 0, Ghost),
 				   u.Nface(), u.SurfaceCB(), u.X(), location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) { 
 	extractGhost<Float,length>(FloatNOrder<Float,length,4,8>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_13){
+	extractGhost<Float,length>(FloatNOrder<Float,length,4,13>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_9){
+	extractGhost<Float,length>(FloatNOrder<Float,length,4,9>(u, 0, Ghost),
 				   u.Nface(), u.SurfaceCB(), u.X(), location);
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
