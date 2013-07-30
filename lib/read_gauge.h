@@ -194,11 +194,11 @@
 }
 
 #define READ_GAUGE_PHASE_FLOAT(P, phase, dir, idx, stride){ \
-  P = 2.*M_PI*phase[idx + (dir/2)*stride];  \
+  P = 2.f*pi_f*phase[idx + (dir/2)*stride];  \
 }
 
 #define READ_GAUGE_PHASE_SHORT(P, phase, dir, idx, stride){ \
-  P = 2.*M_PI*short2float(phase[idx + (dir/2)*stride]);  \
+  P = 2.f*pi_f*short2float(phase[idx + (dir/2)*stride]);  \
 } 
 
 /*!----For DW only----!*/
@@ -502,7 +502,7 @@
 #define RECONSTRUCT_GAUGE_MATRIX_13_SINGLE(dir, gauge, idx, sign) { \
   RECONSTRUCT_GAUGE_MATRIX_12_SINGLE(dir, gauge, idx, sign)  \
   float exp_i3phase_re, exp_i3phase_im;                      \
-  sincosf(3.*PHASE, &exp_i3phase_im, &exp_i3phase_re);       \
+  sincosf(3.f*PHASE, &exp_i3phase_im, &exp_i3phase_re);      \
   float A_re, A_im;                                          \
   COMPLEX_PRODUCT(A, exp_i3phase, gauge##20);                \
   gauge##20_re = A_re;                                       \
@@ -749,18 +749,13 @@
 
 
 #define READ_GAUGE_PHASE_FLOAT_TEX(P, phase, dir, idx, stride) { \
-  P = TEX1DFETCH(float, (phase), idx + (dir/2)*stride); \
-  P *= 2*M_PI;                                          \
+  P = 2.f*pi_f*TEX1DFETCH(float, (phase), idx + (dir/2)*stride); \
 }
 
-#define READ_GAUGE_PHASE_SHORT_TEX(P, phase, dir, idx, stride) { \
-  P = TEX1DFETCH(float, (phase), idx + (dir/2)*stride); \
-  P *= 2*M_PI;     \
-}
+#define READ_GAUGE_PHASE_SHORT_TEX(P, phase, dir, idx, stride) READ_GAUGE_PHASE_FLOAT_TEX(P, phase, dir, idx, stride)
 
 #define READ_GAUGE_PHASE_DOUBLE_TEX(P, phase, dir, idx, stride) { \
-  P = fetch_double((phase), idx + (dir/2)*stride); \
-  P *= 2*M_PI;                                    \
+  P = 2*M_PI*fetch_double((phase), idx + (dir/2)*stride); \
 }
 
 /*!For DW only*/

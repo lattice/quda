@@ -103,7 +103,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->tadpole_coeff = tadpole_coeff;
   gaugeParam->scale = -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
-  std::cout << "scale = " << gaugeParam->scale << std::endl;
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = X1*X2*X3/2;

@@ -392,7 +392,7 @@ namespace quda {
         if(hasPhase){
           RegType phase;
           reconstruct.getPhase(&phase,v);
-          copy(gauge[parity][phaseOffset/sizeof(Float) + dir*stride + x], phase/(2.*M_PI)); 
+          copy(gauge[parity][phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI))); 
         }        
       }
 
@@ -434,7 +434,7 @@ namespace quda {
           if(hasPhase){
             RegType phase=0.;
             reconstruct.getPhase(&phase, v); 
-            copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], phase/(2.*M_PI));
+            copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], static_cast<RegType>(phase/(2.*M_PI)));
           }
         }
 }
