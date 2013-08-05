@@ -115,9 +115,11 @@ namespace quda {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
       x_sloppy = ColorSpinorField::Create(csParam);
-      csParam.create = QUDA_COPY_FIELD_CREATE;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
       r_sloppy = ColorSpinorField::Create(csParam);
+      *r_sloppy = r;
       r_0 = ColorSpinorField::Create(csParam);
+      *r_0 = r;
     }
 
     // Syntatic sugar
