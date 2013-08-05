@@ -11,8 +11,8 @@ namespace quda {
     for (int x=0; x<t.Volume(); x++) {
       for (int s=0; s<t.Nspin(); s++) {
 	for (int c=0; c<t.Ncolor(); c++) {
-	  real(t(x,s,c)) = comm_drand();
-	  imag(t(x,s,c)) = comm_drand();
+	  t(x,s,c).real(comm_drand());
+	  t(x,s,c).imag(comm_drand());
 	}
       }
     }
@@ -57,8 +57,8 @@ namespace quda {
       for (int s=0; s<u.Nspin(); s++) {
 	for (int c=0; c<u.Ncolor(); c++) {
 	  for (int z=0; z<2; z++) {
-	    double diff = z==0 ? fabs(real(u(x,s,c)) - real(v(x,s,c))) : 
-	      fabs(imag(u(x,s,c)) - imag(v(x,s,c)));
+	    double diff = z==0 ? fabs(u(x,s,c).real() - v(x,s,c).real()) : 
+	      fabs(u(x,s,c).imag() - v(x,s,c).imag());
 
 	    for (int f=0; f<fail_check; f++)
 	      if (diff > pow(10.0,-(f+1)/(double)tol)) fail[f]++;

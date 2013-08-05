@@ -10,7 +10,7 @@
 #include <tune_quda.h>
 #include <assert.h>
 #include <register_traits.h>
-#include <complex>
+#include <complex_quda.h>
 
 namespace quda {
   
@@ -48,7 +48,7 @@ namespace quda {
      * @param s spin index
      * @param c color index
      */
-    virtual const std::complex<Float>& operator()(int d, int parity, int x, int row, int col) const = 0;
+    virtual const quda::complex<Float>& operator()(int d, int parity, int x, int row, int col) const = 0;
 
     /**
      * Writable complex-member accessor function
@@ -58,7 +58,7 @@ namespace quda {
      * @param s spin index
      * @param c color index
      */
-    virtual std::complex<Float>& operator()(int d, int parity, int x, int row, int col) = 0;
+    virtual quda::complex<Float>& operator()(int d, int parity, int x, int row, int col) = 0;
 
     /** Returns the number of field colors */
     int Ncolor() const { return U.Ncolor(); }
@@ -89,8 +89,8 @@ namespace quda {
      * @param s spin index
      * @param c color index
      */
-    const std::complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
-      return static_cast<std::complex<Float>**>(U.Gauge_p())
+    const quda::complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
+      return static_cast<quda::complex<Float>**>(U.Gauge_p())
 	[d][ ((parity * U.VolumeCB() + x)*U.Ncolor() + row)*U.Ncolor() + col];
     }
 
@@ -102,8 +102,8 @@ namespace quda {
      * @param s spin index
      * @param c color index
      */
-    std::complex<Float>& operator()(int d, int parity, int x, int row, int col) {
-      return static_cast<std::complex<Float>**>(U.Gauge_p())
+    quda::complex<Float>& operator()(int d, int parity, int x, int row, int col) {
+      return static_cast<quda::complex<Float>**>(U.Gauge_p())
 	[d][ ((parity * U.VolumeCB() + x)*U.Ncolor() + row)*U.Ncolor() + col];
     }
 

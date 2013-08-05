@@ -3,7 +3,7 @@
 #include <color_spinor_field_order.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <complex>
+#include <complex_quda.h>
 
 namespace quda {
 
@@ -146,8 +146,7 @@ namespace quda {
 	std::complex<int> getelem(int row, int col) const {
 	  if(coupling[row] == col) {
 	    return elem[row];
-	  }
-	  else {
+	  } else {
 	    return 0;
 	  }
 	}
@@ -211,7 +210,7 @@ namespace quda {
   }  //UV
 
   template<typename Float>
-  void VUV(int dir, std::complex<Float> *Y, std::complex<Float> *X, const colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, const Gamma &gamma, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, const int *geo_bs, int spin_bs) {
+  void VUV(int dir, quda::complex<Float> *Y, quda::complex<Float> *X, const colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, const Gamma &gamma, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, const int *geo_bs, int spin_bs) {
 
     for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
 
@@ -236,7 +235,7 @@ namespace quda {
 
       //Check to see if we are on the edge of a block, i.e.
       //if this color matrix connects adjacent blocks.
-     std::complex<Float> *M;
+     quda::complex<Float> *M;
 
      //If adjacent site is in same block, M = X
      if(((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) {
@@ -277,9 +276,9 @@ namespace quda {
            for(int ic = 0; ic < Nc; ic++) { //Sum over fine color
 
              //Diagonal Spin
-	     M[total_diag_offset] += half*std::conj(V(i, s, ic, ic_c))*UV(i, s, ic, jc_c);
+	     M[total_diag_offset] += half*quda::conj(V(i, s, ic, ic_c))*UV(i, s, ic, jc_c);
 	     //Off-diagonal Spin
-	     M[total_offdiag_offset] += half*std::conj(V(i, s, ic, ic_c))*UV(i,s_col, ic, jc_c); 
+	     M[total_offdiag_offset] += half*quda::conj(V(i, s, ic, ic_c))*UV(i,s_col, ic, jc_c); 
 	   } //Fine color
 	 } //Coarse Color column
        } //Coarse Color row
@@ -293,7 +292,7 @@ namespace quda {
   //for the forward/backward spin proejctors.
   //Note: No shifting in site index meaning Y_{-\mu}(x+mu) lives at site x.
   template<typename Float>
-  void reverseY(int dir, const std::complex<Float> *Y_p, std::complex<Float> *Y_m, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
+  void reverseY(int dir, const quda::complex<Float> *Y_p, quda::complex<Float> *Y_m, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
 	int csize = 1;
 	for(int d = 0; d < ndim; d++) {
 	  csize *= xc_size[d];
@@ -309,7 +308,7 @@ namespace quda {
 	      }
 	      for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
 	        for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
-		  Y_m[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] = sign*std::conj(Y_p[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_col+s_row)+Nc_c*jc_c+ic_c]);
+		  Y_m[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] = sign*quda::conj(Y_p[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_col+s_row)+Nc_c*jc_c+ic_c]);
 	        } //Color column
 	      } //Color row
 	    } //Spin column
@@ -322,14 +321,14 @@ namespace quda {
   //plus/minus signs for off-diagonal spin components
   //Also add the diagonal mass term from the original fine wilson operator:
   template<typename Float>
-  void coarseDiagonal(std::complex<Float> *X, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
+  void coarseDiagonal(quda::complex<Float> *X, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
 	int csize = 1;
 	for(int d = 0; d < ndim; d++) {
 	  csize *= xc_size[d];
 	}
 
 	int local = Nc_c*Nc_c;
-	std::complex<Float> *Xlocal = new std::complex<Float>[local];
+	quda::complex<Float> *Xlocal = new quda::complex<Float>[local];
 	
 	for(int i = 0; i < csize; i++) { //Volume
 	  int coarse_site_offset = i*Nc_c*Nc_c*Ns_c*Ns_c;
@@ -348,7 +347,7 @@ namespace quda {
 
 	      for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
 	        for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
-		  X[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] += sign*std::conj(Xlocal[Nc_c*jc_c + ic_c]);
+		  X[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] += sign*quda::conj(Xlocal[Nc_c*jc_c + ic_c]);
 	        } //Color column
 	      } //Color row
 	    } //Spin column
@@ -358,7 +357,7 @@ namespace quda {
 }
 
   template<typename Float>
-  void addMass(std::complex<Float> *X, int ndim, const int *xc_size, int Nc_c, int Ns_c, double mass)  {
+  void addMass(quda::complex<Float> *X, int ndim, const int *xc_size, int Nc_c, int Ns_c, double mass)  {
 	int csize = 1;
 	for(int d = 0; d < ndim; d++) {
 	  csize *= xc_size[d];
@@ -379,7 +378,7 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   template<typename Float>
-  void calculateY(std::complex<Float> *Y[], const colorspinor::FieldOrder<Float> &V, const gauge::FieldOrder<Float> &G, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c,const int *geo_bs, int spin_bs) {
+  void calculateY(quda::complex<Float> *Y[], const colorspinor::FieldOrder<Float> &V, const gauge::FieldOrder<Float> &G, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c,const int *geo_bs, int spin_bs) {
 
     //Create a field UV which holds U*V.  Has the same structure as V.
     ColorSpinorParam UVparam(V.Field());
@@ -452,19 +451,19 @@ namespace quda {
     if (precision == QUDA_DOUBLE_PRECISION) {
       colorspinor::FieldOrder<double> *vOrder = colorspinor::createOrder<double>(T.Vectors(),nvec);
       gauge::FieldOrder<double> *gOrder = gauge::createOrder<double>(g);
-      calculateY<double>((std::complex<double>**)Y, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
+      calculateY<double>((quda::complex<double>**)Y, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
     }
     else {
       colorspinor::FieldOrder<float> * vOrder = colorspinor::createOrder<float>(T.Vectors(), nvec);
       gauge::FieldOrder<float> *gOrder = gauge::createOrder<float>(g);
-      calculateY<float>((std::complex<float>**)Y, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
+      calculateY<float>((quda::complex<float>**)Y, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
     }
   }  
 
   //Apply the coarse Dslash to a vector:
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template<typename Float>
-  void coarseDslash(colorspinor::FieldOrder<Float> &out, colorspinor::FieldOrder<Float> &in, std::complex<Float> *Y[]) {
+  void coarseDslash(colorspinor::FieldOrder<Float> &out, colorspinor::FieldOrder<Float> &in, quda::complex<Float> *Y[]) {
     int Nc = in.Ncolor();
     int Ns = in.Nspin();
     int ndim = in.Ndim();
@@ -525,7 +524,7 @@ namespace quda {
             for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
               for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 	        //Forward link  
-	        out(forward_spinor_index, s_row, c_row) += std::conj(Y[2*d][gauge_site_offset+Nc*Nc*(Ns*s_col+s_row) + Nc*c_col+c_row])*in(i, s_col, c_col);
+	        out(forward_spinor_index, s_row, c_row) += quda::conj(Y[2*d][gauge_site_offset+Nc*Nc*(Ns*s_col+s_row) + Nc*c_col+c_row])*in(i, s_col, c_col);
 	        //Backward link
 		out(backward_spinor_index, s_row, c_row) += Y[2*d+1][backward_gauge_site_offset+Nc*Nc*(Ns*s_row+s_col) + Nc*c_row+c_col]*in(i, s_col, c_col);
 	      } //Color column
@@ -540,7 +539,7 @@ namespace quda {
   //out(x) = (1-X)in(x), where X is the local color-spin matrix
   //on the coarse grid.
   template<typename Float>
-  void coarseClover(colorspinor::FieldOrder<Float> &out, const colorspinor::FieldOrder<Float> &in, const std::complex<Float> *X) {
+  void coarseClover(colorspinor::FieldOrder<Float> &out, const colorspinor::FieldOrder<Float> &in, const quda::complex<Float> *X) {
 
     int Nc = out.Ncolor();
     int Ns = out.Nspin();
@@ -616,17 +615,17 @@ namespace quda {
       colorspinor::FieldOrder<double> *inOrder = colorspinor::createOrder<double>(in);
       colorspinor::FieldOrder<double> *outOrder = colorspinor::createOrder<double>(out);
       setZero(*outOrder);
-      coarseDslash(*outOrder, *inOrder, (std::complex<double>**)Y);
+      coarseDslash(*outOrder, *inOrder, (quda::complex<double>**)Y);
       F_eq_rF(*outOrder, -2*kappa);
-      coarseClover(*outOrder, *inOrder, (std::complex<double> *)Y[2*ndim]);
+      coarseClover(*outOrder, *inOrder, (quda::complex<double> *)Y[2*ndim]);
     }
     else {
       colorspinor::FieldOrder<float> *inOrder = colorspinor::createOrder<float>(in);
       colorspinor::FieldOrder<float> *outOrder = colorspinor::createOrder<float>(out);
       setZero(*outOrder);
-      coarseDslash(*outOrder, *inOrder, (std::complex<float>**)Y);
+      coarseDslash(*outOrder, *inOrder, (quda::complex<float>**)Y);
       F_eq_rF(*outOrder, (float) (-2*kappa));
-      coarseClover(*outOrder, *inOrder, (std::complex<float> *)Y[2*ndim]);
+      coarseClover(*outOrder, *inOrder, (quda::complex<float> *)Y[2*ndim]);
     }  
 
   }//ApplyCoarse

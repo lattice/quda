@@ -19,6 +19,20 @@ namespace quda {
     }
 
   }
+
+  /*
+  // Applies the grid prolongation operator (coarse to fine)
+  template <class FineSpinor, class CoarseSpinor>
+  __global__ void prolongate(FineSpinor &out, const CoarseSpinor &in, const int *geo_map, const int *spin_map) {
+
+    int x = blockIdx.x*blockDim.x + threadIdx.x;
+    for (int s=0; s<out.Nspin(); s++) {
+      for (int c=0; c<out.Ncolor(); c++) {
+	out(x, s, c) = in(geo_map[x], spin_map[s], c);
+      }
+    }
+
+    }*/
   
   /*
     Rotates from the coarse-color basis into the fine-color basis.  This

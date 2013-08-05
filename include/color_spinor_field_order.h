@@ -14,6 +14,7 @@
 
 #include <register_traits.h>
 #include <typeinfo>
+#include <complex_quda.h>
 
 namespace quda {
 
@@ -49,7 +50,7 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      virtual const std::complex<Float>& operator()(int x, int s, int c) const = 0;
+      virtual const quda::complex<Float>& operator()(int x, int s, int c) const = 0;
 
       /**
        * Writable complex-member accessor function
@@ -57,7 +58,7 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      virtual std::complex<Float>& operator()(int x, int s, int c) = 0;
+      virtual quda::complex<Float>& operator()(int x, int s, int c) = 0;
 
       /** Returns the number of field colors */
       int Ncolor() const { return field.Ncolor(); }
@@ -78,7 +79,7 @@ namespace quda {
        * @param c color index
        * @param n vector number
        */
-      const std::complex<Float>& operator()(int x, int s, int c, int n) const {
+      const quda::complex<Float>& operator()(int x, int s, int c, int n) const {
 	return (*this)(x, s, c*Nvec + n);
       }
 
@@ -89,7 +90,7 @@ namespace quda {
        * @param c color index
        * @param n vector number
        */
-      std::complex<Float>& operator()(int x, int s, int c, int n) {
+      quda::complex<Float>& operator()(int x, int s, int c, int n) {
 	return (*this)(x, s, c*Nvec + n);      
       }
 
@@ -116,14 +117,14 @@ namespace quda {
       { ; }
       virtual ~SpaceSpinColorOrder() { ; }
 
-      const std::complex<Float>& operator()(int x, int s, int c) const {
+      const quda::complex<Float>& operator()(int x, int s, int c) const {
 	unsigned long index = (x*field.Nspin()+s)*field.Ncolor()+c;
-	return *(static_cast<std::complex<Float>*>(field.V()) + index);
+	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
       }
 
-      std::complex<Float>& operator()(int x, int s, int c) {
+      quda::complex<Float>& operator()(int x, int s, int c) {
 	unsigned long index = (x*field.Nspin()+s)*field.Ncolor()+c;
-	return *(static_cast<std::complex<Float>*>(field.V()) + index);
+	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
       }
 
     };
@@ -140,14 +141,14 @@ namespace quda {
       { ; }
       virtual ~SpaceColorSpinOrder() { ; }
 
-      const std::complex<Float>& operator()(int x, int s, int c) const {
+      const quda::complex<Float>& operator()(int x, int s, int c) const {
 	unsigned long index = (x*field.Ncolor()+c)*field.Nspin()+s;
-	return *(static_cast<std::complex<Float>*>(field.V()) + index);
+	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
       }
 
-      std::complex<Float>& operator()(int x, int s, int c) {
+      quda::complex<Float>& operator()(int x, int s, int c) {
 	unsigned long index = (x*field.Ncolor()+c)*field.Nspin()+s;    
-	return *(static_cast<std::complex<Float>*>(field.V()) + index);
+	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
       }
     };
 
@@ -169,18 +170,18 @@ namespace quda {
 	}
       virtual ~QOPDomainWallOrder() { ; }
 
-      const std::complex<Float>& operator()(int x, int s, int c) const {
+      const quda::complex<Float>& operator()(int x, int s, int c) const {
 	int ls = x / Ls;
 	int x_4d = x - ls*volume_4d;
 	unsigned long index_4d = (x_4d*field.Ncolor()+c)*field.Nspin()+s;
-	return (static_cast<std::complex<Float>**>(field.V()))[ls][index_4d];
+	return (static_cast<quda::complex<Float>**>(field.V()))[ls][index_4d];
       }
 
-      std::complex<Float>& operator()(int x, int s, int c) {
+      quda::complex<Float>& operator()(int x, int s, int c) {
 	int ls = x / Ls;
 	int x_4d = x - ls*volume_4d;
 	unsigned long index_4d = (x_4d*field.Ncolor()+c)*field.Nspin()+s;
-	return (static_cast<std::complex<Float>**>(field.V()))[ls][index_4d];
+	return (static_cast<quda::complex<Float>**>(field.V()))[ls][index_4d];
       }
     };
 
