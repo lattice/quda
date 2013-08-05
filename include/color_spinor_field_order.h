@@ -42,7 +42,6 @@ namespace quda {
 	volume(field.Volume()), nDim(field.Ndim()), nColor(field.Ncolor()), 
 	nSpin(field.Nspin()), nVec(nVec) { ; }
 
-      ColorSpinorField& Field() { return field; }
       ColorSpinorField& Field() const { return field; }
 
       /**
