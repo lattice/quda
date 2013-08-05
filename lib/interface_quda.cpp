@@ -1585,13 +1585,14 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   mgParam.Nvec = nvec;       // set number of null space components
   mgParam.nu_pre = 10; // set the number of pre-smoothing applications
   mgParam.nu_post = 10; // set the number of pre-smoothing applications  
-  mgParam.smoother = QUDA_BICGSTAB_INVERTER;  // set the smoother type
+  mgParam.smoother = QUDA_MR_INVERTER;  // set the smoother type
 
   // create the MG preconditioner
   Solver *K = new MG(mgParam, profileInvert);
+  //(*K)(*out, *in);
 
   SolverParam solverParam(*param);
-  Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+  Solver *solve = new GCR(m, *K, mSloppy, mPre, solverParam, profileInvert);
   (*solve)(*out, *in);
   delete solve;
   delete K;

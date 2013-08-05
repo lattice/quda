@@ -174,6 +174,7 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
+      errorQuda("Not implemented");
       t->P(tmp, in);
       tmp3 = tmp;
       dirac->M(tmp4, tmp3);
@@ -185,9 +186,9 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
     {
       t->P(tmp, in);
-      tmp3 = tmp;
-      dirac->M(tmp4, tmp3);
-      tmp2 = tmp4;
+      dummy = tmp;
+      dirac->M(tmp3, dummy);
+      tmp2 = tmp3;
       t->R(out, tmp2);
     }
 
@@ -195,6 +196,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
     {
+      errorQuda("Not implemented");
       t->P(tmp, in);
       tmp3 = tmp;
       dirac->M(tmp4, tmp3);

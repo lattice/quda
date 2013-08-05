@@ -17,6 +17,7 @@ namespace quda {
     // create the smoother for this level
     std::cout << "MG: level " << param.level << " smoother has operator " << typeid(param.matSmooth).name() << std::endl;
     param.inv_type = param.smoother;
+    if (param.level == 1) param.inv_type_precondition = QUDA_GCR_INVERTER;
     smoother = Solver::create(param, param.matResidual, param.matSmooth, param.matSmooth, profile);
 
     // if not on the coarsest level, construct it
@@ -58,9 +59,10 @@ namespace quda {
       csParam.setPrecision(csParam.precision);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       hack3 = new cudaColorSpinorField(csParam);  // FIXME allocate cudaSpinorFields
-      hack4 = new cudaColorSpinorField(csParam);   // FIXME allocate cudaSpinorFields
+      //hack4 = new cudaColorSpinorField(csParam);   // FIXME allocate cudaSpinorFields
 
-      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack4);
+      // note last two fields are cpu fields!
+      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack1);
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
 
       // coarse null space vectors (dummy for now)
@@ -71,6 +73,7 @@ namespace quda {
       param_coarse->level++;
 
       param_coarse->fine = this;
+      param_coarse->smoother = QUDA_BICGSTAB_INVERTER;
 
       coarse = new MG(*param_coarse, profile);
     }
@@ -100,6 +103,8 @@ namespace quda {
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+
+    printfQuda("MG: level %d, x.order = %d b.order = %d\n", x.FieldOrder(), b.FieldOrder());
 
     printfQuda("MG: level %d, entering V-cycle with x2=%e, r2=%e\n", 
 	       param.level, blas::norm2(x), blas::norm2(b));
@@ -147,7 +152,7 @@ namespace quda {
     } else { // do the coarse grid solve
 
       printfQuda("MG: level %d starting coarsest solve\n", param.level);
-      param.maxiter = 100;
+      param.maxiter = 10;
       (*smoother)(x, b);
       printfQuda("MG: level %d finished coarsest solve\n", param.level);
 

@@ -6,11 +6,6 @@
 
 namespace quda {
 
-  // forward declarations
-  double normCpu(const cpuColorSpinorField &b);
-  double normCuda(const cudaColorSpinorField &b);
-
-
   /*ColorSpinorField::ColorSpinorField() : init(false) {
 
     }*/

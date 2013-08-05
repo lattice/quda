@@ -274,7 +274,9 @@ namespace quda {
 	    blas::axpy(-1.0, *Ap[k], rM);
 	    blas::copy(rPre, rM);
 	  }
-	
+
+	  printfQuda("GCR: pPre.order = %d rPre.order = %d\n", pPre.FieldOrder(), rPre.FieldOrder());
+
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
 	  else blas::copy(pPre, rPre);
 	
