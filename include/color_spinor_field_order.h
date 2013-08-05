@@ -24,20 +24,26 @@ namespace quda {
       class FieldOrder {
 
     protected:
-      /** An internal reference to the actual field we are accessing */
-      cpuColorSpinorField &field;
-      const int Nvec;
+      ColorSpinorField &field; // temporary hack
+      quda::complex<Float> *v;
+      const int volume;
+      const int nDim;
+      const int nColor;
+      const int nSpin;
+      const int nVec;
 
     public:
       /** 
        * Constructor for the FieldOrder class
        * @param field The field that we are accessing
        */
-    FieldOrder(cpuColorSpinorField &field, int Nvec=1) 
-      : field(field), Nvec(Nvec) { ; }
+    FieldOrder(ColorSpinorField &field, int nVec=1) 
+      : field(field), v(static_cast<quda::complex<Float>*>(field.V())), 
+	volume(field.Volume()), nDim(field.Ndim()), nColor(field.Ncolor()), 
+	nSpin(field.Nspin()), nVec(nVec) { ; }
 
-      cpuColorSpinorField& Field() { return field; }
-      const cpuColorSpinorField& Field() const { return field; }
+      ColorSpinorField& Field() { return field; }
+      ColorSpinorField& Field() const { return field; }
 
       /**
        * Destructor for the FieldOrder class
@@ -50,7 +56,7 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      virtual const quda::complex<Float>& operator()(int x, int s, int c) const = 0;
+      __device__ __host__ virtual const quda::complex<Float>& operator()(int x, int s, int c) const = 0;
 
       /**
        * Writable complex-member accessor function
@@ -58,19 +64,19 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      virtual quda::complex<Float>& operator()(int x, int s, int c) = 0;
+      __device__ __host__ virtual quda::complex<Float>& operator()(int x, int s, int c) = 0;
 
       /** Returns the number of field colors */
-      int Ncolor() const { return field.Ncolor(); }
+      __device__ __host__ int Ncolor() const { return nColor; }
 
       /** Returns the number of field spins */
-      int Nspin() const { return field.Nspin(); }
+      __device__ __host__ int Nspin() const { return nSpin; }
 
       /** Returns the field volume */
-      int Volume() const { return field.Volume(); }
+      __device__ __host__ int Volume() const { return volume; }
 
       /** Returns the field geometric dimension */
-      int Ndim() const { return field.Ndim(); }
+      __device__ __host__ int Ndim() const { return nDim; }
 
       /**
        * Specialized read-only complex-member accessor function (for mg prolongator)
@@ -79,8 +85,8 @@ namespace quda {
        * @param c color index
        * @param n vector number
        */
-      const quda::complex<Float>& operator()(int x, int s, int c, int n) const {
-	return (*this)(x, s, c*Nvec + n);
+      __device__ __host__ const quda::complex<Float>& operator()(int x, int s, int c, int n) const {
+	return (*this)(x, s, c*nVec + n);
       }
 
       /**
@@ -90,18 +96,18 @@ namespace quda {
        * @param c color index
        * @param n vector number
        */
-      quda::complex<Float>& operator()(int x, int s, int c, int n) {
-	return (*this)(x, s, c*Nvec + n);      
+      __device__ __host__ quda::complex<Float>& operator()(int x, int s, int c, int n) {
+	return (*this)(x, s, c*nVec + n);      
       }
 
       /** Returns the number of packed vectors (for mg prolongator) */
-      int NvecPacked() const { return Nvec; }
+      __device__ __host__ int NvecPacked() const { return nVec; }
 
       /** Returns the number of packed colors (for mg prolongator) */
-      int NcolorPacked() const { return field.Ncolor() / Nvec; }
+      __device__ __host__ int NcolorPacked() const { return nColor / nVec; }
 
       /** Returns the number of packed spins (for mg prolongator) */
-      int NspinPacked() const { return field.Nspin(); }    
+      __device__ __host__ int NspinPacked() const { return nSpin; }    
 
     };
 
@@ -109,22 +115,21 @@ namespace quda {
       class SpaceSpinColorOrder : public FieldOrder<Float> {
 
     private:
-      cpuColorSpinorField &field; // convenient to have a "local" reference for code brevity
 
     public:
-    SpaceSpinColorOrder(cpuColorSpinorField &field, int Nvec=1)
-      : FieldOrder<Float>(field, Nvec), field(field) 
+    SpaceSpinColorOrder(ColorSpinorField &field, int nVec=1)
+      : FieldOrder<Float>(field, nVec)
       { ; }
       virtual ~SpaceSpinColorOrder() { ; }
 
-      const quda::complex<Float>& operator()(int x, int s, int c) const {
-	unsigned long index = (x*field.Nspin()+s)*field.Ncolor()+c;
-	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
+      __device__ __host__ const quda::complex<Float>& operator()(int x, int s, int c) const {
+	unsigned long index = (x*FieldOrder<Float>::nSpin+s)*FieldOrder<Float>::nColor+c;
+	return *(FieldOrder<Float>::v + index);
       }
 
-      quda::complex<Float>& operator()(int x, int s, int c) {
-	unsigned long index = (x*field.Nspin()+s)*field.Ncolor()+c;
-	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
+      __device__ __host__ quda::complex<Float>& operator()(int x, int s, int c) {
+	unsigned long index = (x*FieldOrder<Float>::nSpin+s)*FieldOrder<Float>::nColor+c;
+	return *(FieldOrder<Float>::v + index);
       }
 
     };
@@ -133,22 +138,21 @@ namespace quda {
       class SpaceColorSpinOrder : public FieldOrder<Float> {
 
     private:
-      cpuColorSpinorField &field;  // convenient to have a "local" reference for code brevity
 
     public:
-    SpaceColorSpinOrder(cpuColorSpinorField &field, int Nvec=1) 
-      : FieldOrder<Float>(field, Nvec), field(field)
+    SpaceColorSpinOrder(ColorSpinorField &field, int nVec=1) 
+      : FieldOrder<Float>(field, nVec)
       { ; }
       virtual ~SpaceColorSpinOrder() { ; }
 
-      const quda::complex<Float>& operator()(int x, int s, int c) const {
-	unsigned long index = (x*field.Ncolor()+c)*field.Nspin()+s;
-	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
+       __device__ __host__ const quda::complex<Float>& operator()(int x, int s, int c) const {
+	unsigned long index = (x*FieldOrder<Float>::nColor+c)*FieldOrder<Float>::nSpin+s;
+	return *(FieldOrder<Float>::v + index);
       }
 
-      quda::complex<Float>& operator()(int x, int s, int c) {
-	unsigned long index = (x*field.Ncolor()+c)*field.Nspin()+s;    
-	return *(static_cast<quda::complex<Float>*>(field.V()) + index);
+       __device__ __host__ quda::complex<Float>& operator()(int x, int s, int c) {
+	unsigned long index = (x*FieldOrder<Float>::nColor+c)*FieldOrder<Float>::nSpin+s;
+	return *(FieldOrder<Float>::v + index);
       }
     };
 
@@ -156,13 +160,14 @@ namespace quda {
       class QOPDomainWallOrder : public FieldOrder<Float> {
 
     private:
-      cpuColorSpinorField &field;  // convenient to have a "local" reference for code brevity
+      quda::complex<Float> **v;
       int volume_4d;
       int Ls;
 
     public:
-    QOPDomainWallOrder(cpuColorSpinorField &field, int Nvec=1) 
-      : FieldOrder<Float>(field, Nvec), field(field), volume_4d(1), Ls(0)
+    QOPDomainWallOrder(ColorSpinorField &field, int nVec=1) 
+      : FieldOrder<Float>(field, nVec), v(static_cast<quda::complex<Float>**>(field.V())), 
+	volume_4d(1), Ls(0)
 	{ 
 	  if (field.Ndim() != 5) errorQuda("Error, wrong number of dimensions for this FieldOrder");
 	  for (int i=0; i<4; i++) volume_4d *= field.X()[i];
@@ -170,38 +175,33 @@ namespace quda {
 	}
       virtual ~QOPDomainWallOrder() { ; }
 
-      const quda::complex<Float>& operator()(int x, int s, int c) const {
+       __device__ __host__ const quda::complex<Float>& operator()(int x, int s, int c) const {
 	int ls = x / Ls;
 	int x_4d = x - ls*volume_4d;
-	unsigned long index_4d = (x_4d*field.Ncolor()+c)*field.Nspin()+s;
-	return (static_cast<quda::complex<Float>**>(field.V()))[ls][index_4d];
+	unsigned long index_4d = (x_4d*FieldOrder<Float>::nColor+c)*FieldOrder<Float>::nSpin+s;
+	return v[ls][index_4d];
       }
-
-      quda::complex<Float>& operator()(int x, int s, int c) {
+      
+       __device__ __host__ quda::complex<Float>& operator()(int x, int s, int c) {
 	int ls = x / Ls;
 	int x_4d = x - ls*volume_4d;
-	unsigned long index_4d = (x_4d*field.Ncolor()+c)*field.Nspin()+s;
-	return (static_cast<quda::complex<Float>**>(field.V()))[ls][index_4d];
+	unsigned long index_4d = (x_4d*FieldOrder<Float>::nColor+c)*FieldOrder<Float>::nSpin+s;
+	return v[ls][index_4d];
       }
     };
 
     template <typename Float>
-      FieldOrder<Float>* createOrder(const ColorSpinorField &a, int Nvec=1) {
+      FieldOrder<Float>* createOrder(const ColorSpinorField &a, int nVec=1) {
       FieldOrder<Float>* ptr=0;
 
-      if (typeid(a) == typeid(cpuColorSpinorField)) {
-	const cpuColorSpinorField &cpu = static_cast<const cpuColorSpinorField&>(a);
-	if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-	  ptr = new SpaceSpinColorOrder<Float>(const_cast<cpuColorSpinorField&>(cpu), Nvec);
-	} else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
-	  ptr = new SpaceColorSpinOrder<Float>(const_cast<cpuColorSpinorField&>(cpu), Nvec);
-	} else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-	  ptr = new QOPDomainWallOrder<Float>(const_cast<cpuColorSpinorField&>(cpu), Nvec);
-	} else {
-	  errorQuda("Order %d not supported in cpuColorSpinorField", a.FieldOrder());
-	}
+      if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+	ptr = new SpaceSpinColorOrder<Float>(const_cast<ColorSpinorField&>(a), nVec);
+      } else if (a.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
+	ptr = new SpaceColorSpinOrder<Float>(const_cast<ColorSpinorField&>(a), nVec);
+      } else if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
+	ptr = new QOPDomainWallOrder<Float>(const_cast<ColorSpinorField&>(a), nVec);
       } else {
-	errorQuda("Accessor only currently supports CPU fields");
+	errorQuda("Order %d not supported in ColorSpinorField", a.FieldOrder());
       }
 
       return ptr;
