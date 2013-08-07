@@ -1,5 +1,6 @@
 #include <quda_internal.h>
 #include <invert_quda.h>
+#include <math.h>
 
 namespace quda {
 
@@ -63,6 +64,8 @@ namespace quda {
 		   name, k, r2, sqrt(r2/b2));
       }
     }
+
+    if (isnan(r2)) errorQuda("Solver appears to have diverged");
   }
 
   void Solver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
