@@ -169,6 +169,10 @@ namespace quda {
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
+    
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) 
+      printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n", 
+		 norm2(x), norm2(rSloppy), norm2(v), norm2(p), norm2(tmp), norm2(r0), norm2(t));
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
@@ -259,6 +263,10 @@ namespace quda {
       k++;
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) 
+	printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n", 
+		   norm2(x), norm2(rSloppy), norm2(v), norm2(p), norm2(tmp), norm2(r0), norm2(t));
+
     }
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -276,7 +284,7 @@ namespace quda {
 
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (param.verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
       // Calculate the true residual

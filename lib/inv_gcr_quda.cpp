@@ -33,8 +33,6 @@ namespace quda {
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
   
-    inner.verbosity = outer.verbosity_precondition;
-  
     inner.iter = 0;
     inner.gflops = 0;
     inner.secs = 0;
@@ -284,7 +282,7 @@ namespace quda {
 	} 
       
 	matSloppy(*Ap[k], *p[k], tmp);
-	if (param.verbosity>= QUDA_DEBUG_VERBOSE)
+	if (getVerbosity()>= QUDA_DEBUG_VERBOSE)
 	  printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, rPre2=%e\n", total_iter, norm2(*Ap[k]), norm2(*p[k]), norm2(rPre));
       }
 
@@ -292,7 +290,7 @@ namespace quda {
 
       double3 Apr = cDotProductNormACuda(*Ap[k], rSloppy);
 
-      if (param.verbosity>= QUDA_DEBUG_VERBOSE) {
+      if (getVerbosity()>= QUDA_DEBUG_VERBOSE) {
 	printfQuda("GCR debug iter=%d: Apr=(%e,%e,%e)\n", total_iter, Apr.x, Apr.y, Apr.z);
 	for (int i=0; i<k; i++)
 	  for (int j=0; j<=k; j++)
@@ -358,10 +356,10 @@ namespace quda {
     double gflops = (blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
-    if (k>=param.maxiter && param.verbosity >= QUDA_SUMMARIZE) 
+    if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (param.verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
   
     // Calculate the true residual
     mat(r, x);

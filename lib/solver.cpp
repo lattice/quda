@@ -1,6 +1,6 @@
 #include <quda_internal.h>
 #include <invert_quda.h>
-#include <math.h>
+#include <cmath>
 
 namespace quda {
 
@@ -55,7 +55,7 @@ namespace quda {
 
   void Solver::PrintStats(const char* name, int k, const double &r2, 
 			  const double &b2, const double &hq2) {
-    if (param.verbosity >= QUDA_VERBOSE) {
+    if (getVerbosity() >= QUDA_VERBOSE) {
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
 	printfQuda("%s: %d iterations, <r,r> = %e, |r|/|b| = %e, heavy-quark residual = %e\n", 
 		   name, k, r2, sqrt(r2/b2), hq2);
@@ -69,7 +69,7 @@ namespace quda {
   }
 
   void Solver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
-    if (param.verbosity >= QUDA_SUMMARIZE) {
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
 	printfQuda("%s: Convergence at %d iterations, L2 relative residual: iterated = %e, true = %e, heavy-quark residual = %e\n", name, k, sqrt(r2/b2), param.true_res, param.true_res_hq);    
       } else {

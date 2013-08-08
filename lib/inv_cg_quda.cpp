@@ -242,7 +242,7 @@ namespace quda {
     if (k==param.maxiter) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (param.verbosity >= QUDA_VERBOSE)
+    if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals

@@ -120,12 +120,6 @@ namespace quda {
     /**< The Gflops rate of the solver */
     double gflops;
     
-    /**< The verbosity setting to use in the solver */
-    QudaVerbosity verbosity;
-
-    /**< The verbosity setting to use in the preconditioner */
-    QudaVerbosity verbosity_precondition;
-
     /**
        Constructor that matches the initial values to that of the
        QudaInvertParam instance
@@ -142,8 +136,8 @@ namespace quda {
       preserve_source(param.preserve_source), num_offset(param.num_offset), 
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops), 
-      verbosity(param.verbosity), verbosity_precondition(param.verbosity_precondition) { 
+      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops)
+    { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
 	tol_offset[i] = param.tol_offset[i];
