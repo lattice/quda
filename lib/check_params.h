@@ -52,12 +52,14 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #if defined INIT_PARAM
   P(anisotropy, INVALID_DOUBLE);
   P(tadpole_coeff, INVALID_DOUBLE);
+  P(scale, INVALID_DOUBLE);
 #else
   if (param->type == QUDA_WILSON_LINKS) {
     P(anisotropy, INVALID_DOUBLE);
   } else if (param->type == QUDA_ASQTAD_FAT_LINKS ||
 	     param->type == QUDA_ASQTAD_LONG_LINKS) {
     P(tadpole_coeff, INVALID_DOUBLE);
+    //P(scale, INVALID_DOUBLE);
   }
 #endif
 
@@ -141,6 +143,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #endif
 
   P(tol, INVALID_DOUBLE);
+
+#ifdef INIT_PARAM
+  P(residual_type, QUDA_L2_RELATIVE_RESIDUAL);
+#else
+  P(residual_type, QUDA_INVALID_RESIDUAL);
+#endif
 
   if (param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
     P(tol_hq, INVALID_DOUBLE);
@@ -281,12 +289,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   //p(ghostDim[1],0);
   //p(ghostDim[2],0);
   //p(ghostDim[3],0);
-#endif
-
-#ifdef INIT_PARAM
-  P(residual_type, QUDA_L2_RELATIVE_RESIDUAL);
-#else
-  P(residual_type, QUDA_INVALID_RESIDUAL);
 #endif
 
 #ifdef INIT_PARAM

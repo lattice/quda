@@ -127,8 +127,8 @@ namespace quda {
      */
     SolverParam(QudaInvertParam &param) : inv_type(param.inv_type), 
       inv_type_precondition(param.inv_type_precondition), 
-      residual_type(param.residual_type), delta(param.reliable_delta), 
-      tol(param.tol), tol_hq(param.tol_hq), 
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      delta(param.reliable_delta), tol(param.tol), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
