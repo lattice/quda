@@ -65,7 +65,7 @@ namespace quda {
       }
     }
 
-    if (isnan(r2)) errorQuda("Solver appears to have diverged");
+    if (std::isnan(r2)) errorQuda("Solver appears to have diverged");
   }
 
   void Solver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
