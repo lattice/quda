@@ -198,7 +198,7 @@ namespace quda {
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
 	  k++;
 	  rUpdate++;
-	  if (resIncrease++ > maxResIncrease) break; 
+	  if (++resIncrease > maxResIncrease) break; 
 	} else {
 	  resIncrease = 0;
 	}
