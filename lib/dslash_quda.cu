@@ -112,10 +112,6 @@ namespace quda {
     // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
   } dslashConstants;
 
-#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-  static QudaTune twistedGamma5Tuning = QUDA_TUNE_NO;//twistedGamma5 is currently disabled
-#endif
-
   // determines whether the temporal ghost zones are packed with a gather kernel,
   // as opposed to multiple calls to cudaMemcpy()
   static bool kernelPackT = false;
@@ -1938,23 +1934,23 @@ namespace quda {
      vol << dslashConstants.x[1] << "x";
      vol << dslashConstants.x[2] << "x";
      vol << dslashConstants.x[3];    
+     aux << "TwistFlavor" << in->TwistFlavor();
      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
    }  
 
   void apply(const cudaStream_t &stream) 
   {
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-    TuneParam tp = tuneLaunch(*this, twistedGamma5Tuning, getVerbosity());
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
-    {
-        twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>> 
-	((sFloat*)out->V(), (float*)out->Norm(), a, b, (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
-    }
-    else
-    {
-        twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>
-	((sFloat*)out->V(), (float*)out->Norm(), a, b, c, (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
+    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
+      twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>> 
+	((sFloat*)out->V(), (float*)out->Norm(), a, b, 
+	 (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
+    } else {
+      twistGamma5Kernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>
+	((sFloat*)out->V(), (float*)out->Norm(), a, b, c, 
+	 (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
     }
 #endif
   }
@@ -1985,6 +1981,7 @@ namespace quda {
   }
 
   long long flops() const { return 24ll * dslashConstants.VolumeCB(); }
+  long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
  };
 
 //!ndeg tm: 
