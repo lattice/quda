@@ -529,7 +529,8 @@ hisq_force_end()
 static int 
 hisq_force_test(void)
 {
-  if (tune) setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+  if (tune) setTuning(QUDA_TUNE_YES);
+  setVerbosity(QUDA_VERBOSE);
 
   hisq_force_init();
 

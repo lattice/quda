@@ -75,6 +75,8 @@ void init()
 
   initQuda(device);
 
+  setVerbosity(QUDA_VERBOSE);
+
   gaugeParam = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
   
@@ -207,8 +209,6 @@ void init()
     
   if (!transfer) {
 
-    //csParam.verbose = QUDA_DEBUG_VERBOSE;
-	
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.pad = inv_param.sp_pad;
     csParam.precision = inv_param.cuda_prec;
@@ -243,7 +243,6 @@ void init()
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
 
-    diracParam.verbose = QUDA_VERBOSE;
     diracParam.tmp1=tmp;
 
     dirac = Dirac::create(diracParam);
@@ -391,7 +390,7 @@ static int dslashTest()
 
     if (tune) { // warm-up run
       printfQuda("Tuning...\n");
-      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);      
+      setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...", loops);	

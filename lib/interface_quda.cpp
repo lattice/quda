@@ -739,7 +739,6 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
-    diracParam.verbose = getVerbosity();
 
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
@@ -1316,8 +1315,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   axCuda(1.0/sqrt(nb), *b);
   axCuda(1.0/sqrt(nb), *x);
 
-  setDslashTuning(param->tune, getVerbosity());
-  setBlasTuning(param->tune, getVerbosity());
+  setTuning(param->tune);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -1578,8 +1576,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // rescale the source vector to help prevent the onset of underflow
   axCuda(1.0/sqrt(nb), *b);
 
-  setDslashTuning(param->tune, getVerbosity());
-  setBlasTuning(param->tune, getVerbosity());
+  setTuning(param->tune);
   
   massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];

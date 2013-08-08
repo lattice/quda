@@ -36,14 +36,12 @@ namespace quda {
     cudaColorSpinorField *tmp1;
     cudaColorSpinorField *tmp2; // used by Wilson-like kernels only
 
-    QudaVerbosity verbose;
-
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
       dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0),
-      tmp1(0), tmp2(0), verbose(QUDA_SILENT)
+      tmp1(0), tmp2(0)
     {
 
     }
@@ -94,7 +92,6 @@ namespace quda {
     void deleteTmp(cudaColorSpinorField **, const bool &reset) const;
 
     QudaTune tune;
-    QudaVerbosity verbose;  
 
     int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
@@ -130,7 +127,6 @@ namespace quda {
     static Dirac* create(const DiracParam &param);
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
-    QudaVerbosity Verbose() const { return verbose; }
   };
 
   // Full Wilson

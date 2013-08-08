@@ -47,7 +47,6 @@ namespace quda {
         {
 	  // variables declared in LatticeFieldParam
 	  precision = QUDA_INVALID_PRECISION;
-	  verbosity = QUDA_SILENT;
 	  nDim = 4;
 	  pad  = 0;
 	  for(int dir=0; dir<nDim; ++dir) x[dir] = 0;
@@ -61,7 +60,6 @@ namespace quda {
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
-	this->verbosity = QUDA_SILENT;
 	this->nDim = 4;
 	this->pad = pad;
 	for(int dir=0; dir<nDim; ++dir) this->x[dir] = x[dir];

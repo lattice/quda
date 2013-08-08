@@ -112,20 +112,9 @@ namespace quda {
     // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
   } dslashConstants;
 
-  // dslashTuning = QUDA_TUNE_YES enables autotuning when the dslash is
-  // first launched
-  static QudaTune dslashTuning = QUDA_TUNE_NO;
-  static QudaVerbosity verbosity = QUDA_SILENT;
-
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
   static QudaTune twistedGamma5Tuning = QUDA_TUNE_NO;//twistedGamma5 is currently disabled
 #endif
-
-  void setDslashTuning(QudaTune tune, QudaVerbosity verbose)
-  {
-    dslashTuning = tune;
-    verbosity = verbose;
-  }
 
   // determines whether the temporal ghost zones are packed with a gather kernel,
   // as opposed to multiple calls to cudaMemcpy()
@@ -793,7 +782,7 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, 
 	     dslashParam, (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 	     (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
@@ -856,7 +845,7 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DSLASH(cloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cloverNorm, 
 	     (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
@@ -920,7 +909,7 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ASYM_DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 		  (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cloverNorm, 
 		  (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)x, (float*)x->Norm(), a);
@@ -1017,7 +1006,7 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
         errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
   
       switch(dslashType){
         case QUDA_DEG_TWIST_INV_DSLASH:
@@ -1158,7 +1147,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 	     (sFloat*)in->V(), (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
@@ -1225,7 +1214,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		       (sFloat*)out->V(), (float*)out->Norm(), fat0, fat1, long0, long1, phase0, phase1, 
@@ -1298,12 +1287,12 @@ namespace quda {
       if (dslashParam.commDim[i] && (i!=3 || kernelPackT || twistPack)) { pack = true; break; }
 
     // Initialize pack from source spinor
-    if(!twistPack){
-	PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), 
-	    profile, QUDA_PROFILE_PACK_KERNEL);
-    }else{	
-        PROFILE(face->pack(*inSpinor, 1-parity, dagger, twist_a, twist_b, streams), 
-	    profile, QUDA_PROFILE_PACK_KERNEL);
+    if (!twistPack) {
+      PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), 
+	      profile, QUDA_PROFILE_PACK_KERNEL);
+    } else {	
+      PROFILE(face->pack(*inSpinor, 1-parity, dagger, twist_a, twist_b, streams), 
+	      profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
     if (pack) {
@@ -1368,6 +1357,7 @@ namespace quda {
 	      completeSum++;
 	    
 	      // Scatter into the end zone
+	      // Both directions use the same stream
 	      PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), 
 		      profile, QUDA_PROFILE_SCATTER);
 	    }
@@ -1821,7 +1811,7 @@ namespace quda {
     virtual ~CloverCuda() { unbindSpinorTex<sFloat>(in); }
     void apply(const cudaStream_t &stream)
     {
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       cloverKernel<<<gridDim, tp.block, tp.shared_bytes, stream>>>
 	((sFloat*)out->V(), (float*)out->Norm(), clover, cloverNorm, 
@@ -1954,7 +1944,7 @@ namespace quda {
   void apply(const cudaStream_t &stream) 
   {
 #if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
-    TuneParam tp = tuneLaunch(*this, twistedGamma5Tuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, twistedGamma5Tuning, getVerbosity());
     dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
     {

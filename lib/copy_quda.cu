@@ -13,8 +13,6 @@
 
 namespace quda {
 
-  QudaTune getBlasTuning();
-  QudaVerbosity getBlasVerbosity();
   cudaStream_t* getBlasStream();
     
   namespace copy {
@@ -75,7 +73,7 @@ namespace quda {
       }  
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
       }
 

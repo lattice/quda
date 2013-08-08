@@ -27,23 +27,21 @@ namespace quda {
     int pad;
 
     QudaPrecision precision;
-    QudaVerbosity verbosity;
 
     LatticeFieldParam() 
-    : nDim(0), pad(0), precision(QUDA_INVALID_PRECISION), verbosity(QUDA_SILENT) { 
+    : nDim(0), pad(0), precision(QUDA_INVALID_PRECISION) {
       for (int i=0; i<nDim; i++) x[i] = 0; 
     }
 
-    LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision, 
-		      QudaVerbosity verbosity) 
-    : nDim(nDim), pad(pad), precision(precision), verbosity(verbosity) { 
+  LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision)
+    : nDim(nDim), pad(pad), precision(precision) { 
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
       for (int i=0; i<nDim; i++) this->x[i] = x[i]; 
     }
     
     // constructor for creating a cpuGaugeField only
     LatticeFieldParam(const QudaGaugeParam &param) 
-    : nDim(4), pad(0), precision(param.cpu_prec), verbosity(QUDA_SILENT)  {
+    : nDim(4), pad(0), precision(param.cpu_prec) {
       for (int i=0; i<nDim; i++) this->x[i] = param.X[i];
     }
   };
@@ -68,9 +66,6 @@ namespace quda {
 
     /** The precision of the field */
     QudaPrecision precision;
-
-    /** The verbosity to use for this field */
-    QudaVerbosity verbosity;
 
     /** Pinned-memory buffer that is used by all derived classes */
     static void *bufferPinned; 
@@ -114,7 +109,6 @@ namespace quda {
 
     QudaPrecision Precision() const { return precision; }
     QudaFieldLocation Location() const;
-    QudaVerbosity Verbosity() const { return verbosity; }
     size_t GBytes() const { return total_bytes / (1<<30); } // returns total storage allocated
 
     void checkField(const LatticeField &);

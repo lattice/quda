@@ -142,7 +142,7 @@ namespace quda {
     virtual ~PackSpinor() { ; }
   
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>> 
 	(out, in, basis, volume);

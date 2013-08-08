@@ -75,7 +75,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, blasTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     blasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>
       (X, Y, Z, W, f, length);
   }

@@ -689,7 +689,8 @@ int main(int argc, char** argv)
 #endif
 
   // enable the tuning
-  quda::setBlasTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO, QUDA_SILENT);
+  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
+  setVerbosity(QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
 

@@ -38,8 +38,6 @@ static cudaEvent_t reduceEnd;
     
 namespace quda {
 
-  QudaTune getBlasTuning();
-  QudaVerbosity getBlasVerbosity();
   cudaStream_t* getBlasStream();
     
   void initReduce()

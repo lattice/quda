@@ -354,7 +354,8 @@ gauge_force_test(void)
   int max_length = 6;    
   
   initQuda(device);
-  
+  setVerbosityQuda(QUDA_VERBOSE);
+
   qudaGaugeParam = newQudaGaugeParam();
   
   qudaGaugeParam.X[0] = xdim;
@@ -550,7 +551,7 @@ gauge_force_test(void)
 
   if (tune) {
     printfQuda("Tuning...\n");
-    quda::setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+    setTuning(QUDA_TUNE_YES);
   }
   
   struct timeval t0, t1;

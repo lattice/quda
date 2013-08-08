@@ -135,7 +135,7 @@ namespace quda {
     virtual ~ExtractGhost() { ; }
   
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       extractGhostKernel<Float, length, nDim, Order> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }

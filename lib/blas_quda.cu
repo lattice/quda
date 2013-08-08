@@ -31,9 +31,6 @@ namespace quda {
 
   void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 
-  // blasTuning = 1 turns off error checking
-  static QudaTune blasTuning = QUDA_TUNE_NO;
-  static QudaVerbosity verbosity = QUDA_SILENT;
   static cudaStream_t *blasStream;
 
   static struct {
@@ -55,14 +52,6 @@ namespace quda {
     endReduce();
   }
     
-  void setBlasTuning(QudaTune tune, QudaVerbosity verbose)
-  {
-    blasTuning = tune;
-    verbosity = verbose;
-  }
-
-  QudaTune getBlasTuning() { return blasTuning; }
-  QudaVerbosity getBlasVerbosity() { return verbosity; }
   cudaStream_t* getBlasStream() { return blasStream; }
 
 #include <blas_core.h>

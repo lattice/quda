@@ -41,7 +41,7 @@ namespace quda {
   
     // used to create cpu params
   ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
-    : LatticeFieldParam(4, X, 0, inv_param.cpu_prec, inv_param.verbosity), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
+    : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
       twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
       create(QUDA_REFERENCE_FIELD_CREATE), v(V) { 
@@ -88,7 +88,7 @@ namespace quda {
 
     // used to create cuda param from a cpu param
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
-    : LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec, cpuParam.verbosity),
+    : LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
       nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor), 
       siteSubset(cpuParam.siteSubset), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), 
@@ -136,8 +136,6 @@ namespace quda {
 		QudaPrecision precision, int pad, QudaSiteSubset subset, 
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
     void destroy();  
-
-    QudaVerbosity verbose;
 
   protected:
     bool init;

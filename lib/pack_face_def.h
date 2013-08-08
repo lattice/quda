@@ -1315,7 +1315,7 @@ class PackFaceWilson : public PackFace<FloatN, Float> {
   virtual ~PackFaceWilson() { }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_WILSON_DIRAC
     PackParam<FloatN> param = this->prepareParam();
@@ -1330,7 +1330,7 @@ class PackFaceWilson : public PackFace<FloatN, Float> {
   }
 
   void apply_twisted(Float a, Float b, const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_TWISTED_MASS_DIRAC
     PackParam<FloatN> param = this->prepareParam();
@@ -1549,7 +1549,7 @@ class PackFaceAsqtad : public PackFace<FloatN, Float> {
   virtual ~PackFaceAsqtad() { }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     
 #ifdef GPU_STAGGERED_DIRAC
     PackParam<FloatN> param = this->prepareParam();
@@ -1669,7 +1669,7 @@ class PackFaceDW : public PackFace<FloatN, Float> {
   virtual ~PackFaceDW() { }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     
 #ifdef GPU_DOMAIN_WALL_DIRAC
     PackParam<FloatN> param = this->prepareParam();
@@ -1793,7 +1793,7 @@ class PackFaceNdegTM : public PackFace<FloatN, Float> {
   virtual ~PackFaceNdegTM() { }
   
   void apply(const cudaStream_t &stream) {    
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
     PackParam<FloatN> param = this->prepareParam();

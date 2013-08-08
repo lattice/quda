@@ -210,6 +210,4 @@ namespace quda {
 
 } // namespace quda
 
-extern int verbose;
-  
 #endif // _QUDA_INTERNAL_H

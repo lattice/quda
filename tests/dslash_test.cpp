@@ -185,7 +185,7 @@ void init(int argc, char **argv) {
 
   }
 
-  //inv_param.verbosity = QUDA_VERBOSE;
+  setVerbosity(QUDA_VERBOSE);
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
@@ -224,8 +224,6 @@ void init(int argc, char **argv) {
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-  //csParam.verbose = QUDA_DEBUG_VERBOSE;
 
   spinor = new cpuColorSpinorField(csParam);
   spinorOut = new cpuColorSpinorField(csParam);
@@ -307,7 +305,6 @@ void init(int argc, char **argv) {
     bool pc = (test_type != 2 && test_type != 4);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.verbose = QUDA_VERBOSE;
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
     
@@ -590,7 +587,7 @@ int main(int argc, char **argv)
 
     if (tune) { // warm-up run
       printfQuda("Tuning...\n");
-      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+      setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...\n", niter);

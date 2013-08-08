@@ -11,7 +11,6 @@ namespace quda {
   void initBlas(); 
   void endBlas(void);
 
-  void setBlasTuning(QudaTune tune, QudaVerbosity verbose);
   void setBlasParam(int kernel, int prec, int threads, int blocks);
 
   extern unsigned long long blas_flops;

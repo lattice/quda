@@ -416,7 +416,7 @@ public:
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>
       (X, Y, Z, W, V, r, length, tp, stream);
   }
