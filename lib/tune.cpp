@@ -8,6 +8,7 @@
 #include <fstream>
 #include <typeinfo>
 #include <map>
+#include <unistd.h>
 
 namespace quda {
 
