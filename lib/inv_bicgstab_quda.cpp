@@ -223,7 +223,7 @@ namespace quda {
       }
 
       rho0 = rho;
-      rho = quda::Complex(rho_r2.x, rho_r2.y);
+      rho = Complex(rho_r2.x, rho_r2.y);
       r2 = rho_r2.z;
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 

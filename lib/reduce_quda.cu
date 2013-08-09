@@ -246,7 +246,7 @@ namespace quda {
 
   double caxpyNormCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyNorm2,0,1,0,0,0,false>
-      (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, x, x, x);
+      (make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
   /**
@@ -272,7 +272,7 @@ namespace quda {
   double caxpyXmazNormXCuda(const Complex &a, cudaColorSpinorField &x, 
 			    cudaColorSpinorField &y, cudaColorSpinorField &z) {
     return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyxmaznormx,1,1,0,0,0,false>
-      (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
+      (make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
   }
 
   /**
@@ -299,7 +299,7 @@ namespace quda {
   double cabxpyAxNormCuda(const double &a, const Complex &b, 
 			  cudaColorSpinorField &x, cudaColorSpinorField &y) {
     return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,cabxpyaxnorm,1,1,0,0,0,false>
-      (make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x, x);
+      (make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, x, x, x);
   }
 
   /**
@@ -377,7 +377,7 @@ namespace quda {
   Complex caxpyDotzyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y,
 			 cudaColorSpinorField &z) {
     double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0,0,0,false>
-      (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
+      (make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
     return Complex(cdot.x, cdot.y);
   }
 
@@ -463,7 +463,7 @@ namespace quda {
 					     cudaColorSpinorField &z, cudaColorSpinorField &w,
 					     cudaColorSpinorField &u) {
     return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1,0,0,false>
-      (make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
+      (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
   }
 
 

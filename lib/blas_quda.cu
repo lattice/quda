@@ -182,13 +182,15 @@ namespace quda {
   struct caxpy {
     const Float2 a;
     caxpy(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-    __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { caxpy_(a, x, y); }
+    __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+    { caxpy_(a, x, y); }
     static int streams() { return 3; } //! total number of input and output streams
     static int flops() { return 4; } //! flops per element
   };
 
   void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    blasCuda<caxpy,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0), 
+    blasCuda<caxpy,0,1,0,0>(make_double2(REAL(a), IMAG(a)), 
+			    make_double2(0.0, 0.0), 
 			    make_double2(0.0, 0.0), x, y, x, x);
   }
 
@@ -227,7 +229,7 @@ namespace quda {
   };
 
   void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y) {
-    blasCuda<caxpby,0,1,0,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<caxpby,0,1,0,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)), 
 			     make_double2(0.0, 0.0), x, y, x, x);
   }
 
@@ -271,7 +273,7 @@ namespace quda {
 
   void cxpaypbzCuda(cudaColorSpinorField &x, const Complex &a, cudaColorSpinorField &y, 
 		    const Complex &b, cudaColorSpinorField &z) {
-    blasCuda<cxpaypbz,0,0,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<cxpaypbz,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)), 
 			       make_double2(0.0, 0.0), x, y, z, z);
   }
 
@@ -334,7 +336,7 @@ namespace quda {
 
   void caxpbypzYmbwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 			cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w) {
-    blasCuda<caxpbypzYmbw,0,1,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<caxpbypzYmbw,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
 				   make_double2(0.0,0.0), x, y, z, w);
   }
 
@@ -355,7 +357,7 @@ namespace quda {
   void cabxpyAxCuda(const double &a, const Complex &b, 
 		    cudaColorSpinorField &x, cudaColorSpinorField &y) {
     // swap arguments around 
-    blasCuda<cabxpyAx,1,1,0,0>(make_double2(a,0.0), make_double2(b.real(),b.imag()), 
+    blasCuda<cabxpyAx,1,1,0,0>(make_double2(a,0.0), make_double2(REAL(b),IMAG(b)), 
 			       make_double2(0.0,0.0), x, y, x, x);
   }
 
@@ -375,7 +377,7 @@ namespace quda {
 
   void caxpbypzCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 		    cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    blasCuda<caxpbypz,0,0,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
+    blasCuda<caxpbypz,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
 			       make_double2(0.0,0.0), x, y, z, z);
   }
 
@@ -398,8 +400,8 @@ namespace quda {
   void caxpbypczpwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 		       cudaColorSpinorField &y, const Complex &c, cudaColorSpinorField &z, 
 		       cudaColorSpinorField &w) {
-    blasCuda<caxpbypczpw,0,0,0,1>(make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
-				  make_double2(c.real(), c.imag()), x, y, z, w);
+    blasCuda<caxpbypczpw,0,0,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
+				  make_double2(REAL(c),IMAG(c)), x, y, z, w);
   }
 
   /**
@@ -420,7 +422,7 @@ namespace quda {
 
   void caxpyXmazCuda(const Complex &a, cudaColorSpinorField &x, 
 		     cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    blasCuda<caxpyxmaz,1,1,0,0>(make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), 
+    blasCuda<caxpyxmaz,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), 
 				make_double2(0.0, 0.0), x, y, z, x);
   }
 
