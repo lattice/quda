@@ -221,7 +221,7 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
   dnl AC_MSG_NOTICE([Found QDP++ configuration program ${QDPXX_CONFIG}])
   dnl AC_SUBST(CXX, "`${QDPXX_CONFIG} --cxx`")
   dnl AC_MSG_NOTICE([QDP++ compiler: ${CXX}])
-  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags`")
+  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags | sed -e 's/-std=c++0x//g'`")
   AC_MSG_NOTICE([QDP++ compile flags: ${QDPXX_CXXFLAGS}])
   AC_SUBST(QDPXX_LDFLAGS,  "`${QDPXX_CONFIG} --ldflags`")
   AC_MSG_NOTICE([QDP++ linking flags: ${QDPXX_LDFLAGS}])
