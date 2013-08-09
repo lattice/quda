@@ -186,7 +186,7 @@ namespace quda {
     }
 
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);    
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());    
       if(link.Precision() == QUDA_DOUBLE_PRECISION){      
 	if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
 	  parity_compute_gauge_force_kernel_dp18<0><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),

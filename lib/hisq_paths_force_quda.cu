@@ -742,7 +742,7 @@ namespace quda {
 
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	QudaReconstructType recon = link.Reconstruct();
 	int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
 			      + kparam.base_idx[2] + kparam.base_idx[3])&1;
@@ -899,7 +899,7 @@ namespace quda {
 	}     
       
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	QudaReconstructType recon = link.Reconstruct();
 	int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
 			      + kparam.base_idx[2] + kparam.base_idx[3])&1;
@@ -1050,7 +1050,7 @@ namespace quda {
       }
       
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	QudaReconstructType recon = link.Reconstruct();
 	int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
 			      + kparam.base_idx[2] + kparam.base_idx[3])&1;
@@ -1185,7 +1185,7 @@ namespace quda {
       }
       
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	QudaReconstructType recon = link.Reconstruct();
 	int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
 			      + kparam.base_idx[2] + kparam.base_idx[3])&1;
@@ -1330,7 +1330,7 @@ namespace quda {
 	}								\
       }     
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	QudaReconstructType recon = link.Reconstruct();
 	int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
 			      + kparam.base_idx[2] + kparam.base_idx[3])&1;
@@ -1423,7 +1423,7 @@ namespace quda {
       }  
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	int threads = X[0]*X[1]*X[2]*X[3]/2;
 	
@@ -1526,7 +1526,7 @@ namespace quda {
        kparam);		
       
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	QudaReconstructType recon = link.Reconstruct();
 	
         if(GOES_BACKWARDS(sig)) errorQuda("sig does not go forward\n");
@@ -1629,7 +1629,7 @@ namespace quda {
        X[0] * X[1] * X[2] * X[3]/2);		
       
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	QudaReconstructType recon = link.Reconstruct();;
       
 	if(sizeof(RealA) == sizeof(float2)){

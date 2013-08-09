@@ -631,7 +631,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       virtual ~UnitarizeForceCuda() { ; }
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	if(gauge.Precision() == QUDA_SINGLE_PRECISION){
 	  getUnitarizeForceField<<<tp.grid,tp.block>>>(gauge.Volume(), (const float2*)gauge.Even_p(), (const float2*)gauge.Odd_p(),

@@ -433,7 +433,7 @@ namespace quda{
     virtual ~UnitarizeLinksCuda() { ; }
     
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
       if(inField.Precision() == QUDA_SINGLE_PRECISION){
 	getUnitarizedField<<<tp.grid,tp.block>>>((float2*)inField.Even_p(), (float2*)inField.Odd_p(),
