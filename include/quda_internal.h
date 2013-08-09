@@ -85,7 +85,7 @@ extern "C" {
 #endif
 
 #define REAL(a) (*((double*)&a))
-#define IMAG(a) (*((double*)&a+sizeof(double)))
+#define IMAG(a) (*((double*)&a+1))
 
 namespace quda {
 
