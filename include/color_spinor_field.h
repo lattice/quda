@@ -5,13 +5,10 @@
 #include <quda.h>
 
 #include <iostream>
-#include <complex>
 
 #include <lattice_field.h>
 
 namespace quda {
-  typedef std::complex<double> Complex;
-
   struct FullClover;
 
   class ColorSpinorParam : public LatticeFieldParam {

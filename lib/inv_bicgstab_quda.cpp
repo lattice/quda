@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <complex>
-
 #include <quda_internal.h>
 #include <blas_quda.h>
 #include <dslash_quda.h>
@@ -211,7 +209,7 @@ namespace quda {
     
       // omega = (t, r) / (t, t)
       omega_t2 = cDotProductNormACuda(t, rSloppy);
-      omega = quda::Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
+      omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
 
       if (param.inv_type_precondition == QUDA_MR_INVERTER) {
 	//x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
