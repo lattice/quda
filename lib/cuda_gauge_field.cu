@@ -14,6 +14,8 @@ namespace quda {
         create != QUDA_REFERENCE_FIELD_CREATE) {
       errorQuda("QDP ordering only supported for reference fields");
     }
+
+
     if(create != QUDA_NULL_FIELD_CREATE &&  
         create != QUDA_ZERO_FIELD_CREATE && 
         create != QUDA_REFERENCE_FIELD_CREATE){
@@ -92,7 +94,7 @@ namespace quda {
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = isPhase ? phase_bytes/2 : (bytes-phase_bytes)/2;
-   
+
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;

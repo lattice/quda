@@ -740,7 +740,7 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
 #endif  
   
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
-  size_t bytes[4] = {
+  int len[4] = {
     Vsh_x*gaugeSiteSize*sizeof(Float),
     Vsh_y*gaugeSiteSize*sizeof(Float),
     Vsh_z*gaugeSiteSize*sizeof(Float),
@@ -757,10 +757,10 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
     MsgHandle *mh_send_fwd;
     MsgHandle *mh_send_back;
 
-    mh_recv_back = comm_declare_receive_relative(ghost_staple_back, dir, -1, 2*bytes[dir]);
-    mh_recv_fwd = comm_declare_receive_relative(ghost_staple_fwd, dir, +1, 2*bytes[dir]);
-    mh_send_fwd = comm_declare_send_relative(staple_fwd_sendbuf[dir], dir, +1, 2*bytes[dir]);
-    mh_send_back = comm_declare_send_relative(staple_back_sendbuf[dir], dir, -1, 2*bytes[dir]);
+    mh_recv_back = comm_declare_receive_relative(ghost_staple_back, dir, -1, 2*len[dir]);
+    mh_recv_fwd = comm_declare_receive_relative(ghost_staple_fwd, dir, +1, 2*len[dir]);
+    mh_send_fwd = comm_declare_send_relative(staple_fwd_sendbuf[dir], dir, +1, 2*len[dir]);
+    mh_send_back = comm_declare_send_relative(staple_back_sendbuf[dir], dir, -1, 2*len[dir]);
     
     comm_start(mh_recv_back);
     comm_start(mh_recv_fwd);

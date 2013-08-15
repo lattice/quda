@@ -154,7 +154,7 @@ unitarize_link_test()
   //the first one is for creating the cpu/cuda data structures
   
   if(gauge_order == QUDA_QDP_GAUGE_ORDER){
-    computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
+    computeKSLinkQuda(fatlink, NULL, sitelink, act_path_coeff, &qudaGaugeParam,
 			   QUDA_COMPUTE_FAT_STANDARD);
   } // gauge order is QDP_GAUGE_ORDER
 

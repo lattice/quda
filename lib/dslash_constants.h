@@ -2,6 +2,7 @@
 
 typedef struct fat_force_stride_s {
   int fat_ga_stride;
+  int long_ga_stride;
   int site_ga_stride;
   int staple_stride;
   int mom_ga_stride;

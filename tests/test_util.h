@@ -10,7 +10,7 @@
 #define hwSiteSize    12 // real numbers per half wilson
 
 #ifdef __cplusplus
-extern "C" {
+//extern "C" {
 #endif
 
   extern int Z[4];
@@ -40,6 +40,10 @@ extern "C" {
 
   int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) ;
+  
+  int neighborIndex(int dim[], int index, int oddBit, int dx[]);
+  int neighborIndexFullLattice(int dim[], int index, int dx[]);  
+
   int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1);
 
@@ -47,6 +51,7 @@ extern "C" {
   void printGaugeElement(void *gauge, int X, QudaPrecision precision);
   
   int fullLatticeIndex(int i, int oddBit);
+  int fullLatticeIndex(int dim[], int index, int oddBit);
   int getOddBit(int X);
 
   void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
@@ -88,7 +93,7 @@ extern "C" {
   double stopwatchReadSeconds();
 
 #ifdef __cplusplus
-}
+//}
 #endif
 
 #endif // _TEST_UTIL_H

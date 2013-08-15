@@ -124,12 +124,12 @@ namespace quda{
 
 
   template<class Cmplx> 
-  __device__ __host__ inline Cmplx & operator+=(Cmplx & a, const Cmplx & b){
-    a.x += b.x; 
-    a.y += b.y;
-    return a;
-  }
- 
+    __device__ __host__ inline Cmplx & operator+=(Cmplx & a, const Cmplx & b){
+      a.x += b.x; 
+      a.y += b.y;
+      return a;
+    }
+
 
   template<class Cmplx>
     __device__ __host__ inline Cmplx operator+(const Cmplx & a, const Cmplx & b){
@@ -644,18 +644,18 @@ namespace quda{
     }
 
 
-    __device__ inline  
-   void loadLinkVariableFromArray(const float2* const array, int dir, int idx, int stride, Matrix<double2,3> *link)
-   { 
-		 float2 single_temp; 
-	   for(int i=0; i<9; ++i){
+  __device__ inline  
+    void loadLinkVariableFromArray(const float2* const array, int dir, int idx, int stride, Matrix<double2,3> *link)
+    { 
+      float2 single_temp; 
+      for(int i=0; i<9; ++i){
         single_temp = array[idx + (dir*9 + i)*stride];
-				link->data[i].x = single_temp.x;
-				link->data[i].y = single_temp.y;
-		 }
-		 return;
-   }
-   
+        link->data[i].x = single_temp.x;
+        link->data[i].y = single_temp.y;
+      }
+      return;
+    }
+
 
 
 
@@ -673,18 +673,18 @@ namespace quda{
 
 
 
-    __device__ inline 
-	  void writeLinkVariableToArray(const Matrix<double2,3> & link, int dir, int idx, int stride, float2* const array)
-   {
-	    float2 single_temp;
+  __device__ inline 
+    void writeLinkVariableToArray(const Matrix<double2,3> & link, int dir, int idx, int stride, float2* const array)
+    {
+      float2 single_temp;
 
       for(int i=0; i<9; ++i){ 
-				single_temp.x = link.data[i].x;
-				single_temp.y = link.data[i].y;
+        single_temp.x = link.data[i].x;
+        single_temp.y = link.data[i].y;
         array[idx + (dir*9 + i)*stride] = single_temp;
       }
-     return;
-   }
+      return;
+    }
 
 
   template<class Cmplx> 
@@ -727,70 +727,70 @@ namespace quda{
       return;
     } 
   // template this! 
-        inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              (*link)(i,j).x = array[(i*3+j)*2];
-              (*link)(i,j).y = array[(i*3+j)*2 + 1];
-            }
-          }
-          return;
-        }
-	
-	template<class Cmplx, class Real>
-        inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              (*link)(i,j).x = array[(i*3+j)*2];
-              (*link)(i,j).y = array[(i*3+j)*2 + 1];
-            }
-          }
-          return;
-        }
-	
-        
-        // and this!
-        inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              array[(i*3+j)*2] = link(i,j).x;
-              array[(i*3+j)*2 + 1] = link(i,j).y;
-            }
-          }
-          return;
-        }
+  inline void copyArrayToLink(Matrix<float2,3>* link, float* array){
+    for(int i=0; i<3; ++i){
+      for(int j=0; j<3; ++j){
+        (*link)(i,j).x = array[(i*3+j)*2];
+        (*link)(i,j).y = array[(i*3+j)*2 + 1];
+      }
+    }
+    return;
+  }
 
-        // and this!
-	template<class Cmplx, class Real>
-        inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
-          for(int i=0; i<3; ++i){
-            for(int j=0; j<3; ++j){
-              array[(i*3+j)*2] = link(i,j).x;
-              array[(i*3+j)*2 + 1] = link(i,j).y;
-            }
-          }
-          return;
+  template<class Cmplx, class Real>
+    inline void copyArrayToLink(Matrix<Cmplx,3>* link, Real* array){
+      for(int i=0; i<3; ++i){
+        for(int j=0; j<3; ++j){
+          (*link)(i,j).x = array[(i*3+j)*2];
+          (*link)(i,j).y = array[(i*3+j)*2 + 1];
         }
+      }
+      return;
+    }
 
 
+  // and this!
+  inline void copyLinkToArray(float* array, const Matrix<float2,3>& link){
+    for(int i=0; i<3; ++i){
+      for(int j=0; j<3; ++j){
+        array[(i*3+j)*2] = link(i,j).x;
+        array[(i*3+j)*2 + 1] = link(i,j).y;
+      }
+    }
+    return;
+  }
 
-        // and this!
-	template<class Cmplx>
-	__host__ __device__ inline
-        void printLink(const Matrix<Cmplx,3>& link){
+  // and this!
+  template<class Cmplx, class Real>
+    inline void copyLinkToArray(Real* array, const Matrix<Cmplx,3>& link){
+      for(int i=0; i<3; ++i){
+        for(int j=0; j<3; ++j){
+          array[(i*3+j)*2] = link(i,j).x;
+          array[(i*3+j)*2 + 1] = link(i,j).y;
+        }
+      }
+      return;
+    }
+
+
+
+  // and this!
+  template<class Cmplx>
+    __host__ __device__ inline
+    void printLink(const Matrix<Cmplx,3>& link){
 #if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
-          printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
-          printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
-          printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
-          printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
-          printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
-          printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
-          printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
-          printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
-          printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
-          printf("\n");
+      printf("(%lf, %lf)\t", link(0,0).x, link(0,0).y);
+      printf("(%lf, %lf)\t", link(0,1).x, link(0,1).y);
+      printf("(%lf, %lf)\n", link(0,2).x, link(0,2).y);
+      printf("(%lf, %lf)\t", link(1,0).x, link(1,0).y);
+      printf("(%lf, %lf)\t", link(1,1).x, link(1,1).y);
+      printf("(%lf, %lf)\n", link(1,2).x, link(1,2).y);
+      printf("(%lf, %lf)\t", link(2,0).x, link(2,0).y);
+      printf("(%lf, %lf)\t", link(2,1).x, link(2,1).y);
+      printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
+      printf("\n");
 #endif
-        }
+    }
 
 } // end namespace quda
 #endif // _QUDA_MATRIX_H_
