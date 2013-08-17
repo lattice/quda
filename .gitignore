@@ -1,1 +1,7 @@
 *.o
+*.f90
+*.mod
+*.a
+*~
+tests/*_test
+make.inc

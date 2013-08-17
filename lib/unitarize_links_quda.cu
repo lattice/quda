@@ -9,7 +9,7 @@
 #include <svd_quda.h>
 #include <hisq_links_quda.h>
 
-namespace quda {
+namespace quda{
 
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
@@ -256,8 +256,6 @@ namespace quda {
   bool unitarizeLinkMILC(const Matrix<Cmplx,3>& in, Matrix<Cmplx,3>* const result)
   {
     Matrix<Cmplx,3> u;
-
-
 #ifdef __CUDA_ARCH__
 #define FL_REUNIT_SVD_ONLY  DEV_FL_REUNIT_SVD_ONLY
 #define FL_REUNIT_ALLOW_SVD DEV_FL_REUNIT_ALLOW_SVD
@@ -271,7 +269,6 @@ namespace quda {
 	return true;
       }
     }
-    return false;
 
     // If we've got this far, then the Caley-Hamilton unitarization 
     // has failed. If SVD is not allowed, the unitarization has failed.
@@ -354,75 +351,26 @@ namespace quda {
 				     Cmplx*  outlink_even, Cmplx*  outlink_odd,
 				     int* num_failures, const int threads)
   {
-    printf("number of threads = %d\n", threads);
-
     int mem_idx = blockIdx.x*blockDim.x + threadIdx.x;
     if (mem_idx >= threads) return;
-
-    int odd = 0;
 
     const Cmplx* inlink;
     Cmplx* outlink;
 
     inlink  = inlink_even;
     outlink = outlink_even;
-
-    printf("mem_idx = %d\n", mem_idx);
-    printf("Vh = %d\n", Vh);
-        
-
+    
     if(mem_idx >= Vh){
       mem_idx = mem_idx - Vh;
       inlink  = inlink_odd;
       outlink = outlink_odd;
-      odd = 1;
     }
-  
-    if(mem_idx==0){
-      printf("Mem_idx == 0\n");
-    }
-
 
     // Unitarization is always done in double precision
     Matrix<double2,3> v, result;
     for(int dir=0; dir<4; ++dir){
-
-      if(mem_idx == 0){
-        printf("About to load link variable\n");
-      }
       loadLinkVariableFromArray(inlink, dir, mem_idx, Vh+INPUT_PADDING, &v); 
-
-   
-      if(mem_idx == 0){
-        printf("input padding = %d\n", INPUT_PADDING);
-        printf("Link variable loaded\n");
-      }
- 
-      if(mem_idx == 0){
-        printLink(v);
-        printf("\n");
-      }
-
-      
-      __syncthreads();
-
-      bool success = unitarizeLinkMILC(v, &result);
-      if(!success){
-        printf("Failed on %d\n", mem_idx);
-      }
-    
-
-      if(!success && mem_idx == 5 && dir==0){
-        printf("Failed on this link\n");
-        if(odd){
-          printf("On odd sublattice\n");
-        }else{
-          printf("On even sublattice\n");
-        }
-        printLink(v);
-        
-      }
-      
+      unitarizeLinkMILC(v, &result);
 #ifdef __CUDA_ARCH__
 #define FL_MAX_ERROR DEV_FL_MAX_ERROR
 #define FL_CHECK_UNITARIZATION DEV_FL_CHECK_UNITARIZATION
@@ -492,15 +440,9 @@ namespace quda {
 						 (float2*)outField.Even_p(), (float2*)outField.Odd_p(),
 						 fails, inField.Volume());
       }else if(inField.Precision() == QUDA_DOUBLE_PRECISION){
-        
-      printfQuda("about to call getUnitarizedField\n");
-
 	getUnitarizedField<<<tp.grid,tp.block>>>((double2*)inField.Even_p(), (double2*)inField.Odd_p(),
 						 (double2*)outField.Even_p(), (double2*)outField.Odd_p(),
 						 fails, inField.Volume());
-
-        printfQuda("Call to getUnitarizedField complete\n"); 
-        
       } else {
 	errorQuda("UnitarizeLinks not implemented for precision %d", inField.Precision());
       }
@@ -547,7 +489,6 @@ namespace quda {
 			  cudaGaugeField* outField, 
 			  int* fails) { 
     UnitarizeLinksCuda unitarizeLinks(inField, *outField, fails);
-    printf("UnitarizeLinksCuda instantiated\n");
     unitarizeLinks.apply(0);
   }
 
