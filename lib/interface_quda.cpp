@@ -272,8 +272,10 @@ void initQudaDevice(int dev) {
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
+#ifndef USE_QDPJIT
   cudaSetDevice(dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+#endif
 
 #ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
