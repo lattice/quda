@@ -345,8 +345,8 @@ namespace quda {
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
-    cudaMemset(v, 0, bytes);
-    if (precision == QUDA_HALF_PRECISION) cudaMemset(norm, 0, norm_bytes);
+    cudaMemsetAsync(v, 0, bytes, streams[Nstream-1]);
+    if (precision == QUDA_HALF_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, streams[Nstream-1]);
   }
 
 
