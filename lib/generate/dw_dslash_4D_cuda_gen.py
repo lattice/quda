@@ -360,6 +360,22 @@ if (sid >= param.threads*Ls) return;
 
 int boundaryCrossing;
 """)
+        if domain_wall:
+          if dslash4 == True:
+            prolog_str+=(
+"""
+int X, x1, x2, x3, x4, xs;
+""")
+          else:
+            prolog_str+=(
+"""
+int X, xs;
+""")
+        else:
+          prolog_str+=(
+"""
+int X, x1, x2, x3, x4, xs;
+""")
         if dslash4 == True:
             prolog_str += (
 """
@@ -377,8 +393,6 @@ if (kernel_type == INTERIOR_KERNEL) {
           if dslash4 == True:
             prolog_str+=(
 """
-int X, x1, x2, x3, x4, xs;
-
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
@@ -392,8 +406,6 @@ xs = X/(X1*X2*X3*X4);
           else:
             prolog_str+=(
 """
-int X, xs;
-
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
@@ -404,8 +416,6 @@ xs = X/(X1*X2*X3*X4);
         else:
           prolog_str+=(
 """
-int X, x1, x2, x3, x4, xs;
-
 X = 2*sid;
 int aux1 = X / X1;
 x1 = X - aux1 * X1;

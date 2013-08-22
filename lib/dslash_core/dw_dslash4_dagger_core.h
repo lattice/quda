@@ -179,6 +179,8 @@ if (sid >= param.threads*Ls) return;
 
 int boundaryCrossing;
 
+int X, x1, x2, x3, x4, xs;
+
 #ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
@@ -186,8 +188,6 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
-
-int X, x1, x2, x3, x4, xs;
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 

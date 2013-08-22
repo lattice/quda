@@ -110,10 +110,10 @@ if (sid >= param.threads*Ls) return;
 
 int boundaryCrossing;
 
+int X, xs;
+
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
-
-int X, xs;
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
