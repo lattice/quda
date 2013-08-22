@@ -13,7 +13,8 @@ bool globalReduce = true;
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision, const int Ls) :
-  Ninternal(Ninternal), precision(precision), nDim(nDim), nDimComms(nDim), nFace(nFace)
+  my_face(0), from_face(0), Ninternal(Ninternal), precision(precision), nDim(nDim), 
+  nDimComms(nDim), nFace(nFace)
 {
   setupDims(X, Ls);
 
@@ -24,16 +25,33 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
 
-  // Buffers hold half spinors
+  // allocate a single contiguous buffer for the buffers
+  size_t faceBytes = 0;
   for (int i=0; i<nDimComms; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
+    if(!commDimPartitioned(i)) continue;
+    faceBytes += 2*nbytes[i];
+  }
 
-    my_back_face[i] = allocatePinned(2*nbytes[i]);
-    my_fwd_face[i] = (char*)my_back_face[i] + nbytes[i];
-    from_back_face[i] = allocatePinned(2*nbytes[i]);
-    from_fwd_face[i] = (char*)from_back_face[i] + nbytes[i];
+  if (faceBytes > 0) {
+    my_face = allocatePinned(faceBytes);
+    from_face = allocatePinned(faceBytes);
+  }
+
+  // assign Buffers hold half spinors
+  size_t offset = 0;
+  for (int i=0; i<nDimComms; i++) {
+    if (!commDimPartitioned(i)) continue;
+
+    my_back_face[i] = (char*)my_face + offset;
+    from_back_face[i] = (char*)from_face + offset;
+    offset += nbytes[i];
+
+    my_fwd_face[i] = (char*)my_face + offset;
+    from_fwd_face[i] = (char*)from_face + offset;
+    offset += nbytes[i];
 
 #ifdef GPU_DIRECT //  just alias the pointer
     ib_my_fwd_face[i] = my_fwd_face[i];
@@ -46,7 +64,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     ib_from_fwd_face[i] = safe_malloc(nbytes[i]);
     ib_from_back_face[i] = safe_malloc(nbytes[i]);
 #endif
-
   }
 
   for (int i=0; i<nDimComms; i++) {
@@ -69,25 +86,21 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
 FaceBuffer::~FaceBuffer()
 {  
   for (int i=0; i<nDimComms; i++) {
-
-#ifndef GPU_DIRECT
-    host_free(ib_my_fwd_face[i]);
-    host_free(ib_my_back_face[i]);
-    host_free(ib_from_fwd_face[i]);
-    host_free(ib_from_back_face[i]);
-#endif
-
     if (commDimPartitioned(i)) {
+#ifndef GPU_DIRECT
+      host_free(ib_my_fwd_face[i]);
+      host_free(ib_my_back_face[i]);
+      host_free(ib_from_fwd_face[i]);
+      host_free(ib_from_back_face[i]);
+#endif
       comm_free(mh_send_fwd[i]);
       comm_free(mh_send_back[i]);
       comm_free(mh_recv_fwd[i]);
       comm_free(mh_recv_back[i]);
     }
 
-    freePinned(from_back_face[i]);
-    freePinned(my_back_face[i]);
   }
-
+  
   for (int i=0; i<nDimComms; i++) {
     ib_my_fwd_face[i] = NULL;
     ib_my_back_face[i] = NULL;
@@ -104,6 +117,9 @@ FaceBuffer::~FaceBuffer()
     mh_send_fwd[i] = NULL;
     mh_send_back[i] = NULL;
   }
+
+  if (from_face) freePinned(from_face);
+  if (my_face) freePinned(my_face);
 
   checkCudaError();
 }

@@ -26,8 +26,10 @@ namespace quda {
     int recBackStrmIdx; // = sendFwdIdx;
     
     // CUDA pinned memory
+    void *my_face;
     void *my_fwd_face[QUDA_MAX_DIM];
     void *my_back_face[QUDA_MAX_DIM];
+    void *from_face;
     void *from_back_face[QUDA_MAX_DIM];
     void *from_fwd_face[QUDA_MAX_DIM];
     
