@@ -493,20 +493,24 @@ namespace quda {
   }
 
   // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhost(const QudaParity parity, const int dagger, cudaStream_t *stream) 
+  void cudaColorSpinorField::packGhost(const QudaParity parity, const int dagger, 
+				       cudaStream_t *stream, void *buffer) 
   {
 #ifdef MULTI_GPU
-    packFace(ghostFaceBuffer, *this, dagger, parity, *stream); 
+    void *packBuffer = buffer ? buffer : ghostFaceBuffer;
+    packFace(packBuffer, *this, dagger, parity, *stream); 
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
 
   }
 
-  void cudaColorSpinorField::packTwistedGhost(const QudaParity parity, const int dagger, double a, double b, cudaStream_t *stream) 
+  void cudaColorSpinorField::packTwistedGhost(const QudaParity parity, const int dagger, 
+					      double a, double b, cudaStream_t *stream, void *buffer) 
   {
 #ifdef MULTI_GPU
-    packTwistedFace(ghostFaceBuffer, *this, dagger, parity, a, b, *stream); 
+    void *packBuffer = buffer ? buffer : ghostFaceBuffer;
+    packTwistedFace(packBuffer, *this, dagger, parity, a, b, *stream); 
 #else
     errorQuda("packTwistedGhost not built on single-GPU build");
 #endif

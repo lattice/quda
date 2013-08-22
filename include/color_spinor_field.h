@@ -297,8 +297,30 @@ namespace quda {
     void allocateGhostBuffer(void);
     static void freeGhostBuffer(void);
 
-    void packGhost(const QudaParity parity, const int dagger, cudaStream_t* stream);
-    void packTwistedGhost(const QudaParity parity, const int dagger, double a, double b, cudaStream_t *stream);
+    /**
+       Packs the cudaColorSpinorField's ghost zone 
+       @param parity Parity of the field
+       @param dagger Whether the operator is the Hermitian conjugate or not
+       @param stream Which stream to use for the kernel
+       @param buffer Optional parameter where the ghost should be
+       stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
+     */
+    void packGhost(const QudaParity parity, const int dagger, 
+		   cudaStream_t* stream, void *buffer=0);
+
+    /**
+       Packs the cudaColorSpinorField's ghost zone (special case for twisted mass) 
+       @param parity Parity of the field
+       @param dagger Whether the operator is the Hermitian conjugate or not
+       @param a Twisted mass parameter
+       @param b Twisted mass parameter
+       @param stream Which stream to use for the kernel
+       @param buffer Optional parameter where the ghost should be
+       stored (default is to use cudaColorSpinorField::ghostFaceBuffer)
+     */
+    void packTwistedGhost(const QudaParity parity, const int dagger, double a, double b, 
+			  cudaStream_t *stream, void *buffer=0);
+
     void sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
 		   const int dagger, cudaStream_t *stream);
     void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
