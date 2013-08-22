@@ -67,8 +67,10 @@
 #define QUDA_WILSON_DSLASH 0 
 #define QUDA_CLOVER_WILSON_DSLASH 1
 #define QUDA_DOMAIN_WALL_DSLASH 2
-#define QUDA_ASQTAD_DSLASH 3
-#define QUDA_TWISTED_MASS_DSLASH 4
+#define QUDA_DOMAIN_WALL_4D_DSLASH 3
+#define QUDA_MOBIUS_DWF_DSLASH 4
+#define QUDA_ASQTAD_DSLASH 5
+#define QUDA_TWISTED_MASS_DSLASH 6
 #define QUDA_INVALID_DSLASH QUDA_INVALID_ENUM
 
 #define QudaInverterType integer(4)
@@ -92,8 +94,6 @@
 #define QUDA_NORMOP_PC_SOLVE 3
 #define QUDA_NORMEQ_SOLVE QUDA_NORMOP_SOLVE // deprecated
 #define QUDA_NORMEQ_PC_SOLVE QUDA_NORMOP_PC_SOLVE // deprecated
-#define QUDA_NORMEQ_4DPC_SOLVE 4 // for 4D preconditioned domain wall dirac operator
-#define QUDA_MDWF_EQ_PC_SOLVE 5 // for 4D preconditioned mobius domain wall dirac operator
 #define QUDA_INVALID_SOLVE QUDA_INVALID_ENUM
 
 #define QudaSchwarzType integer(4)

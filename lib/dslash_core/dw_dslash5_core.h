@@ -108,30 +108,30 @@ VOLATILE spinorFloat o32_im;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*Ls) return;
 
-int X, xs;
-
 int boundaryCrossing;
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
+int X, xs;
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
 xs = X/(X1*X2*X3*X4);
 
-o00_re = 0; o00_im = 0;
-o01_re = 0; o01_im = 0;
-o02_re = 0; o02_im = 0;
-o10_re = 0; o10_im = 0;
-o11_re = 0; o11_im = 0;
-o12_re = 0; o12_im = 0;
-o20_re = 0; o20_im = 0;
-o21_re = 0; o21_im = 0;
-o22_re = 0; o22_im = 0;
-o30_re = 0; o30_im = 0;
-o31_re = 0; o31_im = 0;
-o32_re = 0; o32_im = 0;
+ o00_re = 0; o00_im = 0;
+ o01_re = 0; o01_im = 0;
+ o02_re = 0; o02_im = 0;
+ o10_re = 0; o10_im = 0;
+ o11_re = 0; o11_im = 0;
+ o12_re = 0; o12_im = 0;
+ o20_re = 0; o20_im = 0;
+ o21_re = 0; o21_im = 0;
+ o22_re = 0; o22_im = 0;
+ o30_re = 0; o30_im = 0;
+ o31_re = 0; o31_im = 0;
+ o32_re = 0; o32_im = 0;
 
 
 // 5th dimension -- NB: not partitionable!
@@ -228,7 +228,7 @@ o32_re = 0; o32_im = 0;
 
   // MDWF Dslash_5 operator is given as follow
   // Dslash4pre = [c_5(s)(P_+\delta_{s,s`+1} - mP_+\delta_{s,0}\delta_{s`,L_s-1}
-  //         + P_-\delta_{s,s`-1}-mP_-\delta_{s,L_s-1}\delta_{s`,0}) 
+  //         + P_-\delta_{s,s`-1}-mP_-\delta_{s,L_s-1}\delta_{s`,0})
   //         + b_5(s)\delta_{s,s`}]\delta_{x,x`}
   // For Dslash4pre
   // C_5 \equiv c_5(s)*0.5
@@ -236,13 +236,13 @@ o32_re = 0; o32_im = 0;
   // For Dslash5
   // C_5 \equiv 0.5*{c_5(s)(4+M_5)-1}/{b_5(s)(4+M_5)+1}
   // B_5 \equiv 1.0
-#ifdef MDWF_mode   // Check whether MDWF option is enabled 
+#ifdef MDWF_mode   // Check whether MDWF option is enabled
 #if (MDWF_mode==1)
   VOLATILE spinorFloat C_5;
   VOLATILE spinorFloat B_5;
   C_5 = (spinorFloat)mdwf_c5[xs]*0.5;
   B_5 = (spinorFloat)mdwf_b5[xs];
-  
+
   READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + B_5*i00_re;
   o00_im = C_5*o00_im + B_5*i00_im;
@@ -302,6 +302,7 @@ o32_re = 0; o32_im = 0;
 } // end 5th dimension
 
 {
+
 #ifdef DSLASH_XPAY
  READ_ACCUM(ACCUMTEX, sp_stride)
  VOLATILE spinorFloat coeff;
@@ -339,7 +340,7 @@ o32_re = 0; o32_im = 0;
  o31_im = o31_im + coeff*accum10.y;
  o32_re = o32_re + coeff*accum11.x;
  o32_im = o32_im + coeff*accum11.y;
-#else            
+#else
  o00_re = o00_re + coeff*accum0.x;
  o00_im = o00_im + coeff*accum0.y;
  o01_re = o01_re + coeff*accum0.z;
@@ -452,5 +453,7 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
+
+
 
 #undef VOLATILE

@@ -555,84 +555,27 @@ namespace quda {
 
     bool reset1 = newTmp(&tmp1, in);
 
-    float elapsed_time_ms=0.0f;
-    cudaEvent_t point0, point1, point2, point3, point4, point5, point6 ;
-    cudaEventCreate( &point0 );
-    cudaEventCreate( &point1 );
-    cudaEventCreate( &point2 );
-    cudaEventCreate( &point3 );
-    cudaEventCreate( &point4 );
-    cudaEventCreate( &point5 );
-    cudaEventCreate( &point6 );
-
     //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
     //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
     //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      cudaEventRecord( point0, 0 );
       Dslash4pre(*tmp1, in, QUDA_ODD_PARITY);
-      cudaEventRecord( point1, 0 );
-      cudaEventSynchronize( point1 );
       Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
-      cudaEventRecord( point2, 0 );
-      cudaEventSynchronize( point2 );
       Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5); //kappa5 is dummy value
-      cudaEventRecord( point3, 0 );
-      cudaEventSynchronize( point3 );
       Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
-      cudaEventRecord( point4, 0 );
-      cudaEventSynchronize( point4 );
       Dslash4(*tmp1, out, QUDA_ODD_PARITY);
-      cudaEventRecord( point5, 0 );
-      cudaEventSynchronize( point5 );
       Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
-      cudaEventRecord( point6, 0 );
-      cudaEventSynchronize( point6 );
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      cudaEventRecord( point0, 0 );
       Dslash4pre(*tmp1, in, QUDA_EVEN_PARITY);
-      cudaEventRecord( point1, 0 );
-      cudaEventSynchronize( point1 );
       Dslash4(out, *tmp1, QUDA_ODD_PARITY);
-      cudaEventRecord( point2, 0 );
-      cudaEventSynchronize( point2 );
       Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5); //kappa5 is dummy value
-      cudaEventRecord( point3, 0 );
-      cudaEventSynchronize( point3 );
       Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
-      cudaEventRecord( point4, 0 );
-      cudaEventSynchronize( point4 );
       Dslash4(*tmp1, out, QUDA_EVEN_PARITY);
-      cudaEventRecord( point5, 0 );
-      cudaEventSynchronize( point5 );
       Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
-      cudaEventRecord( point6, 0 );
-      cudaEventSynchronize( point6 );
     } else {
       errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
     }
 
-    cudaEventElapsedTime( &elapsed_time_ms, point0, point1 );
-    printf( "D4pre time: %8.2f ms\n", elapsed_time_ms );
-    cudaEventElapsedTime( &elapsed_time_ms, point1, point2 );
-    printf( "D4 time: %8.2f ms\n", elapsed_time_ms );
-    cudaEventElapsedTime( &elapsed_time_ms, point2, point3 );
-    printf( "D5inv pre time: %8.2f ms\n", elapsed_time_ms );
-    cudaEventElapsedTime( &elapsed_time_ms, point3, point4 );
-    printf( "D4pre time: %8.2f ms\n", elapsed_time_ms );
-    cudaEventElapsedTime( &elapsed_time_ms, point4, point5 );
-    printf( "D4 time: %8.2f ms\n", elapsed_time_ms );
-    cudaEventElapsedTime( &elapsed_time_ms, point5, point6 );
-    printf( "M5 AXPY time: %8.2f ms\n", elapsed_time_ms );
-    cudaEventElapsedTime( &elapsed_time_ms, point0, point6 );
-    printf( "Total M time: %8.2f ms\n", elapsed_time_ms );
-    cudaEventDestroy( point0 );
-    cudaEventDestroy( point1 );
-    cudaEventDestroy( point2 );
-    cudaEventDestroy( point3 );
-    cudaEventDestroy( point4 );
-    cudaEventDestroy( point5 );
-    cudaEventDestroy( point6 );
     deleteTmp(&tmp1, reset1);
   }
 

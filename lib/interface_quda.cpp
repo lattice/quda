@@ -659,31 +659,28 @@ namespace quda {
       diracParam.type = pc ? QUDA_CLOVERPC_DIRAC : QUDA_CLOVER_DIRAC;
       break;
     case QUDA_DOMAIN_WALL_DSLASH:
-      //-----------------------------------------------
-      // Edited by HJ Kim, this modification is needed 
-      // for the 4D preconditioned DW dirac operator
-      //-----------------------------------------------
+      diracParam.type = pc ? QUDA_DOMAIN_WALLPC_DIRAC : QUDA_DOMAIN_WALL_DIRAC;
+      diracParam.Ls = inv_param->Ls;
+      break;
+    case QUDA_DOMAIN_WALL_4D_DSLASH:
       if(pc)
       {
-        if(inv_param->solve_type == QUDA_NORMEQ_4DPC_SOLVE)
-          diracParam.type = QUDA_DOMAIN_WALL_4DPC_DIRAC;
-        else if(inv_param->solve_type == QUDA_MDWF_EQ_PC_SOLVE)
-          diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC;
-        else
-          diracParam.type = QUDA_DOMAIN_WALLPC_DIRAC;
+        diracParam.type = QUDA_DOMAIN_WALL_4DPC_DIRAC;
+        diracParam.Ls = inv_param->Ls;
       }
       else
+        errorQuda("For 4D type of DWF dslash, pc must be turned on, %d", inv_param->dslash_type);
+      break;
+    case QUDA_MOBIUS_DWF_DSLASH:
+      if(pc)
       {
-        diracParam.type = QUDA_DOMAIN_WALL_DIRAC;
-      }
-      diracParam.Ls = inv_param->Ls;
-      //New parameters for mobius operator
-      if(inv_param->solve_type == QUDA_MDWF_EQ_PC_SOLVE)
-      {
+        diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC;
+        diracParam.Ls = inv_param->Ls;
         diracParam.b_5 = inv_param->b_5; 
-        diracParam.c_5 = inv_param->c_5; 
+        diracParam.c_5 = inv_param->c_5;
       }
-      //END NEW    
+      else
+        errorQuda("At currently, only preconditioned Mobius DWF is supported, %d", inv_param->dslash_type);
       break;
     case QUDA_ASQTAD_DSLASH:
       diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;
@@ -880,7 +877,9 @@ namespace quda {
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
 
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
@@ -947,7 +946,9 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
@@ -1016,7 +1017,9 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
 
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
@@ -1180,7 +1183,9 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
 
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
 
@@ -1199,7 +1204,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // for now, though, so here we factorize everything for convenience.
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMEQ_4DPC_SOLVE) || (param->solve_type == QUDA_MDWF_EQ_PC_SOLVE);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
@@ -1389,7 +1394,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
   profileMulti.Start(QUDA_PROFILE_TOTAL);
 
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
 
   if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created

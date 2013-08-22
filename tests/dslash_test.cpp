@@ -77,7 +77,9 @@ void init(int argc, char **argv) {
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+             dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     dw_setDims(gauge_param.X, Lsdim);
     setKernelPackT(true);
   } else {
@@ -108,15 +110,35 @@ void init(int argc, char **argv) {
     inv_param.epsilon = 0.01; 
 //!    inv_param.twist_flavor = QUDA_TWIST_MINUS;
     inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     inv_param.mass = 0.01;
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+    inv_param.mass = 0.01;
+    inv_param.m5 = -1.5;
+    kappa5 = 0.5/(5 + inv_param.m5);
+    inv_param.b_5 = (double*)malloc(Lsdim*sizeof(double));
+    inv_param.c_5 = (double*)malloc(Lsdim*sizeof(double));
+    for(int k = 0; k < Lsdim; k++)
+    {
+      // b5[k], c[k] values are chosen for arbitrary values,
+      // but the difference of them are same as 1.0
+      inv_param.b_5[k] = 1.452;
+      inv_param.c_5[k] = 0.452;
+    }
   }
 
   inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 1;
   
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  if(dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+     dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+     dslash_type == QUDA_MOBIUS_DWF_DSLASH )
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  else
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+
   inv_param.dagger = dagger;
 
   inv_param.cpu_prec = cpu_prec;
@@ -185,7 +207,7 @@ void init(int argc, char **argv) {
 
   }
 
-  //inv_param.verbosity = QUDA_VERBOSE;
+  //inv_param.verbosity = QUDA_DEBUG_VERBOSE;
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
@@ -199,7 +221,9 @@ void init(int argc, char **argv) {
   }
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
@@ -232,7 +256,6 @@ void init(int argc, char **argv) {
   spinorRef = new cpuColorSpinorField(csParam);
   spinorTmp = new cpuColorSpinorField(csParam);
 
-  csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   csParam.x[0] = gauge_param.X[0];
   
   printfQuda("Randomizing fields... ");
@@ -361,6 +384,12 @@ double dslashCUDA(int niter) {
       }
       break;
     case 1:
+      if (transfer) {
+	MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+      } else {
+	dirac->M(*cudaSpinorOut, *cudaSpinor);
+      }
+      break;
     case 2:
       if (transfer) {
 	MatQuda(spinorOut->V(), spinor->V(), &inv_param);
@@ -369,6 +398,12 @@ double dslashCUDA(int niter) {
       }
       break;
     case 3:
+      if (transfer) {
+	MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+      } else {
+	dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+      }
+      break;
     case 4:
       if (transfer) {
 	MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
@@ -508,7 +543,9 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+             dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     switch (test_type) {
     case 0:
       dw_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);

@@ -1491,7 +1491,7 @@ void usage(char** argv )
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
-  printf("    --Lsdim <n>                                # Set Ls dimension size(default 16)\n");  
+  printf("    --Lsdim <n>                               # Set Ls dimension size(default 16)\n");  
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1499,7 +1499,8 @@ void usage(char** argv )
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted_mass/asqtad/domain_wall\n");
+	 "                                                wilson/clover/twisted_mass/asqtad/\n"
+   "                                                domain_wall/domain_wall_4dpc/mobius_Dwf\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     

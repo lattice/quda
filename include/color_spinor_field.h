@@ -57,7 +57,7 @@ namespace quda {
       pad(0), twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
       create(QUDA_REFERENCE_FIELD_CREATE), 
-	  PCtype(((inv_param.solve_type==QUDA_NORMEQ_4DPC_SOLVE)||(inv_param.solve_type==QUDA_MDWF_EQ_PC_SOLVE))?QUDA_4D_PC:QUDA_5D_PC ),
+	  PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||(inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ),
       v(V), verbose(inv_param.verbosity)
       { 
 
@@ -77,7 +77,9 @@ namespace quda {
 	  siteSubset = QUDA_PARITY_SITE_SUBSET;
 	}
 
-	if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+	if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+      inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+      inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
 	  nDim++;
 	  x[4] = inv_param.Ls;
 	}

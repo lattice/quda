@@ -71,6 +71,8 @@ extern "C" {
     QUDA_WILSON_DSLASH,
     QUDA_CLOVER_WILSON_DSLASH,
     QUDA_DOMAIN_WALL_DSLASH,
+    QUDA_DOMAIN_WALL_4D_DSLASH,
+    QUDA_MOBIUS_DWF_DSLASH,
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
@@ -99,8 +101,6 @@ extern "C" {
     QUDA_NORMOP_PC_SOLVE,
     QUDA_NORMEQ_SOLVE = QUDA_NORMOP_SOLVE, // deprecated
     QUDA_NORMEQ_PC_SOLVE = QUDA_NORMOP_PC_SOLVE, // deprecated
-    QUDA_NORMEQ_4DPC_SOLVE,  // for 4D preconditioned domain wall dirac operator
-    QUDA_MDWF_EQ_PC_SOLVE,  // for 4D preconditioned mobius domain wall dirac operator
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
   } QudaSolveType;
 

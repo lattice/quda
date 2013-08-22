@@ -177,8 +177,6 @@ int sp_norm_idx;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*Ls) return;
 
-int X, x1, x2, x3, x4, xs;
-
 int boundaryCrossing;
 
 #ifdef MULTI_GPU
@@ -188,6 +186,8 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
+int X, x1, x2, x3, x4, xs;
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
@@ -1962,7 +1962,6 @@ if (!incomplete)
 {
 
 #ifdef DSLASH_XPAY
-
  READ_ACCUM(ACCUMTEX, sp_stride)
  VOLATILE spinorFloat coeff;
 
@@ -2023,7 +2022,6 @@ if (!incomplete)
  o32_re = coeff*o32_re + accum5.z;
  o32_im = coeff*o32_im + accum5.w;
 #endif // SPINOR_DOUBLE
-
 #endif // DSLASH_XPAY
 }
 

@@ -106,6 +106,8 @@ int main(int argc, char **argv)
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
       dslash_type != QUDA_TWISTED_MASS_DSLASH &&
+      dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH &&
+      dslash_type != QUDA_MOBIUS_DWF_DSLASH &&
       dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
@@ -152,11 +154,26 @@ int main(int argc, char **argv)
     inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
     //inv_param.twist_flavor = QUDA_TWIST_MINUS;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
     inv_param.mass = 0.02;
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+    inv_param.mass = 0.02;
+    inv_param.m5 = -1.8;
+    kappa5 = 0.5/(5 + inv_param.m5);  
+    inv_param.Ls = Lsdim;
+    inv_param.b_5 = (double*)malloc(Lsdim*sizeof(double));
+    inv_param.c_5 = (double*)malloc(Lsdim*sizeof(double));
+    for(int k = 0; k < Lsdim; k++)
+    {
+      // b5[k], c[k] values are chosen for arbitrary values,
+      // but the difference of them are same as 1.0
+      inv_param.b_5[k] = 1.452;
+      inv_param.c_5[k] = 0.452;
+    }
   }
 
   // offsets used only by multi-shift solver
@@ -177,7 +194,10 @@ int main(int argc, char **argv)
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
+      dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
     inv_param.inv_type = QUDA_CG_INVERTER;
   } else {
@@ -259,7 +279,9 @@ int main(int argc, char **argv)
   // *** application-specific.
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     dw_setDims(gauge_param.X, inv_param.Ls);
   } else {
     setDims(gauge_param.X);
@@ -453,14 +475,16 @@ int main(int argc, char **argv)
         wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0, 
                   inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-	dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+        dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else {
         printfQuda("Unsupported dslash_type\n");
         exit(-1);
       }
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+            dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+            dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
           ax(0.25/(kappa5*kappa5), spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
         } else {
           ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);

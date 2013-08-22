@@ -298,7 +298,7 @@ def prolog():
 
     prolog_str+= def_input_spinor()
     if dslash == True: 
-        if d4eo == True:
+        if dslash4 == True:
             prolog_str+= def_gauge()
     if clover == True: prolog_str+= def_clover()
     prolog_str+= def_output_spinor()
@@ -341,12 +341,12 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
 
 
     if dslash:
-        if d4eo == True:
+        if dslash4 == True:
             prolog_str += "\n#include \"read_gauge.h\"\n"
         if not domain_wall:
             prolog_str += "#include \"read_clover.h\"\n"
         prolog_str += "#include \"io_spinor.h\"\n"
-        if d4eo == True:
+        if dslash4 == True:
             prolog_str += (
 """
 #if (defined MULTI_GPU) && (DD_PREC==2) // half precision
@@ -355,24 +355,30 @@ int sp_norm_idx;
 """)
         prolog_str += (
 """
-int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if (sid >= param.threads) return;
-
-int X, x1, x2, x3, x4, xs;
+int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
+if (sid >= param.threads*Ls) return;
 
 int boundaryCrossing;
-
+""")
+        if dslash4 == True:
+            prolog_str += (
+"""
 #ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
-
+""")
+        prolog_str += (
+"""
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
 """)
         if domain_wall:
-          prolog_str+=(
+          if dslash4 == True:
+            prolog_str+=(
 """
+int X, x1, x2, x3, x4, xs;
+
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
@@ -383,9 +389,23 @@ x4 = (X/(X1*X2*X3)) % X4;
 xs = X/(X1*X2*X3*X4);
 
 """)
+          else:
+            prolog_str+=(
+"""
+int X, xs;
+
+boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
+
+X = 2*sid + (boundaryCrossing + param.parity) % 2;
+xs = X/(X1*X2*X3*X4);
+
+""")
+
         else:
           prolog_str+=(
 """
+int X, x1, x2, x3, x4, xs;
+
 X = 2*sid;
 int aux1 = X / X1;
 x1 = X - aux1 * X1;
@@ -405,13 +425,14 @@ X += aux1;
                 out += out_re(s,c)+" = 0; "+out_im(s,c)+" = 0;\n"
         prolog_str+= indent(out)
 
-        prolog_str+= (
+        if dslash4 == True:
+          prolog_str+= (
 """
 #ifdef MULTI_GPU
 } else { // exterior kernel
 
 const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads >> 1); // volume of one face
+const int face_volume = (param.threads*Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 
@@ -419,11 +440,6 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
 
-""")
-        if d4eo == True:
-            prolog_str+=(
-
-"""
 #if (DD_PREC==2) // half precision
 sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
 #endif
@@ -436,28 +452,17 @@ X = 2*sid + (boundaryCrossing + param.parity) % 2;
 
 READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
 """)
-        else:
-            prolog_str+=(
-"""
-coordsFromDWFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity);
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-
-READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
-""")
-        out = ""
-        for s in range(0,4):
+          out = ""
+          for s in range(0,4):
             for c in range(0,3):
-                out += out_re(s,c)+" = "+in_re(s,c)+"; "+out_im(s,c)+" = "+in_im(s,c)+";\n"
-        prolog_str+= indent(out)
-        prolog_str+= "}\n"
-        prolog_str+= "#endif // MULTI_GPU\n"
+              out += out_re(s,c)+" = "+in_re(s,c)+"; "+out_im(s,c)+" = "+in_im(s,c)+";\n"
+          prolog_str+= indent(out)
+          prolog_str+= "}\n"
+          prolog_str+= "#endif // MULTI_GPU\n"
 
-        if domain_wall:
-          if d4eo == True:
-            prolog_str += (
+          if domain_wall:
+            if dslash4 == True:
+              prolog_str += (
 """
 // declare G## here and use ASSN below instead of READ
 #ifdef GAUGE_FLOAT2
@@ -492,20 +497,8 @@ float4 G4;
 
 """)
 
-        prolog_str+= "\n\n"
+          prolog_str+= "\n\n"
 
-    elif domain_wall:
-        prolog_str+=(
-"""
-#include "io_spinor.h"
-
-int sid = blockIdx.x*blockDim.x + threadIdx.x;
-if (sid >= param.threads) return;
-
-// read spinor from device memory
-READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
-
-""")
     else:
         prolog_str+=(
 """
@@ -757,8 +750,9 @@ def gen_dw():
 
     str = "\n\n"
     str += "// 5th dimension -- NB: not partitionable!\n"
-    str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n{\n"
-    str += "// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
+    if normalDWF:
+      str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n"
+    str += "{\n// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
     str += "     int sp_idx = ( xs == %s ? X%s(Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
@@ -822,21 +816,100 @@ def gen_dw():
     str += out_L.replace("-","+").replace(" += "," += -mferm*(").replace(";",");")
 
     str += "    } // end if ( xs != %s )\n" % redge
-    str += "  } // end P_R\n"
-    str += "} // end 5th dimension\n\n\n"
+    str += "  } // end P_R\n\n"
+
+    if dslash5:
+      str += "  // MDWF Dslash_5 operator is given as follow\n"
+      str += "  // Dslash4pre = [c_5(s)(P_+\delta_{s,s`+1} - mP_+\delta_{s,0}\delta_{s`,L_s-1}\n"
+      str += "  //         + P_-\delta_{s,s`-1}-mP_-\delta_{s,L_s-1}\delta_{s`,0})\n"
+      str += "  //         + b_5(s)\delta_{s,s`}]\delta_{x,x`}\n"
+      str += "  // For Dslash4pre\n"
+      str += "  // C_5 \equiv c_5(s)*0.5\n"
+      str += "  // B_5 \equiv b_5(s)\n"
+      str += "  // For Dslash5\n"
+      str += "  // C_5 \equiv 0.5*{c_5(s)(4+M_5)-1}/{b_5(s)(4+M_5)+1}\n"
+      str += "  // B_5 \equiv 1.0\n"
+      str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
+      str += "#if (MDWF_mode==1)\n"
+      str += "  VOLATILE spinorFloat C_5;\n"
+      str += "  VOLATILE spinorFloat B_5;\n"
+      str += "  C_5 = (spinorFloat)mdwf_c5[xs]*0.5;\n"
+      str += "  B_5 = (spinorFloat)mdwf_b5[xs];\n\n"
+      str += "  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );\n"
+      str += "  o00_re = C_5*o00_re + B_5*i00_re;\n" 
+      str += "  o00_im = C_5*o00_im + B_5*i00_im;\n"
+      str += "  o01_re = C_5*o01_re + B_5*i01_re;\n"
+      str += "  o01_im = C_5*o01_im + B_5*i01_im;\n"
+      str += "  o02_re = C_5*o02_re + B_5*i02_re;\n"
+      str += "  o02_im = C_5*o02_im + B_5*i02_im;\n"
+      str += "  o10_re = C_5*o10_re + B_5*i10_re;\n"
+      str += "  o10_im = C_5*o10_im + B_5*i10_im;\n"
+      str += "  o11_re = C_5*o11_re + B_5*i11_re;\n"
+      str += "  o11_im = C_5*o11_im + B_5*i11_im;\n"
+      str += "  o12_re = C_5*o12_re + B_5*i12_re;\n"
+      str += "  o12_im = C_5*o12_im + B_5*i12_im;\n"
+      str += "  o20_re = C_5*o20_re + B_5*i20_re;\n"
+      str += "  o20_im = C_5*o20_im + B_5*i20_im;\n"
+      str += "  o21_re = C_5*o21_re + B_5*i21_re;\n"
+      str += "  o21_im = C_5*o21_im + B_5*i21_im;\n"
+      str += "  o22_re = C_5*o22_re + B_5*i22_re;\n"
+      str += "  o22_im = C_5*o22_im + B_5*i22_im;\n"
+      str += "  o30_re = C_5*o30_re + B_5*i30_re;\n"
+      str += "  o30_im = C_5*o30_im + B_5*i30_im;\n"
+      str += "  o31_re = C_5*o31_re + B_5*i31_re;\n"
+      str += "  o31_im = C_5*o31_im + B_5*i31_im;\n"
+      str += "  o32_re = C_5*o32_re + B_5*i32_re;\n"
+      str += "  o32_im = C_5*o32_im + B_5*i32_im;\n"
+      str += "#elif (MDWF_mode==2)\n"
+      str += "  VOLATILE spinorFloat C_5;\n"
+      str += "  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n\n"
+      str += "  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );\n"
+      str += "  o00_re = C_5*o00_re + i00_re;\n"
+      str += "  o00_im = C_5*o00_im + i00_im;\n"
+      str += "  o01_re = C_5*o01_re + i01_re;\n"
+      str += "  o01_im = C_5*o01_im + i01_im;\n"
+      str += "  o02_re = C_5*o02_re + i02_re;\n"
+      str += "  o02_im = C_5*o02_im + i02_im;\n"
+      str += "  o10_re = C_5*o10_re + i10_re;\n"
+      str += "  o10_im = C_5*o10_im + i10_im;\n"
+      str += "  o11_re = C_5*o11_re + i11_re;\n"
+      str += "  o11_im = C_5*o11_im + i11_im;\n"
+      str += "  o12_re = C_5*o12_re + i12_re;\n"
+      str += "  o12_im = C_5*o12_im + i12_im;\n"
+      str += "  o20_re = C_5*o20_re + i20_re;\n"
+      str += "  o20_im = C_5*o20_im + i20_im;\n"
+      str += "  o21_re = C_5*o21_re + i21_re;\n"
+      str += "  o21_im = C_5*o21_im + i21_im;\n"
+      str += "  o22_re = C_5*o22_re + i22_re;\n"
+      str += "  o22_im = C_5*o22_im + i22_im;\n"
+      str += "  o30_re = C_5*o30_re + i30_re;\n"
+      str += "  o30_im = C_5*o30_im + i30_im;\n"
+      str += "  o31_re = C_5*o31_re + i31_re;\n"
+      str += "  o31_im = C_5*o31_im + i31_im;\n"
+      str += "  o32_re = C_5*o32_re + i32_re;\n"
+      str += "  o32_im = C_5*o32_im + i32_im;\n"
+      str += "#endif  // select MDWF mode\n"
+      str += "#endif  // check MDWF on/off\n"
+    str += "} // end 5th dimension\n\n"
 
     return str
 # end def gen_dw
 
 def gen_dw_inv():
 
-    str = "\n\n"
+    str = "\n"
+    str += "VOLATILE spinorFloat kappa;\n\n"
+    str += "#ifdef MDWF_mode   // Check whether MDWF option is enabled\n" 
+    str += "  kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));\n"
+    str += "#else\n" 
+    str += "  kappa = 2.0*a;\n"
+    str += "#endif  // select MDWF mode\n\n"
     str += "// M5_inv operation -- NB: not partitionable!\n\n"
     str += "// In this part, we will do the following operation in parallel way.\n\n"
     str += "// w = M5inv * v\n"
     str += "// 'w' means output vector\n"
     str += "// 'v' means input vector\n"
-    str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n{\n"
+    str += "{\n"
     str += "  int base_idx = sid%Vh;\n"
     str += "  int sp_idx;\n\n"
     str += "// let's assume the index,\n"
@@ -844,46 +917,72 @@ def gen_dw_inv():
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(2*a,Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,Ls)*mferm);\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
-    str += "  for(int s = 0; s < Ls; s++)\n{\n"
+    str += "  for(int s = 0; s < Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*pow(2*a,Ls-s+xs)*mferm : inv_d_n*pow(2*a,xs-s))/2.0;\n"
-        str += "    factorR = ( xs > s ? -inv_d_n*pow(2*a,Ls-xs+s)*mferm : inv_d_n*pow(2*a,s-xs))/2.0;\n"
+        str += "    factorR = ( xs > s ? -inv_d_n*pow(kappa,Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*pow(2*a,Ls-s+xs)*mferm : inv_d_n*pow(2*a,xs-s))/2.0;\n"
-        str += "    factorL = ( xs > s ? -inv_d_n*pow(2*a,Ls-xs+s)*mferm : inv_d_n*pow(2*a,s-xs))/2.0;\n"
+        str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
     str += "    sp_idx = base_idx + s*Vh;\n"
     str += "    // read spinor from device memory\n"
-    str += "    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );\n"
-    str += "\n"
-    str += "    //Copy input vector to output vector\n"
+    str += "    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );\n\n"
+    str += "    o00_re += factorR*(i00_re + i20_re);\n" 
+    str += "    o00_im += factorR*(i00_im + i20_im);\n"
+    str += "    o20_re += factorR*(i00_re + i20_re);\n" 
+    str += "    o20_im += factorR*(i00_im + i20_im);\n"
+    str += "    o01_re += factorR*(i01_re + i21_re);\n" 
+    str += "    o01_im += factorR*(i01_im + i21_im);\n"
+    str += "    o21_re += factorR*(i01_re + i21_re);\n" 
+    str += "    o21_im += factorR*(i01_im + i21_im);\n"
+    str += "    o02_re += factorR*(i02_re + i22_re);\n" 
+    str += "    o02_im += factorR*(i02_im + i22_im);\n"
+    str += "    o22_re += factorR*(i02_re + i22_re);\n" 
+    str += "    o22_im += factorR*(i02_im + i22_im);\n"
+    str += "    o10_re += factorR*(i10_re + i30_re);\n" 
+    str += "    o10_im += factorR*(i10_im + i30_im);\n"
+    str += "    o30_re += factorR*(i10_re + i30_re);\n" 
+    str += "    o30_im += factorR*(i10_im + i30_im);\n"
+    str += "    o11_re += factorR*(i11_re + i31_re);\n" 
+    str += "    o11_im += factorR*(i11_im + i31_im);\n"
+    str += "    o31_re += factorR*(i11_re + i31_re);\n" 
+    str += "    o31_im += factorR*(i11_im + i31_im);\n"
+    str += "    o12_re += factorR*(i12_re + i32_re);\n" 
+    str += "    o12_im += factorR*(i12_im + i32_im);\n"
+    str += "    o32_re += factorR*(i12_re + i32_re);\n" 
+    str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
-    def proj(i,j):
-        return two_P_L[4*i+j]
-    
-    # xs != 0:
-    out_L = ""
-    for s1 in range(0,4):
-    #{
-        for c in range(0,3):
-            re_rhs, im_rhs = "", ""
-            for s2 in range(0,4):
-                re, im = proj(s1,s2).real, proj(s1,s2).imag
-                if re != 0 :
-                    re_rhs += " + (factorR" + sign(re) + "factorL)*" + in_re(s2,c)
-                    im_rhs += " + (factorR" + sign(re) + "factorL)*" + in_im(s2,c)
-                if im != 0 :
-                    re_rhs += " + (factorR" + sign(-im) + "factorL)*" + in_im(s2,c)
-                    im_rhs += " + (factorR" + sign(im) + "factorL)*" + in_re(s2,c) 
-            out_L += 4*" " + out_re(s1,c) + " += " + re_rhs + ";\n"
-            out_L += 4*" " + out_im(s1,c) + " += " + im_rhs + ";\n"
-    #}
-    
-    str += out_L
+    if dagger == True :  
+        str += "    factorL = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+    else : 
+        str += "    factorL = ( xs > s ? -inv_d_n*pow(kappa,Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
 
+    str += "    o00_re += factorL*(i00_re - i20_re);\n"
+    str += "    o00_im += factorL*(i00_im - i20_im);\n"
+    str += "    o01_re += factorL*(i01_re - i21_re);\n" 
+    str += "    o01_im += factorL*(i01_im - i21_im);\n"
+    str += "    o02_re += factorL*(i02_re - i22_re);\n" 
+    str += "    o02_im += factorL*(i02_im - i22_im);\n"
+    str += "    o10_re += factorL*(i10_re - i30_re);\n" 
+    str += "    o10_im += factorL*(i10_im - i30_im);\n"
+    str += "    o11_re += factorL*(i11_re - i31_re);\n" 
+    str += "    o11_im += factorL*(i11_im - i31_im);\n"
+    str += "    o12_re += factorL*(i12_re - i32_re);\n" 
+    str += "    o12_im += factorL*(i12_im - i32_im);\n"
+    str += "    o20_re += factorL*(i20_re - i00_re);\n" 
+    str += "    o20_im += factorL*(i20_im - i00_im);\n"
+    str += "    o21_re += factorL*(i21_re - i01_re);\n" 
+    str += "    o21_im += factorL*(i21_im - i01_im);\n"
+    str += "    o22_re += factorL*(i22_re - i02_re);\n" 
+    str += "    o22_im += factorL*(i22_im - i02_im);\n"
+    str += "    o30_re += factorL*(i30_re - i10_re);\n" 
+    str += "    o30_im += factorL*(i30_im - i10_im);\n"
+    str += "    o31_re += factorL*(i31_re - i11_re);\n" 
+    str += "    o31_im += factorL*(i31_im - i11_im);\n"
+    str += "    o32_re += factorL*(i32_re - i12_re);\n" 
+    str += "    o32_im += factorL*(i32_im - i12_im);\n"
     str += "  }\n"
     str += "} // end of M5inv dimension\n\n"
 
@@ -1048,18 +1147,71 @@ def twisted():
     return block(str)+"\n"
 # end def twisted
 
-def xpay():
+def coeff():
+  if dslash4:
+    str = "coeff"
+  elif dslash5:
+    str = "coeff"
+  else :
+    str = "a" 
+  return str
+# end def coeff()
+
+def ypax():
     str = ""
-    str += "#ifdef DSLASH_XPAY\n\n"
-    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
     str += "#ifdef SPINOR_DOUBLE\n"
 
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
             if twist == False:
-                str += out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
-                str += out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
+                str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat2(2*i+0)+";\n"
+                str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat2(2*i+1)+";\n"
+
+    str += "#else\n"
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            if twist == False:
+                str += out_re(s,c) +" = "+out_re(s,c)+" + coeff*accum"+nthFloat4(2*i+0)+";\n"
+                str += out_im(s,c) +" = "+out_im(s,c)+" + coeff*accum"+nthFloat4(2*i+1)+";\n"
+
+    str += "#endif // SPINOR_DOUBLE\n"
+    return str
+# end def ypax
+
+def xpay():
+    str = ""
+    str += "#ifdef DSLASH_XPAY\n"
+    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n"
+    if dslash4:
+      str += "VOLATILE spinorFloat coeff;\n\n"
+      str += "#ifdef MDWF_mode\n"
+      str += "coeff = (spinorFloat)(0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "#else\n"
+      str += "coeff = a;\n"
+      str += "#endif\n\n"
+    elif dslash5:
+      str += "VOLATILE spinorFloat coeff;\n\n"
+      str += "#ifdef MDWF_mode\n"
+      str += "coeff = (spinorFloat)(0.5/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n"
+      str += "coeff *= -coeff;\n"
+      str += "#else\n"
+      str += "coeff = a;\n"
+      str += "#endif\n\n"
+      str += "#ifdef YPAX\n"
+      str += ypax()
+      str += "#else\n"
+    
+    str += "#ifdef SPINOR_DOUBLE\n"
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            if twist == False:
+                str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
+                str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
             else:
                 str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat2(2*i+0)+";\n"
                 str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat2(2*i+1)+";\n"
@@ -1070,13 +1222,15 @@ def xpay():
         for c in range(0,3):
             i = 3*s+c
             if twist == False:
-                str += out_re(s,c) +" = a*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
-                str += out_im(s,c) +" = a*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
+                str += out_re(s,c) +" = "+coeff()+"*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
+                str += out_im(s,c) +" = "+coeff()+"*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
             else:
                 str += out_re(s,c) +" = b*"+out_re(s,c)+" + accum"+nthFloat4(2*i+0)+";\n"
                 str += out_im(s,c) +" = b*"+out_im(s,c)+" + accum"+nthFloat4(2*i+1)+";\n"
 
-    str += "#endif // SPINOR_DOUBLE\n\n"
+    str += "#endif // SPINOR_DOUBLE\n"
+    if dslash5:
+      str += "#endif // YPAX\n"
     str += "#endif // DSLASH_XPAY\n"
 
     return str
@@ -1090,10 +1244,12 @@ def epilog():
             str += "#ifdef MULTI_GPU\n"
         else:
             if domain_wall:
+              if dslash4:
                 str += "#if defined MULTI_GPU && defined DSLASH_XPAY\n"
             else:
                 str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"
-        str += (
+        if dslash4:
+          str += (
 """
 int incomplete = 0; // Have all 8 contributions been computed for this site?
 
@@ -1109,8 +1265,8 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
 }
 
 """)
-        str += "if (!incomplete)\n"
-        str += "#endif // MULTI_GPU\n"
+          str += "if (!incomplete)\n"
+          str += "#endif // MULTI_GPU\n"
     
     str += block( "\n" + (twisted() if twist else apply_clover()) + xpay() )
     
@@ -1123,7 +1279,7 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
     str += "#undef SHARED_STRIDE\n\n"
 
     if dslash:
-      if d4eo == True:
+      if dslash4 == True:
         for m in range(0,3):
           for n in range(0,3):
             i = 3*m+n
@@ -1253,7 +1409,9 @@ print "Shared floats set to " + str(sharedFloats);
 domain_wall = True
 twist = False
 clover = False
-d4eo = True
+dslash4 = True
+dslash5 = False
+normalDWF = False
 
 print sys.argv[0] + ": generating dw_dslash4_core.h";
 dslash = True
@@ -1269,7 +1427,8 @@ f = open('dslash_core/dw_dslash4_dagger_core.h', 'w')
 f.write(generate_dslash4D())
 f.close()
 
-d4eo = False
+dslash4 = False
+dslash5 = True
 
 print sys.argv[0] + ": generating dw_dslash5_core.h";
 dslash = True
@@ -1284,6 +1443,8 @@ dagger = True
 f = open('dslash_core/dw_dslash5_dagger_core.h', 'w')
 f.write(generate_dslash5D())
 f.close()
+
+dslash5 = False
 
 print sys.argv[0] + ": generating dw_dslash5inv_core.h";
 dslash = True

@@ -108,12 +108,12 @@ VOLATILE spinorFloat o32_im;
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*Ls) return;
 
-int X, xs;
-
 int boundaryCrossing;
 
 // Inline by hand for the moment and assume even dimensions
 //coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
+
+int X, xs;
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
@@ -135,9 +135,9 @@ xs = X/(X1*X2*X3*X4);
 
 VOLATILE spinorFloat kappa;
 
-#ifdef MDWF_mode   // Check whether MDWF option is enabled 
+#ifdef MDWF_mode   // Check whether MDWF option is enabled
   kappa = (spinorFloat)(-(mdwf_c5[xs]*(4.0 + m5) - 1.0)/(mdwf_b5[xs]*(4.0 + m5) + 1.0));
-#else 
+#else
   kappa = 2.0*a;
 #endif  // select MDWF mode
 
@@ -160,78 +160,73 @@ VOLATILE spinorFloat kappa;
   spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,Ls)*mferm);
   spinorFloat factorR;
   spinorFloat factorL;
-  spinorFloat coeff;
 
   for(int s = 0; s < Ls; s++)
   {
-    factorL = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;
     factorR = ( xs > s ? -inv_d_n*pow(kappa,Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;
-    coeff = factorR + factorL;
+
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
     READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
 
-    //Copy input vector to output vector
-    o00_re +=  coeff*i00_re;
-    o00_im +=  coeff*i00_im;
-    o01_re +=  coeff*i01_re;
-    o01_im +=  coeff*i01_im;
-    o02_re +=  coeff*i02_re;
-    o02_im +=  coeff*i02_im;
-    o10_re +=  coeff*i10_re;
-    o10_im +=  coeff*i10_im;
-    o11_re +=  coeff*i11_re;
-    o11_im +=  coeff*i11_im;
-    o12_re +=  coeff*i12_re;
-    o12_im +=  coeff*i12_im;
-    o20_re +=  coeff*i20_re;
-    o20_im +=  coeff*i20_im;
-    o21_re +=  coeff*i21_re;
-    o21_im +=  coeff*i21_im;
-    o22_re +=  coeff*i22_re;
-    o22_im +=  coeff*i22_im;
-    o30_re +=  coeff*i30_re;
-    o30_im +=  coeff*i30_im;
-    o31_re +=  coeff*i31_re;
-    o31_im +=  coeff*i31_im;
-    o32_re +=  coeff*i32_re;
-    o32_im +=  coeff*i32_im;
+    o00_re += factorR*(i00_re + i20_re);
+    o00_im += factorR*(i00_im + i20_im);
+    o20_re += factorR*(i00_re + i20_re);
+    o20_im += factorR*(i00_im + i20_im);
+    o01_re += factorR*(i01_re + i21_re);
+    o01_im += factorR*(i01_im + i21_im);
+    o21_re += factorR*(i01_re + i21_re);
+    o21_im += factorR*(i01_im + i21_im);
+    o02_re += factorR*(i02_re + i22_re);
+    o02_im += factorR*(i02_im + i22_im);
+    o22_re += factorR*(i02_re + i22_re);
+    o22_im += factorR*(i02_im + i22_im);
+    o10_re += factorR*(i10_re + i30_re);
+    o10_im += factorR*(i10_im + i30_im);
+    o30_re += factorR*(i10_re + i30_re);
+    o30_im += factorR*(i10_im + i30_im);
+    o11_re += factorR*(i11_re + i31_re);
+    o11_im += factorR*(i11_im + i31_im);
+    o31_re += factorR*(i11_re + i31_re);
+    o31_im += factorR*(i11_im + i31_im);
+    o12_re += factorR*(i12_re + i32_re);
+    o12_im += factorR*(i12_im + i32_im);
+    o32_re += factorR*(i12_re + i32_re);
+    o32_im += factorR*(i12_im + i32_im);
 
-    coeff = factorR - factorL;
-    
-    o00_re +=  coeff*i20_re;
-    o00_im +=  coeff*i20_im;
-    o01_re +=  coeff*i21_re;
-    o01_im +=  coeff*i21_im;
-    o02_re +=  coeff*i22_re;
-    o02_im +=  coeff*i22_im;
-    o10_re +=  coeff*i30_re;
-    o10_im +=  coeff*i30_im;
-    o11_re +=  coeff*i31_re;
-    o11_im +=  coeff*i31_im;
-    o12_re +=  coeff*i32_re;
-    o12_im +=  coeff*i32_im;
-    o20_re +=  coeff*i00_re;
-    o20_im +=  coeff*i00_im;
-    o21_re +=  coeff*i01_re;
-    o21_im +=  coeff*i01_im;
-    o22_re +=  coeff*i02_re;
-    o22_im +=  coeff*i02_im;
-    o30_re +=  coeff*i10_re;
-    o30_im +=  coeff*i10_im;
-    o31_re +=  coeff*i11_re;
-    o31_im +=  coeff*i11_im;
-    o32_re +=  coeff*i12_re;
-    o32_im +=  coeff*i12_im;
+    factorL = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;
+
+    o00_re += factorL*(i00_re - i20_re);
+    o00_im += factorL*(i00_im - i20_im);
+    o01_re += factorL*(i01_re - i21_re);
+    o01_im += factorL*(i01_im - i21_im);
+    o02_re += factorL*(i02_re - i22_re);
+    o02_im += factorL*(i02_im - i22_im);
+    o10_re += factorL*(i10_re - i30_re);
+    o10_im += factorL*(i10_im - i30_im);
+    o11_re += factorL*(i11_re - i31_re);
+    o11_im += factorL*(i11_im - i31_im);
+    o12_re += factorL*(i12_re - i32_re);
+    o12_im += factorL*(i12_im - i32_im);
+    o20_re += factorL*(i20_re - i00_re);
+    o20_im += factorL*(i20_im - i00_im);
+    o21_re += factorL*(i21_re - i01_re);
+    o21_im += factorL*(i21_im - i01_im);
+    o22_re += factorL*(i22_re - i02_re);
+    o22_im += factorL*(i22_im - i02_im);
+    o30_re += factorL*(i30_re - i10_re);
+    o30_im += factorL*(i30_im - i10_im);
+    o31_re += factorL*(i31_re - i11_re);
+    o31_im += factorL*(i31_im - i11_im);
+    o32_re += factorL*(i32_re - i12_re);
+    o32_im += factorL*(i32_im - i12_im);
   }
 } // end of M5inv dimension
 
 {
 
 #ifdef DSLASH_XPAY
-
  READ_ACCUM(ACCUMTEX, sp_stride)
-
 #ifdef SPINOR_DOUBLE
  o00_re = a*o00_re + accum0.x;
  o00_im = a*o00_im + accum0.y;
@@ -283,7 +278,6 @@ VOLATILE spinorFloat kappa;
  o32_re = a*o32_re + accum5.z;
  o32_im = a*o32_im + accum5.w;
 #endif // SPINOR_DOUBLE
-
 #endif // DSLASH_XPAY
 }
 
@@ -318,5 +312,7 @@ WRITE_SPINOR(sp_stride);
 #undef i31_im
 #undef i32_re
 #undef i32_im
+
+
 
 #undef VOLATILE
