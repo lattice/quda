@@ -104,7 +104,7 @@ struct ReduceArg {
   Reducer r;
   ReduceType *partial;
   ReduceType *complete;
-  int length;
+  const int length;
   ReduceArg(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
 	    ReduceType *partial, ReduceType *complete, int length) 
   : X(X), Y(Y), Z(Z), W(W), V(V), r(r), partial(partial), complete(complete), length(length) { ; }
@@ -117,8 +117,6 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
   typename FloatN, int M, typename SpinorX, typename SpinorY, 
   typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   __global__ void reduceKernel(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
-  //__global__ void reduceKernel(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
-  //			     ReduceType *partial, ReduceType *complete, int length) {
   unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
@@ -248,11 +246,8 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
   int M, typename SpinorX, typename SpinorY, typename SpinorZ,  
   typename SpinorW, typename SpinorV, typename Reducer>
-doubleN reduceLaunch(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
-		     int len, const TuneParam &tp, const cudaStream_t &stream) {
-  ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> 
-    arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, len);
-
+doubleN reduceLaunch(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> &arg, 
+		     const TuneParam &tp, const cudaStream_t &stream) {
   if (tp.grid.x > REDUCE_MAX_BLOCKS) 
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
@@ -414,13 +409,7 @@ template <typename doubleN, typename ReduceType, typename ReduceSimpleType, type
 class ReduceCuda : public Tunable {
 
 private:
-  SpinorX &X;
-  SpinorY &Y;
-  SpinorZ &Z;
-  SpinorW &W;
-  SpinorV &V;
-  Reducer &r;
-  const int length;
+  mutable ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg;
   doubleN &result;
 
   // host pointers used for backing up fields when tuning
@@ -450,9 +439,9 @@ private:
 public:
   ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, 
 	     SpinorW &W, SpinorV &V, Reducer &r, int length) :
-    result(result), X(X), Y(Y), Z(Z), W(W), V(V), r(r), 
-      X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
-      Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0), length(length)
+  arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, length),
+    result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0), 
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0)
     { ; }
   virtual ~ReduceCuda() { }
 
@@ -462,41 +451,40 @@ public:
     vol << blasConstants.x[1] << "x";
     vol << blasConstants.x[2] << "x";
     vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << X.Precision();
-    return TuneKey(vol.str(), typeid(r).name(), aux.str());
+    aux << "stride=" << blasConstants.stride << ",prec=" << arg.X.Precision();
+    return TuneKey(vol.str(), typeid(arg.r).name(), aux.str());
   }  
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>
-      (X, Y, Z, W, V, r, length, tp, stream);
+    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>(arg, tp, stream);
   }
 
   void preTune() { 
-    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*X.Stride();
-    size_t norm_bytes = (X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
-    X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
-    Y.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
-    W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
-    V.save(&V_h, &Vnorm_h, bytes, norm_bytes);
+    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
+    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
+    arg.X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
+    arg.Y.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    arg.Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
+    arg.W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.V.save(&V_h, &Vnorm_h, bytes, norm_bytes);
   }
 
   void postTune() {
-    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*X.Stride();
-    size_t norm_bytes = (X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
-    X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
-    Y.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
-    W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
-    V.load(&V_h, &Vnorm_h, bytes, norm_bytes);
+    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
+    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
+    arg.X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
+    arg.Y.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    arg.Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
+    arg.W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.V.load(&V_h, &Vnorm_h, bytes, norm_bytes);
   }
 
-  long long flops() const { return r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
+  long long flops() const { return arg.r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
   long long bytes() const { 
-    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
-    if (X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
-    return r.streams()*bytes*length; }
+    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    if (arg.X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
+    return arg.r.streams()*bytes*arg.length; }
 };
 
 
