@@ -395,7 +395,16 @@ int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision prec
   else return compareFloats((float*)a, (float*)b, len, epsilon);
 }
 
+int fullLatticeIndex(int dim[4], int index, int oddBit){
 
+  int za = index/(dim[0]>>1);
+  int zb = za/dim[1];
+  int x2 = za - zb*dim[1];
+  int x4 = zb/dim[2];
+  int x3 = zb - x4*dim[2];
+  
+  return  2*index + ((x2 + x3 + x4 + oddBit) & 1);
+}
 
 // given a "half index" i into either an even or odd half lattice (corresponding
 // to oddBit = {0, 1}), returns the corresponding full lattice index.
@@ -451,6 +460,23 @@ int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
   x1 = (x1+dx1+Z[0]) % Z[0];
   
   return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+}
+
+
+int neighborIndex(int dim[4], int index, int oddBit, int dx[4]){
+
+  const int fullIndex = fullLatticeIndex(dim, index, oddBit);
+
+  int x[4];
+  x[3] = fullIndex/(dim[2]*dim[1]*dim[0]);
+  x[2] = (fullIndex/(dim[1]*dim[0])) % dim[2];
+  x[1] = (fullIndex/dim[0]) % dim[1];
+  x[0] = fullIndex % dim[0];
+
+  for(int dir=0; dir<4; ++dir)
+    x[dir] = (x[dir]+dx[dir]+dim[dir]) % dim[dir];
+
+  return (((x[3]*dim[2] + x[2])*dim[1] + x[1])*dim[0] + x[0])/2;
 }
 
 int
@@ -511,6 +537,30 @@ neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
     
   return ret;
 }
+
+int
+neighborIndexFullLattice(int dim[4], int index, int dx[4])
+{
+  const int volume = dim[0]*dim[1]*dim[2]*dim[3];
+  const int halfVolume = volume/2;
+  int oddBit = 0;
+  int halfIndex = index;
+
+  if(index >= halfVolume){
+    oddBit = 1;
+    halfIndex = index - halfVolume;
+  }
+
+  int neighborHalfIndex = neighborIndex(dim, halfIndex, oddBit, dx);
+
+  int oddBitChanged = (dx[0]+dx[1]+dx[2]+dx[3])%2;
+  if(oddBitChanged){
+    oddBit = 1 - oddBit;
+  }
+
+  return neighborHalfIndex + oddBit*halfVolume;
+}
+
 
 
 int

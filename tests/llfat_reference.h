@@ -8,7 +8,8 @@ extern "C"{
   void llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_path_coeff);
   void llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink, 
 			  void** ghost_sitelink_diag, QudaPrecision prec, void* act_path_coeff);
-  
+
+  void computeLongLinkCPU(void** longlink, void **sitelink, QudaPrecision prec, void* act_path_coeff);  
 #ifdef __cplusplus
 }
 #endif
