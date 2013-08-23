@@ -113,9 +113,6 @@ namespace quda {
     // Obtain global solution by rescaling
     if (b2 > 0.0) axCuda(sqrt(b2), x);
 
-    if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 
-      warningQuda("Exceeded maximum iterations %d", param.maxiter);
-  
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
         profile.Stop(QUDA_PROFILE_COMPUTE);
         profile.Start(QUDA_PROFILE_EPILOGUE);

@@ -84,25 +84,23 @@ namespace quda {
 
     cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
-    double b2; // norm sq of source
-    double r2; // norm sq of residual
+    double b2 = normCuda(b); // norm sq of source
+    double r2;               // norm sq of residual
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, y);
       r2 = xmyNormCuda(b, r);
-      b2 = normCuda(b);
       copyCuda(y, x);
     } else {
       copyCuda(r, b);
-      r2 = normCuda(b);
-      b2 = r2;
+      r2 = b2;
     }
 
     // Check to see that we're not trying to invert on a zero-field source
-    if(b2 == 0){
+    if (b2 == 0) {
       profile.Stop(QUDA_PROFILE_INIT);
-      printfQuda("Warning: inverting on zero-field source\n");
+      warningQuda("inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
       param.true_res_hq = 0.0;

@@ -210,38 +210,54 @@ namespace quda {
     }
     cudaColorSpinorField &rPre = *r_pre;
 
+    cudaColorSpinorField *rM = param.precondition_cycle > 1 ? new cudaColorSpinorField(rSloppy) : 0;
+
     Complex *alpha = new Complex[Nkrylov];
     Complex **beta = new Complex*[Nkrylov];
     for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
     double *gamma = new double[Nkrylov];
-
-    double b2 = normCuda(b);
-
-    const bool use_heavy_quark_res = 
-      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    double stop = b2*param.tol*param.tol; // stopping condition of solver
-    double heavy_quark_res = 0.0; // heavy quark residual
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-
-    int k = 0;
 
     // compute parity of the node
     int parity = 0;
     for (int i=0; i<4; i++) parity += commCoords(i);
     parity = parity % 2;
 
-    cudaColorSpinorField rM(rSloppy);
-    cudaColorSpinorField xM(rSloppy);
+    double b2 = normCuda(b);  // norm sq of source
+    double r2;                // norm sq of residual
+
+    // compute initial residual depending on whether we have an initial guess or not
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      mat(r, x, y);
+      r2 = xmyNormCuda(b, r);
+      copyCuda(y, x);
+      if (&x == &xSloppy) zeroCuda(x); // need to zero x when doing uni-precision solver
+    } else {
+      copyCuda(r, b);
+      r2 = b2;
+    }
+
+    // Check to see that we're not trying to invert on a zero-field source
+    if (b2 == 0) {
+      profile.Stop(QUDA_PROFILE_INIT);
+      warningQuda("inverting on zero-field source\n");
+      x = b;
+      param.true_res = 0.0;
+      param.true_res_hq = 0.0;
+      return;
+    }
+
+    double stop = b2*param.tol*param.tol; // stopping condition of solver
+
+    const bool use_heavy_quark_res = 
+      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    double heavy_quark_res = 0.0; // heavy quark residual
+    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
     blas_flops = 0;
 
-    // calculate initial residual
-    mat(r, x, y);
-    zeroCuda(y);
-    double r2 = xmyNormCuda(b, r);  
     copyCuda(rSloppy, r);
 
     int total_iter = 0;
@@ -252,6 +268,7 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
 
+    int k = 0;
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    total_iter < param.maxiter) {
@@ -263,9 +280,9 @@ namespace quda {
 	  if (m==0) { // residual is just source
 	    copyCuda(rPre, rSloppy);
 	  } else { // compute residual
-	    copyCuda(rM,rSloppy);
-	    axpyCuda(-1.0, *Ap[k], rM);
-	    copyCuda(rPre, rM);
+	    copyCuda(*rM,rSloppy);
+	    axpyCuda(-1.0, *Ap[k], *rM);
+	    copyCuda(rPre, *rM);
 	  }
 	
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
@@ -320,14 +337,12 @@ namespace quda {
 	// recalculate residual in high precision
 	copyCuda(x, xSloppy);
 	xpyCuda(x, y);
-
-	k = 0;
 	mat(r, y, x);
 	r2 = xmyNormCuda(b, r);  
 
-	if (use_heavy_quark_res) { 
-	  heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
-	}
+	if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
+
+	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
 	  restart++; // restarting if residual is still too great
@@ -384,6 +399,8 @@ namespace quda {
     profile.Start(QUDA_PROFILE_FREE);
 
     PrintSummary("GCR", total_iter, r2, b2);
+
+    if (param.precondition_cycle > 1) delete rM;
 
     if (param.precision_sloppy != param.precision) {
       delete x_sloppy;
