@@ -303,9 +303,22 @@ void initQudaMemory()
   if (!comms_initialized) init_default_comms();
 
   streams = new cudaStream_t[Nstream];
-  for (int i=0; i<Nstream; i++) {
+ 
+#if (CUDA_VERSION >= 5050)
+  int greatestPriority;
+  int leastPriority;
+  cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+
+  for (int i=0; i<Nstream-1; i++) {
+    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+  }
+  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
+#else
+  for (int i=0; i<Nstream-1; i++) {
     cudaStreamCreate(&streams[i]);
   }
+#endif
+
   checkCudaError();
   createDslashEvents();
 
