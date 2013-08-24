@@ -280,7 +280,7 @@ namespace quda {
 	  if (m==0) { // residual is just source
 	    copyCuda(rPre, rSloppy);
 	  } else { // compute residual
-	    copyCuda(*rM,rSloppy);
+	    copyCuda(*rM, rSloppy);
 	    axpyCuda(-1.0, *Ap[k], *rM);
 	    copyCuda(rPre, *rM);
 	  }
@@ -407,7 +407,7 @@ namespace quda {
       delete r_sloppy;
     }
 
-    if (param.precision_precondition != param.precision_sloppy) {
+    if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
       delete p_pre;
       delete r_pre;
     }
