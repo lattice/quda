@@ -314,7 +314,7 @@ void initQudaMemory()
   }
   cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
 #else
-  for (int i=0; i<Nstream-1; i++) {
+  for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
   }
 #endif
