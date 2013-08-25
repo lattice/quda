@@ -354,7 +354,7 @@ gauge_force_test(void)
   int max_length = 6;    
   
   initQuda(device);
-  setVerbosityQuda(QUDA_VERBOSE);
+  setVerbosityQuda(QUDA_VERBOSE,"",stdout);
 
   qudaGaugeParam = newQudaGaugeParam();
   
