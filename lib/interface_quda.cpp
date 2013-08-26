@@ -2129,6 +2129,9 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   delete cudaMom;
   profileGaugeForce.Stop(QUDA_PROFILE_FREE);
 
+  profileGaugeForce.Stop(QUDA_PROFILE_TOTAL);
+
+
   if(timeinfo){
     timeinfo[0] = profileGaugeForce.Last(QUDA_PROFILE_H2D);
     timeinfo[1] = profileGaugeForce.Last(QUDA_PROFILE_COMPUTE);
