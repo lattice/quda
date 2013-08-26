@@ -2023,6 +2023,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
 }
 #endif
 
+
 #ifdef GPU_GAUGE_FORCE
   int
 computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
@@ -2061,15 +2062,15 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamSL.pad = 0;
   cpuGaugeField* cpuSiteLink = new cpuGaugeField(gParamSL);
 
-  gParamSL.create =QUDA_NULL_FIELD_CREATE;
+  gParamSL.create = QUDA_NULL_FIELD_CREATE;
   gParamSL.pad = pad;
-  gParamSL.precision = qudaGaugeParam->cuda_prec;
   gParamSL.reconstruct = qudaGaugeParam->reconstruct;
+  gParamSL.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParamSL);  
   qudaGaugeParam->site_ga_pad = gParamSL.pad;//need to record this value
 
   gParamMom.pad = 0;
-  gParamMom.order =QUDA_MILC_GAUGE_ORDER;
+  gParamMom.order = QUDA_MILC_GAUGE_ORDER;
   gParamMom.precision = qudaGaugeParam->cpu_prec;
   gParamMom.create =QUDA_REFERENCE_FIELD_CREATE;
   gParamMom.reconstruct =QUDA_RECONSTRUCT_10;  
@@ -2078,7 +2079,8 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
 
   gParamMom.pad = pad;
-  gParamMom.create =QUDA_NULL_FIELD_CREATE;  
+  gParamMom.create = QUDA_NULL_FIELD_CREATE;  
+  gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
   gParamMom.precision = qudaGaugeParam->cuda_prec;
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
@@ -2130,7 +2132,6 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   profileGaugeForce.Stop(QUDA_PROFILE_FREE);
 
   profileGaugeForce.Stop(QUDA_PROFILE_TOTAL);
-
 
   if(timeinfo){
     timeinfo[0] = profileGaugeForce.Last(QUDA_PROFILE_H2D);
