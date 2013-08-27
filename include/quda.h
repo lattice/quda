@@ -142,6 +142,7 @@ extern "C" {
     QudaMatPCType matpc_type;        /**< The preconditioned matrix type */
     QudaDagType dagger;              /**< Whether we are using the Hermitian conjugate system or not */
     QudaMassNormalization mass_normalization; /**< The mass normalization is being used by the caller */
+    QudaSolverNormalization solver_normalization; /**< The normalization desired in the solver */
 
     QudaPreserveSource preserve_source;       /**< Preserve the source or not in the linear solver (deprecated) */
 

@@ -1329,8 +1329,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
-  axCuda(1.0/sqrt(nb), *b);
-  axCuda(1.0/sqrt(nb), *x);
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    axCuda(1.0/sqrt(nb), *b);
+    axCuda(1.0/sqrt(nb), *x);
+  }
 
   setTuning(param->tune);
 
@@ -1412,8 +1414,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
   dirac.reconstruct(*x, *b, param->solution_type);
 
-  // rescale the solution
-  axCuda(sqrt(nb), *x);
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    // rescale the solution
+    axCuda(sqrt(nb), *x);
+  }
 
   profileInvert.Start(QUDA_PROFILE_D2H);
   *h_x = *x;
@@ -1591,7 +1595,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
   // rescale the source vector to help prevent the onset of underflow
-  axCuda(1.0/sqrt(nb), *b);
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    axCuda(1.0/sqrt(nb), *b);
+  }
 
   setTuning(param->tune);
   
@@ -1700,8 +1706,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
-    // rescale the solution 
-    axCuda(sqrt(nb), *x[i]);
+    if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) { // rescale the solution 
+      axCuda(sqrt(nb), *x[i]);
+    }
 
     if (getVerbosity() >= QUDA_VERBOSE){
       double nx = norm2(*x[i]);

@@ -80,6 +80,7 @@ module quda_fortran
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance 
      
+     integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver 
      
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver 
@@ -99,7 +100,8 @@ module quda_fortran
      QudaMatPCType :: matpc_type
      QudaDagType :: dagger
      QudaMassNormalization :: mass_normalization
-     
+
+     QudaSolverNormalization :: solver_normalization
      QudaPreserveSource :: preserve_source
      
      QudaPrecision :: cpu_prec

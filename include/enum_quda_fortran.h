@@ -135,6 +135,10 @@
 #define QUDA_ASYMMETRIC_MASS_NORMALIZATION 2
 #define QUDA_INVALID_NORMALIZATION QUDA_INVALID_ENUM
 
+#define QudaSolverNormalization integer(4)
+#define QUDA_DEFAULT_NORMALIZATION 0 // leave source and solution untouched
+#define QUDA_SOURCE_NORMALIZATION  1 // normalize such that || src || = 1
+
 #define QudaPreserveSource integer(4)
 #define QUDA_PRESERVE_SOURCE_NO  0 // use the source for the residual
 #define QUDA_PRESERVE_SOURCE_YES 1 // keep the source intact
