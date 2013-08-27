@@ -349,7 +349,7 @@ double benchmark(int kernel, const int niter) {
 
 double test(int kernel) {
 
-  double a = 1.5, b = 2.5, c = 3.5;
+  double a = M_PI, b = M_PI*exp(1.0), c = sqrt(M_PI);
   quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
 
