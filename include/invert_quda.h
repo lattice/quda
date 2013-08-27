@@ -39,6 +39,9 @@ namespace quda {
     /**< Reliable update tolerance */
     double delta;           
 
+    /**< Enable pipeline solver */
+    int pipeline;
+
     /**< Solver tolerance in the L2 residual norm */
     double tol;             
 
@@ -128,7 +131,7 @@ namespace quda {
     SolverParam(QudaInvertParam &param) : inv_type(param.inv_type), 
       inv_type_precondition(param.inv_type_precondition), 
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
-      delta(param.reliable_delta), tol(param.tol), tol_hq(param.tol_hq), 
+      delta(param.reliable_delta), pipeline(param.pipeline), tol(param.tol), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
@@ -219,7 +222,7 @@ namespace quda {
     const DiracMatrix &matPrecon;
 
     // pointers to fields to avoid multiple creation overhead
-    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
     bool init;
 
   public:

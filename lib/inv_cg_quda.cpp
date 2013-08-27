@@ -132,8 +132,8 @@ namespace quda {
       double sigma;
 
       bool breakdown = false;
-      int pipeline = 0;
-      if (pipeline) {
+
+      if (param.pipeline) {
 	double3 triplet = tripleCGReductionCuda(rSloppy, Ap, p);
 	r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
 	r2_old = r2;
@@ -172,7 +172,7 @@ namespace quda {
 	//beta = r2 / r2_old;
 	beta = sigma / r2_old; // use the alternative beta computation
 
-	if (pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, rSloppy, xSloppy, p);
+	if (param.pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, rSloppy, xSloppy, p);
 	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 

@@ -118,6 +118,8 @@ extern "C" {
     int maxiter; /**< Maximum number of iterations in the linear solver */
     double reliable_delta; /**< Reliable update tolerance */
 
+    int pipeline; /**< Whether to use a pipelined solver with less global sums */
+
     int num_offset; /**< Number of offsets in the multi-shift solver */
 
     /** Offsets for multi-shift solver */

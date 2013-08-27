@@ -33,8 +33,6 @@ namespace quda {
     profile.Start(QUDA_PROFILE_FREE);
 
     if(init) {
-      if (wp && wp != pp) delete wp;
-      if (zp && zp != pp) delete zp;
       delete yp;
       delete rp;
       delete pp;
@@ -44,6 +42,20 @@ namespace quda {
     }
 
     profile.Stop(QUDA_PROFILE_FREE);
+  }
+
+  int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+    // reliable updates
+    rNorm = sqrt(r2);
+    if (rNorm > maxrx) maxrx = rNorm;
+    if (rNorm > maxrr) maxrr = rNorm;
+    //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
+    //int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0
+    int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+    
+    //printf("reliable %d %e %e %e %e\n", updateR, rNorm, maxrx, maxrr, r2);
+
+    return updateR;
   }
 
   void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
@@ -61,15 +73,6 @@ namespace quda {
       tmpp = new cudaColorSpinorField(x, csParam);
       tp = new cudaColorSpinorField(x, csParam);
 
-      // MR preconditioner - we need extra vectors
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	wp = new cudaColorSpinorField(x, csParam);
-	zp = new cudaColorSpinorField(x, csParam);
-      } else { // dummy assignments
-	wp = pp;
-	zp = pp;
-      }
-
       init = true;
     }
 
@@ -79,8 +82,6 @@ namespace quda {
     cudaColorSpinorField &v = *vp;
     cudaColorSpinorField &tmp = *tmpp;
     cudaColorSpinorField &t = *tp;
-    cudaColorSpinorField &w = *wp;
-    cudaColorSpinorField &z = *zp;
 
     cudaColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
@@ -166,6 +167,9 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
     
+    rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
+    copyCuda(p, rSloppy);
+
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) 
       printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n", 
 		 norm2(x), norm2(rSloppy), norm2(v), norm2(p), norm2(tmp), norm2(r0), norm2(t));
@@ -173,70 +177,63 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
     
-      if (k==0) {
-	rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
-	copyCuda(p, rSloppy);
-      } else {
-	if (abs(rho*alpha) == 0.0) beta = 0.0;
-	else beta = (rho/rho0) * (alpha/omega);
+      matSloppy(v, p, tmp);
 
-	cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
-      }
-    
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	errorQuda("Temporary disabled");
-	//invertMRCuda(*matPrecon, w, p, &invert_param_inner);
-	matSloppy(v, w, tmp);
+      Complex r0v;
+      if (param.pipeline) {
+	r0v = cDotProductCuda(r0, v);
+	if (k>0) rho = cDotProductCuda(r0, r);
       } else {
-	matSloppy(v, p, tmp);
+	r0v = cDotProductCuda(r0, v);
       }
-
       if (abs(rho) == 0.0) alpha = 0.0;
-      else alpha = rho / cDotProductCuda(r0, v);
+      else alpha = rho / r0v;
 
       // r -= alpha*v
       caxpyCuda(-alpha, v, rSloppy);
 
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	errorQuda("Temporary disabled");
-	//invertMRCuda(*matPrecon, z, rSloppy, &invert_param_inner);
-	matSloppy(t, z, tmp);
-      } else {
-	matSloppy(t, rSloppy, tmp);
-      }
+      matSloppy(t, rSloppy, tmp);
     
-      // omega = (t, r) / (t, t)
-      omega_t2 = cDotProductNormACuda(t, rSloppy);
-      omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
+      int updateR = 0;
+      if (param.pipeline) {
+	// omega = (t, r) / (t, t)
+	omega_t2 = cDotProductNormACuda(t, rSloppy);
+	Complex tr = Complex(omega_t2.x, omega_t2.y);
+	double t2 = omega_t2.z;
+	omega = tr / t2;
+	double s2 = norm2(rSloppy);
+	Complex r0t = cDotProductCuda(r0, t);
+	beta = -r0t / r0v;
+	r2 = s2 - real(omega * conj(tr)) ;
 
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	//x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
-	caxpyCuda(alpha, w, xSloppy);
-	caxpyCuda(omega, z, xSloppy);
-	caxpyCuda(-omega, t, rSloppy);
-	rho_r2 = cDotProductNormBCuda(r0, rSloppy);
+	// now we can work out if we need to do a reliable update
+        updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
+      } else {
+	// omega = (t, r) / (t, t)
+	omega_t2 = cDotProductNormACuda(t, rSloppy);
+	omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
+      }
+
+      if (param.pipeline && !updateR) {
+	//x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
+	caxpbypzYmbwCuda(alpha, p, omega, rSloppy, xSloppy, t);
+	cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
+	//tripleBiCGstabUpdate(alpha, p, omega, rSloppy, xSloppy, t, -beta*omega, v, beta, p
       } else {
 	//x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
 	rho_r2 = caxpbypzYmbwcDotProductUYNormYCuda(alpha, p, omega, rSloppy, xSloppy, t, r0);
-      }
 
-      rho0 = rho;
-      rho = Complex(rho_r2.x, rho_r2.y);
-      r2 = rho_r2.z;
+	rho0 = rho;
+	rho = Complex(rho_r2.x, rho_r2.y);
+	r2 = rho_r2.z;
+      }
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	copyCuda(tmp,y);
 	heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
       }
 
-      // reliable updates
-      rNorm = sqrt(r2);
-      if (rNorm > maxrx) maxrx = rNorm;
-      if (rNorm > maxrr) maxrr = rNorm;
-      //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
-      //int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-    
-      int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+      if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
 
       if (updateR) {
 	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
@@ -262,6 +259,13 @@ namespace quda {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) 
 	printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n", 
 		   norm2(x), norm2(rSloppy), norm2(v), norm2(p), norm2(tmp), norm2(r0), norm2(t));
+
+      // update p
+      if (!param.pipeline || updateR) {// need to update if not pipeline or did a reliable update
+	if (abs(rho*alpha) == 0.0) beta = 0.0;
+	else beta = (rho/rho0) * (alpha/omega);      
+	cxpaypbzCuda(rSloppy, -beta*omega, v, beta, p);
+      }
 
     }
 
