@@ -174,6 +174,7 @@ int main(int argc, char **argv)
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -182,6 +183,8 @@ int main(int argc, char **argv)
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
   }
+
+  inv_param.pipeline = 0;
 
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
