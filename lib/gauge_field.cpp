@@ -66,6 +66,8 @@ namespace quda {
 	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
       } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
 	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+      } else if (reconstruct == QUDA_RECONSTRUCT_10) {
+	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
       }
     }
 
