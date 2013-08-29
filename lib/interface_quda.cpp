@@ -354,13 +354,13 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   checkGaugeParam(param);
 
+  profileGauge.Start(QUDA_PROFILE_INIT);  
   // Set the specific input parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
   GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) : 
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
 
-  profileGauge.Start(QUDA_PROFILE_INIT);  
   // switch the parameters for creating the mirror precise cuda gauge field
   gauge_param.create = QUDA_NULL_FIELD_CREATE;
   gauge_param.precision = param->cuda_prec;
@@ -374,11 +374,12 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 
   profileGauge.Start(QUDA_PROFILE_H2D);  
   precise->copy(*in);
-
-
-
+  profileGauge.Stop(QUDA_PROFILE_H2D);  
 
   param->gaugeGiB += precise->GBytes();
+
+  // creating sloppy fields isn't really compute, but it is work done on the gpu
+  profileGauge.Start(QUDA_PROFILE_COMPUTE); 
 
   // switch the parameters for creating the mirror sloppy cuda gauge field
   gauge_param.precision = param->cuda_prec_sloppy;
@@ -409,7 +410,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   } else {
     precondition = sloppy;
   }
-  profileGauge.Stop(QUDA_PROFILE_H2D);  
+
+  profileGauge.Stop(QUDA_PROFILE_COMPUTE); 
 
   switch (param->type) {
     case QUDA_WILSON_LINKS:
@@ -440,7 +442,9 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       errorQuda("Invalid gauge type");   
   }
 
+  profileGauge.Start(QUDA_PROFILE_FREE);  
   delete in;
+  profileGauge.Stop(QUDA_PROFILE_FREE);  
 
   profileGauge.Stop(QUDA_PROFILE_TOTAL);
 }
