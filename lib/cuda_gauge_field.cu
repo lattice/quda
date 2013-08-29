@@ -210,7 +210,18 @@ namespace quda {
     if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
 
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
-      errorQuda("Not implemented");
+      if (cpu.Order() == QUDA_MILC_GAUGE_ORDER ||
+	  cpu.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
+	resizeBufferPinned(cpu.Bytes());
+	memcpy(bufferPinned, cpu.Gauge_p(), cpu.Bytes());
+
+	// run kernel directly using host-mapped input data
+	void *bufferPinnedMapped;
+	cudaHostGetDevicePointer(&bufferPinnedMapped, bufferPinned, 0);
+	copyGenericGauge(*this, cpu, QUDA_CUDA_FIELD_LOCATION, gauge, bufferPinnedMapped);
+      } else {
+	errorQuda("Not implemented for order %d", cpu.Order());
+      }
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) {
       copy(cpu);
     } else {
