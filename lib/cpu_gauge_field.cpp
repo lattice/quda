@@ -70,7 +70,7 @@ namespace quda {
     }
 
     // compute the fat link max now in case it is needed later (i.e., for half precision)
-    if (link_type == QUDA_ASQTAD_FAT_LINKS) fat_link_max = maxGauge(*this);
+    if (param.compute_fat_link_max) fat_link_max = maxGauge(*this);
   }
 
 

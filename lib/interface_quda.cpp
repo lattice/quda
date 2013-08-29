@@ -357,6 +357,16 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   profileGauge.Start(QUDA_PROFILE_INIT);  
   // Set the specific input parameters and create the cpu gauge field
   GaugeFieldParam gauge_param(h_gauge, *param);
+
+  // if we are using half precision then we need to compute the fat
+  // link maximum while still on the cpu
+  // FIXME get a kernel for this
+  if ((param->cuda_prec == QUDA_HALF_PRECISION ||
+       param->cuda_prec_sloppy == QUDA_HALF_PRECISION ||
+       param->cuda_prec_precondition == QUDA_HALF_PRECISION) &&
+      param->type == QUDA_ASQTAD_FAT_LINKS)
+    gauge_param.compute_fat_link_max = true;
+
   GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<GaugeField*>(new cpuGaugeField(gauge_param)) : 
     static_cast<GaugeField*>(new cudaGaugeField(gauge_param));
@@ -1891,8 +1901,6 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
 
   GaugeFieldParam gParam(0, *qudaGaugeParam);
 
-
-
   // create the host fatlink
   if (cpuFatLink == NULL) {
     gParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -1900,9 +1908,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     gParam.order = QUDA_MILC_GAUGE_ORDER;
     gParam.gauge= fatlink;
     cpuFatLink = new cpuGaugeField(gParam);
-    if(cpuFatLink == NULL){
-      errorQuda("ERROR: Creating cpuFatLink failed\n");
-    }
+    if(cpuFatLink == NULL) errorQuda("ERROR: Creating cpuFatLink failed\n");
   } else {
     cpuFatLink->setGauge((void**)fatlink);
   }
@@ -1926,13 +1932,13 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
       gParam.order = QUDA_MILC_GAUGE_ORDER;
       gParam.gauge = longlink;
       cpuLongLink = new cpuGaugeField(gParam);
-      if(cpuLongLink == NULL){
-        errorQuda("Error: Creating cpuLongLink failed\n");
-      }
+      if(cpuLongLink == NULL) errorQuda("Error: Creating cpuLongLink failed\n");
     }else{
       cpuLongLink->setGauge((void**)longlink);
     }
+  }
 
+  if(longlink){
     // create the device longlink
     if(cudaLongLink == NULL){
       gParam.pad = qudaGaugeParam->llfat_ga_pad; // same padding as for the fatlink - for the time being
@@ -1945,7 +1951,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
   }
 
   // create the host sitelink	
-  if(cpuSiteLink == NULL){
+  if (cpuSiteLink == NULL) {
     gParam.pad = 0; 
     gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
     gParam.link_type = qudaGaugeParam->type;
@@ -1955,10 +1961,8 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
       for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];	
     }
     cpuSiteLink      = new cpuGaugeField(gParam);
-    if(cpuSiteLink == NULL){
-      errorQuda("ERROR: Creating cpuSiteLink failed\n");
-    }
-  }else{
+    if(cpuSiteLink == NULL) errorQuda("ERROR: Creating cpuSiteLink failed\n");
+  } else {
     cpuSiteLink->setGauge(sitelink);
   }
 
@@ -1967,9 +1971,11 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = qudaGaugeParam->type;
     gParam.reconstruct = qudaGaugeParam->reconstruct;      
-    gParam.order       = (gParam.reconstruct == QUDA_RECONSTRUCT_12) ? QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
+    gParam.order       = (gParam.reconstruct == QUDA_RECONSTRUCT_12) ? 
+      QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
     cudaSiteLink = new cudaGaugeField(gParam);
   }
+
   profileFatLink.Stop(QUDA_PROFILE_INIT);
 
   initLatticeConstants(*cudaFatLink, profileFatLink);  
@@ -2003,7 +2009,8 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
   }
 
   // Actually do the fattening
-  computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, cudaFatLink, cudaLongLink, profileFatLink);
+  computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, 
+		     cudaFatLink, cudaLongLink, profileFatLink);
 
   // Transfer back to the host
   profileFatLink.Start(QUDA_PROFILE_D2H);
@@ -2043,7 +2050,8 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 {
   profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
 
-  profileGaugeForce.Start(QUDA_PROFILE_INIT);
+  profileGaugeForce.Start(QUDA_PROFILE_INIT); 
+
 #ifdef MULTI_GPU
   int E[4];
   QudaGaugeParam qudaGaugeParam_ex_buf;
