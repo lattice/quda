@@ -476,6 +476,11 @@ extern "C" {
 			    void* loop_coeff, int num_paths, int max_length, double eb3,
 			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
 
+  /**
+   *  Update the gauge field.
+   */
+  void updateGaugeFieldQuda(void* gauge, void* momentum, double eps, QudaGaugeParam* param);
+
 #ifdef __cplusplus
 }
 #endif

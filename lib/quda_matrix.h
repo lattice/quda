@@ -658,8 +658,6 @@ namespace quda{
 
 
 
-
-
   template<class T>
     __device__ inline
     void writeLinkVariableToArray(const Matrix<T,3> & link,  int dir, int idx, int stride, T* const array)
@@ -685,6 +683,73 @@ namespace quda{
       }
       return;
     }
+
+
+  template<class T>
+    __device__ inline
+    void loadMomentumFromArray(const T* const array, int dir, int idx, int stride, Matrix<T,3> *mom)
+    {
+      T temp2[5];
+      temp2[0] = array[idx + dir*stride*5];
+      temp2[1] = array[idx + dir*stride*5 + stride];
+      temp2[2] = array[idx + dir*stride*5 + 2*stride];
+      temp2[3] = array[idx + dir*stride*5 + 3*stride];
+      temp2[4] = array[idx + dir*stride*5 + 4*stride];
+
+      mom->data[0].x = 0.;
+      mom->data[0].y = temp2[3].x;
+      mom->data[1] = temp2[0];
+      mom->data[2] = temp2[1];
+  
+      mom->data[3].x = -mom->data[1].x;
+      mom->data[3].y =  mom->data[1].y;
+      mom->data[4].x = 0.;
+      mom->data[4].y = temp2[3].y;
+      mom->data[5]   = temp2[2];
+
+      mom->data[6].x = -mom->data[2].x;
+      mom->data[6].y =  mom->data[2].y;
+
+      mom->data[7].x = -mom->data[5].x;
+      mom->data[7].y =  mom->data[5].y;
+
+      mom->data[8].x = 0.;
+      mom->data[8].y = temp2[4].x;
+
+      return;
+    }
+
+
+
+  template<class T, class U>
+    __device__  inline 
+    void writeMomentumToArray(const Matrix<T,3> & mom, int dir, int idx, U coeff, int stride, T* const array)
+    {
+      T temp2;
+      temp2.x = (mom.data[1].x - mom.data[3].x)*0.5*coeff;
+      temp2.y = (mom.data[1].y + mom.data[3].y)*0.5*coeff;
+      array[idx + dir*stride*5] = temp2;
+
+      temp2.x = (mom.data[2].x - mom.data[6].x)*0.5*coeff;
+      temp2.y = (mom.data[2].y + mom.data[6].y)*0.5*coeff;
+      array[idx + dir*stride*5 + stride] = temp2;
+
+      temp2.x = (mom.data[5].x - mom.data[7].x)*0.5*coeff;
+      temp2.y = (mom.data[5].y + mom.data[7].y)*0.5*coeff;
+      array[idx + dir*stride*5 + stride*2] = temp2;
+
+      const typename RealTypeId<T>::Type temp = (mom.data[0].y + mom.data[4].y + mom.data[8].y)*0.3333333333333333333333333;
+      temp2.x =  (mom.data[0].y-temp)*coeff;
+      temp2.y =  (mom.data[4].y-temp)*coeff;
+      array[idx + dir*stride*5 + stride*3] = temp2;
+
+      temp2.x = (mom.data[8].y - temp)*coeff;
+      temp2.y = 0.0;
+      array[idx + dir*stride*5 + stride*4] = temp2;
+
+      return;
+    }
+
 
 
   template<class Cmplx> 
