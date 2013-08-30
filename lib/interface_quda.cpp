@@ -2186,24 +2186,25 @@ void updateGaugeFieldQuda(void* gauge,
 
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  cudaGaugeField cudaGauge(gParam);
+  cudaGaugeField cudaInGauge(gParam);
+  cudaGaugeField cudaOutGauge(gParam);
 
   profileGaugeUpdate.Stop(QUDA_PROFILE_INIT);  
 
   // load fields onto the device
   profileGaugeUpdate.Start(QUDA_PROFILE_H2D);
   cudaMom.loadCPUField(cpuMom, QUDA_CPU_FIELD_LOCATION);
-  cudaGauge.loadCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaInGauge.loadCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
   profileGaugeUpdate.Stop(QUDA_PROFILE_H2D);
 
   // perform the update
   profileGaugeUpdate.Start(QUDA_PROFILE_COMPUTE);
-  updateGaugeFieldCuda(&cudaGauge, eps, cudaMom);
+  updateGaugeFieldCuda(&cudaOutGauge, eps, cudaInGauge, cudaMom);
   profileGaugeUpdate.Stop(QUDA_PROFILE_COMPUTE);
 
   // copy the gauge field back to the host
   profileGaugeUpdate.Start(QUDA_PROFILE_D2H);
-  cudaGauge.saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaOutGauge.saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
   profileGaugeUpdate.Stop(QUDA_PROFILE_D2H);
 
   profileGaugeUpdate.Stop(QUDA_PROFILE_TOTAL);

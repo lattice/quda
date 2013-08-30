@@ -169,6 +169,16 @@ extern "C" {
       void* const three_link_src[4]);
 
 
+  void qudaTest();
+
+  void qudaUpdateU(int precision, 
+                   int dim[4],
+                   double eps,
+                   void* momentum, 
+                   void* link);
+
+
+
 
 #ifdef __cplusplus
 }

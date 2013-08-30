@@ -3,7 +3,7 @@
 
 namespace quda {
 
-  void updateGaugeFieldCuda(cudaGaugeField* const gauge, double eps, const cudaGaugeField& momentum);
+  void updateGaugeFieldCuda(cudaGaugeField* const outGauge, double eps, const cudaGaugeField& inGauge, const cudaGaugeField& momentum);
 
 } // namespace quda
 
