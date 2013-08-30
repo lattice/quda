@@ -58,18 +58,19 @@ namespace quda {
       errorQuda("Unsupported gauge order type %d", order);
     }
   
-    // Ghost zone is always 2-dimensional
-    for (int i=0; i<nDim; i++) {
-      size_t nbytes = nFace * surface[i] * reconstruct * precision;
-      ghost[i] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
-    }  
-
-    // exchange the boundaries
     // no need to exchange data if this is a momentum field
-    if(link_type != QUDA_ASQTAD_MOM_LINKS) exchangeGhost();
+    if (link_type != QUDA_ASQTAD_MOM_LINKS) {
+      // Ghost zone is always 2-dimensional    
+      for (int i=0; i<nDim; i++) {
+	size_t nbytes = nFace * surface[i] * reconstruct * precision;
+	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
+      }  
+      // exchange the boundaries
+      exchangeGhost();
+    }
 
     // compute the fat link max now in case it is needed later (i.e., for half precision)
-    if (link_type == QUDA_ASQTAD_FAT_LINKS) fat_link_max = maxGauge(*this);
+    if (param.compute_fat_link_max) fat_link_max = maxGauge(*this);
   }
 
 
@@ -90,8 +91,10 @@ namespace quda {
       }
     }
   
-    for (int i=0; i<nDim; i++) {
-      if (ghost[i]) host_free(ghost[i]);
+    if (link_type != QUDA_ASQTAD_MOM_LINKS) {
+      for (int i=0; i<nDim; i++) {
+	if (ghost[i]) host_free(ghost[i]);
+      }
     }
   }
 

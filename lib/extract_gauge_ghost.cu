@@ -1,4 +1,5 @@
 #include <gauge_field_order.h>
+#include <omp.h>
 
 namespace quda {
   template <typename Order, int nDim>
@@ -43,6 +44,7 @@ namespace quda {
 	int indexDst = 0;
 	// the following 4-way loop means this is specialized for 4 dimensions 
 
+	// FIXME redefine a, b, c, d such that we always optimize for locality
 	for (int d=arg.X[dim]-arg.nFace; d<arg.X[dim]; d++) { // loop over last nFace faces in this dimension
 	  for (int a=0; a<arg.A[dim]; a++) { // loop over the surface elements of this face
 	    for (int b=0; b<arg.B[dim]; b++) { // loop over the surface elements of this face
@@ -50,11 +52,11 @@ namespace quda {
 		// index is a checkboarded spacetime coordinate
 		int indexCB = (a*arg.f[dim][0] + b*arg.f[dim][1] + c*arg.f[dim][2] + d*arg.f[dim][3]) >> 1;
 		// we only do the extraction for parity we are currently working on
-		int oddness = (a+b+c+d)%2;
+		int oddness = (a+b+c+d) & 1;
 		if (oddness == parity) {
 		  RegType u[length];
 		  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-		  arg.order.saveGhost(u, indexDst, dim, (parity+arg.localParity[dim])%2);
+		  arg.order.saveGhost(u, indexDst, dim, (parity+arg.localParity[dim])&1);
 		  indexDst++;
 		} // oddness == parity
 	      } // c
@@ -96,11 +98,11 @@ namespace quda {
 	// index is a checkboarded spacetime coordinate
 	int indexCB = (a*arg.f[dim][0] + b*arg.f[dim][1] + c*arg.f[dim][2] + d*arg.f[dim][3]) >> 1;
 	// we only do the extraction for parity we are currently working on
-	int oddness = (a+b+c+d)%2;
+	int oddness = (a+b+c+d)&1;
 	if (oddness == parity) {
 	  RegType u[length];
 	  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-	  arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])%2);
+	  arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
 	} // oddness == parity
 
       } // dim
