@@ -118,6 +118,7 @@ struct FloatNOrder {
   virtual ~FloatNOrder() { ; }
 
   __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+    if (x >= volumeCB) return;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -131,6 +132,7 @@ struct FloatNOrder {
   }
 
   __device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+    if (x >= volumeCB) return;
     RegType scale = 0.0;
     if (sizeof(Float)==sizeof(short)) {
       for (int i=0; i<2*Ns*Nc; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
@@ -168,6 +170,7 @@ struct FloatNOrder {
 
 /**! float4 load specialization to obtain full coalescing. */
 template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24], int x) const {
+  if (x >= volumeCB) return;
 #pragma unroll
   for (int i=0; i<4*3*2; i+=4) {
     float4 tmp = ((float4*)field)[i/4 * stride + x];
@@ -177,6 +180,7 @@ template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24],
 
 /**! float4 save specialization to obtain full coalescing. */
 template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float v[24], int x) {
+  if (x >= volumeCB) return;
 #pragma unroll
   for (int i=0; i<4*3*2; i+=4) {
     float4 tmp = make_float4(v[i], v[i+1], v[i+2], v[i+3]);
@@ -196,6 +200,7 @@ struct SpaceColorSpinorOrder {
   virtual ~SpaceColorSpinorOrder() { ; }
 
   __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+    if (x >= volumeCB) return;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -206,6 +211,7 @@ struct SpaceColorSpinorOrder {
   }
 
   __device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+    if (x >= volumeCB) return;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -237,7 +243,7 @@ template <typename Float, int Ns, int Nc>
 
   extern __shared__ typename mapper<Float>::type s_data[];
 
-  int x0 = x-tid;
+  int x0 = x-tid; // x0 is the base index from where we are reading
   int i=tid;
   while (i<vec_length*block_dim) {
     int space_idx = i / vec_length;
@@ -301,6 +307,7 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::l
 #ifdef __CUDA_ARCH__
   load_shared<float, 4, 3>(v, field, x, volumeCB);
 #else
+  if (x >= volumeCB) return;
   const int Ns=4;
   const int Nc=3;
   for (int s=0; s<Ns; s++) {
@@ -318,6 +325,7 @@ template<> __host__ __device__ inline void SpaceColorSpinorOrder<float, 4, 3>::s
 #ifdef __CUDA_ARCH__
   save_shared<float, 4, 3>(field, v, x, volumeCB);
 #else
+  if (x >= volumeCB) return;
   const int Ns=4;
   const int Nc=3;
   for (int s=0; s<Ns; s++) {
@@ -342,6 +350,7 @@ struct SpaceSpinorColorOrder {
   virtual ~SpaceSpinorColorOrder() { ; }
 
   __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+    if (x >= volumeCB) return;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -352,6 +361,7 @@ struct SpaceSpinorColorOrder {
   }
 
   __device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+    if (x >= volumeCB) return;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -387,6 +397,7 @@ struct QDPJITDiracOrder {
   virtual ~QDPJITDiracOrder() { ; }
 
   __device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+    if (x >= volumeCB) return;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
@@ -397,6 +408,7 @@ struct QDPJITDiracOrder {
   }
 
   __device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+    if (x >= volumeCB) return;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
 	for (int z=0; z<2; z++) {
