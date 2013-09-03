@@ -106,8 +106,7 @@ namespace quda {
     RegTypeIn in[Ns*Nc*2];
     RegTypeOut out[Ns*Nc*2];
     inOrder.load(in, x);
-
-    if (x >= volume) return;
+    // if (x >= volume) return; all load and save routines are index safe (needed for shared variants)
     basis(out, in);
     outOrder.save(out, x);
   }
