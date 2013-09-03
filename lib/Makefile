@@ -18,6 +18,7 @@ QUDA_OBJS = timer.o malloc.o solver.o inv_bicgstab_quda.o		\
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	dirac_quda.h dslash_quda.h enum_quda.h gauge_force_quda.h	\
+	gauge_update_quda.h						\
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
 	gauge_field.h double_single.h texture.h	\
@@ -39,6 +40,7 @@ DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h		\
 	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h		\
 	pack_face_def.h hisq_force_macros.h llfat_quda.cu		\
 	unitarize_links_quda.cu fermion_force_quda.cu			\
+	gauge_update_quda.cu						\
 	gauge_force_quda.cu hisq_paths_force_quda.cu			\
 	unitarize_force_quda.cu gauge_force_core.h			\
 	hisq_paths_force_core.h llfat_core.h svd_quda.h read_clover.h	\

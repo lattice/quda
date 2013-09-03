@@ -28,6 +28,11 @@ namespace quda {
     QudaFieldGeometry geometry; // whether the field is a scale, vector or tensor
     int pinned; //used in cpu field only, where the host memory is pinned
 
+    // whether we need to compute the fat link maxima
+    // FIXME temporary flag until we have a kernel that can do this, then we just do this in copy()
+    // always set to false, requires external override
+    bool compute_fat_link_max; 
+
     // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
       nColor(3),
@@ -43,7 +48,8 @@ namespace quda {
       gauge(h_gauge),
       create(QUDA_REFERENCE_FIELD_CREATE), 
       geometry(QUDA_VECTOR_GEOMETRY),
-      pinned(0)
+      pinned(0),
+      compute_fat_link_max(false)
         {
 	  // variables declared in LatticeFieldParam
 	  precision = QUDA_INVALID_PRECISION;
@@ -56,7 +62,8 @@ namespace quda {
 		  const int pad, const QudaFieldGeometry geometry) : LatticeFieldParam(), nColor(3), nFace(0), 
       reconstruct(reconstruct), order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
-      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), pinned(0)
+      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
+      pinned(0), compute_fat_link_max(false)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -69,7 +76,7 @@ namespace quda {
       nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order), 
       fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
       anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
-      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0) {
+      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), compute_fat_link_max(false) {
 
       if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
       else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
