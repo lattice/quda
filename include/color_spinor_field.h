@@ -145,6 +145,7 @@ namespace quda {
     int x[QUDA_MAX_DIM];
 
     int volume;
+    int volumeCB;
     int pad;
     int stride;
 
