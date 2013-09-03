@@ -17,6 +17,8 @@
 #define REORDER_LOCATION QUDA_CPU_FIELD_LOCATION
 #endif
 
+int zeroCopy = 0;
+
 namespace quda {
 
   int cudaColorSpinorField::initGhostFaceBuffer = 0;
@@ -390,18 +392,26 @@ namespace quda {
 
       cudaMemcpy(v, bufferPinned, bytes, cudaMemcpyHostToDevice);
       cudaMemcpy(norm, (char*)bufferPinned+bytes, norm_bytes, cudaMemcpyHostToDevice);
+    } else if (typeid(src) == typeid(cudaColorSpinorField)) {
+      copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else {
-      if (typeid(src) == typeid(cpuColorSpinorField)) {
+      void *Src, *srcNorm;
+      if (!zeroCopy) {
 	resizeBufferDevice(src.Bytes()+src.NormBytes());
-	cudaMemcpy(bufferDevice, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
-	cudaMemcpy((char*)bufferDevice+src.NormBytes(), src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
+	Src = bufferDevice;
+	srcNorm = (char*)bufferDevice + src.Bytes();	
+	cudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
+	cudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
+      } else {
+	resizeBufferPinned(src.Bytes()+src.NormBytes());
+	memcpy(bufferPinned, src.V(), src.Bytes());
+	memcpy((char*)bufferPinned+src.Bytes(), src.Norm(), src.NormBytes());
+
+	cudaHostGetDevicePointer(&Src, bufferPinned, 0);
+	srcNorm = (void*)((char*)Src + src.Bytes());
       }
 
-      void *Src = typeid(src) == typeid(cudaColorSpinorField) ? (void*)src.V() : bufferDevice;
-      void *srcNorm = typeid(src) == typeid(cudaColorSpinorField) ?
-	(void*)src.Norm() : (char*)bufferDevice + src.Bytes();
-
-      cudaMemset(v, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
+      cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
     }
 
@@ -412,22 +422,35 @@ namespace quda {
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
-    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
+    if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
+	typeid(dest) == typeid(cpuColorSpinorField)) {
       resizeBufferPinned(bytes+norm_bytes);
       cudaMemcpy(bufferPinned, v, bytes, cudaMemcpyDeviceToHost);
       cudaMemcpy((char*)bufferPinned+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
-      copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 0, bufferPinned, 0, (char*)bufferPinned+bytes);
-    } else {
-      if (typeid(dest)==typeid(cpuColorSpinorField)) resizeBufferDevice(dest.Bytes()+dest.NormBytes());
-      void *dst = (typeid(dest)==typeid(cudaColorSpinorField)) ? dest.V() : bufferDevice;
-      void *dstNorm = (typeid(dest)==typeid(cudaColorSpinorField)) ? 
-	dest.Norm() : (char*)bufferDevice+dest.Bytes();
 
+      copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 
+			     0, bufferPinned, 0, (char*)bufferPinned+bytes);
+    } else if (typeid(dest) == typeid(cudaColorSpinorField)) {
+      copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION);
+    } else {
+      void *dst, *dstNorm;
+      if (!zeroCopy) {
+	resizeBufferDevice(dest.Bytes()+dest.NormBytes());
+	dst = bufferDevice;
+	dstNorm = (char*)bufferDevice+dest.Bytes();
+      } else {
+	resizeBufferPinned(dest.Bytes()+dest.NormBytes());
+	cudaHostGetDevicePointer(&dst, bufferPinned, 0);
+	dstNorm = (char*)dst+dest.Bytes();
+      }
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
 
-      if (typeid(dest) == typeid(cpuColorSpinorField)) {
-	cudaMemcpy(dest.V(), bufferDevice, dest.Bytes(), cudaMemcpyDeviceToHost);
-	cudaMemcpy(dest.Norm(), (char*)bufferDevice+dest.Bytes(), dest.NormBytes(), cudaMemcpyDeviceToHost);
+      if (!zeroCopy) {
+	cudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
+	cudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
+      } else {
+	memcpy(dest.V(), bufferPinned, dest.Bytes());
+	memcpy(dest.Norm(), (char*)bufferPinned+dest.Bytes(), dest.NormBytes());
       }
     }
 
