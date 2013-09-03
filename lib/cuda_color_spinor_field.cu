@@ -85,6 +85,18 @@ namespace quda {
       }
     }
 
+    if (param.create == QUDA_REFERENCE_FIELD_CREATE && src.EigvN() > 0) {//setup eigenvector form the set
+       nEv      = src.EigvN();
+       if(src.EigvId() > -1){
+         eigv_id   = src.EigvId();
+         volume   = src.EigvVolume(); 
+         stride   = src.EigvStride();
+         length   = src.EigvLength(); 
+         v = (char*)v + eigv_id*length*src.Precision();
+         //nothing for norm pointer...
+       }
+    }
+
     create(param.create);
 
     if (param.create == QUDA_NULL_FIELD_CREATE) {
@@ -181,11 +193,16 @@ namespace quda {
     //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
+printf("\nPrint bytes: %d\n", bytes);
       v = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
 	norm = device_malloc(norm_bytes);
       }
       alloc = true;
+    }
+
+    if(nEv != 0 && siteSubset == QUDA_FULL_SITE_SUBSET){
+       errorQuda("Eigenvectors must be parity fields!");
     }
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -211,6 +228,26 @@ namespace quda {
       dynamic_cast<cudaColorSpinorField*>(even)->createTexObject();
       dynamic_cast<cudaColorSpinorField*>(odd)->destroyTexObject();
       dynamic_cast<cudaColorSpinorField*>(odd)->createTexObject();
+#endif
+    }
+
+//! setup an object for selected eigenvector (the 1st one as a default):
+    if (nEv > 0 && siteSubset == QUDA_PARITY_SITE_SUBSET /*&& create != QUDA_REFERENCE_FIELD_CREATE*/ && eigv_id == -1) {
+      // create the associated even and odd subsets
+       ColorSpinorParam param;
+       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+       param.nDim = nDim;
+       memcpy(param.x, x, nDim*sizeof(int));
+       param.create = QUDA_REFERENCE_FIELD_CREATE;
+       param.v = v;
+       param.norm = 0/*norm*/;//for eigenvectors makes no sense
+       param.nEv  = nEv;
+       param.eigv_id = 0;//here is a problem!
+       //setup volume, [real_]length and stride for a single eigenvector
+       eigenvec = new cudaColorSpinorField(*this, param);
+#ifdef USE_TEXTURE_OBJECTS //sure this is correct?
+       dynamic_cast<cudaColorSpinorField*>(eigenvec)->destroyTexObject();
+       dynamic_cast<cudaColorSpinorField*>(eigenvec)->createTexObject();
 #endif
     }
 
@@ -315,6 +352,10 @@ namespace quda {
 	delete even;
 	delete odd;
       }
+      else{
+        //! for deflated solvers:
+        if (nEv > 0) delete eigenvec;
+      }
       alloc = false;
     }
 
@@ -349,7 +390,21 @@ namespace quda {
     if (precision == QUDA_HALF_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, streams[Nstream-1]);
   }
 
+//! for the deflated solvers:
+  void cudaColorSpinorField::zeroPad() {
+    size_t pad_bytes = (stride - volume) * precision * fieldOrder;
+    int Npad = nColor * nSpin * 2 / fieldOrder;//number of vector regs per site
+ 
+    if (nEv > 0 && eigv_id == -1){//we consider the whole eigenvector set:
+      Npad      *= nEv;//!
+      pad_bytes /= nEv;//!
+    }
+    size_t pitch = ((nEv == 0 || eigv_id != -1) ? stride : eigv_stride)*fieldOrder*precision;
+    char   *dst  = (char*)v + ((nEv == 0 || eigv_id != -1) ? volume : eigv_volume)*fieldOrder*precision;
+    if(pad_bytes) cudaMemset2D(dst, pitch, 0, pad_bytes, Npad);
+  }
 
+/** Old version of the above routine:
   void cudaColorSpinorField::zeroPad() {
     size_t pad_bytes = (stride - volume) * precision * fieldOrder;
     int Npad = nColor * nSpin * 2 / fieldOrder;
@@ -357,7 +412,7 @@ namespace quda {
       if (pad_bytes) cudaMemset((char*)v + (volume + i*stride)*fieldOrder*precision, 0, pad_bytes);
     }
   }
-
+*/
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
     checkField(*this, src);
     copyCuda(*this, src);
@@ -659,6 +714,25 @@ namespace quda {
     out << "alloc = " << a.alloc << std::endl;
     out << "init = " << a.init << std::endl;
     return out;
+  }
+
+//! for deflated solvers:
+  cudaColorSpinorField& cudaColorSpinorField::Eigenvec(const int idx) const {
+    
+    if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
+      if (idx < this->EigvN()) {//setup eigenvector form the set
+        dynamic_cast<cudaColorSpinorField*>(eigenvec)->eigv_id = idx;
+        size_t eigvec_offset = idx*(dynamic_cast<cudaColorSpinorField*>(eigenvec)->Length())*this->Precision();
+        (dynamic_cast<cudaColorSpinorField*>(eigenvec))->v = (void*)((char*)(this->v) + eigvec_offset);
+      }
+      else{
+        errorQuda("Incorrect eigenvector index...");
+      }
+      return *(dynamic_cast<cudaColorSpinorField*>(eigenvec)); 
+    }
+
+    errorQuda("Eigenvector must be a parity spinor");
+    exit(-1);
   }
 
 } // namespace quda

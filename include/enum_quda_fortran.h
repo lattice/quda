@@ -78,6 +78,7 @@
 #define QUDA_BICGSTAB_INVERTER 1
 #define QUDA_GCR_INVERTER 2
 #define QUDA_MR_INVERTER 3
+#define QUDA_EIGCG_INVERTER 4
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaSolutionType integer(4)

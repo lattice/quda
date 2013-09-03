@@ -219,6 +219,10 @@ extern "C" {
      */
     QudaResidualType residual_type;
 
+    /**Parameters for deflated solvers*/
+    int nev;
+    int max_vect_size;//for magma library this parameter must be multiple 16
+
   } QudaInvertParam;
 
 

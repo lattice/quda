@@ -188,6 +188,14 @@ int main(int argc, char **argv)
 
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
+
+//! For deflated solvers only:
+  if(inv_param.inv_type == QUDA_EIGCG_INVERTER){
+    inv_param.max_vect_size = 96;
+  }else{
+    inv_param.max_vect_size = 0;
+  }
+
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);

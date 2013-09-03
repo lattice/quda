@@ -28,20 +28,24 @@ namespace quda {
     void *v; // pointer to field
     void *norm;
 
+    //! for deflated solvers:
+    int nEv;    //number of eigenvectors
+    int eigv_id;//number of eigenvectors
+
     ColorSpinorParam(const ColorSpinorField &a);
 
   ColorSpinorParam()
     : LatticeFieldParam(), nColor(0), nSpin(0), twistFlavor(QUDA_TWIST_INVALID), 
       siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
-      create(QUDA_INVALID_FIELD_CREATE) { ; }
+      create(QUDA_INVALID_FIELD_CREATE), nEv(0), eigv_id(-1) { ; }
   
     // used to create cpu params
   ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
     : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
       twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
-      create(QUDA_REFERENCE_FIELD_CREATE), v(V) { 
+      create(QUDA_REFERENCE_FIELD_CREATE), v(V), nEv(inv_param.max_vect_size), eigv_id(-1) { 
 
         if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
 	for (int d=0; d<nDim; d++) x[d] = X[d];
@@ -90,7 +94,7 @@ namespace quda {
       siteSubset(cpuParam.siteSubset), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-      create(QUDA_COPY_FIELD_CREATE), v(0)
+      create(QUDA_COPY_FIELD_CREATE), v(0), nEv(cpuParam.nEv), eigv_id(-1)
       {
 	fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
 	  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
@@ -117,6 +121,8 @@ namespace quda {
       printfQuda("create = %d\n", create);
       printfQuda("v = %lx\n", (unsigned long)v);
       printfQuda("norm = %lx\n", (unsigned long)norm);
+      //! for deflated solvers
+      if(nEv != 0) printfQuda("nEv = %d\n", nEv);
     }
 
     virtual ~ColorSpinorParam() {
@@ -131,7 +137,7 @@ namespace quda {
   private:
     void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 		QudaPrecision precision, int pad, QudaSiteSubset subset, 
-		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
+		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, int nev = 0, int evid = -1);
     void destroy();  
 
   protected:
@@ -156,6 +162,14 @@ namespace quda {
     void *v; // the field elements
     void *norm; // the normalization field
 
+    //! used for deflated solvers:
+    int nEv;
+    int eigv_id;
+    int eigv_volume;       // volume of a single eigenvector 
+    int eigv_stride;       // stride of a single eigenvector
+    int eigv_real_length;  // physical length of a single eigenvector
+    int eigv_length;       // length including pads (but not ghost zones)
+
     // multi-GPU parameters
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
@@ -172,6 +186,10 @@ namespace quda {
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
 
+    /*Warning: we need copies of the above params for eigenvectors*/
+    size_t eigv_bytes;      // size in bytes of spinor field
+    size_t eigv_norm_bytes; // makes no sense but let's keep it...
+
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
     QudaFieldOrder fieldOrder;
@@ -180,6 +198,9 @@ namespace quda {
     // in the case of full fields, these are references to the even / odd sublattices
     ColorSpinorField *even;
     ColorSpinorField *odd;
+
+    //! for the deflated solver, this is a pointer to a particular eigenvector:
+    ColorSpinorField *eigenvec;
 
     void createGhostZone();
 
@@ -220,6 +241,16 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+
+//! for deflated solvers only:
+    int EigvN() const { return nEv; }
+    int EigvId() const { return eigv_id; }
+    int EigvVolume() const { return eigv_volume; }
+    int EigvStride() const { return eigv_stride; }
+    int EigvLength() const { return eigv_length; }
+
+    size_t EigvBytes() const { return eigv_bytes; }
+    size_t EigvNormBytes() const { return eigv_norm_bytes; }
 
     virtual QudaFieldLocation Location() const = 0;
     QudaSiteSubset SiteSubset() const { return siteSubset; }
@@ -333,6 +364,8 @@ namespace quda {
 
     cudaColorSpinorField& Even() const;
     cudaColorSpinorField& Odd() const;
+
+    cudaColorSpinorField& Eigenvec(const int idx) const;
 
     void zero();
 

@@ -122,6 +122,11 @@ namespace quda {
 
     /**< The Gflops rate of the solver */
     double gflops;
+
+    // EigCG solver parameters
+
+    int nev;
+    int m;
     
     /**
        Constructor that matches the initial values to that of the
@@ -139,7 +144,8 @@ namespace quda {
       preserve_source(param.preserve_source), num_offset(param.num_offset), 
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops)
+      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      nev(param.nev), m(param.max_vect_size) //! for the deflated solvers
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -337,6 +343,25 @@ namespace quda {
     void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p,
 		    cudaColorSpinorField **q, int N);
   };
+
+//experimantal EigCG solver
+  class EigCG : public Solver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+
+    cudaColorSpinorField *Vm;  //eigenvector set (spinor matrix of size eigen_vector_length x m)
+    cudaColorSpinorField *Ap0; //aux arrays
+    cudaColorSpinorField *tmp0;//aux arrays
+
+  public:
+    EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, cudaColorSpinorField *vm, SolverParam &param, TimeProfile &profile);
+    virtual ~EigCG();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
 
 } // namespace quda
 

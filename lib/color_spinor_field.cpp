@@ -20,19 +20,19 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) 
-    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0) 
+    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0), eigenvec(0) 
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, 
 	   param.precision, param.pad, param.siteSubset, param.siteOrder, 
-	   param.fieldOrder, param.gammaBasis);
+	   param.fieldOrder, param.gammaBasis, param.nEv);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) 
-    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0)
+    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0), eigenvec(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, 
 	   field.precision, field.pad, field.siteSubset, field.siteOrder, 
-	   field.fieldOrder, field.gammaBasis);
+	   field.fieldOrder, field.gammaBasis, field.nEv, field.eigv_id);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -129,7 +129,7 @@ namespace quda {
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
-				QudaGammaBasis gammaBasis) {
+				QudaGammaBasis gammaBasis, int nev /*= 0*/, int evid /* = -1*/) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -142,6 +142,10 @@ namespace quda {
     nColor = Nc;
     nSpin = Ns;
     twistFlavor = Twistflavor;
+
+//! for deflated solvers:
+    nEv    = nev;
+    eigv_id = (nev == 0) ? -1: evid;
 
     precision = Prec;
     volume = 1;
@@ -173,6 +177,25 @@ namespace quda {
 
     init = true;
 
+//! stuff for deflated solvers (eigenvector sets):
+    if(nev != 0){
+      eigv_volume = volume;
+      eigv_stride = stride;
+      eigv_length = length;
+      eigv_real_length = length;
+
+      eigv_bytes       = bytes;
+      eigv_norm_bytes  = norm_bytes; 
+      
+      volume *= nev;
+      stride *= nev;
+      length *= nev;
+      real_length *= nev;
+
+      bytes *= nev;
+      norm_bytes *= nev;
+    }
+
     clearGhostPointers();
   }
 
@@ -184,7 +207,7 @@ namespace quda {
     if (&src != this) {
       create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
 	     src.precision, src.pad, src.siteSubset, 
-	     src.siteOrder, src.fieldOrder, src.gammaBasis);    
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.nEv, src.eigv_id);    
     }
     return *this;
   }
@@ -199,11 +222,16 @@ namespace quda {
     if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
     if (param.nDim != 0) nDim = param.nDim;
 
+    if (param.nEv     != 0 ) nEv     = param.nEv;
+
     volume = 1;
     for (int d=0; d<nDim; d++) {
       if (param.x[0] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
+//! for deflated solvers:
+    if(param.nEv > 0) volume *= nEv;
+
   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
 
   
@@ -255,6 +283,7 @@ namespace quda {
     param.twistFlavor = twistFlavor;
     param.precision = precision;
     param.nDim = nDim;
+    param.nEv = nEv;
     memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
     param.pad = pad;
     param.siteSubset = siteSubset;
