@@ -9,11 +9,12 @@ QUDA_OBJS = timer.o malloc.o solver.o inv_bicgstab_quda.o		\
 	hw_quda.o blas_cpu.o clover_field.o copy_clover.o		\
 	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o copy_gauge.o extract_gauge_ghost.o		\
-	max_gauge.o dirac_clover.o dirac_wilson.o dirac_staggered.o	\
-	dirac_domain_wall.o dirac_twisted_mass.o tune.o			\
-	fat_force_quda.o llfat_quda_itf.o clover_quda.o dslash_quda.o	\
-	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
-	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
+	max_gauge.o gauge_update_quda.o dirac_clover.o			\
+	dirac_wilson.o dirac_staggered.o dirac_domain_wall.o		\
+	dirac_twisted_mass.o tune.o fat_force_quda.o llfat_quda_itf.o	\
+	clover_quda.o dslash_quda.o blas_quda.o copy_quda.o		\
+	reduce_quda.o face_buffer.o face_gauge.o comm_common.o		\
+	${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -40,7 +41,6 @@ DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h		\
 	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h		\
 	pack_face_def.h hisq_force_macros.h llfat_quda.cu		\
 	unitarize_links_quda.cu fermion_force_quda.cu			\
-	gauge_update_quda.cu						\
 	gauge_force_quda.cu hisq_paths_force_quda.cu			\
 	unitarize_force_quda.cu gauge_force_core.h			\
 	hisq_paths_force_core.h llfat_core.h svd_quda.h read_clover.h	\

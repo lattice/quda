@@ -33,8 +33,8 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
-#include <gauge_update_quda.h>
 #endif
+#include <gauge_update_quda.h>
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
@@ -2167,13 +2167,17 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   return 0;  
 }
 
+#endif
 
 void updateGaugeFieldQuda(void* gauge, 
     void* momentum, 
-    double eps, 
+    double dt, 
     QudaGaugeParam* param)
 {
   profileGaugeUpdate.Start(QUDA_PROFILE_TOTAL);
+
+  checkGaugeParam(param);
+
   profileGaugeUpdate.Start(QUDA_PROFILE_INIT);  
   GaugeFieldParam gParam(0, *param);
 
@@ -2182,7 +2186,6 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.order = QUDA_MILC_GAUGE_ORDER;
   gParam.gauge = gauge;
   cpuGaugeField cpuGauge(gParam);
 
@@ -2197,7 +2200,7 @@ void updateGaugeFieldQuda(void* gauge,
   cudaGaugeField cudaMom(gParam);
 
   gParam.link_type = QUDA_SU3_LINKS;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.reconstruct = param->reconstruct;
   cudaGaugeField cudaInGauge(gParam);
   cudaGaugeField cudaOutGauge(gParam);
 
@@ -2211,7 +2214,7 @@ void updateGaugeFieldQuda(void* gauge,
 
   // perform the update
   profileGaugeUpdate.Start(QUDA_PROFILE_COMPUTE);
-  updateGaugeFieldCuda(&cudaOutGauge, eps, cudaInGauge, cudaMom);
+  updateGaugeField(cudaOutGauge, dt, cudaInGauge, cudaMom);
   profileGaugeUpdate.Stop(QUDA_PROFILE_COMPUTE);
 
   // copy the gauge field back to the host
@@ -2225,8 +2228,6 @@ void updateGaugeFieldQuda(void* gauge,
   return;
 }
 
-
-#endif
 
 
 /*

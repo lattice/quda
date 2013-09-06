@@ -477,9 +477,15 @@ extern "C" {
 			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
 
   /**
-   *  Update the gauge field.
+   * Evolve the gauge field by step size dt, using the momentum field
+   * I.e., Evalulate U(t+dt) = e(dt pi) U(t) 
+   *
+   * @param gauge The gauge field to be updated 
+   * @param momentum The momentum field
+   * @param dt The integration step size step
+   * @param param The parameters of the external fields and the computation settings
    */
-  void updateGaugeFieldQuda(void* gauge, void* momentum, double eps, QudaGaugeParam* param);
+  void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, QudaGaugeParam* param);
 
 #ifdef __cplusplus
 }

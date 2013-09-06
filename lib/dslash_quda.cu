@@ -2142,7 +2142,6 @@ namespace quda {
 
 #ifdef GPU_GAUGE_FORCE
 #include "gauge_force_quda.cu"
-#include "gauge_update_quda.cu"
 #endif
 
 #ifdef GPU_FERMION_FORCE

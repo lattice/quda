@@ -3,7 +3,15 @@
 
 namespace quda {
 
-  void updateGaugeFieldCuda(cudaGaugeField* const outGauge, double eps, const cudaGaugeField& inGauge, const cudaGaugeField& momentum);
+  /**
+     Evolve the gauge field by step size dt using the momentuim field
+     @param out Updated gauge field
+     @param dt Step size 
+     @param in Input gauge field
+     @param mom Momentum field
+   */
+  void updateGaugeField(GaugeField &out, double dt, 
+			const GaugeField& in, const GaugeField& mom);
 
 } // namespace quda
 
