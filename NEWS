@@ -1,5 +1,9 @@
 
-Version 0.6.0 - xx July 2013
+Version 0.6.0 - xx September 2013
+
+- Implemented a gauge field update routine that evolves the gauge
+  field by a given step size using a momentum field.  This is exposed
+  as the function updateGaugeFieldQuda(...).
 
 - Completely rewritten gauge and clover field copying routines using a
   generic template-driven approach.  Due the large number of possible
