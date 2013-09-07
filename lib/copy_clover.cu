@@ -60,15 +60,11 @@ namespace quda {
     CopyCloverArg<Out,In> arg;
 
   private:
-    int sharedBytesPerThread() const { return 0; }
-    int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
 
-    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
-    bool advanceBlockDim(TuneParam &param) const {
-      bool advance = Tunable::advanceBlockDim(param);
-      if (advance) param.grid = dim3( (arg.volumeCB+param.block.x-1) / param.block.x, 1, 1);
-      return advance;
-    }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
     CopyClover(CopyCloverArg<Out,In> &arg) : arg(arg) { ; }
@@ -92,17 +88,6 @@ namespace quda {
       ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       ps << "shared=" << param.shared_bytes;
       return ps.str();
-    }
-
-    virtual void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.grid = dim3( (arg.volumeCB+param.block.x-1) / param.block.x, 1, 1);
-    }
-
-    /** sets default values for when tuning is disabled */
-    virtual void defaultTuneParam(TuneParam &param) const {
-      Tunable::defaultTuneParam(param);
-      param.grid = dim3( (arg.volumeCB+param.block.x-1) / param.block.x, 1, 1);
     }
 
     long long flops() const { return 0; } 

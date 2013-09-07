@@ -1248,15 +1248,11 @@ class PackFace : public Tunable {
     return param;
   }
 
-  int sharedBytesPerThread() const { return 0; }
-  int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+  unsigned int sharedBytesPerThread() const { return 0; }
+  unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
   
-  bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
-  bool advanceBlockDim(TuneParam &param) const {
-    bool advance = Tunable::advanceBlockDim(param);
-    if (advance) param.grid = dim3( (threads()+param.block.x-1) / param.block.x, 1, 1);
-    return advance;
-  }
+  bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+  unsigned int minThreads() const { return threads(); }
 
  public:
   PackFace(FloatN *faces, const cudaColorSpinorField *in, 
@@ -1278,19 +1274,6 @@ class PackFace : public Tunable {
   
   virtual void apply(const cudaStream_t &stream) = 0;
   virtual void apply_twisted(Float a, Float b, const cudaStream_t &stream) = 0;//for twisted mass only
-
-  virtual void initTuneParam(TuneParam &param) const
-  {
-    Tunable::initTuneParam(param);
-    param.grid = dim3( (threads()+param.block.x-1) / param.block.x, 1, 1);
-  }
-  
-  /** sets default values for when tuning is disabled */
-  virtual void defaultTuneParam(TuneParam &param) const
-  {
-    Tunable::defaultTuneParam(param);
-    param.grid = dim3( (threads()+param.block.x-1) / param.block.x, 1, 1);
-  }
 
   long long bytes() const { 
     size_t faceBytes = (inputPerSite() + outputPerSite())*this->threads()*sizeof(((FloatN*)0)->x);

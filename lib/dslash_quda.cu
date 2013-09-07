@@ -493,20 +493,9 @@ namespace quda {
     const cudaColorSpinorField *x;
     char *saveOut, *saveOutNorm;
 
-    int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
-    bool advanceBlockDim(TuneParam &param) const {
-      bool advance = Tunable::advanceBlockDim(param);
-      if (advance) {
-	param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
-	if (param.grid.x > deviceProp.maxGridSize[0]) {
-	  warningQuda("Autotuner is skipping blockDim=%u (gridDim=%u) because lattice volume is too large",
-		      param.block.x, param.grid.x);
-	  advance = advanceBlockDim(param);
-	}
-      }
-      return advance;
-    }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
 
   public:
     DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
@@ -522,28 +511,6 @@ namespace quda {
       return ps.str();
     }
     virtual int Nface() { return 2; }
-
-    virtual void initTuneParam(TuneParam &param) const
-    {
-      Tunable::initTuneParam(param);
-      param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
-      if (param.grid.x > deviceProp.maxGridSize[0]) {
-	warningQuda("Autotuner is skipping blockDim=%u (gridDim=%u) because lattice volume is too large",
-		    param.block.x, param.grid.x);
-	bool ok = advanceBlockDim(param);
-	if (!ok) errorQuda("Lattice volume is too large for even the largest blockDim");
-      }
-    }
-
-    /** sets default values for when tuning is disabled */
-    virtual void defaultTuneParam(TuneParam &param) const
-    {
-      Tunable::defaultTuneParam(param);
-      param.grid = dim3( (dslashParam.threads+param.block.x-1) / param.block.x, 1, 1);
-      if (param.grid.x > deviceProp.maxGridSize[0]) {
-	errorQuda("Lattice volume is too large for default blockDim");
-      }
-    }
 
     virtual void preTune()
     {
@@ -612,7 +579,7 @@ namespace quda {
 #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) 
   class SharedDslashCuda : public DslashCuda {
   protected:
-    int sharedBytesPerBlock(const TuneParam &param) const { return 0; } // FIXME: this isn't quite true, but works
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; } // FIXME: this isn't quite true, but works
     bool advanceSharedBytes(TuneParam &param) const { 
       if (dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::advanceSharedBytes(param);
       else return false;
@@ -735,7 +702,7 @@ namespace quda {
     const double a;
 
   protected:
-    int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const
     {
 #if (__COMPUTE_CAPABILITY__ >= 200) // Fermi uses shared memory for common input
       if (dslashParam.kernel_type == INTERIOR_KERNEL) { // Interior kernels use shared memory for common iunput
@@ -799,7 +766,7 @@ namespace quda {
     const double a;
 
   protected:
-    int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const
     {
 #if (__COMPUTE_CAPABILITY__ >= 200)
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
@@ -862,7 +829,7 @@ namespace quda {
     const double a;
 
   protected:
-    int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const
     {
 #if (__COMPUTE_CAPABILITY__ >= 200)
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
@@ -940,7 +907,7 @@ namespace quda {
     double a, b, c, d;
 
   protected:
-    int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const
     {
 #if (__COMPUTE_CAPABILITY__ >= 200)
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
@@ -1094,7 +1061,7 @@ namespace quda {
       }
     }
 
-    int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerThread() const { return 0; }
   
   public:
     DomainWallDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
@@ -1177,7 +1144,7 @@ namespace quda {
     const double a;
 
   protected:
-    int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const
     {
       int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
       return 6 * reg_size;
@@ -1899,13 +1866,14 @@ namespace quda {
     const cudaColorSpinorField *in;
 
   protected:
-    int sharedBytesPerThread() const
+    unsigned int sharedBytesPerThread() const
     {
       int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
       return CLOVER_SHARED_FLOATS_PER_THREAD * reg_size;
     }
-    int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
 
   public:
     CloverCuda(cudaColorSpinorField *out, const cFloat *clover, const float *cloverNorm, 
@@ -2016,9 +1984,10 @@ namespace quda {
     double b;
     double c;
 
-    int sharedBytesPerThread() const { return 0; }
-    int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
 
     char *saveOut, *saveOutNorm;
 

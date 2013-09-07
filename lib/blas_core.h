@@ -52,8 +52,8 @@ private:
   char *X_h, *Y_h, *Z_h, *W_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h;
 
-  int sharedBytesPerThread() const { return 0; }
-  int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+  unsigned int sharedBytesPerThread() const { return 0; }
+  unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
   virtual bool advanceSharedBytes(TuneParam &param) const
   {

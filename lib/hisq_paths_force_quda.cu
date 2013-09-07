@@ -620,33 +620,13 @@ namespace quda {
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-
-      // generalize Tunable::advanceBlockDim() to also set gridDim, with extra checking to ensure that gridDim isn't too large for the device
-      bool advanceBlockDim(TuneParam &param) const
-      {
-	const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-	const unsigned int max_blocks = deviceProp.maxGridSize[0];
-	const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
-	const int step = deviceProp.warpSize;
-	bool ret;
-	param.block.x += step;
-	if (param.block.x > max_threads || sharedBytesPerThread()*param.block.x > max_shared) {
-	  param.block = dim3((kparam.threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-	  param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-	  if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	  ret = false;
-	} else {
-	  ret = true;
-	}
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-	return ret;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return kparam.threads; }
 
     public:
       MiddleLink(const cudaGaugeField &link, 
@@ -779,24 +759,6 @@ namespace quda {
 	newOprod.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-	const unsigned int max_blocks = deviceProp.maxGridSize[0];
-	const int step = deviceProp.warpSize;
-	param.block = dim3((kparam.threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-	param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-	param.shared_bytes = sharedBytesPerThread()*param.block.x > sharedBytesPerBlock(param) ?
-	  sharedBytesPerThread()*param.block.x : sharedBytesPerBlock(param);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const {
-	initTuneParam(param);
-      }
-
       long long flops() const { return 0; }
     };
 
@@ -815,16 +777,12 @@ namespace quda {
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-      bool advanceBlockDim(TuneParam &param) const {
-	bool rtn = Tunable::advanceBlockDim(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-	return rtn;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return kparam.threads; }
 
     public:
       LepageMiddleLink(const cudaGaugeField &link, 
@@ -930,19 +888,6 @@ namespace quda {
 	newOprod.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	Tunable::initTuneParam(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const
-      {
-	Tunable::defaultTuneParam(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-
       long long flops() const { return 0; }
     };
     
@@ -961,16 +906,12 @@ namespace quda {
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-      bool advanceBlockDim(TuneParam &param) const {
-	bool rtn = Tunable::advanceBlockDim(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-	return rtn;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return kparam.threads; }
 
     public:
       SideLink(const cudaGaugeField &link, 
@@ -1079,19 +1020,6 @@ namespace quda {
 	newOprod.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	Tunable::initTuneParam(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const
-      {
-	Tunable::defaultTuneParam(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-
       long long flops() const { return 0; }
     };
 
@@ -1108,16 +1036,12 @@ namespace quda {
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-      bool advanceBlockDim(TuneParam &param) const {
-	bool rtn = Tunable::advanceBlockDim(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-	return rtn;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return kparam.threads; }
 
     public:
       SideLinkShort(const cudaGaugeField &link, const cudaGaugeField &P3, int sig, int mu, 
@@ -1214,19 +1138,6 @@ namespace quda {
 	newOprod.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	Tunable::initTuneParam(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const
-      {
-	Tunable::defaultTuneParam(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-
       long long flops() const { return 0; }
     };
 
@@ -1245,16 +1156,12 @@ namespace quda {
       cudaGaugeField &newOprod;
       const hisq_kernel_param_t &kparam;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-      bool advanceBlockDim(TuneParam &param) const {
-	bool rtn = Tunable::advanceBlockDim(param);
-	param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-	return rtn;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return kparam.threads; }
 
     public:
       AllLink(const cudaGaugeField &link, 
@@ -1388,18 +1295,12 @@ namespace quda {
       cudaGaugeField &ForceMatrix;
       const int* X;
       
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-      bool advanceBlockDim(TuneParam &param) const {
-	bool rtn = Tunable::advanceBlockDim(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-
-	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
-	return rtn;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return X[0]*X[1]*X[2]*X[3]/2; }
 
     public:
       OneLinkTerm(const cudaGaugeField &oprod, int sig, 
@@ -1452,22 +1353,6 @@ namespace quda {
 	ForceMatrix.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	Tunable::initTuneParam(param);
-
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const
-      {
-	Tunable::defaultTuneParam(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-
       long long flops() const { return 0; }
     };
     
@@ -1484,17 +1369,12 @@ namespace quda {
       const int * X;
       const hisq_kernel_param_t &kparam;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-      bool advanceBlockDim(TuneParam &param) const {
-	bool rtn = Tunable::advanceBlockDim(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
-	return rtn;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return X[0]*X[1]*X[2]*X[3]/2; }
 
     public:
     LongLinkTerm(const cudaGaugeField &link, const cudaGaugeField &naikOprod,
@@ -1559,21 +1439,6 @@ namespace quda {
 	output.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	Tunable::initTuneParam(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const
-      {
-	Tunable::defaultTuneParam(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-
       long long flops() const { return 0; }
     };
 
@@ -1590,17 +1455,12 @@ namespace quda {
       cudaGaugeField &mom;
       const int* X;
       
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-      bool advanceBlockDim(TuneParam &param) const {
-	bool rtn = Tunable::advanceBlockDim(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads + param.block.x-1)/param.block.x, 1, 1);
-	return rtn;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return X[0]*X[1]*X[2]*X[3]/2; }
 
     public:
     CompleteForce(const cudaGaugeField &link, const cudaGaugeField &oprod, 
@@ -1661,21 +1521,6 @@ namespace quda {
 	mom.restore();
       }
 
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	Tunable::initTuneParam(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const
-      {
-	Tunable::defaultTuneParam(param);
-	int threads = X[0]*X[1]*X[2]*X[3]/2;
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      }
-      
       long long flops() const { return 0; }
     };
 

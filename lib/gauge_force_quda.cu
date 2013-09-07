@@ -138,16 +138,12 @@ namespace quda {
     const int num_paths;
     const kernel_param_t &kparam;
 
-    int sharedBytesPerThread() const { return 0; }
-    int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
   
     // don't tune the grid dimension
-    bool advanceGridDim(TuneParam &param) const { return false; }
-    bool advanceBlockDim(TuneParam &param) const {
-      bool rtn = Tunable::advanceBlockDim(param);
-      param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-      return rtn;
-    }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return kparam.threads; }
 
   public:
     GaugeForceCuda(cudaGaugeField &mom, const int dir, const double &eb3, const cudaGaugeField &link,
@@ -247,17 +243,6 @@ namespace quda {
   
     void preTune() { mom.backup(); }
     void postTune() { mom.restore(); } 
-  
-    void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-    }
-    
-    /** sets default values for when tuning is disabled */
-    void defaultTuneParam(TuneParam &param) const {
-      Tunable::defaultTuneParam(param);
-      param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
-    }
   
     long long flops() const { return 0; } // FIXME: add flops counter
   

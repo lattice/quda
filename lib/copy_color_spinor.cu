@@ -119,18 +119,18 @@ namespace quda {
     int volume;
 
   private:
-    int sharedBytesPerThread() const { 
+    unsigned int sharedBytesPerThread() const { 
       size_t regSize = sizeof(FloatOut) > sizeof(FloatIn) ? sizeof(FloatOut) : sizeof(FloatIn);
       return Ns*Nc*2*regSize;
     }
 
     // the minimum shared memory per block is (block+1) because we pad to avoid bank conflicts
-    int sharedBytesPerBlock(const TuneParam &param) const { return (param.block.x+1)*sharedBytesPerThread(); }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (param.block.x+1)*sharedBytesPerThread(); }
     bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
-    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return volume; }
     bool advanceBlockDim(TuneParam &param) const {
       bool advance = Tunable::advanceBlockDim(param);
-      if (advance) param.grid = dim3( (volume+param.block.x-1) / param.block.x, 1, 1);
       param.shared_bytes = sharedBytesPerThread() * (param.block.x+1); // FIXME: use sharedBytesPerBlock
       return advance;
     }
@@ -159,17 +159,6 @@ namespace quda {
       ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       ps << "shared=" << param.shared_bytes;
       return ps.str();
-    }
-
-    virtual void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.grid = dim3( (volume+param.block.x-1) / param.block.x, 1, 1);
-    }
-
-    /** sets default values for when tuning is disabled */
-    virtual void defaultTuneParam(TuneParam &param) const {
-      Tunable::defaultTuneParam(param);
-      param.grid = dim3( (volume+param.block.x-1) / param.block.x, 1, 1);
     }
 
     long long flops() const { return 0; } 

@@ -596,33 +596,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       cudaGaugeField &newForce;
       int *fails;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
       // don't tune the grid dimension
-      bool advanceGridDim(TuneParam &param) const { return false; }
-
-      // generalize Tunable::advanceBlockDim() to also set gridDim, with extra checking to ensure that gridDim isn't too large for the device
-      bool advanceBlockDim(TuneParam &param) const
-      {
-	const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-	const unsigned int max_blocks = deviceProp.maxGridSize[0];
-	const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
-	const int step = deviceProp.warpSize;
-	const int threads = gauge.Volume();
-	bool ret;
-	param.block.x += step;
-	if (param.block.x > max_threads || sharedBytesPerThread()*param.block.x > max_shared) {
-	  param.block = dim3((threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-	  param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	ret = false;
-	} else {
-	  ret = true;
-	}
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-	return ret;
-      }
+      bool tuneGridDim() const { return false; }
+      unsigned int minThreads() const { return gauge.Volume(); }
 
     public:
       UnitarizeForceCuda(const cudaGaugeField& oldForce, const cudaGaugeField& gauge,  
@@ -648,25 +627,6 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       
       void preTune() { ; }
       void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
-      
-      virtual void initTuneParam(TuneParam &param) const
-      {
-	const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-	const unsigned int max_blocks = deviceProp.maxGridSize[0];
-	const int threads = gauge.Volume();
-	const int step = deviceProp.warpSize;
-	param.block = dim3((threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-	param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-	param.shared_bytes = sharedBytesPerThread()*param.block.x > sharedBytesPerBlock(param) ?
-	  sharedBytesPerThread()*param.block.x : sharedBytesPerBlock(param);
-      }
-      
-      /** sets default values for when tuning is disabled */
-      void defaultTuneParam(TuneParam &param) const {
-	initTuneParam(param);
-      }
       
       long long flops() const { return 0; } // FIXME: add flops counter
       
