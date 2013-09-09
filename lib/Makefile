@@ -95,6 +95,8 @@ gen:
 	$(PYTHON) generate/dw_dslash_cuda_gen.py
 	$(PYTHON) generate/ndeg_tm_dslash_cuda_gen.py
 	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
+	$(PYTHON) generate/deg_tmc_dslash_cuda_gen.py
+	$(PYTHON) generate/gen_tmc.py
 
 clean:
 	-rm -f *.o $(QUDA)
