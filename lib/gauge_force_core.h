@@ -514,6 +514,8 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
     
   SET_SU3_MATRIX(staple, 0);
   for(i=0;i < num_paths; i++){
+    if(path_coeff[i] == 0) continue;
+
     int nbr_oddbit = (oddBit^1 );
 	
     int new_x1 =x1;
