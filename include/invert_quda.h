@@ -145,12 +145,17 @@ namespace quda {
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      nev(param.nev), m(param.max_vect_size) //! for the deflated solvers
+      nev(param.nev), m(param.max_vect_size) //! for EigCG
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
 	tol_offset[i] = param.tol_offset[i];
 	tol_hq_offset[i] = param.tol_hq_offset[i];
+      }
+
+      if((param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
+        m = (m / 16) * 16 + 16;
+        warningQuda("\nSwitched eigenvector subspace dimension to %d\n", m);
       }
     }
     ~SolverParam() { }
@@ -352,8 +357,9 @@ namespace quda {
     const DiracMatrix &matSloppy;
 
     cudaColorSpinorField *Vm;  //eigenvector set (spinor matrix of size eigen_vector_length x m)
-    cudaColorSpinorField *Ap0; //aux arrays
-    cudaColorSpinorField *tmp0;//aux arrays
+    cudaColorSpinorField *Ap0; //aux arrays??
+    cudaColorSpinorField *tmp0;//aux arrays??
+    bool init;
 
   public:
     EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, cudaColorSpinorField *vm, SolverParam &param, TimeProfile &profile);

@@ -14,7 +14,7 @@
 
 #include <iostream>
 
-//#include <magma.h> //for small lattice sizes better use lapack (and host resources)...
+#include <magma.h> //for small lattice sizes better use lapack (and host resources)...
 
 /*
 Base eigCG(nev, m) algorithm:
@@ -33,8 +33,12 @@ namespace quda {
 
   EigCG::~EigCG() {
 
-     Vm.destroy();
+    Vm.destroy();
 
+    if(init) {
+      delete Ap0;
+      delete tmp0;
+    }
   }
 
 
@@ -73,28 +77,6 @@ namespace quda {
       param.true_res_hq = 0.0;
       return;
     }
-
-    //init (set to zero) host Lanczos matrice, and its eigenvalue/vector arrays:
-    Complex *hTm     = new Complex[m*m];//VH A V
-    Complex *hTvecm0 = new Complex[m*m];//eigenvectors of T[m,  m  ]
-    Complex *hTvecm1 = new Complex[m*m];//eigenvectors of T[m-1,m-1]
-    double  *hTvalm0 = new double[m];   //eigenvalues of T[m,  m  ]
-    double  *hTvalm1 = new double[m];   //eigenvalues of T[m-1,m-1]
-
-    //init device Lanczos matrix, and its eigenvalue/vector arrays:
-    cuDoubleComplex *dTm;     //VH A V
-    cuDoubleComplex *dTvecm0; //eigenvectors of T[m,  m  ]
-    cuDoubleComplex *dTvecm1; //eigenvectors of T[m-1,m-1]
-
-    //allocate dT etc. buffers on GPU:
-    cudaMalloc(&dTm, m*m*sizeof(cuDoubleComplex));//  
-    cudaMalloc(&dTvecm0, m*m*sizeof(cuDoubleComplex));  
-    cudaMalloc(&dTvecm1, m*m*sizeof(cuDoubleComplex));  
-
-    //set everything to zero:
-    cudaMemset(dTm, 0, m*m*sizeof(cuDoubleComplex));
-    cudaMemset(dTvecm0, 0, m*m*sizeof(cuDoubleComplex));
-    cudaMemset(dTvecm1, 0, m*m*sizeof(cuDoubleComplex));
 
     cudaColorSpinorField r(b);
 
@@ -173,14 +155,44 @@ namespace quda {
     profile.Start(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
 
+//EigCG specific code:
+    if (!init) {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.setPrecision(param.precision_sloppy);
+      Ap0  = new cudaColorSpinorField(x, csParam);
+      csParam.setPrecision(Vm.Precision());//must be the same precision as Vm
+      tmp0 = new cudaColorSpinorField(x, csParam); 
+      init = true;
+    }
+
+    //init (set to zero) host Lanczos matrice, and its eigenvalue/vector arrays:
+    Complex *hTm     = new Complex[m*m];//VH A V
+    Complex *hTvecm0 = new Complex[m*m];//eigenvectors of T[m,  m  ]
+    Complex *hTvecm1 = new Complex[m*m];//eigenvectors of T[m-1,m-1]
+    double  *hTvalm0 = new double[m];   //eigenvalues of T[m,  m  ]
+    double  *hTvalm1 = new double[m];   //eigenvalues of T[m-1,m-1]
+
+    //init device Lanczos matrix, and its eigenvalue/vector arrays:
+    cuDoubleComplex *dTm;     //VH A V
+    cuDoubleComplex *dTvecm0; //eigenvectors of T[m,  m  ]
+    cuDoubleComplex *dTvecm1; //eigenvectors of T[m-1,m-1]
+
+    //allocate dT etc. buffers on GPU:
+    cudaMalloc(&dTm, m*m*sizeof(cuDoubleComplex));//  
+    cudaMalloc(&dTvecm0, m*m*sizeof(cuDoubleComplex));  
+    cudaMalloc(&dTvecm1, m*m*sizeof(cuDoubleComplex));  
+
+    //set everything to zero:
+    cudaMemset(dTm, 0, m*m*sizeof(cuDoubleComplex));
+    cudaMemset(dTvecm0, 0, m*m*sizeof(cuDoubleComplex));
+    cudaMemset(dTvecm1, 0, m*m*sizeof(cuDoubleComplex));
+
     //magma initialization:
     magma_init();
     magma_int_t info = -1;
 
-    //magma specific objects:
-    char  jobz   = 'V';
-    char  uplo   = 'U';
-
+    //magma params/objects:
     magma_int_t lddTm      = m;//dTm (device)ld (may include padding)
     magma_int_t ldhTm      = m;//hTm (host)ld    (may include padding)
 
@@ -223,6 +235,7 @@ namespace quda {
 
     double alpha0, beta0;//EigCG additional parameters
 
+//Begin CG iterations:
     int k=0, l=0;
     
     PrintStats("eigCG", nev, m, k, r2, b2, heavy_quark_res);
@@ -322,9 +335,9 @@ namespace quda {
            //Compute Ap0 = Ap - beta*Ap0:
            axpyCuda(-beta, Ap0, Ap);//mind precision...
            
-           copyCuda(tmp, Ap0);//make full precision here.
+           copyCuda(tmp0, Ap0);//make full precision here.
 	   for (int i = 0; i < l; i++){
-	     Complex s = cDotProductCuda(Vm.Eigenvec(i),tmp);
+	     Complex s = cDotProductCuda(Vm.Eigenvec(i),tmp0);
 	     hTm[i+l*m] = s/sqrt(rho);
 	     hTm[l+i*m] = conj(s)/sqrt(rho);
 	   }
@@ -341,7 +354,8 @@ namespace quda {
          copyCuda(Vm.Eigenvec(l), r_sloppy);//convert arrays!
          axCuda(scale, Vm.Eigenvec(l));//
       }
-//end eigCG part 
+//end of eigCG part 
+
       double sigma;
       bool breakdown = false;
       r2_old = r2;
@@ -389,7 +403,7 @@ namespace quda {
 	// break-out check if we have reached the limit of the precision
 	static int resIncrease = 0;
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
-	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
+	  warningQuda("EigCG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
 	  k++;
 	  rUpdate++;
 	  if (++resIncrease > maxResIncrease) break; 
@@ -419,9 +433,10 @@ namespace quda {
       breakdown = false;
       k++;
 
-      PrintStats("CG", k, r2, b2, heavy_quark_res);
+      PrintStats("EigCG", k, r2, b2, heavy_quark_res);
     }
 
+//Shutdown magma:
     magma_free(dTauL);
     magma_free(dTauR);
 
@@ -481,6 +496,7 @@ namespace quda {
       delete x_sloppy;
     }
 
+//Clean EigCG resources:
     delete[] hTm;
     delete[] hTvecm0;
     delete[] hTvecm1;
