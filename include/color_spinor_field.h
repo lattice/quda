@@ -18,7 +18,6 @@ namespace quda {
 
     QudaTwistFlavorType twistFlavor; // used by twisted mass
 
-    QudaSiteSubset siteSubset; // Full, even or odd
     QudaSiteOrder siteOrder; // defined for full fields
   
     QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
@@ -32,14 +31,13 @@ namespace quda {
 
   ColorSpinorParam()
     : LatticeFieldParam(), nColor(0), nSpin(0), twistFlavor(QUDA_TWIST_INVALID), 
-      siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
-      fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
-      create(QUDA_INVALID_FIELD_CREATE) { ; }
+      siteOrder(QUDA_INVALID_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
+      gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE) { ; }
   
     // used to create cpu params
   ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
     : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
-      twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
+      twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
       create(QUDA_REFERENCE_FIELD_CREATE), v(V) { 
 
@@ -87,11 +85,11 @@ namespace quda {
   ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param) 
     : LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
       nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor), 
-      siteSubset(cpuParam.siteSubset), siteOrder(QUDA_EVEN_ODD_SITE_ORDER), 
-      fieldOrder(QUDA_INVALID_FIELD_ORDER), 
+      siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
       gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
       create(QUDA_COPY_FIELD_CREATE), v(0)
       {
+	siteSubset = cpuParam.siteSubset;
 	fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
 	  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
       }
@@ -326,6 +324,13 @@ namespace quda {
 		   const int dagger, cudaStream_t *stream);
     void unpackGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
 		     const int dagger, cudaStream_t* stream);
+
+    void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
+	      double a=0, double b=0);
+    void gather(int nFace, int dagger, int dir);
+    void commsStart(int nFace, int dir);
+    int commsQuery(int nFace, int dir); 
+    void scatter(int nFace, int dagger, int dir);
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }

@@ -548,7 +548,7 @@ namespace quda {
     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
     int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
-
+    
     if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
@@ -670,6 +670,105 @@ namespace quda {
       cudaMemcpyAsync(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
     }
 
+  }
+
+  cudaStream_t *stream;
+
+  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
+				  bool zeroCopyPack, double a, double b) {
+    createComms();
+
+    // FIXME - support arbitrary Nface packing
+    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
+      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
+
+    allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated  
+    stream = stream_p;
+    
+    if (zeroCopyPack) {
+      void *my_face_d;
+      cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
+      if (a == 0.0 && b==0.0)
+	packGhost((QudaParity)parity, dagger, &stream[0], my_face_d);
+      else
+	packTwistedGhost((QudaParity)parity, dagger, a, b, &stream[0], my_face_d);	
+    } else {
+      if (a == 0.0 && b==0.0)
+	packGhost((QudaParity)parity, dagger, &stream[Nstream-1]);
+      else
+	packTwistedGhost((QudaParity)parity, dagger, a, b, &stream[Nstream-1]);
+    }
+  }
+
+  void cudaColorSpinorField::gather(int nFace, int dagger, int dir) {
+    // FIXME - support arbitrary Nface packing
+    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
+      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
+
+    int dim = dir/2;
+    if(!commDimPartitioned(dim)) return;
+
+    if (dir%2==0) {
+      // backwards copy to host
+      sendGhost(my_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+0]); 
+    } else {
+      // forwards copy to host
+      sendGhost(my_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+1]);
+    }
+  }
+
+  void cudaColorSpinorField::commsStart(int nFace, int dir) {
+    // FIXME - support arbitrary Nface packing
+    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
+      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
+
+    int dim = dir / 2;
+    if(!commDimPartitioned(dim)) return;
+    
+    if (dir%2 == 0) { // sending backwards
+      // Prepost receive
+      comm_start(mh_recv_fwd[nFace-1][dim]);
+      comm_start(mh_send_back[nFace-1][dim]);
+    } else { //sending forwards
+      // Prepost receive
+      comm_start(mh_recv_back[nFace-1][dim]);
+      // Begin forward send
+      comm_start(mh_send_fwd[nFace-1][dim]);
+    }
+  }
+
+  int cudaColorSpinorField::commsQuery(int nFace, int dir) {
+    // FIXME - support arbitrary Nface packing
+    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
+      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
+
+    int dim = dir / 2;
+    if(!commDimPartitioned(dim)) return 0;
+    
+    if(dir%2==0) {
+      if (comm_query(mh_recv_fwd[nFace-1][dim]) && comm_query(mh_send_back[nFace-1][dim])) return 1;
+    } else {
+      if (comm_query(mh_recv_back[nFace-1][dim]) && comm_query(mh_send_fwd[nFace-1][dim])) return 1;
+    }
+    
+    return 0;
+  }
+
+  void cudaColorSpinorField::scatter(int nFace, int dagger, int dir)
+  {
+    // FIXME - support arbitrary Nface packing
+    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
+      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
+
+    int dim = dir/2;
+    if(!commDimPartitioned(dim)) return;
+    
+    // both scattering occurances now go through the same stream
+    if (dir%2==0) {// receive from forwards
+      unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/]);
+    } else { // receive from backwards
+      unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
+    }
   }
 
   // Return the location of the field
