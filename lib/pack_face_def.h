@@ -1192,7 +1192,7 @@ class PackFace : public Tunable {
     unsigned int threads = 0;
     for (int i=0; i<4; i++) {
       if (!dslashParam.commDim[i]) continue;
-      if ((i==3 && !(kernelPackT || twistPack))) continue; 
+      if ((i==3 && !(getKernelPackT() || getTwistPack()))) continue; 
       threads += 2*nFace*in->GhostFace()[i]; // 2 for forwards and backwards faces
     }
     return threads;
