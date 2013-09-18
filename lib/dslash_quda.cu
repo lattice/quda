@@ -1200,7 +1200,11 @@ namespace quda {
    */
   void inline initDslashCommsPattern() {
     for (int i=0; i<Nstream-1; i++) {
+#ifndef GPU_COMMS
       gatherCompleted[i] = 0;
+#else
+      gatherCompleted[i] = 1;      
+#endif
       commsCompleted[i] = 0;
       dslashCompleted[i] = 0;
     }
@@ -1224,7 +1228,11 @@ namespace quda {
     // total.  Used for exiting the while loop
     commDimTotal = 0;
     for (int i=3; i>=0; i--) commDimTotal += dslashParam.commDim[i];
+#ifndef GPU_COMMS
     commDimTotal *= 4; // 2 from pipe length, 2 from direction
+#else
+    commDimTotal *= 2; // 2 from pipe length, 2 from direction
+#endif
   }
 
 #define PROFILE(f, profile, idx)		\
@@ -1247,7 +1255,8 @@ namespace quda {
 
     bool pack = false;
     for (int i=3; i>=0; i--) 
-      if (dslashParam.commDim[i] && (i!=3 || kernelPackT || twistPack)) { pack = true; break; }
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
+	{ pack = true; break; }
 
     // Initialize pack from source spinor
     PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams, twist_a, twist_b), 
@@ -1289,15 +1298,15 @@ namespace quda {
 	if (!dslashParam.commDim[i]) continue;
       
 	for (int dir=1; dir>=0; dir--) {
-	
+
 	  // Query if gather has completed
 	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
-	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
-		    profile, QUDA_PROFILE_EVENT_QUERY);
-
 	    //CUresult event_test;
 	    //event_test = cuEventQuery(gatherEnd[2*i+dir]);
 	    //if (CUDA_SUCCESS == event_test) {
+	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
+		    profile, QUDA_PROFILE_EVENT_QUERY);
+
 	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
@@ -1354,6 +1363,10 @@ namespace quda {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
     profile.Start(QUDA_PROFILE_TOTAL);
 
+#ifdef GPU_COMMS
+    if (!getKernelPackT()) errorQuda("Kernel packing required for direct GPU communication");
+#endif
+
     dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
@@ -1365,13 +1378,12 @@ namespace quda {
 
     bool pack = false;
     for (int i=3; i>=0; i--) 
-      if (dslashParam.commDim[i] && (i!=3 || kernelPackT || twistPack)) { pack = true; break; }
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
+	{ pack = true; break; }
 
     // Initialize pack from source spinor
-    if (!twistPack) {
-      PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, streams, twist_a, twist_b),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
+    PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, streams, twist_a, twist_b),
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing
@@ -1379,6 +1391,7 @@ namespace quda {
 	      profile, QUDA_PROFILE_EVENT_RECORD);
     }
 
+#ifndef GPU_COMMS
     for(int i = 3; i >=0; i--){
       if (!dslashParam.commDim[i]) continue;
 
@@ -1396,12 +1409,25 @@ namespace quda {
 		profile, QUDA_PROFILE_EVENT_RECORD);
       }
     }
-#endif
+#endif // GPU_COMMS
+
+#endif // MULTI_GPU
 
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
 #ifdef MULTI_GPU
     initDslashCommsPattern();
+
+#ifdef GPU_COMMS
+    cudaEventSynchronize(packEnd[0]);
+    for (int i=3; i>=0; i--) {
+      if (!dslashParam.commDim[i]) continue;
+      
+      for (int dir=1; dir>=0; dir--) {	
+	PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir), profile, QUDA_PROFILE_COMMS_START);
+      }
+    }
+#endif
 
     int completeSum = 0;
     while (completeSum < commDimTotal) {
@@ -1410,20 +1436,19 @@ namespace quda {
       
 	for (int dir=1; dir>=0; dir--) {
 	
+#ifndef GPU_COMMS
 	  // Query if gather has completed
 	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
 	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
 		    profile, QUDA_PROFILE_EVENT_QUERY);
 
-	    //CUresult event_test;
-	    //event_test = cuEventQuery(gatherEnd[2*i+dir]);
-	    //if (CUDA_SUCCESS == event_test) {
 	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
 	      PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir), profile, QUDA_PROFILE_COMMS_START);
 	    }
 	  }
+#endif
 	
 	  // Query if comms has finished
 	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
@@ -1436,25 +1461,29 @@ namespace quda {
 	    
 	      // Scatter into the end zone
 	      // Both directions use the same stream
+#ifndef GPU_COMMS
 	      PROFILE(inSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir), 
 		      profile, QUDA_PROFILE_SCATTER);
+#endif
 	    }
 	  }
 
-	}
+	} // dir=0,1
 	 
 	// enqueue the boundary dslash kernel as soon as the scatters have been enqueued
 	if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
 	  // Record the end of the scattering
+#ifndef GPU_COMMS
 	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
 		  profile, QUDA_PROFILE_EVENT_RECORD);
 
-	  dslashParam.kernel_type = static_cast<KernelType>(i);
-	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-	  
 	  // wait for scattering to finish and then launch dslash
 	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
 		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+#endif
+
+	  dslashParam.kernel_type = static_cast<KernelType>(i);
+	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 	  
 	  // all faces use this stream
 	  PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
