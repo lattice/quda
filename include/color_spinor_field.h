@@ -281,6 +281,15 @@ namespace quda {
     void loadSpinorField(const ColorSpinorField &src);
     void saveSpinorField (ColorSpinorField &src) const;
 
+    /** Whether we have initialized communication for this field */
+    bool initComms;
+
+    /** Create the communication handlers and buffers */
+    void createComms();
+
+    /** Destroy the communication handlers and buffers */
+    void destroyComms();
+
   public:
     //cudaColorSpinorField();
     cudaColorSpinorField(const cudaColorSpinorField&);

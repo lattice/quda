@@ -107,13 +107,6 @@ namespace quda {
     /** The number of dimensions we partition for communication */
     int nDimComms;
 
-    /**
-       The number of degrees of freedom per site for the given field.
-       Currently assumes spin projection of a Wilson-like field (so
-       half the number of degrees of freedom).
-    */
-    int Ndof;
-
     /* 
        The need for persistent message handlers (for GPUDirect support)
        means that we allocate different message handlers for each number of
@@ -142,15 +135,6 @@ namespace quda {
     /** Message handles for sending backwards */
     MsgHandle ***mh_send_back;
     
-    /** Whether we have initialized communication for this field */
-    bool initComms;
-
-    /** Create the communication handlers and buffers */
-    void createComms();
-
-    /** Destroy the communication handlers and buffers */
-    void destroyComms();
-
   public:
     LatticeField(const LatticeFieldParam &param);
     virtual ~LatticeField();

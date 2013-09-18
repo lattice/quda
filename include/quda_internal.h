@@ -23,6 +23,9 @@
 #include <qmp.h>
 #endif
 
+// Experimental: whether we are communicating directly to/from GPU memory
+#define GPU_COMMS
+
 #define MAX_SHORT 32767.0f
 
 // The "Quda" prefix is added to avoid collisions with other libraries.
