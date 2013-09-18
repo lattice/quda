@@ -691,7 +691,7 @@ void endQuda(void)
 
   saveTuneCache(getVerbosity());
 
-#ifndef USE_QDPJIT
+#if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
   // end this CUDA context
   cudaDeviceReset();
 #endif
@@ -940,6 +940,9 @@ namespace quda {
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+#ifdef GPU_COMMS
+  setKernelPackT(true); // for direct GPU communication must use packing currently
+#endif
 
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
@@ -1008,6 +1011,10 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   pushVerbosity(inv_param->verbosity);
 
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+#ifdef GPU_COMMS
+  setKernelPackT(true); // for direct GPU communication must use packing currently
+#endif
+
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
   if (cloverPrecise == NULL && inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) 
     errorQuda("Clover field not allocated");
@@ -1079,6 +1086,9 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   pushVerbosity(inv_param->verbosity);
 
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+#ifdef GPU_COMMS
+  setKernelPackT(true); // for direct GPU communication must use packing currently
+#endif
 
   if (!initialized) errorQuda("QUDA not initialized");
   if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
@@ -1246,6 +1256,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+#ifdef GPU_COMMS
+  setKernelPackT(true); // for direct GPU communication must use packing currently
+#endif
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
 
@@ -1479,6 +1492,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.Start(QUDA_PROFILE_TOTAL);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+#ifdef GPU_COMMS
+  setKernelPackT(true); // for direct GPU communication must use packing currently
+#endif
 
   if (!initialized) errorQuda("QUDA not initialized");
   // check the gauge fields have been created
