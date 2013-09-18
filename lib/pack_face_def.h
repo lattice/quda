@@ -1821,18 +1821,26 @@ void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, const int dagger,
   } 
 }
 
-void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, const cudaStream_t &stream)
+void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, 
+	      const cudaStream_t &stream, double a, double b)
 {
   int nDimPack = 0;
   for (int dim=0; dim<4; dim++) {
     if(!dslashParam.commDim[dim]) continue;
-    if (dim != 3 || getKernelPackT()) nDimPack++;
+    if (dim != 3 || getKernelPackT() || a != 0.0 || b!= 0.0) nDimPack++;
   }
   if (!nDimPack) return; // if zero then we have nothing to pack 
 
   // Need to update this logic for other multi-src dslash packing
   if (in.Nspin() == 1) {
     packFaceAsqtad(ghost_buf, in, dagger, parity, stream);
+  } else if (a!=0.0 || b!=0.0) {
+    // Need to update this logic for other multi-src dslash packing
+    if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS) {
+      packTwistedFaceWilson(ghost_buf, in, dagger, parity, a, b, stream);
+    } else {
+      errorQuda("Cannot perform twisted packing for the spinor.");
+    }
   } else if (in.Ndim() == 5) {
     if(in.TwistFlavor() == QUDA_TWIST_INVALID) {
       packFaceDW(ghost_buf, in, dagger, parity, stream);
@@ -1842,24 +1850,6 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const
   } else {
     packFaceWilson(ghost_buf, in, dagger, parity, stream);
   }
-}
-
-void packTwistedFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, double a, double b, const cudaStream_t &stream)
-{
-  int nDimPack = 0;
-  for (int dim=0; dim<4; dim++) {
-    if(!dslashParam.commDim[dim]) continue;
-    nDimPack++;
-  }
-  if (!nDimPack) return; // if zero then we have nothing to pack 
-
-  // Need to update this logic for other multi-src dslash packing
-  if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS) {
-    packTwistedFaceWilson(ghost_buf, in, dagger, parity, a, b, stream);
-  } else {
-    errorQuda("Cannot perform twisted packing for the spinor.");
-  }
-
 }
 
 #endif // MULTI_GPU

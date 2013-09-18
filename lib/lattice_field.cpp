@@ -64,6 +64,7 @@ namespace quda {
 	Ndof /= csField.Nspin() == 4 ? 2 : 1;
       } else { // FIXME - generalize for all field types
 	errorQuda("Not supported field type in createComms");
+	Ndof = 0;
       }
 
       for (int i=0; i<nDimComms; i++) {

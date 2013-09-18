@@ -1250,13 +1250,8 @@ namespace quda {
       if (dslashParam.commDim[i] && (i!=3 || kernelPackT || twistPack)) { pack = true; break; }
 
     // Initialize pack from source spinor
-    if (!twistPack) {
-      PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams), 
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {	
-      PROFILE(face->pack(*inSpinor, 1-parity, dagger, twist_a, twist_b, streams), 
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
+    PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams, twist_a, twist_b), 
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing
@@ -1498,13 +1493,8 @@ namespace quda {
 	    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
     // Initialize pack from source spinor
-    if (!twistPack) {
-      PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams, true), 
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {	
-      PROFILE(face->pack(*inSpinor, 1-parity, dagger, twist_a, twist_b, streams, true), 
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
+    PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams, true, twist_a, twist_b), 
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     // Record the end of the packing
     PROFILE(cudaEventRecord(packEnd[0], streams[0]), 

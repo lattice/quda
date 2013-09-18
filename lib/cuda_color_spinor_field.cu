@@ -517,25 +517,13 @@ namespace quda {
 
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const QudaParity parity, const int dagger, 
-				       cudaStream_t *stream, void *buffer) 
+				       cudaStream_t *stream, void *buffer, double a, double b) 
   {
 #ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer;
-    packFace(packBuffer, *this, dagger, parity, *stream); 
+    packFace(packBuffer, *this, dagger, parity, *stream, a, b); 
 #else
     errorQuda("packGhost not built on single-GPU build");
-#endif
-
-  }
-
-  void cudaColorSpinorField::packTwistedGhost(const QudaParity parity, const int dagger, 
-					      double a, double b, cudaStream_t *stream, void *buffer) 
-  {
-#ifdef MULTI_GPU
-    void *packBuffer = buffer ? buffer : ghostFaceBuffer;
-    packTwistedFace(packBuffer, *this, dagger, parity, a, b, *stream); 
-#else
-    errorQuda("packTwistedGhost not built on single-GPU build");
 #endif
 
   }
@@ -688,15 +676,9 @@ namespace quda {
     if (zeroCopyPack) {
       void *my_face_d;
       cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
-      if (a == 0.0 && b==0.0)
-	packGhost((QudaParity)parity, dagger, &stream[0], my_face_d);
-      else
-	packTwistedGhost((QudaParity)parity, dagger, a, b, &stream[0], my_face_d);	
+      packGhost((QudaParity)parity, dagger, &stream[0], my_face_d, a, b);
     } else {
-      if (a == 0.0 && b==0.0)
-	packGhost((QudaParity)parity, dagger, &stream[Nstream-1]);
-      else
-	packTwistedGhost((QudaParity)parity, dagger, a, b, &stream[Nstream-1]);
+      packGhost((QudaParity)parity, dagger, &stream[Nstream-1], 0, a, b);
     }
   }
 

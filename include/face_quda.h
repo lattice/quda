@@ -76,21 +76,11 @@ namespace quda {
        @param dagger Whether the operator for which we are applying is the Hermitian conjugate or not
        @param stream The stream to which the packing kernel will be issued
        @param zeroCopyPack Whether we are packing to a device buffer or packing straight to host memory
+       @param a Twisted mass parameter (default=0)
+       @param b Twisted mass parameter (Default=0)
      */
     void pack(quda::cudaColorSpinorField &in, int parity, int dagger, 
-	      cudaStream_t *stream, bool zeroCopyPack=false);
-    /**
-       Pack the cudaColorSpinorField's ghost zone into contiguous buffers (twisted mass variant)
-       @param in The cudaColorSpinorField whose ghost zone we are extracting
-       @param parity The parity of this field
-       @param dagger Whether the operator for which we are applying is the Hermitian conjugate or not
-       @param a Twisted mass parameter
-       @param b Twisted mass parameter
-       @param stream The stream to which the packing kernel will be issued
-       @param zeroCopyPack Whether we are packing to a device buffer or packing straight to host memory
-     */
-    void pack(quda::cudaColorSpinorField &in, int parity, int dagger, 
-	      double a, double b, cudaStream_t *stream, bool zeroCopyPack=false);
+	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
 
     void gather(quda::cudaColorSpinorField &in, int dagger, int dir);
 

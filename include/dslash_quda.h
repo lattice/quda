@@ -87,9 +87,7 @@ namespace quda {
                        const QudaTwistGamma5Type);
 
   // face packing routines
-  void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, const cudaStream_t &stream);
-
-  void packTwistedFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, double a, double b, const cudaStream_t &stream);
+  void packFace(void *ghost_buf, cudaColorSpinorField &in, const int dagger, const int parity, const cudaStream_t &stream, double a=0.0, double b=0.0);
 
 }
 
