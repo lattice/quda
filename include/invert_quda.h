@@ -357,8 +357,7 @@ namespace quda {
     const DiracMatrix &matSloppy;
 
     cudaColorSpinorField *Vm;  //eigenvector set (spinor matrix of size eigen_vector_length x m)
-    cudaColorSpinorField *Ap0; //aux arrays??
-    cudaColorSpinorField *tmp0;//aux arrays??
+    cudaColorSpinorField *v0;//aux arrays??
     bool init;
 
   public:

@@ -9,12 +9,21 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <sys/time.h>
+#include <string.h>
 
 #include <face_quda.h>
 
 #include <iostream>
 
-#include <magma.h> //for small lattice sizes better use lapack (and host resources)...
+#ifdef REAL
+#undef REAL //due to conflicts with magma
+#endif
+
+#include "magma.h"
+
+#ifndef MAX
+#define MAX(a, b) (a > b) ? a : b;
+#endif
 
 /*
 Base eigCG(nev, m) algorithm:
@@ -33,32 +42,29 @@ namespace quda {
 
   EigCG::~EigCG() {
 
-    Vm.destroy();
+    //Vm->destroy();
 
-    if(init) {
-      delete Ap0;
-      delete tmp0;
-    }
+    if(init) delete v0;
   }
 
 
-  void compute_2nev_Ritz_vectors(const cuDoubleComplex dQ){
-       const Complex cone     = Complex(1.0, 0.0);
-       const Complex czero    = Complex(0.0, 0.0);
+void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, const int m, const int _2nev){
+       magmaDoubleComplex cone     =  MAGMA_Z_MAKE(1.0, 0.0);
+       magmaDoubleComplex czero    =  MAGMA_Z_MAKE(0.0, 0.0);
    
        magma_trans_t transV   = 'N';
-       magma_trans_t transC   = 'N';
+       magma_trans_t transQ   = 'N';
  
        magma_int_t ldV       = Vm.Eigenvec(0).Length();
        magma_int_t ldQ       = m;//not vsize (= 2*nev) 
        
-       magmaDoubleComplex *V = Vm.V(); 
+       magmaDoubleComplex *V = (magmaDoubleComplex*)Vm.V(); 
        magmaDoubleComplex *Tmp;
-       magma_malloc(&Tmp, ldV*m*sizeof(magmaDoubleComplex)); 
+       magma_malloc((void**)&Tmp, ldV*m*sizeof(magmaDoubleComplex)); 
 
        cudaMemset(Tmp, 0, ldV*m*sizeof(magmaDoubleComplex)); 
-       magmablas_zgemm(transV, transQ, lddv, 2*nev, m, one, V, ldV, C, ldQ, zero, Tmp, ldV);//in colour-major format
-       cudaMemcpy(V, Tmp, ldV*(2*nev)*sizeof(magmaDoubleComplex), cudaMemcpyDefault); 
+       magmablas_zgemm(transV, transQ, ldV, _2nev, m, (magmaDoubleComplex)cone, V, ldV, dQ, ldQ, (magmaDoubleComplex)czero, Tmp, ldV);//in colour-major format
+       cudaMemcpy(V, Tmp, ldV*(_2nev)*sizeof(magmaDoubleComplex), cudaMemcpyDefault); 
 
        magma_free(Tmp);
   }
@@ -159,12 +165,17 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.setPrecision(param.precision_sloppy);
-      Ap0  = new cudaColorSpinorField(x, csParam);
-      csParam.setPrecision(Vm.Precision());//must be the same precision as Vm
-      tmp0 = new cudaColorSpinorField(x, csParam); 
+      //csParam.setPrecision(param.precision_sloppy);
+      //Ap0  = new cudaColorSpinorField(x, csParam);
+      csParam.setPrecision(Vm->Precision());//must be the same precision as Vm
+      v0 = new cudaColorSpinorField(x, csParam); 
       init = true;
     }
+
+    cudaColorSpinorField &Ap0 = *tmp2_p;
+
+    const int m   = param.m;
+    const int nev = param.nev;
 
     //init (set to zero) host Lanczos matrice, and its eigenvalue/vector arrays:
     Complex *hTm     = new Complex[m*m];//VH A V
@@ -238,7 +249,7 @@ namespace quda {
 //Begin CG iterations:
     int k=0, l=0;
     
-    PrintStats("eigCG", nev, m, k, r2, b2, heavy_quark_res);
+    PrintStats("eigCG", k, r2, b2, heavy_quark_res);
 
     int steps_since_reliable = 1;
 
@@ -248,7 +259,7 @@ namespace quda {
       if (l == m) copyCuda(Ap0,Ap);
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
-      alpha0 = alpha;
+      alpha0 = alpha;//??
       pAp    = reDotProductCuda(p, Ap);
       alpha  = r2 / pAp; 
       
@@ -268,7 +279,7 @@ namespace quda {
            //simplify this:
            magma_zheevd_gpu('V', 'U', m, 
                             (magmaDoubleComplex*)dTvecm0, lddTm, 
-                             hTvalm0, hTvecm0, ldhTm, 
+                             hTvalm0, (magmaDoubleComplex*)hTvecm0, ldhTm, 
                              lwork, llwork, rwork, lrwork, iwork, liwork, &info);
            if(info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
 
@@ -280,15 +291,15 @@ namespace quda {
            cudaMemcpy(dTvecm1, dTm, m*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
            magma_zheevd_gpu('V', 'U', m_1, 
                             (magmaDoubleComplex*)dTvecm1, lddTm, 
-                            hTvalm1, hTvecm1, ldhTm, 
+                            hTvalm1, (magmaDoubleComplex*)hTvecm1, ldhTm, 
                             lwork, llwork, rwork, lrwork, iwork, liwork, &info);
            if(info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
 
            //add last row with zeros (coloumn-major format of the matrix re-interpreted as 2D row-major formated):
-           cudaMemset2D(&dTvecm1[(m_1)], m*sizeof(cuComplexDouble), 0, sizeof(cuComplexDouble),  m_1);
+           cudaMemset2D(&dTvecm1[m_1], m*sizeof(cuDoubleComplex), 0, sizeof(cuDoubleComplex),  m_1);
 
            //attach nev old vectors to nev new vectors (note 2*nev < m):
-           cudaMemcpy(&dTvecm0[nev*m], dTvecm1, nev*m*sizeof(cuComplexDouble), cudaMemcpyDefault);
+           cudaMemcpy(&dTvecm0[nev*m], dTvecm1, nev*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
 
            //Orthogonalize 2*nev vectors:
            l = 2 * nev;
@@ -300,11 +311,11 @@ namespace quda {
            memcpy    (hTauL, hTauR, htsize*sizeof(magmaDoubleComplex));            
 
            //compute TQ product:
-           magma_zunmqr_gpu( 'R', 'N', m, m, l, dTvecm0, lddTm, hTauR, dTm, lddTm, W, sizeLR, dTauR, nb, &info); 
+           magma_zunmqr_gpu( 'R', 'N', m, m, l, dTvecm0, lddTm, hTauR, dTm, lddTm, W, sideLR, dTauR, nb, &info); 
            if(info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1);
               	
            //compute QHT product:
-           magma_zunmqr_gpu( 'L', 'C', m, m, l, dTvecm0, lddTm, hTauL, dTm, lddTm, W, sizeLR, dTauL, nb, &info);
+           magma_zunmqr_gpu( 'L', 'C', m, m, l, dTvecm0, lddTm, hTauL, dTm, lddTm, W, sideLR, dTauL, nb, &info);
            if(info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1);                 	
 
            //solve l=2*nev-dim eigenproblem:
@@ -313,46 +324,42 @@ namespace quda {
            liwork = 3 + 5*l;
            magma_zheevd_gpu('V', 'U', l, 
                             (magmaDoubleComplex*)dTm, lddTm, 
-                             hTvalm0, hTvecm0, ldhTm, 
+                             hTvalm0, (magmaDoubleComplex*)hTvecm0, ldhTm, 
                              lwork, llwork, rwork, lrwork, iwork, liwork, &info);
            if(info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
 
            //solve zero unused part of the eigenvectors in dTm (to complement each coloumn...):
-           cudaMemset2D(&dTm[l], m*sizeof(cuDoubleComplex), 0, (m-l)*sizeof(cudDoubleComplex),  l);//check..
+           cudaMemset2D(&dTm[l], m*sizeof(cuDoubleComplex), 0, (m-l)*sizeof(cuDoubleComplex),  l);//check..
         
-           //Compute dTevecm1=dTevecm*dTevecm1 (C * z_i):
+           //Compute dTm=dTevecm0*dTm (Q * Z):
            //(compute QT product):
-           magma_zunmqr_gpu('L', 'N', m, m, l, dTvecm0, lddTm, hTauL, dTm, lddTm, W, sizeLR, dTauL, nb, &info);
+           magma_zunmqr_gpu('L', 'N', m, m, l, dTvecm0, lddTm, hTauL, dTm, lddTm, W, sideLR, dTauL, nb, &info);
            if(info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1); 
 
-           //Compute Ritz vectors : V=V(n, m)*dTvecm0(m, l)
-           compute_2nev_Ritz_vectors(dTvecm0);
+           //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
+           compute_2nev_Ritz_vectors(*Vm, dTm, m, (2*nev));
            
            //Fill-up diagonal elements of the matrix T
            memset(hTm, 0, m*m*sizeof(Complex));
-    	   for (int i = 0; i < l; i++) hTm[i*m+i]= hTvalm[i];//fill-up diagonal
+    	   for (int i = 0; i < l; i++) hTm[i*m+i]= hTvalm0[i];//fill-up diagonal
 
            //Compute Ap0 = Ap - beta*Ap0:
            axpyCuda(-beta, Ap0, Ap);//mind precision...
            
-           copyCuda(tmp0, Ap0);//make full precision here.
+           copyCuda(*v0, Ap0);//make full precision here.
 	   for (int i = 0; i < l; i++){
-	     Complex s = cDotProductCuda(Vm.Eigenvec(i),tmp0);
-	     hTm[i+l*m] = s/sqrt(rho);
-	     hTm[l+i*m] = conj(s)/sqrt(rho);
+	     Complex s = cDotProductCuda(Vm->Eigenvec(i), *v0);
+	     hTm[i+l*m] = s/sqrt(r2);
+	     hTm[l+i*m] = conj(s)/sqrt(r2);
 	   }
          } else{ //no-RR branch:
-          //if (k > 0){
-            //hTm[(l-1)*m+l] = Complex(-sqrt(beta)/alpha0, 0.0);//'L' (!)
-            //hTm[l*m+(l-1)] = Complex(-sqrt(beta)/alpha0, 0.0);//'U' (!)
-          //}
             hTm[(l+1)*m+l] = Complex(-sqrt(beta)/alpha0, 0.0);//'U' (!)
             hTm[l*m+(l+1)] = Complex(-sqrt(beta)/alpha0, 0.0);//'L' (!)
          }//end of nev
          l += 1;
-         double scale = 1.0 / sqrt(rho);
-         copyCuda(Vm.Eigenvec(l), r_sloppy);//convert arrays!
-         axCuda(scale, Vm.Eigenvec(l));//
+         double scale = 1.0 / sqrt(r2);
+         copyCuda(Vm->Eigenvec(l), *r_sloppy);//convert arrays!
+         axCuda(scale, Vm->Eigenvec(l));//
       }
 //end of eigCG part 
 
@@ -428,7 +435,7 @@ namespace quda {
 	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
 	
 	steps_since_reliable = 0;
-      }
+      }//end of the reliable update
 
       breakdown = false;
       k++;
@@ -468,7 +475,7 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("CG: Reliable updates = %d\n", rUpdate);
+      printfQuda("EigCG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals
     mat(r, x, y);
@@ -478,8 +485,7 @@ namespace quda {
 #else
     param.true_res_hq = 0.0;
 #endif      
-
-    PrintSummary("CG", k, r2, b2);
+    PrintSummary("EigCG", k, r2, b2);
 
     // reset the flops counters
     quda::blas_flops = 0;
@@ -495,7 +501,6 @@ namespace quda {
       delete r_sloppy;
       delete x_sloppy;
     }
-
 //Clean EigCG resources:
     delete[] hTm;
     delete[] hTvecm0;
@@ -512,5 +517,6 @@ namespace quda {
 
     return;
   }
-
+//temporal hack redefine REAL from quda_intenal.h
+#define REAL(a) (*((double*)&a))
 } // namespace quda
