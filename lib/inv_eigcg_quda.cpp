@@ -48,7 +48,7 @@ namespace quda {
   }
 
 
-void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, const int m, const int _2nev){
+void restart_2nev_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, const int m, const int _2nev){
        magmaDoubleComplex cone     =  MAGMA_Z_MAKE(1.0, 0.0);
        magmaDoubleComplex czero    =  MAGMA_Z_MAKE(0.0, 0.0);
    
@@ -165,24 +165,20 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      //csParam.setPrecision(param.precision_sloppy);
-      //Ap0  = new cudaColorSpinorField(x, csParam);
       csParam.setPrecision(Vm->Precision());//must be the same precision as Vm
-      v0 = new cudaColorSpinorField(x, csParam); 
+      v0   = new cudaColorSpinorField(x, csParam); 
       init = true;
     }
 
     cudaColorSpinorField &Ap0 = *tmp2_p;
 
-    const int m   = param.m;
+    const int m   = param.m;//include pad , 64-bit aligned
     const int nev = param.nev;
 
     //init (set to zero) host Lanczos matrice, and its eigenvalue/vector arrays:
     Complex *hTm     = new Complex[m*m];//VH A V
-    Complex *hTvecm0 = new Complex[m*m];//eigenvectors of T[m,  m  ]
-    Complex *hTvecm1 = new Complex[m*m];//eigenvectors of T[m-1,m-1]
-    double  *hTvalm0 = new double[m];   //eigenvalues of T[m,  m  ]
-    double  *hTvalm1 = new double[m];   //eigenvalues of T[m-1,m-1]
+    Complex *hTvecm  = new Complex[m*m];//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
+    double  *hTvalm  = new double[m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
 
     //init device Lanczos matrix, and its eigenvalue/vector arrays:
     cuDoubleComplex *dTm;     //VH A V
@@ -195,7 +191,7 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
     cudaMalloc(&dTvecm1, m*m*sizeof(cuDoubleComplex));  
 
     //set everything to zero:
-    cudaMemset(dTm, 0, m*m*sizeof(cuDoubleComplex));
+    cudaMemset(dTm, 0, m*m*sizeof(cuDoubleComplex));//?
     cudaMemset(dTvecm0, 0, m*m*sizeof(cuDoubleComplex));
     cudaMemset(dTvecm1, 0, m*m*sizeof(cuDoubleComplex));
 
@@ -204,8 +200,7 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
     magma_int_t info = -1;
 
     //magma params/objects:
-    magma_int_t lddTm      = m;//dTm (device)ld (may include padding)
-    magma_int_t ldhTm      = m;//hTm (host)ld    (may include padding)
+    magma_int_t ldTm      = m;//hTm (host/device)ld (may include padding)
 
     magma_int_t nb    = magma_get_zhetrd_nb(m);
     magma_int_t m_1   = m-1;
@@ -259,27 +254,29 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
       if (l == m) copyCuda(Ap0,Ap);
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
-      alpha0 = alpha;//??
+      alpha0 = alpha;
       pAp    = reDotProductCuda(p, Ap);
       alpha  = r2 / pAp; 
       
 //begin eigCG part here:
       if(nev > 0){
-         if (k > 0) hTm[(l-1)*m+(l-1)] = Complex(1/alpha + beta0/alpha0, 0.0);
+         hTm[l*ldTm+l] = Complex(1/alpha + beta0/alpha0, 0.0);
          
          //Start Rayleigh-Ritz procedure here:
          if (l == m){
+           //Create host version of the Lanczos matrix:
+           cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);//how to refine it with streams??
+
            //solve m-dim eigenproblem:
            llwork = MAX(m + m*nb, 2*m + m*m); 
            lrwork = 1 + 5*m + 2*m*m;
            liwork = 3 + 5*m;
 
-           cudaMemcpy(dTm, hTm, m*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
-           cudaMemcpy(dTvecm0, dTm, m*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);//how to refine it with streams??
+           cudaMemcpy(dTvecm0, dTm, ldTm*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);//how to refine it with streams??
            //simplify this:
            magma_zheevd_gpu('V', 'U', m, 
-                            (magmaDoubleComplex*)dTvecm0, lddTm, 
-                             hTvalm0, (magmaDoubleComplex*)hTvecm0, ldhTm, 
+                            (magmaDoubleComplex*)dTvecm0, ldTm, 
+                             hTvalm, (magmaDoubleComplex*)hTvecm, ldTm, 
                              lwork, llwork, rwork, lrwork, iwork, liwork, &info);
            if(info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
 
@@ -288,34 +285,35 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
            llwork = MAX(m_1 + m_1*nb, 2*m_1 + m_1*m_1); 
            lrwork = 1 + 5*m_1 + 2*m_1*m_1;
            liwork = 3 + 5*m_1;
-           cudaMemcpy(dTvecm1, dTm, m*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
+
+           cudaMemcpy(dTvecm1, dTm, ldTm*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
            magma_zheevd_gpu('V', 'U', m_1, 
-                            (magmaDoubleComplex*)dTvecm1, lddTm, 
-                            hTvalm1, (magmaDoubleComplex*)hTvecm1, ldhTm, 
+                            (magmaDoubleComplex*)dTvecm1, ldTm, 
+                            hTvalm, (magmaDoubleComplex*)hTvecm, ldTm, 
                             lwork, llwork, rwork, lrwork, iwork, liwork, &info);
            if(info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
 
            //add last row with zeros (coloumn-major format of the matrix re-interpreted as 2D row-major formated):
-           cudaMemset2D(&dTvecm1[m_1], m*sizeof(cuDoubleComplex), 0, sizeof(cuDoubleComplex),  m_1);
+           cudaMemset2D(&dTvecm1[m_1], ldTm*sizeof(cuDoubleComplex), 0, sizeof(cuDoubleComplex),  m_1);
 
            //attach nev old vectors to nev new vectors (note 2*nev < m):
            cudaMemcpy(&dTvecm0[nev*m], dTvecm1, nev*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
 
            //Orthogonalize 2*nev vectors:
            l = 2 * nev;
-           magma_zgeqrf_gpu(m, l, dTvecm0, lddTm, hTauR, dTauR, &info);
+           magma_zgeqrf_gpu(m, l, dTvecm0, ldTm, hTauR, dTauR, &info);
            if(info != 0) printf("\nError in magma_zgeqrf_gpu, exit ...\n"), exit(-1);
 
-           //compute dTevecm1=QHTQ
+           //compute dTevecm0=QHTmQ
            cudaMemcpy(dTauL, dTauR, dtsize*sizeof(magmaDoubleComplex), cudaMemcpyDefault); 
            memcpy    (hTauL, hTauR, htsize*sizeof(magmaDoubleComplex));            
 
            //compute TQ product:
-           magma_zunmqr_gpu( 'R', 'N', m, m, l, dTvecm0, lddTm, hTauR, dTm, lddTm, W, sideLR, dTauR, nb, &info); 
+           magma_zunmqr_gpu( 'R', 'N', m, m, l, dTvecm0, ldTm, hTauR, dTm, ldTm, W, sideLR, dTauR, nb, &info); 
            if(info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1);
               	
            //compute QHT product:
-           magma_zunmqr_gpu( 'L', 'C', m, m, l, dTvecm0, lddTm, hTauL, dTm, lddTm, W, sideLR, dTauL, nb, &info);
+           magma_zunmqr_gpu( 'L', 'C', m, m, l, dTvecm0, ldTm, hTauL, dTm, ldTm, W, sideLR, dTauL, nb, &info);
            if(info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1);                 	
 
            //solve l=2*nev-dim eigenproblem:
@@ -323,25 +321,25 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
            lrwork = 1 + 5*l + 2*l*l;
            liwork = 3 + 5*l;
            magma_zheevd_gpu('V', 'U', l, 
-                            (magmaDoubleComplex*)dTm, lddTm, 
-                             hTvalm0, (magmaDoubleComplex*)hTvecm0, ldhTm, 
+                            (magmaDoubleComplex*)dTm, ldTm, 
+                             hTvalm, (magmaDoubleComplex*)hTvecm, ldTm, 
                              lwork, llwork, rwork, lrwork, iwork, liwork, &info);
            if(info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
 
            //solve zero unused part of the eigenvectors in dTm (to complement each coloumn...):
-           cudaMemset2D(&dTm[l], m*sizeof(cuDoubleComplex), 0, (m-l)*sizeof(cuDoubleComplex),  l);//check..
+           cudaMemset2D(&dTm[l], ldTm*sizeof(cuDoubleComplex), 0, (m-l)*sizeof(cuDoubleComplex),  l);//check..
         
            //Compute dTm=dTevecm0*dTm (Q * Z):
            //(compute QT product):
-           magma_zunmqr_gpu('L', 'N', m, m, l, dTvecm0, lddTm, hTauL, dTm, lddTm, W, sideLR, dTauL, nb, &info);
+           magma_zunmqr_gpu('L', 'N', m, m, l, dTvecm0, ldTm, hTauL, dTm, ldTm, W, sideLR, dTauL, nb, &info);
            if(info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1); 
 
            //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
-           compute_2nev_Ritz_vectors(*Vm, dTm, m, (2*nev));
+           restart_2nev_vectors(*Vm, dTm, m, (2*nev));//m->ldTm
            
            //Fill-up diagonal elements of the matrix T
-           memset(hTm, 0, m*m*sizeof(Complex));
-    	   for (int i = 0; i < l; i++) hTm[i*m+i]= hTvalm0[i];//fill-up diagonal
+           memset(hTm, 0, ldTm*m*sizeof(Complex));
+    	   for (int i = 0; i < l; i++) hTm[i*ldTm+i]= hTvalm[i];//fill-up diagonal
 
            //Compute Ap0 = Ap - beta*Ap0:
            axpyCuda(-beta, Ap0, Ap);//mind precision...
@@ -349,12 +347,12 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
            copyCuda(*v0, Ap0);//make full precision here.
 	   for (int i = 0; i < l; i++){
 	     Complex s = cDotProductCuda(Vm->Eigenvec(i), *v0);
-	     hTm[i+l*m] = s/sqrt(r2);
-	     hTm[l+i*m] = conj(s)/sqrt(r2);
+	     hTm[i+l*ldTm] = s/sqrt(r2);
+	     hTm[l+i*ldTm] = conj(s)/sqrt(r2);
 	   }
          } else{ //no-RR branch:
-            hTm[(l+1)*m+l] = Complex(-sqrt(beta)/alpha0, 0.0);//'U' (!)
-            hTm[l*m+(l+1)] = Complex(-sqrt(beta)/alpha0, 0.0);//'L' (!)
+            hTm[(l+1)*ldTm+l] = Complex(-sqrt(beta)/alpha0, 0.0);//'U' (!)
+            hTm[l*ldTm+(l+1)] = Complex(-sqrt(beta)/alpha0, 0.0);//'L' (!)
          }//end of nev
          l += 1;
          double scale = 1.0 / sqrt(r2);
@@ -503,11 +501,8 @@ void compute_2nev_Ritz_vectors(cudaColorSpinorField Vm, magmaDoubleComplex *dQ, 
     }
 //Clean EigCG resources:
     delete[] hTm;
-    delete[] hTvecm0;
-    delete[] hTvecm1;
-
-    delete[] hTvalm0;
-    delete[] hTvalm1;
+    delete[] hTvecm;
+    delete[] hTvalm;
 
     cudaFree(dTm);
     cudaFree(dTvecm0);
