@@ -67,6 +67,25 @@ namespace quda {
     return location;
   }
 
+  int LatticeField::Nvec() const {
+    if (typeid(*this) == typeid(const cudaColorSpinorField)) {
+      const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
+      if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
+	return static_cast<int>(csField.FieldOrder());
+    } else if (typeid(*this) == typeid(const cudaGaugeField)) {
+      const GaugeField &gField = static_cast<const GaugeField&>(*this);
+      if (gField.Order() == 2 || gField.Order() == 4)
+	return static_cast<int>(gField.Order());
+    } else if (typeid(*this) == typeid(const cudaCloverField)) { 
+      const CloverField &cField = static_cast<const CloverField&>(*this);
+      if (cField.Order() == 2 || cField.Order() == 4)
+	return static_cast<int>(cField.Order());
+    }
+
+    errorQuda("Unsupported field type");
+    return -1;
+  }
+
   void LatticeField::resizeBufferPinned(size_t bytes) const {
     if ((bytes > bufferPinnedBytes || bufferPinnedInit == 0) && bytes > 0) {
       if (bufferPinnedInit) host_free(bufferPinned);

@@ -326,8 +326,8 @@ namespace quda {
     void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
 	      double a=0, double b=0);
     void gather(int nFace, int dagger, int dir);
-    void commsStart(int nFace, int dir);
-    int commsQuery(int nFace, int dir); 
+    void commsStart(int nFace, int dir, int dagger=0);
+    int commsQuery(int nFace, int dir, int dagger=0); 
     void scatter(int nFace, int dagger, int dir);
 
 #ifdef USE_TEXTURE_OBJECTS

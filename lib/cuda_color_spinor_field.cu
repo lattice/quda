@@ -739,18 +739,86 @@ namespace quda {
       mh_recv_fwd = new MsgHandle**[maxNface];
       mh_recv_back = new MsgHandle**[maxNface];
       for (int j=0; j<maxNface; j++) {
-	mh_send_fwd[j] = new MsgHandle*[nDimComms];
-	mh_send_back[j] = new MsgHandle*[nDimComms];
+	mh_send_fwd[j] = new MsgHandle*[2*nDimComms];
+	mh_send_back[j] = new MsgHandle*[2*nDimComms];
 	mh_recv_fwd[j] = new MsgHandle*[nDimComms];
 	mh_recv_back[j] = new MsgHandle*[nDimComms];
+
 	for (int i=0; i<nDimComms; i++) {
 	  size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 	  if (!commDimPartitioned(i)) continue;
-	  mh_send_fwd[j][i] = comm_declare_send_relative(my_fwd_face[i], i, +1, nbytes_Nface);
-	  mh_send_back[j][i] = comm_declare_send_relative(my_back_face[i], i, -1, nbytes_Nface);
+#ifdef GPU_COMMS
+	  if (i != 3 || getKernelPackT()) {
+#endif
+	    mh_send_fwd[j][2*i+0] = comm_declare_send_relative(my_fwd_face[i], i, +1, nbytes_Nface);
+	    mh_send_back[j][2*i+0] = comm_declare_send_relative(my_back_face[i], i, -1, nbytes_Nface);
+	    mh_send_fwd[j][2*i+1] = mh_send_fwd[j][2*i]; // alias pointers
+	    mh_send_back[j][2*i+1] = mh_send_back[j][2*i]; // alias pointers
+#ifdef GPU_COMMS
+	  } else { 
+	    /* 
+	       use a strided communicator, here we can't really use
+	       the previously declared my_fwd_face and my_back_face
+	       pointers since they don't really map 1-to-1 so let's
+	       just compute the required base pointers and pass these
+	       directly into the communicator construction
+	    */
+	    
+	    int Nblocks = Ndof / Nvec(); // number of Nvec buffers we have
+	    // start of last time slice chunk we are sending forwards
+	    int endOffset = (volume - (j+1)*ghostFace[i]); 
+
+	    size_t offset[4];
+	    void *base[4];
+	    if (nSpin == 1) { // staggered is invariant with dagger
+	      offset[2*0 + 0] = 0;
+	      offset[2*1 + 0] = endOffset;
+	      offset[2*0 + 1] = offset[2*0 + 0];
+	      offset[2*1 + 1] = offset[2*1 + 0];
+	    } else if (nSpin == 4) {    
+	      // !dagger: send last components backwards, send first components forwards
+	      offset[2*0 + 0] = Nblocks*stride;
+	      offset[2*1 + 0] = endOffset;
+	      //  dagger: send first components backwards, send last components forwards
+	      offset[2*0 + 1] = 0;
+	      offset[2*1 + 1] = Nblocks*stride + endOffset;
+	    } else {
+	      errorQuda("Unsupported number of spin components");
+	    }
+
+	    for (int k=0; k<4; k++) {
+	      base[k] = static_cast<char*>(v) + offset[k]*Nvec()*precision; // total offset in bytes
+	    }
+
+	    size_t blksize  = (j+1)*ghostFace[i]*Nvec()*precision; // (j+1) is number of faces
+	    size_t Stride = stride*Nvec()*precision;
+
+	    if (blksize * Nblocks != nbytes_Nface) 
+	      errorQuda("Total strided message size does not match expected size");
+
+	    //printf("\n%d strided sends with Nface=%d Nblocks=%d blksize=%d Stride=%d,
+	    //	   i, j+1, Nblocks, blksize, Stride);
+
+	    mh_send_fwd[j][2*i+0] = comm_declare_strided_send_relative(base[2], i, +1, 
+								       blksize, Nblocks, Stride);
+	    mh_send_back[j][2*i+0] = comm_declare_strided_send_relative(base[0], i, -1, 
+									blksize, Nblocks, Stride);
+	    if (nSpin ==4) { // dagger communicators
+	      mh_send_fwd[j][2*i+1] = comm_declare_strided_send_relative(base[3], i, +1, 
+									 blksize, Nblocks, Stride);
+	      mh_send_back[j][2*i+1] = comm_declare_strided_send_relative(base[1], i, -1, 
+									  blksize, Nblocks, Stride);
+	    } else {
+	      mh_send_fwd[j][2*i+1] = mh_send_fwd[j][2*i+0];
+	      mh_send_back[j][2*i+1] = mh_send_back[j][2*i+0];
+	    }
+	  }
+#endif // GPU_COMMS
+
 	  mh_recv_fwd[j][i] = comm_declare_receive_relative(from_fwd_face[i], i, +1, nbytes_Nface);
 	  mh_recv_back[j][i] = comm_declare_receive_relative(from_back_face[i], i, -1, nbytes_Nface);
-	}
+
+	} // loop over dimension
       }
       
       initComms = true;
@@ -763,11 +831,18 @@ namespace quda {
       for (int j=0; j<maxNface; j++) {
 	for (int i=0; i<nDimComms; i++) {
 	  if (commDimPartitioned(i)) {
-	    comm_free(mh_send_fwd[j][i]);
-	    comm_free(mh_send_back[j][i]);
 	    comm_free(mh_recv_fwd[j][i]);
 	    comm_free(mh_recv_back[j][i]);
-	}
+	    comm_free(mh_send_fwd[j][2*i]);
+	    comm_free(mh_send_back[j][2*i]);
+	    // only in a special case are these not aliasing pointers
+#ifdef GPU_COMMS
+	    if (i == 3 && !getKernelPackT() && nSpin == 4) {
+	      comm_free(mh_send_fwd[j][2*i+1]);
+	      comm_free(mh_send_back[j][2*i+1]);
+	    }
+#endif // GPU_COMMS
+	  }
 	}
 	delete []mh_recv_fwd[j];
 	delete []mh_recv_back[j];
@@ -828,7 +903,7 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::commsStart(int nFace, int dir) {
+  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger) {
     // FIXME - support arbitrary Nface packing
     if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
       errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
@@ -839,16 +914,16 @@ namespace quda {
     if (dir%2 == 0) { // sending backwards
       // Prepost receive
       comm_start(mh_recv_fwd[nFace-1][dim]);
-      comm_start(mh_send_back[nFace-1][dim]);
+      comm_start(mh_send_back[nFace-1][2*dim+dagger]);
     } else { //sending forwards
       // Prepost receive
       comm_start(mh_recv_back[nFace-1][dim]);
       // Begin forward send
-      comm_start(mh_send_fwd[nFace-1][dim]);
+      comm_start(mh_send_fwd[nFace-1][2*dim+dagger]);
     }
   }
 
-  int cudaColorSpinorField::commsQuery(int nFace, int dir) {
+  int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger) {
     // FIXME - support arbitrary Nface packing
     if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
       errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
@@ -857,9 +932,11 @@ namespace quda {
     if(!commDimPartitioned(dim)) return 0;
     
     if(dir%2==0) {
-      if (comm_query(mh_recv_fwd[nFace-1][dim]) && comm_query(mh_send_back[nFace-1][dim])) return 1;
+      if (comm_query(mh_recv_fwd[nFace-1][dim]) && 
+	  comm_query(mh_send_back[nFace-1][2*dim+dagger])) return 1;
     } else {
-      if (comm_query(mh_recv_back[nFace-1][dim]) && comm_query(mh_send_fwd[nFace-1][dim])) return 1;
+      if (comm_query(mh_recv_back[nFace-1][dim]) && 
+	  comm_query(mh_send_fwd[nFace-1][2*dim+dagger])) return 1;
     }
     
     return 0;

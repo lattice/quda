@@ -1363,18 +1363,17 @@ namespace quda {
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
     profile.Start(QUDA_PROFILE_TOTAL);
 
-#ifdef GPU_COMMS
-    if (!getKernelPackT()) errorQuda("Kernel packing required for direct GPU communication");
-#endif
-
     dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
+
+#ifndef GPU_COMMS
     // Record the start of the dslash
     PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
 	    profile, QUDA_PROFILE_EVENT_RECORD);
+#endif // GPU_COMMS
 
     bool pack = false;
     for (int i=3; i>=0; i--) 
@@ -1424,7 +1423,8 @@ namespace quda {
       if (!dslashParam.commDim[i]) continue;
       
       for (int dir=1; dir>=0; dir--) {	
-	PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir), profile, QUDA_PROFILE_COMMS_START);
+	PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	inSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
       }
     }
 #endif
@@ -1445,7 +1445,7 @@ namespace quda {
 	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
-	      PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
 	    }
 	  }
 #endif
@@ -1453,7 +1453,7 @@ namespace quda {
 	  // Query if comms has finished
 	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
 	      gatherCompleted[2*i+dir]) {
-	    PROFILE(int comms_test = inSpinor->commsQuery(dslash.Nface()/2, 2*i+dir), 
+	    PROFILE(int comms_test = inSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger), 
 		    profile, QUDA_PROFILE_COMMS_QUERY);
 	    if (comms_test) { 
 	      commsCompleted[2*i+dir] = 1;

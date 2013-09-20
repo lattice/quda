@@ -151,6 +151,12 @@ namespace quda {
     int Stride() const { return stride; }
     int Pad() const { return pad; }
 
+    /**
+       @return The vector storage length used for native fields , 2
+       for Float2, 4 for Float4
+     */
+    int Nvec() const;
+
     QudaPrecision Precision() const { return precision; }
     QudaFieldLocation Location() const;
     size_t GBytes() const { return total_bytes / (1<<30); } // returns total storage allocated
@@ -164,10 +170,10 @@ namespace quda {
     virtual void gather(int nFace, int dagger, int dir)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir)
+    virtual void commsStart(int nFace, int dir, int dagger=0)
     { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir)
+    virtual int commsQuery(int nFace, int dir, int dagger=0)
     { errorQuda("Not implemented"); return 0; }
 
     virtual void scatter(int nFace, int dagger, int dir)
