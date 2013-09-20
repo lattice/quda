@@ -51,8 +51,6 @@ void *fatlink[4], *longlink[4];
 const void **ghost_fatlink, **ghost_longlink;
 #endif
 
-const int loops = 100;
-
 QudaParity parity;
 extern QudaDagType dagger;
 int transfer = 0; // include transfer time in the benchmark?
@@ -63,6 +61,8 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
+
+extern int niter;
 
 extern int device;
 
@@ -418,8 +418,8 @@ static int dslashTest()
       setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
-    printfQuda("Executing %d kernel loops...", loops);	
-    double secs = dslashCUDA(loops);
+    printfQuda("Executing %d kernel loops...", niter);	
+    double secs = dslashCUDA(niter);
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
 
@@ -439,7 +439,7 @@ static int dslashTest()
     if (prec == QUDA_HALF_PRECISION) bytes_for_one_site += (8*2 + 1)*4;	
 
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*1e+9));
+    printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/niter)*1e+9));
 
     if (!transfer) {
       double spinor_ref_norm2 = norm2(*spinorRef);
@@ -465,10 +465,10 @@ void display_test_info()
 {
   printfQuda("running the following test:\n");
 
-  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", 
+  printfQuda("prec recon   test_type     dagger   S_dim         T_dimension niter\n");
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d      %d\n", 
       get_prec_str(prec), get_recon_str(link_recon), 
-      test_type, dagger, xdim, ydim, zdim, tdim);
+	     test_type, dagger, xdim, ydim, zdim, tdim, niter);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
       dimPartitioned(0),
