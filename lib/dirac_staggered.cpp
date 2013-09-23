@@ -51,7 +51,7 @@ namespace quda {
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     staggeredDslashCuda(&out, gauge, &in, parity, dagger, 0, 0, commDim, profile);
   
-    flops += 1146ll*in.Volume();
+    flops += 654ll*in.Volume();
   }
 
   void DiracStaggered::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
@@ -64,7 +64,7 @@ namespace quda {
     setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
     staggeredDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim, profile);
   
-    flops += 1158ll*in.Volume();
+    flops += 666ll*in.Volume();
   }
 
   // Full staggered operator
