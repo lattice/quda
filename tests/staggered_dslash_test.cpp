@@ -111,10 +111,11 @@ void init()
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.dslash_type = dslash_type;
 
+  // set asqtad as the default
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
-    errorQuda("Must use a staggered dslash");
+    dslash_type = QUDA_STAGGERED_DSLASH;
+  inv_param.dslash_type = dslash_type;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
@@ -170,45 +171,8 @@ void init()
   if (fatlink == NULL || longlink == NULL){
     errorQuda("ERROR: malloc failed for fatlink/longlink");
   }
-  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
-
-  if(link_recon == QUDA_RECONSTRUCT_9 || link_recon == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
-    const double cos_pi_3 = 0.5; // Cos(pi/3)
-    const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j+=2){
-          if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-            const double real = ((double*)longlink[dir])[i*gaugeSiteSize + j];
-            const double imag = ((double*)longlink[dir])[i*gaugeSiteSize + j + 1];
-            ((double*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
-            ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
-          }else{
-            const float real = ((float*)longlink[dir])[i*gaugeSiteSize + j];
-            const float imag = ((float*)longlink[dir])[i*gaugeSiteSize + j + 1];
-            ((float*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
-            ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
-          }
-        } 
-      }
-    }
-  }
-
-  if (dslash_type == QUDA_STAGGERED_DSLASH) { // set all links to zero to emulate the 1-link operator
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-	for(int j=0; j<gaugeSiteSize; j+=2){
-	  if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }else{
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }
-	} 
-      }
-    }
-  }
+  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, 
+				 &gaugeParam, dslash_type);
 
 #ifdef MULTI_GPU
   gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;

@@ -1008,8 +1008,9 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 }
 
 void
-construct_fat_long_gauge_field(void **fatlink, void** longlink,  
-			       int type, QudaPrecision precision, QudaGaugeParam* param)
+construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
+			       QudaPrecision precision, QudaGaugeParam* param,
+			       QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1032,6 +1033,47 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink,
       constructGaugeField((float**)longlink, param);
     }
   }
+
+  if(param->reconstruct == QUDA_RECONSTRUCT_9 || 
+     param->reconstruct == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
+    const double cos_pi_3 = 0.5; // Cos(pi/3)
+    const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+        for(int j=0; j<gaugeSiteSize; j+=2){
+          if(precision == QUDA_DOUBLE_PRECISION){
+            const double real = ((double*)longlink[dir])[i*gaugeSiteSize + j];
+            const double imag = ((double*)longlink[dir])[i*gaugeSiteSize + j + 1];
+            ((double*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
+            ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+          }else{
+            const float real = ((float*)longlink[dir])[i*gaugeSiteSize + j];
+            const float imag = ((float*)longlink[dir])[i*gaugeSiteSize + j + 1];
+            ((float*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
+            ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+          }
+        } 
+      }
+    }
+  }
+
+  if (dslash_type == QUDA_STAGGERED_DSLASH) { // set all links to zero to emulate the 1-link operator
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+	for(int j=0; j<gaugeSiteSize; j+=2){
+	  if(precision == QUDA_DOUBLE_PRECISION){
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }else{
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }
+	} 
+      }
+    }
+  }
+
+
 }
 
 

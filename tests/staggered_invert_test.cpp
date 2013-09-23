@@ -64,6 +64,9 @@ extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
 
+// Dirac operator type
+extern QudaDslashType dslash_type;
+
 static void end();
 
 template<typename Float>
@@ -147,7 +150,11 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
-  inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
+
+  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
+    dslash_type = QUDA_STAGGERED_DSLASH;
+  inv_param->dslash_type = dslash_type;
+
   inv_param->tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
@@ -163,7 +170,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.005;
+  double mass = 0.01;
 
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
@@ -188,7 +195,8 @@ invert_test(void)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
+  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, 
+				 &gaugeParam, dslash_type);
 
   const double cos_pi_3 = 0.5; // Cos(pi/3)
   const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
@@ -262,7 +270,9 @@ invert_test(void)
   int fat_pad = tmp_value;
   int link_pad =  3*tmp_value;
 
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  // FIXME: currently assume staggered is SU(3)
+  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+    QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   cpuFat = new cpuGaugeField(cpuFatParam);
@@ -273,25 +283,30 @@ invert_test(void)
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+    QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = fat_pad;
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda(fatlink, &gaugeParam);
 
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.ga_pad = link_pad;
-  gaugeParam.reconstruct= link_recon;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda(longlink, &gaugeParam);
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+    gaugeParam.ga_pad = link_pad;
+    gaugeParam.reconstruct= link_recon;
+    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    loadGaugeQuda(longlink, &gaugeParam);
+  }
 #else
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   loadGaugeQuda(fatlink, &gaugeParam);
 
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.reconstruct = link_recon;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda(longlink, &gaugeParam);
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+    gaugeParam.reconstruct = link_recon;
+    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    loadGaugeQuda(longlink, &gaugeParam);
+  }
 #endif
 
   double time0 = -((double)clock()); // Start the timer

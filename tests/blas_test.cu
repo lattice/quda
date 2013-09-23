@@ -75,7 +75,8 @@ void initFields(int prec)
   ColorSpinorParam param;
   param.nColor = 3;
   // set spin according to the type of dslash
-  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH) ? 1 : 4;
+  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || 
+	   dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
   param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
 
