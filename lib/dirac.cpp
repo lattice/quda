@@ -150,12 +150,18 @@ namespace quda {
     } else if (param.type == QUDA_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
       return new DiracDomainWallPC(param);
-    } else if (param.type == QUDA_ASQTAD_DIRAC) {
+    } else if (param.type == QUDA_STAGGERED_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);
-    } else if (param.type == QUDA_ASQTADPC_DIRAC) {
+    } else if (param.type == QUDA_STAGGEREDPC_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggeredPC operator\n");
       return new DiracStaggeredPC(param);    
+    } else if (param.type == QUDA_ASQTAD_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracImprovedStaggered operator\n");
+      return new DiracImprovedStaggered(param);
+    } else if (param.type == QUDA_ASQTADPC_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
+      return new DiracImprovedStaggeredPC(param);    
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMass(param, 4);

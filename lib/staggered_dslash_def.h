@@ -10,11 +10,16 @@
 #define DD_AXPY 0
 #define DD_RECON 8
 #define DD_PREC 0
+#define DD_IMPROVED 0
 #endif
 
 // set options for current iteration
 
+#if (DD_IMPROVED==1)
+#define DD_FNAME improvedStaggeredDslash
+#else
 #define DD_FNAME staggeredDslash
+#endif
 
 #if (DD_AXPY==0) // no axpy
 #define DD_AXPY_F 
@@ -38,7 +43,13 @@
 #define DD_RECON_F 8
 
 #if (DD_PREC==0) // DOUBLE PRECISION
+
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1, const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
+#endif
+
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_8_DOUBLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -53,7 +64,12 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
+#endif
+
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_8_SINGLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -68,7 +84,11 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #else // HALF PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_8_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
@@ -89,7 +109,12 @@
 #define DD_RECON_F 9
 
 #if (DD_PREC==0) // DOUBLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1, const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
+#endif
+
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_9_DOUBLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -107,7 +132,12 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
+#endif
+
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_9_SINGLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -125,7 +155,11 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #else // HALF PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_9_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
@@ -148,7 +182,11 @@
 #define DD_RECON_F 12
 
 #if (DD_PREC==0) // DOUBLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_DOUBLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -163,7 +201,11 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_SINGLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -178,7 +220,11 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #else // HALF PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_12_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
@@ -198,7 +244,11 @@
 #define DD_RECON_F 13
 
 #if (DD_PREC==0) // DOUBLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_13_DOUBLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -216,7 +266,11 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #elif (DD_PREC==1) // SINGLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_13_SINGLE
 
 #ifdef DIRECT_ACCESS_FAT_LINK
@@ -234,7 +288,11 @@
 #endif // DIRECT_ACCESS_LONG_LINK
 
 #else // HALF PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1
+#endif
 #define RECONSTRUCT_GAUGE_MATRIX RECONSTRUCT_GAUGE_MATRIX_13_SINGLE
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
@@ -257,8 +315,11 @@
 #define RECONSTRUCT_GAUGE_MATRIX(dir, gauge, idx, sign)
 
 #if (DD_PREC==0) // DOUBLE PRECISION
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
-
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
+#endif
 #ifdef DIRECT_ACCESS_FAT_LINK
 #define READ_FAT_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_18_DOUBLE2(FAT, gauge, dir, idx, fat_ga_stride)
 #else
@@ -272,7 +333,11 @@
 
 #elif (DD_PREC==1) // SINGLE PRECISION
 
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
+#endif
 
 #ifdef DIRECT_ACCESS_FAT_LINK
 #define READ_FAT_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_18_FLOAT2(FAT, gauge, dir, idx, fat_ga_stride)
@@ -287,7 +352,11 @@
 
 #else  // HALF PRECISION
 
+#if (DD_IMPROVED==1)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1
+#endif
 
 /*#ifdef DIRECT_ACCESS_FAT_LINK
 #define READ_FAT_MATRIX(gauge, dir, idx) READ_GAUGE_MATRIX_18_SHORT2(FAT, gauge, dir, idx, fat_ga_stride); RESCALE2(FAT, fat_ga_max);
@@ -538,6 +607,8 @@
 
 // define the kernel
 
+#if (DD_IMPROVED==1)
+
 template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
   (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
@@ -545,6 +616,24 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
   #include "staggered_dslash_core.h"
 #endif
 }
+
+#else // naive staggered kernel
+
+#undef READ_LONG_MATRIX
+#define READ_LONG_MATRIX(gauge, dir, idx)
+
+#undef READ_LONG_PHASE
+#define READ_LONG_PHASE(phase, dir, idx)
+
+template <KernelType kernel_type>
+__global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
+  (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
+#ifdef GPU_STAGGERED_DIRAC
+  #include "staggered_dslash_core.h"
+#endif
+}
+
+#endif
 
 #endif // !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 
@@ -626,11 +715,20 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #undef DD_PREC
 #define DD_PREC 0
 
+#if (DD_IMPROVED==0)
+#undef DD_IMPROVED
+#define DD_IMPROVED 1
+#elif (DD_IMPROVED==1)
+#undef DD_IMPROVED
+#define DD_IMPROVED 0
+
 #undef DD_LOOP
 #undef DD_AXPY
 #undef DD_RECON
 #undef DD_PREC
+#undef DD_IMPROVED
 
+#endif // DD_IMPROVED
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_AXPY

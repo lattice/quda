@@ -340,8 +340,6 @@ namespace quda {
   class DiracStaggered : public Dirac {
 
   protected:
-    cudaGaugeField &fatGauge;
-    cudaGaugeField &longGauge;
     FaceBuffer face; // multi-gpu communication buffers
 
   public:
@@ -376,6 +374,57 @@ namespace quda {
     DiracStaggeredPC(const DiracStaggeredPC &dirac);
     virtual ~DiracStaggeredPC();
     DiracStaggeredPC& operator=(const DiracStaggeredPC &dirac);
+
+    virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+    virtual void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+			 cudaColorSpinorField &x, cudaColorSpinorField &b, 
+			 const QudaSolutionType) const;
+    virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
+  // Full staggered
+  class DiracImprovedStaggered : public Dirac {
+
+  protected:
+    cudaGaugeField &fatGauge;
+    cudaGaugeField &longGauge;
+    FaceBuffer face; // multi-gpu communication buffers
+
+  public:
+    DiracImprovedStaggered(const DiracParam &param);
+    DiracImprovedStaggered(const DiracImprovedStaggered &dirac);
+    virtual ~DiracImprovedStaggered();
+    DiracImprovedStaggered& operator=(const DiracImprovedStaggered &dirac);
+
+    virtual void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
+  
+    virtual void Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+			const QudaParity parity) const;
+    virtual void DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+			    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+    virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+    virtual void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+			 cudaColorSpinorField &x, cudaColorSpinorField &b, 
+			 const QudaSolutionType) const;
+    virtual void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
+  // Even-odd preconditioned staggered
+  class DiracImprovedStaggeredPC : public DiracImprovedStaggered {
+
+  protected:
+
+  public:
+    DiracImprovedStaggeredPC(const DiracParam &param);
+    DiracImprovedStaggeredPC(const DiracImprovedStaggeredPC &dirac);
+    virtual ~DiracImprovedStaggeredPC();
+    DiracImprovedStaggeredPC& operator=(const DiracImprovedStaggeredPC &dirac);
 
     virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
     virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;

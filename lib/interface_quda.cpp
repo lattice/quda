@@ -745,6 +745,9 @@ namespace quda {
         diracParam.type = pc ? QUDA_DOMAIN_WALLPC_DIRAC : QUDA_DOMAIN_WALL_DIRAC;
         diracParam.Ls = inv_param->Ls;
         break;
+      case QUDA_STAGGERED_DSLASH:
+        diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
+        break;
       case QUDA_ASQTAD_DSLASH:
         diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;
         break;
@@ -838,7 +841,7 @@ namespace quda {
       printfQuda("Mass rescale: norm of source in = %g\n", nin);
     }
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
       if (mass_normalization != QUDA_MASS_NORMALIZATION) {
         errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
       }
@@ -890,7 +893,7 @@ namespace quda {
   void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
       QudaMassNormalization mass_normalization, double &coeff)
   {    
-    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
       if (mass_normalization != QUDA_MASS_NORMALIZATION) {
         errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
       }
@@ -1553,7 +1556,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // Balint: Isn't there a nice construction pattern we could use here? This is 
   // expedient but yucky.
   //  DiracParam diracParam; 
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH){
+  if (param->dslash_type == QUDA_ASQTAD_DSLASH || 
+      param->dslash_type == QUDA_STAGGERED_DSLASH){
     param->mass = sqrt(param->offset[0]/4);  
   }
 
@@ -1685,7 +1689,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
             i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
 
       // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
-      if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
+      if (param->dslash_type == QUDA_ASQTAD_DSLASH || 
+	  param->dslash_type == QUDA_STAGGERED_DSLASH) { 
         dirac.setMass(sqrt(param->offset[i]/4));  
         diracSloppy.setMass(sqrt(param->offset[i]/4));  
       }
@@ -1693,7 +1698,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       DiracMdagM m(dirac), mSloppy(diracSloppy);
 
       // need to curry in the shift if we are not doing staggered
-      if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+      if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
+	  param->dslash_type != QUDA_STAGGERED_DSLASH) { 
         m.shift = param->offset[i];
         mSloppy.shift = param->offset[i];
       }
@@ -1710,7 +1716,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       param->true_res_offset[i] = param->true_res;
       param->true_res_hq_offset[i] = param->true_res_hq;
 
-      if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
+      if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+	  param->dslash_type == QUDA_STAGGERED_DSLASH) { 
         dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
         diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
       }

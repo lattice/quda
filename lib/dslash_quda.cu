@@ -348,7 +348,10 @@ namespace quda {
 
   // macro used for staggered dslash
 #define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param, ...)	\
-    GENERIC_STAGGERED_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+  GENERIC_STAGGERED_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param, __VA_ARGS__)
+
+#define IMPROVED_STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param, ...) \
+  GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param, __VA_ARGS__) 
 
 #define MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param,  ...) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
@@ -1137,11 +1140,11 @@ namespace quda {
   private:
     const fatGFloat *fat0, *fat1;
     const longGFloat *long0, *long1;
-   // const typename RealType<longGFloat>::type *phase0, *phase1;
     const phaseFloat *phase0, *phase1;
     const QudaReconstructType reconstruct;
     const int dagger;
     const double a;
+    QudaDslashType type;
 
   protected:
     unsigned int sharedBytesPerThread() const
@@ -1152,13 +1155,12 @@ namespace quda {
 
   public:
     StaggeredDslashCuda(cudaColorSpinorField *out, const fatGFloat *fat0, const fatGFloat *fat1,
-			const longGFloat *long0, const longGFloat *long1,
-                        const phaseFloat *phase0, 
-                        const phaseFloat *phase1, 
-			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
-			const cudaColorSpinorField *x, const double a, const int dagger)
+				const longGFloat *long0, const longGFloat *long1,
+				const phaseFloat *phase0, const phaseFloat *phase1, 
+				const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
+				const cudaColorSpinorField *x, const double a, const int dagger)
       : DslashCuda(out, in, x), fat0(fat0), fat1(fat1), long0(long0), long1(long1), phase0(phase0), phase1(phase1), 
-	reconstruct(reconstruct), dagger(dagger), a(a)
+	reconstruct(reconstruct), dagger(dagger), a(a), type(long0 ? QUDA_ASQTAD_DSLASH : QUDA_STAGGERED_DSLASH)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
@@ -1179,14 +1181,31 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-      STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
-		       (sFloat*)out->V(), (float*)out->Norm(), fat0, fat1, long0, long1, phase0, phase1, 
-		       (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
+      if (type == QUDA_STAGGERED_DSLASH) {
+	STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+			 (sFloat*)out->V(), (float*)out->Norm(), fat0, fat1, 
+			 (sFloat*)in->V(), (float*)in->Norm(), 
+			 (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
+      } else {
+	IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+				  (sFloat*)out->V(), (float*)out->Norm(), 
+				  fat0, fat1, long0, long1, phase0, phase1, 
+				  (sFloat*)in->V(), (float*)in->Norm(), 
+				  (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
+      }
+
     }
 
-    int Nface() { return 6; }
+    int Nface() { return type == QUDA_STAGGERED_DSLASH ? 2 : 6; } 
 
-    long long flops() const { return (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const { 
+      long long flops;
+      if (type == QUDA_STAGGERED_DSLASH) 
+	flops = (x ? 666ll : 654ll) * dslashConstants.VolumeCB();
+      else 
+	flops = (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); 
+      return flops;
+    } 
   };
 
   int gatherCompleted[Nstream];
@@ -1914,10 +1933,68 @@ namespace quda {
 #endif
   }
 
-  void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
-			   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
-			   const int parity, const int dagger, const cudaColorSpinorField *x,
+  void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
+			   const cudaColorSpinorField *in, const int parity, 
+			   const int dagger, const cudaColorSpinorField *x,
 			   const double &k, const int *commOverride, TimeProfile &profile)
+  {
+    inSpinor = (cudaColorSpinorField*)in; // EVIL
+
+#ifdef GPU_STAGGERED_DIRAC
+
+    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
+
+    dslashParam.parity = parity;
+    for(int i=0;i<4;i++){
+      dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
+      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
+      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
+    }
+    void *gauge0, *gauge1;
+    bindFatGaugeTex(gauge, parity, &gauge0, &gauge1);
+
+    if (in->Precision() != gauge.Precision()) {
+      errorQuda("Mixing precisions gauge=%d and spinor=%d not supported",
+		gauge.Precision(), in->Precision());
+    }
+    
+    DslashCuda *dslash = 0;
+    size_t regSize = sizeof(float);
+
+    if (in->Precision() == QUDA_DOUBLE_PRECISION) {
+#if (__COMPUTE_CAPABILITY__ >= 130)
+      dslash = new StaggeredDslashCuda<double2, double2, double2, double>
+	(out, (double2*)gauge0, (double2*)gauge1, 0, 0, 0, 0, gauge.Reconstruct(), in, x, k, dagger);
+      regSize = sizeof(double);
+#else
+      errorQuda("Double precision not supported on this GPU");
+#endif
+    } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
+      dslash = new StaggeredDslashCuda<float2, float2, float4, float>
+	(out, (float2*)gauge0, (float2*)gauge1, 0, 0, 0, 0, gauge.Reconstruct(), in, x, k, dagger);
+    } else if (in->Precision() == QUDA_HALF_PRECISION) {	
+      dslash = new StaggeredDslashCuda<short2, short2, short4, short>
+	(out, (short2*)gauge0, (short2*)gauge1, 0, 0, 0, 0, gauge.Reconstruct(), in, x, k, dagger);
+    }
+
+    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+
+    delete dslash;
+    unbindFatGaugeTex(gauge);
+
+    checkCudaError();
+  
+#else
+    errorQuda("Staggered dslash has not been built");
+#endif  // GPU_STAGGERED_DIRAC
+  }
+
+  void
+  improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
+			      const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
+			      const int parity, const int dagger, const cudaColorSpinorField *x,
+			      const double &k, const int *commOverride, TimeProfile &profile)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -1948,7 +2025,6 @@ namespace quda {
     void *longPhase0 = (char*)longGauge0 + longGauge.PhaseOffset();
     void *longPhase1 = (char*)longGauge1 + longGauge.PhaseOffset();   
 
-
     if (in->Precision() != fatGauge.Precision() || in->Precision() != longGauge.Precision()){
       errorQuda("Mixing gauge and spinor precision not supported"
 		"(precision=%d, fatlinkGauge.precision=%d, longGauge.precision=%d",
@@ -1960,31 +2036,34 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-      dslash = new StaggeredDslashCuda<double2, double2, double2, double>(out, (double2*)fatGauge0, (double2*)fatGauge1,
-								  (double2*)longGauge0, (double2*)longGauge1,
-                                                                  (double*)longPhase0, (double*)longPhase1, 
-								  longGauge.Reconstruct(), in, x, k, dagger);
+      dslash = new StaggeredDslashCuda<double2, double2, double2, double>
+	(out, (double2*)fatGauge0, (double2*)fatGauge1,
+	 (double2*)longGauge0, (double2*)longGauge1,
+	 (double*)longPhase0, (double*)longPhase1, 
+	 longGauge.Reconstruct(), in, x, k, dagger);
       regSize = sizeof(double);
 #else
       errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new StaggeredDslashCuda<float2, float2, float4, float>(out, (float2*)fatGauge0, (float2*)fatGauge1,
-							       (float4*)longGauge0, (float4*)longGauge1, 
-                                                               (float*)longPhase0, (float*)longPhase1,
-							       longGauge.Reconstruct(), in, x, k, dagger);
+      dslash = new StaggeredDslashCuda<float2, float2, float4, float>
+	(out, (float2*)fatGauge0, (float2*)fatGauge1,
+	 (float4*)longGauge0, (float4*)longGauge1, 
+	 (float*)longPhase0, (float*)longPhase1,
+	 longGauge.Reconstruct(), in, x, k, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {	
-      dslash = new StaggeredDslashCuda<short2, short2, short4, short>(out, (short2*)fatGauge0, (short2*)fatGauge1,
-							       (short4*)longGauge0, (short4*)longGauge1, 
-                                                               (short*)longPhase0, (short*)longPhase1,
-							       longGauge.Reconstruct(), in, x, k, dagger);
+      dslash = new StaggeredDslashCuda<short2, short2, short4, short>
+	(out, (short2*)fatGauge0, (short2*)fatGauge1,
+	 (short4*)longGauge0, (short4*)longGauge1, 
+	 (short*)longPhase0, (short*)longPhase1,
+	 longGauge.Reconstruct(), in, x, k, dagger);
     }
 
     dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
 
     delete dslash;
-    unbindGaugeTex(fatGauge);
-    unbindGaugeTex(longGauge);
+    unbindFatGaugeTex(fatGauge);
+    unbindLongGaugeTex(longGauge);
 
     checkCudaError();
   
@@ -1992,7 +2071,6 @@ namespace quda {
     errorQuda("Staggered dslash has not been built");
 #endif  // GPU_STAGGERED_DIRAC
   }
-
 
   template <typename sFloat, typename cFloat>
   class CloverCuda : public Tunable {

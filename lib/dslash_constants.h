@@ -304,6 +304,9 @@ void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile)
   int ga_stride_h = gauge.Stride();
   cudaMemcpyToSymbol(ga_stride, &ga_stride_h, sizeof(int));  
 
+  // set fat link stride (used by naive staggered)
+  cudaMemcpyToSymbol(fat_ga_stride, &ga_stride_h, sizeof(int)); 
+
   int gf = (gauge.GaugeFixed() == QUDA_GAUGE_FIXED_YES);
   cudaMemcpyToSymbol(gauge_fixed, &(gf), sizeof(int));
 
