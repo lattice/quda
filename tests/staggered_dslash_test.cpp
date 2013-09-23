@@ -51,6 +51,9 @@ void *fatlink[4], *longlink[4];
 const void **ghost_fatlink, **ghost_longlink;
 #endif
 
+// Dirac operator type
+extern QudaDslashType dslash_type;
+
 QudaParity parity;
 extern QudaDagType dagger;
 int transfer = 0; // include transfer time in the benchmark?
@@ -108,7 +111,10 @@ void init()
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
+  inv_param.dslash_type = dslash_type;
+
+  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
+    errorQuda("Must use a staggered dslash");
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
@@ -153,7 +159,7 @@ void init()
 
   printfQuda("Randomizing fields ...\n");
 
-  spinor->Source(QUDA_RANDOM_SOURCE);
+  spinor->Source(QUDA_POINT_SOURCE, 0, 0, 0);
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
@@ -188,15 +194,29 @@ void init()
     }
   }
 
-
+  if (dslash_type == QUDA_STAGGERED_DSLASH) { // set all links to zero to emulate the 1-link operator
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+	for(int j=0; j<gaugeSiteSize; j+=2){
+	  if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }else{
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }
+	} 
+      }
+    }
+  }
 
 #ifdef MULTI_GPU
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = cpuFat->Ghost();
-
+  
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
   cpuLong = new cpuGaugeField(cpuLongParam);
@@ -212,23 +232,30 @@ void init()
   gaugeParam.ga_pad = pad_size;    
 #endif
 
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  } else {
+    gaugeParam.type = QUDA_SU3_LINKS;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+  }
 
   printfQuda("Fat links sending..."); 
   loadGaugeQuda(fatlink, &gaugeParam);
   printfQuda("Fat links sent\n"); 
 
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
-
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;  
+    
 #ifdef MULTI_GPU
-  gaugeParam.ga_pad = 3*pad_size;
+    gaugeParam.ga_pad = 3*pad_size;
 #endif
-
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
-  printfQuda("Long links sending..."); 
-  loadGaugeQuda(longlink, &gaugeParam);
-  printfQuda("Long links sent...\n"); 
+    
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+    printfQuda("Long links sending..."); 
+    loadGaugeQuda(longlink, &gaugeParam);
+    printfQuda("Long links sent...\n"); 
+  }
 
   printfQuda("Sending fields to GPU..."); 
 

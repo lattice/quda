@@ -790,6 +790,8 @@ get_dslash_type(char* s)
     ret = QUDA_CLOVER_WILSON_DSLASH;
   }else if (strcmp(s, "twisted_mass") == 0){
     ret = QUDA_TWISTED_MASS_DSLASH;
+  }else if (strcmp(s, "staggered") == 0){
+    ret =  QUDA_STAGGERED_DSLASH;
   }else if (strcmp(s, "asqtad") == 0){
     ret =  QUDA_ASQTAD_DSLASH;
   }else if (strcmp(s, "domain_wall") == 0){
