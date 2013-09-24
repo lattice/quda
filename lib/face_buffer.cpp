@@ -207,15 +207,15 @@ void FaceBuffer::flushPinnedCache()
 void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, 
 		      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
 {
-  in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated  
+  in.allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
   stream = stream_p;
 
   if (zeroCopyPack) {
     void *my_face_d;
     cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
-    in.packGhost((QudaParity)parity, dagger, &stream[0], my_face_d, a, b);
+    in.packGhost(nFace, (QudaParity)parity, dagger, &stream[0], my_face_d, a, b);
   } else {
-    in.packGhost((QudaParity)parity, dagger, &stream[Nstream-1], 0, a, b);
+    in.packGhost(nFace, (QudaParity)parity, dagger, &stream[Nstream-1], 0, a, b);
   }
 }
 
@@ -226,10 +226,10 @@ void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
 
   if (dir%2==0) {
     // backwards copy to host
-    in.sendGhost(my_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]); 
+    in.sendGhost(my_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]); 
   } else {
     // forwards copy to host
-    in.sendGhost(my_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
+    in.sendGhost(my_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
   }
 }
 
@@ -341,9 +341,9 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir)
 
   // both scattering occurances now go through the same stream
   if (dir%2==0) {// receive from forwards
-    out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+recFwdStrmIdx*/]); // 0, 2, 4, 6
+    out.unpackGhost(from_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+recFwdStrmIdx*/]); // 0, 2, 4, 6
   } else { // receive from backwards
-    out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+recBackStrmIdx*/]); // 1, 3, 5, 7
+    out.unpackGhost(from_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+recBackStrmIdx*/]); // 1, 3, 5, 7
   }
 }
 

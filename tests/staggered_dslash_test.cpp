@@ -160,7 +160,7 @@ void init()
 
   printfQuda("Randomizing fields ...\n");
 
-  spinor->Source(QUDA_POINT_SOURCE, 0, 0, 0);
+  spinor->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 

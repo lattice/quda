@@ -19,15 +19,13 @@
 
 int zeroCopy = 0;
 
-#define GPU_COMMS
-
 namespace quda {
 
   int cudaColorSpinorField::initGhostFaceBuffer = 0;
   void* cudaColorSpinorField::ghostFaceBuffer; //gpu memory
   void* cudaColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   void* cudaColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
-  QudaPrecision cudaColorSpinorField::facePrecision; 
+  size_t cudaColorSpinorField::ghostFaceBytes = 0;
 
   /*cudaColorSpinorField::cudaColorSpinorField() : 
     ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
@@ -35,7 +33,8 @@ namespace quda {
     }*/
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
-    ColorSpinorField(param), alloc(false), init(true), texInit(false), initComms(false) {
+    ColorSpinorField(param), alloc(false), init(true), texInit(false), 
+    initComms(false), nFaceComms(0) {
 
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -58,7 +57,8 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
-    ColorSpinorField(src), alloc(false), init(true), texInit(false), initComms(false) {
+    ColorSpinorField(src), alloc(false), init(true), texInit(false), 
+    initComms(false), nFaceComms(0) {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
   }
@@ -66,7 +66,8 @@ namespace quda {
   // creates a copy of src, any differences defined in param
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
-    ColorSpinorField(src), alloc(false), init(true), texInit(false), initComms(false) {  
+    ColorSpinorField(src), alloc(false), init(true), texInit(false), 
+    initComms(false), nFaceComms(0) {  
 
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -107,7 +108,8 @@ namespace quda {
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
-    : ColorSpinorField(src), alloc(false), init(true), texInit(false), initComms(false) {
+    : ColorSpinorField(src), alloc(false), init(true), texInit(false), 
+      initComms(false), nFaceComms(0) {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
     clearGhostPointers();
@@ -180,11 +182,6 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER) {
       errorQuda("Subset not implemented");
     }
-
-    //FIXME: This addition is temporary to ensure we have the correct
-    //field order for a given precision
-    //if (precision == QUDA_DOUBLE_PRECISION) fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
@@ -462,29 +459,28 @@ namespace quda {
     return;
   }
 
-  void cudaColorSpinorField::allocateGhostBuffer(void) {
-    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
+  void cudaColorSpinorField::allocateGhostBuffer(int nFace) {
     int Nint = nColor * nSpin * 2; // number of internal degrees of freedom
     if (nSpin == 4) Nint /= 2; // spin projection for Wilson
 
-    // only allocate if not already allocated or precision is greater then previously
-    if(initGhostFaceBuffer == 0 || precision > facePrecision){    
+    // compute size of buffer required
+    size_t faceBytes = 0;
+    for (int i=0; i<4; i++) {
+      if(!commDimPartitioned(i)) continue;
+      faceBytes += 2*nFace*ghostFace[i]*Nint*precision;
+      // add extra space for the norms for half precision
+      if (precision == QUDA_HALF_PRECISION) faceBytes += 2*nFace*ghostFace[i]*sizeof(float);
+    }
+
+    // only allocate if not already allocated or buffer required is bigger than previously
+    if(initGhostFaceBuffer == 0 || faceBytes > ghostFaceBytes){    
 
       if (initGhostFaceBuffer) device_free(ghostFaceBuffer); 
-
-      // allocate a single contiguous buffer for the buffers
-      size_t faceBytes = 0;
-      for (int i=0; i<4; i++) {
-	if(!commDimPartitioned(i)) continue;
-	faceBytes += 2*nFace*ghostFace[i]*Nint*precision;
-	// add extra space for the norms for half precision
-	if (precision == QUDA_HALF_PRECISION) faceBytes += 2*nFace*ghostFace[i]*sizeof(float);
-      }
 
       if (faceBytes > 0) {
 	ghostFaceBuffer = device_malloc(faceBytes);
 	initGhostFaceBuffer = 1;
-	facePrecision = precision;
+	ghostFaceBytes = faceBytes;
       }
 
     }
@@ -520,12 +516,13 @@ namespace quda {
   }
 
   // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhost(const QudaParity parity, const int dagger, 
-				       cudaStream_t *stream, void *buffer, double a, double b) 
+  void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
+				       const int dagger, cudaStream_t *stream, 
+				       void *buffer, double a, double b) 
   {
 #ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer;
-    packFace(packBuffer, *this, dagger, parity, *stream, a, b); 
+    packFace(packBuffer, *this, nFace, dagger, parity, *stream, a, b); 
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
@@ -533,12 +530,12 @@ namespace quda {
   }
  
   // send the ghost zone to the host
-  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int dim, const QudaDirection dir,
-				       const int dagger, cudaStream_t *stream) {
+  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim, 
+				       const QudaDirection dir, const int dagger, 
+				       cudaStream_t *stream) {
 
 #ifdef MULTI_GPU
     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
-    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
     
     if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
@@ -636,11 +633,10 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::unpackGhost(void* ghost_spinor, const int dim, 
-					 const QudaDirection dir, 
+  void cudaColorSpinorField::unpackGhost(const void* ghost_spinor, const int nFace, 
+					 const int dim, const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
   {
-    int nFace = (nSpin == 1) ? 3 : 1; //3 faces for asqtad
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
     int len = nFace*ghostFace[dim]*Nint;
@@ -648,17 +644,19 @@ namespace quda {
     offset += (dir == QUDA_BACKWARDS) ? 0 : len;
 
     void *dst = (char*)v + precision*offset;
-    void *src = ghost_spinor;
+    const void *src = ghost_spinor;
 
     cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
     
     if (precision == QUDA_HALF_PRECISION) {
+      // norm region of host ghost zone is at the end of the ghost_spinor
+
       int normlen = nFace*ghostFace[dim];
       int norm_offset = stride + ghostNormOffset[dim];
       norm_offset += (dir == QUDA_BACKWARDS) ? 0 : normlen;
 
-      void *dst = (char*)norm + norm_offset*sizeof(float);
-      void *src = (char*)ghost_spinor+nFace*Nint*ghostFace[dim]*precision; // norm region of host ghost zone
+      void *dst = static_cast<char*>(norm) + norm_offset*sizeof(float);
+      const void *src = static_cast<const char*>(ghost_spinor)+nFace*Nint*ghostFace[dim]*precision; 
       cudaMemcpyAsync(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
     }
 
@@ -666,16 +664,25 @@ namespace quda {
 
   cudaStream_t *stream;
 
-  void cudaColorSpinorField::createComms() {
-    if (!initComms) {
+  void cudaColorSpinorField::createComms(int nFace) {
+    if (!initComms || nFaceComms != nFace) {
+
+      // if we are requesting a new number of faces destroy and start over
+      if(nFace != nFaceComms) destroyComms();
 
       if (siteSubset != QUDA_PARITY_SITE_SUBSET) 
 	errorQuda("Only supports single parity fields");
 
 #ifdef GPU_COMMS
-      if (precision == QUDA_HALF_PRECISION)
+      bool comms = false;
+      for (int i=0; i<nDimComms; i++) if (commDimPartitioned(i)) comms = true;
+      if (comms && precision == QUDA_HALF_PRECISION)
 	errorQuda("GPU-aware communication not yet supported with half precision");
 #endif
+
+      if (nFace > maxNface) 
+	errorQuda("Requested number of faces %d in communicator is greater than supported %d",
+		  nFace, maxNface);
 
       // faceBytes is the sum of all face sizes 
       size_t faceBytes = 0;
@@ -702,12 +709,11 @@ namespace quda {
       my_face = bufferPinned;
       from_face = static_cast<char*>(bufferPinned) + faceBytes;
 
-      int nFace = (nSpin == 1) ? 3 : 1; // FIXME for regular staggered operator
-      
       // assign pointers for each face - it's ok to alias for different Nface parameters
 #ifndef GPU_COMMS
       size_t offset = 0;
 #endif
+      printf("\n");
       for (int i=0; i<nDimComms; i++) {
 	if (!commDimPartitioned(i)) continue;
 	
@@ -723,8 +729,8 @@ namespace quda {
 	
 #ifdef GPU_COMMS
 	offset2 += nFace*ghostFace[i]*Ndof*precision;
-	my_fwd_face[i] = fwdGhostFaceBuffer[i];
-	from_fwd_face[i] = static_cast<char*>(v) + offset2;
+	my_fwd_face[i] = fwdGhostFaceBuffer[i];	
+	from_fwd_face[i] = /*static_cast<char*>(ghost[i]) + nFace*ghostFace[i]*Ndof*precision; //*/static_cast<char*>(v) + offset2;
 #else
 	my_fwd_face[i] = static_cast<char*>(my_face) + offset;
 	from_fwd_face[i] = static_cast<char*>(from_face) + offset;
@@ -822,6 +828,7 @@ namespace quda {
       }
       
       initComms = true;
+      nFaceComms = nFace;
     }
     checkCudaError();
   }
@@ -868,46 +875,34 @@ namespace quda {
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
 				  bool zeroCopyPack, double a, double b) {
-    allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated  
-    createComms();
-
-    // FIXME - support arbitrary Nface packing
-    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
-      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
+    allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
+    createComms(nFace); // must call this first
 
     stream = stream_p;
     
     if (zeroCopyPack) {
       void *my_face_d;
       cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
-      packGhost((QudaParity)parity, dagger, &stream[0], my_face_d, a, b);
+      packGhost(nFace, (QudaParity)parity, dagger, &stream[0], my_face_d, a, b);
     } else {
-      packGhost((QudaParity)parity, dagger, &stream[Nstream-1], 0, a, b);
+      packGhost(nFace, (QudaParity)parity, dagger, &stream[Nstream-1], 0, a, b);
     }
   }
 
   void cudaColorSpinorField::gather(int nFace, int dagger, int dir) {
-    // FIXME - support arbitrary Nface packing
-    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
-      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
-
     int dim = dir/2;
     if(!commDimPartitioned(dim)) return;
 
     if (dir%2==0) {
       // backwards copy to host
-      sendGhost(my_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+0]); 
+      sendGhost(my_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim+0]); 
     } else {
       // forwards copy to host
-      sendGhost(my_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+1]);
+      sendGhost(my_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim+1]);
     }
   }
 
   void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger) {
-    // FIXME - support arbitrary Nface packing
-    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
-      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
-
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return;
     
@@ -924,10 +919,6 @@ namespace quda {
   }
 
   int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger) {
-    // FIXME - support arbitrary Nface packing
-    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
-      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
-
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return 0;
     
@@ -944,18 +935,14 @@ namespace quda {
 
   void cudaColorSpinorField::scatter(int nFace, int dagger, int dir)
   {
-    // FIXME - support arbitrary Nface packing
-    if ((nSpin == 4 && nFace != 1) || (nSpin == 1 && nFace != 3))
-      errorQuda("Nface=%d and Nspin=%d not supported", nFace, nSpin);
-
     int dim = dir/2;
     if(!commDimPartitioned(dim)) return;
     
     // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
-      unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/]);
+      unpackGhost(from_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/]);
     } else { // receive from backwards
-      unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
+      unpackGhost(from_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
     }
   }
 

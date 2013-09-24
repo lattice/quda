@@ -46,10 +46,18 @@ namespace quda {
 
     int num_faces = 1;
     int num_norm_faces=2;
+#define TIFR
+#ifdef TIFR // FIXME - this is a hack from hell that needs to be fixed
     if (nSpin == 1) { //staggered
+      num_faces=2;
+      num_norm_faces=2;
+    }
+#else
+    if (nSpin == 1) { // improved staggered
       num_faces=6;
       num_norm_faces=6;
     }
+#endif
 
     // calculate size of ghost zone required
     int ghostVolume = 0;
