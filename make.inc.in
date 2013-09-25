@@ -46,6 +46,7 @@ BUILD_MILC_INTERFACE = @BUILD_MILC_INTERFACE@                   # build milc int
 BUILD_CPS_INTERFACE = @BUILD_CPS_INTERFACE@                     # build cps interface
 BUILD_QDPJIT_INTERFACE = @BUILD_QDPJIT_INTERFACE@               # build qdpjit interface
 BUILD_BQCD_INTERFACE = @BUILD_BQCD_INTERFACE@                   # build bqcd interface
+BUILD_TIFR_INTERFACE = @BUILD_TIFR_INTERFACE@                   # build tifr interface
 
 # Packing option
 DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
@@ -251,6 +252,11 @@ endif
 ifeq ($(strip $(BUILD_BQCD_INTERFACE)), yes)
   NVCCOPT += -DBUILD_BQCD_INTERFACE
   COPT += -DBUILD_BQCD_INTERFACE
+endif
+
+ifeq ($(strip $(BUILD_TIFR_INTERFACE)), yes)
+  NVCCOPT += -DBUILD_TIFR_INTERFACE
+  COPT += -DBUILD_TIFR_INTERFACE
 endif
 
 ifeq ($(strip $(DEVICE_PACK)), yes)
