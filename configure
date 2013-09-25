@@ -579,6 +579,7 @@ FECXX
 FECC
 BUILD_QIO
 DEVICE_PACK
+BUILD_TIFR_INTERFACE
 BUILD_BQCD_INTERFACE
 BUILD_QDPJIT_INTERFACE
 BUILD_CPS_INTERFACE
@@ -676,6 +677,7 @@ enable_milc_interface
 enable_cps_interface
 enable_qdpjit_interface
 enable_bqcd_interface
+enable_tifr_interface
 enable_wilson_dirac
 enable_clover_dirac
 enable_domain_wall_dirac
@@ -1335,6 +1337,7 @@ Optional Features:
   --enable-qdpjit-interface
                           Build the QDPJIT interface (default: disabled)
   --enable-bqcd-interface Build the BQCD interface (default: disabled)
+  --enable-tifr-interface Build the TIFR interface (default: disabled)
   --enable-wilson-dirac   Build Wilson Dirac operator (default: enabled)
   --enable-clover-dirac   Build Wilson-clover Dirac operator (default:
                           enabled)
@@ -2019,6 +2022,15 @@ if test "${enable_bqcd_interface+set}" = set; then :
   enableval=$enable_bqcd_interface;  build_bqcd_interface=${enableval}
 else
    build_bqcd_interface="no"
+
+fi
+
+
+# Check whether --enable-tifr-interface was given.
+if test "${enable_tifr_interface+set}" = set; then :
+  enableval=$enable_tifr_interface;  build_tifr_interface=${enableval}
+else
+   build_tifr_interface="no"
 
 fi
 
@@ -3883,6 +3895,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_tifr_interface} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-tifr-interface : ${build_tifr_interface} " "$LINENO" 5
+  ;;
+esac
+
 case ${build_wilson_dirac} in
 yes|no);;
 *)
@@ -4192,6 +4211,11 @@ BUILD_QDPJIT_INTERFACE=${build_qdpjit_interface}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_BQCD_INTERFACE= ${build_bqcd_interface}" >&5
 $as_echo "$as_me: Setting BUILD_BQCD_INTERFACE= ${build_bqcd_interface}" >&6;}
 BUILD_BQCD_INTERFACE=${build_bqcd_interface}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}" >&5
+$as_echo "$as_me: Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}" >&6;}
+BUILD_TIFR_INTERFACE=${build_tifr_interface}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting DEVICE_PACK= ${device_pack}" >&5

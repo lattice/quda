@@ -300,6 +300,15 @@ namespace quda {
       errorQuda("BQCD interface has not been built\n");
 #endif
 
+    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      extractGhost<Float,length>(TIFROrder<Float,length>(u, 0, Ghost),
+				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }

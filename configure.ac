@@ -82,6 +82,12 @@ AC_ARG_ENABLE(bqcd-interface,
   [ build_bqcd_interface="no" ]
 )
 
+AC_ARG_ENABLE(tifr-interface,
+  AC_HELP_STRING([--enable-tifr-interface], [ Build the TIFR interface (default: disabled)]),
+  [ build_tifr_interface=${enableval} ], 
+  [ build_tifr_interface="no" ]
+)
+
 AC_ARG_ENABLE(wilson-dirac,
   AC_HELP_STRING([--enable-wilson-dirac], [ Build Wilson Dirac operator (default: enabled)]),
   [ build_wilson_dirac=${enableval} ], 
@@ -341,6 +347,14 @@ case ${build_bqcd_interface} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-bqcd-interface : ${build_bqcd_interface} ])
+  ;;
+esac
+
+dnl Build TIFR interface
+case ${build_tifr_interface} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-tifr-interface : ${build_tifr_interface} ])
   ;;
 esac
 
@@ -619,6 +633,9 @@ AC_SUBST( BUILD_QDPJIT_INTERFACE, [${build_qdpjit_interface}])
 
 AC_MSG_NOTICE([Setting BUILD_BQCD_INTERFACE= ${build_bqcd_interface}])
 AC_SUBST( BUILD_BQCD_INTERFACE, [${build_bqcd_interface}])
+
+AC_MSG_NOTICE([Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}])
+AC_SUBST( BUILD_TIFR_INTERFACE, [${build_tifr_interface}])
 
 AC_MSG_NOTICE([Setting DEVICE_PACK= ${device_pack}])
 AC_SUBST( DEVICE_PACK, [${device_pack}])

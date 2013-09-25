@@ -294,6 +294,15 @@ namespace quda {
       errorQuda("BQCD interface has not been built\n");
 #endif
 
+    } else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      copyGauge<FloatOut,FloatIn,length>
+	(TIFROrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", out.Order());
     }
@@ -392,6 +401,15 @@ namespace quda {
 					 out, location, Out, outGhost, type);
 #else
       errorQuda("BQCD interface has not been built\n");
+#endif
+
+    } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      copyGauge<FloatOut,FloatIn,length>(TIFROrder<FloatIn,length>(in, In, inGhost), 
+					 out, location, Out, outGhost, type);
+#else
+      errorQuda("TIFR interface has not been built\n");
 #endif
 
     } else {

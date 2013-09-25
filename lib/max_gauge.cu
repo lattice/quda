@@ -43,6 +43,8 @@ namespace quda {
       max = maxGauge<Float,Nc>(MILCOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
       max = maxGauge<Float,Nc>(BQCDOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
+    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+      max = maxGauge<Float,Nc>(TIFROrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }
