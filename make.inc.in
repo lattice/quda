@@ -38,6 +38,7 @@ BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU c
 
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
+GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
 
 # Interface options
 BUILD_QDP_INTERFACE = @BUILD_QDP_INTERFACE@                     # build qdp interface
@@ -220,6 +221,11 @@ endif
 ifeq ($(strip $(GPU_DIRECT)), yes)
   NVCCOPT += -DGPU_DIRECT
   COPT += -DGPU_DIRECT
+endif
+
+ifeq ($(strip $(GPU_COMMS)), yes)
+  NVCCOPT += -DGPU_COMMS
+  COPT += -DGPU_COMMS
 endif
 
 ifeq ($(strip $(BUILD_QDP_INTERFACE)), yes)

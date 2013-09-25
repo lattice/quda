@@ -164,6 +164,13 @@ AC_ARG_ENABLE(gpu-direct,
   [ gpu_direct="yes" ]
 )
 
+dnl enable direct cuda-nic communication
+AC_ARG_ENABLE(gpu-comms,
+  AC_HELP_STRING([--enable-gpu-comms], [ Enable direct CUDA-NIC communication (experimental, default: disabled)]),
+  [ gpu_comms=${enableval}],
+  [ gpu_comms="no" ]
+)
+
 dnl enable packing and unpacking on the device
 AC_ARG_ENABLE(device-pack,
   AC_HELP_STRING([--enable-device-pack], [ Enable the packing / unpacking of fields on the device (default: disabled)]),
@@ -441,6 +448,14 @@ yes|no);;
   ;;
 esac
 
+dnl Enables direct CUDA-NIC communication
+case ${gpu_comms} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --gpu-comms ])
+  ;;
+esac
+
 dnl QDP-JIT support
 case ${build_qdpjit} in
 yes|no);;
@@ -586,6 +601,9 @@ AC_SUBST( BUILD_MPI, [${build_mpi}])
 
 AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
 AC_SUBST( GPU_DIRECT, [${gpu_direct}])
+
+AC_MSG_NOTICE([Setting GPU_COMMS= ${gpu_comms}])
+AC_SUBST( GPU_COMMS, [${gpu_comms}])
 
 AC_MSG_NOTICE([Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}])
 AC_SUBST( BUILD_QDP_INTERFACE, [${build_qdp_interface}])
