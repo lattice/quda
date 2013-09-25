@@ -46,8 +46,20 @@ namespace quda {
 
     int num_faces = 1;
     int num_norm_faces=2;
-#define TIFR
-#ifdef TIFR // FIXME - this is a hack from hell that needs to be fixed
+
+    // FIXME - this is a hack from hell that needs to be fixed.  When
+    // the TIFR interface is enabled we are forcing naive staggered
+    // support which breaks asqtad/hisq fermions.  The problem occurs
+    // because the ghost zone is allocated before we know which
+    // operator (and hence number of faces are needed).  One solution
+    // may be to separate the ghost zone memory allocation from the
+    // field itself, which has other benefits (1. on multi-gpu
+    // machines with UVA, we can read the ghost zone directly from the
+    // neighbouring field and 2.) we can use a single contiguous
+    // buffer for the ghost zone and its norm which will reduce
+    // latency for half precision and allow us to enable GPU_COMMS
+    // support for half precision).
+#ifdef BUILD_TIFR_INTERFACE
     if (nSpin == 1) { //staggered
       num_faces=2;
       num_norm_faces=2;
