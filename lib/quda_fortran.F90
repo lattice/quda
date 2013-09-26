@@ -22,12 +22,13 @@ module quda_fortran
   ! This corresponds to the QudaGaugeParam struct in quda.h
   type quda_gauge_param
 
-     QudaFieldLocation :: location; !The location of the gauge field
+     QudaFieldLocation :: location !The location of the gauge field
 
      integer(4), dimension(4) :: x
 
      real(8) :: anisotropy    !Used for Wilson and Wilson-clover
      real(8) :: tadpole_coeff !Used for staggered only
+     real(8) :: scale         !Used by staggered long links
 
      QudaLinkType :: link_type
      QudaGaugeFieldOrder :: gauge_order
