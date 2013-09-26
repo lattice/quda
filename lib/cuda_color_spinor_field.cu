@@ -713,7 +713,6 @@ namespace quda {
 #ifndef GPU_COMMS
       size_t offset = 0;
 #endif
-      printf("\n");
       for (int i=0; i<nDimComms; i++) {
 	if (!commDimPartitioned(i)) continue;
 	
