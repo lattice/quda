@@ -38,6 +38,23 @@ namespace quda {
     return solver;
   }
 
+  double Solver::stopping(const double &tol, const double &b2, QudaResidualType residual_type) {
+
+    double stop=0.0;
+    if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
+	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {
+      // use the most stringent stopping condition
+      double lowest = (b2 < 1.0) ? b2 : 1.0;
+      stop = lowest*tol*tol;
+    } else if (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) {
+      stop = tol*tol;
+    } else {
+      stop = b2*tol*tol;
+    }
+
+    return stop;
+  }
+
   bool Solver::convergence(const double &r2, const double &hq2, const double &r2_tol, 
 			   const double &hq_tol) {
     //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
@@ -47,7 +64,8 @@ namespace quda {
       return false;
 
     // check the L2 relative residual norm if necessary
-    if ( (param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) && (r2 > r2_tol) ) 
+    if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
+	  (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) ) 
       return false;
 
     return true;

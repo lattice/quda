@@ -1341,7 +1341,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
   double nb = norm2(*b);
-  if (nb==0.0) errorQuda("Solution has zero norm");
+  if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);

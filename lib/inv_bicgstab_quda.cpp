@@ -132,7 +132,7 @@ namespace quda {
     SolverParam solve_param_inner(param);
     fillInnerSolveParam(solve_param_inner, param);
 
-    double stop = b2*param.tol*param.tol; // stopping condition of solver
+    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;

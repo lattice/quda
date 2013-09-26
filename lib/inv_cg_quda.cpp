@@ -94,7 +94,8 @@ namespace quda {
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
     double r2_old;
-    double stop = b2*param.tol*param.tol; // stopping condition of solver
+
+    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     double heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);

@@ -114,8 +114,9 @@ extern "C" {
   } QudaSchwarzType;
 
   typedef enum QudaResidualType_s {
-    QUDA_L2_RELATIVE_RESIDUAL = 1, // the default
-    QUDA_HEAVY_QUARK_RESIDUAL = 2, // Fermilab heavy quark residual
+    QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
+    QUDA_L2_ABSOLUTE_RESIDUAL = 2, // L2 absolute residual
+    QUDA_HEAVY_QUARK_RESIDUAL = 4, // Fermilab heavy quark residual
     QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
 

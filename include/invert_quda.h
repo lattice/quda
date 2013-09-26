@@ -24,9 +24,10 @@ namespace quda {
     QudaInverterType inv_type_precondition;
     
     /**
-     * Whether to use the L2 relative residual, Fermilab heavy-quark
-     * residual, or both to determine convergence.  To require that both
-     * stopping conditions are satisfied, use a bitwise OR as follows:
+     * Whether to use the L2 relative residual, L2 absolute residual
+     * or Fermilab heavy-quark residual, or combinations therein to
+     * determine convergence.  To require that multiple stopping
+     * conditions are satisfied, use a bitwise OR as follows:
      *
      * p.residual_type = (QudaResidualType) (QUDA_L2_RELATIVE_RESIDUAL
      *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
@@ -183,6 +184,19 @@ namespace quda {
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			  DiracMatrix &matPrecon, TimeProfile &profile);
 
+    /**
+       Set the solver stopping condition
+       @param b2 L2 norm squared of the source vector
+     */
+    static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
+
+    /**
+       Test for solver convergence
+       @param r2 L2 norm squared of the residual 
+       @param hq2 Heavy quark residual
+       @param r2_tol Solver L2 tolerance
+       @param hq_tol Solver heavy-quark tolerance
+     */
     bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
 		     const double &hq_tol);
  

@@ -12,7 +12,8 @@
 #ifndef _ENUM_FORTRAN_QUDA_H
 #define _ENUM_FORTRAN_QUDA_H
 
-#define QUDA_INVALID_ENUM (-2147483647 - 1) // can't include limits.h in a Fortran program
+#/* can't include limits.h in a Fortran program */
+#define QUDA_INVALID_ENUM (-2147483647 - 1) 
 
 #define QudaLinkType integer(4)
 
@@ -36,7 +37,7 @@
 #define QUDA_CPS_WILSON_GAUGE_ORDER 7 //expect *gauge even-odd spacetime column-row color
 #define QUDA_MILC_GAUGE_ORDER 8 //expect *gauge even-odd mu spacetime row-column order
 #define QUDA_BQCD_GAUGE_ORDER 9 //expect *gauge mu even-odd spacetime+halos row-column order
-#define QUDA_TIFR_GAUGE_ORDER 10 //expect *gauge mu even-odd spacetime row-column order
+#define QUDA_TIFR_GAUGE_ORDER 10 
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -51,7 +52,7 @@
 #define QUDA_INVALID_PRECISION QUDA_INVALID_ENUM
 
 #define QudaReconstructType integer(4)
-#define QUDA_RECONSTRUCT_NO 18 // store all 18 real numbers explicitly
+#define QUDA_RECONSTRUCT_NO 18
 #define QUDA_RECONSTRUCT_12 12 // reconstruct from 12 real numbers
 #define QUDA_RECONSTRUCT_8 8  // reconstruct from 8 real numbers
 #define QUDA_RECONSTRUCT_13 13 // used for storing HISQ long-link variables
@@ -60,7 +61,7 @@
 #define QUDA_RECONSTRUCT_INVALID QUDA_INVALID_ENUM
 
 #define QudaGaugeFixed integer(4)
-#define QUDA_GAUGE_FIXED_NO  0 // no gauge fixing
+#define QUDA_GAUGE_FIXED_NO  0
 #define QUDA_GAUGE_FIXED_YES 1 // gauge field stored in temporal gauge
 #define QUDA_GAUGE_FIXED_INVALID QUDA_INVALID_ENUM
 
@@ -105,7 +106,8 @@
 
 #define QudaResidualType integer(4)
 #define QUDA_L2_RELATIVE_RESIDUAL 1
-#define QUDA_HEAVY_QUARK_RESIDUAL 2
+#define QUDA_L2_ABSOLUTE_RESIDUAL 2
+#define QUDA_HEAVY_QUARK_RESIDUAL 4
 #define QUDA_INVALID_RESIDUAL QUDA_INVALID_ENUM
 
 #/*
@@ -143,12 +145,12 @@
 
 #define QudaPreserveSource integer(4)
 #define QUDA_PRESERVE_SOURCE_NO  0 // use the source for the residual
-#define QUDA_PRESERVE_SOURCE_YES 1 // keep the source intact
+#define QUDA_PRESERVE_SOURCE_YES 1
 #define QUDA_PRESERVE_SOURCE_INVALID QUDA_INVALID_ENUM
 
 #define QudaDiracFieldOrder integer(4)
 #define QUDA_INTERNAL_DIRAC_ORDER 0  // internal dirac order used by QUDA varies depending on precision and dslash type
-#define QUDA_DIRAC_ORDER 1           // even-odd color inside spin
+#define QUDA_DIRAC_ORDER 1           
 #define QUDA_QDP_DIRAC_ORDER 2       // even-odd spin inside color
 #define QUDA_QDPJIT_DIRAC_ORDER 3       // even-odd spin inside color
 #define QUDA_CPS_WILSON_DIRAC_ORDER 4// odd-even color inside spin

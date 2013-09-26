@@ -144,7 +144,7 @@ namespace quda {
     double r2[QUDA_MAX_MULTI_SHIFT];
     for (int i=0; i<num_offset; i++) {
       r2[i] = b2;
-      stop[i] = r2[i] * param.tol_offset[i] * param.tol_offset[i];
+      stop[i] = Solver::stopping(param.tol_offset[i], b2, param.residual_type);
     }
 
     double r2_old;
