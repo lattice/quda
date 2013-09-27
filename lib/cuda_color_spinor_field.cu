@@ -195,7 +195,6 @@ namespace quda {
     //else fieldOrder = (nSpin == 4) ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
-printf("\nPrint bytes: %d\n", bytes);
       v = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
 	norm = device_malloc(norm_bytes);
@@ -726,6 +725,10 @@ printf("\nPrint bytes: %d\n", bytes);
         dynamic_cast<cudaColorSpinorField*>(eigenvec)->eigv_id = idx;
         size_t eigvec_offset = idx*(dynamic_cast<cudaColorSpinorField*>(eigenvec)->Length())*this->Precision();
         (dynamic_cast<cudaColorSpinorField*>(eigenvec))->v = (void*)((char*)(this->v) + eigvec_offset);
+#ifdef USE_TEXTURE_OBJECTS 
+       dynamic_cast<cudaColorSpinorField*>(eigenvec)->destroyTexObject();
+       dynamic_cast<cudaColorSpinorField*>(eigenvec)->createTexObject();
+#endif
       }
       else{
         errorQuda("Incorrect eigenvector index...");
