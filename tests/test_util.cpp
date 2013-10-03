@@ -1555,6 +1555,7 @@ bool tune = true;
 int niter = 10;
 int test_type = 0;
 QudaInverterType inv_type;
+int multishift = 0;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1594,7 +1595,8 @@ void usage(char** argv )
 	 "                                                  wilson/clover/twisted_mass/staggered/asqtad/domain_wall\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
-  printf("    --inv_type <cg/bicgstab/gcr>                # The type of solver to use (default cg)\n");
+  printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
+  printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --help                                    # Print out this message\n"); 
@@ -1807,6 +1809,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
       tune = false;
     }else{
       fprintf(stderr, "ERROR: invalid tuning type\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--multishift") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      multishift = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      multishift = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid multishift boolean\n");	
       exit(1);
     }
 

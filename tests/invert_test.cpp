@@ -42,6 +42,7 @@ extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern QudaInverterType  inv_type;
+extern int multishift; // whether to test multi-shift or standard solver
 
 extern char latfile[];
 
@@ -101,8 +102,6 @@ int main(int argc, char **argv)
   display_test_info();
 
   // *** QUDA parameters begin here.
-
-  int multi_shift = 0; // whether to test multi-shift or standard solver
 
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
@@ -170,14 +169,14 @@ int main(int argc, char **argv)
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-    inv_param.solution_type = multi_shift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
+    inv_param.solution_type = multishift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
   }
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multishift) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -315,7 +314,7 @@ int main(int argc, char **argv)
   void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
   void *spinorOut = NULL, **spinorOutMulti = NULL;
-  if (multi_shift) {
+  if (multishift) {
     spinorOutMulti = (void**)malloc(inv_param.num_offset*sizeof(void *));
     for (int i=0; i<inv_param.num_offset; i++) {
       spinorOutMulti[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
@@ -326,7 +325,7 @@ int main(int argc, char **argv)
 
   memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
   memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  if (multi_shift) {
+  if (multishift) {
     for (int i=0; i<inv_param.num_offset; i++) memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinorSiteSize*sSize);    
   } else {
     memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
@@ -360,7 +359,7 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
   // perform the inversion
-  if (multi_shift) {
+  if (multishift) {
     invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
   } else {
     invertQuda(spinorOut, spinorIn, &inv_param);
@@ -376,7 +375,7 @@ int main(int argc, char **argv)
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
-  if (multi_shift) {
+  if (multishift) {
 
     void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
