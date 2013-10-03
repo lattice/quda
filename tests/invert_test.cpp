@@ -41,6 +41,7 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
+extern QudaInverterType  inv_type;
 
 extern char latfile[];
 
@@ -178,11 +179,10 @@ int main(int argc, char **argv)
 
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.inv_type = QUDA_CG_INVERTER;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
   }
+  inv_param.inv_type = inv_type;
 
   inv_param.pipeline = 0;
 

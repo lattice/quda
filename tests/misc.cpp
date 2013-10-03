@@ -819,12 +819,59 @@ get_dslash_type_str(QudaDslashType type)
   case QUDA_TWISTED_MASS_DSLASH:
     ret= "twisted_mass";
     break;
+  case QUDA_STAGGERED_DSLASH:
+    ret = "staggered";
+    break;
   case QUDA_ASQTAD_DSLASH:
     ret = "asqtad";
     break;
   case QUDA_DOMAIN_WALL_DSLASH:
     ret = "domain_wall";
       break;
+  default:
+    ret = "unknown";	
+    break;
+  }
+  
+  
+  return ret;
+    
+}
+
+QudaInverterType
+get_solver_type(char* s)
+{
+  QudaInverterType ret =  QUDA_INVALID_INVERTER;
+  
+  if (strcmp(s, "cg") == 0){
+    ret = QUDA_CG_INVERTER;
+  }else if (strcmp(s, "bicgstab") == 0){
+    ret = QUDA_BICGSTAB_INVERTER;
+  }else if (strcmp(s, "gcr") == 0){
+    ret = QUDA_GCR_INVERTER;
+  }else{
+    fprintf(stderr, "Error: invalid solver type\n");	
+    exit(1);
+  }
+  
+  return ret;
+}
+
+const char* 
+get_solver_type_str(QudaInverterType type)
+{
+  const char* ret;
+  
+  switch( type){	
+  case QUDA_CG_INVERTER:
+    ret=  "cg";
+    break;
+  case QUDA_BICGSTAB_INVERTER:
+    ret= "bicgstab";
+    break;
+  case QUDA_GCR_INVERTER:
+    ret= "gcr";
+    break;
   default:
     ret = "unknown";	
     break;

@@ -45,7 +45,6 @@ int mySpinorSiteSize;
 
 extern float fat_link_max;
 
-
 void initComms(int argc, char **argv, const int *commDims)
 {
 #if defined(QMP_COMMS)
@@ -1555,6 +1554,7 @@ char latfile[256] = "";
 bool tune = true;
 int niter = 10;
 int test_type = 0;
+QudaInverterType inv_type;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1575,15 +1575,15 @@ void usage(char** argv )
 #endif
   printf("    --prec <double/single/half>               # Precision in GPU\n"); 
   printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
-  printf("    --recon <8/9/12/13/18>                         # Link reconstruction type\n"); 
-  printf("    --recon_sloppy <8/9/12/13/18>                  # Sloppy link reconstruction type\n"); 
+  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n"); 
+  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n"); 
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
   printf("    --sdim <n>                                # Set space dimention(X/Y/Z) size\n"); 
   printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
-  printf("    --Lsdim <n>                                # Set Ls dimension size(default 16)\n");  
+  printf("    --Lsdim <n>                               # Set Ls dimension size(default 16)\n");  
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1594,6 +1594,7 @@ void usage(char** argv )
 	 "                                                  wilson/clover/twisted_mass/staggered/asqtad/domain_wall\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
+  printf("    --inv_type <cg/bicgstab/gcr>                # The type of solver to use (default cg)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --help                                    # Print out this message\n"); 
@@ -1875,6 +1876,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }     
     dslash_type =  get_dslash_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--inv_type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    inv_type =  get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
