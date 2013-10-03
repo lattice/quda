@@ -129,6 +129,10 @@ extern "C" {
    */
   void invert_quda_(void *h_x, void *h_b, QudaInvertParam *param);
 
+  /**
+   * Temporary function exposed for TIFR benchmarking
+   */
+  void set_kernel_pack_t_(int *pack);
 
 #ifdef __cplusplus
 }

@@ -2290,3 +2290,12 @@ void comm_set_gridsize_(int *grid)
   initCommsGridQuda(4, grid, bqcd_rank_from_coords, static_cast<void *>(grid));
 #endif
 }
+
+/**
+ * Exposed due to poor derived MPI datatype performance with GPUDirect RDMA
+ */
+void set_kernel_pack_t_(int* pack) 
+{
+  bool pack_ = *pack ? true : false;
+  setKernelPackT(pack_);
+}
