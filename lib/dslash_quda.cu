@@ -1725,7 +1725,7 @@ namespace quda {
 							    (float*)cloverNormP, in, x, a, dagger);
     }
 
-    dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
 
     delete dslash;
     unbindGaugeTex(gauge);
@@ -1789,7 +1789,7 @@ namespace quda {
 								(float*)cloverNormP, in, x, a, dagger);
     }
 
-    dslashCuda(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
 
     delete dslash;
     unbindGaugeTex(gauge);
