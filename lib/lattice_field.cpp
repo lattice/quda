@@ -29,6 +29,8 @@ namespace quda {
 	surface[i] *= param.x[j];
       }
     }
+
+    if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     stride = volumeCB + pad;
   
