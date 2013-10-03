@@ -564,6 +564,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   cpuParam.cloverInv = h_clovinv;
   cpuParam.invNorm = 0;
   cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
 
   CloverField *in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<CloverField*>(new cpuCloverField(cpuParam)) : 
@@ -577,6 +578,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.direct = h_clover ? true : false;
   clover_param.inverse = h_clovinv ? true : false;
   clover_param.create = QUDA_NULL_FIELD_CREATE;
+  clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
   cloverPrecise = new cudaCloverField(clover_param);
   profileClover.Stop(QUDA_PROFILE_INIT);
 
@@ -1618,6 +1620,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     double nh_b = norm2(*h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
+
   // rescale the source vector to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     axCuda(1.0/sqrt(nb), *b);
