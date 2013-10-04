@@ -2246,6 +2246,8 @@ void updateGaugeFieldQuda(void* gauge,
    */
 
 void init_quda_(int *dev) { initQuda(*dev); }
+void init_quda_device_(int *dev) { initQudaDevice(*dev); }
+void init_quda_memory_() { initQudaMemory(); }
 void end_quda_() { endQuda(); }
 void load_gauge_quda_(void *h_gauge, QudaGaugeParam *param) { loadGaugeQuda(h_gauge, param); }
 void free_gauge_quda_() { freeGaugeQuda(); }

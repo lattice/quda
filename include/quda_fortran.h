@@ -7,7 +7,7 @@
  *
  * The following are Fortran interface functions to QUDA that mirror
  * the C-equivalents.  This essentially just means making all calls by
- * refere, using all the lower-case characters and adding a trailing
+ * reference, using all the lower-case characters and adding a trailing
  * underscore.
  */
 
@@ -16,7 +16,28 @@ extern "C" {
 #endif
 
   /**
-   * Initialize the library.
+   * Initialize the library.  This is a low-level interface that is
+   * called by initQuda.  Calling initQudaDevice requires that the
+   * user also call initQudaMemory before using QUDA.
+   *
+   * @param device CUDA device number to use.  In a multi-GPU build,
+   *               this parameter may either be set explicitly on a
+   *               per-process basis or set to -1 to enable a default
+   *               allocation of devices to processes.  
+   */
+  void init_quda_device_(int *device);
+
+  /**
+   * Initialize the library persistant memory allocations (both host
+   * and device).  This is a low-level interface that is called by
+   * initQuda.  Calling initQudaMemory requires that the user has
+   * previously called initQudaDevice.
+   */
+  void init_quda_memory_();
+
+  /**
+   * Initialize the library.  Under the interface this just calls
+   * initQudaMemory and initQudaDevice.
    *
    * @param device  CUDA device number to use.  In a multi-GPU build,
    *                this parameter may be either set explicitly on a
