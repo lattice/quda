@@ -470,10 +470,21 @@ extern "C" {
 			     QudaComputeFatMethod method);
 
   /**
-   * Compute the gauge force.
+   * Compute the gauge force and update the mometum field
+   *
+   * @param mom The momentum field to be updated
+   * @param sitelink The gauge field from which we compute the force
+   * @param input_path_buf[dim][num_paths][path_length] 
+   * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
+   * @param loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param num_paths How many contributions from path_length different "staples"
+   * @param max_length The maximum number of non-zero of links in any path in the action
+   * @param dt The integration step size (for MILC this is dt*beta/3)
+   * @param param The parameters of the external fields and the computation settings
+   * @param timeinfo
    */
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
-			    void* loop_coeff, int num_paths, int max_length, double eb3,
+			    void* loop_coeff, int num_paths, int max_length, double dt,
 			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
 
   /**
