@@ -2270,7 +2270,9 @@ void new_quda_gauge_param_(QudaGaugeParam *param) {
 void new_quda_invert_param_(QudaInvertParam *param) {
   *param = newQudaInvertParam();
 }
-
+void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, QudaGaugeParam* param) {
+  updateGaugeFieldQuda(gauge, momentum, *dt, param);
+}
 
 /**
  * BQCD wants a node mapping with x varying fastest.

@@ -151,6 +151,19 @@ extern "C" {
   void invert_quda_(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
+   * Evolve the gauge field by step size dt, using the momentum field
+   * I.e., Evalulate U(t+dt) = e(dt pi) U(t) 
+   *
+   * @param gauge The gauge field to be updated 
+   * @param momentum The momentum field
+   * @param dt The integration step size step
+   * @param param The parameters of the external fields and the computation settings
+   */
+  void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, QudaGaugeParam* param);
+
+
+
+  /**
    * Temporary function exposed for TIFR benchmarking
    */
   void set_kernel_pack_t_(int *pack);
