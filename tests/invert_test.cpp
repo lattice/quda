@@ -102,6 +102,7 @@ int main(int argc, char **argv)
   // *** QUDA parameters begin here.
 
   int multi_shift = 0; // whether to test multi-shift or standard solver
+  int deflated    = 1;
 
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
@@ -190,9 +191,14 @@ int main(int argc, char **argv)
   inv_param.tol = 1e-7;
 
 //! For deflated solvers only:
+  if(deflated) inv_param.inv_type = QUDA_EIGCG_INVERTER;
+
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER){
-    inv_param.max_vect_size = 96;
+    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+    inv_param.nev = 16;
+    inv_param.max_vect_size = 32;
   }else{
+    inv_param.nev = 0;
     inv_param.max_vect_size = 0;
   }
 
@@ -235,7 +241,7 @@ int main(int argc, char **argv)
   inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 
   gauge_param.ga_pad = 0; // 24*24*24/2;
-  inv_param.sp_pad = 0; // 24*24*24/2;
+  inv_param.sp_pad = 0;//8*16*16; // 24*24*24/2;
   inv_param.cl_pad = 0; // 24*24*24/2;
 
   // For multi-GPU, ga_pad must be large enough to store a time-slice
@@ -368,8 +374,10 @@ int main(int argc, char **argv)
   // perform the inversion
   if (multi_shift) {
     invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
-  } else {
+  } else if(!deflated){
     invertQuda(spinorOut, spinorIn, &inv_param);
+  }else{
+    invertDeflatedQuda(spinorOut, spinorIn, &inv_param);
   }
 
   // stop the timer

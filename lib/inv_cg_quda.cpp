@@ -275,5 +275,4 @@ namespace quda {
 
     return;
   }
-
 } // namespace quda

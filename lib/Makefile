@@ -13,7 +13,7 @@ QUDA_OBJS = timer.o malloc.o solver.o inv_bicgstab_quda.o		\
 	dirac_domain_wall.o dirac_twisted_mass.o tune.o			\
 	fat_force_quda.o llfat_quda_itf.o clover_quda.o dslash_quda.o	\
 	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
-	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
+	face_gauge.o comm_common.o blas_magma.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -23,7 +23,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
 	gauge_field.h double_single.h texture.h	\
 	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h\
-	gauge_field_order.h clover_field_order.h color_spinor_field_order.h
+	gauge_field_order.h clover_field_order.h color_spinor_field_order.h blas_magma.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h 
@@ -117,8 +117,12 @@ cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
 dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-inv_eigcg_quda.o: inv_eigcg_quda.cpp   
+#inv_eigcg_quda.o: inv_eigcg_quda.cpp   
+#	$(CXX) $(MAGMA_INCLUDE) $(CCXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
+
+blas_magma.o: blas_magma.cpp   
 	$(CXX) $(MAGMA_INCLUDE) $(CCXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
+
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@

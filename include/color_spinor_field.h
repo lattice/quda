@@ -199,8 +199,8 @@ namespace quda {
     ColorSpinorField *even;
     ColorSpinorField *odd;
 
-    //! for the deflated solver, this is a pointer to a particular eigenvector:
-    ColorSpinorField *eigenvec;
+    //! for deflated solvers:
+    std::vector<ColorSpinorField*> eigenvectors;
 
     void createGhostZone();
 
@@ -379,6 +379,8 @@ namespace quda {
     bool isNative() const;
 
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
+
+    void getTexObjectInfo() const;
   };
 
   // Forward declaration of accessor functors

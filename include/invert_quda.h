@@ -350,15 +350,48 @@ namespace quda {
   };
 
 //experimantal EigCG solver
-  class EigCG : public Solver {
+  class DeflatedSolver {
+
+  protected:
+    SolverParam &param;
+    TimeProfile &profile;
+
+  public:
+    DeflatedSolver(SolverParam &param, TimeProfile &profile) : 
+    param(param), profile(profile) { ; }
+    virtual ~DeflatedSolver() { ; }
+
+    virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+
+    // solver factory
+    static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
+			  cudaColorSpinorField *eigenvectors, TimeProfile &profile);
+
+    bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
+		     const double &hq_tol);
+ 
+    /**
+       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
+     */
+    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
+
+    /** 
+	Prints out the summary of the solver convergence (requires a
+	versbosity of QUDA_SUMMARIZE).  Assumes
+	SolverParam.true_res and SolverParam.true_res_hq has
+	been set
+    */
+    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
+
+  };
+
+  class EigCG : public DeflatedSolver {
 
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
 
     cudaColorSpinorField *Vm;  //eigenvector set (spinor matrix of size eigen_vector_length x m)
-    cudaColorSpinorField *v0;//aux arrays??
-    bool init;
 
   public:
     EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, cudaColorSpinorField *vm, SolverParam &param, TimeProfile &profile);

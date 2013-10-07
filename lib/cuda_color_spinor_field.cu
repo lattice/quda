@@ -63,7 +63,6 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false) {  
-
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
 	(param.create == QUDA_REFERENCE_FIELD_CREATE && 
@@ -75,7 +74,6 @@ namespace quda {
     } else {
       errorQuda("Undefined behaviour"); // else silent bug possible?
     }
-
     // This must be set before create is called
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       if (typeid(src) == typeid(cudaColorSpinorField)) {
@@ -85,14 +83,14 @@ namespace quda {
 	errorQuda("Cannot reference a non-cuda field");
       }
 
-      if (src.EigvDim() > 0) {//setup eigenvector form the set
-         eigv_dim    = src.EigvDim();
-       if(src.EigvId() > -1){//Don't like it: bug inside!
-         eigv_id   = src.EigvId();
-         volume    = src.EigvVolume(); 
-         stride    = src.EigvStride();
-         length    = src.EigvLength();
-         v = (char*)v + eigv_id*length*src.Precision();//src already have this pointer?
+      if (this->EigvDim() > 0) {//setup eigenvector form the set
+         eigv_dim    = this->EigvDim();
+       if(this->EigvId() > -1){//Don't like it: bug inside!
+         eigv_id   = this->EigvId();
+         volume    = this->EigvVolume(); 
+         stride    = this->EigvStride();
+         length    = this->EigvLength();
+         v = (char*)v + eigv_id*length*this->Precision();//src already have this pointer?
          //nothing for norm pointer...
        }
       }
@@ -233,7 +231,9 @@ namespace quda {
     }
 
 //! setup an object for selected eigenvector (the 1st one as a default):
-    if (eigv_dim > 0 && siteSubset == QUDA_PARITY_SITE_SUBSET /*&& create != QUDA_REFERENCE_FIELD_CREATE*/ && eigv_id == -1) {
+    if (eigv_dim > 0 && siteSubset == QUDA_PARITY_SITE_SUBSET /*&& create != QUDA_REFERENCE_FIELD_CREATE*/ && eigv_id == -1) 
+    {
+       if (getVerbosity() == QUDA_DEBUG_VERBOSE) printfQuda("\nEigenvector set constructor...\n");
       // create the associated even and odd subsets
        ColorSpinorParam param;
        param.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -243,13 +243,19 @@ namespace quda {
        param.v = v;
        param.norm = 0/*norm*/;//for eigenvectors makes no sense
        param.eigv_dim  = eigv_dim;
-       param.eigv_id = 0;//here is a problem!
+       //reserve eigvector set
+       eigenvectors.reserve(eigv_dim);
        //setup volume, [real_]length and stride for a single eigenvector
-       eigenvec = new cudaColorSpinorField(*this, param);
-#ifdef USE_TEXTURE_OBJECTS //sure this is correct?
-       dynamic_cast<cudaColorSpinorField*>(eigenvec)->destroyTexObject();
-       dynamic_cast<cudaColorSpinorField*>(eigenvec)->createTexObject();
+       for(int id = 0; id < eigv_dim; id++)
+       {
+          param.eigv_id = id;
+          eigenvectors.push_back(new cudaColorSpinorField(*this, param));
+
+#ifdef USE_TEXTURE_OBJECTS //sure this is ok? (a lot of texture objects...)
+          dynamic_cast<cudaColorSpinorField*>(eigenvectors[id])->destroyTexObject();
+          dynamic_cast<cudaColorSpinorField*>(eigenvectors[id])->createTexObject();
 #endif
+       }
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
@@ -270,7 +276,6 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
-
     if (isNative()) {
       if (texInit) errorQuda("Already bound textures");
       
@@ -355,7 +360,11 @@ namespace quda {
       }
       else{
         //! for deflated solvers:
-        if (eigv_dim > 0) delete eigenvec;
+        if (eigv_dim > 0) 
+        {
+          std::vector<ColorSpinorField*>::iterator vec;
+          for(vec = eigenvectors.begin(); vec != eigenvectors.end(); vec++) delete *vec;
+        } 
       }
       alloc = false;
     }
@@ -722,22 +731,28 @@ namespace quda {
     
     if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
       if (idx < this->EigvDim()) {//setup eigenvector form the set
-        dynamic_cast<cudaColorSpinorField*>(eigenvec)->eigv_id = idx;
-        size_t eigvec_offset = idx*(dynamic_cast<cudaColorSpinorField*>(eigenvec)->Length())*this->Precision();
-        (dynamic_cast<cudaColorSpinorField*>(eigenvec))->v = (void*)((char*)(this->v) + eigvec_offset);
-#ifdef USE_TEXTURE_OBJECTS 
-       dynamic_cast<cudaColorSpinorField*>(eigenvec)->destroyTexObject();
-       dynamic_cast<cudaColorSpinorField*>(eigenvec)->createTexObject();
-#endif
+        return *(dynamic_cast<cudaColorSpinorField*>(eigenvectors[idx])); 
       }
       else{
         errorQuda("Incorrect eigenvector index...");
       }
-      return *(dynamic_cast<cudaColorSpinorField*>(eigenvec)); 
     }
-
     errorQuda("Eigenvector must be a parity spinor");
     exit(-1);
   }
 
+    void cudaColorSpinorField::getTexObjectInfo() const
+    {
+#ifdef USE_TEXTURE_OBJECTS
+      printfQuda("\nPrint texture info for the field:\n");
+      std::cout << *this;
+      cudaResourceDesc resDesc;
+      //memset(&resDesc, 0, sizeof(resDesc));
+      cudaGetTextureObjectResourceDesc(&resDesc, this->Tex());
+      printfQuda("\nDevice pointer: %p\n", resDesc.res.linear.devPtr);
+      printfQuda("\nVolume (in bytes): %d\n", resDesc.res.linear.sizeInBytes);
+      if (resDesc.resType == cudaResourceTypeLinear) printfQuda("\nResource type: linear \n");
+      checkCudaError();
+#endif
+    }
 } // namespace quda

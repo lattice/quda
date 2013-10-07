@@ -20,7 +20,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) 
-    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0), eigenvec(0) 
+    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0)
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, 
 	   param.precision, param.pad, param.siteSubset, param.siteOrder, 
@@ -28,7 +28,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) 
-    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0), eigenvec(0)
+    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, 
 	   field.precision, field.pad, field.siteSubset, field.siteOrder, 
@@ -194,6 +194,14 @@ namespace quda {
 
       bytes *= evdim;
       norm_bytes *= evdim;
+    }else{
+      eigv_volume = 0;
+      eigv_stride = 0;
+      eigv_length = 0;
+      eigv_real_length = 0;
+
+      eigv_bytes       = 0;
+      eigv_norm_bytes  = 0; 
     }
 
     clearGhostPointers();
@@ -225,6 +233,11 @@ namespace quda {
     if (param.eigv_dim     != 0 ){
       eigv_dim     = param.eigv_dim;
       eigv_id      = param.eigv_id;
+    }
+    else
+    {
+      eigv_dim     = 0;
+      eigv_id      = -1;
     }
 
     volume = 1;
@@ -385,6 +398,11 @@ namespace quda {
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
+    out << "eigDim = " << a.eigv_dim << std::endl;
+    out << "eigID = " << a.eigv_id << std::endl;
+    out << "eigVolume = " << a.eigv_volume << std::endl;
+    out << "eigStride = " << a.eigv_stride << std::endl;
+    out << "eigLength = " << a.eigv_length << std::endl;
     return out;
   }
 

@@ -1862,20 +1862,13 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   cudaColorSpinorField *evects = NULL;
 
   if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev)) 
-     errorQuda("Incorrect eigenvector space setup...");
+     errorQuda("\nIncorrect eigenvector space setup...\n");
 
-    cudaParam.create   = QUDA_ZERO_FIELD_CREATE;
-    cudaParam.eigv_dim = param->max_vect_size;
-    evects = new cudaColorSpinorField(cudaParam); // solution
+  cudaParam.create   = QUDA_ZERO_FIELD_CREATE;
+  cudaParam.eigv_dim = param->max_vect_size;
+  evects = new cudaColorSpinorField(cudaParam); // solution
+  cudaParam.eigv_dim = 0;
 
-//simple checks:
-   double norm = 0.0;
-   norm = norm2(evects->Eigenvec(12));
-   printf("\nNorm: %le\n", norm);
-
-   norm = norm2(*evects);
-   printf("\nNorm: %le\n", norm);
-  
 
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
@@ -1934,12 +1927,19 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // respectively.
 
   // use EigCG
+  if(param->inv_type == QUDA_EIGCG_INVERTER)
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
     SolverParam solverParam(*param);
-    EigCG eigcg(m, mSloppy, evects, solverParam, profileMulti);
-    eigcg(*x, *b);  
+
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, evects, profileInvert);
+    (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
+    delete solve;
+  }
+  else
+  {
+    errorQuda("\nUnknown deflated solver...\n");
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){
