@@ -26,7 +26,7 @@ void init_magma(blasMagmaParam *param, const int m, const int nev)
     param->lwork_max = param->sideLR; 
 
     magma_malloc_pinned((void**)&(param->W), param->lwork_max*sizeof(magmaDoubleComplex));
-    magma_malloc_pinned((void**)&(param->hTau), param->htsize*sizeof(magmaDoubleComplex));
+    magma_malloc_pinned((void**)&(param->hTau), param->htsize*sizeof(magmaDoubleComplex));//fixed!
     magma_malloc((void**)&(param->dTau), param->dtsize*sizeof(magmaDoubleComplex));
 
     magma_malloc_pinned((void**)&(param->lwork), param->llwork*sizeof(magmaDoubleComplex));
@@ -42,7 +42,7 @@ void shutdown_magma(blasMagmaParam *param)
 {
    if(!param->init) printf("\n\nError: Magma was not initialized..\n"), exit(-1);
    magma_free(param->dTau);
-   magma_free_cpu(param->hTau);
+   magma_free_pinned(param->hTau);
 
    magma_free_pinned(param->W);
    magma_free_pinned(param->lwork);

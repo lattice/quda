@@ -1864,10 +1864,10 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev)) 
      errorQuda("\nIncorrect eigenvector space setup...\n");
 
+  cudaParam.setPrecision(QUDA_DOUBLE_PRECISION);//but now we need (always!) gauge field in double precision
   cudaParam.create   = QUDA_ZERO_FIELD_CREATE;
   cudaParam.eigv_dim = param->max_vect_size;
   evects = new cudaColorSpinorField(cudaParam); // solution
-  cudaParam.eigv_dim = 0;
 
 
   profileInvert.Stop(QUDA_PROFILE_H2D);

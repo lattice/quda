@@ -134,9 +134,9 @@ namespace quda {
     blas_flops = 0;
 
 //EigCG specific code:
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.setPrecision(Vm->Precision());//must be the same precision as Vm
-    cudaColorSpinorField  *v0   = new cudaColorSpinorField(x, csParam); 
+    ColorSpinorParam eigParam(Vm->Eigenvec(0));
+    eigParam.create = QUDA_ZERO_FIELD_CREATE;
+    cudaColorSpinorField  *v0   = new cudaColorSpinorField(Vm->Eigenvec(0), eigParam);  
 
     cudaColorSpinorField &Ap0 = *tmp2_p;
 
@@ -179,7 +179,7 @@ namespace quda {
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
       //save previous mat-vec result 
-      if (l == m) copyCuda(Ap0,Ap);
+      if (l == (m-1)) copyCuda(Ap0,Ap);
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
       alpha0 = alpha;
@@ -191,8 +191,7 @@ namespace quda {
          hTm[l*ldTm+l] = Complex(1/alpha + beta0/alpha0, 0.0);
          
          //Start Rayleigh-Ritz procedure here:
-         if (l == m){
-printf("\nStart updets\n");
+         if (l == (m-1)){
            //Create host version of the Lanczos matrix:
            cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);//how to refine it with streams??
            cudaMemcpy(dTvecm0, dTm, ldTm*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);//how to refine it with streams??
