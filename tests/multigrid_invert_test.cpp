@@ -189,7 +189,7 @@ int main(int argc, char **argv)
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  inv_param.gcrNkrylov = 4;
+  inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -208,7 +208,7 @@ int main(int argc, char **argv)
   inv_param.reliable_delta = 1e-2; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+  inv_param.inv_type_precondition = QUDA_MR_INVERTER;
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;

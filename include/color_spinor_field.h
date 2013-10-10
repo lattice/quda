@@ -111,10 +111,12 @@ namespace quda {
        @param precision New precision value
      */
     void setPrecision(QudaPrecision precision) {
+      // is the current status in native field order?
       bool native = false;
-      if ( ((precision == QUDA_DOUBLE_PRECISION || nSpin ==1) && (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
-	   ((precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION) && nSpin ==4 &&
-	    fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
+      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin ==1) && 
+	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
+	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION) && 
+	    nSpin ==4 && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 	   
       this->precision = precision;
 
