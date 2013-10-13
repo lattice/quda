@@ -121,6 +121,47 @@ namespace quda {
 
   };
 
+
+  template <typename Float>
+    struct Reconstruct<10,Float> {
+    typedef typename mapper<Float>::type RegType;
+
+    Reconstruct(const GaugeField &u) { ; }
+
+    __device__ __host__ inline void Pack(RegType out[10], const RegType in[18], int idx) const {
+      for (int i=0; i<4; i++) out[i] = in[i+2];
+      out[4] = in[10];
+      out[5] = in[11];
+      out[6] = in[1];
+      out[7] = in[9];
+      out[8] = in[17];
+      out[9] = 0.0;
+    }
+
+    __device__ __host__ inline void Unpack(RegType out[18], const RegType in[10],
+					   int idx, int dir, const RegType phase) const {
+      out[0] = 0.0;
+      out[1] = in[6];
+      for (int i=0; i<4; i++) out[i+2] = in[i];
+      out[6] = -out[2];
+      out[7] =  out[3];
+      out[8] = 0.0;
+      out[9] = in[7];
+      out[10] = in[4];
+      out[11] = in[5];
+      out[12] = -out[4];
+      out[13] =  out[5];
+      out[14] = -out[10];
+      out[15] =  out[11];
+      out[16] = 0.0;
+      out[17] = in[8];
+    }
+
+    __device__ __host__ inline void getPhase(RegType* phase, const RegType in[18])
+    { *phase=0; return; }
+
+  };
+
   template <typename Float>
     struct Reconstruct<13,Float> {
     typedef typename mapper<Float>::type RegType;
