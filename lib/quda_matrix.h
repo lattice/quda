@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <cuda.h>
 
+#include <complex_quda.h>
+
 namespace quda{
 
   // Given a real type T, returns the corresponding complex type
@@ -295,6 +297,21 @@ namespace quda{
         __device__ __host__ inline T & operator()(int i, int j){
           return data[index<N>(i,j)];
         }
+
+        __device__ __host__ inline complex<typename RealTypeId<T>::Type> const & operator()(int i) const{
+	  int j = i % N;
+	  int k = i / N;
+	  return static_cast<complex<typename RealTypeId<T>::Type> >
+	    (data[index<N>(j,k)]);
+        }
+
+        __device__ __host__ inline complex<typename RealTypeId<T>::Type>& operator()(int i) {
+	  int j = i % N;
+	  int k = i / N;
+	  return static_cast<complex<typename RealTypeId<T>::Type>& >
+	    (data[index<N>(j,k)]);
+        }
+
     };
 
   template<class T>
@@ -426,7 +443,9 @@ namespace quda{
       Matrix<T,N> result;
       for(int i=0; i<N; ++i){
         for(int j=0; j<N; ++j){
-          result(i,j) = conj(other(j,i));
+          result(i,j) = 
+	    conj(static_cast<complex<typename RealTypeId<T>::Type> >
+		 (other(j,i)));
         }
       }
       return result;

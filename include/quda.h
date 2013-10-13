@@ -494,9 +494,12 @@ extern "C" {
    * @param gauge The gauge field to be updated 
    * @param momentum The momentum field
    * @param dt The integration step size step
+   * @param conj_mom Whether to conjugate the momentum matrix
+   * @param exact Whether to use an exact exponential or Taylor expand
    * @param param The parameters of the external fields and the computation settings
    */
-  void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, QudaGaugeParam* param);
+  void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, 
+			    int conj_mom, int exact, QudaGaugeParam* param);
 
 #ifdef __cplusplus
 }

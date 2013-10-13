@@ -157,11 +157,29 @@ extern "C" {
    * @param gauge The gauge field to be updated 
    * @param momentum The momentum field
    * @param dt The integration step size step
+   * @param conj_mom Whether to conjugate the momentum matrix
+   * @param exact Whether to use an exact exponential or Taylor expand
    * @param param The parameters of the external fields and the computation settings
    */
-  void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, QudaGaugeParam* param);
+  void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, 
+				bool *conj_mom, bool *exact, QudaGaugeParam* param);
 
-
+  /**
+   * Compute the gauge force and update the mometum field
+   *
+   * @param mom The momentum field to be updated
+   * @param gauge The gauge field from which we compute the force
+   * @param input_path_buf[dim][num_paths][path_length] (Fortran 3-d array)
+   * @param path_length One less that the number of links in a loop (e.g., 3 for a staple)
+   * @param loop_coeff Coefficients of the different loops in the Symanzik action
+   * @param num_paths How many contributions from path_length different "staples"
+   * @param max_length The maximum number of non-zero of links in any path in the action
+   * @param dt The integration step size (for MILC this is dt*beta/3)
+   * @param param The parameters of the external fields and the computation settings
+   */
+  int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int *path_length,
+				double *loop_coeff, int num_paths, int max_length, double dt,
+				QudaGaugeParam *qudaGaugeParam);
 
   /**
    * Temporary function exposed for TIFR benchmarking
