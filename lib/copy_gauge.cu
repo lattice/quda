@@ -418,6 +418,21 @@ namespace quda {
 
   }
 
+  void checkMomOrder(const GaugeField &u) {
+    if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+      if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+      if (u.Reconstruct() != QUDA_RECONSTRUCT_NO)
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+    } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+      if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+    } else {
+      errorQuda("Unsupported gauge field order %d", u.Order());
+    }
+  }
+
   template <typename FloatOut, typename FloatIn>
   void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, 
 		 FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
@@ -432,62 +447,85 @@ namespace quda {
     } else {
       if (location != QUDA_CPU_FIELD_LOCATION) errorQuda("Location %d not supported", location);
 
-      // we are doing momentum field packing
-      if (in.Reconstruct() != QUDA_RECONSTRUCT_10 || out.Reconstruct() != QUDA_RECONSTRUCT_10) {
-	errorQuda("Unsupported reconstruction types out=%d in=%d for momentum field", 
-		  out.Reconstruct(), in.Reconstruct());
-      }
+      checkMomOrder(in);
+      checkMomOrder(out);
     
       int faceVolumeCB[QUDA_MAX_DIM];
       for (int d=0; d<in.Ndim(); d++) faceVolumeCB[d] = in.SurfaceCB(d) * in.Nface();
 
-      // momentum only currently supported on MILC and Float2 fields currently
+      // momentum only currently supported on MILC (10), TIFR (18) and Float2 (10) fields currently
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	  CopyGaugeArg<FloatNOrder<FloatOut,10,2,10>, FloatNOrder<FloatIn,10,2,10> >
-	    arg(FloatNOrder<FloatOut,10,2,10>(out, Out), 
-		FloatNOrder<FloatIn,10,2,10>(in, In), in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
-	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-
+	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	    CopyGaugeArg<FloatNOrder<FloatOut,10,2,10>, FloatNOrder<FloatIn,10,2,10> >
+	      arg(FloatNOrder<FloatOut,10,2,10>(out, Out), 
+		  FloatNOrder<FloatIn,10,2,10>(in, In), in.Volume(), faceVolumeCB, in.Ndim());
+	    copyGauge<FloatOut,FloatIn,10>(arg);
+	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 #ifdef BUILD_MILC_INTERFACE
-	  CopyGaugeArg<FloatNOrder<FloatOut,10,2,10>, MILCOrder<FloatIn,10> >
-	    arg(FloatNOrder<FloatOut,10,2,10>(out, Out), MILCOrder<FloatIn,10>(in, In), 
-		in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
+	    CopyGaugeArg<FloatNOrder<FloatOut,10,2,10>, MILCOrder<FloatIn,10> >
+	      arg(FloatNOrder<FloatOut,10,2,10>(out, Out), MILCOrder<FloatIn,10>(in, In), 
+		  in.Volume(), faceVolumeCB, in.Ndim());
+	    copyGauge<FloatOut,FloatIn,10>(arg);
+#else
+	    errorQuda("MILC interface has not been built\n");
+#endif
+	    
+	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
+#ifdef BUILD_TIFR_INTERFACE
+	    CopyGaugeArg<FloatNOrder<FloatOut,18,2,10>, TIFROrder<FloatIn,18> >
+	      arg(FloatNOrder<FloatOut,18,2,10>(out, Out), TIFROrder<FloatIn,18>(in, In), 
+		  in.Volume(), faceVolumeCB, in.Ndim());
+	    copyGauge<FloatOut,FloatIn,18>(arg);
+#else
+	    errorQuda("TIFR interface has not been built\n");
+#endif
+	    
+	  } else {
+	    errorQuda("Gauge field orders %d not supported", in.Order());
+	  }
+	} else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
+#ifdef BUILD_MILC_INTERFACE
+	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	    CopyGaugeArg<MILCOrder<FloatOut,10>, FloatNOrder<FloatIn,10,2,10> >
+	      arg(MILCOrder<FloatOut,10>(out, Out), FloatNOrder<FloatIn,10,2,10>(in, In),
+		  in.Volume(), faceVolumeCB, in.Ndim());
+	    copyGauge<FloatOut,FloatIn,10>(arg);
+	  } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
+	    CopyGaugeArg<MILCOrder<FloatOut,10>, MILCOrder<FloatIn,10> >
+	      arg(MILCOrder<FloatOut,10>(out, Out), MILCOrder<FloatIn,10>(in, In),
+		  in.Volume(), faceVolumeCB, in.Ndim());
+	    copyGauge<FloatOut,FloatIn,10>(arg);
+	  } else {
+	    errorQuda("Gauge field orders %d not supported", in.Order());
+	  }
 #else
 	  errorQuda("MILC interface has not been built\n");
 #endif
-
-	} else {
-	  errorQuda("Gauge field orders %d not supported", in.Order());
-	}
-      } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
-
-#ifdef BUILD_MILC_INTERFACE
-	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	  CopyGaugeArg<MILCOrder<FloatOut,10>, FloatNOrder<FloatIn,10,2,10> >
-	    arg(MILCOrder<FloatOut,10>(out, Out), FloatNOrder<FloatIn,10,2,10>(in, In),
-		in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
-	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
-	  CopyGaugeArg<MILCOrder<FloatOut,10>, MILCOrder<FloatIn,10> >
-	    arg(MILCOrder<FloatOut,10>(out, Out), MILCOrder<FloatIn,10>(in, In),
-		in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
-	} else {
-	  errorQuda("Gauge field orders %d not supported", in.Order());
-	}
+	  
+	} else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
+#ifdef BUILD_TIFR_INTERFACE
+	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+	    CopyGaugeArg<TIFROrder<FloatOut,18>, FloatNOrder<FloatIn,18,2,10> >
+	      arg(TIFROrder<FloatOut,18>(out, Out), FloatNOrder<FloatIn,18,2,10>(in, In),
+		  in.Volume(), faceVolumeCB, in.Ndim());
+	    copyGauge<FloatOut,FloatIn,18>(arg);
+	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
+	    CopyGaugeArg<TIFROrder<FloatOut,18>, TIFROrder<FloatIn,18> >
+	      arg(TIFROrder<FloatOut,18>(out, Out), TIFROrder<FloatIn,18>(in, In),
+		  in.Volume(), faceVolumeCB, in.Ndim());
+	    copyGauge<FloatOut,FloatIn,10>(arg);
+	  } else {
+	    errorQuda("Gauge field orders %d not supported", in.Order());
+	  }
 #else
-	errorQuda("MILC interface has not been built\n");
+	  errorQuda("TIFR interface has not been built\n");
 #endif
-
-      } else {
-	errorQuda("Gauge field orders %d not supported", out.Order());
-      }
+	} else {
+	  errorQuda("Gauge field orders %d not supported", out.Order());
+	}
     }
   }
-
+  
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
