@@ -2104,17 +2104,17 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->site_ga_pad = gParamSL.pad;//need to record this value
 
   gParamMom.pad = 0;
-  gParamMom.order = QUDA_MILC_GAUGE_ORDER;
+  //gParamMom.order = QUDA_MILC_GAUGE_ORDER; 
+  // FIXME - does MILC ever use different ordering for mom and link fields?
   gParamMom.precision = qudaGaugeParam->cpu_prec;
-  gParamMom.create =QUDA_REFERENCE_FIELD_CREATE;
+  gParamMom.create = QUDA_REFERENCE_FIELD_CREATE;
 
-#ifndef BUILD_TIFR_INTERFACE // FIXME
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
-  gParamMom.reconstruct =QUDA_RECONSTRUCT_10;  
-#else
-  gParamMom.link_type = QUDA_SU3_LINKS;
-  gParamMom.reconstruct =QUDA_RECONSTRUCT_NO;  
-#endif
+  if (gParam.order == QUDA_TIFR_GAUGE_ORDER) {
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  } else {
+    gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  }
 
   gParamMom.gauge=mom;
   cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
@@ -2123,13 +2123,8 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamMom.create = QUDA_NULL_FIELD_CREATE;  
   gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
 
-#ifndef BUILD_TIFR_INTERFACE // FIXME
   gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
-#else
-  gParamMom.link_type = QUDA_SU3_LINKS;
-  gParamMom.reconstruct =QUDA_RECONSTRUCT_NO;  
-#endif
 
   gParamMom.precision = qudaGaugeParam->cuda_prec;
   cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
@@ -2144,7 +2139,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   profileGaugeForce.Start(QUDA_PROFILE_COMMS);
   int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
   exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
-      cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
+			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
   profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
 
   profileGaugeForce.Start(QUDA_PROFILE_H2D);
@@ -2305,25 +2300,26 @@ void update_gauge_field_quda_(void *gauge, void *momentum, double *dt,
 }
 
 int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int *path_length,
-			     double *loop_coeff, int num_paths, int max_length, double dt,
+			     double *loop_coeff, int *num_paths, int *max_length, double *dt,
 			     QudaGaugeParam *param) {
+
   // fortran uses multi-dimenional arrays which we have convert into an array of pointers to pointers 
   const int dim = 4;
   int ***input_path = (int***)safe_malloc(dim*sizeof(int**));
   for (int i=0; i<dim; i++) {
-    input_path[i] = (int**)safe_malloc(num_paths*sizeof(int*));
-    for (int j=0; j<num_paths; j++) {
+    input_path[i] = (int**)safe_malloc(*num_paths*sizeof(int*));
+    for (int j=0; j<*num_paths; j++) {
       input_path[i][j] = (int*)safe_malloc(path_length[j]*sizeof(int));
       for (int k=0; k<path_length[j]; k++) {
-	input_path[i][j][k] = input_path_buf[(i*num_paths + j)*path_length[j] + k];
+	input_path[i][j][k] = input_path_buf[(i* (*num_paths) + j)* (*max_length) + k];
       }
     }
   }
 
-  computeGaugeForceQuda(mom, gauge, input_path, path_length, loop_coeff, num_paths, max_length, dt, param, 0);
+  computeGaugeForceQuda(mom, gauge, input_path, path_length, loop_coeff, *num_paths, *max_length, *dt, param, 0);
 
   for (int i=0; i<dim; i++) {
-    for (int j=0; num_paths; j++) host_free(input_path[i][j]);
+    for (int j=0; *num_paths; j++) host_free(input_path[i][j]);
     host_free(input_path[i]);
   }
   host_free(input_path);

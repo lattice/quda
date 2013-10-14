@@ -178,7 +178,7 @@ extern "C" {
    * @param param The parameters of the external fields and the computation settings
    */
   int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int *path_length,
-				double *loop_coeff, int num_paths, int max_length, double dt,
+				double *loop_coeff, int *num_paths, int *max_length, double *dt,
 				QudaGaugeParam *qudaGaugeParam);
 
   /**
