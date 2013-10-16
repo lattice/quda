@@ -1452,7 +1452,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   for (int i=0; i<momSiteSize; i++) iter[i] = 0;
   
   for (int i=0; i<len; i++) {
-    for (int j=0; j<momSiteSize; j++) {
+    for (int j=0; j<momSiteSize-1; j++) {
       int is = i*momSiteSize+j;
       double diff = fabs(momA[is]-momB[is]);
       for (int f=0; f<fail_check; f++)
