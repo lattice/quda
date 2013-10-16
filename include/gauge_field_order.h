@@ -122,8 +122,9 @@ namespace quda {
   };
 
 
+  // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
   template <typename Float>
-    struct Reconstruct<10,Float> {
+    struct Reconstruct<11,Float> {
     typedef typename mapper<Float>::type RegType;
 
     Reconstruct(const GaugeField &u) { ; }

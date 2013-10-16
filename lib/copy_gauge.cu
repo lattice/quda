@@ -472,8 +472,8 @@ namespace quda {
 	    
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {
 #ifdef BUILD_TIFR_INTERFACE
-	    CopyGaugeArg<FloatNOrder<FloatOut,18,2,10>, TIFROrder<FloatIn,18> >
-	      arg(FloatNOrder<FloatOut,18,2,10>(out, Out), TIFROrder<FloatIn,18>(in, In), 
+	    CopyGaugeArg<FloatNOrder<FloatOut,18,2,11>, TIFROrder<FloatIn,18> >
+	      arg(FloatNOrder<FloatOut,18,2,11>(out, Out), TIFROrder<FloatIn,18>(in, In), 
 		  in.Volume(), faceVolumeCB, in.Ndim());
 	    copyGauge<FloatOut,FloatIn,18>(arg);
 #else
@@ -505,8 +505,9 @@ namespace quda {
 	} else if (out.Order() == QUDA_TIFR_GAUGE_ORDER) {
 #ifdef BUILD_TIFR_INTERFACE
 	  if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-	    CopyGaugeArg<TIFROrder<FloatOut,18>, FloatNOrder<FloatIn,18,2,10> >
-	      arg(TIFROrder<FloatOut,18>(out, Out), FloatNOrder<FloatIn,18,2,10>(in, In),
+	    // FIX ME - 11 is a misnomer to avoid confusion in template instantiation
+	    CopyGaugeArg<TIFROrder<FloatOut,18>, FloatNOrder<FloatIn,18,2,11> >
+	      arg(TIFROrder<FloatOut,18>(out, Out), FloatNOrder<FloatIn,18,2,11>(in, In),
 		  in.Volume(), faceVolumeCB, in.Ndim());
 	    copyGauge<FloatOut,FloatIn,18>(arg);
 	  } else if (in.Order() == QUDA_TIFR_GAUGE_ORDER) {

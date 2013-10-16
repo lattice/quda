@@ -287,7 +287,8 @@ namespace quda {
 			  QudaFieldLocation location) {
     if (mom.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (mom.Reconstruct() == QUDA_RECONSTRUCT_10) {
-	updateGaugeField<Float>(out, in, FloatNOrder<Float,18,2,10>(mom), dt, mom.X(), conj_mom, exact, location);
+	// FIX ME - 11 is a misnomer to avoid confusion in template instantiation
+	updateGaugeField<Float>(out, in, FloatNOrder<Float,18,2,11>(mom), dt, mom.X(), conj_mom, exact, location);
       } else {
 	errorQuda("Reconstruction type not supported");
       }
