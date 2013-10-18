@@ -66,8 +66,9 @@ namespace quda {
 	size_t nbytes = nFace * surface[i] * reconstruct * precision;
 	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
       }  
-      // exchange the boundaries
-      exchangeGhost();
+      // exchange the boundaries if a non-trivial field
+      if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE) 
+	exchangeGhost();
     }
 
     // compute the fat link max now in case it is needed later (i.e., for half precision)
