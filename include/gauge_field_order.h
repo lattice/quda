@@ -599,7 +599,7 @@ namespace quda {
     LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
       volumeCB(u.VolumeCB()), geometry(geometry) { ; }
   MILCOrder(const MILCOrder &order) : LegacyOrder<Float,length>(order), 
-      gauge(order.gauge), volumeCB(order.volumeCB), geometry(geometry)
+      gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
     virtual ~MILCOrder() { ; }
 
@@ -634,7 +634,7 @@ namespace quda {
       volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3), geometry(geometry)
       { if (length != 18) errorQuda("Gauge length %d not supported", length); }
   CPSOrder(const CPSOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge), 
-      volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3), geometry(geometry)
+      volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3), geometry(order.geometry)
       { ; }
     virtual ~CPSOrder() { ; }
 
