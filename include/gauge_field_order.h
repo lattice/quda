@@ -594,21 +594,24 @@ namespace quda {
     typedef typename mapper<Float>::type RegType;
     Float *gauge;
     const int volumeCB;
-  MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
-    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()) { ; }
-  MILCOrder(const MILCOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB)
+    const int geometry;
+  MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, int geometry=4) : 
+    LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
+      volumeCB(u.VolumeCB()), geometry(geometry) { ; }
+  MILCOrder(const MILCOrder &order) : LegacyOrder<Float,length>(order), 
+      gauge(order.gauge), volumeCB(order.volumeCB), geometry(geometry)
       { ; }
     virtual ~MILCOrder() { ; }
 
     __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
       for (int i=0; i<length; i++) {
-	v[i] = (RegType)gauge[((parity*volumeCB+x)*4 + dir)*length + i];
+	v[i] = (RegType)gauge[((parity*volumeCB+x)*geometry + dir)*length + i];
       }
     }
 
     __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
       for (int i=0; i<length; i++) {
-	gauge[((parity*volumeCB+x)*4 + dir)*length + i] = (Float)v[i];
+	gauge[((parity*volumeCB+x)*geometry + dir)*length + i] = (Float)v[i];
       }
     }
 
@@ -625,11 +628,13 @@ namespace quda {
     const int volumeCB;
     const Float anisotropy;
     const int Nc;
-  CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
-    : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3) 
+    const int geometry;
+  CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, int geometry=4) 
+    : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
+      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3), geometry(geometry)
       { if (length != 18) errorQuda("Gauge length %d not supported", length); }
   CPSOrder(const CPSOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge), 
-      volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3)
+      volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3), geometry(geometry)
       { ; }
     virtual ~CPSOrder() { ; }
 
@@ -639,7 +644,7 @@ namespace quda {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
 	    v[(i*Nc+j)*2+z] = 
-	      (RegType)(gauge[((((parity*volumeCB+x)*4 + dir)*Nc + j)*Nc + i)*2 + z] / anisotropy);
+	      (RegType)(gauge[((((parity*volumeCB+x)*geometry + dir)*Nc + j)*Nc + i)*2 + z] / anisotropy);
 	  }
 	}
       }
@@ -649,7 +654,7 @@ namespace quda {
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
-	    gauge[((((parity*volumeCB+x)*4 + dir)*Nc + j)*Nc + i)*2 + z] = 
+	    gauge[((((parity*volumeCB+x)*geometry + dir)*Nc + j)*Nc + i)*2 + z] = 
 	      (Float)(anisotropy * v[(i*Nc+j)*2+z]);
 	  }
 	}

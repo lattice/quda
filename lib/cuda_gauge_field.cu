@@ -138,6 +138,9 @@ namespace quda {
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
   void cudaGaugeField::exchangeGhost() {
+    if (geometry != QUDA_VECTOR_GEOMETRY) 
+      errorQuda("Cannot exchange for %d geometry gauge field", geometry);
+
     if (ghostExchange) return;
 
     void *ghost_[QUDA_MAX_DIM];
@@ -207,8 +210,6 @@ namespace quda {
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
   {
-    if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
-
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
       if (cpu.Order() == QUDA_MILC_GAUGE_ORDER ||
 	  cpu.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
@@ -276,8 +277,6 @@ namespace quda {
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const
   {
-    if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
-
     // FIXME use the generic copying for the below copying
     // do device-side reordering then copy
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {

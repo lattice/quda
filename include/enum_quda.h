@@ -332,9 +332,9 @@ extern "C" {
   } QudaFatLinkFlag;
 
   typedef enum QudaFieldGeometry_s {
-    QUDA_SCALAR_GEOMETRY,
-    QUDA_VECTOR_GEOMETRY,
-    QUDA_TENSOR_GEOMETRY,
+    QUDA_SCALAR_GEOMETRY = 1,
+    QUDA_VECTOR_GEOMETRY = 4,
+    QUDA_TENSOR_GEOMETRY = 6,
     QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
 
