@@ -2087,7 +2087,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif
 
   gParamSL.pad = 0;
-#ifngitdef MULTI_GPU
+#ifndef MULTI_GPU
   gParamSL.create = QUDA_REFERENCE_FIELD_CREATE;
   gParamSL.gauge = sitelink;
   cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParamSL);
