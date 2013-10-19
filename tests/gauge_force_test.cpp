@@ -499,8 +499,6 @@ gauge_force_test(void)
   }
 
 #endif
-  
-
 
   void* mom = malloc(4*V*momSiteSize*gSize);
   void* refmom = malloc(4*V*momSiteSize*gSize);
@@ -559,16 +557,9 @@ gauge_force_test(void)
   /* Multiple execution to exclude warmup time in the first run*/
   for (int i =0;i < attempts; i++){
     gettimeofday(&t0, NULL);
-#ifdef MULTI_GPU
-    computeGaugeForceQuda(mom, sitelink_ex,  input_path_buf, length,
-			  loop_coeff, num_paths, max_length, eb3,
-			  &qudaGaugeParam, timeinfo);
-    
-#else
     computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
 			  loop_coeff, num_paths, max_length, eb3,
 			  &qudaGaugeParam, timeinfo);
-#endif  
     gettimeofday(&t1, NULL);
   }
   
