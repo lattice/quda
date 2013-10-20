@@ -2075,10 +2075,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   QudaGaugeParam qudaGaugeParam_ex_buf;
   QudaGaugeParam* qudaGaugeParam_ex=&qudaGaugeParam_ex_buf;
   memcpy(qudaGaugeParam_ex, qudaGaugeParam, sizeof(QudaGaugeParam));
-  E[0] = qudaGaugeParam_ex->X[0] = qudaGaugeParam->X[0] + 4;
-  E[1] = qudaGaugeParam_ex->X[1] = qudaGaugeParam->X[1] + 4;
-  E[2] = qudaGaugeParam_ex->X[2] = qudaGaugeParam->X[2] + 4;
-  E[3] = qudaGaugeParam_ex->X[3] = qudaGaugeParam->X[3] + 4;
+  for (int d=0; d<4; d++) E[d] = qudaGaugeParam_ex->X[d] = qudaGaugeParam->X[d] + 4;
 #endif
 
   GaugeFieldParam gParam(0, *qudaGaugeParam);
@@ -2092,34 +2089,53 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   int pad = X[2]*X[1]*X[0]/2;
 #endif
 
-  GaugeFieldParam& gParamMom = gParam;
-
+  gParamSL.pad = 0;
+#ifndef MULTI_GPU
   gParamSL.create = QUDA_REFERENCE_FIELD_CREATE;
   gParamSL.gauge = sitelink;
-  gParamSL.pad = 0;
-  cpuGaugeField* cpuSiteLink = new cpuGaugeField(gParamSL);
-
+  cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParamSL);
+#else
+  // need to get host gauge field into extended order (can be MILC or QDP)
+  GaugeFieldParam appParam = gParam;
+  appParam.order = gParam.order;
+  appParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  appParam.gauge = sitelink;
+  
+  cpuGaugeField appLink(appParam);
+  
+  gParamSL.order = QUDA_MILC_GAUGE_ORDER;
+  gParamSL.create = QUDA_NULL_FIELD_CREATE;
+  cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParamSL);
+  
+  copyExtendedGauge(*cpuSiteLink, appLink, 2, QUDA_CPU_FIELD_LOCATION);
+#endif
+  
   gParamSL.create = QUDA_NULL_FIELD_CREATE;
   gParamSL.pad = pad;
   gParamSL.reconstruct = qudaGaugeParam->reconstruct;
-  gParamSL.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  gParamSL.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
+		    qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParamSL);  
   qudaGaugeParam->site_ga_pad = gParamSL.pad;//need to record this value
 
+  GaugeFieldParam &gParamMom = gParam;
   gParamMom.pad = 0;
-  //gParamMom.order = QUDA_MILC_GAUGE_ORDER; 
-  // FIXME - does MILC ever use different ordering for mom and link fields?
+  gParamMom.order = qudaGaugeParam->gauge_order;
+  // FIXME - test program uses MILC for mom but can use QDP for gauge
+  if (gParamMom.order == QUDA_QDP_GAUGE_ORDER) gParamMom.order = QUDA_MILC_GAUGE_ORDER;
   gParamMom.precision = qudaGaugeParam->cpu_prec;
-  gParamMom.create = QUDA_REFERENCE_FIELD_CREATE;
 
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
-  if (gParam.order == QUDA_TIFR_GAUGE_ORDER) {
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParamMom.create = QUDA_REFERENCE_FIELD_CREATE;
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER) {
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
   } else {
-    gParam.reconstruct = QUDA_RECONSTRUCT_10;
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
   }
 
   gParamMom.gauge=mom;
+
   cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
 
   gParamMom.pad = pad;
@@ -2166,6 +2182,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 
 
   profileGaugeForce.Start(QUDA_PROFILE_D2H);
+
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   profileGaugeForce.Stop(QUDA_PROFILE_D2H);
 
@@ -2387,10 +2404,12 @@ int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int 
   computeGaugeForceQuda(mom, gauge, input_path, path_length, loop_coeff, *num_paths, *max_length, *dt, param, 0);
 
   for (int i=0; i<dim; i++) {
-    for (int j=0; *num_paths; j++) host_free(input_path[i][j]);
+    for (int j=0; j<*num_paths; j++) { host_free(input_path[i][j]); }
     host_free(input_path[i]);
   }
   host_free(input_path);
+
+  return 0;
 }
 
 /**
