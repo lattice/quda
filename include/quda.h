@@ -501,6 +501,8 @@ extern "C" {
   void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, 
 			    int conj_mom, int exact, QudaGaugeParam* param);
 
+  void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, 
+                                   QudaParity parity, QudaGaugeParam* param);
 #ifdef __cplusplus
 }
 #endif

@@ -114,6 +114,9 @@ static TimeProfile profileGaugeForce("computeGaugeForceQuda");
 //!<Profiler for updateGaugeFieldQuda 
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 
+//!<Profiler for updateGaugeFieldQuda
+static TimeProfile profileCloverDerivative("computeCloverDerivativeQuda");
+
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
@@ -2188,6 +2191,71 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif // GPU_GAUGE_FORCE
   return 0;  
 }
+
+
+void computeCloverDerivativeQuda(void* out,
+                                 void* gauge,
+                                 void* oprod,
+                                 QudaParity parity,
+                                 QudaGaugeParam* param)
+{
+  profileCloverDerivative.Start(QUDA_PROFILE_TOTAL);
+
+  checkGaugeParam(param);
+  
+  profileCloverDerivative.Start(QUDA_PROFILE_INIT);
+  GaugeFieldParam gParam(0, *param);
+
+  // create the host fields 
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.pad = 0;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = QUDA_SU3_LINKS;
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.gauge = gauge;
+  cpuGaugeField cpuGauge(gParam);
+
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.gauge = oprod;
+  cpuGaugeField cpuOprod(gParam);
+
+  gParam.gauge = out;
+  cpuGaugeField cpuOut(gParam);
+
+  // copy fields to the device
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam.link_type = QUDA_SU3_LINKS;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaGaugeField cudaGauge(gParam);
+  
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  cudaGaugeField cudaOprod(gParam);
+
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaGaugeField cudaOut(gParam);
+
+  profileCloverDerivative.Stop(QUDA_PROFILE_INIT);
+
+  // load fields onto the device
+  profileCloverDerivative.Start(QUDA_PROFILE_H2D);
+  cudaGauge.loadCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaOprod.loadCPUField(cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
+
+  // Additional load just as a test
+  cudaOut.loadCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
+
+  profileCloverDerivative.Start(QUDA_PROFILE_D2H);
+  cudaOprod.saveCPUField(cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
+
+  profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
+  
+  return;
+}
+
+
 
 
 void updateGaugeFieldQuda(void* gauge, 
