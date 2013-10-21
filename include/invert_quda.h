@@ -125,8 +125,8 @@ namespace quda {
 
     // EigCG solver parameters
 
-    int nev;
-    int m;
+    int nev;//number of eigenvectors produced by EigCG
+    int m;//Dimension of the search space
     
     /**
        Constructor that matches the initial values to that of the
@@ -155,7 +155,7 @@ namespace quda {
 
       if((param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
         m = (m / 16) * 16 + 16;
-        warningQuda("\nSwitched eigenvector subspace dimension to %d\n", m);
+        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
       }
     }
     ~SolverParam() { }
@@ -361,11 +361,11 @@ namespace quda {
     param(param), profile(profile) { ; }
     virtual ~DeflatedSolver() { ; }
 
-    virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+    virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &eigvset, cudaColorSpinorField &in) = 0;
 
     // solver factory
     static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
-			  cudaColorSpinorField *eigenvectors, TimeProfile &profile);
+			  ColorSpinorParam *eigenvParam, TimeProfile &profile);
 
     bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
 		     const double &hq_tol);
@@ -391,13 +391,13 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
 
-    cudaColorSpinorField *Vm;  //eigenvector set (spinor matrix of size eigen_vector_length x m)
+    cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
   public:
-    EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, cudaColorSpinorField *vm, SolverParam &param, TimeProfile &profile);
+    EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile);
     virtual ~EigCG();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &eigvset, cudaColorSpinorField &in);
   };
 
 

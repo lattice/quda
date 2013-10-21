@@ -1858,18 +1858,6 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     x = new cudaColorSpinorField(cudaParam); // solution
   }
 
-  //create an eigenvector set here:
-  cudaColorSpinorField *evects = NULL;
-
-  if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev)) 
-     errorQuda("\nIncorrect eigenvector space setup...\n");
-
-  cudaParam.setPrecision(QUDA_DOUBLE_PRECISION);//but now we need (always!) gauge field in double precision
-  cudaParam.create   = QUDA_ZERO_FIELD_CREATE;
-  cudaParam.eigv_dim = param->max_vect_size;
-  evects = new cudaColorSpinorField(cudaParam); // solution
-
-
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
   double nb = norm2(*b);
@@ -1926,14 +1914,30 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // taken care of by Dirac::prepare() and Dirac::reconstruct(),
   // respectively.
 
-  // use EigCG
+  // use EigCG (test version!)
+  // create an eigenvector set here:
+  cudaColorSpinorField *evects = NULL;
+
+  if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev)) 
+     errorQuda("\nIncorrect eigenvector space setup...\n");
+
+  ColorSpinorParam eigvParam(cpuParam, *param);
+  //if(param->cuda_sloppy_precision != QUDA_DOUBLE_PRECISION)//currently half precision is not supported
+      //eigvParam.setPrecision(param->cuda_prec_sloppy);
+  //else 
+      //eigvParam.setPrecision(param->cuda_prec);
+  eigvParam.setPrecision(param->cuda_prec);
+  eigvParam.create   = QUDA_ZERO_FIELD_CREATE;
+  eigvParam.eigv_dim = param->nev;
+  evects = new cudaColorSpinorField(eigvParam); // eigenvectors
+
   if(param->inv_type == QUDA_EIGCG_INVERTER)
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
     SolverParam solverParam(*param);
 
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, evects, profileInvert);
-    (*solve)(*out, *in);
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, &eigvParam, profileInvert);
+    (*solve)(*out, *evects, *in);
     solverParam.updateInvertParam(*param);
     delete solve;
   }

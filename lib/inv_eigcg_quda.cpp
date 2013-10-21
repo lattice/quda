@@ -26,19 +26,23 @@ WARNING: for coalescing m must be multiple of 16, use pad for other choises
 
 namespace quda {
 
-  EigCG::EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, cudaColorSpinorField *vm, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), Vm(vm) //eigenvector set from a given object?
+  EigCG::EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy)
   {
-
+    if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or search space is too small..)\n");
+    //Create an eigenvector set:
+    eigvParam->create   = QUDA_ZERO_FIELD_CREATE;
+    eigvParam->eigv_dim = param.m;
+    Vm = new cudaColorSpinorField(*eigvParam); // solution
   }
 
   EigCG::~EigCG() {
 
-    //delete Vm;
+    delete Vm;
 
   }
 
-  void EigCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void EigCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &e, cudaColorSpinorField &b) 
   {
 
     blasMagmaParam magma_param;
@@ -308,6 +312,9 @@ namespace quda {
 
 //Shutdown magma:
     shutdown_magma(&magma_param);
+
+//Copy nev eigvectors:
+    //copyCuda(e, Vm->ReducedEigenvecSet(nev));//new:this return an eigenvectorset consists of nev first eigenvectors    
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);

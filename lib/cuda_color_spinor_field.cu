@@ -741,6 +741,25 @@ namespace quda {
     exit(-1);
   }
 
+//WARNING(DANGEROUS): not what we need, this will resize the object!
+  cudaColorSpinorField& cudaColorSpinorField::ReducedEigenvecSet(const int num) const {
+    
+    if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
+      if (num < this->EigvDim()) {//setup eigenvector subset
+//future cheanges: we need to create a reference spinor, but with reduced volume/length etc.
+        //eigv_id   = this->EigvId();
+        //volume    = num*this->EigvVolume(); 
+        //stride    = num*this->EigvStride();
+        //length    = num*this->EigvLength();
+      }
+      else{
+        errorQuda("Incorrect eigenvector dimension...");
+      }
+    }
+    errorQuda("Eigenvector must be a parity spinor");
+    exit(-1);
+  }
+
     void cudaColorSpinorField::getTexObjectInfo() const
     {
 #ifdef USE_TEXTURE_OBJECTS

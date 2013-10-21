@@ -366,6 +366,7 @@ namespace quda {
     cudaColorSpinorField& Odd() const;
 
     cudaColorSpinorField& Eigenvec(const int idx) const;
+    cudaColorSpinorField& ReducedEigenvecSet(const int num) const;
 
     void zero();
 
