@@ -16,7 +16,11 @@ extern cudaStream_t *stream;
  * Staple exchange routine
  * used in fat link computation
  ***************************************************************/
-#if defined(MULTI_GPU) && (defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE))
+//#ifndef CLOVER_FORCE
+//#define CLOVER_FORCE
+//#endif
+
+#if defined(MULTI_GPU) && (defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE) || defined(CLOVER_FORCE))
 
 enum {
   XUP = 0,
@@ -312,7 +316,7 @@ void exchange_cpu_sitelink(int* X,
 }
 
 
-#define MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_buf, dst_idx, sitelink, src_idx, num, dir) \
+#define MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_buf, dst_idx, sitelink, src_idx, num, dir, geom) \
   if(src_oddness) src_idx += Vh_ex;					\
   if(dst_oddness) dst_idx += R[dir]*slice_3d[dir]/2;			\
   if(cpu_order == QUDA_QDP_GAUGE_ORDER) {				\
@@ -322,14 +326,14 @@ void exchange_cpu_sitelink(int* X,
       memcpy(dst, src, gaugebytes*(num));				\
     }									\
   } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {			\
-    char* src = ((char*)sitelink)+ 4*(src_idx)*gaugebytes;		\
-    char* dst = ((char*)ghost_buf[dir]) + 4*(dst_idx)*gaugebytes;	\
-    memcpy(dst, src, 4*gaugebytes*(num));				\
+    char* src = ((char*)sitelink)+ (geom)*(src_idx)*gaugebytes;		\
+    char* dst = ((char*)ghost_buf[dir]) + (geom)*(dst_idx)*gaugebytes;	\
+    memcpy(dst, src, (geom)*gaugebytes*(num));				\
   } else {								\
     errorQuda("Unsupported gauge order");				\
   }									\
 
-#define MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_buf, src_idx, num, dir) \
+#define MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_buf, src_idx, num, dir, geom) \
   if(oddness){								\
     if(commDimPartitioned(dir)){					\
       src_idx += R[dir]*slice_3d[dir]/2;				\
@@ -352,17 +356,17 @@ void exchange_cpu_sitelink(int* X,
   } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {			\
     char* src;								\
     if(commDimPartitioned(dir)){					\
-      src=((char*)ghost_buf[dir]) + 4*(src_idx)*gaugebytes;		\
+      src=((char*)ghost_buf[dir]) + (geom)*(src_idx)*gaugebytes;	\
     }else{								\
-      src = ((char*)sitelink)+ 4*(src_idx)*gaugebytes;			\
+      src = ((char*)sitelink)+ (geom)*(src_idx)*gaugebytes;		\
     }									\
-    char* dst = ((char*)sitelink) + 4*(dst_idx)*gaugebytes;		\
-    memcpy(dst, src, 4*gaugebytes*(num));				\
+    char* dst = ((char*)sitelink) + (geom)*(dst_idx)*gaugebytes;	\
+    memcpy(dst, src, (geom)*gaugebytes*(num));				\
   } else {								\
     errorQuda("Unsupported gauge order");				\
   }
 
-#define MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_buf, dst_face, src_face, dir) \
+#define MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_buf, dst_face, src_face, dir, geom) \
   /*even*/								\
   int even_dst_idx = (dst_face*E[2]*E[1]*E[0])/2;				\
   int even_src_idx;							\
@@ -399,8 +403,8 @@ void exchange_cpu_sitelink(int* X,
     }else{								\
       src = (char*)sitelink;						\
     }									\
-    memcpy(dst+4*even_dst_idx*gaugebytes, src+4*even_src_idx*gaugebytes, 4*R[dir]*slice_3d[dir]*gaugebytes/2); \
-    memcpy(dst+4*odd_dst_idx*gaugebytes, src+4*odd_src_idx*gaugebytes, 4*R[dir]*slice_3d[dir]*gaugebytes/2); \
+    memcpy(dst+(geom)*even_dst_idx*gaugebytes, src+(geom)*even_src_idx*gaugebytes, (geom)*R[dir]*slice_3d[dir]*gaugebytes/2); \
+    memcpy(dst+(geom)*odd_dst_idx*gaugebytes, src+(geom)*odd_src_idx*gaugebytes, (geom)*R[dir]*slice_3d[dir]*gaugebytes/2); \
   } else {								\
     errorQuda("Unsupported gauge order\n");				\
   }
@@ -413,7 +417,7 @@ void exchange_cpu_sitelink(int* X,
 // gaugeSiteSize
 
 void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
-			      QudaPrecision gPrecision, int optflag)
+			      QudaPrecision gPrecision, int optflag, int geometry)
 {
   int E[4];
   for (int i=0; i<4; i++) E[i] = X[i] + 2*R[i];
@@ -446,7 +450,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
   int slice_3d[] = { E[3]*E[2]*E[1], E[3]*E[2]*E[0], E[3]*E[1]*E[0], E[2]*E[1]*E[0]};  
   int len[4];
   for(int i=0; i<4;i++){
-    len[i] = slice_3d[i] * R[i] * 4*gaugeSiteSize*gPrecision; //2 slices, 4 directions' links
+    len[i] = slice_3d[i] * R[i] * geometry*gaugeSiteSize*gPrecision; //2 slices, 4 directions' links
   }
 
   void* ghost_sitelink_fwd_sendbuf[4];
@@ -485,7 +489,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		  dst_oddness = 1-oddness;
 		}
 
-		MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, 1, dir);		
+		MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, 1, dir, geometry);		
 
 	      }//c
 	    }else{
@@ -501,7 +505,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		  if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		    dst_oddness = 1-oddness;
 		  }
-		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, (endc[dir]-c+1)/2, dir);	
+		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_back_sendbuf, dst_idx, sitelink, src_idx, (endc[dir]-c+1)/2, dir, geometry);	
 
 		}//if c
 	      }//for loop
@@ -525,7 +529,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		  dst_oddness = 1-oddness;
 		}
 		
-		MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, 1,dir);
+		MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, 1,dir, geometry);
 	      }//c
 	    }else{
 	      for(int loop=0; loop < 2; loop++){
@@ -540,7 +544,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		  if((X[dir] % 2 ==1) && (commDim(dir) > 1)){ //switch even/odd position
 		    dst_oddness = 1-oddness;
 		  }
-		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, (endc[dir]-c+1)/2,dir);
+		  MEMCOPY_GAUGE_FIELDS_GRID_TO_BUF(ghost_sitelink_fwd_sendbuf, dst_idx, sitelink, src_idx, (endc[dir]-c+1)/2,dir, geometry);
 		}
 	      }//for loop
 	    }//if
@@ -595,7 +599,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		  src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d+X[dir])*f_main[dir][3])>> 1;
 		}
 
-		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, 1, dir);
+		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, 1, dir, geometry);
 		
 	      }//c    
 	    }else{
@@ -614,7 +618,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		    src_idx = ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d+X[dir])*f_main[dir][3])>> 1;
 		  }
 
-		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, (endc[dir]-c+1)/2, dir);
+		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_back, src_idx, (endc[dir]-c+1)/2, dir, geometry);
 
 		}//if c  		
 	      }//for loop	      
@@ -627,7 +631,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
     }else{
       //when dir == 3 (T direction), the data layout format in sitelink and the message is the same, we can do large copys  
 
-      MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_sitelink_back, 0, X[3], dir)
+      MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_sitelink_back, 0, X[3], dir, geometry)
     }//if
     
     //fwd
@@ -648,7 +652,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		  src_idx =  ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d-X[dir])*f_main[dir][3])>> 1;
 		}
 
-		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, 1, dir);
+		MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, 1, dir, geometry);
 
 	      }//c
 	    }else{
@@ -664,7 +668,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
 		  }else{
 		    src_idx =  ( a*f_main[dir][0] + b*f_main[dir][1]+ c*f_main[dir][2] + (d-X[dir])*f_main[dir][3])>> 1;
 		  }
-		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, (endc[dir]-c+1)/2, dir);
+		  MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID(sitelink, dst_idx, ghost_sitelink_fwd, src_idx, (endc[dir]-c+1)/2, dir, geometry);
 		}//if		
 	      }//for loop
 	    }//if 
@@ -677,7 +681,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
     } else {
 
       //when dir == 3 (T direction), the data layout format in sitelink and the message is the same, we can do large copys
-      MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_sitelink_fwd, (X[3]+R[3]), 2, dir) // TESTME 2
+      MEMCOPY_GAUGE_FIELDS_BUF_TO_GRID_T(sitelink, ghost_sitelink_fwd, (X[3]+R[3]), 2, dir, geometry) // TESTME 2
 
     }//if    
 

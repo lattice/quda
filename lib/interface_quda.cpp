@@ -19,16 +19,18 @@
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
+#include <algorithm>
 
 #ifdef NUMA_AFFINITY
 #include <numa_affinity.h>
 #endif
 
 #include <cuda.h>
+#include "face_quda.h"
 
 #ifdef MULTI_GPU
 extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
-    QudaPrecision gPrecision, int optflag);
+    QudaPrecision gPrecision, int optflag, int geom);
 #endif // MULTI_GPU
 
 #ifdef GPU_GAUGE_FORCE
@@ -58,7 +60,6 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 #include "check_params.h"
 #undef PRINT_PARAM
 
-#include "face_quda.h"
 
 int numa_affinity_enabled = 1;
 
@@ -2018,7 +2019,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     profileFatLink.Start(QUDA_PROFILE_COMMS);
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
     exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
-        cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0);
+        cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0, 4);
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
 #endif
 
@@ -2158,7 +2159,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   profileGaugeForce.Start(QUDA_PROFILE_COMMS);
   int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
   exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
-			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
+			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1, 4);
   profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
 
   profileGaugeForce.Start(QUDA_PROFILE_H2D);
@@ -2169,6 +2170,8 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
   profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 #endif
+
+
 
   profileGaugeForce.Start(QUDA_PROFILE_H2D);
   cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
@@ -2209,10 +2212,73 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   return 0;  
 }
 
+int getGaugePadding(GaugeFieldParam& param){
+  int pad = 0;
+#ifdef MULTI_GPU
+  int volume = param.x[0]*param.x[1]*param.x[2]*param.x[3];
+  int face_size[4];
+  for(int dir=0; dir<4; ++dir) face_size[dir] = (volume/param.x[dir])/2;
+  pad = *std::max_element(face_size, face_size+4);
+#endif
+
+  return pad;
+}
+
+
+void* createExtendedGaugeField(void* gauge, QudaGaugeParam* param)
+{
+  // This function takes a cpu field in MILC format, 
+  // extends it, and loads it onto the GPU. 
+  // Then it returns a pointer to that field.
+  int E[4];
+  QudaGaugeParam param_ex;
+  memcpy(&param_ex, param, sizeof(QudaGaugeParam));
+  for(int dir=0; dir<4; ++dir) E[dir] = param_ex.X[dir] = param->X[dir]+4;
+  GaugeFieldParam gParam_ex(0, param_ex);
+  gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam_ex.order = QUDA_MILC_GAUGE_ORDER;
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  gParam_ex.pad = 0;
+  gParam_ex.link_type = QUDA_SU3_LINKS;
+  cpuGaugeField cpuGaugeEx(gParam_ex);
+
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam_ex.pad = getGaugePadding(gParam_ex);
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  gParam_ex.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam_ex.link_type = QUDA_SU3_LINKS;
+  cudaGaugeField* cudaGaugeEx = new cudaGaugeField(gParam_ex);
+
+
+  GaugeFieldParam gParam(0, *param);
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.pad = 0;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam.link_type = QUDA_SU3_LINKS;
+  {
+    cpuGaugeField cpuGauge(gParam);
+    copyExtendedGauge(cpuGaugeEx, cpuGauge, 2, QUDA_CPU_FIELD_LOCATION);
+  }
+
+  int R[4] = {2,2,2,2};
+  // To call exchange_cpu_sitelink_ex, need to build code in face_gauge.cpp. Not a problem, but it takes 40 minutes.
+ // exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuGaugeEx.Gauge_p(), cpuGaugeEx.Order(), cpuGaugeEx.Precision(), 1, 4);
+  cudaGaugeEx->loadCPUField(cpuGaugeEx, QUDA_CPU_FIELD_LOCATION);
+ 
+  return cudaGaugeEx;
+}
+
+void destroyQudaGaugeField(void* gauge){
+  cudaGaugeField* g = reinterpret_cast<cudaGaugeField*>(gauge);
+  delete g;
+}
+
 
 void computeCloverDerivativeQuda(void* out,
                                  void* gauge,
                                  void* oprod,
+                                 int mu, int nu,
                                  QudaParity parity,
                                  QudaGaugeParam* param)
 {
@@ -2221,54 +2287,147 @@ void computeCloverDerivativeQuda(void* out,
   checkGaugeParam(param);
   
   profileCloverDerivative.Start(QUDA_PROFILE_INIT);
+
+  void* temp = (char*)malloc(147456*sizeof(char));
+
+  printfQuda("Temp memory allocated\n");
+  fflush(stdout); 
+ 
+  // create host fields
   GaugeFieldParam gParam(0, *param);
-
-  // create the host fields 
   gParam.order = QUDA_MILC_GAUGE_ORDER;
-  gParam.pad = 0;
+  //gParam.pad = 0;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.link_type = QUDA_SU3_LINKS;
-  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.gauge = gauge;
-  cpuGaugeField cpuGauge(gParam);
+  cpuGaugeField cpuOut(gParam);
+  printfQuda("cpuOut created\n");
+  fflush(stdout);
 
+//  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+#ifdef USE_EXTENDED_VOLUME
+  int E[4];
+  QudaGaugeParam param_ex;
+  memcpy(&param_ex, param, sizeof(QudaGaugeParam));
+  for(int dir=0; dir<4; ++dir) E[dir] = param_ex.X[dir] = param->X[dir]+4;
+  GaugeFieldParam gParam_ex(0, param_ex);
+  gParam_ex.order = QUDA_MILC_GAUGE_ORDER;
+  gParam_ex.pad = 0;
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  gParam_ex.link_type = QUDA_SU3_LINKS;
+  cpuGaugeField cpuGauge(gParam_ex);
+  
+  gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam_ex.link_type = QUDA_GENERAL_LINKS;
+  cpuGaugeField cpuOprod(gParam_ex);
+#else
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.gauge = oprod;
   cpuGaugeField cpuOprod(gParam);
 
-  gParam.gauge = out;
-  cpuGaugeField cpuOut(gParam);
-
-  // copy fields to the device
   gParam.geometry = QUDA_VECTOR_GEOMETRY;
   gParam.link_type = QUDA_SU3_LINKS;
-  gParam.create = QUDA_NULL_FIELD_CREATE;
-  cudaGaugeField cudaGauge(gParam);
-  
+  gParam.gauge = gauge;
+  cpuGaugeField cpuGauge(gParam);
+#endif
+
+
+  // create device fields
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.pad = getGaugePadding(gParam);
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+
+  cudaGaugeField cudaOut(gParam);
+#ifdef USE_EXTENDED_VOLUME
+  gParam_ex.pad = getGaugePadding(gParam_ex);
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam_ex.link_type = QUDA_GENERAL_LINKS;
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  cudaGaugeParam cudaOprod(gParam_ex);
+
+  gParam_ex.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam_ex.link_type = QUDA_SU3_LINKS;
+  cudaGaugeField cudaGauge(gParam_ex);
+#else
   cudaGaugeField cudaOprod(gParam);
 
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaGaugeField cudaOut(gParam);
-
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam.link_type = QUDA_SU3_LINKS;
+  cudaGaugeField cudaGauge(gParam);
+#endif
+  printfQuda("gParam.pad = %d\n", gParam.pad);
   profileCloverDerivative.Stop(QUDA_PROFILE_INIT);
 
+#ifdef USE_EXTENDED_VOLUME
+  // set up extended gauge and outer-product fields
+  GaugeFieldParam appParam = gParam;
+  appParam.order = gParam.order; // ???
+  appParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  appParam.gauge = gauge;
+  
+  {
+    cpuGaugeField appField(appParam);
+    copyExtendedGauge(cpuGauge, appField, 2, QUDA_CPU_FIELD_LOCATION);
+  }
+  
+  appParam.geometry = QUDA_SCALAR_GEOMETRY;
+  appParam.link_type = QUDA_GENERAL_LINKS;
+  appParam.gauge = oprod;
+  {
+    cpuGaugeField appField(appParam);
+    copyExtendedGaugeField(cpuOprod, appField, 2, QUDA_CPU_FIELD_LOCATION);
+  }
+
+  profileCloverDerivative.Start(QUDA_PROFILE_COMMS);
+
+  int R[4] = {2,2,2,2};
+  // Gauge field does not need to be copied each time
+  exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuGauge.Gauge_p(), cpuGauge.Order(), cpuGauge.Precision(), 1, 4);
+  exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuOprod.Gauge_p(), cpuOprod.Order(), cpuOprod.Precision(), 1, 4);
+
+  profileCloverDerivative.Stop(QUDA_PROFILE_COMMS);
+#endif
+  
   // load fields onto the device
   profileCloverDerivative.Start(QUDA_PROFILE_H2D);
+  printfQuda("About to call loadCPUField\n");
   cudaGauge.loadCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  printfQuda("Call to loadCPUField complete\n");
+  printfQuda("geo check %d %d\n", cudaOprod.Geometry(), cpuOprod.Geometry());
   cudaOprod.loadCPUField(cpuOprod, QUDA_CPU_FIELD_LOCATION);
   profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
 
+  profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
+  cloverDerivative(cudaOut, cudaGauge, cudaOprod, mu, nu, parity);
+  profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
+
+
+
   // Additional load just as a test
-  cudaOut.loadCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
+//  cudaOut.loadCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
+
+  cudaGauge.saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+
+  checkCudaError();
+  printfQuda("cudaOut.Bytes() = %d\n", cudaOut.Bytes());
+  printfQuda("cpuOut.Bytes() = %d\n", cpuOut.Bytes()); 
+
 
   profileCloverDerivative.Start(QUDA_PROFILE_D2H);
-  cudaOprod.saveCPUField(cpuOprod, QUDA_CPU_FIELD_LOCATION);
+  cudaOut.saveCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
   profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
+  checkCudaError();
 
   profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
-  
+
+  free(temp); 
+ 
   return;
 }
 

@@ -186,7 +186,10 @@ namespace quda {
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			 void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
   
-  void cloverDerivative(cudaGaugeField& out, const cudaGaugeField& gauge, const cudaGaugeField& oprod);
+
+  void cloverDerivative(cudaGaugeField &out, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, QudaParity parity);
+
+
 
 } // namespace quda
 

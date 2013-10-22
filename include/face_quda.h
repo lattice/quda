@@ -114,7 +114,7 @@ void commDimPartitionedSet(int dir);
 			       void** ghost_sitelink_diag, 
 			       QudaPrecision gPrecision, QudaGaugeParam* param, int optflag); 
     void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
-				  QudaPrecision gPrecision, int optflag);
+				  QudaPrecision gPrecision, int optflag, int geometry);
     void exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway,  cudaStream_t * stream);
     void exchange_gpu_staple_comms(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream);
     void exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dir, int whichway, cudaStream_t * stream);

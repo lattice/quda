@@ -14,9 +14,13 @@ setGaugeParams(QudaGaugeParam* gaugeParam,
 {
   for(int dir=0; dir<4; ++dir) gaugeParam->X[dir] = dim[dir];
 
+  gaugeParam->type = QUDA_GENERAL_LINKS;
+  gaugeParam->t_boundary = QUDA_PERIODIC_T;
+
   gaugeParam->cpu_prec = gaugeParam->cuda_prec = precision;
   gaugeParam->cuda_prec_sloppy = precision;
   gaugeParam->reconstruct = recon;
+  gaugeParam->reconstruct_sloppy = recon;
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->anisotropy = 1.0;
   gaugeParam->tadpole_coeff = 1.0;
@@ -27,11 +31,27 @@ setGaugeParams(QudaGaugeParam* gaugeParam,
   gaugeParam->cuda_prec_precondition = precision;
   gaugeParam->reconstruct_precondition = recon;
 
+
   return;
 }
 
+void*  qudaCreateExtendedGaugeField(void* gauge, int precision)
+{
+  using namespace milc_interface;
+ 
+  QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION; 
+  QudaGaugeParam gaugeParam = newQudaGaugeParam();
+  Layout layout;
+  const int* dim = layout.getLocalDim();
+  setGaugeParams(&gaugeParam, dim, qudaPrecision);
 
-void qudaCloverDerivative(void* out, void* gauge, void* oprod, int precision, int parity)
+  return createExtendedGaugeField(gauge, &gaugeParam);
+}
+
+
+
+
+void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, int precision, int parity)
 {
 
   using namespace milc_interface;
@@ -45,8 +65,9 @@ void qudaCloverDerivative(void* out, void* gauge, void* oprod, int precision, in
 
   const int* dim = layout.getLocalDim();
   setGaugeParams(&gaugeParam, dim, qudaPrecision);
-  
-  computeCloverDerivativeQuda(out, gauge, oprod, qudaParity, &gaugeParam);
+
+  computeCloverDerivativeQuda(out, gauge, oprod, mu, nu, qudaParity, &gaugeParam);
+
 
   return;
 }

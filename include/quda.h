@@ -501,13 +501,22 @@ extern "C" {
   void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, 
 			    int conj_mom, int exact, QudaGaugeParam* param);
 
-  void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, 
+
+  /**
+   * Take a gauge field on the host, extend it and load it onto the device. 
+   * Return a pointer to the extended gauge field.
+   */
+  void* createExtendedGaugeField(void* gauge, QudaGaugeParam* param);
+
+
+
+  void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
                                    QudaParity parity, QudaGaugeParam* param);
 #ifdef __cplusplus
 }
 #endif
 
-#include <quda_fortran.h>
+//#include <quda_fortran.h>
 /* #include <quda_new_interface.h> */
 
 #endif /* _QUDA_H */
