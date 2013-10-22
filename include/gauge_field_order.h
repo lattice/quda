@@ -595,9 +595,9 @@ namespace quda {
     Float *gauge;
     const int volumeCB;
     const int geometry;
-  MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, int geometry=4) : 
+  MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
     LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
-      volumeCB(u.VolumeCB()), geometry(geometry) { ; }
+      volumeCB(u.VolumeCB()), geometry(u.Geometry()) { ; }
   MILCOrder(const MILCOrder &order) : LegacyOrder<Float,length>(order), 
       gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
@@ -629,9 +629,9 @@ namespace quda {
     const Float anisotropy;
     const int Nc;
     const int geometry;
-  CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, int geometry=4) 
+  CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
     : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
-      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3), geometry(geometry)
+      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3), geometry(u.Geometry())
       { if (length != 18) errorQuda("Gauge length %d not supported", length); }
   CPSOrder(const CPSOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge), 
       volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3), geometry(order.geometry)
