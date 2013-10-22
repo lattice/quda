@@ -15,6 +15,20 @@ namespace quda {
       errorQuda("QDP ordering only supported for reference fields");
     }
 
+    if (order == QUDA_QDP_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER ||
+	order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER ||
+	order == QUDA_CPS_WILSON_GAUGE_ORDER) 
+      errorQuda("Field ordering %d presently disabled for this type", order);
+
+#ifdef MULTI_GPU
+    if (link_type != QUDA_ASQTAD_MOM_LINKS) {
+      bool pad_check = true;
+      for (int i=0; i<nDim; i++)
+	if (pad < nFace*surfaceCB[i]) pad_check = false;
+      if (!pad_check)
+	warningQuda("cudaGaugeField being constructed with insufficient padding\n");
+    }
+#endif
 
     if(create != QUDA_NULL_FIELD_CREATE &&  
         create != QUDA_ZERO_FIELD_CREATE && 
@@ -197,7 +211,7 @@ namespace quda {
 
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
-          static_cast<const cpuGaugeField&>(src).gauge); 
+		       static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -343,7 +357,7 @@ namespace quda {
         spin = a.Ndim();
         break;
       case QUDA_TENSOR_GEOMETRY:
-        spin = a.Ndim() * (a.Ndim()-1);
+        spin = a.Ndim() * (a.Ndim()-1) / 2;
         break;
       default:
         errorQuda("Unsupported field geometry %d", a.Geometry());

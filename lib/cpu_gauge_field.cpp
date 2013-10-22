@@ -44,7 +44,7 @@ namespace quda {
 	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER) {
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	size_t nbytes = geometry * volume * reconstruct * precision;
+	size_t nbytes = nDim * volume * reconstruct * precision;
 	gauge = (void **) (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
 	if(create == QUDA_ZERO_FIELD_CREATE){
 	  memset(gauge, 0, nbytes);
@@ -67,7 +67,7 @@ namespace quda {
 	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
       }  
       // exchange the boundaries if a non-trivial field
-      if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE && geometry == QUDA_VECTOR_GEOMETRY) 
+      if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE) 
 	exchangeGhost();
     }
 
