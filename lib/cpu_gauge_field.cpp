@@ -22,11 +22,16 @@ namespace quda {
       errorQuda("10-reconstruction only supported with MILC gauge order");
     }
 
+    int siteDim;
+    if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
+    else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
+    else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
+
     if (order == QUDA_QDP_GAUGE_ORDER) {
 
-      gauge = (void**) safe_malloc(nDim * sizeof(void*));
+      gauge = (void**) safe_malloc(siteDim * sizeof(void*));
 
-      for (int d=0; d<nDim; d++) {
+      for (int d=0; d<siteDim; d++) {
 	size_t nbytes = volume * reconstruct * precision;
 	if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
 	  gauge[d] = (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
@@ -44,7 +49,7 @@ namespace quda {
 	       order == QUDA_BQCD_GAUGE_ORDER || order == QUDA_TIFR_GAUGE_ORDER) {
 
       if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
-	size_t nbytes = nDim * volume * reconstruct * precision;
+	size_t nbytes = siteDim * volume * reconstruct * precision;
 	gauge = (void **) (pinned ? pinned_malloc(nbytes) : safe_malloc(nbytes));
 	if(create == QUDA_ZERO_FIELD_CREATE){
 	  memset(gauge, 0, nbytes);
@@ -67,7 +72,8 @@ namespace quda {
 	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
       }  
       // exchange the boundaries if a non-trivial field
-      if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE) 
+      if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE &&
+	  geometry == QUDA_VECTOR_GEOMETRY) 
 	exchangeGhost();
     }
 
@@ -78,9 +84,14 @@ namespace quda {
 
   cpuGaugeField::~cpuGaugeField()
   {
+    int siteDim;
+    if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
+    else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
+    else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
+
     if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
       if (order == QUDA_QDP_GAUGE_ORDER) {
-	for (int d=0; d<nDim; d++) {
+	for (int d=0; d<siteDim; d++) {
 	  if (gauge[d]) host_free(gauge[d]);
 	}
 	if (gauge) host_free(gauge);
