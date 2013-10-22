@@ -33,7 +33,7 @@ void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
 
   for(int dir=0; dir<4; ++dir) gaugeParam.X[dir] = local_dim[dir];
 
-  updateGaugeFieldQuda(link, momentum, eps, &gaugeParam); 
+//  updateGaugeFieldQuda(link, momentum, eps, &gaugeParam); 
 
   return;
 }

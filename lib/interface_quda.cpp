@@ -2262,8 +2262,7 @@ void* createExtendedGaugeField(void* gauge, QudaGaugeParam* param)
   }
 
   int R[4] = {2,2,2,2};
-  // To call exchange_cpu_sitelink_ex, need to build code in face_gauge.cpp. Not a problem, but it takes 40 minutes.
- // exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuGaugeEx.Gauge_p(), cpuGaugeEx.Order(), cpuGaugeEx.Precision(), 1, 4);
+  exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuGaugeEx.Gauge_p(), cpuGaugeEx.Order(), cpuGaugeEx.Precision(), 1, 4);
   cudaGaugeEx->loadCPUField(cpuGaugeEx, QUDA_CPU_FIELD_LOCATION);
  
   return cudaGaugeEx;
@@ -2404,7 +2403,7 @@ void computeCloverDerivativeQuda(void* out,
   profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
 
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
-  cloverDerivative(cudaOut, cudaGauge, cudaOprod, mu, nu, parity);
+//  cloverDerivative(cudaOut, cudaGauge, cudaOprod, mu, nu, parity);
   profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
 
 
