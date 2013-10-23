@@ -2237,7 +2237,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   GaugeFieldParam gParam_ex(0, param_ex);
   if(geometry == 1){
     gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
-  }else if(geometry == 2){
+  }else if(geometry == 4){
     gParam_ex.geometry = QUDA_VECTOR_GEOMETRY;
   }else{
     errorQuda("Only scalar and vector geometries are supported\n");
@@ -2407,8 +2407,13 @@ void computeCloverDerivativeQuda(void* out,
 //  cudaOut.loadCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
   profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
 
+  param->type = QUDA_SU3_LINKS;
+  cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(gauge,4,param));
+  param->type = QUDA_GENERAL_LINKS;
+  cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(oprod,1,param)); 
+
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
-  cloverDerivative(cudaOut, cudaGauge, cudaOprod, mu, nu, parity);
+  cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity);
   profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
 
 
@@ -2421,6 +2426,9 @@ void computeCloverDerivativeQuda(void* out,
   cudaOut.saveCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
   profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
   checkCudaError();
+
+  delete gPointer; // delete the gauge field pointer
+  delete oPointer; // delete the outer product pointer
 
   profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
 

@@ -45,7 +45,8 @@ void*  qudaCreateExtendedGaugeField(void* gauge, int precision)
   const int* dim = layout.getLocalDim();
   setGaugeParams(&gaugeParam, dim, qudaPrecision);
 
-  return createExtendedGaugeField(gauge, &gaugeParam);
+  //return createExtendedGaugeField(gauge, &gaugeParam);
+  return NULL;
 }
 
 
