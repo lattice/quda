@@ -127,6 +127,8 @@ namespace quda {
     static Dirac* create(const DiracParam &param);
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
+
+    void Dagger(QudaDagType dag) { dagger = dag; }
   };
 
   // Full Wilson
