@@ -115,7 +115,10 @@ static TimeProfile profileGaugeForce("computeGaugeForceQuda");
 //!<Profiler for updateGaugeFieldQuda 
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 
-//!<Profiler for updateGaugeFieldQuda
+//!<Profiler for createExtendedGaugeField
+static TimeProfile profileExtendedGauge("createExtendedGaugeField");
+
+//!<Profiler for updateCloverDerivative
 static TimeProfile profileCloverDerivative("computeCloverDerivativeQuda");
 
 //!< Profiler for endQuda
@@ -740,6 +743,8 @@ void endQuda(void)
     profileFatLink.Print();
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
+    profileExtendedGauge.Print();
+    profileCloverDerivative.Print();
     profileEnd.Print();
 
     printfQuda("\n");
@@ -2562,6 +2567,10 @@ int getGaugePadding(GaugeFieldParam& param){
 
 void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
+  profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
+
+  profileExtendedGauge.Start(QUDA_PROFILE_INIT);
+
   // This function takes a cpu field in MILC format, 
   // extends it, and loads it onto the GPU. 
   // Then it returns a pointer to that field.
@@ -2603,12 +2612,21 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
     copyExtendedGauge(cpuGaugeEx, cpuGauge, 2, QUDA_CPU_FIELD_LOCATION);
   }
 
+  profileExtendedGauge.Stop(QUDA_PROFILE_INIT);
+
+  profileExtendedGauge.Start(QUDA_PROFILE_COMMS);
+
   int R[4] = {2,2,2,2};
   exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuGaugeEx.Gauge_p(), cpuGaugeEx.Order(), cpuGaugeEx.Precision(), 0, geometry);
 
+  profileExtendedGauge.Stop(QUDA_PROFILE_COMMS);
+
   // load data onto the GPU
+  profileExtendedGauge.Start(QUDA_PROFILE_H2D);
   cudaGaugeEx->loadCPUField(cpuGaugeEx, QUDA_CPU_FIELD_LOCATION);
- 
+  profileExtendedGauge.Stop(QUDA_PROFILE_H2D);
+
+  profileExtendedGauge.Stop(QUDA_PROFILE_TOTAL);
   return cudaGaugeEx;
 }
 
