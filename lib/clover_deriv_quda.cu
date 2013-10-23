@@ -26,15 +26,15 @@ namespace quda {
       int gaugeStride;
       int oprodStride;
 
-      int forceLengthCB;
-      int gaugeLengthCB;
-      int oprodLengthCB;
+      int forceOffset;
+      int gaugeOffset;
+      int oprodOffset;
 
       CloverDerivArg(cudaGaugeField& force, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, int parity) :  
         mu(mu), nu(nu), parity(parity), volumeCB(force.VolumeCB()), 
         force(reinterpret_cast<Cmplx*>(force.Gauge_p())),  gauge(reinterpret_cast<Cmplx*>(gauge.Gauge_p())), oprod(reinterpret_cast<Cmplx*>(oprod.Gauge_p())),
         forceStride(force.Stride()), gaugeStride(gauge.Stride()), oprodStride(oprod.Stride()),
-        forceLengthCB(force.Length()/2), gaugeLengthCB(gauge.Length()/2), oprodLengthCB(oprod.Length()/2)
+        forceOffset(force.Bytes()/(2*sizeof(Cmplx))), gaugeOffset(gauge.Bytes()/(2*sizeof(Cmplx))), oprodOffset(oprod.Bytes()/(2*sizeof(Cmplx)))
       {
         for(int dir=0; dir<4; ++dir) X[dir] = force.X()[dir];
       }
@@ -45,7 +45,7 @@ namespace quda {
     x[3] = cb_index/(X[2]*X[1]*X[0]/2);
     x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
     x[1] = (cb_index/(X[0]/2)) % X[1];
-    x[0] = 2*(cb_index/(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+    x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
 
     return;
   }
@@ -76,23 +76,24 @@ namespace quda {
       getCoords(y, index, arg.X, otherparity);
       int X[4]; 
       for(int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
-#ifdef EXTENDED_VOLUME
+//#ifdef EXTENDED_VOLUME
       for(int dir=0; dir<4; ++dir){
         x[dir] += 2;
         y[dir] += 2;
         X[dir] += 4;
       }
-#endif
+//#endif
 
       if(index == 0){
         printf("parity = %d\n", arg.parity);
         printf("otherparity = %d\n", otherparity);
+        printf("mu nu = %d %d\n", arg.mu, arg.nu);
       }
 
-      const Cmplx* thisGauge = arg.gauge + arg.parity*arg.gaugeLengthCB;
-      const Cmplx* otherGauge = arg.gauge + (otherparity)*arg.gaugeLengthCB;
+      Cmplx* thisGauge = arg.gauge + arg.parity*arg.gaugeOffset;
+      Cmplx* otherGauge = arg.gauge + (otherparity)*arg.gaugeOffset;
 
-      const Cmplx* thisOprod = arg.oprod + arg.parity*arg.oprodLengthCB;
+      Cmplx* thisOprod = arg.oprod + arg.parity*arg.oprodOffset;
 
       const int& mu = arg.mu;
       const int& nu = arg.nu;
@@ -109,6 +110,15 @@ namespace quda {
         loadLinkVariableFromArray(thisGauge, mu, linkIndex(x, d, X), 
             arg.gaugeStride, &U1);
 
+        if(index == 1){
+          printf("index = %d\n", index);
+          printf("linkIndex = %d\n", linkIndex(x, d, X));
+          printf("x = %d %d %d %d\n", x[0], x[1], x[2], x[3]);
+          printLink(U1);
+        }
+
+       // writeLinkVariableToArray(U1, mu, linkIndex(x, d, X), arg.gaugeStride, thisGauge);
+
         // load U(x+mu)_(+nu)
         Matrix<Cmplx,3> U2;
         d[mu]++;
@@ -116,23 +126,54 @@ namespace quda {
             arg.gaugeStride, &U2);
         d[mu]--;
 
+        if(index==1){
+          printf("\n");
+          printLink(U2);
+        }
+
         // load U(x+nu)_(+mu) 
         Matrix<Cmplx,3> U3;
         d[nu]++;
         loadLinkVariableFromArray(otherGauge, mu, linkIndex(x, d, X),
             arg.gaugeStride, &U3);
         d[nu]--;
+      
+        if(index==1){
+          printf("\n");
+          printLink(U3);
+        }
+  
 
         // load U(x)_(+nu)
         Matrix<Cmplx,3> U4;
         loadLinkVariableFromArray(thisGauge, nu, linkIndex(x, d, X),
             arg.gaugeStride, &U4);
 
+
+        if(index==1){
+          printf("\n");
+          printLink(U4);
+        }
+  
+        
+
         // load Oprod
         Matrix<Cmplx,3> Oprod1;
         loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod1);
 
+        if(index==1){
+          printf("\n");
+          printLink(Oprod1);
+        }
+
+
+
         thisForce = U1*U2*conj(U3)*conj(U4)*Oprod1;
+
+        if(index == 1){
+          printf("\n");
+          printLink(thisForce);
+        }
 
         Matrix<Cmplx,3> Oprod2;
         d[mu]++; d[nu]++;
@@ -140,8 +181,8 @@ namespace quda {
         d[mu]--; d[nu]--;
 
         thisForce += U1*U2*Oprod2*conj(U3)*conj(U4);
-      }  
-/*
+      } 
+ 
       { 
         int d[4] = {0, 0, 0, 0};
         // load U(x)_(+mu)
@@ -180,7 +221,7 @@ namespace quda {
         Matrix<Cmplx, 3> Oprod4;
         d[mu]++;
         loadMatrixFromArray(thisOprod, linkIndex(y, d, X), arg.oprodStride, &Oprod4);
-        d[nu]++;
+        d[mu]--;
         otherForce += U1*Oprod4*U2*conj(U3)*conj(U4);
       }
 
@@ -212,13 +253,13 @@ namespace quda {
 
         // load U(x)_(+mu)
         Matrix<Cmplx,3> U4;
-        loadLinkVariableFromArray(otherGauge, mu, linkIndex(x, d, X),
+        loadLinkVariableFromArray(otherGauge, mu, linkIndex(y, d, X),
             arg.gaugeStride, &U4);
 
         // load Oprod(x+mu)
         Matrix<Cmplx, 3> Oprod1;
         d[mu]++;
-        loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod1);
+        loadMatrixFromArray(thisOprod, linkIndex(y, d, X), arg.oprodStride, &Oprod1);
         d[mu]--;    
 
 
@@ -226,7 +267,7 @@ namespace quda {
 
         Matrix<Cmplx,3> Oprod2;
         d[nu]--;
-        loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod2);
+        loadMatrixFromArray(thisOprod, linkIndex(y, d, X), arg.oprodStride, &Oprod2);
         d[nu]++;
 
         otherForce -= conj(U1)*Oprod2*U2*U3*conj(U4);
@@ -237,21 +278,21 @@ namespace quda {
         // load U(x-nu)(+nu)
         Matrix<Cmplx,3> U1;
         d[nu]--;
-        loadLinkVariableFromArray(otherGauge, nu, linkIndex(y, d, X), 
+        loadLinkVariableFromArray(otherGauge, nu, linkIndex(x, d, X), 
             arg.gaugeStride, &U1);
         d[nu]++;
 
         // load U(x-nu)(+mu) 
         Matrix<Cmplx, 3> U2;
         d[nu]--;
-        loadLinkVariableFromArray(otherGauge, mu, linkIndex(y, d, X),
+        loadLinkVariableFromArray(otherGauge, mu, linkIndex(x, d, X),
             arg.gaugeStride, &U2);
         d[nu]++;
 
         // load U(x+mu-nu)(nu)
         Matrix<Cmplx, 3> U3;
         d[mu]++; d[nu]--;
-        loadLinkVariableFromArray(thisGauge, nu, linkIndex(y, d, X),
+        loadLinkVariableFromArray(thisGauge, nu, linkIndex(x, d, X),
             arg.gaugeStride, &U3);
         d[mu]--; d[nu]++;
 
@@ -264,7 +305,7 @@ namespace quda {
         Matrix<Cmplx,3> Oprod1;
         d[mu]++; d[nu]--;
         loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod1);
-        d[nu]--; d[mu]++;
+        d[mu]--; d[nu]++;
 
         thisForce -= conj(U1)*U2*Oprod1*U3*conj(U4);
 
@@ -273,11 +314,10 @@ namespace quda {
 
         thisForce -= Oprod4*conj(U1)*U2*U3*conj(U4);
       }
-*/
       // Write to array
       {
-  //      writeMatrixToArray(thisForce, index, arg.forceStride, arg.force + arg.parity*arg.forceLengthCB);
-  //      writeMatrixToArray(otherForce, index, arg.forceStride, arg.force + otherparity*arg.forceLengthCB); 
+        writeMatrixToArray(thisForce, index, arg.forceStride, arg.force + arg.parity*arg.forceOffset);
+        writeMatrixToArray(otherForce, index, arg.forceStride, arg.force + otherparity*arg.forceOffset); 
       }
       return;
     } // cloverDerivativeKernel
@@ -321,7 +361,7 @@ namespace quda {
           vol << arg.X[2] << "x";
           vol << arg.X[3] << "x";
           aux << "threads=" << arg.volumeCB << ",prec=" << sizeof(Complex)/2;
-          aux << "stride=" << arg.forceLengthCB;
+          aux << "stride=" << arg.forceOffset;
           return TuneKey(vol.str(), typeid(*this).name(), aux.str());
         }
     };
@@ -341,9 +381,12 @@ namespace quda {
       dim3 gridDim((arg.volumeCB + blockDim.x-1)/blockDim.x, 1, 1);
       
       printfQuda("arg.volumeCB = %d\n", arg.volumeCB);
-      printfQuda("arg.forceLengthCB = %d\n", arg.forceLengthCB);
-      printfQuda("arg.gaugeLengthCB = %d\n", arg.gaugeLengthCB);
-      printfQuda("arg.oprodLengthCB = %d\n", arg.oprodLengthCB);
+      printfQuda("arg.forceOffset = %d\n", arg.forceOffset);
+      printfQuda("arg.gaugeOffset = %d\n", arg.gaugeOffset);
+      printfQuda("arg.oprodOffset = %d\n", arg.oprodOffset);
+      printfQuda("out.bytes() = %d\n", out.Bytes());
+      printfQuda("gauge.bytes() = %d\n", gauge.Bytes());
+      printfQuda("oprod.bytes() = %d\n", oprod.Bytes());
       
       printfQuda("arg.forceStride = %d\n", arg.forceStride);
       printfQuda("arg.gaugeStride = %d\n", arg.gaugeStride);

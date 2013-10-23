@@ -56,7 +56,7 @@ void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, i
 
   using namespace milc_interface;
 
-  QudaParity qudaParity = (parity==0) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+  QudaParity qudaParity = (parity==2) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
   QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
