@@ -22,7 +22,7 @@ namespace quda {
       errorQuda("10-reconstruction only supported with MILC gauge order");
     }
 
-    int siteDim;
+    int siteDim=0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
@@ -84,7 +84,7 @@ namespace quda {
 
   cpuGaugeField::~cpuGaugeField()
   {
-    int siteDim;
+    int siteDim = 0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
