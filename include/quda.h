@@ -506,8 +506,12 @@ extern "C" {
    * Take a gauge field on the host, extend it and load it onto the device. 
    * Return a pointer to the extended gauge field.
    */
-  void* createExtendedGaugeField(void* gauge, QudaGaugeParam* param);
+  void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
 
+  /**
+   *  Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   */
+  void destroyQudaGaugeField(void* gauge);
 
 
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,

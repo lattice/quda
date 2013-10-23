@@ -35,7 +35,7 @@ setGaugeParams(QudaGaugeParam* gaugeParam,
   return;
 }
 
-void*  qudaCreateExtendedGaugeField(void* gauge, int precision)
+void*  qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
 {
   using namespace milc_interface;
  
@@ -45,10 +45,24 @@ void*  qudaCreateExtendedGaugeField(void* gauge, int precision)
   const int* dim = layout.getLocalDim();
   setGaugeParams(&gaugeParam, dim, qudaPrecision);
 
-  //return createExtendedGaugeField(gauge, &gaugeParam);
-  return NULL;
+
+  if(geometry == 1){
+    gaugeParam.type = QUDA_GENERAL_LINKS;
+  }else if(geometry == 4){
+    gaugeParam.type = QUDA_SU3_LINKS;
+  }
+  
+  return createExtendedGaugeField(gauge, geometry, &gaugeParam);
 }
 
+void qudaDestroyGaugeField(void* gauge)
+{
+  using namespace milc_interface;
+
+  destroyQudaGaugeField(gauge);
+
+  return;
+}
 
 
 
@@ -66,6 +80,7 @@ void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, i
 
   const int* dim = layout.getLocalDim();
   setGaugeParams(&gaugeParam, dim, qudaPrecision);
+
 
   computeCloverDerivativeQuda(out, gauge, oprod, mu, nu, qudaParity, &gaugeParam);
 

@@ -202,6 +202,10 @@ extern "C" {
                             int mu, int nu, int precision, int parity);
 
 
+  void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision);
+
+  void qudaDestroyGaugeField(void* gauge);
+
 #ifdef __cplusplus
 }
 #endif

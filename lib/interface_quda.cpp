@@ -2308,22 +2308,7 @@ void computeCloverDerivativeQuda(void* out,
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge = out;
   cpuGaugeField cpuOut(gParam);
-#ifdef USE_EXTENDED_VOLUME
-  int E[4];
-  QudaGaugeParam param_ex;
-  memcpy(&param_ex, param, sizeof(QudaGaugeParam));
-  for(int dir=0; dir<4; ++dir) E[dir] = param_ex.X[dir] = param->X[dir]+4;
-  GaugeFieldParam gParam_ex(0, param_ex);
-  gParam_ex.order = QUDA_MILC_GAUGE_ORDER;
-  gParam_ex.pad = 0;
-  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
-  gParam_ex.link_type = QUDA_SU3_LINKS;
-  cpuGaugeField cpuGauge(gParam_ex);
-  
-  gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
-  gParam_ex.link_type = QUDA_GENERAL_LINKS;
-  cpuGaugeField cpuOprod(gParam_ex);
-#else
+#ifndef USE_EXTENDED_VOLUME
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.gauge = oprod;
@@ -2345,18 +2330,7 @@ void computeCloverDerivativeQuda(void* out,
 
  // gParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaGaugeField cudaOut(gParam);
-#ifdef USE_EXTENDED_VOLUME
-  gParam_ex.pad = getGaugePadding(gParam_ex);
-  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
-  gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
-  gParam_ex.link_type = QUDA_GENERAL_LINKS;
-  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
-  cudaGaugeField cudaOprod(gParam_ex);
-
-  gParam_ex.geometry = QUDA_VECTOR_GEOMETRY;
-  gParam_ex.link_type = QUDA_SU3_LINKS;
-  cudaGaugeField cudaGauge(gParam_ex);
-#else
+#ifndef USE_EXTENDED_VOLUME
   cudaGaugeField cudaOprod(gParam);
 
   gParam.geometry = QUDA_VECTOR_GEOMETRY;
@@ -2365,60 +2339,18 @@ void computeCloverDerivativeQuda(void* out,
 #endif
   profileCloverDerivative.Stop(QUDA_PROFILE_INIT);
 
-#ifdef USE_EXTENDED_VOLUME
-  // set up extended gauge and outer-product fields
-  GaugeFieldParam appParam = gParam;
-  appParam.geometry = QUDA_VECTOR_GEOMETRY;
-  appParam.order = QUDA_MILC_GAUGE_ORDER;
-  appParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  appParam.gauge = gauge;
-  appParam.pad = 0;
-  
-  {
-    cpuGaugeField appField(appParam);
-    printf("Calling copyExtendedGauge for vector field\n");
-    copyExtendedGauge(cpuGauge, appField, 2, QUDA_CPU_FIELD_LOCATION);
-  }
-  
-  appParam.geometry = QUDA_SCALAR_GEOMETRY;
-  appParam.link_type = QUDA_GENERAL_LINKS;
-  appParam.gauge = oprod;
-  {
-    cpuGaugeField appField(appParam);
-    printf("Calling copyExtendedGauge for scalar field\n");
-    printf("geom = %d %d\n", cpuOprod.Geometry(), appField.Geometry());
-    copyExtendedGauge(cpuOprod, appField, 2, QUDA_CPU_FIELD_LOCATION);
-  }
-
-  profileCloverDerivative.Start(QUDA_PROFILE_COMMS);
-
-  int R[4] = {2,2,2,2};
-  // Gauge field does not need to be copied each time
-  exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuGauge.Gauge_p(), cpuGauge.Order(), cpuGauge.Precision(), 0, 4);
-  exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuOprod.Gauge_p(), cpuOprod.Order(), cpuOprod.Precision(), 0, 1);
-
-  profileCloverDerivative.Stop(QUDA_PROFILE_COMMS);
-#endif
   
   // load fields onto the device
   profileCloverDerivative.Start(QUDA_PROFILE_H2D);
-  cudaGauge.loadCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
-  cudaOprod.loadCPUField(cpuOprod, QUDA_CPU_FIELD_LOCATION);
-//  cudaOut.loadCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
-  profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
-
   param->type = QUDA_SU3_LINKS;
   cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(gauge,4,param));
   param->type = QUDA_GENERAL_LINKS;
   cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(oprod,1,param)); 
+  profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
 
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
   cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity);
   profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
-
-
-// Additional load just as a test
-//  cudaGauge.saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
 
   checkCudaError();
 
@@ -2427,8 +2359,8 @@ void computeCloverDerivativeQuda(void* out,
   profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
   checkCudaError();
 
-  delete gPointer; // delete the gauge field pointer
-  delete oPointer; // delete the outer product pointer
+  destroyQudaGaugeField(gPointer); // delete the gauge field pointer
+  destroyQudaGaugeField(oPointer); // delete the outer product pointer
 
   profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
 
