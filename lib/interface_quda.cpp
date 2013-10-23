@@ -2341,12 +2341,16 @@ void computeCloverDerivativeQuda(void* out,
 
   
   // load fields onto the device
-  profileCloverDerivative.Start(QUDA_PROFILE_H2D);
-  param->type = QUDA_SU3_LINKS;
-  cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(gauge,4,param));
-  param->type = QUDA_GENERAL_LINKS;
-  cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(oprod,1,param)); 
-  profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
+//  profileCloverDerivative.Start(QUDA_PROFILE_H2D);
+//  param->type = QUDA_SU3_LINKS;
+//  cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(gauge,4,param));
+//  param->type = QUDA_GENERAL_LINKS;
+//  cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(oprod,1,param)); 
+
+  cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(gauge);
+  cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(oprod);
+
+//  profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
 
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
   cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity);
@@ -2359,8 +2363,8 @@ void computeCloverDerivativeQuda(void* out,
   profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
   checkCudaError();
 
-  destroyQudaGaugeField(gPointer); // delete the gauge field pointer
-  destroyQudaGaugeField(oPointer); // delete the outer product pointer
+//  destroyQudaGaugeField(gPointer); // delete the gauge field pointer
+//  destroyQudaGaugeField(oPointer); // delete the outer product pointer
 
   profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
 
