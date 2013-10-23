@@ -406,6 +406,21 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
+   * Solve for multiple shifts (e.g., masses).  This is a special
+   * variant of the multi-shift solver where the additional vectors
+   * required for force computation are also returned.
+   * @param _hp_xe   Array of solution spinor fields
+   * @param _hp_xo   Array of fields with A_oo^{-1} D_oe * x 
+   * @param _hp_ye   Array of fields with M_ee * x
+   * @param _hp_yo   Array of fields with A_oo^{-1} D_oe * M_ee * x
+   * @param _hp_b    Array of source spinor fields
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
+   */
+  void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, 
+			      void **_hp_yo, void *_hp_b, QudaInvertParam *param);
+
+  /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
    * @param _hp_b    Array of source spinor fields
