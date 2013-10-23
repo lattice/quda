@@ -1,8 +1,8 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = clover_invert.o copy_gauge_extended.o timer.o malloc.o	\
-	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
+QUDA_OBJS = clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
+	timer.o malloc.o solver.o inv_bicgstab_quda.o inv_cg_quda.o	\
 	inv_multi_cg_quda.o inv_gcr_quda.o inv_mr_quda.o inv_mre.o	\
 	interface_quda.o util_quda.o color_spinor_field.o		\
 	color_spinor_util.o cpu_color_spinor_field.o			\

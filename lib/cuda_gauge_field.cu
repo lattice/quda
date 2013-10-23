@@ -193,7 +193,6 @@ namespace quda {
 
   void cudaGaugeField::copy(const GaugeField &src) {
 
-    if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
     checkField(src);
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {

@@ -19,16 +19,18 @@
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
 #include <hisq_links_quda.h>
+#include <algorithm>
 
 #ifdef NUMA_AFFINITY
 #include <numa_affinity.h>
 #endif
 
 #include <cuda.h>
+#include "face_quda.h"
 
 #ifdef MULTI_GPU
 extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
-    QudaPrecision gPrecision, int optflag);
+    QudaPrecision gPrecision, int optflag, int geom);
 #endif // MULTI_GPU
 
 #ifdef GPU_GAUGE_FORCE
@@ -58,7 +60,6 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 #include "check_params.h"
 #undef PRINT_PARAM
 
-#include "face_quda.h"
 
 int numa_affinity_enabled = 1;
 
@@ -113,6 +114,9 @@ static TimeProfile profileGaugeForce("computeGaugeForceQuda");
 
 //!<Profiler for updateGaugeFieldQuda 
 static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
+
+//!<Profiler for updateGaugeFieldQuda
+static TimeProfile profileCloverDerivative("computeCloverDerivativeQuda");
 
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
@@ -2351,7 +2355,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     profileFatLink.Start(QUDA_PROFILE_COMMS);
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
     exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
-        cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0);
+        cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0, 4);
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
 #endif
 
@@ -2491,7 +2495,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   profileGaugeForce.Start(QUDA_PROFILE_COMMS);
   int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
   exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
-			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1);
+			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1, 4);
   profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
 
   profileGaugeForce.Start(QUDA_PROFILE_H2D);
@@ -2502,6 +2506,8 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
   profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 #endif
+
+
 
   profileGaugeForce.Start(QUDA_PROFILE_H2D);
   cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
@@ -2540,6 +2546,155 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #endif // GPU_GAUGE_FORCE
   return 0;  
 }
+
+int getGaugePadding(GaugeFieldParam& param){
+  int pad = 0;
+#ifdef MULTI_GPU
+  int volume = param.x[0]*param.x[1]*param.x[2]*param.x[3];
+  int face_size[4];
+  for(int dir=0; dir<4; ++dir) face_size[dir] = (volume/param.x[dir])/2;
+  pad = *std::max_element(face_size, face_size+4);
+#endif
+
+  return pad;
+}
+
+
+void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
+{
+  // This function takes a cpu field in MILC format, 
+  // extends it, and loads it onto the GPU. 
+  // Then it returns a pointer to that field.
+  int E[4];
+  QudaGaugeParam param_ex;
+  memcpy(&param_ex, param, sizeof(QudaGaugeParam));
+  for(int dir=0; dir<4; ++dir) E[dir] = param_ex.X[dir] = param->X[dir]+4;
+  GaugeFieldParam gParam_ex(0, param_ex);
+  if(geometry == 1){
+    gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
+  }else if(geometry == 4){
+    gParam_ex.geometry = QUDA_VECTOR_GEOMETRY;
+  }else{
+    errorQuda("Only scalar and vector geometries are supported\n");
+  }
+  gParam_ex.order = QUDA_MILC_GAUGE_ORDER;
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  gParam_ex.pad = 0;
+  gParam_ex.link_type = param->type;
+  cpuGaugeField cpuGaugeEx(gParam_ex);
+
+  // create an extended device field
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam_ex.pad = getGaugePadding(gParam_ex);
+  gParam_ex.create = QUDA_NULL_FIELD_CREATE;
+  cudaGaugeField* cudaGaugeEx = new cudaGaugeField(gParam_ex);
+
+
+  // Perform communication on the CPU
+  GaugeFieldParam gParam(0, *param);
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.pad = 0;
+  gParam.geometry = gParam_ex.geometry;
+  gParam.link_type = gParam_ex.link_type;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge = gauge;
+  {
+    cpuGaugeField cpuGauge(gParam);
+    copyExtendedGauge(cpuGaugeEx, cpuGauge, 2, QUDA_CPU_FIELD_LOCATION);
+  }
+
+  int R[4] = {2,2,2,2};
+  exchange_cpu_sitelink_ex(gParam.x, R, (void**)cpuGaugeEx.Gauge_p(), cpuGaugeEx.Order(), cpuGaugeEx.Precision(), 0, geometry);
+
+  // load data onto the GPU
+  cudaGaugeEx->loadCPUField(cpuGaugeEx, QUDA_CPU_FIELD_LOCATION);
+ 
+  return cudaGaugeEx;
+}
+
+void destroyQudaGaugeField(void* gauge){
+  cudaGaugeField* g = reinterpret_cast<cudaGaugeField*>(gauge);
+  delete g;
+}
+
+
+void computeCloverDerivativeQuda(void* out,
+                                 void* gauge,
+                                 void* oprod,
+                                 int mu, int nu,
+                                 QudaParity parity,
+                                 QudaGaugeParam* param,
+                                 int conjugate)
+{
+  profileCloverDerivative.Start(QUDA_PROFILE_TOTAL);
+
+  checkGaugeParam(param);
+  
+  profileCloverDerivative.Start(QUDA_PROFILE_INIT);
+#ifndef USE_EXTENDED_VOLUME
+#define USE_EXTENDED_VOLUME
+#endif
+ 
+  // create host fields
+  GaugeFieldParam gParam(0, *param);
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.pad = 0;
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge = out;
+  cpuGaugeField cpuOut(gParam);
+#ifndef USE_EXTENDED_VOLUME
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.gauge = oprod;
+  cpuGaugeField cpuOprod(gParam);
+
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam.link_type = QUDA_SU3_LINKS;
+  gParam.gauge = gauge;
+  cpuGaugeField cpuGauge(gParam);
+#endif
+
+  // create device fields
+  gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.pad = getGaugePadding(gParam);
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+
+ // gParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaGaugeField cudaOut(gParam);
+#ifndef USE_EXTENDED_VOLUME
+  cudaGaugeField cudaOprod(gParam);
+
+  gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  gParam.link_type = QUDA_SU3_LINKS;
+  cudaGaugeField cudaGauge(gParam);
+#endif
+  profileCloverDerivative.Stop(QUDA_PROFILE_INIT);
+
+  cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(gauge);
+  cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(oprod);
+
+
+  profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
+  cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity, conjugate);
+  profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
+
+
+  profileCloverDerivative.Start(QUDA_PROFILE_D2H);
+  cudaOut.saveCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
+  profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
+  checkCudaError();
+
+
+  profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
+
+  return;
+}
+
+
 
 
 void updateGaugeFieldQuda(void* gauge, 

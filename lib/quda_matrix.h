@@ -124,6 +124,10 @@ namespace quda{
       return make_float2(a,b);
     } 
 
+  template<class Cmplx>
+    __device__ __host__ inline Cmplx operator-(const Cmplx &a){
+      return makeComplex(-a.x, -a.y);
+    }
 
   template<class Cmplx> 
     __device__ __host__ inline Cmplx & operator+=(Cmplx & a, const Cmplx & b){
@@ -131,6 +135,13 @@ namespace quda{
       a.y += b.y;
       return a;
     }
+
+  template<class Cmplx>
+    __device__ __host__ inline Cmplx & operator-=(Cmplx & a, const Cmplx & b){
+    a.x -= b.x;
+    a.y -= b.y; 
+    return a;
+  }
 
 
   template<class Cmplx>
@@ -353,6 +364,15 @@ namespace quda{
     }
 
 
+  template<class T, int N> 
+    __device__ __host__ inline Matrix<T,N> operator-=(Matrix<T,N> & a, const Matrix<T,N> & b)
+  {
+    for(int i=0; i<N*N; i++){
+      a.data[i] -= b.data[i];
+    }
+    return a;
+  }
+
 
   template<class T, int N>
     __device__ __host__ inline Matrix<T,N> operator-(const Matrix<T,N> & a, const Matrix<T,N> & b)
@@ -381,6 +401,15 @@ namespace quda{
       return scalar*a;
     }
 
+  template<class T, int N>
+    __device__ __host__ inline Matrix<T,N> operator-(const Matrix<T,N> & a){
+      Matrix<T,N> result;
+      for(int i=0; i<(N*N); ++i){
+        result.data[i] = -1*a.data[i]; 
+      }
+      return result;
+    }
+
 
 
   template<class T>
@@ -402,6 +431,9 @@ namespace quda{
       result(2,2) = a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2);
       return result;
     }
+
+    
+
 
 
   // This is so that I can multiply real and complex matrices
@@ -654,7 +686,7 @@ namespace quda{
 
   template<class T>
     __device__ inline
-    void loadLinkVariableFromArray(const T* const array, int dir, int idx, int stride, Matrix<T,3> *link)
+    void loadLinkVariableFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<T,3> *link)
     {
       for(int i=0; i<9; ++i){
         link->data[i] = array[idx + (dir*9 + i)*stride];
@@ -663,8 +695,18 @@ namespace quda{
     }
 
 
+  template<class T, int N>
+    __device__ inline 
+    void loadMatrixFromArray(const T* const array, const int idx, const int stride, Matrix<T,N> *mat)
+    {
+      for(int i=0; i<(N*N); ++i){
+        mat->data[i] = array[idx + i*stride];
+      }
+    }
+
+
   __device__ inline  
-    void loadLinkVariableFromArray(const float2* const array, int dir, int idx, int stride, Matrix<double2,3> *link)
+    void loadLinkVariableFromArray(const float2* const array, const int dir, const int idx, const int stride, Matrix<double2,3> *link)
     { 
       float2 single_temp; 
       for(int i=0; i<9; ++i){
@@ -677,9 +719,20 @@ namespace quda{
 
 
 
+  template<class T, int N>
+    __device__ inline 
+    void writeMatrixToArray(const Matrix<T,N>& mat, const int idx, const int stride, T* const array)
+    {
+      for(int i=0; i<(N*N); ++i){
+        array[idx + i*stride] = mat.data[i];
+      }
+    }
+
+
+
   template<class T>
     __device__ inline
-    void writeLinkVariableToArray(const Matrix<T,3> & link,  int dir, int idx, int stride, T* const array)
+    void writeLinkVariableToArray(const Matrix<T,3> & link, const int dir, const int idx, const int stride, T* const array)
     {
       for(int i=0; i<9; ++i){ 
         array[idx + (dir*9 + i)*stride] = link.data[i];
@@ -691,7 +744,7 @@ namespace quda{
 
 
   __device__ inline 
-    void writeLinkVariableToArray(const Matrix<double2,3> & link, int dir, int idx, int stride, float2* const array)
+    void writeLinkVariableToArray(const Matrix<double2,3> & link, const int dir, const int idx, const int stride, float2* const array)
     {
       float2 single_temp;
 
@@ -706,7 +759,7 @@ namespace quda{
 
   template<class T>
     __device__ inline
-    void loadMomentumFromArray(const T* const array, int dir, int idx, int stride, Matrix<T,3> *mom)
+    void loadMomentumFromArray(const T* const array, const int dir, const int idx, const int stride, Matrix<T,3> *mom)
     {
       T temp2[5];
       temp2[0] = array[idx + dir*stride*5];
@@ -742,7 +795,7 @@ namespace quda{
 
   template<class T, class U>
     __device__  inline 
-    void writeMomentumToArray(const Matrix<T,3> & mom, int dir, int idx, U coeff, int stride, T* const array)
+    void writeMomentumToArray(const Matrix<T,3> & mom, const int dir, const int idx, const U coeff, const int stride, T* const array)
     {
       T temp2;
       temp2.x = (mom.data[1].x - mom.data[3].x)*0.5*coeff;
