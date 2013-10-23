@@ -199,7 +199,7 @@ extern "C" {
 
 
   void qudaCloverDerivative(void* out, void* gauge, void* oprod, 
-                            int mu, int nu, int precision, int parity);
+                            int mu, int nu, int precision, int parity, int conjugate);
 
 
   void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision);

@@ -515,7 +515,7 @@ extern "C" {
 
 
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
-                                   QudaParity parity, QudaGaugeParam* param);
+                                   QudaParity parity, QudaGaugeParam* param, int conjugate);
 #ifdef __cplusplus
 }
 #endif

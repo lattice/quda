@@ -124,6 +124,10 @@ namespace quda{
       return make_float2(a,b);
     } 
 
+  template<class Cmplx>
+    __device__ __host__ inline Cmplx operator-(const Cmplx &a){
+      return makeComplex(-a.x, -a.y);
+    }
 
   template<class Cmplx> 
     __device__ __host__ inline Cmplx & operator+=(Cmplx & a, const Cmplx & b){
@@ -397,6 +401,15 @@ namespace quda{
       return scalar*a;
     }
 
+  template<class T, int N>
+    __device__ __host__ inline Matrix<T,N> operator-(const Matrix<T,N> & a){
+      Matrix<T,N> result;
+      for(int i=0; i<(N*N); ++i){
+        result.data[i] = -1*a.data[i]; 
+      }
+      return result;
+    }
+
 
 
   template<class T>
@@ -418,6 +431,9 @@ namespace quda{
       result(2,2) = a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2);
       return result;
     }
+
+    
+
 
 
   // This is so that I can multiply real and complex matrices

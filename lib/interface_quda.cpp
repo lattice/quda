@@ -2288,7 +2288,8 @@ void computeCloverDerivativeQuda(void* out,
                                  void* oprod,
                                  int mu, int nu,
                                  QudaParity parity,
-                                 QudaGaugeParam* param)
+                                 QudaGaugeParam* param,
+                                 int conjugate)
 {
   profileCloverDerivative.Start(QUDA_PROFILE_TOTAL);
 
@@ -2320,7 +2321,6 @@ void computeCloverDerivativeQuda(void* out,
   cpuGaugeField cpuGauge(gParam);
 #endif
 
-
   // create device fields
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -2339,36 +2339,23 @@ void computeCloverDerivativeQuda(void* out,
 #endif
   profileCloverDerivative.Stop(QUDA_PROFILE_INIT);
 
-  
-  // load fields onto the device
-//  profileCloverDerivative.Start(QUDA_PROFILE_H2D);
-//  param->type = QUDA_SU3_LINKS;
-//  cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(gauge,4,param));
-//  param->type = QUDA_GENERAL_LINKS;
-//  cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(createExtendedGaugeField(oprod,1,param)); 
-
   cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(gauge);
   cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(oprod);
 
-//  profileCloverDerivative.Stop(QUDA_PROFILE_H2D);
 
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
-  cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity);
+  cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity, conjugate);
   profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
 
-  checkCudaError();
 
   profileCloverDerivative.Start(QUDA_PROFILE_D2H);
   cudaOut.saveCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
   profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
   checkCudaError();
 
-//  destroyQudaGaugeField(gPointer); // delete the gauge field pointer
-//  destroyQudaGaugeField(oPointer); // delete the outer product pointer
 
   profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
 
- 
   return;
 }
 
