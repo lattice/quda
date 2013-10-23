@@ -81,9 +81,13 @@ void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, i
   const int* dim = layout.getLocalDim();
   setGaugeParams(&gaugeParam, dim, qudaPrecision);
 
+  void* gPointer = qudaCreateExtendedGaugeField(gauge, 4, precision);
+  void* oPointer = qudaCreateExtendedGaugeField(oprod, 1, precision);
 
-  computeCloverDerivativeQuda(out, gauge, oprod, mu, nu, qudaParity, &gaugeParam);
+  computeCloverDerivativeQuda(out, gPointer, oPointer, mu, nu, qudaParity, &gaugeParam);
 
+  qudaDestroyGaugeField(gPointer);
+  qudaDestroyGaugeField(oPointer);
 
   return;
 }
