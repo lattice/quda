@@ -188,7 +188,7 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaCloverField::copy(const CloverField &src) {
+  void cudaCloverField::copy(const CloverField &src, bool inverse) {
 
     checkField(src);
     
@@ -207,7 +207,7 @@ namespace quda {
 	  cudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
       }
       
-      if (src.V(true)) {
+      if (src.V(true) && inverse) {
 	copyGenericClover(*this, src, true, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
 	cudaMemcpy(cloverInv, packClover, bytes, cudaMemcpyHostToDevice);
 	if (precision == QUDA_HALF_PRECISION) 
