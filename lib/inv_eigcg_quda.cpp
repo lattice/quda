@@ -211,7 +211,7 @@ namespace quda {
     	   for (int i = 0; i < l; i++) hTm[i*ldTm+i]= hTvalm[i];//fill-up diagonal
 
            //Compute Ap0 = Ap - beta*Ap0:
-           axpyCuda(-beta, Ap0, Ap);//mind precision...
+           xpayCuda(Ap, -beta, Ap0);//mind precision...
            
            copyCuda(*v0, Ap0);//make full precision here.
 	   for (int i = 0; i < l; i++){
