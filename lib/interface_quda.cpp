@@ -2609,10 +2609,13 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   gParam.gauge = gauge;
   {
     cpuGaugeField cpuGauge(gParam);
+    profileExtendedGauge.Stop(QUDA_PROFILE_INIT);
+
+    profileExtendedGauge.Start(QUDA_PROFILE_PREAMBLE);
     copyExtendedGauge(cpuGaugeEx, cpuGauge, 2, QUDA_CPU_FIELD_LOCATION);
+    profileExtendedGauge.Stop(QUDA_PROFILE_PREAMBLE);
   }
 
-  profileExtendedGauge.Stop(QUDA_PROFILE_INIT);
 
   profileExtendedGauge.Start(QUDA_PROFILE_COMMS);
 
