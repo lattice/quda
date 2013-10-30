@@ -176,7 +176,7 @@ namespace quda {
 //Begin CG iterations:
     int k=0, l=0;
     
-    PrintStats("eigCG", k, r2, b2, heavy_quark_res);
+    PrintStats("EigCG", k, r2, b2, heavy_quark_res);
 
     int steps_since_reliable = 1;
 
@@ -314,7 +314,7 @@ namespace quda {
     shutdown_magma(&magma_param);
 
 //Copy nev eigvectors:
-    //copyCuda(e, Vm->ReducedEigenvecSet(nev));//new:this return an eigenvectorset consists of nev first eigenvectors    
+    copyCuda(e, Vm->ReducedEigenvecSet(nev));//new:this return an eigenvector set that consists of nev first eigenvectors    
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);

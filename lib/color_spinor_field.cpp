@@ -20,7 +20,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) 
-    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0)
+    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0), eigvsubset_init(false), eigenvecsubset(0)
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, 
 	   param.precision, param.pad, param.siteSubset, param.siteOrder, 
@@ -28,7 +28,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) 
-    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0)
+    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0),eigvsubset_init(false), eigenvecsubset(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, 
 	   field.precision, field.pad, field.siteSubset, field.siteOrder, 

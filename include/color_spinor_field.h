@@ -202,6 +202,9 @@ namespace quda {
     //! for deflated solvers:
     std::vector<ColorSpinorField*> eigenvectors;
 
+    bool eigvsubset_init;
+    ColorSpinorField*  eigenvecsubset;//keep info about subset of eigenvectors
+
     void createGhostZone();
 
     // resets the above attributes based on contents of param
@@ -281,6 +284,7 @@ namespace quda {
     //void *norm; // the normalization field
     bool alloc; // whether we allocated memory
     bool init;
+    bool eigenvsubset_init;
 
     bool texInit; // whether a texture object has been created or not
 #ifdef USE_TEXTURE_OBJECTS
