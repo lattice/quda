@@ -14,7 +14,7 @@ namespace quda {
     int volumeEx;
     int nDim;
     int geometry;
-    int X[QUDA_MAX_DIM];
+    int X[QUDA_MAX_DIM]; // geometry of the normal gauge field
     int faceVolumeCB[QUDA_MAX_DIM];
     CopyGaugeExArg(const OutOrder &out, const InOrder &in, int R,
 		 const int *X, const int *faceVolumeCB, int nDim, int geometry) 
@@ -39,38 +39,30 @@ namespace quda {
     int E[4];
     for (int d=0; d<4; d++) E[d] = arg.X[d] + 2*arg.R;
     
-    int za = X/(E[0]/2);
-    int x0h = X - za*(E[0]/2);
-    int zb = za/E[1];
-    x[1] = za - zb*E[1];
-    x[3] = zb / E[2];
-    x[2] = zb - x[3]*E[2];
+    int za = X/(arg.X[0]/2);
+    int x0h = X - za*(arg.X[0]/2);
+    int zb = za/arg.X[1];
+    x[1] = za - zb*arg.X[1];
+    x[3] = zb / arg.X[2];
+    x[2] = zb - x[3]*arg.X[2];
     x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
     
-    // if coordinate is outside of the normal gauge field then ignore
-    if( x[0]<arg.R || x[0] >= arg.X[0]+arg.R || 
-	x[1]<arg.R || x[1] >= arg.X[1]+arg.R || 
-	x[2]<arg.R || x[2] >= arg.X[2]+arg.R || 
-	x[3]<arg.R || x[3] >= arg.X[3]+arg.R ) return;
-    
-    for (int d=0; d<4; d++) x[d] = (x[d] - arg.R + arg.X[d]) % arg.X[d];
-    
-    // Y is the cb spatial index into the normal gauge field
-    int Y = (((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0]+x[0]) >> 1;
+    // Y is the cb spatial index into the extended gauge field
+    int Y = ((((x[3]+arg.R)*E[2] + (x[2]+arg.R))*E[1] + (x[1]+arg.R))*E[0]+(x[0]+arg.R)) >> 1;
     
     for(int d=0; d<arg.geometry; d++){
       RegTypeIn in[length];
       RegTypeOut out[length];
-      arg.in.load(in, Y, d, parity);
+      arg.in.load(in, X, d, parity);
       for (int i=0; i<length; i++) out[i] = in[i];
-      arg.out.save(out, X, d, parity);
+      arg.out.save(out, Y, d, parity);
     }//dir
   }
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
   void copyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> arg) {
     for (int parity=0; parity<2; parity++) {
-      for(int X=0; X<arg.volumeEx/2; X++){
+      for(int X=0; X<arg.volume/2; X++){
 	copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder> (arg, X, parity);
       }
     }
