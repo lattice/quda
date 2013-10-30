@@ -38,7 +38,7 @@ namespace quda {
      Here we use an inplace inversion which hopefully reduces register pressure
    */
   template <int blockSize, typename Float, typename Clover>
-  __device__ __host__ void cloverInvertCompute(CloverInvertArg<Clover> arg, int x, int parity) {
+  __device__ __host__ double cloverInvertCompute(CloverInvertArg<Clover> arg, int x, int parity) {
 
     Float A[72];
     double trlogA = 0.0; 
@@ -127,31 +127,16 @@ namespace quda {
     // save the inverted matrix
     arg.inverse.save(A, x, parity);
 
-    if (arg.computeTraceLog) {
-#ifdef __CUDA_ARCH__
-      // fix me
-      /*typedef cub::BlockReduce<double, blockSize> BlockReduce;
-	__shared__ typename BlockReduce::TempStorage temp_storage;
-	double aggregate = BlockReduce(temp_storage).Sum(trlogA);
-	if (threadIdx.x == 0) atomicAdd(arg.trlogA_d+parity, aggregate);      */
-      
-      typedef cub::WarpReduce<double, 4> WarpReduce;
-      __shared__ typename WarpReduce::TempStorage temp_storage;
-      double aggregate = WarpReduce(temp_storage).Sum(trlogA);
-      if (threadIdx.x % warpSize == 0) atomicAdd(arg.trlogA_d+parity, aggregate);
-#else
-      // should make this thread safe if we ever apply threads to cpu code
-      arg.trlogA_h[parity] += trlogA; 
-#endif
-    }
-
+    return trlogA;
   }
 
   template <int blockSize, typename Float, typename Clover>
   void cloverInvert(CloverInvertArg<Clover> arg) {  
     for (int parity=0; parity<2; parity++) {
       for (int x=0; x<arg.clover.volumeCB; x++) {
-	cloverInvertCompute<blockSize, Float>(arg, x, parity);
+	// should make this thread safe if we ever apply threads to cpu code
+	double trlogA = cloverInvertCompute<blockSize, Float>(arg, x, parity);
+	if (arg.computeTraceLog) arg.trlogA_h[parity] += trlogA;
       }
     }
   }
@@ -159,9 +144,18 @@ namespace quda {
   template <int blockSize, typename Float, typename Clover>
   __global__ void cloverInvertKernel(CloverInvertArg<Clover> arg) {  
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    if (idx >= arg.clover.volumeCB) return;
+    //if (idx >= arg.clover.volumeCB) return;
     int parity = blockIdx.y;
-    cloverInvertCompute<blockSize, Float>(arg, idx, parity);
+    double trlogA = 0.0;
+    if (idx < arg.clover.volumeCB) trlogA = cloverInvertCompute<blockSize, Float>(arg, idx, parity);
+
+    if (arg.computeTraceLog) {
+      typedef cub::BlockReduce<double, blockSize> BlockReduce;
+	__shared__ typename BlockReduce::TempStorage temp_storage;
+	double aggregate = BlockReduce(temp_storage).Sum(trlogA);
+	if (threadIdx.x == 0) atomicAdd(arg.trlogA_d+parity, aggregate);
+    }
+
   }
 
   template <typename Float, typename Clover>
@@ -218,7 +212,6 @@ namespace quda {
     CloverInvertArg<Clover> arg(inverse, clover, computeTraceLog, trlog);
     CloverInvert<Float,Clover> invert(arg, location);
     invert.apply(0);
-
     cudaDeviceSynchronize();
   }
 
