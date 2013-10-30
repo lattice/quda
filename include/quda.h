@@ -164,6 +164,9 @@ extern "C" {
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
 
+    int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
+    double trlogA[2];                      /**< The trace log of the clover term (even/odd computed separately) */
+
     QudaVerbosity verbosity;               /**< The verbosity setting to use in the solver */
 
     int sp_pad;                            /**< The padding to use for the fermion fields */

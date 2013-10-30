@@ -10,11 +10,11 @@ namespace quda {
   struct CloverInvertArg {
     const Clover clover;
     Clover inverse;
-    bool computeTrace;
-    double *trlogA_h;
+    bool computeTraceLog;
+    double * const trlogA_h;
     double *trlogA_d;
-    CloverInvertArg(Clover &inverse, const Clover &clover, bool computeTrace=0, double *trlogA=0) :
-      inverse(inverse), clover(clover), computeTrace(computeTrace), trlogA_h(trlogA) { 
+    CloverInvertArg(Clover &inverse, const Clover &clover, bool computeTraceLog=0, double* const trlogA=0) :
+      inverse(inverse), clover(clover), computeTraceLog(computeTraceLog), trlogA_h(trlogA) { 
       cudaHostGetDevicePointer(&trlogA_d, trlogA_h, 0); // set the matching device pointer
     }
   };
@@ -127,13 +127,12 @@ namespace quda {
     // save the inverted matrix
     arg.inverse.save(A, x, parity);
 
-    if (arg.computeTrace) {
+    if (arg.computeTraceLog) {
 #ifdef __CUDA_ARCH__
       // fix me
       /*typedef cub::BlockReduce<double, blockSize> BlockReduce;
 	__shared__ typename BlockReduce::TempStorage temp_storage;
 	double aggregate = BlockReduce(temp_storage).Sum(trlogA);
-	__syncthreads();
 	if (threadIdx.x == 0) atomicAdd(arg.trlogA_d+parity, aggregate);      */
       
       typedef cub::WarpReduce<double, 4> WarpReduce;
@@ -192,8 +191,7 @@ namespace quda {
       } else {
 	cloverInvert<1, Float, Clover>(arg);
       }
-      //if (arg.computeTrace) cudaDeviceSynchronize();
-      //printf("Block %d reduce test %e %e\n", tp.block.x, arg.trlogA_h[0], arg.trlogA_h[1]);
+      if (arg.computeTraceLog) cudaDeviceSynchronize();
     }
 
     TuneKey tuneKey() const {
@@ -215,29 +213,25 @@ namespace quda {
   };
 
   template <typename Float, typename Clover>
-  void cloverInvert(Clover inverse, const Clover clover, QudaFieldLocation location) {
-
-    // alocate memory to write trace log A to
-    double *trlog = (double*) pinned_malloc(2*sizeof(double));
-
-    CloverInvertArg<Clover> arg(inverse, clover, false, trlog);
+  void cloverInvert(Clover inverse, const Clover clover, bool computeTraceLog, 
+		    double* const trlog, QudaFieldLocation location) {
+    CloverInvertArg<Clover> arg(inverse, clover, computeTraceLog, trlog);
     CloverInvert<Float,Clover> invert(arg, location);
     invert.apply(0);
 
     cudaDeviceSynchronize();
-    //printf("Computed trace log is %e %e\n", trlog[0], trlog[1]);
-
-    host_free(trlog);
   }
 
   template <typename Float>
- void cloverInvert(const CloverField &clover, QudaFieldLocation location) {
+  void cloverInvert(const CloverField &clover, bool computeTraceLog, QudaFieldLocation location) {
     if (clover.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
       cloverInvert<Float>(FloatNOrder<Float,72,2>(clover, 1), 
-			  FloatNOrder<Float,72,2>(clover, 0), location);
+			  FloatNOrder<Float,72,2>(clover, 0), 
+			  computeTraceLog, clover.TrLog(), location);
     } else if (clover.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
       cloverInvert<Float>(FloatNOrder<Float,72,4>(clover, 1), 
-			  FloatNOrder<Float,72,4>(clover, 0), location);
+			  FloatNOrder<Float,72,4>(clover, 0), 
+			  computeTraceLog, clover.TrLog(), location);
     } else {
       errorQuda("Clover field %d order not supported", clover.Order());
     }
@@ -245,14 +239,14 @@ namespace quda {
   }
 
   // this is the function that is actually called, from here on down we instantiate all required templates
-  void cloverInvert(CloverField &clover, QudaFieldLocation location) {
+  void cloverInvert(CloverField &clover, bool computeTraceLog, QudaFieldLocation location) {
     if (clover.Precision() == QUDA_HALF_PRECISION && clover.Order() > 4) 
       errorQuda("Half precision not supported for order %d", clover.Order());
 
     if (clover.Precision() == QUDA_DOUBLE_PRECISION) {
-      cloverInvert<double>(clover, location);
+      cloverInvert<double>(clover, computeTraceLog, location);
     } else if (clover.Precision() == QUDA_SINGLE_PRECISION) {
-      cloverInvert<float>(clover, location);
+      cloverInvert<float>(clover, computeTraceLog, location);
     } else {
       errorQuda("Precision %d not supported", clover.Precision());
     }

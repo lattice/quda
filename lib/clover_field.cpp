@@ -12,7 +12,8 @@ namespace quda {
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
-    clover(0), norm(0), cloverInv(0), invNorm(0), order(param.order), create(param.create)
+    clover(0), norm(0), cloverInv(0), invNorm(0), order(param.order), create(param.create),
+    trlog(static_cast<double*>(pinned_malloc(2*sizeof(double))))
   {
     if (nDim != 4) errorQuda("Number of dimensions must be 4, not %d", nDim);
 
@@ -29,13 +30,13 @@ namespace quda {
       norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
     }
   }
-
+  
   CloverField::~CloverField() {
-
+    host_free(trlog);
   }
 
   cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
-
+    
     if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE) 
       errorQuda("Create type %d not supported", create);
 

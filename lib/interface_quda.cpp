@@ -591,8 +591,12 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   // inverted clover term is required when applying preconditioned operator
   if (!h_clovinv && pc_solve) {
     profileClover.Start(QUDA_PROFILE_COMPUTE);
-    cloverInvert(*cloverPrecise, QUDA_CUDA_FIELD_LOCATION);
+    cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog, QUDA_CUDA_FIELD_LOCATION);
     profileClover.Stop(QUDA_PROFILE_COMPUTE);
+    if (inv_param->compute_clover_trlog) {
+      inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
+      inv_param->trlogA[1] = cloverPrecise->TrLog()[1];
+    }
   }
 
   inv_param->cloverGiB = cloverPrecise->GBytes();

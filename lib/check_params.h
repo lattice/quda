@@ -261,6 +261,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
 #if defined INIT_PARAM
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
+    P(compute_clover_trlog, 0);
 #else
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
