@@ -314,7 +314,7 @@ namespace quda {
     shutdown_magma(&magma_param);
 
 //Copy nev eigvectors:
-    copyCuda(e, Vm->ReducedEigenvecSet(nev));//new:this return an eigenvector set that consists of nev first eigenvectors    
+    copyCuda(e, Vm->GetEigenvecSubset(nev));//new:this return an eigenvector set that consists of nev first eigenvectors    
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);

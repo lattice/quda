@@ -86,12 +86,15 @@ namespace quda {
       if (this->EigvDim() > 0) {//setup eigenvector form the set
          eigv_dim    = this->EigvDim();
        if(this->EigvId() > -1){
-         eigv_id   = this->EigvId();
-         volume    = this->EigvVolume(); 
-         stride    = this->EigvStride();
-         length    = this->EigvLength();
-         v = (char*)v + eigv_id*length*this->Precision();//src already have this pointer?
-         //adjust norm pointer here...
+         eigv_id    = this->EigvId();
+         volume     = this->EigvVolume(); 
+         stride     = this->EigvStride();
+         length     = this->EigvLength();
+         bytes      = this->EigvBytes();
+         norm_bytes = this->EigvNormBytes(); 
+         //v = (char*)v + eigv_id*length*this->Precision();//previous version...
+         v    = (void*)((char*)v + eigv_id*bytes);         
+         norm = (void*)((char*)norm + eigv_id*norm_bytes);         
        }
        //do nothing for the eigenvector subset...
       }
@@ -242,7 +245,7 @@ namespace quda {
        memcpy(param.x, x, nDim*sizeof(int));
        param.create = QUDA_REFERENCE_FIELD_CREATE;
        param.v = v;
-       param.norm = 0/*norm*/;//half precision is currently not implemented.
+       param.norm = norm;
        param.eigv_dim  = eigv_dim;
        //reserve eigvector set
        eigenvectors.reserve(eigv_dim);
@@ -367,8 +370,8 @@ namespace quda {
         {
           std::vector<ColorSpinorField*>::iterator vec;
           for(vec = eigenvectors.begin(); vec != eigenvectors.end(); vec++) delete *vec;
-          if(eigenvsubset_init) delete *eigenvsubset;//!check!
-          eigenvsubset_init = false;
+          if(eigvsubset_init) delete eigenvecsubset;//!check!
+          eigvsubset_init = false;
         } 
       }
       alloc = false;
@@ -746,46 +749,44 @@ namespace quda {
     exit(-1);
   }
 
-//WARNING(DANGEROUS): not what we need, this will resize the object!
-  cudaColorSpinorField& cudaColorSpinorField::ReducedEigenvecSet(const int num) const {
+  cudaColorSpinorField& cudaColorSpinorField::GetEigenvecSubset(const int range, const int first_element) {
 
+    if(first_element < 0) errorQuda("\nError: trying to set negative first element.\n");
     if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
-      if (num == this->EigvDim()) return *this; //nothing to reduce, this is the same eigenvector set...
-      else if (num < this->EigvDim()) {//setup eigenvector subset
+      if ((first_element+range) == this->EigvDim()) return *this; //nothing to reduce, this is the same eigenvector set...
+      else if ((first_element+range) < this->EigvDim()) {//setup eigenvector subset
         ColorSpinorParam param;
         param.siteSubset = siteSubset;
         param.nDim = nDim;
         memcpy(param.x, x, nDim*sizeof(int));
         param.create = QUDA_REFERENCE_FIELD_CREATE;
-        param.v = this->V();
-        param.norm = 0/*norm*/;//half precision is currently not implemented.
-        param.eigv_dim  = num;
+        param.v = dynamic_cast<cudaColorSpinorField*>(eigenvectors[first_element])->V();
+        param.norm = dynamic_cast<cudaColorSpinorField*>(eigenvectors[first_element])->Norm();
+        param.eigv_dim  = range;
+        param.eigv_id   = -1;
         
         if (this->eigvsubset_init)
         {//redefine subset
           //reset parameters:
-          dynamic_cast<cudaColorSpinorField*>(eigvsubset).reset(param);
+          dynamic_cast<cudaColorSpinorField*>(eigenvecsubset)->reset(param);
+          (dynamic_cast<cudaColorSpinorField*>(eigenvecsubset))->v    = (void*)((char*)v + eigv_id*bytes);         
+          (dynamic_cast<cudaColorSpinorField*>(eigenvecsubset))->norm = (void*)((char*)norm + eigv_id*norm_bytes); 
 #ifdef USE_TEXTURE_OBJECTS //(a lot of texture objects...)
-          dynamic_cast<cudaColorSpinorField*>(eigvsubset)->destroyTexObject();
-          dynamic_cast<cudaColorSpinorField*>(eigvsubset)->createTexObject();
+          dynamic_cast<cudaColorSpinorField*>(eigenvecsubset)->destroyTexObject();
+          dynamic_cast<cudaColorSpinorField*>(eigenvecsubset)->createTexObject();
 #endif
-          return *(dynamic_cast<cudaColorSpinorField*>(eigvsubset));
+          return *(dynamic_cast<cudaColorSpinorField*>(eigenvecsubset));
         }
         else
         {//create subset
-          eigvsubset_init = true;
-          eigvsubset = new cudaColorSpinorField(*this, param);
+          eigvsubset_init = true;//check this!
+          eigenvecsubset  = new cudaColorSpinorField(*this, param);
 #ifdef USE_TEXTURE_OBJECTS 
-          dynamic_cast<cudaColorSpinorField*>(eigvsubset)->destroyTexObject();
-          dynamic_cast<cudaColorSpinorField*>(eigvsubset)->createTexObject();
+          dynamic_cast<cudaColorSpinorField*>(eigenvecsubset)->destroyTexObject();
+          dynamic_cast<cudaColorSpinorField*>(eigenvecsubset)->createTexObject();
 #endif
-          return *(dynamic_cast<cudaColorSpinorField*>(eigvsubset));
+          return *(dynamic_cast<cudaColorSpinorField*>(eigenvecsubset));
         } 
-//future cheanges: we need to create a reference spinor, but with reduced volume/length etc.
-        //eigv_id   = this->EigvId();
-        //volume    = num*this->EigvVolume(); 
-        //stride    = num*this->EigvStride();
-        //length    = num*this->EigvLength();
       }
       else{
         errorQuda("Incorrect eigenvector dimension...");

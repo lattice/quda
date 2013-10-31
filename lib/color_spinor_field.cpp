@@ -182,7 +182,7 @@ namespace quda {
       eigv_volume = volume;
       eigv_stride = stride;
       eigv_length = length;
-      eigv_real_length = length;
+      eigv_real_length = real_length;//?
 
       eigv_bytes       = bytes;
       eigv_norm_bytes  = norm_bytes; 
@@ -281,6 +281,17 @@ namespace quda {
       norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
     } else {
       norm_bytes = 0;
+    }
+
+//for deflated solvers:
+    if(eigv_dim > 0 && eigv_id > -1){
+      eigv_volume      = volume;
+      eigv_stride      = stride;
+      eigv_length      = length;
+      eigv_real_length = real_length;
+
+      eigv_bytes       = bytes;
+      eigv_norm_bytes  = norm_bytes; 
     }
 
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");

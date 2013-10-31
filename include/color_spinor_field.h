@@ -370,7 +370,7 @@ namespace quda {
     cudaColorSpinorField& Odd() const;
 
     cudaColorSpinorField& Eigenvec(const int idx) const;
-    cudaColorSpinorField& ReducedEigenvecSet(const int num) const;
+    cudaColorSpinorField& GetEigenvecSubset(const int range, const int first_element=0);
 
     void zero();
 
