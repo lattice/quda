@@ -2453,7 +2453,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamSL.create = QUDA_NULL_FIELD_CREATE;
   cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParamSL);
   
-  copyExtendedGauge(*cpuSiteLink, appLink, 2, QUDA_CPU_FIELD_LOCATION);
+  copyExtendedGauge(*cpuSiteLink, appLink, QUDA_CPU_FIELD_LOCATION);
 #endif
   
   gParamSL.create = QUDA_NULL_FIELD_CREATE;
@@ -2578,10 +2578,9 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   // This function takes a cpu field in MILC format, 
   // extends it, and loads it onto the GPU. 
   // Then it returns a pointer to that field.
-  int E[4];
   QudaGaugeParam param_ex;
   memcpy(&param_ex, param, sizeof(QudaGaugeParam));
-  for(int dir=0; dir<4; ++dir) E[dir] = param_ex.X[dir] = param->X[dir]+4;
+  for(int dir=0; dir<4; ++dir) param_ex.X[dir] = param->X[dir]+4;
   GaugeFieldParam gParam_ex(0, param_ex);
   if(geometry == 1){
     gParam_ex.geometry = QUDA_SCALAR_GEOMETRY;
@@ -2616,7 +2615,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
     profileExtendedGauge.Stop(QUDA_PROFILE_INIT);
 
     profileExtendedGauge.Start(QUDA_PROFILE_PREAMBLE);
-    copyExtendedGauge(cpuGaugeEx, cpuGauge, 2, QUDA_CPU_FIELD_LOCATION);
+    copyExtendedGauge(cpuGaugeEx, cpuGauge, QUDA_CPU_FIELD_LOCATION);
     profileExtendedGauge.Stop(QUDA_PROFILE_PREAMBLE);
   }
 
