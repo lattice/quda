@@ -87,7 +87,7 @@ NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 
 TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
 ifneq ($(TESLA_ARCH),true)
-  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
+  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false -w
 endif
 
 ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
