@@ -9,27 +9,23 @@ namespace quda {
   struct CopyGaugeArg {
     OutOrder out;
     const InOrder in;
-    int volume;
-    int faceVolumeCB[QUDA_MAX_DIM];
-    int nDim;
-    CopyGaugeArg(const OutOrder &out, const InOrder &in, int volume, const int *faceVolumeCB, int nDim) 
-      : out(out), in(in), volume(volume), nDim(nDim) {
-      for (int d=0; d<nDim; d++) this->faceVolumeCB[d] = faceVolumeCB[d];
-    }
+    CopyGaugeArg(const OutOrder &out, const InOrder &in) 
+      : out(out), in(in) { }
   };
 
   /**
      Generic CPU gauge reordering and packing 
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+  template <typename FloatOut, typename FloatIn, int length, 
+	    int nDim, typename OutOrder, typename InOrder>
   void copyGauge(CopyGaugeArg<OutOrder,InOrder> arg) {  
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
     for (int parity=0; parity<2; parity++) {
 
-      for (int d=0; d<arg.nDim; d++) {
-	for (int x=0; x<arg.volume/2; x++) {
+      for (int d=0; d<nDim; d++) {
+	for (int x=0; x<arg.in.volumeCB; x++) {
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
 	  arg.in.load(in, x, d, parity);
@@ -45,16 +41,17 @@ namespace quda {
       Generic CUDA gauge reordering and packing.  Adopts a similar form as
       the CPU version, using the same inlined functions.
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+  template <typename FloatOut, typename FloatIn, int length, 
+	    int nDim, typename OutOrder, typename InOrder>
   __global__ void copyGaugeKernel(CopyGaugeArg<OutOrder,InOrder> arg) {  
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
     for (int parity=0; parity<2; parity++) {
 
-      for (int d=0; d<arg.nDim; d++) {
+      for (int d=0; d<nDim; d++) {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
-	if (x >= arg.volume/2) return;
+	if (x >= arg.in.volumeCB) return;
 
 	RegTypeIn in[length];
 	RegTypeOut out[length];
@@ -68,15 +65,16 @@ namespace quda {
   /**
      Generic CPU gauge ghost reordering and packing 
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+  template <typename FloatOut, typename FloatIn, int length, 
+	    int nDim, typename OutOrder, typename InOrder>
     void copyGhost(CopyGaugeArg<OutOrder,InOrder> arg) {  
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
     for (int parity=0; parity<2; parity++) {
 
-      for (int d=0; d<arg.nDim; d++) {
-	for (int x=0; x<arg.faceVolumeCB[d]; x++) {
+      for (int d=0; d<nDim; d++) {
+	for (int x=0; x<arg.in.faceVolumeCB[d]; x++) {
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
 	  arg.in.loadGhost(in, x, d, parity); // assumes we are loading 
@@ -92,7 +90,8 @@ namespace quda {
      Generic CUDA kernel for copying the ghost zone.  Adopts a similar form as
      the CPU version, using the same inlined functions.
   */
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
+  template <typename FloatOut, typename FloatIn, int length, 
+	    int nDim, typename OutOrder, typename InOrder>
   __global__ void copyGhostKernel(CopyGaugeArg<OutOrder,InOrder> arg) {  
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
@@ -100,8 +99,8 @@ namespace quda {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
 
     for (int parity=0; parity<2; parity++) {
-      for (int d=0; d<arg.nDim; d++) {
-	if (x < arg.faceVolumeCB[d]) {
+      for (int d=0; d<nDim; d++) {
+	if (x < arg.in.faceVolumeCB[d]) {
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
 	  arg.in.loadGhost(in, x, d, parity); // assumes we are loading 
@@ -113,7 +112,8 @@ namespace quda {
     }
   }
 
-  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool isGhost>
+  template <typename FloatOut, typename FloatIn, int length, int nDim, 
+	    typename OutOrder, typename InOrder, bool isGhost>
     class CopyGauge : Tunable {
     CopyGaugeArg<OutOrder,InOrder> arg;
     int size;
@@ -128,20 +128,20 @@ namespace quda {
   public:
     CopyGauge(CopyGaugeArg<OutOrder,InOrder> &arg) : arg(arg) { 
       int faceMax = 0;
-      for (int d=0; d<arg.nDim; d++) {
-	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
+      for (int d=0; d<nDim; d++) {
+	faceMax = (arg.in.faceVolumeCB[d] > faceMax ) ? arg.in.faceVolumeCB[d] : faceMax;
       }
-      size = isGhost ? faceMax : arg.volume/2;
+      size = isGhost ? faceMax : arg.in.volumeCB;
     }
     virtual ~CopyGauge() { ; }
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (!isGhost) {
-	copyGaugeKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
+	copyGaugeKernel<FloatOut, FloatIn, length, nDim, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       } else {
-	copyGhostKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
+	copyGhostKernel<FloatOut, FloatIn, length, nDim, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }
@@ -162,36 +162,43 @@ namespace quda {
 
     long long flops() const { return 0; } 
     long long bytes() const { 
-      int sites = 4*arg.volume/2;
+      int sites = nDim*arg.in.volumeCB;
       if (isGhost) {
 	sites = 0;
-	for (int d=0; d<4; d++) sites += arg.faceVolumeCB[d];
+	for (int d=0; d<nDim; d++) sites += arg.in.faceVolumeCB[d];
       }
+
+#if __COMPUTE_CAPABILITY__ >= 200
       return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
-                          + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
+			    + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
+#else      
+      return 2 * sites * (  arg.in.Bytes() + arg.out.Bytes() );
+#endif
     } 
   };
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
     void copyGauge(OutOrder outOrder, const InOrder inOrder, int volume, 
 		   const int *faceVolumeCB, int nDim, QudaFieldLocation location, int type) {
-
-    CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder, volume, faceVolumeCB, nDim);
+    
+    if (nDim != 4) errorQuda("Unsupported number of dimensions %d", nDim);
+    
+    CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder);
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
-      if (type == 0) copyGauge<FloatOut, FloatIn, length>(arg);
+      if (type == 0) copyGauge<FloatOut, FloatIn, length, 4>(arg);
 #ifdef MULTI_GPU // only copy the ghost zone if doing multi-gpu
-      copyGhost<FloatOut, FloatIn, length>(arg);
+      copyGhost<FloatOut, FloatIn, length, 4>(arg);
 #endif
     } else if (location == QUDA_CUDA_FIELD_LOCATION) {
       // first copy body
       if (type == 0) {
-	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 0> gaugeCopier(arg);
+	CopyGauge<FloatOut, FloatIn, length, 4, OutOrder, InOrder, 0> gaugeCopier(arg);
 	gaugeCopier.apply(0);
       }
 #ifdef MULTI_GPU
       // now copy ghost
-      CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg);
+      CopyGauge<FloatOut, FloatIn, length, 4, OutOrder, InOrder, 1> ghostCopier(arg);
       ghostCopier.apply(0);
 #endif
     } else {
@@ -220,7 +227,7 @@ namespace quda {
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (FloatNOrder<FloatOut,length,2,8>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);	   
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
         copyGauge<FloatOut,FloatIn,length>
 	  (FloatNOrder<FloatOut,length,2,13>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);	   
@@ -238,7 +245,7 @@ namespace quda {
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (FloatNOrder<FloatOut,length,4,8>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (FloatNOrder<FloatOut,length,4,13>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
@@ -320,7 +327,7 @@ namespace quda {
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,8>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,13>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
@@ -338,7 +345,7 @@ namespace quda {
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,8>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,13>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
@@ -408,6 +415,12 @@ namespace quda {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
     
+#if __COMPUTE_CAPABILITY__ < 200
+    if (in.Reconstruct() == QUDA_RECONSTRUCT_13 || in.Reconstruct() == QUDA_RECONSTRUCT_9 ||
+	out.Reconstruct() == QUDA_RECONSTRUCT_13 || out.Reconstruct() == QUDA_RECONSTRUCT_9)
+      errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
+#endif
+
     if (in.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
       // we are doing gauge field packing
       copyGauge<FloatOut,FloatIn,18>(out, in, location, Out, In, outGhost, inGhost, type);
@@ -420,23 +433,18 @@ namespace quda {
 		  out.Reconstruct(), in.Reconstruct());
       }
     
-      int faceVolumeCB[QUDA_MAX_DIM];
-      for (int d=0; d<in.Ndim(); d++) faceVolumeCB[d] = in.SurfaceCB(d) * in.Nface();
-
       // momentum only currently supported on MILC and Float2 fields currently
 	if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  CopyGaugeArg<FloatNOrder<FloatOut,10,2,10>, FloatNOrder<FloatIn,10,2,10> >
-	    arg(FloatNOrder<FloatOut,10,2,10>(out, Out), 
-		FloatNOrder<FloatIn,10,2,10>(in, In), in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
+	    arg(FloatNOrder<FloatOut,10,2,10>(out, Out), FloatNOrder<FloatIn,10,2,10>(in, In));
+	  copyGauge<FloatOut,FloatIn,10,4>(arg);
 	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
 #ifdef BUILD_MILC_INTERFACE
 	  CopyGaugeArg<FloatNOrder<FloatOut,10,2,10>, MILCOrder<FloatIn,10> >
-	    arg(FloatNOrder<FloatOut,10,2,10>(out, Out), MILCOrder<FloatIn,10>(in, In), 
-		in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
+	    arg(FloatNOrder<FloatOut,10,2,10>(out, Out), MILCOrder<FloatIn,10>(in, In));
+	  copyGauge<FloatOut,FloatIn,10,4>(arg);
 #else
 	  errorQuda("MILC interface has not been built\n");
 #endif
@@ -449,14 +457,12 @@ namespace quda {
 #ifdef BUILD_MILC_INTERFACE
 	if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	  CopyGaugeArg<MILCOrder<FloatOut,10>, FloatNOrder<FloatIn,10,2,10> >
-	    arg(MILCOrder<FloatOut,10>(out, Out), FloatNOrder<FloatIn,10,2,10>(in, In),
-		in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
+	    arg(MILCOrder<FloatOut,10>(out, Out), FloatNOrder<FloatIn,10,2,10>(in, In));
+	  copyGauge<FloatOut,FloatIn,10,4>(arg);
 	} else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 	  CopyGaugeArg<MILCOrder<FloatOut,10>, MILCOrder<FloatIn,10> >
-	    arg(MILCOrder<FloatOut,10>(out, Out), MILCOrder<FloatIn,10>(in, In),
-		in.Volume(), faceVolumeCB, in.Ndim());
-	  copyGauge<FloatOut,FloatIn,10>(arg);
+	    arg(MILCOrder<FloatOut,10>(out, Out), MILCOrder<FloatIn,10>(in, In));
+	  copyGauge<FloatOut,FloatIn,10,4>(arg);
 	} else {
 	  errorQuda("Gauge field orders %d not supported", in.Order());
 	}
