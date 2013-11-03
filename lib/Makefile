@@ -2,20 +2,21 @@ include ../make.inc
 
 QUDA = libquda.a
 QUDA_OBJS = clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
-	timer.o malloc.o solver.o inv_bicgstab_quda.o inv_cg_quda.o	\
-	inv_multi_cg_quda.o inv_gcr_quda.o inv_mr_quda.o inv_mre.o	\
-	interface_quda.o util_quda.o color_spinor_field.o		\
-	color_spinor_util.o cpu_color_spinor_field.o			\
-	cuda_color_spinor_field.o dirac.o hw_quda.o blas_cpu.o		\
-	clover_field.o lattice_field.o gauge_field.o			\
-	cpu_gauge_field.o cuda_gauge_field.o extract_gauge_ghost.o	\
-	max_gauge.o gauge_update_quda.o dirac_clover.o dirac_wilson.o	\
-	dirac_staggered.o dirac_improved_staggered.o			\
-	dirac_domain_wall.o dirac_twisted_mass.o tune.o			\
-	fat_force_quda.o llfat_quda_itf.o clover_quda.o dslash_quda.o	\
-	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
-	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
-	copy_color_spinor.o copy_gauge.o copy_clover.o
+	extract_gauge_ghost_extended.o timer.o malloc.o solver.o	\
+	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
+	inv_gcr_quda.o inv_mr_quda.o inv_mre.o interface_quda.o		\
+	util_quda.o color_spinor_field.o color_spinor_util.o		\
+	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	\
+	hw_quda.o blas_cpu.o clover_field.o lattice_field.o		\
+	gauge_field.o cpu_gauge_field.o cuda_gauge_field.o		\
+	extract_gauge_ghost.o max_gauge.o gauge_update_quda.o		\
+	dirac_clover.o dirac_wilson.o dirac_staggered.o			\
+	dirac_improved_staggered.o dirac_domain_wall.o			\
+	dirac_twisted_mass.o tune.o fat_force_quda.o llfat_quda_itf.o	\
+	clover_quda.o dslash_quda.o blas_quda.o copy_quda.o		\
+	reduce_quda.o face_buffer.o face_gauge.o comm_common.o		\
+	${COMM_OBJS} ${NUMA_AFFINITY_OBJS} copy_color_spinor.o		\
+	copy_gauge.o copy_clover.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\

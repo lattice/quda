@@ -469,7 +469,6 @@ namespace quda {
             for (int j=0; j<N; j++) {
               int intIdx = i*N + j;
               int padIdx = intIdx / N;
-              //copy(ghost[dir][(parity*faceVolumeCB[dir]*M + padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
               copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + hasPhase) + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
             }
           }
@@ -496,19 +495,25 @@ namespace quda {
       int faceVolumeCB[QUDA_MAX_DIM];
       const int volumeCB;
       const int stride;
+      const int geometry;
       const int hasPhase;
-    LegacyOrder(const GaugeField &u, Float **ghost_) : volumeCB(u.VolumeCB()), stride(u.Stride()), hasPhase(0) {
-      for (int i=0; i<4; i++) {
-	ghost[i] = (ghost_) ? ghost_[i] : (Float*)(u.Ghost()[i]);
-	faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
+
+      LegacyOrder(const GaugeField &u, Float **ghost_) 
+      : volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()), hasPhase(0) {
+	for (int i=0; i<4; i++) {
+	  ghost[i] = (ghost_) ? ghost_[i] : (Float*)(u.Ghost()[i]);
+	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
+	}
       }
-    }
-    LegacyOrder(const LegacyOrder &order) : volumeCB(order.volumeCB), stride(order.stride), hasPhase(0) {
-      for (int i=0; i<4; i++) {
-	ghost[i] = order.ghost[i];
-	faceVolumeCB[i] = order.faceVolumeCB[i];
+
+      LegacyOrder(const LegacyOrder &order) 
+      : volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry), hasPhase(0) {
+	for (int i=0; i<4; i++) {
+	  ghost[i] = order.ghost[i];
+	  faceVolumeCB[i] = order.faceVolumeCB[i];
+	}
       }
-    }
+
       virtual ~LegacyOrder() { ; }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
@@ -518,6 +523,23 @@ namespace quda {
       __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
 	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
       }
+
+      __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dir, 
+						  int dim, int g, int parity, const int R[]) const {
+	for (int i=0; i<length; i++) {
+	  v[i] = ghost[dim]
+	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
+	}
+      }
+
+      __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, 
+						  int dir, int dim, int g, int parity, const int R[]) {
+        for (int i=0; i<length; i++) {
+	  ghost[dim]
+	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
+	}
+      }
+
     };
 
   /**
@@ -594,10 +616,10 @@ namespace quda {
     typedef typename mapper<Float>::type RegType;
     Float *gauge;
     const int volumeCB;
-    const int geometry;
+    const int &geometry;
   MILCOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
     LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
-      volumeCB(u.VolumeCB()), geometry(u.Geometry()) { ; }
+      volumeCB(u.VolumeCB()), geometry(LegacyOrder<Float,length>::geometry) { ; }
   MILCOrder(const MILCOrder &order) : LegacyOrder<Float,length>(order), 
       gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
@@ -628,10 +650,11 @@ namespace quda {
     const int volumeCB;
     const Float anisotropy;
     const int Nc;
-    const int geometry;
+    const int &geometry;
   CPSOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
     : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
-      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3), geometry(u.Geometry())
+      volumeCB(u.VolumeCB()), anisotropy(u.Anisotropy()), Nc(3), 
+      geometry(LegacyOrder<Float,length>::geometry) 
       { if (length != 18) errorQuda("Gauge length %d not supported", length); }
   CPSOrder(const CPSOrder &order) : LegacyOrder<Float,length>(order), gauge(order.gauge), 
       volumeCB(order.volumeCB), anisotropy(order.anisotropy), Nc(3), geometry(order.geometry)

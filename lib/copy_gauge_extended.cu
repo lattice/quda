@@ -228,6 +228,12 @@ namespace quda {
 
   void copyExtendedGauge(GaugeField &out, const GaugeField &in,
 			 QudaFieldLocation location, void *Out, void *In) {
+
+    for (int d=0; d<in.Ndim(); d++) {
+      if ( (out.X()[d] - in.X()[d]) % 2 != 0)
+	errorQuda("Cannot copy into an asymmetrically extended gauge field");
+    }
+
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
 	copyGaugeEx(out, in, location, (double*)Out, (double*)In);

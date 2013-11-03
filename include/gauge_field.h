@@ -236,6 +236,7 @@ namespace quda {
     virtual ~cpuGaugeField();
 
     void exchangeGhost();
+    void exchangeExtendedGhost(const int *R);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
@@ -283,6 +284,17 @@ namespace quda {
      @param ghost The array where we want to pack the ghost zone into
   */
   void extractGaugeGhost(const GaugeField &u, void **ghost);
+
+  /**
+     This function is used for  extracting the gauge ghost zone from a
+     gauge field array.  Defined in extract_gauge_ghost.cu.
+     @param u The gauge field from which we want to extract/pack the ghost zone
+     @param dim The dimension in which we are packing/unpacking
+     @param ghost The array where we want to pack/unpack the ghost zone into/from
+     @param extract Whether we are extracting into ghost or injecting from ghost
+  */
+  void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R, 
+				 void **ghost, bool extract);
 
   /**
      This function is used to calculate the maximum absolute value of

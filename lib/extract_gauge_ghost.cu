@@ -1,5 +1,4 @@
 #include <gauge_field_order.h>
-#include <omp.h>
 
 namespace quda {
   template <typename Order, int nDim>
@@ -128,7 +127,7 @@ namespace quda {
       int faceMax = 0;
       for (int d=0; d<nDim; d++) 
 	faceMax = (arg.surfaceCB[d] > faceMax ) ? arg.surfaceCB[d] : faceMax;
-      size = 2 * arg.nFace * faceMax; // factor of comes from parity
+      size = 2 * arg.nFace * faceMax; // factor 2 of comes from parity
     }
     virtual ~ExtractGhost() { ; }
   
@@ -193,6 +192,8 @@ namespace quda {
     for (int dim=0; dim<nDim; dim++) localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
 
     ExtractGhostArg<Order, nDim> arg(order, nFace, X, surfaceCB, A, B, C, f, localParity);
+
+    printf("size of extract arg = %lu\n", sizeof(arg));
     if (location==QUDA_CPU_FIELD_LOCATION) {
       extractGhost<Float,length,nDim,Order>(arg);
     } else {
