@@ -46,6 +46,9 @@ BUILD_CPS_INTERFACE = @BUILD_CPS_INTERFACE@                     # build cps inte
 BUILD_QDPJIT_INTERFACE = @BUILD_QDPJIT_INTERFACE@               # build qdpjit interface
 BUILD_BQCD_INTERFACE = @BUILD_BQCD_INTERFACE@                   # build bqcd interface
 
+#BLAS library
+BUILD_MAGMA = @BUILD_MAGMA@ 					# build magma interface
+
 # Packing option
 DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
 
@@ -60,6 +63,10 @@ FEF90 = @FEF90@			# front-end F90
 MPI_HOME=@MPI_HOME@
 QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
+
+MAGMA_HOME=@MAGMA_HOME@
+ATLAS_HOME=@ATLAS_HOME@
+LAPACK_HOME=@LAPACK_HOME@
 
 NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
 
@@ -123,6 +130,15 @@ ifeq ($(strip $(BUILD_QIO)), yes)
   INC += -DHAVE_QIO -I$(QIO_HOME)/include
   LIB += -L$(QIO_HOME)/lib -lqio -llime
   QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
+endif
+
+ifeq ($(strip $(BUILD_MAGMA)), yes)
+  MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
+  MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -fopenmp -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
+  COPT += -DMAGMA_LIB
+else
+  MAGMA_INCLUDE = 
+  MAGMA_FLAGS   = 
 endif
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)

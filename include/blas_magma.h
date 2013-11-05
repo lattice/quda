@@ -42,11 +42,11 @@ extern "C" {
 
       int lwork_max; 
 
-      cuFloatComplex *W;
-      cuFloatComplex *hTau;
-      cuFloatComplex *dTau;
+      cuComplex *W;
+      cuComplex *hTau;
+      cuComplex *dTau;
 
-      cuFloatComplex *lwork;
+      cuComplex *lwork;
       float          *rwork;
       int        *iwork;
 
@@ -56,14 +56,14 @@ extern "C" {
    void init_magma(blasMagmaArgs *param, const int m, const int nev);
    void shutdown_magma(blasMagmaArgs *param);
 
-   int runRayleighRitz(cuFloatComplex *dTm, 
-                       cuFloatComplex *dTvecm0,  
-                       cuFloatComplex *dTvecm1, 
+   int runRayleighRitz(cuComplex *dTm, 
+                       cuComplex *dTvecm0,  
+                       cuComplex *dTvecm1, 
                        std::complex<float> *hTvecm, 
                        float *hTvalm, 
-                       const blasMagmaArgs *param, const int i);
+                       const blasMagmaArgs *param);
 
-   void restart_2nev_vectors(cuFloatComplex *dVm, cuFloatComplex *dQ, const blasMagmaArgs *param, const int len);
+   void restart_2nev_vectors(cuComplex *dVm, cuComplex *dQ, const blasMagmaArgs *param, const int len);
 
 #ifdef __cplusplus
 }

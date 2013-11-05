@@ -41,14 +41,14 @@ namespace quda {
     hTvalm  = new float[param.m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
 
     //allocate dT etc. buffers on GPU:
-    cudaMalloc(&dTm, param.m*param.m*sizeof(cuFloatComplex));//  
-    cudaMalloc(&dTvecm0, param.m*param.m*sizeof(cuFloatComplex));  
-    cudaMalloc(&dTvecm1, param.m*param.m*sizeof(cuFloatComplex));  
+    cudaMalloc(&dTm, param.m*param.m*sizeof(cuComplex));//  
+    cudaMalloc(&dTvecm0, param.m*param.m*sizeof(cuComplex));  
+    cudaMalloc(&dTvecm1, param.m*param.m*sizeof(cuComplex));  
 
     //set everything to zero:
-    cudaMemset(dTm, 0, param.m*param.m*sizeof(cuFloatComplex));//?
-    cudaMemset(dTvecm0, 0, param.m*param.m*sizeof(cuFloatComplex));
-    cudaMemset(dTvecm1, 0, param.m*param.m*sizeof(cuFloatComplex));
+    cudaMemset(dTm, 0, param.m*param.m*sizeof(cuComplex));//?
+    cudaMemset(dTvecm0, 0, param.m*param.m*sizeof(cuComplex));
+    cudaMemset(dTvecm1, 0, param.m*param.m*sizeof(cuComplex));
 
   }
 
@@ -68,8 +68,11 @@ namespace quda {
 
   void EigCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &e, cudaColorSpinorField &b) 
   {
-
-    blasMagmaArgs magma_param;
+#ifdef MAGMA_LIB
+    blasMagmaArgs magma_args;
+#else
+    errorQuda("Error: EigCG solver requires magma library...\n");    
+#endif
 
     profile.Start(QUDA_PROFILE_INIT);
 
@@ -173,7 +176,7 @@ namespace quda {
     const int ldTm  = m;
 
     //magma initialization:
-    init_magma(&magma_param, m, nev);
+    init_magma(&magma_args, m, nev);
     double alpha0 = 1.0, beta0 = 0.0;//EigCG additional parameters
 
 //Begin CG iterations:
@@ -187,11 +190,8 @@ namespace quda {
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
-      //construct Lanczos basis:
-      double scale = 1.0 / sqrt(r2);
-      copyCuda(Vm->Eigenvec(l), *r_sloppy);//convert arrays
-      axCuda(scale, Vm->Eigenvec(l));
-      scale = 1.0;
+
+      double scale = 1.0;
 
       if(k > 0){
         if(!relup_flag){
@@ -209,12 +209,12 @@ namespace quda {
 	   axpyCuda(-rp, rSloppy, p);
 	   xpayCuda(rSloppy, beta, p);
            scale /= (1.0-rp*beta);
-           relup_flag = (l == (m-1)) ? relup_flag : false;
+           relup_flag = (l == m) ? relup_flag : false;
         }
       }
 
       //save previous mat-vec result 
-      if (l == (m-1)) copyCuda(Ap0, Ap);
+      if (l == m) copyCuda(Ap0, Ap);
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
   
@@ -224,20 +224,20 @@ namespace quda {
       }
 
       //Begin Rayleigh-Ritz procedure:
-      if (l == (m-1)){
+      if (l == m){
          //Create device version of the Lanczos matrix:
-         cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuFloatComplex), cudaMemcpyDefault);//how to refine it with streams??
-         cudaMemcpy(dTvecm0, dTm, ldTm*m*sizeof(cuFloatComplex), cudaMemcpyDefault);//how to refine it with streams??
+         cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuComplex), cudaMemcpyDefault);//how to refine it with streams??
+         cudaMemcpy(dTvecm0, dTm, ldTm*m*sizeof(cuComplex), cudaMemcpyDefault);//how to refine it with streams??
            
          //run main part here: 
-         l = runRayleighRitz((cuFloatComplex*)dTm, (cuFloatComplex*)dTvecm0, (cuFloatComplex*)dTvecm1, hTvecm, hTvalm, &magma_param, l);
+         int _2nev = runRayleighRitz((cuComplex*)dTm, (cuComplex*)dTvecm0, (cuComplex*)dTvecm1, hTvecm, hTvalm, &magma_args);
 
          //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
-         restart_2nev_vectors((cuFloatComplex*)Vm->V(), (cuFloatComplex*)dTm, &magma_param, Vm->Eigenvec(0).Length());//m->ldTm
+         restart_2nev_vectors((cuComplex*)Vm->V(), (cuComplex*)dTm, &magma_args, Vm->EigvLength());//m->ldTm
            
          //Fill-up diagonal elements of the matrix T
          memset(hTm, 0, ldTm*m*sizeof(std::complex<float>));
-    	 for (int i = 0; i < l; i++) hTm[i*ldTm+i]= hTvalm[i];//fill-up diagonal
+    	 for (int i = 0; i < _2nev; i++) hTm[i*ldTm+i]= hTvalm[i];//fill-up diagonal
 
          //Compute Ap0 = Ap - beta*Ap0:
          xpayCuda(Ap, -beta, Ap0);//mind precision...
@@ -247,18 +247,25 @@ namespace quda {
          }
            
          copyCuda(*v0, Ap0);//convert arrays here:
-	 for (int i = 0; i < l; i++){
+	 for (int i = 0; i < _2nev; i++){
 	     std::complex<double> s = cDotProductCuda(*v0, Vm->Eigenvec(i));
-	     hTm[l*ldTm+i] = std::complex<float>((float)(s.real()/sqrt(r2)), (float)(s.imag()/sqrt(r2)));
-	     hTm[i*ldTm+l] = conj(hTm[l*ldTm+i]);
+	     hTm[_2nev*ldTm+i] = std::complex<float>((float)(s.real()/sqrt(r2)), (float)(s.imag()/sqrt(r2)));
+	     hTm[i*ldTm+_2nev] = conj(hTm[_2nev*ldTm+i]);
 	 }
+         l = _2nev;
       } else{ //no-RR branch:
          if(k > 0){
             hTm[l*ldTm+(l-1)] = std::complex<float>((float)(sqrt(beta0)/alpha0), 0.0f);//'U' 
-            hTm[(l-1)*ldTm+l] = hTm[(l+1)*ldTm+l];//'L' 
+            hTm[(l-1)*ldTm+l] = hTm[l*ldTm+(l-1)];//'L'
          }
       }
       l += 1;
+      //construct Lanczos basis:
+      copyCuda(Vm->Eigenvec(l-1), *r_sloppy);//convert arrays
+      //rescale the vector
+      scale = 1.0 / sqrt(r2);
+      axCuda(scale, Vm->Eigenvec(l-1));
+
       //end of RR-procedure
       alpha0 = alpha;
       beta0  = beta;
@@ -321,7 +328,7 @@ namespace quda {
     }
 
 //Shutdown magma:
-    shutdown_magma(&magma_param);
+    shutdown_magma(&magma_args);
 
 //Copy nev eigvectors:
     copyCuda(e, Vm->GetEigenvecSubset(nev));//new:this return an eigenvector set that consists of nev first eigenvectors    
