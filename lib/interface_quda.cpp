@@ -118,6 +118,9 @@ static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 //!<Profiler for createExtendedGaugeField
 static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 
+//!<Profiler for createClover>
+static TimeProfile profileCloverCreate("createCloverQuda");
+
 //!<Profiler for updateCloverDerivative
 static TimeProfile profileCloverDerivative("computeCloverDerivativeQuda");
 
@@ -740,6 +743,7 @@ void endQuda(void)
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     profileInit.Print();
     profileGauge.Print();
+    profileCloverCreate.Print();
     profileClover.Print();
     profileInvert.Print();
     profileMulti.Print();
@@ -2569,6 +2573,44 @@ int getGaugePadding(GaugeFieldParam& param){
 }
 
 
+void createCloverQuda(QudaInvertParam* invertParam)
+{
+  // Here's some rudimentary clover creation code. 
+  // This code only works on a single GPU and it will 
+  // almost certainly be rewritten in the next 24 hours. 
+  // It's really just a place holder (JF. 11/05/13).
+  profileCloverCreate.Start(QUDA_PROFILE_TOTAL);
+  if(!cloverPrecise){
+    profileCloverCreate.Start(QUDA_PROFILE_INIT);
+    CloverFieldParam cloverParam;
+    cloverParam.nDim = 4;
+    for(int dir=0; dir<4; ++dir) cloverParam.x[dir] = gaugePrecise->X()[dir];
+    cloverParam.pad = invertParam->cl_pad;
+    cloverParam.direct = true;
+    cloverParam.inverse = false;
+    cloverParam.create = QUDA_NULL_FIELD_CREATE;
+    cloverParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    cloverPrecise = new cudaCloverField(cloverParam);
+  }
+  profileCloverCreate.Stop(QUDA_PROFILE_INIT);
+
+  profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
+  double cloverCoeff = 1.0;
+
+  // Use gaugePrecise to construct cloverPrecise
+  // In multi-GPU mode, gaugePrecise has to be extended before it's
+  // used to construct the clover field. The multi-GPU code hasn't been 
+  // implemented yet.
+  computeClover(*cloverPrecise, *gaugePrecise, cloverCoeff, QUDA_CUDA_FIELD_LOCATION);
+ 
+  profileCloverCreate.Stop(QUDA_PROFILE_COMPUTE);
+  
+  profileCloverCreate.Stop(QUDA_PROFILE_TOTAL);
+
+  return;
+}
+
+#ifdef MULTI_GPU
 void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
   profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
@@ -2635,6 +2677,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   profileExtendedGauge.Stop(QUDA_PROFILE_TOTAL);
   return cudaGaugeEx;
 }
+#endif MULTI_GPU 
 
 void destroyQudaGaugeField(void* gauge){
   cudaGaugeField* g = reinterpret_cast<cudaGaugeField*>(gauge);

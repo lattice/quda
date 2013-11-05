@@ -231,7 +231,7 @@ namespace quda {
     if (gauge.Precision() != precision) 
       errorQuda("Gauge and clover precisions must match");
 
-    computeCloverCuda(*this, gauge);
+    computeClover(*this, gauge, 1.0, QUDA_CUDA_FIELD_LOCATION);
 
   }
 

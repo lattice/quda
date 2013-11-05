@@ -531,6 +531,7 @@ extern "C" {
    */
   void destroyQudaGaugeField(void* gauge);
 
+  void createCloverQuda(QudaInvertParam* param);
 
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
                                    QudaParity parity, QudaGaugeParam* param, int conjugate);

@@ -172,7 +172,7 @@ namespace quda {
   };
 
   // driver for computing the clover field from the gauge field
-  void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge);
+  void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);
 
   /**
      This generic function is used for copying the clover field where
