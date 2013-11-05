@@ -1,7 +1,7 @@
 #include "blas_magma.h"
 #include "magma.h"
 
-void init_magma(blasMagmaParam *param, const int m, const int nev)
+void init_magma(blasMagmaArgs *param, const int m, const int nev)
 {
     magma_init();
 
@@ -13,7 +13,7 @@ void init_magma(blasMagmaParam *param, const int m, const int nev)
     //magma params/objects:
     param->ldTm  = m;//hTm (host/device)ld (may include padding)
 
-    param->nb    = magma_get_zhetrd_nb(m);
+    param->nb    = magma_get_chetrd_nb(m);
 
     param->llwork = MAX(m + m*param->nb, 2*m + m*m); 
     param->lrwork = 1 + 5*m + 2*m*m;
@@ -25,11 +25,11 @@ void init_magma(blasMagmaParam *param, const int m, const int nev)
     param->sideLR = (m - 2*nev + param->nb)*(m + param->nb) + m*param->nb;
     param->lwork_max = param->sideLR; 
 
-    magma_malloc_pinned((void**)&(param->W), param->lwork_max*sizeof(magmaDoubleComplex));
-    magma_malloc_pinned((void**)&(param->hTau), param->htsize*sizeof(magmaDoubleComplex));//fixed!
-    magma_malloc((void**)&(param->dTau), param->dtsize*sizeof(magmaDoubleComplex));
+    magma_malloc_pinned((void**)&(param->W), param->lwork_max*sizeof(magmaFloatComplex));
+    magma_malloc_pinned((void**)&(param->hTau), param->htsize*sizeof(magmaFloatComplex));//fixed!
+    magma_malloc((void**)&(param->dTau), param->dtsize*sizeof(magmaFloatComplex));
 
-    magma_malloc_pinned((void**)&(param->lwork), param->llwork*sizeof(magmaDoubleComplex));
+    magma_malloc_pinned((void**)&(param->lwork), param->llwork*sizeof(magmaFloatComplex));
     magma_malloc_cpu((void**)&(param->rwork), param->lrwork*sizeof(double));
     magma_malloc_cpu((void**)&(param->iwork), param->liwork*sizeof(magma_int_t));
     
@@ -38,7 +38,7 @@ void init_magma(blasMagmaParam *param, const int m, const int nev)
     return;
 }
 
-void shutdown_magma(blasMagmaParam *param)
+void shutdown_magma(blasMagmaArgs *param)
 {
    if(!param->init) printf("\n\nError: Magma was not initialized..\n"), exit(-1);
    magma_free(param->dTau);
@@ -55,87 +55,82 @@ void shutdown_magma(blasMagmaParam *param)
 
    return;
 }
-int runRayleighRitz(cuDoubleComplex *dTm, 
-                    cuDoubleComplex *dTvecm0,  
-                    cuDoubleComplex *dTvecm1, 
-                    std::complex<double> *hTvecm, 
-                    double *hTvalm, 
-                    const blasMagmaParam *param, const int i)
+int runRayleighRitz(cuFloatComplex *dTm, 
+                    cuFloatComplex *dTvecm0,  
+                    cuFloatComplex *dTvecm1, 
+                    std::complex<float> *hTvecm, 
+                    float *hTvalm, 
+                    const blasMagmaArgs *param, const int i)
 {
      int l = i;
      //solve m-dim eigenproblem:
-     magma_zheevd_gpu('V', 'U', param->m, 
-                      (magmaDoubleComplex*)dTvecm0, param->ldTm, 
-                       hTvalm, (magmaDoubleComplex*)hTvecm, param->ldTm, 
-                       (magmaDoubleComplex *)param->lwork, param->llwork, param->rwork, param->lrwork, (magma_int_t*)param->iwork, param->liwork, (magma_int_t*)&param->info);
-     if(param->info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
+     magma_cheevd_gpu('V', 'U', param->m, 
+                      (magmaFloatComplex*)dTvecm0, param->ldTm, 
+                       hTvalm, (magmaFloatComplex*)hTvecm, param->ldTm, 
+                       (magmaFloatComplex *)param->lwork, param->llwork, param->rwork, param->lrwork, (magma_int_t*)param->iwork, param->liwork, (magma_int_t*)&param->info);
+     if(param->info != 0) printf("\nError in magma_cheevd_gpu, exit ...\n"), exit(-1);
 
      //solve (m-1)-dim eigenproblem:
-      cudaMemcpy(dTvecm1, dTm, param->ldTm*param->m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
-      magma_zheevd_gpu('V', 'U', (param->m-1), 
-                       (magmaDoubleComplex*)dTvecm1, param->ldTm, 
-                        hTvalm, (magmaDoubleComplex*)hTvecm, param->ldTm, 
-                        (magmaDoubleComplex *)param->lwork, param->llwork, param->rwork, param->lrwork, param->iwork, param->liwork, (magma_int_t*)&param->info);
-      if(param->info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
+      cudaMemcpy(dTvecm1, dTm, param->ldTm*param->m*sizeof(cuFloatComplex), cudaMemcpyDefault);
+      magma_cheevd_gpu('V', 'U', (param->m-1), 
+                       (magmaFloatComplex*)dTvecm1, param->ldTm, 
+                        hTvalm, (magmaFloatComplex*)hTvecm, param->ldTm, 
+                        (magmaFloatComplex *)param->lwork, param->llwork, param->rwork, param->lrwork, param->iwork, param->liwork, (magma_int_t*)&param->info);
+      if(param->info != 0) printf("\nError in magma_cheevd_gpu, exit ...\n"), exit(-1);
       //add last row with zeros (coloumn-major format of the matrix re-interpreted as 2D row-major formated):
-      cudaMemset2D(&dTvecm1[(param->m-1)], param->ldTm*sizeof(cuDoubleComplex), 0, sizeof(cuDoubleComplex),  param->m-1);
+      cudaMemset2D(&dTvecm1[(param->m-1)], param->ldTm*sizeof(cuFloatComplex), 0, sizeof(cuFloatComplex),  param->m-1);
 
       //attach nev old vectors to nev new vectors (note 2*nev < m):
-      cudaMemcpy(&dTvecm0[param->nev*param->m], dTvecm1, param->nev*param->m*sizeof(cuDoubleComplex), cudaMemcpyDefault);
+      cudaMemcpy(&dTvecm0[param->nev*param->m], dTvecm1, param->nev*param->m*sizeof(cuFloatComplex), cudaMemcpyDefault);
 
       //Orthogonalize 2*nev vectors:
       l = 2 * param->nev;
-      magma_zgeqrf_gpu(param->m, l, dTvecm0, param->ldTm, param->hTau, param->dTau, (magma_int_t*)&param->info);
-      if(param->info != 0) printf("\nError in magma_zgeqrf_gpu, exit ...\n"), exit(-1);
+      magma_cgeqrf_gpu(param->m, l, dTvecm0, param->ldTm, param->hTau, param->dTau, (magma_int_t*)&param->info);
+      if(param->info != 0) printf("\nError in magma_cgeqrf_gpu, exit ...\n"), exit(-1);
 
       //compute dTevecm0=QHTmQ
       //get TQ product:
-      magma_zunmqr_gpu( 'R', 'N', param->m, param->m, l, dTvecm0, param->ldTm, param->hTau, dTm, param->ldTm, param->W, param->sideLR, param->dTau, param->nb, (magma_int_t*)&param->info); 
-      if(param->info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1);
+      magma_cunmqr_gpu( 'R', 'N', param->m, param->m, l, dTvecm0, param->ldTm, param->hTau, dTm, param->ldTm, param->W, param->sideLR, param->dTau, param->nb, (magma_int_t*)&param->info); 
+      if(param->info != 0) printf("\nError in magma_cunmqr_gpu, exit ...\n"), exit(-1);
              	
       //get QHT product:
-      magma_zunmqr_gpu( 'L', 'C', param->m, param->m, l, dTvecm0, param->ldTm, param->hTau, dTm, param->ldTm, param->W, param->sideLR, param->dTau, param->nb, (magma_int_t*)&param->info);
-      if(param->info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1);                 	
+      magma_cunmqr_gpu( 'L', 'C', param->m, param->m, l, dTvecm0, param->ldTm, param->hTau, dTm, param->ldTm, param->W, param->sideLR, param->dTau, param->nb, (magma_int_t*)&param->info);
+      if(param->info != 0) printf("\nError in magma_cunmqr_gpu, exit ...\n"), exit(-1);                 	
 
       //solve l=2*nev-dim eigenproblem:
 //dTm
-      magma_zheevd_gpu('V', 'U', l, 
-                      (magmaDoubleComplex*)dTm, param->ldTm, 
-                       hTvalm, (magmaDoubleComplex*)hTvecm, param->ldTm, 
+      magma_cheevd_gpu('V', 'U', l, 
+                      (magmaFloatComplex*)dTm, param->ldTm, 
+                       hTvalm, (magmaFloatComplex*)hTvecm, param->ldTm, 
                        param->lwork, param->llwork, param->rwork, param->lrwork, param->iwork, param->liwork, (magma_int_t*)&param->info);
-      if(param->info != 0) printf("\nError in magma_zheevd_gpu, exit ...\n"), exit(-1);
+      if(param->info != 0) printf("\nError in magma_cheevd_gpu, exit ...\n"), exit(-1);
 
       //solve zero unused part of the eigenvectors in dTm (to complement each coloumn...):
-      cudaMemset2D(&dTm[l], param->ldTm*sizeof(cuDoubleComplex), 0, (param->m-l)*sizeof(cuDoubleComplex),  l);//check..
+      cudaMemset2D(&dTm[l], param->ldTm*sizeof(cuFloatComplex), 0, (param->m-l)*sizeof(cuFloatComplex),  l);//check..
         
       //Compute dTm=dTevecm0*dTm (Q * Z):
       //(compute QT product):
-      magma_zunmqr_gpu('L', 'N', param->m, param->m, l, dTvecm0, param->ldTm, param->hTau, dTm, param->ldTm, param->W, param->sideLR, param->dTau, param->nb, (magma_int_t*)&param->info);
-      if(param->info != 0) printf("\nError in magma_zunmqr_gpu, exit ...\n"), exit(-1); 
+      magma_cunmqr_gpu('L', 'N', param->m, param->m, l, dTvecm0, param->ldTm, param->hTau, dTm, param->ldTm, param->W, param->sideLR, param->dTau, param->nb, (magma_int_t*)&param->info);
+      if(param->info != 0) printf("\nError in magma_cunmqr_gpu, exit ...\n"), exit(-1); 
 
       return l;
 }
 
 
-void restart_2nev_vectors(cuDoubleComplex *dVm, cuDoubleComplex *dQ, const blasMagmaParam *param, const int len)
+void restart_2nev_vectors(cuFloatComplex *dVm, cuFloatComplex *dQ, const blasMagmaArgs *param, const int len)
 {
        int _2nev = 2*param->nev;
-       magmaDoubleComplex cone     =  MAGMA_Z_MAKE(1.0, 0.0);
-       magmaDoubleComplex czero    =  MAGMA_Z_MAKE(0.0, 0.0);
-   
-       magma_trans_t transV   = 'N';
-       magma_trans_t transQ   = 'N';
  
        magma_int_t ldV       = (magma_int_t)len;
        magma_int_t ldQ       = param->m;//not vsize (= 2*nev) 
        
-       magmaDoubleComplex *V = (magmaDoubleComplex*)dVm; 
-       magmaDoubleComplex *Tmp;
-       magma_malloc((void**)&Tmp, ldV*param->m*sizeof(magmaDoubleComplex)); 
+       magmaFloatComplex *V = (magmaFloatComplex*)dVm; 
+       magmaFloatComplex *Tmp;
+       magma_malloc((void**)&Tmp, ldV*param->m*sizeof(magmaFloatComplex)); 
 
-       cudaMemset(Tmp, 0, ldV*param->m*sizeof(magmaDoubleComplex)); 
-       magmablas_zgemm(transV, transQ, ldV, _2nev, param->m, (magmaDoubleComplex)cone, V, ldV, dQ, ldQ, (magmaDoubleComplex)czero, Tmp, ldV);//in colour-major format
-       cudaMemcpy(V, Tmp, ldV*(_2nev)*sizeof(magmaDoubleComplex), cudaMemcpyDefault); 
+       cudaMemset(Tmp, 0, ldV*param->m*sizeof(magmaFloatComplex)); 
+       magmablas_cgemm('N', 'N', ldV, _2nev, param->m, MAGMA_C_ONE, V, ldV, dQ, ldQ, MAGMA_C_ZERO, Tmp, ldV);//in colour-major format
+       cudaMemcpy(V, Tmp, ldV*(_2nev)*sizeof(magmaFloatComplex), cudaMemcpyDefault); 
 
        magma_free(Tmp);
 

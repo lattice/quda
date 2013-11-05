@@ -1931,6 +1931,19 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   eigvParam.eigv_dim = param->nev;
   evects = new cudaColorSpinorField(eigvParam); // eigenvectors
 
+  if (pc_solution && !pc_solve) {
+    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
+  }
+
+  if (!mat_solution && !pc_solution && pc_solve) {
+    errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
+  }
+
+  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
+    cudaColorSpinorField tmp(*in);
+    dirac.Mdag(*in, tmp);
+  } 
+
   if(param->inv_type == QUDA_EIGCG_INVERTER)
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);

@@ -393,6 +393,17 @@ namespace quda {
 
     cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
+    //move this to separate DeflatedSolverArgs class...
+    //host Lanczos matrice, and its eigenvalue/vector arrays:
+    std::complex<float> *hTm;//VH A V
+    std::complex<float> *hTvecm;//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
+    float  *hTvalm;   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
+
+    //device Lanczos matrix, and its eigenvalue/vector arrays:
+    void *dTm;     //VH A V
+    void *dTvecm0; //eigenvectors of T[m,  m  ]
+    void *dTvecm1; //eigenvectors of T[m-1,m-1]
+
   public:
     EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile);
     virtual ~EigCG();

@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 
-   typedef struct blasMagmaParam_s {
+   typedef struct blasMagmaArgs_s {
       //problem sizes:
       int m;
       int nev;
@@ -42,64 +42,28 @@ extern "C" {
 
       int lwork_max; 
 
-      cuDoubleComplex *W;
-      cuDoubleComplex *hTau;
-      cuDoubleComplex *dTau;
+      cuFloatComplex *W;
+      cuFloatComplex *hTau;
+      cuFloatComplex *dTau;
 
-      cuDoubleComplex *lwork;
-      double             *rwork;
+      cuFloatComplex *lwork;
+      float          *rwork;
       int        *iwork;
 
-   }blasMagmaParam;
-/*
-   typedef struct blasMagmaParam_s {
-      //problem sizes:
-      int m;
-      int nev;
+   }blasMagmaArgs;
 
-      //general magma library parameters:	
-      magma_int_t info;
 
-      bool init;
+   void init_magma(blasMagmaArgs *param, const int m, const int nev);
+   void shutdown_magma(blasMagmaArgs *param);
 
-      //magma params/objects:
-      magma_int_t ldTm;//hTm (host/device)ld (may include padding)
+   int runRayleighRitz(cuFloatComplex *dTm, 
+                       cuFloatComplex *dTvecm0,  
+                       cuFloatComplex *dTvecm1, 
+                       std::complex<float> *hTvecm, 
+                       float *hTvalm, 
+                       const blasMagmaArgs *param, const int i);
 
-      magma_int_t nb;
-
-      magma_int_t llwork; 
-      magma_int_t lrwork;
-      magma_int_t liwork;
-
-      int sideLR;
-
-      magma_int_t htsize;//MIN(l,k)-number of Householder vectors, but we always have k <= MIN(m,n)
-      magma_int_t dtsize;//in general: MIN(m,k) for side = 'L' and MIN(n,k) for side = 'R'
-
-      magma_int_t lwork_max; 
-
-      magmaDoubleComplex *W;
-      magmaDoubleComplex *hTau;
-      magmaDoubleComplex *dTau;
-
-      magmaDoubleComplex *lwork;
-      double             *rwork;
-      magma_int_t        *iwork;
-
-   }blasMagmaParam;
-*/
-
-   void init_magma(blasMagmaParam *param, const int m, const int nev);
-   void shutdown_magma(blasMagmaParam *param);
-
-   int runRayleighRitz(cuDoubleComplex *dTm, 
-                       cuDoubleComplex *dTvecm0,  
-                       cuDoubleComplex *dTvecm1, 
-                       std::complex<double> *hTvecm, 
-                       double *hTvalm, 
-                       const blasMagmaParam *param, const int i);
-
-   void restart_2nev_vectors(cuDoubleComplex *dVm, cuDoubleComplex *dQ, const blasMagmaParam *param, const int len);
+   void restart_2nev_vectors(cuFloatComplex *dVm, cuFloatComplex *dQ, const blasMagmaArgs *param, const int len);
 
 #ifdef __cplusplus
 }

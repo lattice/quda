@@ -32,20 +32,44 @@ namespace quda {
     if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or search space is too small..)\n");
     //Create an eigenvector set:
     eigvParam->create   = QUDA_ZERO_FIELD_CREATE;
+    eigvParam->setPrecision(QUDA_SINGLE_PRECISION);//eigCG internal search space is in single precision (currently)
     eigvParam->eigv_dim = param.m;
     Vm = new cudaColorSpinorField(*eigvParam); // solution
+
+    hTm     = new std::complex<float>[param.m*param.m];//VH A V
+    hTvecm  = new std::complex<float>[param.m*param.m];//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
+    hTvalm  = new float[param.m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
+
+    //allocate dT etc. buffers on GPU:
+    cudaMalloc(&dTm, param.m*param.m*sizeof(cuFloatComplex));//  
+    cudaMalloc(&dTvecm0, param.m*param.m*sizeof(cuFloatComplex));  
+    cudaMalloc(&dTvecm1, param.m*param.m*sizeof(cuFloatComplex));  
+
+    //set everything to zero:
+    cudaMemset(dTm, 0, param.m*param.m*sizeof(cuFloatComplex));//?
+    cudaMemset(dTvecm0, 0, param.m*param.m*sizeof(cuFloatComplex));
+    cudaMemset(dTvecm1, 0, param.m*param.m*sizeof(cuFloatComplex));
+
   }
 
   EigCG::~EigCG() {
 
     delete Vm;
 
+    delete[] hTm;
+    delete[] hTvecm;
+    delete[] hTvalm;
+
+    cudaFree(dTm);
+    cudaFree(dTvecm0);
+    cudaFree(dTvecm1);
+
   }
 
   void EigCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &e, cudaColorSpinorField &b) 
   {
 
-    blasMagmaParam magma_param;
+    blasMagmaArgs magma_param;
 
     profile.Start(QUDA_PROFILE_INIT);
 
@@ -117,7 +141,6 @@ namespace quda {
     int heavy_quark_check = 10; // how often to check the heavy quark residual
 
     double alpha=1.0, beta=0.0;
-    double aux=0.0; 
  
     double pAp;
     int rUpdate = 0;
@@ -149,29 +172,9 @@ namespace quda {
 
     const int ldTm  = m;
 
-    //init (set to zero) host Lanczos matrice, and its eigenvalue/vector arrays:
-    Complex *hTm     = new Complex[m*m];//VH A V
-    Complex *hTvecm  = new Complex[m*m];//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
-    double  *hTvalm  = new double[m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
-
-    //init device Lanczos matrix, and its eigenvalue/vector arrays:
-    cuDoubleComplex *dTm;     //VH A V
-    cuDoubleComplex *dTvecm0; //eigenvectors of T[m,  m  ]
-    cuDoubleComplex *dTvecm1; //eigenvectors of T[m-1,m-1]
-
-    //allocate dT etc. buffers on GPU:
-    cudaMalloc(&dTm, m*m*sizeof(cuDoubleComplex));//  
-    cudaMalloc(&dTvecm0, m*m*sizeof(cuDoubleComplex));  
-    cudaMalloc(&dTvecm1, m*m*sizeof(cuDoubleComplex));  
-
-    //set everything to zero:
-    cudaMemset(dTm, 0, m*m*sizeof(cuDoubleComplex));//?
-    cudaMemset(dTvecm0, 0, m*m*sizeof(cuDoubleComplex));
-    cudaMemset(dTvecm1, 0, m*m*sizeof(cuDoubleComplex));
-
     //magma initialization:
     init_magma(&magma_param, m, nev);
-    double alpha0, beta0;//EigCG additional parameters
+    double alpha0 = 1.0, beta0 = 0.0;//EigCG additional parameters
 
 //Begin CG iterations:
     int k=0, l=0;
@@ -179,66 +182,95 @@ namespace quda {
     PrintStats("EigCG", k, r2, b2, heavy_quark_res);
 
     int steps_since_reliable = 1;
+    bool relup_flag = false;
+    double sigma = 0.0;
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
+      //construct Lanczos basis:
+      double scale = 1.0 / sqrt(r2);
+      copyCuda(Vm->Eigenvec(l), *r_sloppy);//convert arrays
+      axCuda(scale, Vm->Eigenvec(l));
+      scale = 1.0;
+
+      if(k > 0){
+        if(!relup_flag){
+           beta = sigma / r2_old;
+           axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
+	   if (use_heavy_quark_res && k%heavy_quark_check==0) { 
+	     copyCuda(tmp,y);
+	     heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	   }
+	steps_since_reliable++;
+        }else{//after reliable update:
+           beta = r2 / r2_old;
+	   // explicitly restore the orthogonality of the gradient vector
+	   double rp = reDotProductCuda(rSloppy, p) / (r2);
+	   axpyCuda(-rp, rSloppy, p);
+	   xpayCuda(rSloppy, beta, p);
+           scale /= (1.0-rp*beta);
+           relup_flag = (l == (m-1)) ? relup_flag : false;
+        }
+      }
+
       //save previous mat-vec result 
-      if (l == (m-1)) copyCuda(Ap0,Ap);
+      if (l == (m-1)) copyCuda(Ap0, Ap);
 
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
+  
+      //construct the Lanczos matrix:
+      if(k > 0){
+        hTm[(l-1)*ldTm+(l-1)] = std::complex<float>((float)(1/alpha + beta0/alpha0), 0.0f);
+      }
+
+      //Begin Rayleigh-Ritz procedure:
+      if (l == (m-1)){
+         //Create device version of the Lanczos matrix:
+         cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuFloatComplex), cudaMemcpyDefault);//how to refine it with streams??
+         cudaMemcpy(dTvecm0, dTm, ldTm*m*sizeof(cuFloatComplex), cudaMemcpyDefault);//how to refine it with streams??
+           
+         //run main part here: 
+         l = runRayleighRitz((cuFloatComplex*)dTm, (cuFloatComplex*)dTvecm0, (cuFloatComplex*)dTvecm1, hTvecm, hTvalm, &magma_param, l);
+
+         //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
+         restart_2nev_vectors((cuFloatComplex*)Vm->V(), (cuFloatComplex*)dTm, &magma_param, Vm->Eigenvec(0).Length());//m->ldTm
+           
+         //Fill-up diagonal elements of the matrix T
+         memset(hTm, 0, ldTm*m*sizeof(std::complex<float>));
+    	 for (int i = 0; i < l; i++) hTm[i*ldTm+i]= hTvalm[i];//fill-up diagonal
+
+         //Compute Ap0 = Ap - beta*Ap0:
+         xpayCuda(Ap, -beta, Ap0);//mind precision...
+         if(relup_flag){
+           axCuda(scale, Ap0);
+           relup_flag = false;
+         }
+           
+         copyCuda(*v0, Ap0);//convert arrays here:
+	 for (int i = 0; i < l; i++){
+	     std::complex<double> s = cDotProductCuda(*v0, Vm->Eigenvec(i));
+	     hTm[l*ldTm+i] = std::complex<float>((float)(s.real()/sqrt(r2)), (float)(s.imag()/sqrt(r2)));
+	     hTm[i*ldTm+l] = conj(hTm[l*ldTm+i]);
+	 }
+      } else{ //no-RR branch:
+         if(k > 0){
+            hTm[l*ldTm+(l-1)] = std::complex<float>((float)(sqrt(beta0)/alpha0), 0.0f);//'U' 
+            hTm[(l-1)*ldTm+l] = hTm[(l+1)*ldTm+l];//'L' 
+         }
+      }
+      l += 1;
+      //end of RR-procedure
       alpha0 = alpha;
+      beta0  = beta;
+
       pAp    = reDotProductCuda(p, Ap);
       alpha  = r2 / pAp; 
-      
-//begin eigCG part here:
-      if(nev > 0){
-         hTm[l*ldTm+l] = Complex(1/alpha + beta0/alpha0, 0.0);
          
-         //Start Rayleigh-Ritz procedure here:
-         if (l == (m-1)){
-           //Create host version of the Lanczos matrix:
-           cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);//how to refine it with streams??
-           cudaMemcpy(dTvecm0, dTm, ldTm*m*sizeof(cuDoubleComplex), cudaMemcpyDefault);//how to refine it with streams??
-           
-           //run main part here: 
-           l = runRayleighRitz(dTm, dTvecm0, dTvecm1, hTvecm, hTvalm, &magma_param, l);
-
-           //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
-           restart_2nev_vectors((cuDoubleComplex*)Vm->V(), dTm, &magma_param, Vm->Eigenvec(0).Length());//m->ldTm
-           
-           //Fill-up diagonal elements of the matrix T
-           memset(hTm, 0, ldTm*m*sizeof(Complex));
-    	   for (int i = 0; i < l; i++) hTm[i*ldTm+i]= hTvalm[i];//fill-up diagonal
-
-           //Compute Ap0 = Ap - beta*Ap0:
-           xpayCuda(Ap, -beta, Ap0);//mind precision...
-           
-           copyCuda(*v0, Ap0);//make full precision here.
-	   for (int i = 0; i < l; i++){
-	     Complex s = cDotProductCuda(Vm->Eigenvec(i), *v0);
-	     hTm[i+l*ldTm] = s/sqrt(r2);
-	     hTm[l+i*ldTm] = conj(s)/sqrt(r2);
-	   }
-         } else{ //no-RR branch:
-            hTm[(l+1)*ldTm+l] = Complex(-sqrt(beta)/alpha0, 0.0);//'U' (!)
-            hTm[l*ldTm+(l+1)] = Complex(-sqrt(beta)/alpha0, 0.0);//'L' (!)
-         }//end of nev
-         l += 1;
-         double scale = 1.0 / sqrt(r2);
-         copyCuda(Vm->Eigenvec(l), *r_sloppy);//convert arrays!
-         axCuda(scale, Vm->Eigenvec(l));//
-      }
-//end of eigCG part 
-
-      double sigma;
-      bool breakdown = false;
-      r2_old = r2;
-
       // here we are deploying the alternative beta computation 
+      r2_old = r2;
       Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
       r2 = real(cg_norm); // (r_new, r_new)
       sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
-
 
       // reliable update conditions
       rNorm = sqrt(r2);
@@ -250,20 +282,7 @@ namespace quda {
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
 
-      if ( !(updateR || updateX)) {
-	//beta = r2 / r2_old;
-        beta0  = beta; //used for the Lanczos matrix construction
-	beta   = sigma / r2_old; // use the alternative beta computation
-
-	axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);//update of xSloppy and then p
-
-	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	  copyCuda(tmp,y);
-	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
-	}
-
-	steps_since_reliable++;
-      } else {//reliable update
+      if (updateR || updateX) {
 	axpyCuda(alpha, p, xSloppy);
 	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
       
@@ -291,20 +310,11 @@ namespace quda {
 	r0Norm = rNorm;      
 	rUpdate++;
 
-	// explicitly restore the orthogonality of the gradient vector
-	double rp = reDotProductCuda(rSloppy, p) / (r2);
-	axpyCuda(-rp, rSloppy, p);
-        
-        beta0 = beta;
-	beta = r2 / r2_old; 
-	xpayCuda(rSloppy, beta, p);
-
 	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
-	
+        
+        relup_flag = true;	
 	steps_since_reliable = 0;
       }//end of the reliable update
-
-      breakdown = false;
       k++;
 
       PrintStats("EigCG", k, r2, b2, heavy_quark_res);
@@ -359,15 +369,7 @@ namespace quda {
       delete x_sloppy;
     }
 //Clean EigCG resources:
-    delete[] hTm;
-    delete[] hTvecm;
-    delete[] hTvalm;
-
     delete v0;
-
-    cudaFree(dTm);
-    cudaFree(dTvecm0);
-    cudaFree(dTvecm1);
 
     profile.Stop(QUDA_PROFILE_FREE);
 

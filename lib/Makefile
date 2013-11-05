@@ -66,8 +66,8 @@ QUDA_CORE = clover_core.h staggered_dslash_core.h			\
 
 INC += -I../include -Idslash_core -I.
 
-MAGMA_INCLUDE = -I/usr/local/cuda/include -I../include -I/home/astrel/Install/magma-atlas-gcc-4.6.4/include
-MAGMA_FLAGS   = -DADD_ -fopenmp -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
+#MAGMA_INCLUDE = -I/usr/local/cuda/include -I../include -I/opt/magma-1.4.0/include
+#MAGMA_FLAGS   = -DADD_ -fopenmp -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
 
 HDRS = $(QUDA_HDRS:%=../include/%)
 HDRS += $(QUDA_INLN)
