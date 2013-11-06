@@ -517,12 +517,21 @@ namespace quda {
 
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
+                                       const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
 				       void *buffer, double a, double b) 
   {
+    int face_num;
+    if(dir == QUDA_BACKWARDS){
+      face_num = 0;
+    }else if(dir == QUDA_FORWARDS){
+      face_num = 1;
+    }else{
+      face_num = 2;
+    }
 #ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer;
-    packFace(packBuffer, *this, nFace, dagger, parity, *stream, a, b); 
+    packFace(packBuffer, *this, nFace, dagger, parity, dim, face_num, *stream, a, b); 
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
@@ -879,12 +888,14 @@ namespace quda {
 
     stream = stream_p;
     
+    const int dim=-1; // pack all partitioned dimensions
+ 
     if (zeroCopyPack) {
       void *my_face_d;
       cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
-      packGhost(nFace, (QudaParity)parity, dagger, &stream[0], my_face_d, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d, a, b);
     } else {
-      packGhost(nFace, (QudaParity)parity, dagger, &stream[Nstream-1], 0, a, b);
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[Nstream-1], 0, a, b);
     }
   }
 

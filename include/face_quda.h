@@ -72,6 +72,8 @@ namespace quda {
     /**
        Pack the cudaColorSpinorField's ghost zone into contiguous buffers
        @param in The cudaColorSpinorField whose ghost zone we are extracting
+       @param dim The dimension in which we pack
+       @param dir Whether we pack data to be sent forward or backwards or in both directions
        @param parity The parity of this field
        @param dagger Whether the operator for which we are applying is the Hermitian conjugate or not
        @param stream The stream to which the packing kernel will be issued
@@ -79,15 +81,29 @@ namespace quda {
        @param a Twisted mass parameter (default=0)
        @param b Twisted mass parameter (Default=0)
      */
+    void pack(quda::cudaColorSpinorField &in, int dim, int dir, int parity, int dagger, 
+	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
+
+    void pack(quda::cudaColorSpinorField &in, int dir, int parity, int dagger, 
+              cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
+
     void pack(quda::cudaColorSpinorField &in, int parity, int dagger, 
 	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
 
+
+    void gather(quda::cudaColorSpinorField &in, int dagger, int dir, int streamIdx);
+
     void gather(quda::cudaColorSpinorField &in, int dagger, int dir);
+
+
 
     void commsStart(int dir);
     int  commsQuery(int dir);
     void scatter(quda::cudaColorSpinorField &out, int dagger, int dir);
-    
+  
+    void scatter(quda::cudaColorSpinorField &out, int dagger, int dir, int streamIdx); 
+
+ 
     void exchangeCpuSpinor(quda::cpuColorSpinorField &in, int parity, int dagger);
     
     void exchangeLink(void** ghost_link, void** link_sendbuf, QudaFieldLocation location);

@@ -16,7 +16,7 @@
 
   /********************** Staple code, used by link fattening **************/
 
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) ||defined(GPU_HISQ_FORCE)
+#if defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE) || defined(GPU_CLOVER_DIRAC)
 
 namespace quda {
 

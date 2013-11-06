@@ -419,7 +419,9 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       return precision;
     }
 
-    int Stride() { return stride; }
+    int Stride() const { return stride; }
+
+    void setStride(int stride_) { stride = stride_; }
   };
 
 //} // namespace quda

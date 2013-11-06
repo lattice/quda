@@ -314,6 +314,8 @@ namespace quda {
        Packs the cudaColorSpinorField's ghost zone 
        @param nFace How many faces to pack (depth)
        @param parity Parity of the field
+       @param dim Labels space-time dimensions
+       @param dir Pack data to send in forward of backward directions, or both
        @param dagger Whether the operator is the Hermitian conjugate or not
        @param stream Which stream to use for the kernel
        @param buffer Optional parameter where the ghost should be
@@ -321,7 +323,7 @@ namespace quda {
        @param a Twisted mass parameter (default=0)
        @param b Twisted mass parameter (default=0)
      */
-    void packGhost(const int nFace, const QudaParity parity, const int dagger, 
+    void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger, 
 		   cudaStream_t* stream, void *buffer=0, double a=0, double b=0);
 
     /**

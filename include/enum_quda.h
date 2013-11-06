@@ -316,7 +316,8 @@ extern "C" {
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
-    QUDA_FORWARDS = +1
+    QUDA_FORWARDS = +1,
+    QUDA_BOTH_DIRS = 2
   } QudaDirection;
   
   typedef enum QudaComputeFatMethod_s {

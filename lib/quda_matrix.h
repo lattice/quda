@@ -661,6 +661,18 @@ namespace quda{
       return;
     }
 
+  template<class T, int N>
+    __device__ __host__ inline 
+    void outerProd(const T (&a)[N], const T (&b)[N], Matrix<T,N>* m){
+      for(int i=0; i<N; ++i){
+        const T conjb_i = conj(static_cast<complex<typename RealTypeId<T>::Type> >(b[i]));
+        for(int j=0; j<N; ++j){
+          (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
+        }
+      }
+      return;
+    }
+
 
   // Need some print utilities
   template<class T, int N>
@@ -772,7 +784,7 @@ namespace quda{
       mom->data[0].y = temp2[3].x;
       mom->data[1] = temp2[0];
       mom->data[2] = temp2[1];
-  
+
       mom->data[3].x = -mom->data[1].x;
       mom->data[3].y =  mom->data[1].y;
       mom->data[4].x = 0.;

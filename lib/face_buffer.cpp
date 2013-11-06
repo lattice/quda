@@ -204,7 +204,7 @@ void FaceBuffer::flushPinnedCache()
 }
 
 
-void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, 
+void FaceBuffer::pack(cudaColorSpinorField &in, int dim, int dir,  int parity, int dagger, 
 		      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
 {
   in.allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
@@ -213,26 +213,50 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger,
   if (zeroCopyPack) {
     void *my_face_d;
     cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
-    in.packGhost(nFace, (QudaParity)parity, dagger, &stream[0], my_face_d, a, b);
+    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[0], my_face_d, a, b);
   } else {
-    in.packGhost(nFace, (QudaParity)parity, dagger, &stream[Nstream-1], 0, a, b);
+    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[Nstream-1], 0, a, b);
   }
 }
 
-void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
+void FaceBuffer::pack(cudaColorSpinorField &in, int dir, int parity, int dagger, 
+                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
 {
+  const int dim = -1;
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+}
+
+void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, 
+                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
+{
+  const int dim = -1; // pack all partitioned space-time dimensions
+  const int dir = 2; // pack both forward and backwards directions
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+
+}
+
+
+void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir, int stream_idx){
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
   if (dir%2==0) {
     // backwards copy to host
-    in.sendGhost(my_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]); 
+    in.sendGhost(my_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[stream_idx]); 
   } else {
     // forwards copy to host
-    in.sendGhost(my_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
+    in.sendGhost(my_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[stream_idx]);
   }
 }
 
+
+void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir){
+  
+  if(!commDimPartitioned(dir/2)) return;
+
+  const int stream_idx = (dir%2 == 0) ? dir+sendBackStrmIdx : dir-1+sendFwdStrmIdx;
+  gather(in, dagger, dir, stream_idx);
+}
 
 // experimenting with callbacks for GPU -> MPI interaction.
 // much slower though because callbacks are done on a background thread
@@ -334,17 +358,20 @@ int FaceBuffer::commsQuery(int dir)
 }
 
 
-void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir)
+void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir, int stream_idx)
 {
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
-  // both scattering occurances now go through the same stream
-  if (dir%2==0) {// receive from forwards
-    out.unpackGhost(from_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+recFwdStrmIdx*/]); // 0, 2, 4, 6
-  } else { // receive from backwards
-    out.unpackGhost(from_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+recBackStrmIdx*/]); // 1, 3, 5, 7
+  if(dir%2==0) { // receive from forwards
+    out.unpackGhost(from_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[stream_idx]); 
+  }else{ // receive from backwards 
+    out.unpackGhost(from_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[stream_idx]);
   }
+}
+
+void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir){
+  scatter(out, dagger, dir, (dir/2)*2);
 }
 
 
