@@ -1,5 +1,4 @@
 #include <gauge_field_order.h>
-#include <omp.h>
 
 namespace quda {
   template <typename Order, int nDim>
