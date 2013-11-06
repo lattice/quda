@@ -226,8 +226,7 @@ namespace quda {
       //Begin Rayleigh-Ritz procedure:
       if (l == m){
          //Create device version of the Lanczos matrix:
-         cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuComplex), cudaMemcpyDefault);//how to refine it with streams??
-         cudaMemcpy(dTvecm0, dTm, ldTm*m*sizeof(cuComplex), cudaMemcpyDefault);//how to refine it with streams??
+         cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuComplex), cudaMemcpyDefault);
            
          //run main part here: 
          int _2nev = runRayleighRitz((cuComplex*)dTm, (cuComplex*)dTvecm0, (cuComplex*)dTvecm1, hTvecm, hTvalm, &magma_args);

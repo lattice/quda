@@ -73,6 +73,7 @@ int runRayleighRitz(cuComplex *dTm,
      int l = 0;
 #ifdef MAGMA_LIB
      //solve m-dim eigenproblem:
+     cudaMemcpy(dTvecm0, dTm, param->ldTm*param->m*sizeof(cuComplex), cudaMemcpyDefault);
      magma_cheevd_gpu('V', 'U', param->m, 
                       (magmaFloatComplex*)dTvecm0, param->ldTm, 
                        hTvalm, (magmaFloatComplex*)hTvecm, param->ldTm, 
@@ -80,17 +81,17 @@ int runRayleighRitz(cuComplex *dTm,
      if(param->info != 0) printf("\nError in magma_cheevd_gpu, exit ...\n"), exit(-1);
 
      //solve (m-1)-dim eigenproblem:
-      cudaMemcpy(dTvecm1, dTm, param->ldTm*param->m*sizeof(cuComplex), cudaMemcpyDefault);
-      magma_cheevd_gpu('V', 'U', (param->m-1), 
+     cudaMemcpy(dTvecm1, dTm, param->ldTm*param->m*sizeof(cuComplex), cudaMemcpyDefault);
+     magma_cheevd_gpu('V', 'U', (param->m-1), 
                        (magmaFloatComplex*)dTvecm1, param->ldTm, 
                         hTvalm, (magmaFloatComplex*)hTvecm, param->ldTm, 
                         (magmaFloatComplex *)param->lwork, param->llwork, param->rwork, param->lrwork, param->iwork, param->liwork, (magma_int_t*)&param->info);
-      if(param->info != 0) printf("\nError in magma_cheevd_gpu, exit ...\n"), exit(-1);
+     if(param->info != 0) printf("\nError in magma_cheevd_gpu, exit ...\n"), exit(-1);
       //add last row with zeros (coloumn-major format of the matrix re-interpreted as 2D row-major formated):
-      cudaMemset2D(&dTvecm1[(param->m-1)], param->ldTm*sizeof(cuComplex), 0, sizeof(cuComplex),  param->m-1);
+     cudaMemset2D(&dTvecm1[(param->m-1)], param->ldTm*sizeof(cuComplex), 0, sizeof(cuComplex),  param->m-1);
 
-      //attach nev old vectors to nev new vectors (note 2*nev < m):
-      cudaMemcpy(&dTvecm0[param->nev*param->m], dTvecm1, param->nev*param->m*sizeof(cuComplex), cudaMemcpyDefault);
+     //attach nev old vectors to nev new vectors (note 2*nev < m):
+     cudaMemcpy(&dTvecm0[param->nev*param->m], dTvecm1, param->nev*param->m*sizeof(cuComplex), cudaMemcpyDefault);
 
       //Orthogonalize 2*nev vectors:
       l = 2 * param->nev;
