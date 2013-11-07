@@ -457,7 +457,7 @@ namespace quda {
 
       bool tuneSharedBytes() const { return false; } // Don't tune the shared memory.
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-      unsigned int minThreads() { return arg.threads; }
+      unsigned int minThreads() const { return arg.threads; }
 
       public:
       CloverCompute(CloverArg<Float,Clover> &arg, QudaFieldLocation location) 
