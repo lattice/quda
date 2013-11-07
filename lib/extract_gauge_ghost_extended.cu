@@ -43,11 +43,48 @@ namespace quda {
     }
   };
 
+  template <typename Float, int length, typename Arg>
+  __device__ __host__ void extractor(Arg &arg, int dir, int a, int b, 
+				     int c, int d, int g, int parity) {
+    typename mapper<Float>::type u[length];
+    int &dim = arg.dim;
+    int srcIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
+		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
+    
+    int dstIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
+		  c*arg.fBuf[dim][2] + d*arg.fBuf[dim][3]) >> 1;
+    
+    arg.order.load(u, srcIdx, g, parity); // load the ghost element from the bulk
+    
+    // need dir dependence in write
+    arg.order.saveGhostEx(u, dstIdx, dir, dim, g, 
+			  (parity+arg.localParity[dim])&1, arg.R);
+  }
+
+
+  template <typename Float, int length, typename Arg>
+  __device__ __host__ void injector(Arg &arg, int dir, int a, int b, 
+				    int c, int d, int g, int parity) {
+    typename mapper<Float>::type u[length];
+    int &dim = arg.dim;
+    int srcIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
+		  c*arg.fBuf[dim][2] + d*arg.fBuf[dim][3]) >> 1;
+    
+    int dstIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
+		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
+    
+    // need dir dependence in read
+    arg.order.loadGhostEx(u, srcIdx, dir, dim, g, 
+			  (parity+arg.localParity[dim])&1, arg.R);
+    
+    arg.order.save(u, dstIdx, g, parity); // save the ghost element into the bulk
+  }
+  
   /**
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, typename Order>
+  template <typename Float, int length, int nDim, typename Order, bool extract>
   void extractGhostEx(ExtractGhostExArg<Order,nDim> arg) {  
     typedef typename mapper<Float>::type RegType;
 
@@ -56,8 +93,7 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
 
       // the following 4-way loop means this is specialized for 4 dimensions 
-      // dir = 0 backwards
-      // dir = 1 forwards
+      // dir = 0 backwards, dir = 1 forwards
       for (int dir = 0; dir<2; dir++) {
       
 	for (int d=dir*arg.X[dim] + (1-dir)*arg.R[dim]; 
@@ -68,75 +104,13 @@ namespace quda {
 	      for (int c=arg.C0[dim]; c<arg.C1[dim]; c++) { // loop over the interior surface
 		for (int g=0; g<arg.order.geometry; g++) {
 
-		  // index is a checkboarded spacetime coordinate
-		  int srcIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
-				c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
-
-		  int dstIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
-				c*arg.fBuf[dim][2] + d*arg.fBuf[dim][3]) >> 1;
-
 		  // we only do the extraction for parity we are currently working on
 		  int oddness = (a+b+c+d) & 1;
 		  if (oddness == parity) {
-		    RegType u[length];
-		    arg.order.load(u, srcIdx, g, parity); // load the ghost element from the bulk
-
-		    // need dir dependence in write
-		    arg.order.saveGhostEx(u, dstIdx, dir, dim, g, 
-					  (parity+arg.localParity[dim])&1, arg.R);
-		  } // oddness == parity
-		} // g
-	      } // c
-	    } // b
-	  } // a
-	} // d
-      } // dir
-      
-    } // parity
-
-  }
-
-  /**
-     Generic CPU gauge ghost extraction and packing
-     NB This routines is specialized to four dimensions
-  */
-  template <typename Float, int length, int nDim, typename Order>
-  void injectGhostEx(ExtractGhostExArg<Order,nDim> arg) {  
-    typedef typename mapper<Float>::type RegType;
-
-    int dim = arg.dim;
-
-    for (int parity=0; parity<2; parity++) {
-
-      // the following 4-way loop means this is specialized for 4 dimensions 
-      // dir = 0 backwards
-      // dir = 1 forwards
-      for (int dir = 0; dir<2; dir++) {
-      
-	for (int d=dir*arg.X[dim] + (1-dir)*arg.R[dim]; 
-	     d < dir*arg.X[dim] + (1-dir)*arg.R[dim] + arg.R[dim]; d++) {
-
-	  for (int a=arg.A0[dim]; a<arg.A1[dim]; a++) { // loop over the interior surface
-	    for (int b=arg.B0[dim]; b<arg.B1[dim]; b++) { // loop over the interior surface
-	      for (int c=arg.C0[dim]; c<arg.C1[dim]; c++) { // loop over the interior surface
-		for (int g=0; g<arg.order.geometry; g++) {
-
-		  // index is a checkboarded spacetime coordinate
-		  int srcIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
-				c*arg.fBuf[dim][2] + d*arg.fBuf[dim][3]) >> 1;
-
-		  int dstIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
-				c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
-
-		  // we only do the extraction for parity we are currently working on
-		  int oddness = (a+b+c+d) & 1;
-		  if (oddness == parity) {
-		    RegType u[length];
-		    // need dir dependence in read
-		    arg.order.loadGhostEx(u, srcIdx, dir, dim, g, 
-					  (parity+arg.localParity[dim])&1, arg.R);
-
-		    arg.order.save(u, dstIdx, g, parity); // save the ghost element into the bulk
+		    if (extract) 
+		      extractor<Float,length>(arg, dir, a, b, c, d, g, parity);
+		    else 
+		      injector<Float,length>(arg, dir, a, b, c, d, g, parity);
 		  } // oddness == parity
 		} // g
 	      } // c
@@ -154,6 +128,49 @@ namespace quda {
      NB This routines is specialized to four dimensions
      FIXME this implementation will have two-way warp divergence
   */
+  
+  /**
+     Generic CPU gauge ghost extraction and packing
+     NB This routines is specialized to four dimensions
+  */
+  template <typename Float, int length, int nDim, typename Order, bool extract>
+  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim> arg) {  
+    typedef typename mapper<Float>::type RegType;
+
+    int dim = arg.dim;
+
+    // parallelize over parity and dir using block or grid 
+    for (int parity=0; parity<2; parity++) {
+
+      // the following 4-way loop means this is specialized for 4 dimensions 
+      // dir = 0 backwards, dir = 1 forwards
+      for (int dir = 0; dir<2; dir++) {
+      
+	// linear index used for writing into ghost buffer
+	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
+	if (X >= 2*arg.R[dim]*arg.surfaceCB[dim]*arg.order.geometry) continue;
+	// X = (((d * A + a)*B + b)*C + c)*geometry + g
+	int dabc = X/arg.order.geometry;
+	int g = X - dabc*arg.order.geometry;
+	int dab = dabc/(arg.C1[dim]-arg.C0[dim]);
+	int c = arg.C0[dim] + dabc - dab*(arg.C1[dim]-arg.C0[dim]);
+	int da = dab/(arg.B1[dim]-arg.B0[dim]);
+	int b = arg.B0[dim] + dab - da*(arg.B1[dim]-arg.B0[dim]);
+	int d = da / (arg.A1[dim]-arg.A0[dim]);
+	int a = arg.A0[dim] + da - d * (arg.A1[dim]-arg.A0[dim]);
+	d += dir*arg.X[dim] + (1-dir)*arg.R[dim];
+
+	// we only do the extraction for parity we are currently working on
+	int oddness = (a+b+c+d) & 1;
+	if (oddness == parity) {
+	  if (extract) extractor<Float,length>(arg, dir, a, b, c, d, g, parity);
+	  else injector<Float,length>(arg, dir, a, b, c, d, g, parity);
+	} // oddness == parity
+      } // dir
+      
+    } // parity
+
+  }
 
   template <typename Float, int length, int nDim, typename Order>
   class ExtractGhostEx : Tunable {
@@ -172,27 +189,26 @@ namespace quda {
   public:
     ExtractGhostEx(ExtractGhostExArg<Order,nDim> &arg, bool extract, 
 		   QudaFieldLocation location) : arg(arg), extract(extract), location(location) { 
-      // assumes we are parallelizing over for/back and parity
-      size = 2 * 2 * arg.R[arg.dim] * arg.surfaceCB[arg.dim]; 
+      size = arg.R[arg.dim] * arg.surfaceCB[arg.dim]; 
     }
     virtual ~ExtractGhostEx() { ; }
   
     void apply(const cudaStream_t &stream) {
       if (extract) {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  extractGhostEx<Float,length,nDim,Order>(arg);
+	  extractGhostEx<Float,length,nDim,Order,true>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	  //extractGhostExKernel<Float, length, nDim, Order> 
-	  //<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  extractGhostExKernel<Float,length,nDim,Order,true> 
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	}
       } else { // we are injecting
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  injectGhostEx<Float,length,nDim,Order>(arg);
+	  extractGhostEx<Float,length,nDim,Order,false>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	  //injectGhostExKernel<Float, length, nDim, Order> 
-	  //<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  extractGhostExKernel<Float,length,nDim,Order,false> 
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	}
       }
 
@@ -204,7 +220,8 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];    
-      aux << "stride=" << arg.order.stride << ",extract=", extract;
+      aux << "stride=" << arg.order.stride << ",extract=" <<
+	extract << ",dimension=" << arg.dim;
       return TuneKey(vol.str(), typeid(*this).name(), aux.str());
     }
 
@@ -216,7 +233,7 @@ namespace quda {
     }
 
     long long flops() const { return 0; } 
-    long long bytes() const { return 2 * size * arg.order.Bytes(); } // 2 for i/o    
+    long long bytes() const { return 2 * 2 * 2 * size * arg.order.Bytes(); } // 2 for i/o    
   };
 
 
