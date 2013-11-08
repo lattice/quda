@@ -3,6 +3,7 @@
 #include <complex_quda.h>
 #include <cub/cub.cuh> 
 #include <launch_kernel.cuh>
+#include <face_quda.h>
 
 namespace quda {
 
@@ -185,7 +186,10 @@ namespace quda {
       } else {
 	cloverInvert<1, Float, Clover>(arg);
       }
-      if (arg.computeTraceLog) cudaDeviceSynchronize();
+      if (arg.computeTraceLog) {
+	cudaDeviceSynchronize();
+	reduceDoubleArray(arg.trlogA_h, 2);
+      }
     }
 
     TuneKey tuneKey() const {
