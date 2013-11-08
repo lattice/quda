@@ -2459,14 +2459,24 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   appParam.order = gParam.order;
   appParam.create = QUDA_REFERENCE_FIELD_CREATE;
   appParam.gauge = sitelink;
-  
+  appParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cpuGaugeField appLink(appParam);
   
   gParamSL.order = QUDA_MILC_GAUGE_ORDER;
   gParamSL.create = QUDA_NULL_FIELD_CREATE;
+  gParamSL.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParamSL);
   
   copyExtendedGauge(*cpuSiteLink, appLink, QUDA_CPU_FIELD_LOCATION);
+  int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
+
+  profileGaugeForce.Stop(QUDA_PROFILE_INIT);
+  profileGaugeForce.Start(QUDA_PROFILE_COMMS);
+  cpuSiteLink->exchangeExtendedGhost(R);
+  //exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
+  //			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1, 4);
+  profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
+  profileGaugeForce.Start(QUDA_PROFILE_INIT);
 #endif
   
   gParamSL.create = QUDA_NULL_FIELD_CREATE;
@@ -2514,12 +2524,6 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
 #ifdef MULTI_GPU
-  profileGaugeForce.Start(QUDA_PROFILE_COMMS);
-  int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
-  exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
-			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1, 4);
-  profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
-
   profileGaugeForce.Start(QUDA_PROFILE_H2D);
   loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
   profileGaugeForce.Stop(QUDA_PROFILE_H2D);
@@ -2644,6 +2648,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.pad = 0;
   gParam_ex.link_type = param->type;
+  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cpuGaugeField cpuGaugeEx(gParam_ex);
 
   // create an extended device field
@@ -2661,6 +2666,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   gParam.link_type = gParam_ex.link_type;
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge = gauge;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   {
     cpuGaugeField cpuGauge(gParam);
     profileExtendedGauge.Stop(QUDA_PROFILE_INIT);
@@ -2686,7 +2692,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   profileExtendedGauge.Stop(QUDA_PROFILE_TOTAL);
   return cudaGaugeEx;
 }
-#endif MULTI_GPU 
+#endif // MULTI_GPU
 
 void destroyQudaGaugeField(void* gauge){
   cudaGaugeField* g = reinterpret_cast<cudaGaugeField*>(gauge);
@@ -2904,6 +2910,7 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.gauge = gauge;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
 
   if (gParam.order == QUDA_TIFR_GAUGE_ORDER) {

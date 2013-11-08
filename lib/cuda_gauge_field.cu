@@ -50,7 +50,9 @@ namespace quda {
       }        
     }
 
-    if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost(); 
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+      if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost(); 
+    }
 
     even = gauge;
     odd = (char*)gauge + bytes/2; 
@@ -155,8 +157,6 @@ namespace quda {
     if (geometry != QUDA_VECTOR_GEOMETRY) 
       errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
-    if (ghostExchange) return;
-
     void *ghost_[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
@@ -178,8 +178,6 @@ namespace quda {
       copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost_, 1);
       for (int d=0; d<nDim; d++) device_free(ghost_[d]);
     }
-
-    ghostExchange = true;
   }
 
   void cudaGaugeField::setGauge(void *gauge_)

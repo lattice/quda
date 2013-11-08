@@ -52,9 +52,10 @@ namespace quda {
 		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
     
     int dstIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
-		  c*arg.fBuf[dim][2] + d*arg.fBuf[dim][3]) >> 1;
+		  c*arg.fBuf[dim][2] + (d-(dir?arg.X[dim]:arg.R[dim]))*arg.fBuf[dim][3]) >> 1;
     
-    arg.order.load(u, srcIdx, g, parity); // load the ghost element from the bulk
+    // load the ghost element from the bulk
+    arg.order.load(u, srcIdx, g, parity); 
     
     // need dir dependence in write
     arg.order.saveGhostEx(u, dstIdx, dir, dim, g, 
@@ -68,7 +69,7 @@ namespace quda {
     typename mapper<Float>::type u[length];
     int &dim = arg.dim;
     int srcIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
-		  c*arg.fBuf[dim][2] + d*arg.fBuf[dim][3]) >> 1;
+		  c*arg.fBuf[dim][2] + (d-dir*(arg.X[dim]+arg.R[dim]))*arg.fBuf[dim][3]) >> 1;
     
     int dstIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
 		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
@@ -95,10 +96,10 @@ namespace quda {
       // the following 4-way loop means this is specialized for 4 dimensions 
       // dir = 0 backwards, dir = 1 forwards
       for (int dir = 0; dir<2; dir++) {
-      
-	for (int d=dir*arg.X[dim] + (1-dir)*arg.R[dim]; 
-	     d < dir*arg.X[dim] + (1-dir)*arg.R[dim] + arg.R[dim]; d++) {
 
+	int D0 = extract ? dir*arg.X[dim] + (1-dir)*arg.R[dim] : dir*(arg.X[dim] + arg.R[dim]); 
+	  
+	for (int d=D0; d<D0+arg.R[dim]; d++) {
 	  for (int a=arg.A0[dim]; a<arg.A1[dim]; a++) { // loop over the interior surface
 	    for (int b=arg.B0[dim]; b<arg.B1[dim]; b++) { // loop over the interior surface
 	      for (int c=arg.C0[dim]; c<arg.C1[dim]; c++) { // loop over the interior surface
@@ -145,7 +146,9 @@ namespace quda {
       // the following 4-way loop means this is specialized for 4 dimensions 
       // dir = 0 backwards, dir = 1 forwards
       for (int dir = 0; dir<2; dir++) {
-      
+      	
+	// this will have two-warp divergence since we only do work on
+	// one parity but parity alternates between threads
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
 	if (X >= 2*arg.R[dim]*arg.surfaceCB[dim]*arg.order.geometry) continue;

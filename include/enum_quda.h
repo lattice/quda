@@ -339,6 +339,13 @@ extern "C" {
     QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
 
+  typedef enum QudaGhostExchange_s {
+    QUDA_GHOST_EXCHANGE_NO,
+    QUDA_GHOST_EXCHANGE_PAD,
+    QUDA_GHOST_EXCHANGE_EXTENDED,
+    QUDA_GHOST_EXCHANGE_INVALID = QUDA_INVALID_ENUM
+  } QudaGhostExchange;
+
 #ifdef __cplusplus
 }
 #endif

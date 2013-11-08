@@ -71,10 +71,13 @@ namespace quda {
 	size_t nbytes = nFace * surface[i] * reconstruct * precision;
 	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
       }  
-      // exchange the boundaries if a non-trivial field
-      if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE &&
-	  geometry == QUDA_VECTOR_GEOMETRY) 
-	exchangeGhost();
+
+      if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+	// exchange the boundaries if a non-trivial field
+	if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE &&
+	    geometry == QUDA_VECTOR_GEOMETRY) 
+	  exchangeGhost();
+      }
     }
 
     // compute the fat link max now in case it is needed later (i.e., for half precision)
@@ -114,8 +117,6 @@ namespace quda {
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
   void cpuGaugeField::exchangeGhost() {
-    if (ghostExchange) return;
-
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*reconstruct*precision);
 
@@ -127,8 +128,6 @@ namespace quda {
     faceBuf.exchangeLink(ghost, send, QUDA_CPU_FIELD_LOCATION);
 
     for (int d=0; d<nDim; d++) host_free(send[d]);
-
-    ghostExchange = true;
   }
 
   void cpuGaugeField::exchangeExtendedGhost(const int *R) {
@@ -154,10 +153,10 @@ namespace quda {
 	MsgHandle *mh_send_fwd;
 	MsgHandle *mh_send_back;
 	
-	mh_recv_back = comm_declare_receive_relative(recv[0*4+d], d, -1, bytes[d]);
-	mh_recv_fwd = comm_declare_receive_relative(recv[1*4+d], d, +1, bytes[d]);
-	mh_send_fwd = comm_declare_send_relative(send[0*4+d], d, +1, bytes[d]);
-	mh_send_back = comm_declare_send_relative(send[1*4+d], d, -1, bytes[d]);
+	mh_recv_back = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
+	mh_recv_fwd  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
+	mh_send_back = comm_declare_send_relative(send[d], d, -1, bytes[d]);
+	mh_send_fwd  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
 	
 	comm_start(mh_recv_back);
 	comm_start(mh_recv_fwd);

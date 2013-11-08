@@ -193,7 +193,6 @@ namespace quda {
 
     ExtractGhostArg<Order, nDim> arg(order, nFace, X, surfaceCB, A, B, C, f, localParity);
 
-    printf("size of extract arg = %lu\n", sizeof(arg));
     if (location==QUDA_CPU_FIELD_LOCATION) {
       extractGhost<Float,length,nDim,Order>(arg);
     } else {
