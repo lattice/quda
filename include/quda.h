@@ -222,6 +222,8 @@ extern "C" {
     /**Parameters for deflated solvers*/
     int nev;
     int max_vect_size;//for magma library this parameter must be multiple 16
+    int rhs_idx;
+    int deflation_grid;//total deflation space is nev*deflation_grid
 
   } QudaInvertParam;
 
@@ -419,13 +421,15 @@ extern "C" {
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
 
   /**
-   * Deflated solvers interface (e.g., eigCG).
-   * @param _hp_x    Array of solution spinor fields
-   * @param _hp_b    Array of source spinor fields
+   * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).
+   * @param _h_x    Outnput: array of solution spinor fields (typically O(10))
+   * @param _h_b    Input: array of source spinor fields (typically O(10))
+   * @param _h_u    Input/Output: array of Ritz spinor fields (typically O(100))
+   * @param _h_h    Input/Output: complex projection mutirx (typically O(100))
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invertDeflatedQuda(void *h_x, void *h_b, QudaInvertParam *param);
+  void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, QudaInvertParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).

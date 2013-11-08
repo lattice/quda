@@ -123,10 +123,12 @@ namespace quda {
     /**< The Gflops rate of the solver */
     double gflops;
 
-    // EigCG solver parameters
+    // Incremental EigCG solver parameters
 
     int nev;//number of eigenvectors produced by EigCG
     int m;//Dimension of the search space
+    int deflation_grid;
+    int rhs_idx;
     
     /**
        Constructor that matches the initial values to that of the
@@ -145,7 +147,7 @@ namespace quda {
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      nev(param.nev), m(param.max_vect_size) //! for EigCG
+      nev(param.nev), m(param.max_vect_size), deflation_grid(param.deflation_grid), rhs_idx(0) //! for IncEigCG
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -153,9 +155,12 @@ namespace quda {
 	tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if((param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
+      if((param.inv_type == QUDA_INC_EIGCG_INVERTER) && m % 16){//current hack for the magma library
         m = (m / 16) * 16 + 16;
         warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
+      }
+      if(param.rhs_idx != 0 && param.inv_type==QUDA_INC_EIGCG_INVERTER){
+        rhs_idx = param.rhs_idx;
       }
     }
     ~SolverParam() { }
@@ -174,8 +179,9 @@ namespace quda {
 	param.true_res_offset[i] = true_res_offset[i];
 	param.true_res_hq_offset[i] = true_res_hq_offset[i];
       }
+      //for incremental eigCG:
+      param.rhs_idx = rhs_idx;
     }
-
   };
 
   class Solver {
@@ -361,7 +367,7 @@ namespace quda {
     param(param), profile(profile) { ; }
     virtual ~DeflatedSolver() { ; }
 
-    virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &eigvset, cudaColorSpinorField &in) = 0;
+    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *eigvset, cudaColorSpinorField *in) = 0;
 
     // solver factory
     static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
@@ -385,13 +391,76 @@ namespace quda {
 
   };
 
-  class EigCG : public DeflatedSolver {
+/*
+Concerning used precisions:
+external Ritz vectors must currently have full solver precision. This is also precision for the projection
+matrix used. 
+Internal eigCG deflation space may have, in principle, an arbitrary precision: it's unrelated to the solver precisions; 
+but we pinned it currently to the single precision because half precision is currently not supported. This can be easely 
+included into the framework, though.
+*/
+
+//for future : replace by IncEigCGargs.
+  class ProjectionMatrix {
+
+  private:
+    //
+    const DiracMatrix &mat;
+
+    //device projection matrix:
+    void *dproj; //VH A V
+
+    //host projection matrix(used for small dimensions):
+    void *hproj; //VH A V
+ 
+    QudaPrecision prec;     //precision must match DiracMatrix precision and Ritz vectors precision
+    int ld;                 //projection matrix leading dimension
+    int tot_dim;            //full dimension (nev*deflation_grid)
+    int curr_dim;           //current dimension (must match rhs_idx: dim = (rhs_idx < deflation_grid) ? nev * rhs_idx) 
+    int prev_dim;
+    int bytes;
+
+  public:
+    ProjectionMatrix(DiracMatrix &mat, SolverParam &param);
+    virtual ~ProjectionMatrix();
+
+    //Solve dH y = u^{dagger}r: (y has precision of dH)
+    //For small dim: use CPU
+    //For big dim: use GPU (e.g., dim > 128)
+    //output: complex vector y
+    void operator()(void *out, cudaColorSpinorField *r, cudaColorSpinorField *u);
+
+    //Compute H=U^{dag}MU (also computes block of H-matrix):
+    //void computeProj(cudaColorSpinorField *u);
+
+    //extend projection matrix:
+    //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
+    //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
+    //extend H-matrix with the components
+    void ConstructProj(cudaColorSpinorField *u); 
+
+    //reset current dimention:
+    void ResetProjMatDim(const int n);    
+
+    //copy from the host:
+    void LoadProj(void *out);
+
+    //copy to the host:
+    void SaveProj(void *out);
+  };
+
+  class IncEigCG : public DeflatedSolver {
 
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
 
-    cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
+    Solver *initCG;//initCG solver for deflated inversions
+    SolverParam initCGparam; // parameters for initCG solve
+
+    bool eigcg_alloc;
+
+    cudaColorSpinorField *Vm;  //deflation vectors  (spinor matrix of size eigen_vector_length x m)
 
     //move this to separate DeflatedSolverArgs class...
     //host Lanczos matrice, and its eigenvalue/vector arrays:
@@ -405,10 +474,16 @@ namespace quda {
     void *dTvecm1; //eigenvectors of T[m-1,m-1]
 
   public:
-    EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile);
-    virtual ~EigCG();
+    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile);
+    virtual ~IncEigCG();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &eigvset, cudaColorSpinorField &in);
+    void EigCG(cudaColorSpinorField &out, cudaColorSpinorField &nev_eigvecs, cudaColorSpinorField &in);
+
+    void DeflateInitGuess(cudaColorSpinorField &in, const cudaColorSpinorField &u, const ProjectionMatrix *pM);
+
+    void OrthRitz(cudaColorSpinorField &u);
+
+    void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in, cudaColorSpinorField *u, ProjectionMatrix *pM);
   };
 
 

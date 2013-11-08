@@ -86,9 +86,9 @@ namespace quda {
   {
     DeflatedSolver* solver=0;
 
-    if (param.inv_type == QUDA_EIGCG_INVERTER) {
-      report("EIGCG");
-      solver = new EigCG(mat, matSloppy, eigvParam, param, profile);
+    if (param.inv_type == QUDA_INC_EIGCG_INVERTER) {
+      report("Incremental EIGCG");
+      solver = new IncEigCG(mat, matSloppy, eigvParam, param, profile);
     }else{
       errorQuda("Invalid solver type");
     }

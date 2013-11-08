@@ -26,53 +26,138 @@ WARNING: for coalescing m must be multiple of 16, use pad for other choises
 
 namespace quda {
 
-  EigCG::EigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy)
+  ProjectionMatrix::ProjectionMatrix(DiracMatrix &mat, SolverParam &param) : mat(mat), prev_dim(0)
+  { 
+     if(param.nev == 0 || param.deflation_grid < param.nev) errorQuda("\nIncorrect deflation space parameters...\n");
+
+     tot_dim      = param.deflation_grid*param.nev;
+     curr_dim     = param.nev;
+     ld           = ((tot_dim+15) / 16) * tot_dim;
+
+     //precision:
+     prec    = param.precision;//always check precision!
+
+     //bytes:
+     bytes = ld*tot_dim * (2*prec);//complex matrix
+
+     //allocate complex arrays:
+     hproj = malloc(bytes);
+     memset(hproj, 0, bytes); 
+      
+     cudaMalloc(&dproj,bytes);
+     cudaMemset(dproj, 0, bytes);
+  }
+
+  ProjectionMatrix::~ProjectionMatrix() {
+    //free allocated resources:
+    free(hproj);
+    cudaFree(dproj);
+  }
+
+  void ProjectionMatrix::operator()(void *out, cudaColorSpinorField *r, cudaColorSpinorField *u)
   {
-    if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or search space is too small..)\n");
-    //Create an eigenvector set:
-    eigvParam->create   = QUDA_ZERO_FIELD_CREATE;
-    eigvParam->setPrecision(QUDA_SINGLE_PRECISION);//eigCG internal search space is in single precision (currently)
-    eigvParam->eigv_dim = param.m;
-    Vm = new cudaColorSpinorField(*eigvParam); // solution
+     return;
+  }
 
-    hTm     = new std::complex<float>[param.m*param.m];//VH A V
-    hTvecm  = new std::complex<float>[param.m*param.m];//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
-    hTvalm  = new float[param.m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
+  void ProjectionMatrix::ConstructProj(cudaColorSpinorField *u)
+  {
+     return;
+  }
 
-    //allocate dT etc. buffers on GPU:
-    cudaMalloc(&dTm, param.m*param.m*sizeof(cuComplex));//  
-    cudaMalloc(&dTvecm0, param.m*param.m*sizeof(cuComplex));  
-    cudaMalloc(&dTvecm1, param.m*param.m*sizeof(cuComplex));  
+  void ProjectionMatrix::LoadProj(void *in)
+  {
+     memcpy(hproj, in, bytes);
+     cudaMemcpy(dproj, in, bytes, cudaMemcpyDefault);
+     return;
+  }
 
-    //set everything to zero:
-    cudaMemset(dTm, 0, param.m*param.m*sizeof(cuComplex));//?
-    cudaMemset(dTvecm0, 0, param.m*param.m*sizeof(cuComplex));
-    cudaMemset(dTvecm1, 0, param.m*param.m*sizeof(cuComplex));
+  void ProjectionMatrix::SaveProj(void *out)
+  {
+     cudaMemcpy(out, dproj, bytes, cudaMemcpyDefault);
+     return;
+  }
+
+  void ProjectionMatrix::ResetProjMatDim(const int n)
+  {
+     if(n > tot_dim) errorQuda("\nCannot reset projection matrix dimension.\n");
+     prev_dim = curr_dim;
+     curr_dim = n;
+     return;
+  }
+
+
+  // set the required parameters for the initCG solver
+  void fillInitCGSolveParam(SolverParam &initCGparam) {
+    initCGparam.iter   = 0;
+    initCGparam.gflops = 0;
+    initCGparam.secs   = 0;
+
+    initCGparam.inv_type        = QUDA_CG_INVERTER;       // use CG solver
+    initCGparam.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
+  }
+
+
+  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), Vm(0), hTm(0), hTvecm(0), hTvalm(0), dTm(0), dTvecm0(0), dTvecm1(0), initCG(0), initCGparam(param)
+  {
+
+    if(param.rhs_idx < param.deflated_grid)
+    {
+       printfQuda("\nAllocating resources for the EigCG solver.\n");
+       if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or search space is too small..)\n");
+       //Create an eigenvector set:
+       eigvParam->create   = QUDA_ZERO_FIELD_CREATE;
+       eigvParam->setPrecision(QUDA_SINGLE_PRECISION);//eigCG internal search space is in single precision (currently)
+       eigvParam->eigv_dim = param.m;
+
+       Vm = new cudaColorSpinorField(*eigvParam); //search space for Ritz vectors
+
+       hTm     = new std::complex<float>[param.m*param.m];//VH A V
+       hTvecm  = new std::complex<float>[param.m*param.m];//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
+       hTvalm  = new float[param.m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
+
+       //allocate dT etc. buffers on GPU:
+       cudaMalloc(&dTm, param.m*param.m*sizeof(cuComplex));//  
+       cudaMalloc(&dTvecm0, param.m*param.m*sizeof(cuComplex));  
+       cudaMalloc(&dTvecm1, param.m*param.m*sizeof(cuComplex));  
+
+       //set everything to zero:
+       cudaMemset(dTm, 0, param.m*param.m*sizeof(cuComplex));//?
+       cudaMemset(dTvecm0, 0, param.m*param.m*sizeof(cuComplex));
+       cudaMemset(dTvecm1, 0, param.m*param.m*sizeof(cuComplex));
+       //Error check is missing...
+       
+       eigcg_alloc = true;
+    }
+    else
+    {
+       printfQuda("\nIncEigCG will deploy initCG solver.\n");
+       eigcg_alloc = false;
+    }
+    fillInitCGSolveParam(initCGparam);
+  }
+
+  IncEigCG::~IncEigCG() {
+    if(eigcg_alloc)
+    {
+      delete Vm;
+
+      delete[] hTm;
+      delete[] hTvecm;
+      delete[] hTvalm;
+
+      cudaFree(dTm);
+      cudaFree(dTvecm0);
+      cudaFree(dTvecm1);
+    }
 
   }
 
-  EigCG::~EigCG() {
-
-    delete Vm;
-
-    delete[] hTm;
-    delete[] hTvecm;
-    delete[] hTvalm;
-
-    cudaFree(dTm);
-    cudaFree(dTvecm0);
-    cudaFree(dTvecm1);
-
-  }
-
-  void EigCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &e, cudaColorSpinorField &b) 
+  void IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &e, cudaColorSpinorField &b) 
   {
-#ifdef MAGMA_LIB
-    blasMagmaArgs magma_args;
-#else
-    errorQuda("Error: EigCG solver requires magma library...\n");    
-#endif
+    if(!eigcg_alloc){
+       errorQuda("Error: EigCG solver resources were not allocated...\n");
+    }
 
     profile.Start(QUDA_PROFILE_INIT);
 
@@ -148,6 +233,8 @@ namespace quda {
     double pAp;
     int rUpdate = 0;
 
+    int eigvRestart = 0;
+
     double rNorm = sqrt(r2);
     double r0Norm = rNorm;
     double maxrx = rNorm;
@@ -176,7 +263,9 @@ namespace quda {
     const int ldTm  = m;
 
     //magma initialization:
-    init_magma(&magma_args, m, nev);
+
+    BlasMagmaArgs *magma_args = new BlasMagmaArgs(m, nev);
+
     double alpha0 = 1.0, beta0 = 0.0;//EigCG additional parameters
 
 //Begin CG iterations:
@@ -229,10 +318,10 @@ namespace quda {
          cudaMemcpy(dTm, hTm, ldTm*m*sizeof(cuComplex), cudaMemcpyDefault);
            
          //run main part here: 
-         int _2nev = runRayleighRitz((cuComplex*)dTm, (cuComplex*)dTvecm0, (cuComplex*)dTvecm1, hTvecm, hTvalm, &magma_args);
+         int _2nev = magma_args->RayleighRitz((cuComplex*)dTm, (cuComplex*)dTvecm0, (cuComplex*)dTvecm1, hTvecm, hTvalm);
 
          //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
-         restart_2nev_vectors((cuComplex*)Vm->V(), (cuComplex*)dTm, &magma_args, Vm->EigvLength());//m->ldTm
+         magma_args->Restart_2nev_vectors((cuComplex*)Vm->V(), (cuComplex*)dTm, &magma_args, Vm->EigvLength());//m->ldTm
            
          //Fill-up diagonal elements of the matrix T
          memset(hTm, 0, ldTm*m*sizeof(std::complex<float>));
@@ -251,6 +340,8 @@ namespace quda {
 	     hTm[_2nev*ldTm+i] = std::complex<float>((float)(s.real()/sqrt(r2)), (float)(s.imag()/sqrt(r2)));
 	     hTm[i*ldTm+_2nev] = conj(hTm[_2nev*ldTm+i]);
 	 }
+
+         eigvRestart++;
          l = _2nev;
       } else{ //no-RR branch:
          if(k > 0){
@@ -327,7 +418,7 @@ namespace quda {
     }
 
 //Shutdown magma:
-    shutdown_magma(&magma_args);
+    delete magma_args;
 
 //Copy nev eigvectors:
     copyCuda(e, Vm->GetEigenvecSubset(nev));//new:this return an eigenvector set that consists of nev first eigenvectors    
@@ -347,8 +438,10 @@ namespace quda {
     if (k==param.maxiter) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (getVerbosity() >= QUDA_VERBOSE)
+    if (getVerbosity() >= QUDA_VERBOSE){
       printfQuda("EigCG: Reliable updates = %d\n", rUpdate);
+      printfQuda("EigCG: Eigenspace restarts = %d\n", eigvRestart);
+    }
 
     // compute the true residuals
     mat(r, x, y);
@@ -381,4 +474,91 @@ namespace quda {
 
     return;
   }
+
+  void IncEigCG::DeflateInitGuess(cudaColorSpinorField &in, const cudaColorSpinorField &u, const ProjectionMatrix &pM);
+  {
+    //using magma gesv routine:
+    return;
+  }
+
+  void IncEigCG::OrthRitz(cudaColorSpinorField &u)
+  {
+    //based on mGS algorithm:
+    return;
+  }
+
+  void IncEigCG::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in, cudaColorSpinorField *u, ProjectionMatrix *pM) 
+  {
+     //if this operator applied during the first stage of the incremental eigCG (to construct deflation space):
+     //then: call eigCG inverter 
+     if((param.rhs_idx == 0) || (param.inv_type == QUDA_EIGCG_INVERTER))
+     {
+        //compute the first nev Ritz vectors:
+        EigCG(*x, *b, u->GetEigenvecSubset(param.nev));
+
+        //Construct projection matrix:
+        pM->constructProj(u->GetEigenvecSubset(param.nev));
+
+        //finish for this first rhs:
+        param.rhs_idx++;
+     }
+     else if(param.rhs_idx < param.deflation_grid)
+     {
+        //we are still in the 1st stage
+        const int w_range = param.nev*(param.rhs_idx+1);
+        const int offset  = param.nev*param.rhs_idx;
+
+        //deflate initial guess:
+        DeflateInitGuess(*in, u->GetEigenvecSubset(w_range), *pM);
+
+        //compute current nev Ritz vectors:
+        EigCG(*x, *b, u->GetEigenvecSubset(param.nev, offset));
+        
+        //orthogonalize new nev vectors against old vectors 
+        OrthRitz(u->GetEigenvecSubset(w_range));
+
+        //Construct(extend) projection matrix:
+        pM->constructProj(u->GetEigenvecSubset(w_range));
+
+        //finish for this first rhs:
+        param.rhs_idx++;
+     }
+     //second stage here: param.rhs_idx >= param.deflation_grid 
+     else
+     {
+        //deallocate eigCG resources (if they were created)
+        if(eigcg_alloc){
+          delete Vm;
+
+          delete[] hTm;
+          delete[] hTvecm;
+          delete[] hTvalm;
+
+          cudaFree(dTm);
+          cudaFree(dTvecm0);
+          cudaFree(dTvecm1);
+          eigcg_alloc = false;
+        }
+
+        //deflate initial guess:
+        const int range = param.nev*param.deflation_grid;
+
+        DeflateInitGuess(*in, u->GetEigenvecSubset(range), *pM);
+
+        initCG = new CG(mat, matSloppy, initCGparam, param.profile);
+
+        //launch initCG:
+        initCG(*in, *out);
+
+        //clean initCG:
+        delete initCG;
+
+        param.rhs_idx++;
+     } 
+//in main routine don't forget: solverParam.updateInvertParam(*param);
+     
+     return;
+  }
+
+
 } // namespace quda

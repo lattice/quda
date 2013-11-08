@@ -144,7 +144,7 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.4125;
+  double mass = -1.0;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -188,15 +188,15 @@ int main(int argc, char **argv)
   inv_param.pipeline = 0;
 
   inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-7;
+  inv_param.tol = 1e-10;
 
 //! For deflated solvers only:
   if(deflated) inv_param.inv_type = QUDA_EIGCG_INVERTER;
 
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.nev = 16;
-    inv_param.max_vect_size = 32;
+    inv_param.nev = 16;//not working for 64
+    inv_param.max_vect_size = 144;
   }else{
     inv_param.nev = 0;
     inv_param.max_vect_size = 0;

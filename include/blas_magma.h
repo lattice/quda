@@ -12,11 +12,12 @@
 #define MAX(a, b) (a > b) ? a : b;
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//magma library interface 
+//required for Incremental EigCG solver
 
-   typedef struct blasMagmaArgs_s {
+   class BlasMagmaArgs{
+    private:
+
       //problem sizes:
       int m;
       int nev;
@@ -47,26 +48,24 @@ extern "C" {
       cuComplex *dTau;
 
       cuComplex *lwork;
-      float          *rwork;
-      int        *iwork;
+      float     *rwork;
+      int       *iwork;
 
-   }blasMagmaArgs;
+    public:
+      BlasMagmaArgs(const int m, const int nev);
+      ~BlasMagmaArgs();
 
+      //Collection of methods for Incremental EigCG
+      int RayleighRitz(cuComplex *dTm, cuComplex *dTvecm0, cuComplex *dTvecm1,  std::complex<float> *hTvecm,  float *hTvalm);
 
-   void init_magma(blasMagmaArgs *param, const int m, const int nev);
-   void shutdown_magma(blasMagmaArgs *param);
+      void Restart_2nev_vectors(cuComplex *dVm, cuComplex *dQ, const int len);
+      
+      //this accepts host routines, and employ either CPU or GPU, depending on problem size etc.
+      void SolveProjMatrix(void* rhs, const int n, void* H, const int ldH, const int prec);
 
-   int runRayleighRitz(cuComplex *dTm, 
-                       cuComplex *dTvecm0,  
-                       cuComplex *dTvecm1, 
-                       std::complex<float> *hTvecm, 
-                       float *hTvalm, 
-                       const blasMagmaArgs *param);
+      //GPU version of the above
+      void SolveGPUProjMatrix(void* rhs, const int n, void* H, const int ldH, const int prec);
+   };
 
-   void restart_2nev_vectors(cuComplex *dVm, cuComplex *dQ, const blasMagmaArgs *param, const int len);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // _BLAS_MAGMA_H

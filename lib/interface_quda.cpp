@@ -1764,11 +1764,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 }
 
 //******************************************
-//Experimental EigCG solver, for testing only
+//Incremental EigCG solver, for testing only
 
-void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
+void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, QudaInvertParam *param);
 {
-
+/*
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
@@ -1796,13 +1796,26 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
+  if(pc_solve){
+    errorQuda("\nError: deflated solvers require even-odd preconditioning..\n");
+  }
+
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
   param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
   if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-    param->spinorGiB *= (param->inv_type == QUDA_EIGCG_INVERTER ? 5 : 7)/(double)(1<<30);
+    param->spinorGiB *= (param->inv_type == QUDA_INC_EIGCG_INVERTER ? 5 : 7)/(double)(1<<30);
   } else {
-    param->spinorGiB *= (param->inv_type == QUDA_EIGCG_INVERTER ? 8 : 9)/(double)(1<<30);
+    param->spinorGiB *= (param->inv_type == QUDA_INC_EIGCG_INVERTER ? 8 : 9)/(double)(1<<30);
+  }
+
+  // Host pointers for x, take a copy of the input host pointers
+  void** hp_x;
+  hp_x = new void* [ param->num_offset ];
+
+  void* hp_b = _hp_b;
+  for(int i=0;i < param->num_offset;i++){
+    hp_x[i] = _hp_x[i];
   }
 
   param->secs = 0;
@@ -1914,21 +1927,19 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // taken care of by Dirac::prepare() and Dirac::reconstruct(),
   // respectively.
 
-  // use EigCG (test version!)
-  // create an eigenvector set here:
+  // use incremental EigCG (test version!)
+  // first stage uses incremental eigcg algorithm for inc_num sources:
+  // create an eigenvector set:
   cudaColorSpinorField *evects = NULL;
 
-  if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev)) 
-     errorQuda("\nIncorrect eigenvector space setup...\n");
+  if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev) || param->inc_num <= 0) 
+     errorQuda("\nIncorrect eigCG setup...\n");
 
   ColorSpinorParam eigvParam(cpuParam, *param);
-  //if(param->cuda_sloppy_precision != QUDA_DOUBLE_PRECISION)//currently half precision is not supported
-      //eigvParam.setPrecision(param->cuda_prec_sloppy);
-  //else 
-      //eigvParam.setPrecision(param->cuda_prec);
+  //eigvParam.setPrecision(param->cuda_prec);
   eigvParam.setPrecision(param->cuda_prec);
   eigvParam.create   = QUDA_ZERO_FIELD_CREATE;
-  eigvParam.eigv_dim = param->nev;
+  eigvParam.eigv_dim = param->nev*param->inc_num;
   evects = new cudaColorSpinorField(eigvParam); // eigenvectors
 
   if (pc_solution && !pc_solve) {
@@ -1944,13 +1955,13 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     dirac.Mdag(*in, tmp);
   } 
 
-  if(param->inv_type == QUDA_EIGCG_INVERTER)
+  if(param->inv_type == QUDA_INC_EIGCG_INVERTER)
   {
     DiracMdagM m(dirac), mSloppy(diracSloppy);
     SolverParam solverParam(*param);
 
     DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, &eigvParam, profileInvert);
-    (*solve)(*out, *evects, *in);
+    (*solve)(out, evects, in);
     solverParam.updateInvertParam(*param);
     delete solve;
   }
@@ -1997,6 +2008,7 @@ void invertDeflatedQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   saveTuneCache(getVerbosity());
 
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
+*/
 }
 
 
