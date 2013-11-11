@@ -151,7 +151,7 @@ namespace quda {
 	// one parity but parity alternates between threads
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
-	if (X >= 2*arg.R[dim]*arg.surfaceCB[dim]*arg.order.geometry) continue;
+	if (X >= arg.R[dim]*arg.surfaceCB[dim]*arg.order.geometry) continue;
 	// X = (((d * A + a)*B + b)*C + c)*geometry + g
 	int dabc = X/arg.order.geometry;
 	int g = X - dabc*arg.order.geometry;
@@ -161,7 +161,9 @@ namespace quda {
 	int b = arg.B0[dim] + dab - da*(arg.B1[dim]-arg.B0[dim]);
 	int d = da / (arg.A1[dim]-arg.A0[dim]);
 	int a = arg.A0[dim] + da - d * (arg.A1[dim]-arg.A0[dim]);
-	d += dir*arg.X[dim] + (1-dir)*arg.R[dim];
+
+	int D0 = extract ? dir*arg.X[dim] + (1-dir)*arg.R[dim] : dir*(arg.X[dim] + arg.R[dim]); 
+	d += D0;
 
 	// we only do the extraction for parity we are currently working on
 	int oddness = (a+b+c+d) & 1;
@@ -306,51 +308,51 @@ namespace quda {
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
-    /*if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,19>(u, 0, Ghost), 
-				       dim, u.SurfaceCB(), u.X(), R, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, location);
 	} else {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,18>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,12>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), 
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,13>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,9>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       }
     } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,19>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, location);
 	} else {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,18>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,12>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) { 
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,8>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       } else if(u.Reconstruct() == QUDA_RECONSTRUCT_13){
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,13>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       } else if(u.Reconstruct() == QUDA_RECONSTRUCT_9){
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,9>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, location);
       }
-      } else */if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
+    } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
 #ifdef BUILD_QDP_INTERFACE
       extractGhostEx<Float,length>(QDPOrder<Float,length>(u, 0, Ghost),
