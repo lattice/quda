@@ -375,14 +375,16 @@ namespace quda {
       int faceVolumeCB[QUDA_MAX_DIM];
       const int volumeCB;
       const int stride;
+      const int geometry;
       const int hasPhase; 
       const size_t phaseOffset;
 
     FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
-      reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), phaseOffset(u.PhaseOffset()) {
+      reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()), 
+	hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), 
+	phaseOffset(u.PhaseOffset()) {
 	if (gauge_) { gauge[0] = gauge_; gauge[1] = (Float*)((char*)gauge_ + u.Bytes()/2);
 	} else { gauge[0] = (Float*)u.Gauge_p(); gauge[1] = (Float*)((char*)u.Gauge_p() + u.Bytes()/2);	}
-
 
 	for (int i=0; i<4; i++) {
 	  ghost[i] = ghost_ ? ghost_[i] : 0; 
@@ -393,7 +395,8 @@ namespace quda {
 
 
     FloatNOrder(const FloatNOrder &order) 
-    : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), hasPhase(order.hasPhase), phaseOffset(order.phaseOffset) {
+    : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), 
+	geometry(order.geometry), hasPhase(order.hasPhase), phaseOffset(order.phaseOffset) {
       gauge[0] = order.gauge[0];
       gauge[1] = order.gauge[1];
       for (int i=0; i<4; i++) {
@@ -460,7 +463,7 @@ namespace quda {
 
       __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
         if (!ghost[dir]) { // store in main field not separate array
-          save(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+	  // error
         } else {
           const int M = reconLen / N;
           RegType tmp[reconLen];
@@ -480,6 +483,54 @@ namespace quda {
         }
       }
 
+      __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dir, 
+						  int dim, int g, int parity, const int R[]) const {
+        if (!ghost[dir]) { // load from main field not separate array
+	  // error
+        } else {
+
+         const int M = reconLen / N;
+          RegType tmp[reconLen];
+          for (int i=0; i<M; i++) {
+            for (int j=0; j<N; j++) {
+              int intIdx = i*N + j; // internal dof index
+              int padIdx = intIdx / N;
+              copy(tmp[i*N+j], ghost[dir][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dir]*(M*N + hasPhase) 
+					  + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N]);
+            }
+          }
+          RegType phase=0.; 
+          if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) 
+					      + faceVolumeCB[dir]*M*N + x]); 
+          reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);	 
+
+	}
+      }
+
+      __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, 
+						  int dir, int dim, int g, int parity, const int R[]) {
+        if (!ghost[dir]) { // load from main field not separate array
+	  // error
+	} else {
+          const int M = reconLen / N;
+          RegType tmp[reconLen];
+          reconstruct.Pack(tmp, v, x);
+          for (int i=0; i<M; i++) {
+            for (int j=0; j<N; j++) {
+              int intIdx = i*N + j;
+              int padIdx = intIdx / N;
+              copy(ghost[dir][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dir]*(M*N + hasPhase) 
+			      + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
+            }
+          }
+          if(hasPhase){
+            RegType phase=0.;
+            reconstruct.getPhase(&phase, v); 
+            copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], 
+		 static_cast<RegType>(phase/(2.*M_PI)));
+	  }
+	}
+      }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }
     };

@@ -196,6 +196,7 @@ namespace quda {
     virtual ~cudaGaugeField();
 
     void exchangeGhost(); // exchange the ghost and store store in the padded region
+    void exchangeExtendedGhost(const int *R);
 
     void copy(const GaugeField &);     // generic gauge field copy
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
