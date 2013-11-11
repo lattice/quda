@@ -2419,7 +2419,19 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
 }
 #endif
 
+int getGaugePadding(GaugeFieldParam& param){
+  int pad = 0;
+#ifdef MULTI_GPU
+  int volume = param.x[0]*param.x[1]*param.x[2]*param.x[3];
+  int face_size[4];
+  for(int dir=0; dir<4; ++dir) face_size[dir] = (volume/param.x[dir])/2;
+  pad = *std::max_element(face_size, face_size+4);
+#endif
 
+  return pad;
+}
+
+#if 1
 int
 computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 		      void* loop_coeff, int num_paths, int max_length, double eb3,
@@ -2485,6 +2497,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamSL.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
 		    qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+
   cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParamSL);  
   qudaGaugeParam->site_ga_pad = gParamSL.pad;//need to record this value
 
@@ -2515,6 +2528,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
 
   gParamMom.precision = qudaGaugeParam->cuda_prec;
+
   cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   profileGaugeForce.Stop(QUDA_PROFILE_INIT);
@@ -2523,19 +2537,12 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
+  profileGaugeForce.Start(QUDA_PROFILE_H2D);
 #ifdef MULTI_GPU
-  profileGaugeForce.Start(QUDA_PROFILE_H2D);
   loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
-  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 #else  
-  profileGaugeForce.Start(QUDA_PROFILE_H2D);
   loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);    
-  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 #endif
-
-
-
-  profileGaugeForce.Start(QUDA_PROFILE_H2D);
   cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   profileGaugeForce.Stop(QUDA_PROFILE_H2D);
 
@@ -2573,18 +2580,142 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   return 0;  
 }
 
-int getGaugePadding(GaugeFieldParam& param){
-  int pad = 0;
+#else
+
+int
+computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
+		      void* loop_coeff, int num_paths, int max_length, double eb3,
+		      QudaGaugeParam* qudaGaugeParam, double* timeinfo)
+{
+
+#ifdef GPU_GAUGE_FORCE
+  profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
+  profileGaugeForce.Start(QUDA_PROFILE_INIT); 
+
+  GaugeFieldParam gParam(0, *qudaGaugeParam);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.pad = 0;
+
 #ifdef MULTI_GPU
-  int volume = param.x[0]*param.x[1]*param.x[2]*param.x[3];
-  int face_size[4];
-  for(int dir=0; dir<4; ++dir) face_size[dir] = (volume/param.x[dir])/2;
-  pad = *std::max_element(face_size, face_size+4);
+  GaugeFieldParam gParamEx(gParam);
+  for (int d=0; d<4; d++) gParamEx.x[d] = gParam.x[d] + 4;
 #endif
 
-  return pad;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge = siteLink;
+  cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParam);
+
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.reconstruct = qudaGaugeParam->reconstruct;
+  gParam.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
+		  qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+
+  cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParam);  
+
+  profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
+
+  profileGaugeForce.Start(QUDA_PROFILE_H2D);
+  cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);    
+  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
+
+  profileGaugeForce.Start(QUDA_PROFILE_INIT); 
+
+#ifndef MULTI_GPU
+  cudaGaugeField *cudaGauge = cudaSiteLink;
+#else
+
+  gParamEx.create = QUDA_NULL_FIELD_CREATE;
+  gParamEx.reconstruct = qudaGaugeParam->reconstruct;
+  gParamEx.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
+		    qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+
+  cudaGaugeField *cudaGauge = new cudaGaugeField(gParamEx);
+  
+  copyExtendedGauge(*cudaGauge, *cudaSiteLink, QUDA_CUDA_FIELD_LOCATION);
+  int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
+
+  profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
+  profileGaugeForce.Start(QUDA_PROFILE_COMMS);
+
+  cudaGauge->exchangeExtendedGhost(R);
+
+  profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
+  profileGaugeForce.Start(QUDA_PROFILE_INIT); 
+
+#endif
+  
+  GaugeFieldParam &gParamMom = gParam;
+  gParamMom.order = qudaGaugeParam->gauge_order;
+  // FIXME - test program always uses MILC for mom but can use QDP for gauge
+  if (gParamMom.order == QUDA_QDP_GAUGE_ORDER) gParamMom.order = QUDA_MILC_GAUGE_ORDER;
+  gParamMom.precision = qudaGaugeParam->cpu_prec;
+  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParamMom.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParamMom.gauge=mom;
+  if (gParamMom.order == QUDA_TIFR_GAUGE_ORDER) gParamMom.reconstruct = QUDA_RECONSTRUCT_NO;
+  else gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+
+  cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
+
+  gParamMom.create = QUDA_NULL_FIELD_CREATE;  
+  gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParamMom.precision = qudaGaugeParam->cuda_prec;
+
+  cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
+
+  profileGaugeForce.Stop(QUDA_PROFILE_INIT);
+
+  profileGaugeForce.Start(QUDA_PROFILE_H2D);
+  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
+
+  initLatticeConstants(*cudaMom, profileGaugeForce);
+
+  qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to set this (until we use generic order classes)
+  gauge_force_init_cuda(qudaGaugeParam, max_length); 
+
+  // actually do the computation
+  profileGaugeForce.Start(QUDA_PROFILE_COMPUTE);
+  gauge_force_cuda(*cudaMom, eb3, *cudaGauge, qudaGaugeParam, input_path_buf, 
+		   path_length, loop_coeff, num_paths, max_length);
+  profileGaugeForce.Stop(QUDA_PROFILE_COMPUTE);
+
+
+  profileGaugeForce.Start(QUDA_PROFILE_D2H);
+
+  cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  profileGaugeForce.Stop(QUDA_PROFILE_D2H);
+
+  profileGaugeForce.Start(QUDA_PROFILE_FREE);
+  delete cpuSiteLink;
+  delete cpuMom;
+  delete cudaSiteLink;
+#ifdef MULTI_GPU
+  delete cudaGauge;
+#endif
+  delete cudaMom;
+  profileGaugeForce.Stop(QUDA_PROFILE_FREE);
+
+  profileGaugeForce.Stop(QUDA_PROFILE_TOTAL);
+
+  if(timeinfo){
+    timeinfo[0] = profileGaugeForce.Last(QUDA_PROFILE_H2D);
+    timeinfo[1] = profileGaugeForce.Last(QUDA_PROFILE_COMPUTE);
+    timeinfo[2] = profileGaugeForce.Last(QUDA_PROFILE_D2H);
+  }
+
+  checkCudaError();
+#else
+  errorQuda("Gauge force has not been built");
+#endif // GPU_GAUGE_FORCE
+  return 0;  
 }
 
+#endif
 
 void createCloverQuda(QudaInvertParam* invertParam)
 {
