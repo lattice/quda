@@ -463,7 +463,7 @@ namespace quda {
 
       __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
         if (!ghost[dir]) { // store in main field not separate array
-	  // error
+	  save(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
         } else {
           const int M = reconLen / N;
           RegType tmp[reconLen];
