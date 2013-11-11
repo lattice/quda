@@ -100,6 +100,7 @@ namespace quda {
     output << "scale = " << param.scale << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
+    output << "ghostExchange = " << param.ghostExchange << std::endl;
 
     return output;  // for multiple << operators.
   }
