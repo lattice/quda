@@ -73,6 +73,7 @@ namespace quda {
   __global__ void copyGaugeExKernel(CopyGaugeExArg<OutOrder,InOrder> arg) {
     for (int parity=0; parity<2; parity++) {
       int X = blockIdx.x * blockDim.x + threadIdx.x;
+      if (X >= arg.volume/2) return;
       copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder>(arg, X, parity);
     }
   }
@@ -81,20 +82,17 @@ namespace quda {
     class CopyGaugeEx : Tunable {
     CopyGaugeExArg<OutOrder,InOrder> arg;
     QudaFieldLocation location;
-    int size;
 
   private:
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return size; }
+    unsigned int minThreads() const { return arg.volume/2; }
 
   public:
     CopyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, QudaFieldLocation location) 
-      : arg(arg), location(location) { 
-      size = arg.volume/2;
-    }
+      : arg(arg), location(location) { ; }
     virtual ~CopyGaugeEx() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -136,9 +134,9 @@ namespace quda {
 
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-  void copyGaugeEx(OutOrder outOrder, const InOrder inOrder, 
-		   const int *E, const int *X, const int *faceVolumeCB, int nDim, int geometry, 
-		   QudaFieldLocation location) {
+  void copyGaugeEx(OutOrder outOrder, const InOrder inOrder, const int *E, 
+		   const int *X, const int *faceVolumeCB, int nDim, 
+		   int geometry, QudaFieldLocation location) {
 
     CopyGaugeExArg<OutOrder,InOrder> 
       arg(outOrder, inOrder, E, X, faceVolumeCB, nDim, geometry);
@@ -207,6 +205,16 @@ namespace quda {
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
+
+    } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
+
+#ifdef BUILD_QDP_INTERFACE
+      copyGaugeEx<FloatOut,FloatIn,length>
+	(QDPOrder<FloatOut,length>(out, Out), inOrder,
+	 out.X(), X, faceVolumeCB, out.Ndim(), out.Geometry(), location);
+#else
+      errorQuda("QDP interface has not been built\n");
+#endif
 
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
 
@@ -282,6 +290,15 @@ namespace quda {
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
+
+    } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
+
+#ifdef BUILD_QDP_INTERFACE
+      copyGaugeEx<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In), 
+					   in.X(), out, location, Out);
+#else
+      errorQuda("QDP interface has not been built\n");
+#endif
 
     } else if (in.Order() == QUDA_MILC_GAUGE_ORDER) {
 
