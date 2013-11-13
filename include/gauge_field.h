@@ -142,6 +142,7 @@ namespace quda {
     QudaGaugeFixed GaugeFixed() const { return fixed; }
     QudaGaugeFieldOrder FieldOrder() const { return order; }
     QudaFieldGeometry Geometry() const { return geometry; }
+    QudaGhostExchange GhostExchange() const { return ghostExchange; }
 
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
