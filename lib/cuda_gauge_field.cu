@@ -188,48 +188,51 @@ namespace quda {
     size_t bytes[QUDA_MAX_DIM];
     // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
       bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
       send[d] = device_malloc(2 * bytes[d]);
       recv[d] = device_malloc(2 * bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
-      if (commDimPartitioned(d)) {
-	//extract into a contiguous buffer
-	extractExtendedGaugeGhost(*this, d, R, send, true);
+      if (!commDimPartitioned(d)) continue;
+      //extract into a contiguous buffer
+      extractExtendedGaugeGhost(*this, d, R, send, true);
+      cudaDeviceSynchronize();
+      
+      // do the exchange
+      MsgHandle *mh_recv_back;
+      MsgHandle *mh_recv_fwd;
+      MsgHandle *mh_send_fwd;
+      MsgHandle *mh_send_back;
 
-	// do the exchange
-	MsgHandle *mh_recv_back;
-	MsgHandle *mh_recv_fwd;
-	MsgHandle *mh_send_fwd;
-	MsgHandle *mh_send_back;
-	
-	mh_recv_back = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-	mh_recv_fwd  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
-	mh_send_back = comm_declare_send_relative(send[d], d, -1, bytes[d]);
-	mh_send_fwd  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
-	
-	comm_start(mh_recv_back);
-	comm_start(mh_recv_fwd);
-	comm_start(mh_send_fwd);
-	comm_start(mh_send_back);
-	
-	comm_wait(mh_send_fwd);
-	comm_wait(mh_send_back);
-	comm_wait(mh_recv_back);
-	comm_wait(mh_recv_fwd);
-	
-	comm_free(mh_send_fwd);
-	comm_free(mh_send_back);
-	comm_free(mh_recv_back);
-	comm_free(mh_recv_fwd);
-
-	// inject back into the gauge field
-	extractExtendedGaugeGhost(*this, d, R, recv, false);
-      }
+      // look into storing these for later
+      mh_recv_back = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
+      mh_recv_fwd  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
+      mh_send_back = comm_declare_send_relative(send[d], d, -1, bytes[d]);
+      mh_send_fwd  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
+      
+      comm_start(mh_recv_back);
+      comm_start(mh_recv_fwd);
+      comm_start(mh_send_fwd);
+      comm_start(mh_send_back);
+      
+      comm_wait(mh_send_fwd);
+      comm_wait(mh_send_back);
+      comm_wait(mh_recv_back);
+      comm_wait(mh_recv_fwd);
+      
+      comm_free(mh_send_fwd);
+      comm_free(mh_send_back);
+      comm_free(mh_recv_back);
+      comm_free(mh_recv_fwd);
+      
+      // inject back into the gauge field
+      extractExtendedGaugeGhost(*this, d, R, recv, false);
     }
 
     for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
       device_free(send[d]);
       device_free(recv[d]);
     }
@@ -246,7 +249,6 @@ namespace quda {
   }
 
   void cudaGaugeField::copy(const GaugeField &src) {
-
     checkField(src);
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
@@ -394,6 +396,8 @@ namespace quda {
     backed_up = false;
   }
 
+  void setGhostSpinor(bool value);
+
   // Return the L2 norm squared of the gauge field
   double norm2(const cudaGaugeField &a) {
 
@@ -422,8 +426,6 @@ namespace quda {
     if (a.Reconstruct() == QUDA_RECONSTRUCT_13 || a.Reconstruct() == QUDA_RECONSTRUCT_9)
       errorQuda("Unsupported field reconstruct %d", a.Reconstruct());
 
-
-
     ColorSpinorParam spinor_param;
     spinor_param.nColor = a.Reconstruct()/2;
     spinor_param.nSpin = a.Ndim();
@@ -433,11 +435,17 @@ namespace quda {
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = (QudaFieldOrder)a.FieldOrder();
+    spinor_param.fieldOrder = (a.Precision() == QUDA_DOUBLE_PRECISION || spinor_param.nSpin == 1) ? 
+    QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.Gauge_p();
+
+    // quick hack to disable ghost zone creation which otherwise breaks this mapping on multi-gpu
+    setGhostSpinor(false);
     cudaColorSpinorField b(spinor_param);
+    setGhostSpinor(true);
+
     return norm2(b);
   }
 
