@@ -485,50 +485,42 @@ namespace quda {
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dir, 
 						  int dim, int g, int parity, const int R[]) const {
-        if (!ghost[dir]) { // load from main field not separate array
-	  // error
-        } else {
-
-         const int M = reconLen / N;
-          RegType tmp[reconLen];
-          for (int i=0; i<M; i++) {
-            for (int j=0; j<N; j++) {
-              int intIdx = i*N + j; // internal dof index
-              int padIdx = intIdx / N;
-              copy(tmp[i*N+j], ghost[dir][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dir]*(M*N + hasPhase) 
-					  + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N]);
-            }
-          }
-          RegType phase=0.; 
-          if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) 
-					      + faceVolumeCB[dir]*M*N + x]); 
-          reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);	 
-
+	const int M = reconLen / N;
+	RegType tmp[reconLen];
+	for (int i=0; i<M; i++) {
+	  for (int j=0; j<N; j++) {
+	    int intIdx = i*N + j; // internal dof index
+	    int padIdx = intIdx / N;
+	    copy(tmp[i*N+j], ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase) 
+					+ (padIdx*R[dim]*faceVolumeCB[dim]+x)*N + intIdx%N]);
+	  }
 	}
+	RegType phase=0.; 
+	if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) 
+					    + R[dim]*faceVolumeCB[dim]*M*N + x]); 
+
+	// this will fail for non-18 reconstruct since it's not doing boundary checking correctly
+	reconstruct.Unpack(v, tmp, x, g, 2.*M_PI*phase); 
       }
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, 
 						  int dir, int dim, int g, int parity, const int R[]) {
-        if (!ghost[dir]) { // load from main field not separate array
-	  // error
-	} else {
-          const int M = reconLen / N;
-          RegType tmp[reconLen];
-          reconstruct.Pack(tmp, v, x);
-          for (int i=0; i<M; i++) {
-            for (int j=0; j<N; j++) {
-              int intIdx = i*N + j;
-              int padIdx = intIdx / N;
-              copy(ghost[dir][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dir]*(M*N + hasPhase) 
-			      + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
-            }
-          }
-          if(hasPhase){
-            RegType phase=0.;
-            reconstruct.getPhase(&phase, v); 
-            copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], 
-		 static_cast<RegType>(phase/(2.*M_PI)));
+	const int M = reconLen / N;
+	RegType tmp[reconLen];
+	reconstruct.Pack(tmp, v, x);
+	for (int i=0; i<M; i++) {
+	  for (int j=0; j<N; j++) {
+	    int intIdx = i*N + j;
+	    int padIdx = intIdx / N;
+	    copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase) 
+			    + (padIdx*R[dim]*faceVolumeCB[dim]+x)*N + intIdx%N], tmp[i*N+j]);
 	  }
+	}
+	if(hasPhase){
+	  RegType phase=0.;
+	  reconstruct.getPhase(&phase, v); 
+	  copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + R[dim]*faceVolumeCB[dim]*M*N + x], 
+	       static_cast<RegType>(phase/(2.*M_PI)));
 	}
       }
 
