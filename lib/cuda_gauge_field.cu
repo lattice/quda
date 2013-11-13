@@ -198,7 +198,6 @@ namespace quda {
       if (!commDimPartitioned(d)) continue;
       //extract into a contiguous buffer
       extractExtendedGaugeGhost(*this, d, R, send, true);
-      cudaDeviceSynchronize();
       
       // do the exchange
       MsgHandle *mh_recv_back;

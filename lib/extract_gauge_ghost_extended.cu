@@ -41,6 +41,7 @@ namespace quda {
 	localParity[d] = localParity_[d]; 
       }
     }
+
   };
 
   template <typename Float, int length, typename Arg>
@@ -56,7 +57,7 @@ namespace quda {
     
     // load the ghost element from the bulk
     arg.order.load(u, srcIdx, g, parity); 
-    
+
     // need dir dependence in write
     arg.order.saveGhostEx(u, dstIdx, dir, dim, g, 
 			  (parity+arg.localParity[dim])&1, arg.R);
@@ -108,10 +109,8 @@ namespace quda {
 		  // we only do the extraction for parity we are currently working on
 		  int oddness = (a+b+c+d) & 1;
 		  if (oddness == parity) {
-		    if (extract) 
-		      extractor<Float,length>(arg, dir, a, b, c, d, g, parity);
-		    else 
-		      injector<Float,length>(arg, dir, a, b, c, d, g, parity);
+		    if (extract) extractor<Float,length>(arg, dir, a, b, c, d, g, parity);
+		    else injector<Float,length>(arg, dir, a, b, c, d, g, parity);
 		  } // oddness == parity
 		} // g
 	      } // c
@@ -141,29 +140,38 @@ namespace quda {
     int dim = arg.dim;
 
     // parallelize over parity and dir using block or grid 
-    for (int parity=0; parity<2; parity++) {
+    /*for (int parity=0; parity<2; parity++) {*/
+    {
+      int parity = blockIdx.z;
 
       // the following 4-way loop means this is specialized for 4 dimensions 
       // dir = 0 backwards, dir = 1 forwards
-      for (int dir = 0; dir<2; dir++) {
-      	
+      //for (int dir = 0; dir<2; dir++) {
+      {
+	int dir = blockIdx.y;
+
 	// this will have two-warp divergence since we only do work on
 	// one parity but parity alternates between threads
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
-	if (X >= arg.R[dim]*arg.surfaceCB[dim]*arg.order.geometry) continue;
-	// X = (((d * A + a)*B + b)*C + c)*geometry + g
-	int dabc = X/arg.order.geometry;
-	int g = X - dabc*arg.order.geometry;
-	int dab = dabc/(arg.C1[dim]-arg.C0[dim]);
-	int c = arg.C0[dim] + dabc - dab*(arg.C1[dim]-arg.C0[dim]);
-	int da = dab/(arg.B1[dim]-arg.B0[dim]);
-	int b = arg.B0[dim] + dab - da*(arg.B1[dim]-arg.B0[dim]);
-	int d = da / (arg.A1[dim]-arg.A0[dim]);
-	int a = arg.A0[dim] + da - d * (arg.A1[dim]-arg.A0[dim]);
 
+	int dA = arg.A1[dim]-arg.A0[dim];
+	int dB = arg.B1[dim]-arg.B0[dim];
+	int dC = arg.C1[dim]-arg.C0[dim];
 	int D0 = extract ? dir*arg.X[dim] + (1-dir)*arg.R[dim] : dir*(arg.X[dim] + arg.R[dim]); 
-	d += D0;
+
+	if (X >= arg.R[dim]*dA*dB*dC*arg.order.geometry) return;
+
+	// thread order is optimized to maximize coalescing
+	// X = (((g*R + d) * dA + a)*dB + b)*dC + c
+	int gdab = X / dC;
+	int c    = arg.C0[dim] + X    - gdab*dC;
+	int gda  = gdab / dB;
+	int b    = arg.B0[dim] + gdab - gda *dB;
+	int gd   = gda / dA;
+	int a    = arg.A0[dim] + gda  - gd  *dA;
+	int g    = gd / arg.R[dim];
+	int d    = D0          + gd   - g   *arg.R[dim];
 
 	// we only do the extraction for parity we are currently working on
 	int oddness = (a+b+c+d) & 1;
@@ -194,7 +202,10 @@ namespace quda {
   public:
     ExtractGhostEx(ExtractGhostExArg<Order,nDim> &arg, bool extract, 
 		   QudaFieldLocation location) : arg(arg), extract(extract), location(location) { 
-      size = arg.R[arg.dim] * arg.surfaceCB[arg.dim]; 
+      int dA = arg.A1[arg.dim]-arg.A0[arg.dim];
+      int dB = arg.B1[arg.dim]-arg.B0[arg.dim];
+      int dC = arg.C1[arg.dim]-arg.C0[arg.dim];
+      size = arg.R[arg.dim]*dA*dB*dC*arg.order.geometry;
     }
     virtual ~ExtractGhostEx() { ; }
   
@@ -204,6 +215,8 @@ namespace quda {
 	  extractGhostEx<Float,length,nDim,Order,true>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	  tp.grid.y = 2;
+	  tp.grid.z = 2;
 	  extractGhostExKernel<Float,length,nDim,Order,true> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	}
@@ -212,11 +225,12 @@ namespace quda {
 	  extractGhostEx<Float,length,nDim,Order,false>(arg);
 	} else {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	  tp.grid.y = 2;
+	  tp.grid.z = 2;
 	  extractGhostExKernel<Float,length,nDim,Order,false> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	}
       }
-
     }
 
     TuneKey tuneKey() const {
@@ -296,7 +310,10 @@ namespace quda {
 				       C0, C1, fSrc, fBuf, localParity);
     ExtractGhostEx<Float,length,nDim,Order> extractor(arg, extract, location);
     extractor.apply(0);
-    if (location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (location == QUDA_CUDA_FIELD_LOCATION) {
+      cudaDeviceSynchronize(); // need to sync before we commence any communication
+      checkCudaError();
+    }
   }
 
   /** This is the template driver for extractGhost */
