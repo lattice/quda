@@ -10,7 +10,6 @@ namespace quda {
   double normCpu(const cpuColorSpinorField &b);
   double normCuda(const cudaColorSpinorField &b);
 
-
   /*ColorSpinorField::ColorSpinorField() : init(false) {
 
     }*/
@@ -39,7 +38,16 @@ namespace quda {
     destroy();
   }
 
+  static bool createSpinorGhost = true;
+  void setGhostSpinor(bool value) { createSpinorGhost = value; }
+
   void ColorSpinorField::createGhostZone() {
+
+    if (!createSpinorGhost) {
+      total_length = length;
+      total_norm_length = 2*stride;
+      return;
+    }
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
       printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
