@@ -45,7 +45,7 @@ namespace quda {
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
     }else{
       bytes = length*precision;
-      bytes = ALIGNMENT_ADJUST(bytes);
+      bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
   }
@@ -55,7 +55,6 @@ namespace quda {
   }
 
   bool GaugeField::isNative() const {
-
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION || 
@@ -70,7 +69,6 @@ namespace quda {
 	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
       }
     }
-
     return false;
   }
 
