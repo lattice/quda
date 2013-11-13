@@ -182,24 +182,30 @@ namespace quda {
     CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder, volume, faceVolumeCB, nDim, geometry);
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
-      if (type == 0) copyGauge<FloatOut, FloatIn, length>(arg);
+      if (type == 0 || type == 2) {
+	copyGauge<FloatOut, FloatIn, length>(arg);
+      }
 #ifdef MULTI_GPU // only copy the ghost zone if doing multi-gpu
-      if (geometry == QUDA_VECTOR_GEOMETRY) copyGhost<FloatOut, FloatIn, length>(arg);
-      //else warningQuda("Cannot copy for %d geometry gauge field", geometry);
+      if (type == 0 || type == 1) {
+	if (geometry == QUDA_VECTOR_GEOMETRY) copyGhost<FloatOut, FloatIn, length>(arg);
+	//else warningQuda("Cannot copy for %d geometry gauge field", geometry);
+      }
 #endif
     } else if (location == QUDA_CUDA_FIELD_LOCATION) {
       // first copy body
-      if (type == 0) {
+      if (type == 0 || type == 2) {
 	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 0> gaugeCopier(arg);
 	gaugeCopier.apply(0);
       }
 #ifdef MULTI_GPU
-      if (geometry == QUDA_VECTOR_GEOMETRY) {
-	// now copy ghost
-	CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg);
-	ghostCopier.apply(0);
-      } else {
-	//warningQuda("Cannot copy for %d geometry gauge field", geometry);
+      if (type == 0 || type == 1) {
+	if (geometry == QUDA_VECTOR_GEOMETRY) {
+	  // now copy ghost
+	  CopyGauge<FloatOut, FloatIn, length, OutOrder, InOrder, 1> ghostCopier(arg);
+	  ghostCopier.apply(0);
+	} else {
+	  //warningQuda("Cannot copy for %d geometry gauge field", geometry);
+	}
       }
 #endif
     } else {
@@ -559,6 +565,10 @@ namespace quda {
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			void *Out, void *In, void **ghostOut, void **ghostIn, int type) {
+    // do not copy the ghost zone if it does not exist
+    if (type == 0 && (in.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD || 
+		      out.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD)) type = 2;
+
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
 	copyGauge(out, in, location, (double*)Out, (double*)In, (double**)ghostOut, (double**)ghostIn, type);
