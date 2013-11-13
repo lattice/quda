@@ -368,40 +368,36 @@ gauge_force_test(void)
   qudaGaugeParam.anisotropy = 1.0;
   qudaGaugeParam.cpu_prec = link_prec;
   qudaGaugeParam.cuda_prec = link_prec;
+  qudaGaugeParam.cuda_prec_sloppy = link_prec;
   qudaGaugeParam.reconstruct = link_recon;  
-  qudaGaugeParam.type = QUDA_WILSON_LINKS; // in this context, just means these are site links   
+  qudaGaugeParam.reconstruct_sloppy = link_recon;  
+  qudaGaugeParam.type = QUDA_SU3_LINKS; // in this context, just means these are site links   
   
   qudaGaugeParam.gauge_order = gauge_order;
-  
-  int gSize = qudaGaugeParam.cpu_prec;
+  qudaGaugeParam.t_boundary = QUDA_PERIODIC_T;
+  qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  qudaGaugeParam.ga_pad = 0;
+  qudaGaugeParam.mom_ga_pad = 0;
+
+  size_t gSize = qudaGaugeParam.cpu_prec;
     
   void* sitelink;  
   void* sitelink_1d;
   
 #ifdef GPU_DIRECT
-  if (cudaMallocHost(&sitelink_1d, 4*V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
-    errorQuda("ERROR: cudaMallocHost failed for sitelink_1d\n");
-  }
+  sitelink_1d = pinned_malloc(4*V*gaugeSiteSize*gSize);
 #else
-  sitelink_1d= malloc(4*V*gaugeSiteSize*gSize);
+  sitelink_1d = safe_malloc(4*V*gaugeSiteSize*gSize);
 #endif
-  if(sitelink_1d == NULL){
-    printf("ERROR: malloc failed for sitelink_1d\n");
-    exit(1);
-  }
   
   // this is a hack to have site link generated in 2d 
   // then copied to 1d array in "MILC" format
   void* sitelink_2d[4];
-  for(int i=0;i < 4;i++){
 #ifdef GPU_DIRECT
-    if(cudaMallocHost(&sitelink_2d[i], V*gaugeSiteSize*qudaGaugeParam.cpu_prec) == cudaErrorMemoryAllocation) {
-    errorQuda("ERROR: cudaMallocHost failed for sitelink_2d\n");
-  }
+  for(int i=0;i<4;i++) sitelink_2d[i] = pinned_malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec); 
 #else
-    sitelink_2d[i] = malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
+  for(int i=0;i<4;i++) sitelink_2d[i] = safe_malloc(V*gaugeSiteSize*qudaGaugeParam.cpu_prec);
 #endif
-  }
   
   // fills the gauge field with random numbers
   createSiteLinkCPU(sitelink_2d, qudaGaugeParam.cpu_prec, 0);
@@ -422,21 +418,11 @@ gauge_force_test(void)
   }  
   
 #ifdef MULTI_GPU
-  void* sitelink_ex;
   void* sitelink_ex_2d[4];
   void* sitelink_ex_1d;
 
-  if (cudaMallocHost((void**)&sitelink_ex_1d, 4*V_ex*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
-    errorQuda("ERROR: cudaMallocHost failed for sitelink_ex_1d\n");
-  }
-  for(int i=0;i < 4;i++){
-    if (cudaMallocHost((void**)&sitelink_ex_2d[i], V_ex*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for sitelink_ex_2d\n");
-    }
-    if(sitelink_ex_2d[i] == NULL){
-      errorQuda("ERROR; allocate sitelink_ex[%d] failed\n", i);
-    }
-  }
+  sitelink_ex_1d = pinned_malloc(4*V_ex*gaugeSiteSize*gSize);
+  for(int i=0;i < 4;i++) sitelink_ex_2d[i] = pinned_malloc(V_ex*gaugeSiteSize*gSize);
 
   int X1= Z[0];
   int X2= Z[1];
@@ -492,24 +478,15 @@ gauge_force_test(void)
     }
   }
   
-  if(qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER){
-    sitelink_ex = sitelink_ex_2d;
-  }else{
-    sitelink_ex = sitelink_ex_1d;
-  }
-
 #endif
 
-  void* mom = malloc(4*V*momSiteSize*gSize);
-  void* refmom = malloc(4*V*momSiteSize*gSize);
-  if(mom == NULL || refmom == NULL){
-    printf("ERROR: malloc failed for mom/refmom\n");
-    exit(1);
-  }    
+  void* mom = safe_malloc(4*V*momSiteSize*gSize);
+  void* refmom = safe_malloc(4*V*momSiteSize*gSize);
+
   memset(mom, 0, 4*V*momSiteSize*gSize);
-  //initiaze some data in cpuMom
-  createMomCPU(mom,  qudaGaugeParam.cpu_prec);      
-  memcpy(refmom, mom, 4*V*momSiteSize*qudaGaugeParam.cpu_prec);
+  //initialize some data in cpuMom
+  createMomCPU(mom, qudaGaugeParam.cpu_prec);      
+  memcpy(refmom, mom, 4*V*momSiteSize*gSize);
   
   
   double loop_coeff_d[sizeof(loop_coeff_f)/sizeof(float)];
@@ -528,18 +505,9 @@ gauge_force_test(void)
   
   int** input_path_buf[4];
   for(int dir =0; dir < 4; dir++){
-    input_path_buf[dir] = (int**)malloc(num_paths*sizeof(int*));
-    if (input_path_buf[dir] == NULL){
-      printf("ERORR: malloc failed for input path\n");
-      exit(1);
-    }
-    
+    input_path_buf[dir] = (int**)safe_malloc(num_paths*sizeof(int*));    
     for(int i=0;i < num_paths;i++){
-      input_path_buf[dir][i] = (int*)malloc(length[i]*sizeof(int));
-      if (input_path_buf[dir][i] == NULL){
-	printf("ERROR: malloc failed for input_path_buf[dir][%d]\n", i);
-	exit(1);
-      }
+      input_path_buf[dir][i] = (int*)safe_malloc(length[i]*sizeof(int));
       if(dir == 0) memcpy(input_path_buf[dir][i], path_dir_x[i], length[i]*sizeof(int));
       else if(dir ==1) memcpy(input_path_buf[dir][i], path_dir_y[i], length[i]*sizeof(int));
       else if(dir ==2) memcpy(input_path_buf[dir][i], path_dir_z[i], length[i]*sizeof(int));
@@ -562,7 +530,7 @@ gauge_force_test(void)
 			  &qudaGaugeParam, timeinfo);
     gettimeofday(&t1, NULL);
   }
-  
+ 
   double total_time = t1.tv_sec - t0.tv_sec + 0.000001*(t1.tv_usec - t0.tv_usec);
   //The number comes from CPU implementation in MILC, gauge_force_imp.c
   int flops=153004;
@@ -599,35 +567,21 @@ gauge_force_test(void)
   printf("kernel performance: %.2f GFLOPS, overall performance : %.2f GFOPS\n", kernel_perf, perf);
   
   for(int dir = 0; dir < 4; dir++){
-    for(int i=0;i < num_paths; i++){
-      free(input_path_buf[dir][i]);
-    }
-    free(input_path_buf[dir]);
+    for(int i=0;i < num_paths; i++) host_free(input_path_buf[dir][i]);
+    host_free(input_path_buf[dir]);
   }
   
-#ifdef GPU_DIRECT  
-  cudaFreeHost(sitelink_1d);
-#else
-  free(sitelink_1d);
-#endif
-  for(int dir=0;dir < 4;dir++){
-#ifdef GPU_DIRECT
-    cudaFreeHost(sitelink_2d[dir]);
-#else
-    free(sitelink_2d[dir]);
-#endif
-  }
+  host_free(sitelink_1d);
+  for(int dir=0;dir < 4;dir++) host_free(sitelink_2d[dir]);
   
 #ifdef MULTI_GPU  
-  cudaFreeHost(sitelink_ex_1d);
-  for(int dir=0; dir < 4; dir++){
-    cudaFreeHost(sitelink_ex_2d[dir]);
-  }
+  host_free(sitelink_ex_1d);
+  for(int dir=0; dir < 4; dir++) host_free(sitelink_ex_2d[dir]);
 #endif
 
 
-  free(mom);
-  free(refmom);
+  host_free(mom);
+  host_free(refmom);
   endQuda();
   
   if (res == 0){//failed
@@ -635,7 +589,7 @@ gauge_force_test(void)
     printf("Warning: you test failed. \n");
     printf("        Did you use --verify?\n");
     printf("        Did you check the GPU health by running cuda memtest?\n");
-    }
+  }
   
   return accuracy_level;
 }            
@@ -644,16 +598,16 @@ gauge_force_test(void)
 static void
 display_test_info()
 {
-    printf("running the following test:\n");
+  printf("running the following test:\n");
     
-    printf("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order    Attempts\n");
-    printf("%s                       %s                         %d/%d/%d                       %d                  %s           %d\n",  
-	   get_prec_str(link_prec),
-	   get_recon_str(link_recon), 
-	   xdim,ydim,zdim, tdim, 
-	   get_gauge_order_str(gauge_order),
-	   attempts);
-    return ;
+  printf("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order    Attempts\n");
+  printf("%s                       %s                         %d/%d/%d                       %d                  %s           %d\n",  
+	 get_prec_str(link_prec),
+	 get_recon_str(link_recon), 
+	 xdim,ydim,zdim, tdim, 
+	 get_gauge_order_str(gauge_order),
+	 attempts);
+  return ;
     
 }
 
@@ -670,69 +624,69 @@ usage_extra(char** argv )
 int 
 main(int argc, char **argv) 
 {
-    int i;
-    for (i =1;i < argc; i++){
+  int i;
+  for (i =1;i < argc; i++){
 	
-      if(process_command_line_option(argc, argv, &i) == 0){
-	continue;
-      }
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }
 
-      if( strcmp(argv[i], "--gauge-order") == 0){
-	if(i+1 >= argc){
-	  usage(argv);
-	}
-	
-	if(strcmp(argv[i+1], "milc") == 0){
-	  gauge_order = QUDA_MILC_GAUGE_ORDER;
-	}else if(strcmp(argv[i+1], "qdp") == 0){
-	  gauge_order = QUDA_QDP_GAUGE_ORDER;
-	}else{
-	  fprintf(stderr, "Error: unsupported gauge-field order\n");
-	  exit(1);
-	}
-	i++;
-	continue;
+    if( strcmp(argv[i], "--gauge-order") == 0){
+      if(i+1 >= argc){
+	usage(argv);
       }
-      if( strcmp(argv[i], "--attempts") == 0){
-	if(i+1 >= argc){
-	  usage(argv);
-	}
 	
-	attempts = atoi(argv[i+1]);
-	if(attempts <= 0){
-	  printf("ERROR: invalid number of attempts(%d)\n", attempts);
-	}
-	i++;
-	continue;
+      if(strcmp(argv[i+1], "milc") == 0){
+	gauge_order = QUDA_MILC_GAUGE_ORDER;
+      }else if(strcmp(argv[i+1], "qdp") == 0){
+	gauge_order = QUDA_QDP_GAUGE_ORDER;
+      }else{
+	fprintf(stderr, "Error: unsupported gauge-field order\n");
+	exit(1);
       }
+      i++;
+      continue;
+    }
+    if( strcmp(argv[i], "--attempts") == 0){
+      if(i+1 >= argc){
+	usage(argv);
+      }
+	
+      attempts = atoi(argv[i+1]);
+      if(attempts <= 0){
+	printf("ERROR: invalid number of attempts(%d)\n", attempts);
+      }
+      i++;
+      continue;
+    }
      
-      if( strcmp(argv[i], "--verify") == 0){
-	verify_results=1;
-	continue;	    
-      }	
+    if( strcmp(argv[i], "--verify") == 0){
+      verify_results=1;
+      continue;	    
+    }	
       
-      fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-      usage(argv);
-    }
+    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
     
     
-    link_prec = prec;
+  link_prec = prec;
 
-    initComms(argc, argv, gridsize_from_cmdline);
+  initComms(argc, argv, gridsize_from_cmdline);
 
-    display_test_info();
+  display_test_info();
     
-    int accuracy_level = gauge_force_test();
-    printfQuda("accuracy_level=%d\n", accuracy_level);
+  int accuracy_level = gauge_force_test();
+  printfQuda("accuracy_level=%d\n", accuracy_level);
 
-    finalizeComms();
+  finalizeComms();
     
-    int ret;
-    if(accuracy_level >=3 ){
-      ret = 0; 
-    }else{
-      ret = 1; //we delclare the test failed
-    }
+  int ret;
+  if(accuracy_level >=3 ){
+    ret = 0; 
+  }else{
+    ret = 1; //we delclare the test failed
+  }
 
-    return ret;
+  return ret;
 }
