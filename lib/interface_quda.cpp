@@ -2431,13 +2431,14 @@ int getGaugePadding(GaugeFieldParam& param){
   return pad;
 }
 
-#if 1
+#if 0
 int
 computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 		      void* loop_coeff, int num_paths, int max_length, double eb3,
 		      QudaGaugeParam* qudaGaugeParam, double* timeinfo)
 {
 #ifdef GPU_GAUGE_FORCE
+
   profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
   profileGaugeForce.Start(QUDA_PROFILE_INIT); 
 
@@ -2453,11 +2454,9 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 #ifdef MULTI_GPU
   GaugeFieldParam gParam_ex(0, *qudaGaugeParam_ex);
   GaugeFieldParam& gParamSL = gParam_ex;  
-  int pad = E[2]*E[1]*E[0]/2;
 #else
   GaugeFieldParam& gParamSL = gParam;
   int* X = qudaGaugeParam->X;
-  int pad = X[2]*X[1]*X[0]/2;
 #endif
 
   gParamSL.pad = 0;
@@ -2475,11 +2474,12 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   cpuGaugeField appLink(appParam);
   
   gParamSL.order = QUDA_MILC_GAUGE_ORDER;
-  gParamSL.create = QUDA_NULL_FIELD_CREATE;
+  gParamSL.create = QUDA_ZERO_FIELD_CREATE;
   gParamSL.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParamSL);
   
   copyExtendedGauge(*cpuSiteLink, appLink, QUDA_CPU_FIELD_LOCATION);
+
   int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
 
   profileGaugeForce.Stop(QUDA_PROFILE_INIT);
@@ -2487,18 +2487,20 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   cpuSiteLink->exchangeExtendedGhost(R);
   //exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
   //			   cpuSiteLink->Order(), qudaGaugeParam->cpu_prec, 1, 4);
+
   profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
   profileGaugeForce.Start(QUDA_PROFILE_INIT);
 #endif
   
-  gParamSL.create = QUDA_NULL_FIELD_CREATE;
-  gParamSL.pad = pad;
+  gParamSL.create = QUDA_ZERO_FIELD_CREATE;
+  gParamSL.pad = 0;
   gParamSL.reconstruct = qudaGaugeParam->reconstruct;
   gParamSL.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
 		    qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
   cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParamSL);  
+
   qudaGaugeParam->site_ga_pad = gParamSL.pad;//need to record this value
 
   GaugeFieldParam &gParamMom = gParam;
@@ -2520,7 +2522,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 
   cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
 
-  gParamMom.pad = pad;
+  gParamMom.pad = 0;
   gParamMom.create = QUDA_NULL_FIELD_CREATE;  
   gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
 
@@ -2551,7 +2553,6 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   gauge_force_cuda(*cudaMom, eb3, *cudaSiteLink, qudaGaugeParam, input_path_buf, 
 		   path_length, loop_coeff, num_paths, max_length);
   profileGaugeForce.Stop(QUDA_PROFILE_COMPUTE);
-
 
   profileGaugeForce.Start(QUDA_PROFILE_D2H);
 
@@ -2592,6 +2593,8 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
   profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
   profileGaugeForce.Start(QUDA_PROFILE_INIT); 
 
+  checkGaugeParam(qudaGaugeParam);
+
   GaugeFieldParam gParam(0, *qudaGaugeParam);
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.pad = 0;
@@ -2625,11 +2628,12 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
   cudaGaugeField *cudaGauge = cudaSiteLink;
 #else
 
-  gParamEx.create = QUDA_NULL_FIELD_CREATE;
+  gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.reconstruct = qudaGaugeParam->reconstruct;
   gParamEx.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
 		    qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  qudaGaugeParam->site_ga_pad = gParamEx.pad;//need to record this value
 
   cudaGaugeField *cudaGauge = new cudaGaugeField(gParamEx);
   
@@ -2637,13 +2641,11 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
   int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
 
   profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
+
   profileGaugeForce.Start(QUDA_PROFILE_COMMS);
-
   cudaGauge->exchangeExtendedGhost(R);
-
   profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
   profileGaugeForce.Start(QUDA_PROFILE_INIT); 
-
 #endif
   
   GaugeFieldParam &gParamMom = gParam;
@@ -2675,8 +2677,10 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
 
   initLatticeConstants(*cudaMom, profileGaugeForce);
 
-  qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to set this (until we use generic order classes)
+  profileGaugeForce.Start(QUDA_PROFILE_CONSTANT);
+  qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to set this (until we use order classes)
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
+  profileGaugeForce.Stop(QUDA_PROFILE_CONSTANT);
 
   // actually do the computation
   profileGaugeForce.Start(QUDA_PROFILE_COMPUTE);
@@ -2684,9 +2688,7 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
 		   path_length, loop_coeff, num_paths, max_length);
   profileGaugeForce.Stop(QUDA_PROFILE_COMPUTE);
 
-
   profileGaugeForce.Start(QUDA_PROFILE_D2H);
-
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   profileGaugeForce.Stop(QUDA_PROFILE_D2H);
 
