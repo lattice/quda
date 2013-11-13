@@ -137,48 +137,49 @@ namespace quda {
     size_t bytes[QUDA_MAX_DIM];
     // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
       bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
       send[d] = safe_malloc(2 * bytes[d]);
       recv[d] = safe_malloc(2 * bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
-      if (commDimPartitioned(d)) {
-	//extract into a contiguous buffer
-	extractExtendedGaugeGhost(*this, d, R, send, true);
-
-	// do the exchange
-	MsgHandle *mh_recv_back;
-	MsgHandle *mh_recv_fwd;
-	MsgHandle *mh_send_fwd;
-	MsgHandle *mh_send_back;
-	
-	mh_recv_back = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-	mh_recv_fwd  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
-	mh_send_back = comm_declare_send_relative(send[d], d, -1, bytes[d]);
-	mh_send_fwd  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
-	
-	comm_start(mh_recv_back);
-	comm_start(mh_recv_fwd);
-	comm_start(mh_send_fwd);
-	comm_start(mh_send_back);
-	
-	comm_wait(mh_send_fwd);
-	comm_wait(mh_send_back);
-	comm_wait(mh_recv_back);
-	comm_wait(mh_recv_fwd);
-	
-	comm_free(mh_send_fwd);
-	comm_free(mh_send_back);
-	comm_free(mh_recv_back);
-	comm_free(mh_recv_fwd);
-
-	// inject back into the gauge field
-	extractExtendedGaugeGhost(*this, d, R, recv, false);
-      }
+      if (!commDimPartitioned(d)) continue;
+      //extract into a contiguous buffer
+      extractExtendedGaugeGhost(*this, d, R, send, true);
+      
+      // do the exchange
+      MsgHandle *mh_recv_back;
+      MsgHandle *mh_recv_fwd;
+      MsgHandle *mh_send_fwd;
+      MsgHandle *mh_send_back;
+      
+      mh_recv_back = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
+      mh_recv_fwd  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
+      mh_send_back = comm_declare_send_relative(send[d], d, -1, bytes[d]);
+      mh_send_fwd  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
+      
+      comm_start(mh_recv_back);
+      comm_start(mh_recv_fwd);
+      comm_start(mh_send_fwd);
+      comm_start(mh_send_back);
+      
+      comm_wait(mh_send_fwd);
+      comm_wait(mh_send_back);
+      comm_wait(mh_recv_back);
+      comm_wait(mh_recv_fwd);
+      
+      comm_free(mh_send_fwd);
+      comm_free(mh_send_back);
+      comm_free(mh_recv_back);
+      comm_free(mh_recv_fwd);
+      
+      // inject back into the gauge field
+      extractExtendedGaugeGhost(*this, d, R, recv, false);
     }
 
     for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
       host_free(send[d]);
       host_free(recv[d]);
     }
