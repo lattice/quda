@@ -332,27 +332,27 @@ namespace quda {
 
   // Put into clover order 
   // Upper-left block (chirality index 0)
-  //     /                                                                              \
-  //     |  1 - c*(F[0,1] - F[2,3]) ,     -c*(F[1,2] - F[0,3]) + c*I*(F[0,2] + F[1,3])   |
-  //     |                                                                              |
-  //     |  -c*(F[1,2] - F[0,3]) - c*I*(F[0,2] + F[1,3]),   1 + c*(F[0,1] - F[2,3])      |
-  //     |                                                                              |
-  //     \                                                                              / 
+  //     /                                                                                \
+  //     |  1 + c*I*(F[0,1] - F[2,3]) ,     c*I*(F[1,2] - F[0,3]) + c*(F[0,2] + F[1,3])   |
+  //     |                                                                                |
+  //     |  c*I*(F[1,2] - F[0,3]) - c*(F[0,2] + F[1,3]),   1 - c*I*(F[0,1] - F[2,3])      |
+  //     |                                                                                |
+  //     \                                                                                / 
 
   //     /
-  //     | 1 - c*(F[0] - F[5]),   -c*(F[2] - F[3]) + c*I*(F[1] + F[4])  
+  //     | 1 - c*I*(F[0] - F[5]),   -c*I*(F[2] - F[3]) - c*(F[1] + F[4])  
   //     |
-  //     |  -c*(F[2] -F[3]) - c*I*(F[1] + F[4]),   1 + c*(F[0] - F[5])  
+  //     |  -c*I*(F[2] -F[3]) + c*(F[1] + F[4]),   1 + c*I*(F[0] - F[5])  
   //     |
   //     \
   // 
   // Lower-right block (chirality index 1)
   //
-  //     /                                                               \
-  //     |  1 - c*(F[0] + F[5]),  -c*(F[2] + F[3]) + c*I*(F[1] - F[4])    |
-  //     |                                                               |
-  //     |    -c*(F[2]+F[3]) - c*I*(F[1]-F[4]),     1+ c*(F[0] + F[5])    |
-  //     \                                                               / 
+  //     /                                                                  \
+  //     |  1 - c*I*(F[0] + F[5]),  -c*I*(F[2] + F[3]) - c*(F[1] - F[4])    |
+  //     |                                                                  |
+  //     |  -c*I*(F[2]+F[3]) + c*(F[1]-F[4]),     1 + c*I*(F[0] + F[5])     |
+  //     \                                                                  / 
   //
 
   // Core routine for constructing clover term from field strength
@@ -379,10 +379,10 @@ namespace quda {
       Cmplx I; I.x = 0; I.y = 1.;
       Matrix<Cmplx,3> block1[2];
       Matrix<Cmplx,3> block2[2];
-      block1[0] =  cloverCoeff*(F[0]-F[5]);
-      block1[1] =  cloverCoeff*(F[0]+F[5]);
-      block2[0] = -cloverCoeff*(F[2]-F[3]) - cloverCoeff*I*(F[1]+F[4]);
-      block2[1] = -cloverCoeff*(F[2]+F[3]) - cloverCoeff*I*(F[1]-F[4]);
+      block1[0] =  cloverCoeff*I*(F[0]-F[5]);
+      block1[1] =  cloverCoeff*I*(F[0]+F[5]);
+      block2[0] = -cloverCoeff*I*(F[2]-F[3]) + cloverCoeff*(F[1]+F[4]);
+      block2[1] = -cloverCoeff*I*(F[2]+F[3]) + cloverCoeff*(F[1]-F[4]);
 
 
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
