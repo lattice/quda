@@ -429,7 +429,7 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, QudaInvertParam *param);
+  void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaInvertParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).

@@ -1766,9 +1766,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 //******************************************
 //Incremental EigCG solver, for testing only
 
-void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, QudaInvertParam *param);
+void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaInvertParam *param)
 {
-/*
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
@@ -1796,26 +1795,13 @@ void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, Qud
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
-  if(pc_solve){
-    errorQuda("\nError: deflated solvers require even-odd preconditioning..\n");
-  }
-
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
   param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
   if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-    param->spinorGiB *= (param->inv_type == QUDA_INC_EIGCG_INVERTER ? 5 : 7)/(double)(1<<30);
+    param->spinorGiB *= (param->inv_type == QUDA_EIGCG_INVERTER ? 5 : 7)/(double)(1<<30);
   } else {
-    param->spinorGiB *= (param->inv_type == QUDA_INC_EIGCG_INVERTER ? 8 : 9)/(double)(1<<30);
-  }
-
-  // Host pointers for x, take a copy of the input host pointers
-  void** hp_x;
-  hp_x = new void* [ param->num_offset ];
-
-  void* hp_b = _hp_b;
-  for(int i=0;i < param->num_offset;i++){
-    hp_x[i] = _hp_x[i];
+    param->spinorGiB *= (param->inv_type == QUDA_EIGCG_INVERTER ? 8 : 9)/(double)(1<<30);
   }
 
   param->secs = 0;
@@ -1831,7 +1817,7 @@ void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, Qud
 
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
-  Dirac &diracPre = *dPre;
+  Dirac &diracDeflate = *d;
 
   profileInvert.Start(QUDA_PROFILE_H2D);
 
@@ -1843,12 +1829,12 @@ void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, Qud
   const int *X = cudaGauge->X();
 
   // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
+  ColorSpinorParam cpuParam(_h_b, *param, X, pc_solution);
   ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
     static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
 
-  cpuParam.v = hp_x;
+  cpuParam.v = _h_x;
   ColorSpinorField *h_x = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
     static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
     static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
@@ -1907,40 +1893,10 @@ void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, Qud
     printfQuda("Prepared source post mass rescale = %g\n", nin);   
   }
 
-  // solution_type specifies *what* system is to be solved.
-  // solve_type specifies *how* the system is to be solved.
-  //
-  // We have the following four cases (plus preconditioned variants):
-  //
-  // solution_type    solve_type    Effect
-  // -------------    ----------    ------
-  // MAT              DIRECT        Solve Ax=b
-  // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
-  // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
-  // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
-  //
-  // We generally require that the solution_type and solve_type
-  // preconditioning match.  As an exception, the unpreconditioned MAT
-  // solution_type may be used with any solve_type, including
-  // DIRECT_PC and NORMOP_PC.  In these cases, preparation of the
-  // preconditioned source and reconstruction of the full solution are
-  // taken care of by Dirac::prepare() and Dirac::reconstruct(),
-  // respectively.
+  //max_vect_size -> eigv_search_dim ?
 
-  // use incremental EigCG (test version!)
-  // first stage uses incremental eigcg algorithm for inc_num sources:
-  // create an eigenvector set:
-  cudaColorSpinorField *evects = NULL;
-
-  if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev) || param->inc_num <= 0) 
-     errorQuda("\nIncorrect eigCG setup...\n");
-
-  ColorSpinorParam eigvParam(cpuParam, *param);
-  //eigvParam.setPrecision(param->cuda_prec);
-  eigvParam.setPrecision(param->cuda_prec);
-  eigvParam.create   = QUDA_ZERO_FIELD_CREATE;
-  eigvParam.eigv_dim = param->nev*param->inc_num;
-  evects = new cudaColorSpinorField(eigvParam); // eigenvectors
+  if (param->max_vect_size == 0 || param->nev == 0 || (param->max_vect_size < param->nev)) 
+     errorQuda("\nIncorrect eigenvector space setup...\n");
 
   if (pc_solution && !pc_solve) {
     errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
@@ -1955,15 +1911,48 @@ void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, Qud
     dirac.Mdag(*in, tmp);
   } 
 
-  if(param->inv_type == QUDA_INC_EIGCG_INVERTER)
+  if(param->inv_type == QUDA_INC_EIGCG_INVERTER || param->inv_type == QUDA_EIGCG_INVERTER)
   {
-    DiracMdagM m(dirac), mSloppy(diracSloppy);
+    // create an eigenvector set here:
+    cudaColorSpinorField *ritzvects = NULL;
+
+    //temporal trick, create host spinor corresponding eigenvector window:
+
+    ColorSpinorParam cpuEigvParam(_h_u, *param, X, true); //Eigenvector set is always a parity spinor.
+    cpuEigvParam.eigv_dim    = param->nev*(param->rhs_idx+1);
+    cpuColorSpinorField *h_u = new cpuColorSpinorField(cpuEigvParam);
+
+    ColorSpinorParam cudaEigvParam(cpuEigvParam, *param);
+    cudaEigvParam.setPrecision(param->cuda_prec);//the same as for full precision iterations
+    cudaEigvParam.create   = QUDA_COPY_FIELD_CREATE;
+    cudaEigvParam.eigv_dim = param->nev*(param->rhs_idx+1);
+
+    ritzvects = new cudaColorSpinorField(*h_u, cudaEigvParam);//check!
+
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mDeflate(diracDeflate);
     SolverParam solverParam(*param);
 
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, &eigvParam, profileInvert);
-    (*solve)(out, evects, in);
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, &cudaEigvParam, profileInvert);
+
+    ProjectionMatrix *projMat = new ProjectionMatrix(mDeflate, solverParam);
+
+    projMat->LoadProj(_h_p);
+
+    (*solve)(out, in, ritzvects, projMat);
     solverParam.updateInvertParam(*param);
     delete solve;
+
+    if(param->rhs_idx < param->deflation_grid || param->inv_type == QUDA_EIGCG_INVERTER)
+    {
+      //copy projection matrix and Ritz vectors to the host.
+      projMat->SaveProj(_h_p);
+      //const int offset = param->nev*param->rhs_idx;
+      //h_u->GetEigenvecSubset(param->nev, offset) = ritzvects->GetEigenvecSubset(param->nev, offset);
+      *h_u = *ritzvects;
+    }
+    delete h_u;
+    delete ritzvects;
+    delete projMat;
   }
   else
   {
@@ -1996,8 +1985,6 @@ void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, Qud
   delete b;
   delete x;
 
-  delete evects;
-
   delete d;
   delete dSloppy;
   delete dPre;
@@ -2008,7 +1995,6 @@ void invertIncDeflatedQuda(void **_h_x, void **_h_b, void *_h_u, void *_h_p, Qud
   saveTuneCache(getVerbosity());
 
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
-*/
 }
 
 

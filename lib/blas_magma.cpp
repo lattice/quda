@@ -144,21 +144,21 @@ void BlasMagmaArgs::SolveProjMatrix(void* rhs, const int n, void* H, const int l
 {
 #ifdef MAGMA_LIB
        void *tmp; 
-       magma_int *ipiv;
-       magma_int err;//??
+       magma_int_t *ipiv;
+       magma_int_t err;//??
 
-       magma_malloc_pinned(tmp, ldH*n*(2*prec));
-       magma_malloc_pinned(ipiv, n*sizeof(magma_int));
+       magma_malloc_pinned((void**)&tmp, ldH*n*(2*prec));
+       magma_malloc_pinned((void**)&ipiv, n*sizeof(magma_int_t));
 
        if(prec == sizeof(double))
        {
-          magma_zcopymatrix(n, n, (magmaDoubleComplex*)tmp, ldH, (magmaDoubleComplex*)H, ldm);
+          magma_zcopymatrix(n, n, (magmaDoubleComplex*)tmp, ldH, (magmaDoubleComplex*)H, ldH);
           err = magma_zgesv(n, 1, (magmaDoubleComplex*)tmp, ldH, ipiv, (magmaDoubleComplex*)rhs, n, &info);
           if(err != 0) printf("\nError in magma_zgesv, exit ...\n"), exit(-1);
        }
        else if (prec == sizeof(float))
        {
-          magma_ccopymatrix(n, n, (magmaFloatComplex*)tmp, ldH, (magmaFloatComplex*)H, ldm);
+          magma_ccopymatrix(n, n, (magmaFloatComplex*)tmp, ldH, (magmaFloatComplex*)H, ldH);
           err = magma_cgesv(n, 1, (magmaFloatComplex*)tmp, ldH, ipiv, (magmaFloatComplex*)rhs, n, &info);
           if(err != 0) printf("\nError in magma_cgesv, exit ...\n"), exit(-1);
        }

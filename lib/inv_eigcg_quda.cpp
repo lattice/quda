@@ -26,7 +26,7 @@ WARNING: for coalescing m must be multiple of 16, use pad for other choises
 
 namespace quda {
 
-  ProjectionMatrix::ProjectionMatrix(DiracMatrix &mat, SolverParam &param) : mat(mat), prev_dim(0)
+  ProjectionMatrix::ProjectionMatrix(DiracMatrix &matDefl, SolverParam &param) : matDefl(matDefl), prev_dim(0)
   { 
      if(param.nev == 0 || param.deflation_grid < param.nev) errorQuda("\nIncorrect deflation space parameters...\n");
 
@@ -59,7 +59,7 @@ namespace quda {
      return;
   }
 
-  void ProjectionMatrix::ConstructProj(cudaColorSpinorField *u)
+  void ProjectionMatrix::ConstructProj(cudaColorSpinorField &u)
   {
      return;
   }
@@ -98,10 +98,10 @@ namespace quda {
 
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, ColorSpinorParam *eigvParam, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), Vm(0), hTm(0), hTvecm(0), hTvalm(0), dTm(0), dTvecm0(0), dTvecm1(0), initCG(0), initCGparam(param)
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), initCG(0), initCGparam(param), Vm(0), hTm(0), hTvecm(0), hTvalm(0), dTm(0), dTvecm0(0), dTvecm1(0)
   {
 
-    if(param.rhs_idx < param.deflated_grid)
+    if(param.rhs_idx < param.deflation_grid)
     {
        printfQuda("\nAllocating resources for the EigCG solver.\n");
        if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or search space is too small..)\n");
@@ -135,6 +135,7 @@ namespace quda {
        eigcg_alloc = false;
     }
     fillInitCGSolveParam(initCGparam);
+    initCG = new CG(mat, matSloppy, initCGparam, profile);
   }
 
   IncEigCG::~IncEigCG() {
@@ -150,6 +151,7 @@ namespace quda {
       cudaFree(dTvecm0);
       cudaFree(dTvecm1);
     }
+    delete initCG;
 
   }
 
@@ -321,7 +323,7 @@ namespace quda {
          int _2nev = magma_args->RayleighRitz((cuComplex*)dTm, (cuComplex*)dTvecm0, (cuComplex*)dTvecm1, hTvecm, hTvalm);
 
          //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
-         magma_args->Restart_2nev_vectors((cuComplex*)Vm->V(), (cuComplex*)dTm, &magma_args, Vm->EigvLength());//m->ldTm
+         magma_args->Restart_2nev_vectors((cuComplex*)Vm->V(), (cuComplex*)dTm, Vm->EigvLength());//m->ldTm
            
          //Fill-up diagonal elements of the matrix T
          memset(hTm, 0, ldTm*m*sizeof(std::complex<float>));
@@ -475,7 +477,7 @@ namespace quda {
     return;
   }
 
-  void IncEigCG::DeflateInitGuess(cudaColorSpinorField &in, const cudaColorSpinorField &u, const ProjectionMatrix &pM);
+  void IncEigCG::DeflateInitGuess(cudaColorSpinorField &in, const cudaColorSpinorField &u, const ProjectionMatrix &pM)
   {
     //using magma gesv routine:
     return;
@@ -494,10 +496,10 @@ namespace quda {
      if((param.rhs_idx == 0) || (param.inv_type == QUDA_EIGCG_INVERTER))
      {
         //compute the first nev Ritz vectors:
-        EigCG(*x, *b, u->GetEigenvecSubset(param.nev));
+        EigCG(*out, *in, u->GetEigenvecSubset(param.nev));
 
         //Construct projection matrix:
-        pM->constructProj(u->GetEigenvecSubset(param.nev));
+        pM->ConstructProj(u->GetEigenvecSubset(param.nev));
 
         //finish for this first rhs:
         param.rhs_idx++;
@@ -512,13 +514,13 @@ namespace quda {
         DeflateInitGuess(*in, u->GetEigenvecSubset(w_range), *pM);
 
         //compute current nev Ritz vectors:
-        EigCG(*x, *b, u->GetEigenvecSubset(param.nev, offset));
+        EigCG(*out, *in, u->GetEigenvecSubset(param.nev, offset));
         
         //orthogonalize new nev vectors against old vectors 
         OrthRitz(u->GetEigenvecSubset(w_range));
 
         //Construct(extend) projection matrix:
-        pM->constructProj(u->GetEigenvecSubset(w_range));
+        pM->ConstructProj(u->GetEigenvecSubset(w_range));
 
         //finish for this first rhs:
         param.rhs_idx++;
@@ -545,13 +547,8 @@ namespace quda {
 
         DeflateInitGuess(*in, u->GetEigenvecSubset(range), *pM);
 
-        initCG = new CG(mat, matSloppy, initCGparam, param.profile);
-
         //launch initCG:
-        initCG(*in, *out);
-
-        //clean initCG:
-        delete initCG;
+        (*initCG)(*in, *out);
 
         param.rhs_idx++;
      } 

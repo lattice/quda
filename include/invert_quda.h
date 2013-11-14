@@ -67,7 +67,7 @@ namespace quda {
     QudaPrecision precision_sloppy;
 
     /**< The precision used by the QUDA preconditioner */
-    QudaPrecision precision_precondition;
+    QudaPrecision precision_precondition;//also deflation space vectors precision
 
     /**< Preserve the source or not in the linear solver (deprecated?) */    
     QudaPreserveSource preserve_source;       
@@ -355,6 +355,55 @@ namespace quda {
 		    cudaColorSpinorField **q, int N);
   };
 
+//for future : replace by IncEigCGargs.
+  class ProjectionMatrix {
+
+  private:
+    //
+    const DiracMatrix &matDefl;
+
+    //device projection matrix:
+    void *dproj; //VH A V
+
+    //host projection matrix(used for small dimensions):
+    void *hproj; //VH A V
+ 
+    QudaPrecision prec;     //precision must match Ritz vectors precision
+    int ld;                 //projection matrix leading dimension
+    int tot_dim;            //full dimension (nev*deflation_grid)
+    int curr_dim;           //current dimension (must match rhs_idx: dim = (rhs_idx < deflation_grid) ? nev * rhs_idx) 
+    int prev_dim;
+    int bytes;
+
+  public:
+    ProjectionMatrix(DiracMatrix &matDefl, SolverParam &param);
+    virtual ~ProjectionMatrix();
+
+    //Solve dH y = u^{dagger}r: (y has precision of dH)
+    //For small dim: use CPU
+    //For big dim: use GPU (e.g., dim > 128)
+    //output: complex vector y
+    void operator()(void *out, cudaColorSpinorField *r, cudaColorSpinorField *u);
+
+    //Compute H=U^{dag}MU (also computes block of H-matrix):
+    //void computeProj(cudaColorSpinorField *u);
+
+    //extend projection matrix:
+    //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
+    //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
+    //extend H-matrix with the components
+    void ConstructProj(cudaColorSpinorField &u); 
+
+    //reset current dimention:
+    void ResetProjMatDim(const int n);    
+
+    //copy from the host:
+    void LoadProj(void *out);
+
+    //copy to the host:
+    void SaveProj(void *out);
+  };
+
 //experimantal EigCG solver
   class DeflatedSolver {
 
@@ -367,7 +416,7 @@ namespace quda {
     param(param), profile(profile) { ; }
     virtual ~DeflatedSolver() { ; }
 
-    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *eigvset, cudaColorSpinorField *in) = 0;
+    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in, cudaColorSpinorField *u,  ProjectionMatrix *pM) = 0;
 
     // solver factory
     static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
@@ -400,55 +449,6 @@ but we pinned it currently to the single precision because half precision is cur
 included into the framework, though.
 */
 
-//for future : replace by IncEigCGargs.
-  class ProjectionMatrix {
-
-  private:
-    //
-    const DiracMatrix &mat;
-
-    //device projection matrix:
-    void *dproj; //VH A V
-
-    //host projection matrix(used for small dimensions):
-    void *hproj; //VH A V
- 
-    QudaPrecision prec;     //precision must match DiracMatrix precision and Ritz vectors precision
-    int ld;                 //projection matrix leading dimension
-    int tot_dim;            //full dimension (nev*deflation_grid)
-    int curr_dim;           //current dimension (must match rhs_idx: dim = (rhs_idx < deflation_grid) ? nev * rhs_idx) 
-    int prev_dim;
-    int bytes;
-
-  public:
-    ProjectionMatrix(DiracMatrix &mat, SolverParam &param);
-    virtual ~ProjectionMatrix();
-
-    //Solve dH y = u^{dagger}r: (y has precision of dH)
-    //For small dim: use CPU
-    //For big dim: use GPU (e.g., dim > 128)
-    //output: complex vector y
-    void operator()(void *out, cudaColorSpinorField *r, cudaColorSpinorField *u);
-
-    //Compute H=U^{dag}MU (also computes block of H-matrix):
-    //void computeProj(cudaColorSpinorField *u);
-
-    //extend projection matrix:
-    //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
-    //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
-    //extend H-matrix with the components
-    void ConstructProj(cudaColorSpinorField *u); 
-
-    //reset current dimention:
-    void ResetProjMatDim(const int n);    
-
-    //copy from the host:
-    void LoadProj(void *out);
-
-    //copy to the host:
-    void SaveProj(void *out);
-  };
-
   class IncEigCG : public DeflatedSolver {
 
   private:
@@ -479,7 +479,7 @@ included into the framework, though.
 
     void EigCG(cudaColorSpinorField &out, cudaColorSpinorField &nev_eigvecs, cudaColorSpinorField &in);
 
-    void DeflateInitGuess(cudaColorSpinorField &in, const cudaColorSpinorField &u, const ProjectionMatrix *pM);
+    void DeflateInitGuess(cudaColorSpinorField &in, const cudaColorSpinorField &u, const ProjectionMatrix &pM);
 
     void OrthRitz(cudaColorSpinorField &u);
 
