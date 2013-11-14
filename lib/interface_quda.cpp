@@ -2169,10 +2169,12 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
 
 #endif
 
+
+
 void updateGaugeFieldQuda(void* gauge, 
-    void* momentum, 
-    double dt, 
-    QudaGaugeParam* param)
+			  void* momentum, 
+			  double dt, 
+			  QudaGaugeParam* param)
 {
   profileGaugeUpdate.Start(QUDA_PROFILE_TOTAL);
 
@@ -2187,20 +2189,28 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.gauge = gauge;
-  cpuGaugeField cpuGauge(gParam);
+  //gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
 
-  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+
   gParam.gauge = momentum;
-  cpuGaugeField cpuMom(gParam);
+
+  cpuGaugeField *cpuMom = new cpuGaugeField(gParam);
 
   // create the device fields 
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.reconstruct = QUDA_RECONSTRUCT_10;
+
   cudaGaugeField cudaMom(gParam);
 
+  gParam.pad = param->ga_pad;
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = param->reconstruct;
+
   cudaGaugeField cudaInGauge(gParam);
   cudaGaugeField cudaOutGauge(gParam);
 
@@ -2208,10 +2218,10 @@ void updateGaugeFieldQuda(void* gauge,
 
   // load fields onto the device
   profileGaugeUpdate.Start(QUDA_PROFILE_H2D);
-  cudaMom.loadCPUField(cpuMom, QUDA_CPU_FIELD_LOCATION);
-  cudaInGauge.loadCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaMom.loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  cudaInGauge.loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
   profileGaugeUpdate.Stop(QUDA_PROFILE_H2D);
-
+  
   // perform the update
   profileGaugeUpdate.Start(QUDA_PROFILE_COMPUTE);
   updateGaugeField(cudaOutGauge, dt, cudaInGauge, cudaMom);
@@ -2219,14 +2229,18 @@ void updateGaugeFieldQuda(void* gauge,
 
   // copy the gauge field back to the host
   profileGaugeUpdate.Start(QUDA_PROFILE_D2H);
-  cudaOutGauge.saveCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  cudaOutGauge.saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
   profileGaugeUpdate.Stop(QUDA_PROFILE_D2H);
 
   profileGaugeUpdate.Stop(QUDA_PROFILE_TOTAL);
 
+  delete cpuMom;
+  delete cpuGauge;
+
   checkCudaError();
   return;
 }
+
 
 
 

@@ -188,7 +188,9 @@ namespace quda {
     if (location == QUDA_CPU_FIELD_LOCATION) {
       if (type == 0) copyGauge<FloatOut, FloatIn, length, 4>(arg);
 #ifdef MULTI_GPU // only copy the ghost zone if doing multi-gpu
+    if(arg.in.ghostInit && arg.out.ghostInit){
       copyGhost<FloatOut, FloatIn, length, 4>(arg);
+    }
 #endif
     } else if (location == QUDA_CUDA_FIELD_LOCATION) {
       // first copy body
@@ -198,8 +200,10 @@ namespace quda {
       }
 #ifdef MULTI_GPU
       // now copy ghost
-      CopyGauge<FloatOut, FloatIn, length, 4, OutOrder, InOrder, 1> ghostCopier(arg);
-      ghostCopier.apply(0);
+      if(arg.in.ghostInit && arg.out.ghostInit){
+        CopyGauge<FloatOut, FloatIn, length, 4, OutOrder, InOrder, 1> ghostCopier(arg);
+        ghostCopier.apply(0);
+      }
 #endif
     } else {
       errorQuda("Undefined field location %d for copyGauge", location);

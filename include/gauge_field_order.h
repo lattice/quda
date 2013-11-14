@@ -333,13 +333,14 @@ namespace quda {
       int faceVolumeCB[QUDA_MAX_DIM];
       const int volumeCB;
       const int stride;
+      const bool ghostInit;
 #if __COMPUTE_CAPABILITY__ >= 200
       const int hasPhase; 
       const size_t phaseOffset;
 #endif
 
       FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
-      : reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride())
+      : reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), ghostInit((u.GhostInit()))
 #if __COMPUTE_CAPABILITY__ >= 200
 	, hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || 
 		  u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), 
@@ -356,7 +357,7 @@ namespace quda {
         }
 
       FloatNOrder(const FloatNOrder &order) 
-        : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride)
+        : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), ghostInit(order.ghostInit)
 #if __COMPUTE_CAPABILITY__ >= 200
 	  , hasPhase(order.hasPhase), phaseOffset(order.phaseOffset)
 #endif
@@ -478,14 +479,15 @@ struct LegacyOrder {
   int faceVolumeCB[QUDA_MAX_DIM];
   const int volumeCB;
   const int stride;
+  const bool ghostInit;
   const int hasPhase;
-  LegacyOrder(const GaugeField &u, Float **ghost_) : volumeCB(u.VolumeCB()), stride(u.Stride()), hasPhase(0) {
+  LegacyOrder(const GaugeField &u, Float **ghost_) : volumeCB(u.VolumeCB()), stride(u.Stride()), ghostInit(u.GhostInit()), hasPhase(0) {
     for (int i=0; i<4; i++) {
       ghost[i] = (ghost_) ? ghost_[i] : (Float*)(u.Ghost()[i]);
       faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth
     }
   }
-  LegacyOrder(const LegacyOrder &order) : volumeCB(order.volumeCB), stride(order.stride), hasPhase(0) {
+  LegacyOrder(const LegacyOrder &order) : volumeCB(order.volumeCB), stride(order.stride), ghostInit(order.ghostInit), hasPhase(0) {
     for (int i=0; i<4; i++) {
       ghost[i] = order.ghost[i];
       faceVolumeCB[i] = order.faceVolumeCB[i];

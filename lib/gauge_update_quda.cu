@@ -141,7 +141,7 @@ namespace quda {
   void updateGaugeField(Gauge &out, const Gauge &in, const Mom &mom, 
 			double dt, const int *X, QudaFieldLocation location) {
     // degree of exponential expansion
-    const int N = 6;
+    const int N = 8;
 
     typedef typename ComplexTypeId<Float>::Type Complex;
     UpdateGaugeArg<Complex, Gauge, Mom> arg(out, in, mom, dt, 4);
