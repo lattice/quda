@@ -115,7 +115,7 @@ namespace quda {
             Ftmp = Ftmp * conj(U4);
 
             // sum this contribution to Fmunu
-            F += Ftmp + conj(Ftmp);
+            F += Ftmp - conj(Ftmp);
           }
 
           { // positive mu, negative nu
@@ -157,7 +157,7 @@ namespace quda {
             Ftmp = Ftmp * U4;
 
             // sum this contribution to Fmunu
-            F += Ftmp + conj(Ftmp);
+            F += Ftmp - conj(Ftmp);
           }
 
 
@@ -200,7 +200,7 @@ namespace quda {
             Ftmp = Ftmp * conj(U4);
 
             // sum this contribution to Fmunu
-            F += Ftmp + conj(Ftmp);
+            F += Ftmp - conj(Ftmp);
           }
 
           { // negative mu, negative nu
@@ -246,7 +246,7 @@ namespace quda {
             Ftmp = Ftmp * U4;
 
             // sum this contribution to Fmunu
-            F += Ftmp + conj(Ftmp);
+            F += Ftmp - conj(Ftmp);
           }
 
           Cmplx* thisFmunu = arg.Fmunu + parity*arg.FmunuOffset;
