@@ -78,9 +78,8 @@ namespace quda {
       for (int mu=0; mu<4; mu++) {
         for (int nu=0; nu<mu; nu++) {
           Matrix<Cmplx,3> F;
-          setZero(&F);
 
-          { // positive mu, nu
+          { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
 
             // load U(x)_(+mu)
             Matrix<Cmplx,3> U1;
@@ -115,95 +114,99 @@ namespace quda {
             Ftmp = Ftmp * conj(U4);
 
             // sum this contribution to Fmunu
-            F += Ftmp - conj(Ftmp);
+            F = Ftmp;
           }
 
           { // positive mu, negative nu
 
-            // load U(x)_(+mu)
+            // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
+
+            // load U(x)_(+nu)
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
-            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x, dx, X), 
+            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x, dx, X), 
                 arg.gaugeStride, &U1);
 
-            // load U(x+mu)_(-nu) = U(x+mu-nu)_(+nu)
+            // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
             Matrix<Cmplx,3> U2;
-            dx[mu]++;
-            dx[nu]--;
-            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U2);
             dx[nu]++;
             dx[mu]--;
+            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x,dx,X), 
+                arg.gaugeStride, &U2);
+            dx[mu]++;
+            dx[nu]--;
 
             Matrix<Cmplx,3> Ftmp =  U1 * conj(U2);
 
-            // load U(x-nu)_mu
+            // load U(x-mu)_nu
             Matrix<Cmplx,3> U3;
-            dx[nu]--;
-            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
+            dx[mu]--;
+            loadLinkVariableFromArray(otherGauge, nu, linkIndex(x,dx,X), 
                 arg.gaugeStride, &U3);
-            dx[nu]++;
+            dx[mu]++;
 
             Ftmp =  Ftmp * conj(U3);
 
-            // load U(x)_(-nu) = U(x-nu)_(+nu)
+            // load U(x)_(-mu) = U(x-mu)_(+mu)
             Matrix<Cmplx,3> U4;
-            dx[nu]--;
-            loadLinkVariableFromArray(otherGauge, nu, linkIndex(x,dx,X), 
+            dx[mu]--;
+            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
                 arg.gaugeStride, &U4);
-            dx[nu]++;
+            dx[mu]++;
 
             // complete the plaquette
             Ftmp = Ftmp * U4;
 
             // sum this contribution to Fmunu
-            F += Ftmp - conj(Ftmp);
+            F += Ftmp;
           }
 
 
-          { // negative mu, positive nu
+          { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu) U[dagger](x,mu)
 
-            // load U(x)_(-mu)
+
+            // load U(x)_(-nu)
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
-            dx[mu]--;
-            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U1);
-            dx[mu]++;
-
-            // load U(x-mu)_(+nu)
-            Matrix<Cmplx,3> U2;
-            dx[mu]--;
+            dx[nu]--;
             loadLinkVariableFromArray(otherGauge, nu, linkIndex(x,dx,X), 
+                arg.gaugeStride, &U1);
+            dx[nu]++;
+
+            // load U(x-nu)_(+mu)
+            Matrix<Cmplx,3> U2;
+            dx[nu]--;
+            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
                 arg.gaugeStride, &U2);
-            dx[mu]++;
+            dx[nu]++;
 
             Matrix<Cmplx,3> Ftmp = conj(U1) * U2;
 
-            // load U(x+nu-mu)_(+mu)
+            // load U(x+mu-nu)_(+nu)
             Matrix<Cmplx,3> U3;
-            dx[nu]++;
-            dx[mu]--;
-            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U3);
             dx[mu]++;
             dx[nu]--;
+            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x,dx,X), 
+                arg.gaugeStride, &U3);
+            dx[nu]++;
+            dx[mu]--;
 
             Ftmp = Ftmp * U3;
 
-            // load U(x)_(+nu)
+            // load U(x)_(+mu)
             Matrix<Cmplx,3> U4;
-            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x,dx,X), 
+            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x,dx,X), 
                 arg.gaugeStride, &U4);
 
             // complete the plaquette
             Ftmp = Ftmp * conj(U4);
 
             // sum this contribution to Fmunu
-            F += Ftmp - conj(Ftmp);
+            F += Ftmp;
           }
 
-          { // negative mu, negative nu
+          { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
+
 
             // load U(x)_(-mu)
             Matrix<Cmplx,3> U1;
@@ -246,8 +249,10 @@ namespace quda {
             Ftmp = Ftmp * U4;
 
             // sum this contribution to Fmunu
-            F += Ftmp - conj(Ftmp);
+            F += Ftmp;
           }
+          
+          F -= conj(F);
 
           Cmplx* thisFmunu = arg.Fmunu + parity*arg.FmunuOffset;
           int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
