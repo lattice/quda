@@ -120,6 +120,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1;
+  inv_param->use_sloppy_partial_accumulator = false;
+  inv_param->pipeline = false;
 
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -129,6 +131,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // Pre Fermi architecture only supports L2 relative residual norm
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 #endif
+  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
@@ -594,9 +597,6 @@ int main(int argc, char** argv)
   display_test_info();
 
   int ret = invert_test();
-
-  display_test_info();
-
 
   // finalize the communications layer
 #if defined(QMP_COMMS)
