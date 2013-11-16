@@ -65,15 +65,23 @@ namespace quda {
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
-    cudaColorSpinorField *x_sloppy, *r_sloppy;
+    cudaColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
       csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      x_sloppy = &x;
       r_sloppy = &r;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = new cudaColorSpinorField(x, csParam);
       r_sloppy = new cudaColorSpinorField(r, csParam);
+    }
+
+    cudaColorSpinorField *x_sloppy;
+    if (param.precision_sloppy == x.Precision() ||
+	!param.use_sloppy_partial_accumulator) {
+      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
+      x_sloppy = &x;
+    } else {
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      x_sloppy = new cudaColorSpinorField(x, csParam);
     }
 
     cudaColorSpinorField &xSloppy = *x_sloppy;
@@ -83,7 +91,7 @@ namespace quda {
     if(&x != &xSloppy){
       copyCuda(y,x);
       zeroCuda(xSloppy);
-    }else{
+    } else {
       zeroCuda(y);
     }
     
@@ -173,7 +181,7 @@ namespace quda {
 	//beta = r2 / r2_old;
 	beta = sigma / r2_old; // use the alternative beta computation
 
-	if (param.pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, rSloppy, xSloppy, p);
+	if (param.pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, xSloppy, rSloppy, p);
 	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
@@ -184,13 +192,13 @@ namespace quda {
 	steps_since_reliable++;
       } else {
 	axpyCuda(alpha, p, xSloppy);
-	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
+	copyCuda(x, xSloppy); // nop when these pointers alias
       
 	xpyCuda(x, y); // swap these around?
 	mat(r, y, x); // here we can use x as tmp
 	r2 = xmyNormCuda(b, r);
 
-	if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
+	copyCuda(rSloppy, r); //nop when these pointers alias
 	zeroCuda(xSloppy);
 
 	// break-out check if we have reached the limit of the precision
@@ -228,7 +236,7 @@ namespace quda {
       PrintStats("CG", k, r2, b2, heavy_quark_res);
     }
 
-    if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
+    copyCuda(x, xSloppy); // nop when these pointers alias
     xpyCuda(y, x);
 
     profile.Stop(QUDA_PROFILE_COMPUTE);
@@ -267,10 +275,8 @@ namespace quda {
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
-    if (param.precision_sloppy != x.Precision()) {
-      delete r_sloppy;
-      delete x_sloppy;
-    }
+    if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
+    if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
 
     profile.Stop(QUDA_PROFILE_FREE);
 
