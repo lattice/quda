@@ -40,6 +40,9 @@ namespace quda {
     /**< Reliable update tolerance */
     double delta;           
 
+    /**< Whether to keep the partial solution accumulator in sloppy precision */
+    bool use_sloppy_partial_accumulator;
+
     /**< Enable pipeline solver */
     int pipeline;
 
@@ -96,7 +99,7 @@ namespace quda {
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
 
-
+    
 
     /** Maximum size of Krylov space used by solver */
     int Nkrylov;
@@ -132,7 +135,8 @@ namespace quda {
     SolverParam(QudaInvertParam &param) : inv_type(param.inv_type), 
       inv_type_precondition(param.inv_type_precondition), 
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
-      delta(param.reliable_delta), pipeline(param.pipeline), tol(param.tol), tol_hq(param.tol_hq), 
+      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
+      pipeline(param.pipeline), tol(param.tol), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 

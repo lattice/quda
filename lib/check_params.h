@@ -158,6 +158,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
+#ifdef INIT_PARAM /**< Default is to use a sloppy accumulator */
+  P(use_sloppy_partial_accumulator, 1);
+#else
+  P(use_sloppy_partial_accumulator, INVALID_INT);
+#endif
 
 #ifndef CHECK_PARAM
   P(pipeline, 0); /** Whether to use a pipelined solver */
