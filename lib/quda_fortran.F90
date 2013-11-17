@@ -125,6 +125,9 @@ module quda_fortran
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
      
+     integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
+     real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately) 
+
      QudaVerbosity :: verbosity    
      
      integer(4) :: sp_pad
