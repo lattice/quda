@@ -18,6 +18,7 @@ namespace quda {
     if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
       errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
        
+    if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
 
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*reconstruct;

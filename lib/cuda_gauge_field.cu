@@ -68,6 +68,18 @@ namespace quda {
       createTexObject(oddPhaseTex, (char*)odd + phase_offset, isPhase);
     }
 #endif
+    
+    // FIXME - don't want to allocate this all the time
+#if !defined(GPU_COMMS)
+    const int R[] = {2, 2, 2, 2};
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+      bytes = surface[d] * R[d] * geometry * reconstruct * precision;
+      send_h[d] = pinned_malloc(2 * bytes);
+      recv_h[d] = pinned_malloc(2 * bytes);
+    }
+#endif
+
   }
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -150,6 +162,15 @@ namespace quda {
         if (ghost[i]) device_free(ghost[i]);
       }
     }
+
+#if !defined(GPU_COMMS)
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+      host_free(recv_h[d]);
+      host_free(send_h[d]);
+    }
+#endif
+
   }
 
   // This does the exchange of the gauge field ghost zone and places it
@@ -183,57 +204,94 @@ namespace quda {
 
   void cudaGaugeField::exchangeExtendedGhost(const int *R) {
     
+    void *send_d[QUDA_MAX_DIM];
+    void *recv_d[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
     size_t bytes[QUDA_MAX_DIM];
+
+    // do the exchange
+    MsgHandle *mh_recv_back[QUDA_MAX_DIM];
+    MsgHandle *mh_recv_fwd[QUDA_MAX_DIM];
+    MsgHandle *mh_send_fwd[QUDA_MAX_DIM];
+    MsgHandle *mh_send_back[QUDA_MAX_DIM];
+
     // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
       bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
-      send[d] = device_malloc(2 * bytes[d]);
-      recv[d] = device_malloc(2 * bytes[d]);
-    }
-
-    for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-      //extract into a contiguous buffer
-      extractExtendedGaugeGhost(*this, d, R, send, true);
-      
-      // do the exchange
-      MsgHandle *mh_recv_back;
-      MsgHandle *mh_recv_fwd;
-      MsgHandle *mh_send_fwd;
-      MsgHandle *mh_send_back;
+      send_d[d] = device_malloc(2 * bytes[d]);
+      recv_d[d] = device_malloc(2 * bytes[d]);
+#ifdef GPU_COMMS
+      recv[d] = recv_d[d];
+      send[d] = send_d[d];
+#else
+      if (R[d] != 2) errorQuda("Currently require R[%d] = 2", d);
+      recv[d] = recv_h[d];
+      send[d] = send_h[d];
+#endif
 
       // look into storing these for later
-      mh_recv_back = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-      mh_recv_fwd  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
-      mh_send_back = comm_declare_send_relative(send[d], d, -1, bytes[d]);
-      mh_send_fwd  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
-      
-      comm_start(mh_recv_back);
-      comm_start(mh_recv_fwd);
-      comm_start(mh_send_fwd);
-      comm_start(mh_send_back);
-      
-      comm_wait(mh_send_fwd);
-      comm_wait(mh_send_back);
-      comm_wait(mh_recv_back);
-      comm_wait(mh_recv_fwd);
-      
-      comm_free(mh_send_fwd);
-      comm_free(mh_send_back);
-      comm_free(mh_recv_back);
-      comm_free(mh_recv_fwd);
-      
-      // inject back into the gauge field
-      extractExtendedGaugeGhost(*this, d, R, recv, false);
+      mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
+      mh_recv_fwd[d]  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
+      mh_send_back[d] = comm_declare_send_relative(send[d], d, -1, bytes[d]);
+      mh_send_fwd[d]  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-      device_free(send[d]);
-      device_free(recv[d]);
+
+      // prepost the receives
+      comm_start(mh_recv_back[d]);
+      comm_start(mh_recv_fwd[d]);
+
+      //extract into a contiguous buffer
+      extractExtendedGaugeGhost(*this, d, R, send_d, true);
+      
+      // pipeline the forwards and backwards sending
+#ifndef GPU_COMMS
+      cudaMemcpyAsync(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, streams[0]);
+      cudaMemcpyAsync(((char*)send_h[d])+bytes[d], ((char*)send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
+#endif      
+
+#ifndef GPU_COMMS
+      cudaStreamSynchronize(streams[0]);
+#endif
+      comm_start(mh_send_back[d]);
+
+#ifndef GPU_COMMS
+      cudaStreamSynchronize(streams[1]);
+#endif
+      comm_start(mh_send_fwd[d]);
+
+      // forwards recv
+      comm_wait(mh_send_back[d]);
+      comm_wait(mh_recv_fwd[d]);
+#ifndef GPU_COMMS
+      cudaMemcpyAsync(((char*)recv_d[d])+bytes[d], ((char*)recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
+#endif      
+      
+      // backwards recv
+      comm_wait(mh_send_fwd[d]);
+      comm_wait(mh_recv_back[d]);
+#ifndef GPU_COMMS
+      cudaMemcpyAsync(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice, streams[1]);
+#endif      
+
+      // inject back into the gauge field
+      extractExtendedGaugeGhost(*this, d, R, recv_d, false);
+    }
+
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+
+      comm_free(mh_send_fwd[d]);
+      comm_free(mh_send_back[d]);
+      comm_free(mh_recv_back[d]);
+      comm_free(mh_recv_fwd[d]);
+      
+      device_free(send_d[d]);
+      device_free(recv_d[d]);
     }
 
   }
@@ -257,6 +315,8 @@ namespace quda {
     } else {
       fat_link_max = 1.0;
     }
+
+    //if (src.Order() == QUDA_TIFR_GAUGE_ORDER) fat_link_max = src.Scale();
 
     if (typeid(src) == typeid(cudaGaugeField)) {
       // copy field and ghost zone into this field
