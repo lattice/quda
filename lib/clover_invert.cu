@@ -151,10 +151,16 @@ namespace quda {
     if (idx < arg.clover.volumeCB) trlogA = cloverInvertCompute<blockSize, Float>(arg, idx, parity);
 
     if (arg.computeTraceLog) {
+#if (__COMPUTE_CAPABILITY__ >= 300)
       typedef cub::BlockReduce<double, blockSize> BlockReduce;
-	__shared__ typename BlockReduce::TempStorage temp_storage;
-	double aggregate = BlockReduce(temp_storage).Sum(trlogA);
-	if (threadIdx.x == 0) atomicAdd(arg.trlogA_d+parity, aggregate);
+      __shared__ typename BlockReduce::TempStorage temp_storage;
+      double aggregate = BlockReduce(temp_storage).Sum(trlogA);
+      if (threadIdx.x == 0) atomicAdd(arg.trlogA_d+parity, aggregate);
+#else
+      // FIXME disable cub on pre-Kepler
+      atomicAdd(arg.trlogA_d+parity, trlogA);
+#endif // __COMPUTE_CAPABILITY__
+
     }
 
   }
