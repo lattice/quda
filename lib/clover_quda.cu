@@ -23,9 +23,7 @@ namespace quda {
       int FmunuStride; // stride used on Fmunu field
       int FmunuOffset; // parity offset 
 
-
       typename ComplexTypeId<Float>::Type* Fmunu;
-
       Gauge  gauge;
       Clover clover;
 
@@ -485,10 +483,8 @@ namespace quda {
   template<typename Float>
     void computeClover(CloverField &clover, const GaugeField& gauge, Float cloverCoeff, QudaFieldLocation location){
       int pad = 0;
-
       GaugeFieldParam tensorParam(gauge.X(), gauge.Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
       tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-
       GaugeField* Fmunu = NULL;
       if(location == QUDA_CPU_FIELD_LOCATION){
         Fmunu = new cpuGaugeField(tensorParam);
