@@ -401,6 +401,12 @@ namespace quda{
       return scalar*a;
     }
 
+  template<class T, int N, class S>
+    __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const S & scalar){
+      a = scalar*a;
+      return a;
+    }
+
   template<class T, int N>
     __device__ __host__ inline Matrix<T,N> operator-(const Matrix<T,N> & a){
       Matrix<T,N> result;

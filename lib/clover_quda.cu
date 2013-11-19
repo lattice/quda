@@ -3,6 +3,7 @@
 #include <tune_quda.h>
 #include <clover_field.h>
 #include <gauge_field.h>
+#include <gauge_field_order.h>
 
 namespace CloverOrder {
   using namespace quda;
@@ -10,36 +11,32 @@ namespace CloverOrder {
 } // CloverOrder
 
 
+
 namespace quda {
 
-  template<typename Float, typename Clover>
+  template<typename Float, typename Clover, typename Gauge>
     struct CloverArg {
       int threads; // number of active threads required
       int X[4]; // grid dimensions
       double cloverCoeff;
 
-      int gaugeStride; // stride used on gauge field
-      int gaugeOffset; // parity offset 
-
       int FmunuStride; // stride used on Fmunu field
       int FmunuOffset; // parity offset 
 
 
-      const typename ComplexTypeId<Float>::Type* gauge;
       typename ComplexTypeId<Float>::Type* Fmunu;
+
+      Gauge  gauge;
       Clover clover;
 
-      CloverArg(Clover &clover, const GaugeField& gauge, GaugeField& Fmunu, double cloverCoeff)
+      CloverArg(Clover &clover, Gauge &gauge, GaugeField& Fmunu, double cloverCoeff)
         : threads(Fmunu.Volume()), 
         cloverCoeff(cloverCoeff),
-        gaugeStride(gauge.Stride()), gaugeOffset(gauge.Bytes()/(4*sizeof(Float))),
         FmunuStride(Fmunu.Stride()), FmunuOffset(Fmunu.Bytes()/(4*sizeof(Float))),
-        gauge(reinterpret_cast<const typename ComplexTypeId<Float>::Type*>(gauge.Gauge_p())),  
         Fmunu(reinterpret_cast<typename ComplexTypeId<Float>::Type*>(Fmunu.Gauge_p())),
-        clover(clover) { 
+        gauge(gauge), clover(clover) { 
           for(int dir=0; dir<4; ++dir) X[dir] = Fmunu.X()[dir];
         }
-
     };
 
   __device__ __host__ inline int linkIndex(int x[], int dx[], const int X[4]) {
@@ -50,8 +47,8 @@ namespace quda {
   }
 
 
-  template <typename Float, typename Clover>
-    __host__ __device__ void computeFmunuCore(CloverArg<Float,Clover> arg, int idx) {
+  template <typename Float, typename Clover, typename GaugeOrder>
+    __host__ __device__ void computeFmunuCore(CloverArg<Float,Clover,GaugeOrder>& arg, int idx) {
 
       // compute spacetime dimensions and parity
       int aux1 = idx / (arg.X[0]/2);
@@ -70,28 +67,22 @@ namespace quda {
 
       typedef typename ComplexTypeId<Float>::Type Cmplx;
 
-      const int otherParity = (1-parity);
-      const Cmplx* thisGauge = arg.gauge + parity*arg.gaugeOffset;
-      const Cmplx* otherGauge = arg.gauge + (otherParity)*arg.gaugeOffset;
 
 
       for (int mu=0; mu<4; mu++) {
         for (int nu=0; nu<mu; nu++) {
           Matrix<Cmplx,3> F;
-
           { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
 
             // load U(x)_(+mu)
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
-            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x, dx, X), 
-                arg.gaugeStride, &U1);
+            arg.gauge.load((Float*)(U1.data),linkIndex(x,dx,X), mu, parity); 
 
             // load U(x+mu)_(+nu)
             Matrix<Cmplx,3> U2;
             dx[mu]++;
-            loadLinkVariableFromArray(otherGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U2);
+            arg.gauge.load((Float*)(U2.data),linkIndex(x,dx,X), nu, 1-parity); 
             dx[mu]--;
 
             Matrix<Cmplx,3> Ftmp = U1 * U2;
@@ -99,40 +90,31 @@ namespace quda {
             // load U(x+nu)_(+mu)
             Matrix<Cmplx,3> U3;
             dx[nu]++;
-            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U3);
+            arg.gauge.load((Float*)(U3.data),linkIndex(x,dx,X), mu, 1-parity); 
             dx[nu]--;
 
             Ftmp = Ftmp * conj(U3) ;
 
             // load U(x)_(+nu)
             Matrix<Cmplx,3> U4;
-            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U4);
+            arg.gauge.load((Float*)(U4.data),linkIndex(x,dx,X), nu, parity); 
 
             // complete the plaquette
-            Ftmp = Ftmp * conj(U4);
-
-            // sum this contribution to Fmunu
-            F = Ftmp;
+            F = Ftmp * conj(U4);
           }
 
-          { // positive mu, negative nu
-
-            // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
+          { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
 
             // load U(x)_(+nu)
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
-            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x, dx, X), 
-                arg.gaugeStride, &U1);
+            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, parity);
 
             // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
             Matrix<Cmplx,3> U2;
             dx[nu]++;
             dx[mu]--;
-            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U2);
+            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, parity);
             dx[mu]++;
             dx[nu]--;
 
@@ -141,8 +123,7 @@ namespace quda {
             // load U(x-mu)_nu
             Matrix<Cmplx,3> U3;
             dx[mu]--;
-            loadLinkVariableFromArray(otherGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U3);
+            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, 1-parity);
             dx[mu]++;
 
             Ftmp =  Ftmp * conj(U3);
@@ -150,8 +131,7 @@ namespace quda {
             // load U(x)_(-mu) = U(x-mu)_(+mu)
             Matrix<Cmplx,3> U4;
             dx[mu]--;
-            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U4);
+            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, 1-parity);
             dx[mu]++;
 
             // complete the plaquette
@@ -161,23 +141,20 @@ namespace quda {
             F += Ftmp;
           }
 
-
-          { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu) U[dagger](x,mu)
+          { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
 
 
             // load U(x)_(-nu)
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
             dx[nu]--;
-            loadLinkVariableFromArray(otherGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U1);
+            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, 1-parity);
             dx[nu]++;
 
             // load U(x-nu)_(+mu)
             Matrix<Cmplx,3> U2;
             dx[nu]--;
-            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U2);
+            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, 1-parity);
             dx[nu]++;
 
             Matrix<Cmplx,3> Ftmp = conj(U1) * U2;
@@ -186,8 +163,7 @@ namespace quda {
             Matrix<Cmplx,3> U3;
             dx[mu]++;
             dx[nu]--;
-            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U3);
+            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, parity);
             dx[nu]++;
             dx[mu]--;
 
@@ -195,10 +171,8 @@ namespace quda {
 
             // load U(x)_(+mu)
             Matrix<Cmplx,3> U4;
-            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U4);
-
-            // complete the plaquette
+            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, parity);
+            
             Ftmp = Ftmp * conj(U4);
 
             // sum this contribution to Fmunu
@@ -212,16 +186,14 @@ namespace quda {
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
             dx[mu]--;
-            loadLinkVariableFromArray(otherGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U1);
+            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), mu, 1-parity);
             dx[mu]++;
 
             // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
             Matrix<Cmplx,3> U2;
             dx[mu]--;
             dx[nu]--;
-            loadLinkVariableFromArray(thisGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U2);
+            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), nu, parity);
             dx[nu]++;
             dx[mu]++;
 
@@ -231,8 +203,7 @@ namespace quda {
             Matrix<Cmplx,3> U3;
             dx[mu]--;
             dx[nu]--;
-            loadLinkVariableFromArray(thisGauge, mu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U3);
+            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), mu, parity);
             dx[nu]++;
             dx[mu]++;
 
@@ -241,8 +212,7 @@ namespace quda {
             // load U(x)_(-nu) = U(x-nu)_(+nu)
             Matrix<Cmplx,3> U4;
             dx[nu]--;
-            loadLinkVariableFromArray(otherGauge, nu, linkIndex(x,dx,X), 
-                arg.gaugeStride, &U4);
+            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), nu, 1-parity);
             dx[nu]++;
 
             // complete the plaquette
@@ -251,12 +221,12 @@ namespace quda {
             // sum this contribution to Fmunu
             F += Ftmp;
           }
-          
           F -= conj(F);
 
+          F *= 1.0/8.0;
+      
           Cmplx* thisFmunu = arg.Fmunu + parity*arg.FmunuOffset;
           int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
-          //writeLinkVariableToArray(F, munu_idx, X/2, arg.FmunuStride, arg.Fmunu+parity*arg.FmunuOffset);
           writeLinkVariableToArray(F, munu_idx, idx/2, arg.FmunuStride, thisFmunu);
         } // nu < mu
       } // mu
@@ -265,15 +235,16 @@ namespace quda {
     }
 
 
-  template<typename Float, typename Clover>
-    __global__ void computeFmunuKernel(CloverArg<Float,Clover> arg){
+
+  template<typename Float, typename Clover, typename Gauge>
+    __global__ void computeFmunuKernel(CloverArg<Float,Clover,Gauge> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
       if(idx >= arg.threads) return;
-      computeFmunuCore(arg,idx);
+      computeFmunuCore<Float,Clover,Gauge>(arg,idx);
     }
 
-  template<typename Float, typename Clover>
-    void computeFmunuCPU(CloverArg<Float,Clover>& arg){
+  template<typename Float, typename Clover, typename Gauge>
+    void computeFmunuCPU(CloverArg<Float,Clover,Gauge>& arg){
       errorQuda("computeFmunuCPU not yet supported\n");
       for(int idx=0; idx<arg.threads; idx++){
         computeFmunuCore(arg,idx);
@@ -282,9 +253,9 @@ namespace quda {
 
 
 
-  template<typename Float, typename Clover>
+  template<typename Float, typename Clover, typename Gauge>
     class FmunuCompute : Tunable {
-      CloverArg<Float,Clover> arg;
+      CloverArg<Float,Clover,Gauge> arg;
       const QudaFieldLocation location;
 
       private: 
@@ -296,7 +267,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      FmunuCompute(CloverArg<Float,Clover> &arg, QudaFieldLocation location)
+      FmunuCompute(CloverArg<Float,Clover,Gauge> &arg, QudaFieldLocation location)
         : arg(arg), location(location) {}
       virtual ~FmunuCompute() {}
 
@@ -356,16 +327,15 @@ namespace quda {
   //
 
   // Core routine for constructing clover term from field strength
-  template<typename Float, typename Clover>
+  template<typename Float, typename Clover, typename Gauge>
     __device__ __host__
-    void cloverComputeCore(CloverArg<Float,Clover> arg, int idx){
+    void cloverComputeCore(CloverArg<Float,Clover,Gauge>& arg, int idx){
 
       int parity = 0;  
       if(idx > arg.threads/2){
         parity = 1;
         idx -= arg.threads/2;
       }
-
       typedef typename ComplexTypeId<Float>::Type Cmplx;
 
       Float cloverCoeff = arg.cloverCoeff;
@@ -435,25 +405,25 @@ namespace quda {
     }
 
 
-  template<typename Float, typename Clover>
+  template<typename Float, typename Clover, typename Gauge>
     __global__
-    void cloverComputeKernel(CloverArg<Float,Clover> arg){
+    void cloverComputeKernel(CloverArg<Float,Clover,Gauge> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
       if(idx >= arg.threads) return;
       cloverComputeCore(arg, idx);
     }
 
-  template<typename Float, typename Clover>
-    void cloverComputeCPU(CloverArg<Float,Clover> arg){
+  template<typename Float, typename Clover, typename Gauge>
+    void cloverComputeCPU(CloverArg<Float,Clover,Gauge> arg){
       for(int idx=0; idx<arg.threads; ++idx){
         cloverComputeCore(arg, idx);
       }
     }
 
 
-  template<typename Float, typename Clover>
+  template<typename Float, typename Clover, typename Gauge>
     class CloverCompute : Tunable {
-      CloverArg<Float, Clover> arg;
+      CloverArg<Float, Clover, Gauge> arg;
       const QudaFieldLocation location;
 
       private: 
@@ -465,7 +435,7 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      CloverCompute(CloverArg<Float,Clover> &arg, QudaFieldLocation location) 
+      CloverCompute(CloverArg<Float,Clover,Gauge> &arg, QudaFieldLocation location) 
         : arg(arg), location(location) {}
 
       virtual ~CloverCompute() {}
@@ -501,25 +471,23 @@ namespace quda {
 
 
 
-  template<typename Float,typename Clover>
-    void computeClover(Clover clover, const GaugeField& gauge, GaugeField& Fmunu, Float cloverCoeff, QudaFieldLocation location){
-      CloverArg<Float,Clover> arg(clover, gauge, Fmunu, cloverCoeff);
-
-      FmunuCompute<Float,Clover> fmunuCompute(arg, location);
+  template<typename Float,typename Clover,typename Gauge>
+    void computeClover(Clover clover, Gauge gauge, GaugeField& Fmunu, Float cloverCoeff, QudaFieldLocation location){
+      CloverArg<Float,Clover,Gauge> arg(clover, gauge, Fmunu, cloverCoeff);
+      FmunuCompute<Float,Clover,Gauge> fmunuCompute(arg, location);
       fmunuCompute.apply(0);
-
-      CloverCompute<Float,Clover> cloverCompute(arg, location);
+      CloverCompute<Float,Clover,Gauge> cloverCompute(arg, location);
       cloverCompute.apply(0);
-
       cudaDeviceSynchronize();
     }
-
 
 
   template<typename Float>
     void computeClover(CloverField &clover, const GaugeField& gauge, Float cloverCoeff, QudaFieldLocation location){
       int pad = 0;
+
       GaugeFieldParam tensorParam(gauge.X(), gauge.Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
+      tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
 
       GaugeField* Fmunu = NULL;
       if(location == QUDA_CPU_FIELD_LOCATION){
@@ -530,11 +498,45 @@ namespace quda {
         errorQuda("Invalid location\n");
       }
 
+      // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
+      // Need to fix this!!
+
       if(clover.Order() == QUDA_FLOAT2_CLOVER_ORDER){
-        computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), gauge, *Fmunu, cloverCoeff, location);
+        if(gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER){
+          if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
+            computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float, 18, 2, 18>(gauge), *Fmunu, cloverCoeff, location);  
+          }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
+            computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float, 18, 2, 12>(gauge),  *Fmunu, cloverCoeff, location);
+
+          }else{
+            errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
+          }
+
+        }else if(gauge.Order() == QUDA_FLOAT4_GAUGE_ORDER){
+          if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
+            computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float,18,4,12>(gauge),  *Fmunu, cloverCoeff, location);
+          }else{
+            errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
+          }
+        }
       }else if(clover.Order() == QUDA_FLOAT4_CLOVER_ORDER){
-        computeClover(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), gauge, *Fmunu, cloverCoeff, location);
-      }
+        if(gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER){
+          if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
+            computeClover(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), FloatNOrder<Float,18,2,18>(gauge),  *Fmunu, cloverCoeff, location);
+          }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
+            computeClover(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), FloatNOrder<Float,18,2,12>(gauge),  *Fmunu, cloverCoeff, location);
+          }else{
+            errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
+          }
+
+        }else if(gauge.Order() == QUDA_FLOAT4_GAUGE_ORDER){
+          if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
+            computeClover(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), FloatNOrder<Float,18,4,12>(gauge), *Fmunu, cloverCoeff, location);
+          }else{
+            errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
+          } // gauge order
+        }
+      } // clover order
 
       if(Fmunu) delete Fmunu;
     }
