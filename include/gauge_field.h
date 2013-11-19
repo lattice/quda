@@ -183,11 +183,6 @@ namespace quda {
     void *even;
     void *odd;
 
-#ifndef GPU_COMMS // FIXME clean this up for arbitrary R using a pinned memory pool
-    void *send_h[QUDA_MAX_DIM];
-    void *recv_h[QUDA_MAX_DIM];
-#endif
-
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t evenTex;
     cudaTextureObject_t oddTex;

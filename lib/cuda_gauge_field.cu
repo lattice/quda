@@ -68,17 +68,6 @@ namespace quda {
       createTexObject(oddPhaseTex, (char*)odd + phase_offset, isPhase);
     }
 #endif
-    
-    // FIXME - don't want to allocate this all the time
-#if !defined(GPU_COMMS)
-    const int R[] = {2, 2, 2, 2};
-    for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-      bytes = surface[d] * R[d] * geometry * reconstruct * precision;
-      send_h[d] = pinned_malloc(2 * bytes);
-      recv_h[d] = pinned_malloc(2 * bytes);
-    }
-#endif
 
   }
 
@@ -163,14 +152,6 @@ namespace quda {
       }
     }
 
-#if !defined(GPU_COMMS)
-    for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
-      host_free(recv_h[d]);
-      host_free(send_h[d]);
-    }
-#endif
-
   }
 
   // This does the exchange of the gauge field ghost zone and places it
@@ -209,6 +190,31 @@ namespace quda {
     void *send[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
     size_t bytes[QUDA_MAX_DIM];
+
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+      bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
+    }
+
+#ifndef GPU_COMMS
+    void *send_h[QUDA_MAX_DIM];
+    void *recv_h[QUDA_MAX_DIM];
+    size_t total_bytes = 0;
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+      total_bytes += 2*bytes[d];
+    }
+    resizeBufferPinned(total_bytes);
+
+    size_t offset = 0;
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+
+      recv_h[d] = static_cast<char*>(bufferPinned) + offset;
+      send_h[d] = static_cast<char*>(recv_h[d]) + bytes[d];
+      offset += 2*bytes[d];
+    }
+#endif
 
     // do the exchange
     MsgHandle *mh_recv_back[QUDA_MAX_DIM];
