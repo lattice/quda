@@ -45,23 +45,36 @@ namespace quda {
   }
 
 
+  __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity)
+  {
+    x[3] = cb_index/(X[2]*X[1]*X[0]/2);
+    x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
+    x[1] = (cb_index/(X[0]/2)) % X[1];
+    x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+
+    return;
+  }
+
+
+
+
+
   template <typename Float, typename Clover, typename GaugeOrder>
     __host__ __device__ void computeFmunuCore(CloverArg<Float,Clover,GaugeOrder>& arg, int idx) {
 
       // compute spacetime dimensions and parity
-      int aux1 = idx / (arg.X[0]/2);
-      int x[4];
-      x[0] = idx - aux1 * (arg.X[0]/2); // this is chbd x
-      int aux2 = aux1 / arg.X[1];
-      x[1] = aux1 - aux2 * arg.X[1];
-      int aux3 = aux2 / arg.X[2];
-      x[2] = aux2 - aux3 * arg.X[2];
-      int parity = aux3 / arg.X[3];
-      x[3] = aux3 - parity * arg.X[3];
-      x[0] = 2*x[0] + parity; // now this is the full index
+      int parity = 0;
+      if(idx >= arg.threads/2){
+        parity = 1;
+        idx -= arg.threads/2;
+      }
 
       int X[4]; 
       for(int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
+
+      int x[4];
+      getCoords(x, idx, X, parity);
+
 
       typedef typename ComplexTypeId<Float>::Type Cmplx;
 
@@ -170,7 +183,7 @@ namespace quda {
             // load U(x)_(+mu)
             Matrix<Cmplx,3> U4;
             arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, parity);
-            
+
             Ftmp = Ftmp * conj(U4);
 
             // sum this contribution to Fmunu
@@ -222,10 +235,10 @@ namespace quda {
           F -= conj(F);
 
           F *= 1.0/8.0;
-      
+
           Cmplx* thisFmunu = arg.Fmunu + parity*arg.FmunuOffset;
           int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
-          writeLinkVariableToArray(F, munu_idx, idx/2, arg.FmunuStride, thisFmunu);
+          writeLinkVariableToArray(F, munu_idx, idx, arg.FmunuStride, thisFmunu);
         } // nu < mu
       } // mu
       // F[1,0], F[2,0], F[2,1], F[3,0], F[3,1], F[3,2]
@@ -326,11 +339,11 @@ namespace quda {
 
   // Core routine for constructing clover term from field strength
   template<typename Float, typename Clover, typename Gauge>
-    __device__ __host__
+    __device__ //__host__
     void cloverComputeCore(CloverArg<Float,Clover,Gauge>& arg, int idx){
 
       int parity = 0;  
-      if(idx > arg.threads/2){
+      if(idx >= arg.threads/2){
         parity = 1;
         idx -= arg.threads/2;
       }
@@ -339,7 +352,7 @@ namespace quda {
       Float cloverCoeff = arg.cloverCoeff;
 
       // Load the field-strength tensor from global memory
-      Matrix<Cmplx,3> F[5];
+      Matrix<Cmplx,3> F[6];
       for(int i=0; i<6; ++i){
         loadLinkVariableFromArray(arg.Fmunu + parity*arg.FmunuOffset, i, idx, arg.FmunuStride, &F[i]); 
       }
@@ -414,7 +427,7 @@ namespace quda {
   template<typename Float, typename Clover, typename Gauge>
     void cloverComputeCPU(CloverArg<Float,Clover,Gauge> arg){
       for(int idx=0; idx<arg.threads; ++idx){
-        cloverComputeCore(arg, idx);
+        //  cloverComputeCore(arg, idx);
       }
     }
 
