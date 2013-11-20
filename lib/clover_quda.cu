@@ -376,8 +376,8 @@ namespace quda {
         // c = 0(1) => positive(negative) chiral block
         // Compute real diagonal elements
         for(int i=0; i<3; ++i){
-          diag[i]   = 1 - block1[ch](i,i).x;
-          diag[i+3] = 1 + block1[ch](i,i).x;
+          diag[i]   = 0.5 - block1[ch](i,i).x;
+          diag[i+3] = 0.5 + block1[ch](i,i).x;
         }
 
         // Compute off diagonal components
