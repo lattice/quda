@@ -423,7 +423,7 @@ namespace quda {
     delete magma_args;
 
 //Copy nev eigvectors:
-    copyCuda(e, Vm->GetEigenvecSubset(nev));//new:this return an eigenvector set that consists of nev first eigenvectors    
+    Vm->CopyEigenvecSubset(e, nev);
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
@@ -496,10 +496,12 @@ namespace quda {
      if((param.rhs_idx == 0) || (param.inv_type == QUDA_EIGCG_INVERTER))
      {
         //compute the first nev Ritz vectors:
-        EigCG(*out, *in, u->GetEigenvecSubset(param.nev));
+//        EigCG(*out, *in, u->GetEigenvecSubset(param.nev));
+        EigCG(*out, *in, *u);
 
         //Construct projection matrix:
-        pM->ConstructProj(u->GetEigenvecSubset(param.nev));
+//        pM->ConstructProj(u->GetEigenvecSubset(param.nev));
+        pM->ConstructProj(*u);
 
         //finish for this first rhs:
         param.rhs_idx++;
@@ -511,16 +513,20 @@ namespace quda {
         const int offset  = param.nev*param.rhs_idx;
 
         //deflate initial guess:
-        DeflateInitGuess(*in, u->GetEigenvecSubset(w_range), *pM);
+//        DeflateInitGuess(*in, u->GetEigenvecSubset(w_range), *pM);
+        DeflateInitGuess(*in, *u, *pM);
 
         //compute current nev Ritz vectors:
-        EigCG(*out, *in, u->GetEigenvecSubset(param.nev, offset));
-        
+//        EigCG(*out, *in, u->GetEigenvecSubset(param.nev, offset));
+        EigCG(*out, *in, *u);        
+
         //orthogonalize new nev vectors against old vectors 
-        OrthRitz(u->GetEigenvecSubset(w_range));
+//        OrthRitz(u->GetEigenvecSubset(w_range));
+        OrthRitz(*u);
 
         //Construct(extend) projection matrix:
-        pM->ConstructProj(u->GetEigenvecSubset(w_range));
+//        pM->ConstructProj(u->GetEigenvecSubset(w_range));
+        pM->ConstructProj(*u);
 
         //finish for this first rhs:
         param.rhs_idx++;
@@ -545,7 +551,8 @@ namespace quda {
         //deflate initial guess:
         const int range = param.nev*param.deflation_grid;
 
-        DeflateInitGuess(*in, u->GetEigenvecSubset(range), *pM);
+//        DeflateInitGuess(*in, u->GetEigenvecSubset(range), *pM);
+        DeflateInitGuess(*in, *u, *pM);
 
         //launch initCG:
         (*initCG)(*in, *out);
