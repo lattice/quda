@@ -6,6 +6,7 @@
 #include <sys/time.h>
 
 #include <quda.h>
+#include <quda_fortran.h>
 #include <quda_internal.h>
 #include <comm_quda.h>
 #include <tune_quda.h>
