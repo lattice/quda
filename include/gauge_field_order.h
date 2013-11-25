@@ -787,13 +787,14 @@ namespace quda {
     Float *gauge;
     const int volumeCB;
     const int Nc;
+    const Float scale;
   TIFROrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) 
     : LegacyOrder<Float,length>(u, ghost_), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()), 
-      volumeCB(u.VolumeCB()), Nc(3) { 
+      volumeCB(u.VolumeCB()), Nc(3), scale(u.Scale()) { 
       if (length != 18) errorQuda("Gauge length %d not supported", length);
     }
   TIFROrder(const TIFROrder &order) 
-    : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), Nc(3) {       
+    : LegacyOrder<Float,length>(order), gauge(order.gauge), volumeCB(order.volumeCB), Nc(3), scale(order.scale) {       
       if (length != 18) errorQuda("Gauge length %d not supported", length);
     }
 
@@ -804,7 +805,7 @@ namespace quda {
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
-	    v[(i*Nc+j)*2+z] = (RegType)gauge[((((dir*2+parity)*volumeCB + x)*Nc + j)*Nc + i)*2 + z];
+	    v[(i*Nc+j)*2+z] = (RegType)gauge[((((dir*2+parity)*volumeCB + x)*Nc + j)*Nc + i)*2 + z] / scale;
 	  }
 	}
       }
@@ -814,7 +815,7 @@ namespace quda {
       for (int i=0; i<Nc; i++) {
 	for (int j=0; j<Nc; j++) {
 	  for (int z=0; z<2; z++) {
-	    gauge[((((dir*2+parity)*volumeCB + x)*Nc + j)*Nc + i)*2 + z] = (Float)v[(i*Nc+j)*2+z];
+	    gauge[((((dir*2+parity)*volumeCB + x)*Nc + j)*Nc + i)*2 + z] = (Float)v[(i*Nc+j)*2+z] * scale;
 	  }
 	}
       }

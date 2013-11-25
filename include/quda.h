@@ -554,7 +554,6 @@ extern "C" {
 }
 #endif
 
-//#include <quda_fortran.h>
 /* #include <quda_new_interface.h> */
 
 #endif /* _QUDA_H */
