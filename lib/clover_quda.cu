@@ -18,6 +18,9 @@ namespace quda {
     struct CloverArg {
       int threads; // number of active threads required
       int X[4]; // grid dimensions
+#ifdef MULTI_GPU
+      int border[4]; 
+#endif
       double cloverCoeff;
 
       int FmunuStride; // stride used on Fmunu field
@@ -34,6 +37,12 @@ namespace quda {
         Fmunu(reinterpret_cast<typename ComplexTypeId<Float>::Type*>(Fmunu.Gauge_p())),
         gauge(gauge), clover(clover) { 
           for(int dir=0; dir<4; ++dir) X[dir] = Fmunu.X()[dir];
+
+#ifdef MULTI_GPU
+          for(int dir=0; dir<4; ++dir){
+            border[dir] = commDimPartitioned(dir) ? 2 : 0;
+          }
+#endif
         }
     };
 
@@ -74,7 +83,12 @@ namespace quda {
 
       int x[4];
       getCoords(x, idx, X, parity);
-
+#ifdef MULTI_GPU
+      for(int dir=0; dir<4; ++dir){
+        x[dir] += arg.border[dir];
+        X[dir] += 2*arg.border[dir];
+      }
+#endif
 
       typedef typename ComplexTypeId<Float>::Type Cmplx;
 
@@ -83,162 +97,170 @@ namespace quda {
       for (int mu=0; mu<4; mu++) {
         for (int nu=0; nu<mu; nu++) {
           Matrix<Cmplx,3> F;
-          { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
+          setZero(&F);
+          /*
+             { // U(x,mu) U(x+mu,nu) U[dagger](x+nu,mu) U[dagger](x,nu)
 
-            // load U(x)_(+mu)
-            Matrix<Cmplx,3> U1;
-            int dx[4] = {0, 0, 0, 0};
-            arg.gauge.load((Float*)(U1.data),linkIndex(x,dx,X), mu, parity); 
+          // load U(x)_(+mu)
+          Matrix<Cmplx,3> U1;
+          int dx[4] = {0, 0, 0, 0};
+          arg.gauge.load((Float*)(U1.data),linkIndex(x,dx,X), mu, parity); 
+          // load U(x+mu)_(+nu)
+          Matrix<Cmplx,3> U2;
+          dx[mu]++;
+          arg.gauge.load((Float*)(U2.data),linkIndex(x,dx,X), nu, 1-parity); 
+          dx[mu]--;
 
-            // load U(x+mu)_(+nu)
-            Matrix<Cmplx,3> U2;
-            dx[mu]++;
-            arg.gauge.load((Float*)(U2.data),linkIndex(x,dx,X), nu, 1-parity); 
-            dx[mu]--;
+          Matrix<Cmplx,3> Ftmp = U1 * U2;
 
-            Matrix<Cmplx,3> Ftmp = U1 * U2;
+          // load U(x+nu)_(+mu)
+          Matrix<Cmplx,3> U3;
+          dx[nu]++;
+          arg.gauge.load((Float*)(U3.data),linkIndex(x,dx,X), mu, 1-parity); 
+          dx[nu]--;
 
-            // load U(x+nu)_(+mu)
-            Matrix<Cmplx,3> U3;
-            dx[nu]++;
-            arg.gauge.load((Float*)(U3.data),linkIndex(x,dx,X), mu, 1-parity); 
-            dx[nu]--;
+          Ftmp = Ftmp * conj(U3) ;
 
-            Ftmp = Ftmp * conj(U3) ;
+          // load U(x)_(+nu)
+          Matrix<Cmplx,3> U4;
+          arg.gauge.load((Float*)(U4.data),linkIndex(x,dx,X), nu, parity); 
 
-            // load U(x)_(+nu)
-            Matrix<Cmplx,3> U4;
-            arg.gauge.load((Float*)(U4.data),linkIndex(x,dx,X), nu, parity); 
-
-            // complete the plaquette
-            F = Ftmp * conj(U4);
+          // complete the plaquette
+          F = Ftmp * conj(U4);
           }
+
 
           { // U(x,nu) U[dagger](x+nu-mu,mu) U[dagger](x-mu,nu) U(x-mu, mu)
 
-            // load U(x)_(+nu)
-            Matrix<Cmplx,3> U1;
-            int dx[4] = {0, 0, 0, 0};
-            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, parity);
+          // load U(x)_(+nu)
+          Matrix<Cmplx,3> U1;
+          int dx[4] = {0, 0, 0, 0};
+          arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, parity);
 
-            // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
-            Matrix<Cmplx,3> U2;
-            dx[nu]++;
-            dx[mu]--;
-            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, parity);
-            dx[mu]++;
-            dx[nu]--;
+          // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
+          Matrix<Cmplx,3> U2;
+          dx[nu]++;
+          dx[mu]--;
+          arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, parity);
+          dx[mu]++;
+          dx[nu]--;
 
-            Matrix<Cmplx,3> Ftmp =  U1 * conj(U2);
+          Matrix<Cmplx,3> Ftmp =  U1 * conj(U2);
 
-            // load U(x-mu)_nu
-            Matrix<Cmplx,3> U3;
-            dx[mu]--;
-            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, 1-parity);
-            dx[mu]++;
+          // load U(x-mu)_nu
+          Matrix<Cmplx,3> U3;
+          dx[mu]--;
+          arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, 1-parity);
+          dx[mu]++;
 
-            Ftmp =  Ftmp * conj(U3);
+          Ftmp =  Ftmp * conj(U3);
 
-            // load U(x)_(-mu) = U(x-mu)_(+mu)
-            Matrix<Cmplx,3> U4;
-            dx[mu]--;
-            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, 1-parity);
-            dx[mu]++;
+          // load U(x)_(-mu) = U(x-mu)_(+mu)
+          Matrix<Cmplx,3> U4;
+          dx[mu]--;
+          arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, 1-parity);
+          dx[mu]++;
 
-            // complete the plaquette
-            Ftmp = Ftmp * U4;
+          // complete the plaquette
+          Ftmp = Ftmp * U4;
 
-            // sum this contribution to Fmunu
-            F += Ftmp;
+          // sum this contribution to Fmunu
+          F += Ftmp;
           }
 
           { // U[dagger](x-nu,nu) U(x-nu,mu) U(x+mu-nu,nu) U[dagger](x,mu)
 
 
-            // load U(x)_(-nu)
-            Matrix<Cmplx,3> U1;
-            int dx[4] = {0, 0, 0, 0};
-            dx[nu]--;
-            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, 1-parity);
-            dx[nu]++;
+          // load U(x)_(-nu)
+          Matrix<Cmplx,3> U1;
+          int dx[4] = {0, 0, 0, 0};
+          dx[nu]--;
+          arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, 1-parity);
+          dx[nu]++;
 
-            // load U(x-nu)_(+mu)
-            Matrix<Cmplx,3> U2;
-            dx[nu]--;
-            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, 1-parity);
-            dx[nu]++;
+          // load U(x-nu)_(+mu)
+          Matrix<Cmplx,3> U2;
+          dx[nu]--;
+          arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, 1-parity);
+          dx[nu]++;
 
-            Matrix<Cmplx,3> Ftmp = conj(U1) * U2;
+          Matrix<Cmplx,3> Ftmp = conj(U1) * U2;
 
-            // load U(x+mu-nu)_(+nu)
-            Matrix<Cmplx,3> U3;
-            dx[mu]++;
-            dx[nu]--;
-            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, parity);
-            dx[nu]++;
-            dx[mu]--;
+          // load U(x+mu-nu)_(+nu)
+          Matrix<Cmplx,3> U3;
+          dx[mu]++;
+          dx[nu]--;
+          arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, parity);
+          dx[nu]++;
+          dx[mu]--;
 
-            Ftmp = Ftmp * U3;
+          Ftmp = Ftmp * U3;
 
-            // load U(x)_(+mu)
-            Matrix<Cmplx,3> U4;
-            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, parity);
+          // load U(x)_(+mu)
+          Matrix<Cmplx,3> U4;
+          arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, parity);
 
-            Ftmp = Ftmp * conj(U4);
+          Ftmp = Ftmp * conj(U4);
 
-            // sum this contribution to Fmunu
-            F += Ftmp;
-          }
+          // sum this contribution to Fmunu
+          F += Ftmp;
+        }
 
-          { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
+        */
+        { // U[dagger](x-mu,mu) U[dagger](x-mu-nu,nu) U(x-mu-nu,mu) U(x-nu,nu)
 
 
-            // load U(x)_(-mu)
-            Matrix<Cmplx,3> U1;
-            int dx[4] = {0, 0, 0, 0};
-            dx[mu]--;
-            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), mu, 1-parity);
-            dx[mu]++;
+          // load U(x)_(-mu)
+          Matrix<Cmplx,3> U1;
+          int dx[4] = {0, 0, 0, 0};
+          dx[mu]--;
+          arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), mu, 1-parity);
+          dx[mu]++;
 
-            // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
-            Matrix<Cmplx,3> U2;
-            dx[mu]--;
-            dx[nu]--;
-            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), nu, parity);
-            dx[nu]++;
-            dx[mu]++;
+          // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
+          Matrix<Cmplx,3> U2;
+          dx[mu]--;
+          dx[nu]--;
+          arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), nu, parity);
+          dx[nu]++;
+          dx[mu]++;
 
-            Matrix<Cmplx,3> Ftmp = conj(U1) * conj(U2);
+          Matrix<Cmplx,3> Ftmp = conj(U1) * conj(U2);
 
-            // load U(x-nu)_mu
-            Matrix<Cmplx,3> U3;
-            dx[mu]--;
-            dx[nu]--;
-            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), mu, parity);
-            dx[nu]++;
-            dx[mu]++;
+          // load U(x-nu)_mu
+          Matrix<Cmplx,3> U3;
+          dx[mu]--;
+          dx[nu]--;
+          arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), mu, parity);
+          dx[nu]++;
+          dx[mu]++;
 
-            Ftmp = Ftmp * U3;
+          Ftmp = Ftmp * U3;
 
-            // load U(x)_(-nu) = U(x-nu)_(+nu)
-            Matrix<Cmplx,3> U4;
-            dx[nu]--;
-            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), nu, 1-parity);
-            dx[nu]++;
+          // load U(x)_(-nu) = U(x-nu)_(+nu)
+          Matrix<Cmplx,3> U4;
+          dx[nu]--;
+          arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), nu, 1-parity);
+          dx[nu]++;
 
-            // complete the plaquette
-            Ftmp = Ftmp * U4;
+          // complete the plaquette
+          Ftmp = Ftmp * U4;
 
-            // sum this contribution to Fmunu
-            F += Ftmp;
-          }
-          F -= conj(F);
+          // sum this contribution to Fmunu
+          F += Ftmp;
 
-          F *= 1.0/8.0;
+        }
+        F -= conj(F);
 
-          Cmplx* thisFmunu = arg.Fmunu + parity*arg.FmunuOffset;
-          int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
-          writeLinkVariableToArray(F, munu_idx, idx, arg.FmunuStride, thisFmunu);
+        F *= 1.0/8.0;
+
+
+
+
+        Cmplx* thisFmunu = arg.Fmunu + parity*arg.FmunuOffset;
+        int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
+
+        writeLinkVariableToArray(F, munu_idx, idx, arg.FmunuStride, thisFmunu);
         } // nu < mu
       } // mu
       // F[1,0], F[2,0], F[2,1], F[3,0], F[3,1], F[3,2]
@@ -376,8 +398,8 @@ namespace quda {
         // c = 0(1) => positive(negative) chiral block
         // Compute real diagonal elements
         for(int i=0; i<3; ++i){
-          diag[i]   = 0.5 - block1[ch](i,i).x;
-          diag[i+3] = 0.5 + block1[ch](i,i).x;
+          diag[i]   = 1.0 - block1[ch](i,i).x;
+          diag[i+3] = 1.0 + block1[ch](i,i).x;
         }
 
         // Compute off diagonal components
@@ -403,11 +425,11 @@ namespace quda {
         triangle[14] =   block1[ch](2,1);
 
         for(int i=0; i<6; ++i){
-          A[ch*36 + i] = diag[i];
+          A[ch*36 + i] = 0.5*diag[i];
         } 
         for(int i=0; i<15; ++i){
-          A[ch*36+6+2*i]     = triangle[idtab[i]].x;
-          A[ch*36+6+2*i + 1] = triangle[idtab[i]].y;
+          A[ch*36+6+2*i]     = 0.5*triangle[idtab[i]].x;
+          A[ch*36+6+2*i + 1] = 0.5*triangle[idtab[i]].y;
         } 
       } // ch
 
@@ -496,7 +518,7 @@ namespace quda {
   template<typename Float>
     void computeClover(CloverField &clover, const GaugeField& gauge, Float cloverCoeff, QudaFieldLocation location){
       int pad = 0;
-      GaugeFieldParam tensorParam(gauge.X(), gauge.Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
+      GaugeFieldParam tensorParam(clover.X(), clover.Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
       tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
       GaugeField* Fmunu = NULL;
       if(location == QUDA_CPU_FIELD_LOCATION){

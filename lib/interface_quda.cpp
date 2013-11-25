@@ -2722,13 +2722,9 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
 
 void createCloverQuda(QudaInvertParam* invertParam)
 {
-  // Here's some rudimentary clover creation code. 
-  // This code only works on a single GPU and it will 
-  // almost certainly be rewritten in the next 24 hours. 
-  // It's really just a place holder (JF. 11/05/13).
   profileCloverCreate.Start(QUDA_PROFILE_TOTAL);
+  profileCloverCreate.Start(QUDA_PROFILE_INIT);
   if(!cloverPrecise){
-    profileCloverCreate.Start(QUDA_PROFILE_INIT);
     CloverFieldParam cloverParam;
     cloverParam.nDim = 4;
     for(int dir=0; dir<4; ++dir) cloverParam.x[dir] = gaugePrecise->X()[dir];
@@ -2739,17 +2735,42 @@ void createCloverQuda(QudaInvertParam* invertParam)
     cloverParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     cloverPrecise = new cudaCloverField(cloverParam);
   }
+
+#ifdef MULTI_GPU
+  int y[4];
+  for(int dir=0; dir<4; ++dir){ 
+    y[dir] = commDimPartitioned(dir) ?  gaugePrecise->X()[dir] + 4 : gaugePrecise->X()[dir];
+  }
+  int pad = 0;
+  // Should have QUDA_RECONSTRUCT_12 below, but copyExtendedGauge currently supports 
+  // only QUDA_RECONSTRUCT_NO.
+  GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+                           pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+  gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+  gParamEx.order = gaugePrecise->Order();
+  gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+
+  cudaGaugeField gaugeExtended(gParamEx);
+  cudaGaugeField* cudaGauge = &gaugeExtended;
+
+  copyExtendedGauge(gaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+
+  int R[4]; // radius of the extended region in each dimension / direction
+  for(int dir=0; dir<4; ++dir){
+    R[dir] = commDimPartitioned(dir) ? 2 : 0;
+  }
   profileCloverCreate.Stop(QUDA_PROFILE_INIT);
 
-  profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
-  double cloverCoeff = 1.0;
+  profileCloverCreate.Start(QUDA_PROFILE_COMMS);
+  gaugeExtended.exchangeExtendedGhost(R);
+  profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
+#else
+  cudaGaugeField* cudaGauge = gaugePrecise;
+  profileCloverCreate.Stop(QUDA_PROFILE_INIT);
+#endif 
 
-  // Use gaugePrecise to construct cloverPrecise
-  // In multi-GPU mode, gaugePrecise has to be extended before it's
-  // used to construct the clover field. The multi-GPU code hasn't been 
-  // implemented yet.
-  computeClover(*cloverPrecise, *gaugePrecise, cloverCoeff, QUDA_CUDA_FIELD_LOCATION);
- 
+  profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
+  computeClover(*cloverPrecise, *cudaGauge, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
   profileCloverCreate.Stop(QUDA_PROFILE_COMPUTE);
   
   profileCloverCreate.Stop(QUDA_PROFILE_TOTAL);
