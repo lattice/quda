@@ -251,7 +251,7 @@ namespace quda {
           } // switch
         } // x[dir] + shift[dir] >= X[dir]
       }else{ // shift < 0
-        if(x[dir] + shift < 0){
+        if(static_cast<int>(x[dir]) + shift < 0){
           switch(dir){
             case 0:
               ghost_idx = (3 + shift)*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;

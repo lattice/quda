@@ -190,7 +190,7 @@ namespace quda {
 			 void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
   
 
-  void cloverDerivative(cudaGaugeField &out, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, QudaParity parity, int conjugate);
+  void cloverDerivative(cudaGaugeField &out, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, double coeff, QudaParity parity, int conjugate);
 
 
 

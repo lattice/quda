@@ -529,6 +529,10 @@ extern "C" {
    */
   void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
 
+
+  void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
+
+
   /**
    *  Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
    */
@@ -537,6 +541,7 @@ extern "C" {
   void createCloverQuda(QudaInvertParam* param);
 
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
+                                   double coeff,
                                    QudaParity parity, QudaGaugeParam* param, int conjugate);
 
   /**

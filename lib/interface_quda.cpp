@@ -2779,6 +2779,36 @@ void createCloverQuda(QudaInvertParam* invertParam)
 }
 
 #ifdef MULTI_GPU
+void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
+{
+
+  GaugeFieldParam gParam(0,*param);
+  if(geometry == 1){
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  }else if(geometry == 4){ 
+    gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  }else{
+    errorQuda("Only scalar and vector geometries are supported\n");
+  }
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.pad = 0;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.gauge = gauge;
+
+  cpuGaugeField cpuGauge(gParam);
+
+
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+
+  cudaGaugeField* cudaGauge = new cudaGaugeField(gParam);
+  cudaGauge->loadCPUField(cpuGauge,QUDA_CPU_FIELD_LOCATION);
+
+  return cudaGauge;
+}
+
+
 void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
   profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
@@ -2859,6 +2889,7 @@ void computeCloverDerivativeQuda(void* out,
                                  void* gauge,
                                  void* oprod,
                                  int mu, int nu,
+                                 double coeff,
                                  QudaParity parity,
                                  QudaGaugeParam* param,
                                  int conjugate)
@@ -2916,7 +2947,7 @@ void computeCloverDerivativeQuda(void* out,
 
 
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
-  cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity, conjugate);
+  cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, coeff, parity, conjugate);
   profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
 
 
