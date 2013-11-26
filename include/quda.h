@@ -532,6 +532,7 @@ extern "C" {
 
   void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
 
+  void  saveGaugeField(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
   /**
    *  Reinterpret gauge as a pointer to cudaGaugeField and call destructor.

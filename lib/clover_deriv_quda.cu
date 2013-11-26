@@ -291,8 +291,8 @@ namespace quda {
 
       // Write to array
       {
-        writeMatrixToArray(thisForce, index, arg.forceStride, arg.force + arg.parity*arg.forceOffset);
-        writeMatrixToArray(otherForce, index, arg.forceStride, arg.force + otherparity*arg.forceOffset); 
+        appendMatrixToArray(thisForce, index, arg.forceStride, arg.force + arg.parity*arg.forceOffset);
+        appendMatrixToArray(otherForce, index, arg.forceStride, arg.force + otherparity*arg.forceOffset); 
       }
       return;
     } // cloverDerivativeKernel
