@@ -193,10 +193,12 @@ int main(int argc, char **argv)
 //! For deflated solvers only:
   if(deflated) inv_param.inv_type = QUDA_EIGCG_INVERTER;
 
+  inv_param.rhs_idx = 0;
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
     inv_param.nev = 16;//not working for 64
     inv_param.max_vect_size = 144;
+    inv_param.deflation_grid = 1;//to test the stuff
   }else{
     inv_param.nev = 0;
     inv_param.max_vect_size = 0;
@@ -336,6 +338,37 @@ int main(int argc, char **argv)
     spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   }
 
+  void *ritzVects = 0;
+  void *projMat   = 0;
+  if(deflated){
+    ritzVects = malloc(inv_param.nev*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
+    projMat   = malloc(inv_param.nev*inv_param.nev*2*sSize);
+    memset(ritzVects, 0, inv_param.nev*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+    memset(projMat, 0, inv_param.nev*inv_param.nev*2*sSize);
+
+//for test only:
+    double nrm = 0.0;
+
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
+    {
+      //((float*)spinorIn)[0] = 1.0;
+      for (int i = 0; i < inv_param.nev*Vh*spinorSiteSize; i++){ 
+        float tmp = rand() / (float)RAND_MAX;
+        ((float*)ritzVects)[i] = tmp;
+        nrm += tmp*tmp;
+      }
+    }
+    else
+    {
+      for (int i = 0; i < inv_param.nev*Vh*spinorSiteSize; i++){ 
+        double tmp = rand() / (double)RAND_MAX;
+        ((double*)ritzVects)[i] = tmp;
+        nrm += tmp*tmp;
+      }
+    }
+    printfQuda("\nTest norm (prec = %d): %le\n\n", inv_param.cpu_prec, nrm);
+  }
+
   // create a point source at 0 (in each subvolume...  FIXME)
 
   // create a point source at 0 (in each subvolume...  FIXME)
@@ -377,7 +410,26 @@ int main(int argc, char **argv)
   } else if(!deflated){
     invertQuda(spinorOut, spinorIn, &inv_param);
   }else{
-    invertDeflatedQuda(spinorOut, spinorIn, &inv_param);
+    invertIncDeflatedQuda(spinorOut, spinorIn, ritzVects, projMat, &inv_param);
+
+    double nrm = 0.0;//test only 
+
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
+    {
+      for (int i = 0; i < inv_param.nev*Vh*spinorSiteSize; i++){ 
+        float tmp = ((float*)ritzVects)[i];
+        nrm += tmp*tmp;
+      }
+    }
+    else
+    {
+      for (int i = 0; i < inv_param.nev*Vh*spinorSiteSize; i++){ 
+        double tmp = ((double*)ritzVects)[i];
+        nrm += tmp*tmp;
+      }
+    }
+    printfQuda("\nPost-process test norm (prec = %d): %le\n\n", inv_param.cpu_prec, nrm);
+
   }
 
   // stop the timer
@@ -498,6 +550,11 @@ int main(int argc, char **argv)
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
 	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
+  }
+
+  if(deflated){
+    free(ritzVects);
+    free(projMat);
   }
 
   freeGaugeQuda();

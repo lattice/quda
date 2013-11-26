@@ -28,7 +28,7 @@ namespace quda {
 
   ProjectionMatrix::ProjectionMatrix(DiracMatrix &matDefl, SolverParam &param) : matDefl(matDefl), prev_dim(0)
   { 
-     if(param.nev == 0 || param.deflation_grid < param.nev) errorQuda("\nIncorrect deflation space parameters...\n");
+     if(param.nev == 0 || param.deflation_grid == 0) errorQuda("\nIncorrect deflation space parameters...\n");
 
      tot_dim      = param.deflation_grid*param.nev;
      curr_dim     = param.nev;
@@ -67,13 +67,17 @@ namespace quda {
   void ProjectionMatrix::LoadProj(void *in)
   {
      memcpy(hproj, in, bytes);
+     printfQuda("\nCopy %d bytes for the projector matrix..\n", bytes);
      cudaMemcpy(dproj, in, bytes, cudaMemcpyDefault);
+     checkCudaError();
      return;
   }
 
   void ProjectionMatrix::SaveProj(void *out)
   {
+     printfQuda("\nCopy %d bytes for the projector matrix..\n", bytes);
      cudaMemcpy(out, dproj, bytes, cudaMemcpyDefault);
+     checkCudaError();
      return;
   }
 
@@ -83,6 +87,18 @@ namespace quda {
      prev_dim = curr_dim;
      curr_dim = n;
      return;
+  }
+
+  void ProjectionMatrix::PrintInfo()
+  {
+     printfQuda("\nProjection matrix information:\n");
+     printfQuda("Precision %d\n", prec);
+     printfQuda("Leading dimension %d\n", ld);
+     printfQuda("Total dimension %d\n", tot_dim);
+     printfQuda("Current dimension %d\n", curr_dim);
+     printfQuda("Bytes: %d\n", bytes);
+     printfQuda("Host pointer: %p\n", hproj);
+     printfQuda("Device pointer: %p\n\n", dproj);
   }
 
 
@@ -103,8 +119,8 @@ namespace quda {
 
     if(param.rhs_idx < param.deflation_grid)
     {
-       printfQuda("\nAllocating resources for the EigCG solver.\n");
-       if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or search space is too small..)\n");
+       printfQuda("\nAllocating resources for the EigCG solver...\n");
+       if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or the search space is too small..)\n");
        //Create an eigenvector set:
        eigvParam->create   = QUDA_ZERO_FIELD_CREATE;
        eigvParam->setPrecision(QUDA_SINGLE_PRECISION);//eigCG internal search space is in single precision (currently)
@@ -126,6 +142,7 @@ namespace quda {
        cudaMemset(dTvecm0, 0, param.m*param.m*sizeof(cuComplex));
        cudaMemset(dTvecm1, 0, param.m*param.m*sizeof(cuComplex));
        //Error check is missing...
+       printfQuda("\n..done.\n");
        
        eigcg_alloc = true;
     }
@@ -496,11 +513,9 @@ namespace quda {
      if((param.rhs_idx == 0) || (param.inv_type == QUDA_EIGCG_INVERTER))
      {
         //compute the first nev Ritz vectors:
-//        EigCG(*out, *in, u->GetEigenvecSubset(param.nev));
-        EigCG(*out, *in, *u);
+        EigCG(*out, *u, *in);
 
         //Construct projection matrix:
-//        pM->ConstructProj(u->GetEigenvecSubset(param.nev));
         pM->ConstructProj(*u);
 
         //finish for this first rhs:
@@ -513,19 +528,15 @@ namespace quda {
         const int offset  = param.nev*param.rhs_idx;
 
         //deflate initial guess:
-//        DeflateInitGuess(*in, u->GetEigenvecSubset(w_range), *pM);
         DeflateInitGuess(*in, *u, *pM);
 
         //compute current nev Ritz vectors:
-//        EigCG(*out, *in, u->GetEigenvecSubset(param.nev, offset));
-        EigCG(*out, *in, *u);        
+        EigCG(*out, *u, *in);        
 
         //orthogonalize new nev vectors against old vectors 
-//        OrthRitz(u->GetEigenvecSubset(w_range));
         OrthRitz(*u);
 
         //Construct(extend) projection matrix:
-//        pM->ConstructProj(u->GetEigenvecSubset(w_range));
         pM->ConstructProj(*u);
 
         //finish for this first rhs:
@@ -551,16 +562,15 @@ namespace quda {
         //deflate initial guess:
         const int range = param.nev*param.deflation_grid;
 
-//        DeflateInitGuess(*in, u->GetEigenvecSubset(range), *pM);
         DeflateInitGuess(*in, *u, *pM);
 
         //launch initCG:
-        (*initCG)(*in, *out);
+        (*initCG)(*out, *in);
 
         param.rhs_idx++;
      } 
 //in main routine don't forget: solverParam.updateInvertParam(*param);
-     
+
      return;
   }
 

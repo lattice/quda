@@ -1860,7 +1860,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
   double nb = norm2(*b);
-  if (nb==0.0) errorQuda("Solution has zero norm");
+  if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = norm2(*h_b);
@@ -1938,9 +1938,11 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
 
     projMat->LoadProj(_h_p);
 
+    if (getVerbosity() >= QUDA_VERBOSE){
+       projMat->PrintInfo();
+    }
+
     (*solve)(out, in, ritzvects, projMat);
-    solverParam.updateInvertParam(*param);
-    delete solve;
 
     if(param->rhs_idx < param->deflation_grid || param->inv_type == QUDA_EIGCG_INVERTER)
     {
@@ -1948,11 +1950,15 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
       projMat->SaveProj(_h_p);
       //const int offset = param->nev*param->rhs_idx;
       //h_u->GetEigenvecSubset(param->nev, offset) = ritzvects->GetEigenvecSubset(param->nev, offset);
+
       *h_u = *ritzvects;
     }
     delete h_u;
     delete ritzvects;
     delete projMat;
+
+    solverParam.updateInvertParam(*param);
+    delete solve;
   }
   else
   {

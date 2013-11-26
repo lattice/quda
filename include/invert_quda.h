@@ -402,6 +402,9 @@ namespace quda {
 
     //copy to the host:
     void SaveProj(void *out);
+
+    //print information about the projector:
+    void PrintInfo();
   };
 
 //experimantal EigCG solver
