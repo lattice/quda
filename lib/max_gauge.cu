@@ -16,7 +16,7 @@ namespace quda {
 	for (int x=0; x<volume/2; x++) {
 	  RegType v[Nc*Nc*2];
 	  order.load(v, x, d, parity);
-	  for (int i=0; i<Nc*Nc*2; i++) if (abs(v[i]) > max) { max = v[i]; }
+	  for (int i=0; i<Nc*Nc*2; i++) if (abs(v[i]) > max) { max = abs(v[i]); }
 	}
       }
 

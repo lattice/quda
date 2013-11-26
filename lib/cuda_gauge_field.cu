@@ -185,15 +185,18 @@ namespace quda {
 
   void cudaGaugeField::exchangeExtendedGhost(const int *R) {
     
-    void *send_d[QUDA_MAX_DIM];
-    void *recv_d[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
+    void *send_d[QUDA_MAX_DIM];
+    void *recv_d[QUDA_MAX_DIM];
     size_t bytes[QUDA_MAX_DIM];
 
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
+      // store both parities and directions in each
       bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
+      send_d[d] = device_malloc(2 * bytes[d]);
+      recv_d[d] = device_malloc(2 * bytes[d]);
     }
 
 #ifndef GPU_COMMS
@@ -202,7 +205,7 @@ namespace quda {
     size_t total_bytes = 0;
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-      total_bytes += 2*bytes[d];
+      total_bytes += 4*bytes[d];
     }
     resizeBufferPinned(total_bytes);
 
@@ -211,8 +214,8 @@ namespace quda {
       if (!commDimPartitioned(d)) continue;
 
       recv_h[d] = static_cast<char*>(bufferPinned) + offset;
-      send_h[d] = static_cast<char*>(recv_h[d]) + bytes[d];
-      offset += 2*bytes[d];
+      send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
+      offset += 4*bytes[d];
     }
 #endif
 
@@ -222,34 +225,32 @@ namespace quda {
     MsgHandle *mh_send_fwd[QUDA_MAX_DIM];
     MsgHandle *mh_send_back[QUDA_MAX_DIM];
 
-    // store both parities and directions in each
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-      bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
-      send_d[d] = device_malloc(2 * bytes[d]);
-      recv_d[d] = device_malloc(2 * bytes[d]);
 #ifdef GPU_COMMS
       recv[d] = recv_d[d];
       send[d] = send_d[d];
 #else
-      if (R[d] != 2) errorQuda("Currently require R[%d] = 2", d);
       recv[d] = recv_h[d];
       send[d] = send_h[d];
 #endif
 
       // look into storing these for later
       mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
-      mh_recv_fwd[d]  = comm_declare_receive_relative(((char*)recv[d])+bytes[d], d, +1, bytes[d]);
+      mh_recv_fwd[d]  = comm_declare_receive_relative(static_cast<char*>(recv[d])+bytes[d], 
+						      d, +1, bytes[d]);
       mh_send_back[d] = comm_declare_send_relative(send[d], d, -1, bytes[d]);
-      mh_send_fwd[d]  = comm_declare_send_relative(((char*)send[d])+bytes[d], d, +1, bytes[d]);
+      mh_send_fwd[d]  = comm_declare_send_relative(static_cast<char*>(send[d])+bytes[d], 
+						   d, +1, bytes[d]);
     }
 
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
 
+      // FIXME why does this break if the order is switched?
       // prepost the receives
-      comm_start(mh_recv_back[d]);
       comm_start(mh_recv_fwd[d]);
+      comm_start(mh_recv_back[d]);
 
       //extract into a contiguous buffer
       extractExtendedGaugeGhost(*this, d, R, send_d, true);
@@ -257,7 +258,8 @@ namespace quda {
       // pipeline the forwards and backwards sending
 #ifndef GPU_COMMS
       cudaMemcpyAsync(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, streams[0]);
-      cudaMemcpyAsync(((char*)send_h[d])+bytes[d], ((char*)send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
+      cudaMemcpyAsync(static_cast<char*>(send_h[d])+bytes[d], 
+		      static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
 #endif      
 
 #ifndef GPU_COMMS
@@ -274,7 +276,8 @@ namespace quda {
       comm_wait(mh_send_back[d]);
       comm_wait(mh_recv_fwd[d]);
 #ifndef GPU_COMMS
-      cudaMemcpyAsync(((char*)recv_d[d])+bytes[d], ((char*)recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
+      cudaMemcpyAsync(static_cast<char*>(recv_d[d])+bytes[d], 
+		      static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
 #endif      
       
       // backwards recv
@@ -312,12 +315,15 @@ namespace quda {
   }
 
   void cudaGaugeField::copy(const GaugeField &src) {
+    if (this == &src) return;
+
     checkField(src);
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
       if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0) 
         errorQuda("fat_link_max has not been computed");
+      printf("Fat link max = %e\n", fat_link_max);
     } else {
       fat_link_max = 1.0;
     }
@@ -339,6 +345,12 @@ namespace quda {
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
     } else {
       errorQuda("Invalid gauge field type");
+    }
+
+    // if we have copied from a source without a pad then we need to exchange
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD &&
+	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
+      exchangeGhost(); 
     }
 
     checkCudaError();
