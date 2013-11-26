@@ -174,6 +174,9 @@ namespace quda {
   // driver for computing the clover field from the gauge field
   void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);
 
+
+  void computeCloverSigmaTrace(GaugeField &gauge, const CloverField &clover, int dir1, int dir2, QudaFieldLocation location);
+
   /**
      This generic function is used for copying the clover field where
      in the input and output can be in any order and location.

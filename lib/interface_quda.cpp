@@ -123,8 +123,11 @@ static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 //!<Profiler for createClover>
 static TimeProfile profileCloverCreate("createCloverQuda");
 
-//!<Profiler for updateCloverDerivative
+//!<Profiler for computeCloverDerivative
 static TimeProfile profileCloverDerivative("computeCloverDerivativeQuda");
+
+//!<Profiler for computeCloverSigmaTrace
+static TimeProfile profileCloverTrace("computeCloverTraceQuda");
 
 //!<Profiler for computeStaggeredOprodQuda
 static TimeProfile profileStaggeredOprod("computeStaggeredOprodQuda");
@@ -770,6 +773,7 @@ void endQuda(void)
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
     profileCloverDerivative.Print();
+    profileCloverTrace.Print();
     profileStaggeredOprod.Print();
     profileEnd.Print();
 
@@ -2755,6 +2759,8 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
 
 #endif
 
+
+
 void createCloverQuda(QudaInvertParam* invertParam)
 {
   profileCloverCreate.Start(QUDA_PROFILE_TOTAL);
@@ -2936,6 +2942,24 @@ void destroyQudaGaugeField(void* gauge){
   cudaGaugeField* g = reinterpret_cast<cudaGaugeField*>(gauge);
   delete g;
 }
+
+
+void computeCloverTraceQuda(void *out,
+                            void *clov,
+                            int mu,
+                            int nu)
+{
+
+  profileCloverTrace.Start(QUDA_PROFILE_TOTAL);
+
+  cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(out);
+
+  computeCloverSigmaTrace(*cudaGauge, *cloverPrecise, mu, nu,  QUDA_CUDA_FIELD_LOCATION);
+
+  profileCloverTrace.Stop(QUDA_PROFILE_TOTAL);
+  return;
+}
+
 
 
 void computeCloverDerivativeQuda(void* out,
