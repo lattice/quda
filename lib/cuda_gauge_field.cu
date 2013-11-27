@@ -183,7 +183,7 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::exchangeExtendedGhost(const int *R) {
+  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
     
     void *send[QUDA_MAX_DIM];
     void *recv[QUDA_MAX_DIM];
@@ -192,7 +192,7 @@ namespace quda {
     size_t bytes[QUDA_MAX_DIM];
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
+      if (!commDimPartitioned(d) && !no_comms_fill) continue;
       // store both parities and directions in each
       bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
       send_d[d] = device_malloc(2 * bytes[d]);
@@ -245,60 +245,69 @@ namespace quda {
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
+      if (!commDimPartitioned(d) && !no_comms_fill) continue;
 
       // FIXME why does this break if the order is switched?
       // prepost the receives
-      comm_start(mh_recv_fwd[d]);
-      comm_start(mh_recv_back[d]);
+      if (commDimPartitioned(d)) {
+	comm_start(mh_recv_fwd[d]);
+	comm_start(mh_recv_back[d]);
+      }
 
-      //extract into a contiguous buffer
-      extractExtendedGaugeGhost(*this, d, R, send_d, true);
-      
-      // pipeline the forwards and backwards sending
+      if (commDimPartitioned(d)) {
+	//extract into a contiguous buffer
+	extractExtendedGaugeGhost(*this, d, R, send_d, true);
+	
+	// pipeline the forwards and backwards sending
 #ifndef GPU_COMMS
-      cudaMemcpyAsync(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, streams[0]);
-      cudaMemcpyAsync(static_cast<char*>(send_h[d])+bytes[d], 
-		      static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
+	cudaMemcpyAsync(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, streams[0]);
+	cudaMemcpyAsync(static_cast<char*>(send_h[d])+bytes[d], 
+			static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
 #endif      
-
+	
 #ifndef GPU_COMMS
-      cudaStreamSynchronize(streams[0]);
+	cudaStreamSynchronize(streams[0]);
 #endif
-      comm_start(mh_send_back[d]);
-
+	comm_start(mh_send_back[d]);
+	
 #ifndef GPU_COMMS
-      cudaStreamSynchronize(streams[1]);
+	cudaStreamSynchronize(streams[1]);
 #endif
-      comm_start(mh_send_fwd[d]);
-
-      // forwards recv
-      comm_wait(mh_send_back[d]);
-      comm_wait(mh_recv_fwd[d]);
+	comm_start(mh_send_fwd[d]);
+	
+	// forwards recv
+	comm_wait(mh_send_back[d]);
+	comm_wait(mh_recv_fwd[d]);
 #ifndef GPU_COMMS
-      cudaMemcpyAsync(static_cast<char*>(recv_d[d])+bytes[d], 
-		      static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
+	cudaMemcpyAsync(static_cast<char*>(recv_d[d])+bytes[d], 
+			static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
 #endif      
-      
-      // backwards recv
-      comm_wait(mh_send_fwd[d]);
-      comm_wait(mh_recv_back[d]);
+	
+	// backwards recv
+	comm_wait(mh_send_fwd[d]);
+	comm_wait(mh_recv_back[d]);
 #ifndef GPU_COMMS
-      cudaMemcpyAsync(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice, streams[1]);
+	cudaMemcpyAsync(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice, streams[1]);
 #endif      
+      } else { // if just doing a local exchange to fill halo then need to swap faces
+	cudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], send_d[d], bytes[d], cudaMemcpyDeviceToDevice);
+	cudaMemcpy(recv_d[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToDevice);
+      }
 
       // inject back into the gauge field
       extractExtendedGaugeGhost(*this, d, R, recv_d, false);
     }
 
     for (int d=0; d<nDim; d++) {
-      if (!commDimPartitioned(d)) continue;
+      if (!commDimPartitioned(d) && !no_comms_fill) continue;
 
-      comm_free(mh_send_fwd[d]);
-      comm_free(mh_send_back[d]);
-      comm_free(mh_recv_back[d]);
-      comm_free(mh_recv_fwd[d]);
-      
+      if (commDimPartitioned(d)) {
+	comm_free(mh_send_fwd[d]);
+	comm_free(mh_send_back[d]);
+	comm_free(mh_recv_back[d]);
+	comm_free(mh_recv_fwd[d]);
+      }
+
       device_free(send_d[d]);
       device_free(recv_d[d]);
     }
