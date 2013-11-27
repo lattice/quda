@@ -254,9 +254,10 @@ namespace quda {
 	comm_start(mh_recv_back[d]);
       }
 
+      //extract into a contiguous buffer
+      extractExtendedGaugeGhost(*this, d, R, send_d, true);
+
       if (commDimPartitioned(d)) {
-	//extract into a contiguous buffer
-	extractExtendedGaugeGhost(*this, d, R, send_d, true);
 	
 	// pipeline the forwards and backwards sending
 #ifndef GPU_COMMS

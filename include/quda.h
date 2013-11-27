@@ -529,9 +529,6 @@ extern "C" {
    */
   void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
   
-  void* createExtendedField(void* gauge, int geometry, QudaGaugeParam* param);
-
-
   void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
 
   void  saveGaugeField(void* outGauge, void* inGauge, QudaGaugeParam* param);

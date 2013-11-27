@@ -120,8 +120,6 @@ static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 //!<Profiler for createExtendedGaugeField
 static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 
-//!<Profiler for createExtendedField
-static TimeProfile profileExtendedField("createExtendedField");
 
 //!<Profiler for createClover>
 static TimeProfile profileCloverCreate("createCloverQuda");
@@ -775,7 +773,6 @@ void endQuda(void)
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
-    profileExtendedField.Print();
     profileCloverDerivative.Print();
     profileCloverTrace.Print();
     profileStaggeredOprod.Print();
@@ -2872,10 +2869,10 @@ void saveGaugeField(void* gauge, void* inGauge, QudaGaugeParam* param){
 }
 
 
-void* createExtendedField(void* gauge, int geometry, QudaGaugeParam* param)
+void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
-  profileExtendedField.Start(QUDA_PROFILE_TOTAL);
-  profileExtendedField.Start(QUDA_PROFILE_INIT);
+  profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
+  profileExtendedGauge.Start(QUDA_PROFILE_INIT);
 
   QudaFieldGeometry geom;
   if(geometry == 1){
@@ -2885,7 +2882,6 @@ void* createExtendedField(void* gauge, int geometry, QudaGaugeParam* param)
   }else{
     errorQuda("Only scalar and vector geometries are supported");
   }
-
 
   // Create the unextended cpu field 
   GaugeFieldParam gParam(0, *param);
@@ -2904,18 +2900,17 @@ void* createExtendedField(void* gauge, int geometry, QudaGaugeParam* param)
   gParam.create = QUDA_NULL_FIELD_CREATE;
   cudaGaugeField cudaGauge(gParam);
 
-  profileExtendedField.Stop(QUDA_PROFILE_INIT);
+  profileExtendedGauge.Stop(QUDA_PROFILE_INIT);
 
   // load the data into the unextended device field 
-  profileExtendedField.Start(QUDA_PROFILE_H2D);
+  profileExtendedGauge.Start(QUDA_PROFILE_H2D);
   cudaGauge.loadCPUField(cpuGauge, QUDA_CPU_FIELD_LOCATION);
-  profileExtendedField.Stop(QUDA_PROFILE_H2D);
+  profileExtendedGauge.Stop(QUDA_PROFILE_H2D);
 
-  profileExtendedField.Start(QUDA_PROFILE_INIT);
+  profileExtendedGauge.Start(QUDA_PROFILE_INIT);
 
   QudaGaugeParam param_ex;
   memcpy(&param_ex, param, sizeof(QudaGaugeParam));
-  //for(int dir=0; dir<4; ++dir) param_ex.X[dir] = commDimPartitioned(dir) ? param->X[dir] : param->X[dir]+4;
   for(int dir=0; dir<4; ++dir) param_ex.X[dir] = param->X[dir]+4;
   GaugeFieldParam gParam_ex(0, param_ex);
   gParam_ex.link_type     = param->type; 
@@ -2930,21 +2925,19 @@ void* createExtendedField(void* gauge, int geometry, QudaGaugeParam* param)
   // copy data from the interior into the border region
   copyExtendedGauge(*cudaGaugeEx, cudaGauge, QUDA_CUDA_FIELD_LOCATION);
   int R[4] = {2,2,2,2};
-
-  profileExtendedField.Stop(QUDA_PROFILE_INIT);
- 
+  profileExtendedGauge.Stop(QUDA_PROFILE_INIT);
   // communicate 
-  profileExtendedField.Start(QUDA_PROFILE_COMMS);
-  cudaGaugeEx->exchangeExtendedGhost(R);
-  profileExtendedField.Stop(QUDA_PROFILE_COMMS);
+  profileExtendedGauge.Start(QUDA_PROFILE_COMMS);
+  cudaGaugeEx->exchangeExtendedGhost(R, true);
+  profileExtendedGauge.Stop(QUDA_PROFILE_COMMS);
 
-  profileExtendedField.Stop(QUDA_PROFILE_TOTAL);
+  profileExtendedGauge.Stop(QUDA_PROFILE_TOTAL);
   
   return cudaGaugeEx;
 }
 
 
-
+/*
 void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
   profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
@@ -3015,6 +3008,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
   profileExtendedGauge.Stop(QUDA_PROFILE_TOTAL);
   return cudaGaugeEx;
 }
+*/
 #endif // MULTI_GPU
 
 void destroyQudaGaugeField(void* gauge){
