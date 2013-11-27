@@ -197,7 +197,16 @@ namespace quda {
     virtual ~cudaGaugeField();
 
     void exchangeGhost(); // exchange the ghost and store store in the padded region
-    void exchangeExtendedGhost(const int *R);
+
+    /**
+       This does routine will populate the border / halo region of a
+       gauge field that has been created using copyExtendedGauge.  
+
+       @param R The thickness of the extended region in each dimension
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimenions
+     */
+    void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     void copy(const GaugeField &);     // generic gauge field copy
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
@@ -244,7 +253,16 @@ namespace quda {
     virtual ~cpuGaugeField();
 
     void exchangeGhost();
-    void exchangeExtendedGhost(const int *R);
+
+    /**
+       This does routine will populate the border / halo region of a
+       gauge field that has been created using copyExtendedGauge.  
+
+       @param R The thickness of the extended region in each dimension
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimenions
+     */
+    void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
