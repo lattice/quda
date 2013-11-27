@@ -332,7 +332,6 @@ namespace quda {
       fat_link_max = src.LinkMax();
       if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0) 
         errorQuda("fat_link_max has not been computed");
-      printf("Fat link max = %e\n", fat_link_max);
     } else {
       fat_link_max = 1.0;
     }

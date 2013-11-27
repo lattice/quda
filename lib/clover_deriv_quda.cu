@@ -15,6 +15,7 @@ namespace quda {
       int X[4];
       int mu;
       int nu;
+      typename RealTypeId<Cmplx>::Type coeff;
       int parity;
       int volumeCB;
 
@@ -32,8 +33,8 @@ namespace quda {
      
       bool conjugate;      
 
-      CloverDerivArg(cudaGaugeField& force, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, int parity, bool conjugate) :  
-        mu(mu), nu(nu), parity(parity), volumeCB(force.VolumeCB()), 
+      CloverDerivArg(cudaGaugeField& force, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, double coeff, int parity, bool conjugate) :  
+        mu(mu), nu(nu), coeff(coeff), parity(parity), volumeCB(force.VolumeCB()), 
         force(reinterpret_cast<Cmplx*>(force.Gauge_p())),  gauge(reinterpret_cast<Cmplx*>(gauge.Gauge_p())), oprod(reinterpret_cast<Cmplx*>(oprod.Gauge_p())),
         forceStride(force.Stride()), gaugeStride(gauge.Stride()), oprodStride(oprod.Stride()),
         forceOffset(force.Bytes()/(2*sizeof(Cmplx))), gaugeOffset(gauge.Bytes()/(2*sizeof(Cmplx))), oprodOffset(oprod.Bytes()/(2*sizeof(Cmplx)))
@@ -130,7 +131,7 @@ namespace quda {
         Matrix<Cmplx,3> Oprod1;
         loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod1);
 
-        if(isConjugate) Oprod1 = -conj(Oprod1);
+        if(isConjugate) Oprod1 -= conj(Oprod1);
         thisForce = U1*U2*conj(U3)*conj(U4)*Oprod1;
 
         Matrix<Cmplx,3> Oprod2;
@@ -138,7 +139,7 @@ namespace quda {
         loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod2);
         d[mu]--; d[nu]--;
 
-        if(isConjugate) Oprod2 = -conj(Oprod2);
+        if(isConjugate) Oprod2 -= conj(Oprod2);
 
         thisForce += U1*U2*Oprod2*conj(U3)*conj(U4);
 
@@ -176,7 +177,7 @@ namespace quda {
         loadMatrixFromArray(thisOprod, linkIndex(y, d, X), arg.oprodStride, &Oprod3);
         d[nu]--;
 
-        if(isConjugate) Oprod3 = -conj(Oprod3);
+        if(isConjugate) Oprod3 -= conj(Oprod3);
         otherForce = U1*U2*conj(U3)*Oprod3*conj(U4);
 
         // load Oprod(x+mu)
@@ -185,7 +186,7 @@ namespace quda {
         loadMatrixFromArray(thisOprod, linkIndex(y, d, X), arg.oprodStride, &Oprod4);
         d[mu]--;
 
-        if(isConjugate) Oprod4 = -conj(Oprod4);
+        if(isConjugate) Oprod4 -= conj(Oprod4);
 
         otherForce += U1*Oprod4*U2*conj(U3)*conj(U4);
       }
@@ -227,7 +228,7 @@ namespace quda {
         loadMatrixFromArray(thisOprod, linkIndex(y, d, X), arg.oprodStride, &Oprod1);
         d[mu]--;    
 
-        if(isConjugate) Oprod1 = -conj(Oprod1);
+        if(isConjugate) Oprod1 -= conj(Oprod1);
 
         otherForce -= conj(U1)*U2*U3*Oprod1*conj(U4);
 
@@ -236,7 +237,7 @@ namespace quda {
         loadMatrixFromArray(thisOprod, linkIndex(y, d, X), arg.oprodStride, &Oprod2);
         d[nu]++;
 
-        if(isConjugate) Oprod2 = -conj(Oprod2);
+        if(isConjugate) Oprod2 -= conj(Oprod2);
         otherForce -= conj(U1)*Oprod2*U2*U3*conj(U4);
       }
 
@@ -274,19 +275,24 @@ namespace quda {
         loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod1);
         d[mu]--; d[nu]++;
 
-        if(isConjugate) Oprod1 = -conj(Oprod1);
+        if(isConjugate) Oprod1 -= conj(Oprod1);
         thisForce -= conj(U1)*U2*Oprod1*U3*conj(U4);
 
         Matrix<Cmplx, 3> Oprod4;
         loadMatrixFromArray(thisOprod, linkIndex(x, d, X), arg.oprodStride, &Oprod4);
 
-        if(isConjugate) Oprod4 = -conj(Oprod4);
+        if(isConjugate) Oprod4 -= conj(Oprod4);
         thisForce -= Oprod4*conj(U1)*U2*U3*conj(U4);
       }
+    
+      thisForce *= arg.coeff;
+      otherForce *= arg.coeff;
+
+
       // Write to array
       {
-        writeMatrixToArray(thisForce, index, arg.forceStride, arg.force + arg.parity*arg.forceOffset);
-        writeMatrixToArray(otherForce, index, arg.forceStride, arg.force + otherparity*arg.forceOffset); 
+        appendMatrixToArray(thisForce, index, arg.forceStride, arg.force + arg.parity*arg.forceOffset);
+        appendMatrixToArray(otherForce, index, arg.forceStride, arg.force + otherparity*arg.forceOffset); 
       }
       return;
     } // cloverDerivativeKernel
@@ -344,11 +350,11 @@ namespace quda {
     void cloverDerivative(cudaGaugeField &out,
         cudaGaugeField& gauge,
         cudaGaugeField& oprod,
-        int mu, int nu, int parity,
+        int mu, int nu, double coeff, int parity,
         int conjugate)
     {
       typedef typename ComplexTypeId<Float>::Type Complex;
-      CloverDerivArg<Complex> arg(out, gauge, oprod, mu, nu, parity, conjugate);
+      CloverDerivArg<Complex> arg(out, gauge, oprod, mu, nu, coeff, parity, conjugate);
 //      CloverDerivative<Complex> cloverDerivative(arg);
 //      cloverDerivative.apply(0);
       dim3 blockDim(128, 1, 1);
@@ -364,7 +370,7 @@ namespace quda {
   void cloverDerivative(cudaGaugeField &out,   
       cudaGaugeField& gauge,
       cudaGaugeField& oprod,
-      int mu, int nu, QudaParity parity, int conjugate)
+      int mu, int nu, double coeff, QudaParity parity, int conjugate)
   {
     assert(oprod.Geometry() == QUDA_SCALAR_GEOMETRY);
     assert(out.Geometry() == QUDA_SCALAR_GEOMETRY);
@@ -372,9 +378,9 @@ namespace quda {
     int device_parity = (parity == QUDA_EVEN_PARITY) ? 0 : 1;
 
     if(out.Precision() == QUDA_DOUBLE_PRECISION){
-      cloverDerivative<double>(out, gauge, oprod, mu, nu, device_parity, conjugate);   
+      cloverDerivative<double>(out, gauge, oprod, mu, nu, coeff, device_parity, conjugate);   
     } else if (out.Precision() == QUDA_SINGLE_PRECISION){
-      cloverDerivative<float>(out, gauge, oprod, mu, nu, device_parity, conjugate);
+      cloverDerivative<float>(out, gauge, oprod, mu, nu, coeff, device_parity, conjugate);
     } else {
       errorQuda("Precision %d not supported", out.Precision());
     }

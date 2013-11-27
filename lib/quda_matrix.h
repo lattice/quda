@@ -138,10 +138,10 @@ namespace quda{
 
   template<class Cmplx>
     __device__ __host__ inline Cmplx & operator-=(Cmplx & a, const Cmplx & b){
-    a.x -= b.x;
-    a.y -= b.y; 
-    return a;
-  }
+      a.x -= b.x;
+      a.y -= b.y; 
+      return a;
+    }
 
 
   template<class Cmplx>
@@ -310,17 +310,17 @@ namespace quda{
         }
 
         __device__ __host__ inline complex<typename RealTypeId<T>::Type> const & operator()(int i) const{
-	  int j = i % N;
-	  int k = i / N;
-	  return static_cast<complex<typename RealTypeId<T>::Type> >
-	    (data[index<N>(j,k)]);
+          int j = i % N;
+          int k = i / N;
+          return static_cast<complex<typename RealTypeId<T>::Type> >
+            (data[index<N>(j,k)]);
         }
 
         __device__ __host__ inline complex<typename RealTypeId<T>::Type>& operator()(int i) {
-	  int j = i % N;
-	  int k = i / N;
-	  return static_cast<complex<typename RealTypeId<T>::Type>& >
-	    (data[index<N>(j,k)]);
+          int j = i % N;
+          int k = i / N;
+          return static_cast<complex<typename RealTypeId<T>::Type>& >
+            (data[index<N>(j,k)]);
         }
 
     };
@@ -366,12 +366,12 @@ namespace quda{
 
   template<class T, int N> 
     __device__ __host__ inline Matrix<T,N> operator-=(Matrix<T,N> & a, const Matrix<T,N> & b)
-  {
-    for(int i=0; i<N*N; i++){
-      a.data[i] -= b.data[i];
+    {
+      for(int i=0; i<N*N; i++){
+        a.data[i] -= b.data[i];
+      }
+      return a;
     }
-    return a;
-  }
 
 
   template<class T, int N>
@@ -438,7 +438,7 @@ namespace quda{
       return result;
     }
 
-    
+
 
 
 
@@ -482,8 +482,8 @@ namespace quda{
       for(int i=0; i<N; ++i){
         for(int j=0; j<N; ++j){
           result(i,j) = 
-	    conj(static_cast<complex<typename RealTypeId<T>::Type> >
-		 (other(j,i)));
+            conj(static_cast<complex<typename RealTypeId<T>::Type> >
+                (other(j,i)));
         }
       }
       return result;
@@ -746,6 +746,23 @@ namespace quda{
       }
     }
 
+  __device__ inline 
+    void appendMatrixToArray(const Matrix<double2,3>& mat, const int idx, const int stride, double2* const array)
+    {
+      for(int i=0; i<9; ++i){
+        array[idx + i*stride].x += mat.data[i].x;
+        array[idx + i*stride].y += mat.data[i].y;
+      }
+    }
+
+  __device__ inline 
+    void appendMatrixToArray(const Matrix<float2,3>& mat, const int idx, const int stride, float2* const array)
+    {
+      for(int i=0; i<9; ++i){
+        array[idx + i*stride].x += mat.data[i].x;
+        array[idx + i*stride].y += mat.data[i].y;
+      }
+    }
 
 
   template<class T>

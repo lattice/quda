@@ -123,8 +123,11 @@ static TimeProfile profileExtendedGauge("createExtendedGaugeField");
 //!<Profiler for createClover>
 static TimeProfile profileCloverCreate("createCloverQuda");
 
-//!<Profiler for updateCloverDerivative
+//!<Profiler for computeCloverDerivative
 static TimeProfile profileCloverDerivative("computeCloverDerivativeQuda");
+
+//!<Profiler for computeCloverSigmaTrace
+static TimeProfile profileCloverTrace("computeCloverTraceQuda");
 
 //!<Profiler for computeStaggeredOprodQuda
 static TimeProfile profileStaggeredOprod("computeStaggeredOprodQuda");
@@ -770,6 +773,7 @@ void endQuda(void)
     profileGaugeUpdate.Print();
     profileExtendedGauge.Print();
     profileCloverDerivative.Print();
+    profileCloverTrace.Print();
     profileStaggeredOprod.Print();
     profileEnd.Print();
 
@@ -2755,6 +2759,8 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
 
 #endif
 
+
+
 void createCloverQuda(QudaInvertParam* invertParam)
 {
   profileCloverCreate.Start(QUDA_PROFILE_TOTAL);
@@ -2814,6 +2820,54 @@ void createCloverQuda(QudaInvertParam* invertParam)
 }
 
 #ifdef MULTI_GPU
+void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
+{
+
+  GaugeFieldParam gParam(0,*param);
+  if(geometry == 1){
+    gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  }else if(geometry == 4){ 
+    gParam.geometry = QUDA_VECTOR_GEOMETRY;
+  }else{
+    errorQuda("Only scalar and vector geometries are supported\n");
+  }
+  gParam.pad = 0;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.gauge = gauge;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+
+  
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  cudaGaugeField* cudaGauge = new cudaGaugeField(gParam);
+  if(gauge){
+    gParam.order = QUDA_MILC_GAUGE_ORDER;
+    gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    cpuGaugeField cpuGauge(gParam);
+    cudaGauge->loadCPUField(cpuGauge,QUDA_CPU_FIELD_LOCATION);
+  }
+  return cudaGauge;
+}
+
+
+void saveGaugeField(void* gauge, void* inGauge, QudaGaugeParam* param){
+
+  cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
+
+  GaugeFieldParam gParam(0,*param);
+  gParam.geometry = cudaGauge->Geometry();
+  gParam.pad = 0;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.gauge = gauge;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE; 
+
+  cpuGaugeField cpuGauge(gParam);
+  cudaGauge->saveCPUField(cpuGauge,QUDA_CPU_FIELD_LOCATION);
+}
+
+
 void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
   profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
@@ -2890,10 +2944,29 @@ void destroyQudaGaugeField(void* gauge){
 }
 
 
+void computeCloverTraceQuda(void *out,
+                            void *clov,
+                            int mu,
+                            int nu)
+{
+
+  profileCloverTrace.Start(QUDA_PROFILE_TOTAL);
+
+  cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(out);
+
+  computeCloverSigmaTrace(*cudaGauge, *cloverPrecise, mu, nu,  QUDA_CUDA_FIELD_LOCATION);
+
+  profileCloverTrace.Stop(QUDA_PROFILE_TOTAL);
+  return;
+}
+
+
+
 void computeCloverDerivativeQuda(void* out,
                                  void* gauge,
                                  void* oprod,
                                  int mu, int nu,
+                                 double coeff,
                                  QudaParity parity,
                                  QudaGaugeParam* param,
                                  int conjugate)
@@ -2914,8 +2987,8 @@ void computeCloverDerivativeQuda(void* out,
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge = out;
-  cpuGaugeField cpuOut(gParam);
+//  gParam.gauge = out;
+//  cpuGaugeField cpuOut(gParam);
 #ifndef USE_EXTENDED_VOLUME
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.link_type = QUDA_GENERAL_LINKS;
@@ -2928,15 +3001,19 @@ void computeCloverDerivativeQuda(void* out,
   cpuGaugeField cpuGauge(gParam);
 #endif
 
+/*
   // create device fields
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.create = QUDA_NULL_FIELD_CREATE;
-  gParam.pad = getGaugePadding(gParam);
+//  gParam.pad = getGaugePadding(gParam);
+  gParam.pad = 0;
+  gParam.ghostExchange  = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+//  cudaGaugeField cudaOut(gParam);
+*/
 
- // gParam.create = QUDA_ZERO_FIELD_CREATE;
-  cudaGaugeField cudaOut(gParam);
 #ifndef USE_EXTENDED_VOLUME
   cudaGaugeField cudaOprod(gParam);
 
@@ -2946,22 +3023,27 @@ void computeCloverDerivativeQuda(void* out,
 #endif
   profileCloverDerivative.Stop(QUDA_PROFILE_INIT);
 
+  cudaGaugeField* cudaOut = reinterpret_cast<cudaGaugeField*>(out);
   cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(gauge);
   cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(oprod);
 
 
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
-  cloverDerivative(cudaOut, *gPointer, *oPointer, mu, nu, parity, conjugate);
+  cloverDerivative(*cudaOut, *gPointer, *oPointer, mu, nu, coeff, parity, conjugate);
   profileCloverDerivative.Stop(QUDA_PROFILE_COMPUTE);
 
 
   profileCloverDerivative.Start(QUDA_PROFILE_D2H);
-  cudaOut.saveCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
+
+//  saveGaugeField(out, cudaOut, param);
+//  cudaOut->saveCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
   profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
   checkCudaError();
 
+//  delete cudaOut;
 
   profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
+
 
   return;
 }
