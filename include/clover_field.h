@@ -112,6 +112,14 @@ namespace quda {
      */
     void loadCPUField(const cpuCloverField &cpu);
 
+  
+    /**
+      Copy from this CloverField into cpuCloverField cpu
+      @param cpu The cpu clover destination field
+    */
+    void saveCPUField(cpuCloverField &cpu);  
+
+
     friend class DiracClover;
     friend class DiracCloverPC;
     friend struct FullClover;

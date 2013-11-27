@@ -40,7 +40,8 @@ namespace quda {
 
 #ifdef MULTI_GPU
           for(int dir=0; dir<4; ++dir){
-            border[dir] = commDimPartitioned(dir) ? 2 : 0;
+          //  border[dir] = commDimPartitioned(dir) ? 2 : 0;
+            border[dir] = 2;
           }
 #endif
         }

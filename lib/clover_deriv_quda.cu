@@ -13,6 +13,7 @@ namespace quda {
     struct CloverDerivArg
     {
       int X[4];
+      int border[4];
       int mu;
       int nu;
       typename RealTypeId<Cmplx>::Type coeff;
@@ -40,6 +41,8 @@ namespace quda {
         forceOffset(force.Bytes()/(2*sizeof(Cmplx))), gaugeOffset(gauge.Bytes()/(2*sizeof(Cmplx))), oprodOffset(oprod.Bytes()/(2*sizeof(Cmplx)))
       {
         for(int dir=0; dir<4; ++dir) X[dir] = force.X()[dir];
+        //for(int dir=0; dir<4; ++dir) border[dir] =  commDimPartitioned(dir) ? 2 : 0;
+        for(int dir=0; dir<4; ++dir) border[dir] = 2;
       }
     };
 
@@ -81,9 +84,9 @@ namespace quda {
       for(int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
 
       for(int dir=0; dir<4; ++dir){
-        x[dir] += 2;
-        y[dir] += 2;
-        X[dir] += 4;
+        x[dir] += arg.border[dir];
+        y[dir] += arg.border[dir];
+        X[dir] += 2*arg.border[dir];
       }
 
       Cmplx* thisGauge = arg.gauge + arg.parity*arg.gaugeOffset;

@@ -41,7 +41,7 @@ namespace quda {
       int dir2 = arg.dir2;
 
 
-      int sign = 1;
+      Float sign = 1;
       if(dir2 < dir1){
         int tmp = dir2;
         dir2 = dir1;
@@ -130,7 +130,7 @@ namespace quda {
             int jk = (j+3)*(j+2)/2;
             for(int k=0; k<3; ++k){
               int kj = (k+3)*(k+2)/2 + j;
-              ctmp = conj(tri[0][kj]) - tri[0][jk] + conj(tri[1][kj]) - tri[1][jk];
+              ctmp = conj(tri[0][kj]) - tri[0][jk] - conj(tri[1][kj]) + tri[1][jk];
               mat(j,k).x = ctmp.real();
               mat(j,k).y = ctmp.imag();
               jk++;

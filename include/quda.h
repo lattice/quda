@@ -528,6 +528,8 @@ extern "C" {
    * Return a pointer to the extended gauge field.
    */
   void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
+  
+  void* createExtendedField(void* gauge, int geometry, QudaGaugeParam* param);
 
 
   void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
