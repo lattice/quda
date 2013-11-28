@@ -648,30 +648,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     cloverPrecondition = cloverSloppy;
   }
 
-  // need to copy back the odd inverse field into the application clover field
-  if (!h_clovinv && pc_solve) {
-    // copy the inverted clover term into host application order on the device
-    clover_param.setPrecision(inv_param->clover_cpu_prec);
-    clover_param.direct = false;
-    clover_param.inverse = true;
-    clover_param.order = inv_param->clover_order;
-
-    // this isn't really "epilogue" but this label suffices
-    profileClover.Start(QUDA_PROFILE_EPILOGUE);
-    cudaCloverField hack(clover_param);
-    hack.copy(*cloverPrecise);
-    profileClover.Stop(QUDA_PROFILE_EPILOGUE);
-
-    // copy the odd components into the host application's clover field
-    profileClover.Start(QUDA_PROFILE_D2H);
-    cudaMemcpy((char*)(in->V(false))+in->Bytes()/2, (char*)(hack.V(true))+hack.Bytes()/2, 
-        in->Bytes()/2, cudaMemcpyDeviceToHost);
-    profileClover.Stop(QUDA_PROFILE_D2H);
-
-    checkCudaError();
-  }
-
-
   delete in; // delete object referencing input field
 
   popVerbosity();
