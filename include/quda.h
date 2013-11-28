@@ -533,6 +533,9 @@ extern "C" {
 
   void  saveGaugeField(void* outGauge, void* inGauge, QudaGaugeParam* param);
 
+  void  extendGaugeField(void* outGauge, void* inGauge);
+
+
   /**
    *  Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
    */
@@ -541,7 +544,7 @@ extern "C" {
   void createCloverQuda(QudaInvertParam* param);
 
 
-  void computeCloverTraceQuda(void* out, void* clover, int mu, int nu);
+  void computeCloverTraceQuda(void* out, void* clover, int mu, int nu, int dim[4]);
 
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
                                    double coeff,

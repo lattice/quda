@@ -13,20 +13,21 @@ namespace CloverOrder {
 
 namespace quda {
 
-  template<typename Clover, typename Gauge>
+  template<typename Clover1, typename Clover2, typename Gauge>
     struct CloverTraceArg {
-      Clover clover;
+      Clover1 clover1;
+      Clover2 clover2;
       Gauge gauge;
       int dir1;
       int dir2;
 
-      CloverTraceArg(Clover &clover, Gauge &gauge, int dir1, int dir2)
-        : clover(clover), gauge(gauge), dir1(dir1), dir2(dir2) {}
+      CloverTraceArg(Clover1 &clover1, Clover2 &clover2, Gauge &gauge, int dir1, int dir2)
+        : clover1(clover1), clover2(clover2), gauge(gauge), dir1(dir1), dir2(dir2) {}
     };
 
 
-  template <typename Float, typename Clover, typename Gauge>
-    __device__ __host__ void cloverSigmaTraceCompute(CloverTraceArg<Clover,Gauge>& arg, int x, int parity) 
+  template <typename Float, typename Clover1, typename Clover2, typename Gauge>
+    __device__ __host__ void cloverSigmaTraceCompute(CloverTraceArg<Clover1, Clover2, Gauge>& arg, int x, int parity) 
     {
 
       Float A[72];
@@ -55,7 +56,12 @@ namespace quda {
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
       complex<Float> ctmp;
 
-      arg.clover.load(A,x,parity);
+      if(parity==0){
+        arg.clover1.load(A,x,parity);
+      }else{
+        arg.clover2.load(A,x,parity);
+      }
+
       for(int ch=0; ch<2; ++ch){
         // factor of two is inherent to QUDA clover storage
         for (int i=0; i<6; i++) diag[ch][i] = 2.0*A[ch*36+i];
@@ -87,6 +93,7 @@ namespace quda {
             }
           } // X Y
 
+
         }else if(dir2 == 2){
 
           for(int j=0; j<3; ++j){
@@ -111,6 +118,7 @@ namespace quda {
               jk++;
             }
           }
+
         } // dir2 == 3 // X T
 
       }else if(dir1 == 1){
@@ -166,32 +174,28 @@ namespace quda {
       return;
     }
 
-  template<typename Float, typename Clover, typename Gauge>
-    void cloverSigmaTrace(CloverTraceArg<Clover,Gauge> arg)
+  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
+    void cloverSigmaTrace(CloverTraceArg<Clover1,Clover2,Gauge> arg)
     {
-      for(int parity=0; parity<2; parity++){
-        for(int x=0; x<arg.clover.volumeCB; x++){
-          cloverSigmaTraceCompute<Float,Clover,Gauge>(arg, x, parity);
-        }
+      for(int x=0; x<arg.clover1.volumeCB; x++){
+        cloverSigmaTraceCompute<Float,Clover1,Clover2,Gauge>(arg, x, 1);
       }
       return;
     }
 
 
-  template<typename Float, typename Clover, typename Gauge>
-    __global__ void cloverSigmaTraceKernel(CloverTraceArg<Clover,Gauge> arg)
+  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
+    __global__ void cloverSigmaTraceKernel(CloverTraceArg<Clover1,Clover2,Gauge> arg)
     {
       int idx = blockIdx.x*blockDim.x + threadIdx.x;
-      if(idx >= arg.clover.volumeCB) return;
-
-      for(int parity=0; parity<2; parity++){
-        cloverSigmaTraceCompute<Float,Clover,Gauge>(arg, idx, parity);
-      }
+      if(idx >= arg.clover1.volumeCB) return;
+      // odd parity
+      cloverSigmaTraceCompute<Float,Clover1,Clover2,Gauge>(arg, idx, 1);
     }
 
-  template<typename Float, typename Clover, typename Gauge>
+  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
     class CloverSigmaTrace : Tunable {
-      CloverTraceArg<Clover,Gauge> arg;
+      CloverTraceArg<Clover1,Clover2,Gauge> arg;
       const QudaFieldLocation location;
 
       private:
@@ -200,27 +204,27 @@ namespace quda {
 
       bool tuneSharedBytes() const { return false; } // Don't tune the shared memory
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-      unsigned int minThreads() const { return arg.clover.volumeCB; }
+      unsigned int minThreads() const { return arg.clover1.volumeCB; }
 
       public: 
-      CloverSigmaTrace(CloverTraceArg<Clover,Gauge> &arg, QudaFieldLocation location)
+      CloverSigmaTrace(CloverTraceArg<Clover1,Clover2,Gauge> &arg, QudaFieldLocation location)
         : arg(arg), location(location) {;}
       virtual ~CloverSigmaTrace() {;}
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
           dim3 blockDim(128, 1, 1);
-          dim3 gridDim((arg.clover.volumeCB + blockDim.x - 1)/blockDim.x, 1, 1);
-          cloverSigmaTraceKernel<Float,Clover,Gauge><<<gridDim,blockDim,0>>>(arg);
+          dim3 gridDim((arg.clover1.volumeCB + blockDim.x - 1)/blockDim.x, 1, 1);
+          cloverSigmaTraceKernel<Float,Clover1,Clover2,Gauge><<<gridDim,blockDim,0>>>(arg);
         }else{
-          cloverSigmaTrace<Float,Clover,Gauge>(arg);
+          cloverSigmaTrace<Float,Clover1,Clover2,Gauge>(arg);
         }
       }
 
       TuneKey tuneKey() const {
         std::stringstream vol, aux;
-        vol << arg.clover.volumeCB;
-        aux << "stride=" << arg.clover.stride;
+        vol << arg.clover1.volumeCB;
+        aux << "stride=" << arg.clover1.stride;
         return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }
 
@@ -237,11 +241,12 @@ namespace quda {
     }; // CloverSigmaTrace
 
 
-  template<typename Float, typename Clover, typename Gauge>
-    void computeCloverSigmaTrace(Clover clover, Gauge gauge, int dir1, int dir2, QudaFieldLocation location)
+  template<typename Float, typename Clover1, typename Clover2, typename Gauge>
+    void computeCloverSigmaTrace(Clover1 clover1, Clover2 clover2, Gauge gauge, int dir1, int dir2, QudaFieldLocation location)
     {
-      CloverTraceArg<Clover,Gauge> arg(clover, gauge, dir1, dir2);
-      CloverSigmaTrace<Float,Clover,Gauge> traceCompute(arg, location);
+      CloverTraceArg<Clover1, Clover2, Gauge> arg(clover1, clover2, gauge, dir1, dir2);
+
+      CloverSigmaTrace<Float,Clover1,Clover2,Gauge> traceCompute(arg, location);
       traceCompute.apply(0);
       cudaDeviceSynchronize();
       return;
@@ -256,9 +261,13 @@ namespace quda {
       if(clover.Order() == QUDA_FLOAT2_CLOVER_ORDER){
         if(gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER){
           if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float, 18, 2, 18>(gauge), dir1, dir2, location);
+            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0),
+                CloverOrder::quda::FloatNOrder<Float,72,2>(clover,1), 
+                FloatNOrder<Float, 18, 2, 18>(gauge), dir1, dir2, location);
           }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float, 18, 2, 12>(gauge), dir1, dir2, location);
+            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), 
+                CloverOrder::quda::FloatNOrder<Float,72,2>(clover,1),
+                FloatNOrder<Float, 18, 2, 12>(gauge), dir1, dir2, location);
 
           }else{
             errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
@@ -266,7 +275,9 @@ namespace quda {
 
         }else if(gauge.Order() == QUDA_FLOAT4_GAUGE_ORDER){
           if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float,18,4,12>(gauge),  dir1, dir2, location);
+            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), 
+                CloverOrder::quda::FloatNOrder<Float,72,2>(clover,1),
+                FloatNOrder<Float,18,4,12>(gauge),  dir1, dir2, location);
           }else{
             errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
           }
@@ -274,9 +285,13 @@ namespace quda {
       }else if(clover.Order() == QUDA_FLOAT4_CLOVER_ORDER){
         if(gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER){
           if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), FloatNOrder<Float,18,2,18>(gauge),  dir1, dir2, location);
+            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), 
+                CloverOrder::quda::FloatNOrder<Float,72,4>(clover,1),
+                FloatNOrder<Float,18,2,18>(gauge),  dir1, dir2, location);
           }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), FloatNOrder<Float,18,2,12>(gauge),  dir1, dir2, location);
+            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), 
+                CloverOrder::quda::FloatNOrder<Float,72,4>(clover,1),
+                FloatNOrder<Float,18,2,12>(gauge),  dir1, dir2, location);
           }else{
             errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
           }
