@@ -2751,6 +2751,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
     cloverParam.inverse = false;
     cloverParam.create = QUDA_NULL_FIELD_CREATE;
     cloverParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    cloverParam.setPrecision(invertParam->cuda_prec);
     cloverPrecise = new cudaCloverField(cloverParam);
   }
 
