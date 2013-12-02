@@ -539,18 +539,14 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if (!initialized) errorQuda("QUDA not initialized");
 
- // if (!h_clover && !h_clovinv && inv_param->clover_coeff) {
- //   device_calc = true;
-    //  errorQuda("loadCloverQuda() called with neither clover term nor inverse");
-//  }
-
-
-  if(!h_clovinv && inv_param->clover_coeff){
-    device_calc = true;
+  if (!h_clover && !h_clovinv) {
+    if(inv_param->clover_coeff != 0){
+      device_calc = true;
+    }else{
+      errorQuda("loadCloverQuda() called with neither clover term nor inverse");
+    }
   }
 
-
-  printfQuda("clover_coeff = %lf\n", inv_param->clover_coeff);
 
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
     errorQuda("Half precision not supported on CPU");
