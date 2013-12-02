@@ -189,7 +189,9 @@ namespace quda {
     //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
     // FIXME - I don't understand this, shouldn't it be commDim(dim) == 0 ?
     int localParity[nDim];
-    for (int dim=0; dim<nDim; dim++) localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
+    for (int dim=0; dim<nDim; dim++) 
+      //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
+      localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
     ExtractGhostArg<Order, nDim> arg(order, nFace, X, surfaceCB, A, B, C, f, localParity);
 

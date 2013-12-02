@@ -304,7 +304,8 @@ namespace quda {
     // FIXME - I don't understand this, shouldn't it be commDim(dim) == 0 ?
     int localParity[nDim];
     for (int d=0; d<nDim; d++) 
-      localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
+      localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
+    //      localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
 
     ExtractGhostExArg<Order, nDim> arg(order, dim, X, R, surfaceCB, A0, A1, B0, B1, 
 				       C0, C1, fSrc, fBuf, localParity);
