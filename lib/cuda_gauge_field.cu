@@ -47,7 +47,7 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         size_t nbytes = nFace * surface[i] * reconstruct * precision;
-        ghost[i] = device_malloc(nbytes);
+        ghost[i] = nbytes ? device_malloc(nbytes) : NULL;
       }        
     }
 
