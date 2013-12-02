@@ -40,7 +40,6 @@ namespace quda {
 
 #ifdef MULTI_GPU
           for(int dir=0; dir<4; ++dir){
-          //  border[dir] = commDimPartitioned(dir) ? 2 : 0;
             border[dir] = 2;
           }
 #endif
@@ -86,8 +85,8 @@ namespace quda {
       getCoords(x, idx, X, parity);
 #ifdef MULTI_GPU
       for(int dir=0; dir<4; ++dir){
-        x[dir] += arg.border[dir];
-        X[dir] += 2*arg.border[dir];
+           x[dir] += arg.border[dir];
+           X[dir] += 2*arg.border[dir];
       }
 #endif
 
@@ -110,6 +109,7 @@ namespace quda {
             dx[mu]++;
             arg.gauge.load((Float*)(U2.data),linkIndex(x,dx,X), nu, 1-parity); 
             dx[mu]--;
+   
 
             Matrix<Cmplx,3> Ftmp = U1 * U2;
 
@@ -216,6 +216,8 @@ namespace quda {
             arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), mu, 1-parity);
             dx[mu]++;
 
+
+
             // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
             Matrix<Cmplx,3> U2;
             dx[mu]--;
@@ -253,12 +255,12 @@ namespace quda {
 
           F *= 1.0/8.0;
 
-
+          
 
 
           Cmplx* thisFmunu = arg.Fmunu + parity*arg.FmunuOffset;
           int munu_idx = (mu*(mu-1))/2 + nu; // lower-triangular indexing
-
+  
           writeLinkVariableToArray(F, munu_idx, idx, arg.FmunuStride, thisFmunu);
         } // nu < mu
       } // mu
@@ -423,6 +425,7 @@ namespace quda {
         triangle[13] =   block1[ch](2,0);
         triangle[14] =   block1[ch](2,1);
 
+
         for(int i=0; i<6; ++i){
           A[ch*36 + i] = 0.5*diag[i];
         } 
@@ -431,6 +434,7 @@ namespace quda {
           A[ch*36+6+2*i + 1] = 0.5*triangle[idtab[i]].y;
         } 
       } // ch
+
 
       arg.clover.save(A, idx, parity);
       return;

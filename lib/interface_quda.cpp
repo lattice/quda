@@ -532,14 +532,26 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 {
   profileClover.Start(QUDA_PROFILE_TOTAL);
 
+  bool device_calc = false; // calculate clover and inverse on the device?
+
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
   if (!initialized) errorQuda("QUDA not initialized");
 
-  if (!h_clover && !h_clovinv) {
-    errorQuda("loadCloverQuda() called with neither clover term nor inverse");
+ // if (!h_clover && !h_clovinv && inv_param->clover_coeff) {
+ //   device_calc = true;
+    //  errorQuda("loadCloverQuda() called with neither clover term nor inverse");
+//  }
+
+
+  if(!h_clovinv && inv_param->clover_coeff){
+    device_calc = true;
   }
+
+
+  printfQuda("clover_coeff = %lf\n", inv_param->clover_coeff);
+
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION) {
     errorQuda("Half precision not supported on CPU");
   }
@@ -570,45 +582,53 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   // uninverted clover term is also required for "asymmetric" preconditioning
-  if (!h_clover && pc_solve && pc_solution && asymmetric) {
+  if (!h_clover && pc_solve && pc_solution && asymmetric && !device_calc) {
     warningQuda("Uninverted clover term not loaded");
   }
 
-  // create a param for the cpu clover field
-  profileClover.Start(QUDA_PROFILE_INIT);
-  CloverFieldParam cpuParam;
-  cpuParam.nDim = 4;
-  for (int i=0; i<4; i++) cpuParam.x[i] = gaugePrecise->X()[i];
-  cpuParam.precision = inv_param->clover_cpu_prec;
-  cpuParam.order = inv_param->clover_order;
-  cpuParam.direct = h_clover ? true : false;
-  cpuParam.inverse = h_clovinv ? true : false;
-  cpuParam.clover = h_clover;
-  cpuParam.norm = 0;
-  cpuParam.cloverInv = h_clovinv;
-  cpuParam.invNorm = 0;
-  cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-
-  CloverField *in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<CloverField*>(new cpuCloverField(cpuParam)) : 
-    static_cast<CloverField*>(new cudaCloverField(cpuParam));
-
   CloverFieldParam clover_param;
-  clover_param.nDim = 4;
-  for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
-  clover_param.setPrecision(inv_param->clover_cuda_prec);
-  clover_param.pad = inv_param->cl_pad;
-  clover_param.direct = h_clover ? true : false;
-  clover_param.inverse = (h_clovinv || pc_solve) ? true : false;
-  clover_param.create = QUDA_NULL_FIELD_CREATE;
-  clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
-  cloverPrecise = new cudaCloverField(clover_param);
-  profileClover.Stop(QUDA_PROFILE_INIT);
+  CloverField *in;
 
-  profileClover.Start(QUDA_PROFILE_H2D);
-  cloverPrecise->copy(*in, h_clovinv ? true : false); 
-  profileClover.Stop(QUDA_PROFILE_H2D);
+  if(!device_calc){
+    // create a param for the cpu clover field
+    profileClover.Start(QUDA_PROFILE_INIT);
+    CloverFieldParam cpuParam;
+    cpuParam.nDim = 4;
+    for (int i=0; i<4; i++) cpuParam.x[i] = gaugePrecise->X()[i];
+    cpuParam.precision = inv_param->clover_cpu_prec;
+    cpuParam.order = inv_param->clover_order;
+    cpuParam.direct = h_clover ? true : false;
+    cpuParam.inverse = h_clovinv ? true : false;
+    cpuParam.clover = h_clover;
+    cpuParam.norm = 0;
+    cpuParam.cloverInv = h_clovinv;
+    cpuParam.invNorm = 0;
+    cpuParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    cpuParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+
+    in = (inv_param->clover_location == QUDA_CPU_FIELD_LOCATION) ?
+      static_cast<CloverField*>(new cpuCloverField(cpuParam)) : 
+      static_cast<CloverField*>(new cudaCloverField(cpuParam));
+
+    clover_param.nDim = 4;
+    for (int i=0; i<4; i++) clover_param.x[i] = gaugePrecise->X()[i];
+    clover_param.setPrecision(inv_param->clover_cuda_prec);
+    clover_param.pad = inv_param->cl_pad;
+    clover_param.direct = h_clover ? true : false;
+    clover_param.inverse = (h_clovinv || pc_solve) ? true : false;
+    clover_param.create = QUDA_NULL_FIELD_CREATE;
+    clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    cloverPrecise = new cudaCloverField(clover_param);
+    profileClover.Stop(QUDA_PROFILE_INIT);
+
+    profileClover.Start(QUDA_PROFILE_H2D);
+    cloverPrecise->copy(*in, h_clovinv ? true : false); 
+    profileClover.Stop(QUDA_PROFILE_H2D);
+  }else{
+    profileClover.Start(QUDA_PROFILE_COMPUTE);
+    createCloverQuda(inv_param);
+    profileClover.Stop(QUDA_PROFILE_COMPUTE);
+  }
 
   // inverted clover term is required when applying preconditioned operator
   if (!h_clovinv && pc_solve) {
@@ -649,7 +669,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   // need to copy back the odd inverse field into the application clover field
-  if (!h_clovinv && pc_solve) {
+  if (!h_clovinv && pc_solve && !device_calc) {
     // copy the inverted clover term into host application order on the device
     clover_param.setPrecision(inv_param->clover_cpu_prec);
     clover_param.direct = false;
@@ -672,7 +692,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
 
-  delete in; // delete object referencing input field
+  if(!device_calc) delete in; // delete object referencing input field
 
   popVerbosity();
 
@@ -2767,49 +2787,67 @@ void createCloverQuda(QudaInvertParam* invertParam)
   profileCloverCreate.Start(QUDA_PROFILE_TOTAL);
   profileCloverCreate.Start(QUDA_PROFILE_INIT);
   if(!cloverPrecise){
+    printfQuda("About to create cloverPrecise\n");
     CloverFieldParam cloverParam;
     cloverParam.nDim = 4;
     for(int dir=0; dir<4; ++dir) cloverParam.x[dir] = gaugePrecise->X()[dir];
+    cloverParam.setPrecision(invertParam->clover_cuda_prec);
     cloverParam.pad = invertParam->cl_pad;
     cloverParam.direct = true;
-    cloverParam.inverse = false;
+    cloverParam.inverse = true;
+    cloverParam.norm    = 0;
+    cloverParam.invNorm = 0;
     cloverParam.create = QUDA_NULL_FIELD_CREATE;
     cloverParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     cloverPrecise = new cudaCloverField(cloverParam);
   }
 
-#ifdef MULTI_GPU
   int y[4];
   for(int dir=0; dir<4; ++dir){ 
-    //y[dir] = commDimPartitioned(dir) ?  gaugePrecise->X()[dir] + 4 : gaugePrecise->X()[dir];
-    y[dir] = gaugePrecise->X()[dir];
+    y[dir] = gaugePrecise->X()[dir] + 4;
   }
   int pad = 0;
-  // Should have QUDA_RECONSTRUCT_12 below, but seems to be buggy
   GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
       pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.order = gaugePrecise->Order();
   gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
 
-  cudaGaugeField gaugeExtended(gParamEx);
-  cudaGaugeField* cudaGauge = &gaugeExtended;
+  cudaGaugeField cudaGaugeExtended(gParamEx);
+  cudaGaugeField* cudaGauge = &cudaGaugeExtended;
 
-  copyExtendedGauge(gaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  GaugeFieldParam gParam(gaugePrecise->X(), gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+                          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
 
+  // copy gaugePrecise into the extended device gauge field
+  copyExtendedGauge(cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+#if 0
   profileCloverCreate.Stop(QUDA_PROFILE_INIT);
-
   profileCloverCreate.Start(QUDA_PROFILE_COMMS);
-  gaugeExtended.exchangeExtendedGhost(R);
+  cudaGaugeExtended.exchangeExtendedGhost(R,true);
   profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
 #else
-  cudaGaugeField* cudaGauge = gaugePrecise;
+
+  // create an extended gauge field on the hose
+  for(int dir=0; dir<4; ++dir) gParam.x[dir] += 4;
+  cpuGaugeField cpuGaugeExtended(gParam);
+  cudaGaugeExtended.saveCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
   profileCloverCreate.Stop(QUDA_PROFILE_INIT);
-#endif 
+  // communicate data
+  profileCloverCreate.Start(QUDA_PROFILE_COMMS);
+  //cpuGaugeExtended.exchangeExtendedGhost(R,true);
+  exchange_cpu_sitelink_ex(const_cast<int*>(gaugePrecise->X()), R, (void**)cpuGaugeExtended.Gauge_p(),
+        cpuGaugeExtended.Order(),cpuGaugeExtended.Precision(), 0, 4);
+  cudaGaugeExtended.loadCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
+  profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
+#endif
 
   profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
-  computeClover(*cloverPrecise, *cudaGauge, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+  computeClover(*cloverPrecise, cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
   profileCloverCreate.Stop(QUDA_PROFILE_COMPUTE);
 
   profileCloverCreate.Stop(QUDA_PROFILE_TOTAL);
