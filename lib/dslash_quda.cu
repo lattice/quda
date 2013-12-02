@@ -1437,10 +1437,17 @@ namespace quda {
     initDslashCommsPattern();
 
 #ifdef GPU_COMMS
-    cudaEventSynchronize(packEnd[0]);
+    bool pack_event = false;
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
-      
+
+      if ((i!=3 || getKernelPackT() || getTwistPack()) && !pack_event) {
+	cudaEventSynchronize(packEnd[0]);
+	pack_event = true;
+      } else {
+	cudaEventSynchronize(dslashStart);
+      }
+
       for (int dir=1; dir>=0; dir--) {	
 	PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
 	inSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
