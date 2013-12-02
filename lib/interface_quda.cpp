@@ -84,6 +84,7 @@ cudaCloverField *cloverPrecise = NULL;
 cudaCloverField *cloverSloppy = NULL;
 cudaCloverField *cloverPrecondition = NULL;
 
+cudaGaugeField *momResident = NULL;
 
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
@@ -2737,26 +2738,31 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
       path_length, loop_coeff, num_paths, max_length);
   profileGaugeForce.Stop(QUDA_PROFILE_COMPUTE);
 
+  // still need to copy this back even when preserving
   profileGaugeForce.Start(QUDA_PROFILE_D2H);
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   profileGaugeForce.Stop(QUDA_PROFILE_D2H);
+
+  if (qudaGaugeParam->preserve_gauge) {
+    momResident = cudaMom;
+    gaugePrecise = cudaSiteLink;
+    gauge_preserved = true;
+    cudaSiteLink = NULL;  
+  } else {
+    profileGaugeForce.Start(QUDA_PROFILE_FREE);
+    delete cudaSiteLink;
+    delete cudaMom;
+    profileGaugeForce.Stop(QUDA_PROFILE_FREE);
+  }
+
 
   profileGaugeForce.Start(QUDA_PROFILE_FREE);
   delete cpuSiteLink;
   delete cpuMom;
 
-  if (qudaGaugeParam->preserve_gauge) {
-    gaugePrecise = cudaSiteLink;
-    gauge_preserved = true;
-    cudaSiteLink = NULL;  
-  } else {
-    delete cudaSiteLink;
-  }
-
 #ifdef MULTI_GPU
   delete cudaGauge;
 #endif
-  delete cudaMom;
   profileGaugeForce.Stop(QUDA_PROFILE_FREE);
 
   profileGaugeForce.Stop(QUDA_PROFILE_TOTAL);
@@ -2813,12 +2819,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
   cudaGaugeField cudaGaugeExtended(gParamEx);
   cudaGaugeField* cudaGauge = &cudaGaugeExtended;
 
-  GaugeFieldParam gParam(gaugePrecise->X(), gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
-                          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.order = QUDA_MILC_GAUGE_ORDER;
-  gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-
   // copy gaugePrecise into the extended device gauge field
   copyExtendedGauge(cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
   int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
@@ -2828,6 +2828,12 @@ void createCloverQuda(QudaInvertParam* invertParam)
   cudaGaugeExtended.exchangeExtendedGhost(R,true);
   profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
 #else
+
+  GaugeFieldParam gParam(gaugePrecise->X(), gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+                          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
 
   // create an extended gauge field on the hose
   for(int dir=0; dir<4; ++dir) gParam.x[dir] += 4;
@@ -3260,7 +3266,7 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
 
-  cudaGaugeField cudaMom(gParam);
+  cudaGaugeField *cudaMom = !gauge_preserved ? new cudaGaugeField(gParam) : NULL;
 
   gParam.pad = param->ga_pad;
   gParam.link_type = QUDA_SU3_LINKS;
@@ -3271,21 +3277,22 @@ void updateGaugeFieldQuda(void* gauge,
 
   profileGaugeUpdate.Stop(QUDA_PROFILE_INIT);  
 
-  // load fields onto the device
   profileGaugeUpdate.Start(QUDA_PROFILE_H2D);
-  cudaMom.loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
-  if (!gauge_preserved) {
+  if (!gauge_preserved) {   // load fields onto the device
     cudaInGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
-  } else {
+    cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  } else { // or use resident fields already present
     cudaInGauge = gaugePrecise;
     gaugePrecise = NULL;
+    cudaMom = momResident;
+    momResident = NULL;
     gauge_preserved = false;
   } 
   profileGaugeUpdate.Stop(QUDA_PROFILE_H2D);
 
   // perform the update
   profileGaugeUpdate.Start(QUDA_PROFILE_COMPUTE);
-  updateGaugeField(*cudaOutGauge, dt, *cudaInGauge, cudaMom, 
+  updateGaugeField(*cudaOutGauge, dt, *cudaInGauge, *cudaMom, 
       (bool)conj_mom, (bool)exact);
   profileGaugeUpdate.Stop(QUDA_PROFILE_COMPUTE);
 
@@ -3314,6 +3321,7 @@ void updateGaugeFieldQuda(void* gauge,
 
   delete cudaInGauge;
   delete cudaOutGauge;
+  delete cudaMom;
 
   delete cpuMom;
   delete cpuGauge;
