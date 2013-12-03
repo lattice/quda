@@ -85,6 +85,7 @@ cudaCloverField *cloverSloppy = NULL;
 cudaCloverField *cloverPrecondition = NULL;
 
 cudaGaugeField *momResident = NULL;
+cudaGaugeField *extendedGaugeResident = NULL;
 
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
@@ -723,6 +724,11 @@ void freeGaugeQuda(void)
   gaugeFatPrecondition = NULL;
   gaugeFatSloppy = NULL;
   gaugeFatPrecise = NULL;
+
+  if (extendedGaugeResident) {
+    delete extendedGaugeResident;
+    extendedGaugeResident = NULL;
+  }
 }
 
 
@@ -2814,55 +2820,59 @@ void createCloverQuda(QudaInvertParam* invertParam)
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.order = gaugePrecise->Order();
   gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gParamEx.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gParamEx.t_boundary = gaugePrecise->TBoundary();
   gParamEx.nFace = 1;
 
-  cudaGaugeField cudaGaugeExtended(gParamEx);
-  cudaGaugeField* cudaGauge = &cudaGaugeExtended;
+  cudaGaugeField *cudaGaugeExtended = NULL;
+  if (extendedGaugeResident) {
+    cudaGaugeExtended = extendedGaugeResident;
+    profileCloverCreate.Stop(QUDA_PROFILE_INIT);
+  } else {
+    cudaGaugeExtended = new cudaGaugeField(gParamEx);
 
-  printfQuda("Calling copyExtendedGauge\n");
-
-  // copy gaugePrecise into the extended device gauge field
-  copyExtendedGauge(cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-  cudaDeviceSynchronize();
-  printfQuda("Call to copyExtendedGauge complete\n");
-  int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+    // copy gaugePrecise into the extended device gauge field
+    copyExtendedGauge(*cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
 #if 1
-  profileCloverCreate.Stop(QUDA_PROFILE_INIT);
-  profileCloverCreate.Start(QUDA_PROFILE_COMMS);
-  cudaGaugeExtended.exchangeExtendedGhost(R,true);
-  profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
+    profileCloverCreate.Stop(QUDA_PROFILE_INIT);
+    profileCloverCreate.Start(QUDA_PROFILE_COMMS);
+    cudaGaugeExtended->exchangeExtendedGhost(R,true);
+    profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
 #else
-
-  GaugeFieldParam gParam(gaugePrecise->X(), gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
-                          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.order = QUDA_MILC_GAUGE_ORDER;
-  gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gParam.nFace = 1;
-
-  // create an extended gauge field on the hose
-  for(int dir=0; dir<4; ++dir) gParam.x[dir] += 4;
-  cpuGaugeField cpuGaugeExtended(gParam);
-  cudaGaugeExtended.saveCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
- 
-  profileCloverCreate.Stop(QUDA_PROFILE_INIT);
-  // communicate data
-  profileCloverCreate.Start(QUDA_PROFILE_COMMS);
-  //exchange_cpu_sitelink_ex(const_cast<int*>(gaugePrecise->X()), R, (void**)cpuGaugeExtended.Gauge_p(),
-  //			   cpuGaugeExtended.Order(),cpuGaugeExtended.Precision(), 0, 4);
-  cpuGaugeExtended.exchangeExtendedGhost(R,true);
-
-  cudaGaugeExtended.loadCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
-  profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
+    
+    GaugeFieldParam gParam(gaugePrecise->X(), gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+			   pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.order = QUDA_MILC_GAUGE_ORDER;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParam.t_boundary = gaugePrecise->TBoundary();
+    gParam.nFace = 1;
+    
+    // create an extended gauge field on the hose
+    for(int dir=0; dir<4; ++dir) gParam.x[dir] += 4;
+    cpuGaugeField cpuGaugeExtended(gParam);
+    cudaGaugeExtended->saveCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
+    
+    profileCloverCreate.Stop(QUDA_PROFILE_INIT);
+    // communicate data
+    profileCloverCreate.Start(QUDA_PROFILE_COMMS);
+    //exchange_cpu_sitelink_ex(const_cast<int*>(gaugePrecise->X()), R, (void**)cpuGaugeExtended.Gauge_p(),
+    //			   cpuGaugeExtended.Order(),cpuGaugeExtended.Precision(), 0, 4);
+    cpuGaugeExtended.exchangeExtendedGhost(R,true);
+    
+    cudaGaugeExtended->loadCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
+    profileCloverCreate.Stop(QUDA_PROFILE_COMMS);
 #endif
+  }
 
   profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
-  computeClover(*cloverPrecise, cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+  computeClover(*cloverPrecise, *cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
   profileCloverCreate.Stop(QUDA_PROFILE_COMPUTE);
 
   profileCloverCreate.Stop(QUDA_PROFILE_TOTAL);
+
+  // FIXME always preserve the extended gauge
+  extendedGaugeResident = cudaGaugeExtended;
 
   return;
 }
@@ -2918,6 +2928,12 @@ void saveGaugeField(void* gauge, void* inGauge, QudaGaugeParam* param){
 void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
   profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
+
+  if (param->preserve_gauge && extendedGaugeResident && geometry == 4) {
+    profileExtendedGauge.Stop(QUDA_PROFILE_TOTAL);
+    return extendedGaugeResident;
+  }
+
   profileExtendedGauge.Start(QUDA_PROFILE_INIT);
 
   QudaFieldGeometry geom = QUDA_INVALID_GEOMETRY;
