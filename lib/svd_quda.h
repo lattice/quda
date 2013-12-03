@@ -84,7 +84,7 @@ namespace quda{
       Matrix<T,3> temp1, temp2;
       outerProd(v,v,&temp1);
 
-      temp2 = conj(tau)*temp1;    
+      temp2 = Conj(tau)*temp1;    
 
       setIdentity(&temp1);
 
@@ -315,7 +315,7 @@ namespace quda{
 
         w = mat(0,0) - beta; 
         norm1 = cabs(w);
-        w = conj(w)/norm1; 
+        w = Conj(w)/norm1; 
 
         // Assign the vector elements
         vec[0] = COMPLEX_UNITY; 
@@ -342,9 +342,9 @@ namespace quda{
         if( p(0,1).x > 0.0 ){ beta = -beta; }
         w = p(0,1)-beta;
         norm1 = cabs(w);
-        w = conj(w)/norm1; 
-        z = conj(p(0,2))/norm1;
-        vec[2] = z*conj(w);
+        w = Conj(w)/norm1; 
+        z = Conj(p(0,2))/norm1;
+        vec[2] = z*Conj(w);
 
         tau = (beta - p(0,1))/beta;
         // construct the Householder matrix
@@ -366,7 +366,7 @@ namespace quda{
         if( p(1,1).x > 0 ){ beta = -beta; }
         w = p(1,1) - beta;
         norm1 = cabs(w);
-        w = conj(w)/norm1;
+        w = Conj(w)/norm1;
         z = p(2,1)/norm1;
         vec[2] = z*w;
 
@@ -386,7 +386,7 @@ namespace quda{
       if( p(1,2).y != 0.0 ){
         beta = cabs(p(1,2));
         if( p(1,2).x > 0.0 ){ beta = -beta; }
-        temp(2,2) = conj(p(1,2))/beta;
+        temp(2,2) = Conj(p(1,2))/beta;
 	p(2,2) = p(2,2)*temp(2,2); // This is the only element of p needed below
         v = v*temp;
       }

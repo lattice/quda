@@ -541,6 +541,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   if (!initialized) errorQuda("QUDA not initialized");
 
   if (!h_clover && !h_clovinv) {
+    printf("clover_coeff: %lf\n", inv_param->clover_coeff);
     if(inv_param->clover_coeff != 0){
       device_calc = true;
     }else{
@@ -2819,8 +2820,12 @@ void createCloverQuda(QudaInvertParam* invertParam)
   cudaGaugeField cudaGaugeExtended(gParamEx);
   cudaGaugeField* cudaGauge = &cudaGaugeExtended;
 
+  printfQuda("Calling copyExtendedGauge\n");
+
   // copy gaugePrecise into the extended device gauge field
   copyExtendedGauge(cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  cudaDeviceSynchronize();
+  printfQuda("Call to copyExtendedGauge complete\n");
   int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
 #if 1
   profileCloverCreate.Stop(QUDA_PROFILE_INIT);

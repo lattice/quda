@@ -31,6 +31,19 @@ namespace quda{
     struct RealTypeId; 
 
   template<>
+    struct RealTypeId<float>
+    {
+      typedef float Type;
+    };
+
+  template<>
+    struct RealTypeId<double>
+    {
+      typedef double Type;
+    };
+
+
+  template<>
     struct RealTypeId<float2>
     {
       typedef float Type;
@@ -219,6 +232,12 @@ namespace quda{
   {
     return a;
   }
+
+  template<typename Cmplx>
+    __device__ __host__ inline Cmplx Conj(const Cmplx & a)
+    {
+      return makeComplex(a.x,-a.y);
+    }
 
 
 
@@ -659,7 +678,7 @@ namespace quda{
     __device__ __host__ inline
     void outerProd(const Array<T,N>& a, const Array<T,N> & b, Matrix<T,N>* m){
       for(int i=0; i<N; ++i){
-        const T conjb_i = conj(b[i]);
+        const T conjb_i = Conj(b[i]);
         for(int j=0; j<N; ++j){
           (*m)(j,i) = a[j]*conjb_i; // we reverse the ordering of indices because it cuts down on the number of function calls
         }
