@@ -112,8 +112,14 @@ namespace quda {
       accumulateConjugateProduct(&out[14], &out[0], &out[10], -1);
       accumulateConjugateProduct(&out[16], &out[0], &out[8], +1);
       accumulateConjugateProduct(&out[16], &out[2], &out[6], -1);
-      RegType u0 = (dir < 3 ? anisotropy :
-		    (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
+//      RegType u0 = (dir < 3 ? anisotropy :
+//		    (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
+
+
+            RegType u0 = (dir < 3 ? anisotropy :
+                    (((idx >= (X[3]-1)*X[0]*X[1]*X[2]/2) && true) ? tBoundary : 1));
+
+
       for (int i=12; i<18; i++) out[i]*=u0;
     }
 

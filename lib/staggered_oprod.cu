@@ -13,7 +13,7 @@ namespace quda {
 #include <texture.h>
   }
 
-  static bool kernelPackT = false;
+  static bool kernelPackT = true;
 
   template<int N>
     void createEventArray(cudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
@@ -54,8 +54,8 @@ namespace quda {
     destroyEventArray(gatherEnd);
     destroyEventArray(scatterEnd);
     cudaEventDestroy(packEnd);
-    cudaEventDestroy(oprodStart);
 #endif
+    cudaEventDestroy(oprodStart);
     cudaEventDestroy(oprodEnd);
     return;
   }
@@ -495,7 +495,7 @@ namespace quda {
       for(int i=3; i>=0; i--){
         if(commDimPartitioned(i)){
 
-          cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd : oprodStart;
+          cudaEvent_t &event = (i!=3 || kernelPackT) ? packEnd : oprodStart;
           cudaStreamWaitEvent(streams[2*i], event, 0); // wait in stream 2*i for event to complete
       
 
@@ -573,6 +573,8 @@ namespace quda {
             if(!oprodCompleted[i] && commsCompleted[i]){
               cudaEventRecord(scatterEnd[i], streams[2*i]);
               cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[i],0);
+
+              printf("Calling exterior oprod kernel\n");
 
               arg.dir = i;
               arg.ghostOffset = ghostOffset[i];

@@ -136,17 +136,17 @@ namespace quda {
 #define CONJ_INDEX(i,j) j*3 + i
 
       T tmp;
-      mat[CONJ_INDEX(0,0)] = conj(mat[0]);
-      mat[CONJ_INDEX(1,1)] = conj(mat[4]);
-      mat[CONJ_INDEX(2,2)] = conj(mat[8]);
-      tmp  = conj(mat[1]);
-      mat[CONJ_INDEX(1,0)] = conj(mat[3]);
+      mat[CONJ_INDEX(0,0)] = Conj(mat[0]);
+      mat[CONJ_INDEX(1,1)] = Conj(mat[4]);
+      mat[CONJ_INDEX(2,2)] = Conj(mat[8]);
+      tmp  = Conj(mat[1]);
+      mat[CONJ_INDEX(1,0)] = Conj(mat[3]);
       mat[CONJ_INDEX(0,1)] = tmp;	
-      tmp = conj(mat[2]);
-      mat[CONJ_INDEX(2,0)] = conj(mat[6]);
+      tmp = Conj(mat[2]);
+      mat[CONJ_INDEX(2,0)] = Conj(mat[6]);
       mat[CONJ_INDEX(0,2)] = tmp;
-      tmp = conj(mat[5]);
-      mat[CONJ_INDEX(2,1)] = conj(mat[7]);
+      tmp = Conj(mat[5]);
+      mat[CONJ_INDEX(2,1)] = Conj(mat[7]);
       mat[CONJ_INDEX(1,2)] = tmp;
 
 #undef CONJ_INDEX
@@ -1843,6 +1843,8 @@ namespace quda {
       int pad = 0;
       GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, pad, QUDA_SCALAR_GEOMETRY);
 
+      gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gauge_param.siteSubset = QUDA_FULL_SITE_SUBSET;
       gauge_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       cudaGaugeField Pmu(gauge_param);
       cudaGaugeField P3(gauge_param);

@@ -542,6 +542,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   if (!initialized) errorQuda("QUDA not initialized");
 
   if (!h_clover && !h_clovinv) {
+    printf("clover_coeff: %lf\n", inv_param->clover_coeff);
     if(inv_param->clover_coeff != 0){
       device_calc = true;
     }else{
