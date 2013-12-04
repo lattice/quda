@@ -561,6 +561,7 @@ extern "C" {
    */
   void computeStaggeredOprodQuda(void** oprod, void** quark, int num, double** coeff, QudaGaugeParam* param);
 
+  void computeStaggeredForceQuda(void* mom, void* quark, double* coeff);
 
 
 #ifdef __cplusplus

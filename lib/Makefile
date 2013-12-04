@@ -17,7 +17,7 @@ QUDA_OBJS = clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	reduce_quda.o face_buffer.o face_gauge.o comm_common.o		\
 	${COMM_OBJS} ${NUMA_AFFINITY_OBJS} copy_color_spinor.o		\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
-	clover_trace_quda.o
+	clover_trace_quda.o ks_force_quda.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
