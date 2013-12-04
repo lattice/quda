@@ -1843,6 +1843,8 @@ namespace quda {
       int pad = 0;
       GaugeFieldParam gauge_param(X, param.cuda_prec, QUDA_RECONSTRUCT_NO, pad, QUDA_SCALAR_GEOMETRY);
 
+      gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+      gauge_param.siteSubset = QUDA_FULL_SITE_SUBSET;
       gauge_param.order = QUDA_FLOAT2_GAUGE_ORDER;
       cudaGaugeField Pmu(gauge_param);
       cudaGaugeField P3(gauge_param);
