@@ -169,6 +169,8 @@ extern "C" {
   void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, 
 				bool *conj_mom, bool *exact, QudaGaugeParam* param);
 
+  void compute_staggered_force_quda(void* cudaMom, void* qudaQuark, double *coeff);
+
   /**
    * Compute the gauge force and update the mometum field
    *
