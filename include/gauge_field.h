@@ -35,6 +35,12 @@ namespace quda {
 
     QudaGhostExchange ghostExchange;
 
+    /** The staggered phase convention to use */
+    QudaStaggeredPhase staggeredPhaseType;
+
+    /** Whether the staggered phase factor has been applied */
+    bool staggeredPhaseApplied;
+
     // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
       nColor(3),
@@ -52,7 +58,9 @@ namespace quda {
       geometry(QUDA_VECTOR_GEOMETRY),
       pinned(0),
       compute_fat_link_max(false),
-      ghostExchange(QUDA_GHOST_EXCHANGE_PAD)
+      ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
+      staggeredPhaseApplied(false)
         {
 	  // variables declared in LatticeFieldParam
 	  precision = QUDA_INVALID_PRECISION;
@@ -68,7 +76,8 @@ namespace quda {
       order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
-      pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange)
+      pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -82,12 +91,14 @@ namespace quda {
       fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
       anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
-      compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD) {
-
-      if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
-      else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
-      else errorQuda("Error: invalid link type(%d)\n", link_type);
-    }
+      compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
+      staggeredPhaseType(param.staggered_phase_type), 
+      staggeredPhaseApplied(param.staggered_phase_applied) 
+      {
+	if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
+	else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
+	else errorQuda("Error: invalid link type(%d)\n", link_type);
+      }
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
@@ -120,6 +131,12 @@ namespace quda {
     QudaGhostExchange ghostExchange; // the type of ghost exchange to perform
     mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
 
+    /** The staggered phase convention to use */
+    QudaStaggeredPhase staggeredPhaseType;
+
+    /** Whether the staggered phase factor has been applied */
+    bool staggeredPhaseApplied;
+
     /**
        This function returns true if the field is stored in an
        internal field order for the given precision.
@@ -143,6 +160,17 @@ namespace quda {
     QudaGaugeFieldOrder FieldOrder() const { return order; }
     QudaFieldGeometry Geometry() const { return geometry; }
     QudaGhostExchange GhostExchange() const { return ghostExchange; }
+    QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
+
+    /**
+       Apply the staggered phase factors to the gauge field.
+     */
+    void applyStaggeredPhase();
+
+    /**
+       Remove the staggered phase factors from the gauge field.
+     */
+    void removeStaggeredPhase();
 
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
@@ -329,6 +357,13 @@ namespace quda {
      @param u The gauge field from which we want to compute the max
   */
   double maxGauge(const GaugeField &u);
+
+  /** 
+      Apply the staggered phase factor to the gauge field.
+
+      @param u The gauge field to which we apply the staggered phase factors
+  */
+  void applyGaugePhase(GaugeField &u);
 
 } // namespace quda
 

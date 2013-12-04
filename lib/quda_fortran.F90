@@ -53,6 +53,16 @@ module quda_fortran
 
      integer(4) :: preserve_gauge ! Used by link fattening
     
+     ! Set the staggered phase type of the links
+     QudaStaggeredPhase :: staggered_phase_type; 
+     ! Whether the staggered phase has already been applied to the links
+     integer(4) :: staggered_phase_applied 
+
+     integer(4) :: use_resident_gauge  ! Use the resident gauge field 
+     integer(4) :: use_resident_mom    ! Use the resident mom field
+     integer(4) :: make_resident_gauge ! Make the gauge field resident
+     integer(4) :: make_resident_mom   ! Make the mom field resident
+
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h

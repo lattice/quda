@@ -96,6 +96,18 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(preserve_gauge, INVALID_INT);
 #endif
 
+#if defined INIT_PARAM
+  P(use_resident_gauge, 0);
+  P(use_resident_mom, 0);
+  P(make_resident_gauge, 0);
+  P(make_resident_mom, 0);
+#else
+  P(use_resident_gauge, INVALID_INT);
+  P(use_resident_mom, INVALID_INT);
+  P(make_resident_gauge, INVALID_INT);
+  P(make_resident_mom, INVALID_INT);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif

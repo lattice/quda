@@ -376,6 +376,8 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
+  printfQuda("loadGaugeQuda use_resident_gauge = %d\n", param->use_resident_gauge);
+
   profileGauge.Start(QUDA_PROFILE_TOTAL);
 
   if (!initialized) errorQuda("QUDA not initialized");
@@ -411,16 +413,18 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
-  if (!param->preserve_gauge) {
-    precise = new cudaGaugeField(gauge_param);
-    profileGauge.Stop(QUDA_PROFILE_INIT);  
+  precise = new cudaGaugeField(gauge_param);
 
+  if (param->use_resident_gauge) {
+    if(gaugePrecise == NULL) errorQuda("No resident gauge field");
+    // copy rather than point at to ensure that the padded region is filled in
+    precise->copy(*gaugePrecise);
+    profileGauge.Stop(QUDA_PROFILE_INIT);  
+  } else {
+    profileGauge.Stop(QUDA_PROFILE_INIT);  
     profileGauge.Start(QUDA_PROFILE_H2D);  
     precise->copy(*in);
     profileGauge.Stop(QUDA_PROFILE_H2D);  
-  } else {
-    precise = gaugePrecise;
-    profileGauge.Stop(QUDA_PROFILE_INIT);  
   }
 
   param->gaugeGiB += precise->GBytes();
@@ -731,6 +735,29 @@ void freeGaugeQuda(void)
     delete extendedGaugeResident;
     extendedGaugeResident = NULL;
   }
+}
+
+// just free the sloppy fields used in mixed-precision solvers
+void freeSloppyGaugeQuda(void) 
+{  
+  if (!initialized) errorQuda("QUDA not initialized");
+  if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
+  if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
+
+  gaugePrecondition = NULL;
+  gaugeSloppy = NULL;
+
+  if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
+  if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
+
+  gaugeLongPrecondition = NULL;
+  gaugeLongSloppy = NULL;
+
+  if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
+  if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
+
+  gaugeFatPrecondition = NULL;
+  gaugeFatSloppy = NULL;
 }
 
 
@@ -2488,8 +2515,6 @@ int getGaugePadding(GaugeFieldParam& param){
   return pad;
 }
 
-bool gauge_preserved = false;
-
 #if 0 
   int
 computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
@@ -2648,6 +2673,11 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
     QudaGaugeParam* qudaGaugeParam, double* timeinfo)
 {
 
+  printfQuda("GaugeForce: use_resident_gauge = %d, make_resident_gauge = %d\n", 
+	     qudaGaugeParam->use_resident_gauge, qudaGaugeParam->make_resident_gauge);
+  printfQuda("GaugeForce: use_resident_mom = %d, make_resident_mom = %d\n", 
+	     qudaGaugeParam->use_resident_mom, qudaGaugeParam->make_resident_mom);
+
 #ifdef GPU_GAUGE_FORCE
   profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
   profileGaugeForce.Start(QUDA_PROFILE_INIT); 
@@ -2667,19 +2697,27 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
   gParam.gauge = siteLink;
   cpuGaugeField *cpuSiteLink = new cpuGaugeField(gParam);
 
-  gParam.create = QUDA_NULL_FIELD_CREATE;
-  gParam.reconstruct = qudaGaugeParam->reconstruct;
-  gParam.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
-      qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
-    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  cudaGaugeField* cudaSiteLink = NULL;
 
-  cudaGaugeField* cudaSiteLink = new cudaGaugeField(gParam);  
+  if (qudaGaugeParam->use_resident_gauge) {
+    if (!gaugePrecise) errorQuda("No resident gauge field to use");
+    cudaSiteLink = gaugePrecise;
+    profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
+    printfQuda("GaugeForce: Using resident gauge field\n");
+  } else {
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.reconstruct = qudaGaugeParam->reconstruct;
+    gParam.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
+		    qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
+      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    
+    cudaSiteLink = new cudaGaugeField(gParam);  
+    profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
 
-  profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
-
-  profileGaugeForce.Start(QUDA_PROFILE_H2D);
-  cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);    
-  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
+    profileGaugeForce.Start(QUDA_PROFILE_H2D);
+    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);    
+    profileGaugeForce.Stop(QUDA_PROFILE_H2D);
+  }
 
   profileGaugeForce.Start(QUDA_PROFILE_INIT); 
 
@@ -2720,19 +2758,25 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
 
   cpuGaugeField* cpuMom = new cpuGaugeField(gParamMom);              
 
-  gParamMom.create = QUDA_NULL_FIELD_CREATE;  
-  gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
-  gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
-  gParamMom.precision = qudaGaugeParam->cuda_prec;
+  cudaGaugeField* cudaMom = NULL;
+  if (qudaGaugeParam->use_resident_mom) {
+    if (!gaugePrecise) errorQuda("No resident momentum field to use");
+    cudaMom = momResident;
+    printfQuda("GaugeForce: Using resident mom field\n");
+    profileGaugeForce.Stop(QUDA_PROFILE_INIT);
+  } else {
+    gParamMom.create = QUDA_NULL_FIELD_CREATE;  
+    gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
+    gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
+    gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
+    gParamMom.precision = qudaGaugeParam->cuda_prec;
+    cudaMom = new cudaGaugeField(gParamMom);
+    profileGaugeForce.Stop(QUDA_PROFILE_INIT);
 
-  cudaGaugeField* cudaMom = new cudaGaugeField(gParamMom);
-
-  profileGaugeForce.Stop(QUDA_PROFILE_INIT);
-
-  profileGaugeForce.Start(QUDA_PROFILE_H2D);
-  cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
-  profileGaugeForce.Stop(QUDA_PROFILE_H2D);
+    profileGaugeForce.Start(QUDA_PROFILE_H2D);
+    cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+    profileGaugeForce.Stop(QUDA_PROFILE_H2D);
+  }
 
   initLatticeConstants(*cudaMom, profileGaugeForce);
 
@@ -2752,20 +2796,21 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   profileGaugeForce.Stop(QUDA_PROFILE_D2H);
 
-  if (qudaGaugeParam->preserve_gauge) {
-    momResident = cudaMom;
+  profileGaugeForce.Start(QUDA_PROFILE_FREE);
+  if (qudaGaugeParam->make_resident_gauge) {
+    if (gaugePrecise && gaugePrecise != cudaSiteLink) delete gaugePrecise;
     gaugePrecise = cudaSiteLink;
-    gauge_preserved = true;
-    cudaSiteLink = NULL;  
   } else {
-    profileGaugeForce.Start(QUDA_PROFILE_FREE);
     delete cudaSiteLink;
-    delete cudaMom;
-    profileGaugeForce.Stop(QUDA_PROFILE_FREE);
   }
 
+  if (qudaGaugeParam->make_resident_mom) {
+    if (momResident && momResident != cudaMom) delete momResident;
+    momResident = cudaMom;
+  } else {
+    delete cudaMom;
+  }
 
-  profileGaugeForce.Start(QUDA_PROFILE_FREE);
   delete cpuSiteLink;
   delete cpuMom;
 
@@ -2931,7 +2976,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 {
   profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
 
-  if (param->preserve_gauge && extendedGaugeResident && geometry == 4) {
+  if (param->use_resident_gauge && extendedGaugeResident && geometry == 4) {
     profileExtendedGauge.Stop(QUDA_PROFILE_TOTAL);
     return extendedGaugeResident;
   }
@@ -3358,34 +3403,46 @@ void updateGaugeFieldQuda(void* gauge,
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
 
-  cudaGaugeField *cudaMom = !gauge_preserved ? new cudaGaugeField(gParam) : NULL;
+  cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : NULL;
 
   gParam.pad = param->ga_pad;
   gParam.link_type = QUDA_SU3_LINKS;
   gParam.reconstruct = param->reconstruct;
 
-  cudaGaugeField *cudaInGauge = !gauge_preserved ? new cudaGaugeField(gParam) : NULL;
+  cudaGaugeField *cudaInGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : NULL;
   cudaGaugeField *cudaOutGauge = new cudaGaugeField(gParam);
 
   profileGaugeUpdate.Stop(QUDA_PROFILE_INIT);  
 
   profileGaugeUpdate.Start(QUDA_PROFILE_H2D);
-  if (!gauge_preserved) {   // load fields onto the device
+
+  printfQuda("UpdateGaugeFieldQuda use_resident_gauge = %d, make_resident_gauge = %d\n", 
+	     param->use_resident_gauge, param->make_resident_gauge);
+  printfQuda("UpdateGaugeFieldQuda use_resident_mom = %d, make_resident_mom = %d\n", 
+	     param->use_resident_mom, param->make_resident_mom);
+
+  if (!param->use_resident_gauge) {   // load fields onto the device
     cudaInGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
-    cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   } else { // or use resident fields already present
+    if (!gaugePrecise) errorQuda("No resident gauge field allocated");
     cudaInGauge = gaugePrecise;
     gaugePrecise = NULL;
+  } 
+
+  if (!param->use_resident_mom) {
+    cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  } else {
+    if (!momResident) errorQuda("No resident mom field allocated");
     cudaMom = momResident;
     momResident = NULL;
-    gauge_preserved = false;
-  } 
+  }
+
   profileGaugeUpdate.Stop(QUDA_PROFILE_H2D);
 
   // perform the update
   profileGaugeUpdate.Start(QUDA_PROFILE_COMPUTE);
   updateGaugeField(*cudaOutGauge, dt, *cudaInGauge, *cudaMom, 
-      (bool)conj_mom, (bool)exact);
+		   (bool)conj_mom, (bool)exact);
   profileGaugeUpdate.Stop(QUDA_PROFILE_COMPUTE);
 
   // copy the gauge field back to the host
@@ -3395,24 +3452,14 @@ void updateGaugeFieldQuda(void* gauge,
 
   profileGaugeUpdate.Stop(QUDA_PROFILE_TOTAL);
 
-  if (param->preserve_gauge) {
-    if (gaugePrecise != NULL) 
-      delete gaugePrecise;
-
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-
-    int *X = gParam.x;
-    gParam.pad = MAX(X[0]*X[1]*X[2]/2, X[0]*X[2]*X[3]/2);
-    gParam.pad = MAX(gParam.pad, X[0]*X[1]*X[3]/2);
-    gParam.pad = MAX(gParam.pad, X[1]*X[2]*X[3]/2);
-
-    gaugePrecise = new cudaGaugeField(gParam);
-
-    gaugePrecise->copy(*cudaOutGauge);
+  if (param->make_resident_gauge) {
+    if (gaugePrecise != NULL) delete gaugePrecise;
+    gaugePrecise = cudaOutGauge;
+  } else {
+    delete cudaOutGauge;
   }
 
   delete cudaInGauge;
-  delete cudaOutGauge;
   delete cudaMom;
 
   delete cpuMom;
@@ -3434,6 +3481,7 @@ void init_quda_memory_() { initQudaMemory(); }
 void end_quda_() { endQuda(); }
 void load_gauge_quda_(void *h_gauge, QudaGaugeParam *param) { loadGaugeQuda(h_gauge, param); }
 void free_gauge_quda_() { freeGaugeQuda(); }
+void free_sloppy_gauge_quda_() { freeSloppyGaugeQuda(); }
 void load_clover_quda_(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param) 
 { loadCloverQuda(h_clover, h_clovinv, inv_param); }
 void free_clover_quda_(void) { freeCloverQuda(); }
@@ -3485,6 +3533,27 @@ int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int 
   host_free(input_path);
 
   return 0;
+}
+
+// apply the staggered phases
+void apply_staggered_phase_quda_() {
+  printfQuda("applying staggered phase\n");
+  if (gaugePrecise) {
+    gaugePrecise->applyStaggeredPhase();
+  } else {
+    errorQuda("No persistent gauge field");
+  }
+}
+
+// remove the staggered phases
+void remove_staggered_phase_quda_() {
+  printfQuda("removing staggered phase\n");
+  if (gaugePrecise) {
+    gaugePrecise->removeStaggeredPhase();
+  } else {
+    errorQuda("No persistent gauge field");
+  }
+  cudaDeviceSynchronize();
 }
 
 /**
