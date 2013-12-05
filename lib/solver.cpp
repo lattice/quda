@@ -81,14 +81,14 @@ namespace quda {
   }
 
   // solver factory
-  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, 
+  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDeflate,
                                          ColorSpinorParam *eigvParam, TimeProfile &profile)
   {
     DeflatedSolver* solver=0;
 
     if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
       report("Incremental EIGCG");
-      solver = new IncEigCG(mat, matSloppy, eigvParam, param, profile);
+      solver = new IncEigCG(mat, matSloppy, matDeflate, eigvParam, param, profile);
     }else{
       errorQuda("Invalid solver type");
     }

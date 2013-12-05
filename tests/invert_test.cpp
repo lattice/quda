@@ -188,7 +188,7 @@ int main(int argc, char **argv)
   inv_param.pipeline = 0;
 
   inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-10;
+  inv_param.tol = 1e-12;
 
 //! For deflated solvers only:
   if(deflated) inv_param.inv_type = QUDA_EIGCG_INVERTER;

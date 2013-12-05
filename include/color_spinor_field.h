@@ -34,14 +34,14 @@ namespace quda {
 
     ColorSpinorParam(const ColorSpinorField &a);
 
-  ColorSpinorParam()
+    ColorSpinorParam()
     : LatticeFieldParam(), nColor(0), nSpin(0), twistFlavor(QUDA_TWIST_INVALID), 
       siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(QUDA_INVALID_GAMMA_BASIS), 
       create(QUDA_INVALID_FIELD_CREATE), eigv_dim(0), eigv_id(-1) { ; }
   
     // used to create cpu params
-  ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
+    ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
     : LatticeFieldParam(4, X, 0, inv_param.cpu_prec), nColor(3), nSpin(inv_param.dslash_type == QUDA_ASQTAD_DSLASH ? 1 : 4), 
       twistFlavor(inv_param.twist_flavor), siteSubset(QUDA_INVALID_SITE_SUBSET), siteOrder(QUDA_INVALID_SITE_ORDER), 
       fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 

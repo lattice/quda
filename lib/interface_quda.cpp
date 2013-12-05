@@ -1808,16 +1808,26 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
   param->gflops = 0;
   param->iter = 0;
 
-  Dirac *d = NULL;
-  Dirac *dSloppy = NULL;
-  Dirac *dPre = NULL;
+  DiracParam diracParam;
+  DiracParam diracSloppyParam;
+  //DiracParam diracDeflateParam;
 
-  // create the dirac operator
-  createDirac(d, dSloppy, dPre, *param, pc_solve);
+  setDiracParam(diracParam, param, pc_solve);
+  setDiracSloppyParam(diracSloppyParam, param, pc_solve);
+
+  if(param->cuda_prec == QUDA_HALF_PRECISION){
+    //Warning: Ritz vectors must have the same precision.
+    errorQuda("\nHalf precision for deflation is not supported\n");
+    //setDiracParam(diracDeflateParam, *param, pc_solve);
+  }
+
+  Dirac *d        = Dirac::create(diracParam); // create the Dirac operator   
+  Dirac *dSloppy  = Dirac::create(diracSloppyParam);
+  //Dirac *dDeflate = Dirac::create(diracPreParam);
 
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
-  Dirac &diracDeflate = *d;
+  Dirac &diracDeflate = *d;//*dDeflate
 
   profileInvert.Start(QUDA_PROFILE_H2D);
 
@@ -1923,7 +1933,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
     cpuColorSpinorField *h_u = new cpuColorSpinorField(cpuEigvParam);
 
     ColorSpinorParam cudaEigvParam(cpuEigvParam, *param);
-    cudaEigvParam.setPrecision(param->cuda_prec);//the same as for full precision iterations
+    cudaEigvParam.setPrecision(param->cuda_prec);//the same as for full precision iterations (see diracDeflateParam)
     cudaEigvParam.create   = QUDA_COPY_FIELD_CREATE;
     cudaEigvParam.eigv_dim = param->nev*(param->rhs_idx+1);
 
@@ -1932,30 +1942,27 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
     DiracMdagM m(dirac), mSloppy(diracSloppy), mDeflate(diracDeflate);
     SolverParam solverParam(*param);
 
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, &cudaEigvParam, profileInvert);
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mDeflate, &cudaEigvParam, profileInvert);
 
-    ProjectionMatrix *projMat = new ProjectionMatrix(mDeflate, solverParam);
+    //ProjectionMatrix *projMat = new ProjectionMatrix(mDeflate, solverParam);
+    solve->LoadProjectionMatrix(_h_p, 0);
+    //
+    //if (getVerbosity() >= QUDA_VERBOSE){
+       //projMat->PrintInfo();
+    //}
 
-    projMat->LoadProj(_h_p);
-
-    if (getVerbosity() >= QUDA_VERBOSE){
-       projMat->PrintInfo();
-    }
-
-    (*solve)(out, in, ritzvects, projMat);
+    (*solve)(out, in, ritzvects);
 
     if(param->rhs_idx < param->deflation_grid || param->inv_type == QUDA_EIGCG_INVERTER)
     {
       //copy projection matrix and Ritz vectors to the host.
-      projMat->SaveProj(_h_p);
-      //const int offset = param->nev*param->rhs_idx;
-      //h_u->GetEigenvecSubset(param->nev, offset) = ritzvects->GetEigenvecSubset(param->nev, offset);
+      solve->SaveProjectionMatrix(_h_p);
 
       *h_u = *ritzvects;
     }
     delete h_u;
     delete ritzvects;
-    delete projMat;
+    //delete projMat;
 
     solverParam.updateInvertParam(*param);
     delete solve;
@@ -1993,7 +2000,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
 
   delete d;
   delete dSloppy;
-  delete dPre;
+//  delete dDeflate;
 
   popVerbosity();
 
