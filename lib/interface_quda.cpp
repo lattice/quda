@@ -947,8 +947,8 @@ namespace quda {
   }
 
   void massRescale(QudaDslashType dslash_type, double &kappa, double &mass, 
-      QudaSolutionType solution_type, 
-      QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
+		   QudaSolutionType solution_type, 
+		   QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
   {   
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
@@ -1497,7 +1497,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   massRescale(param->dslash_type, param->kappa, param->mass, 
-      param->solution_type, param->mass_normalization, *in);
+	      param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -1990,7 +1990,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   setTuning(param->tune);
 
   massRescale(param->dslash_type, param->kappa, param->mass,
-      param->solution_type, param->mass_normalization, *b);
+	      param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];
   for(int i=0; i < param->num_offset; i++){ 
     unscaled_shifts[i] = param->offset[i];
@@ -2315,7 +2315,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   setTuning(param->tune);
 
   massRescale(param->dslash_type, param->kappa, param->mass,
-      param->solution_type, param->mass_normalization, *b);
+	      param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];
   for(int i=0; i < param->num_offset; i++){ 
     unscaled_shifts[i] = param->offset[i];
