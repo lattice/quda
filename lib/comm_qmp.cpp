@@ -112,7 +112,7 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
  * Declare a message handle for strided sending to a node displaced in
  * (x,y,z,t) according to "displacement"
  */
-MsgHandle *comm_declare_strided_send_displaced(void *buffer, int dim, int dir, 
+MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
 					       size_t blksize, int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
@@ -134,7 +134,7 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, int dim, int dir,
  * Declare a message handle for strided receiving from a node
  * displaced in (x,y,z,t) according to "displacement"
  */
-MsgHandle *comm_declare_strided_receive_displaced(void *buffer, int dim, int dir, 
+MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
 						  size_t blksize, int nblocks, size_t stride)
 {
   Topology *topo = comm_default_topology();
