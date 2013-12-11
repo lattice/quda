@@ -376,7 +376,8 @@ void initQuda(int dev)
 
 void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
 {
-  printfQuda("loadGaugeQuda use_resident_gauge = %d\n", param->use_resident_gauge);
+  //printfQuda("loadGaugeQuda use_resident_gauge = %d phase=%d\n", 
+  //param->use_resident_gauge, param->staggered_phase_applied);
 
   profileGauge.Start(QUDA_PROFILE_TOTAL);
 
@@ -419,6 +420,9 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     if(gaugePrecise == NULL) errorQuda("No resident gauge field");
     // copy rather than point at to ensure that the padded region is filled in
     precise->copy(*gaugePrecise);
+    precise->exchangeGhost();
+    delete gaugePrecise;
+    gaugePrecise = NULL;
     profileGauge.Stop(QUDA_PROFILE_INIT);  
   } else {
     profileGauge.Stop(QUDA_PROFILE_INIT);  
@@ -1797,7 +1801,9 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     axCuda(sqrt(nb), *x);
   }
 
-  if (solutionResident) errorQuda("solutionResident already allocated");
+  if (solutionResident) 
+    delete solutionResident;
+  //errorQuda("solutionResident already allocated");
   cudaParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   cudaParam.x[0] *= 2;
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -1805,9 +1811,9 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   dirac.Dslash(solutionResident->Odd(), solutionResident->Even(), QUDA_ODD_PARITY);
 
-  //profileInvert.Start(QUDA_PROFILE_D2H);
-  //*h_x = *x;
-  //profileInvert.Stop(QUDA_PROFILE_D2H);
+  profileInvert.Start(QUDA_PROFILE_D2H);
+  *h_x = *x;
+  profileInvert.Stop(QUDA_PROFILE_D2H);
 
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = norm2(*x);
@@ -2906,10 +2912,10 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
     QudaGaugeParam* qudaGaugeParam, double* timeinfo)
 {
 
-  printfQuda("GaugeForce: use_resident_gauge = %d, make_resident_gauge = %d\n", 
+  /*printfQuda("GaugeForce: use_resident_gauge = %d, make_resident_gauge = %d\n", 
 	     qudaGaugeParam->use_resident_gauge, qudaGaugeParam->make_resident_gauge);
   printfQuda("GaugeForce: use_resident_mom = %d, make_resident_mom = %d\n", 
-	     qudaGaugeParam->use_resident_mom, qudaGaugeParam->make_resident_mom);
+  qudaGaugeParam->use_resident_mom, qudaGaugeParam->make_resident_mom);*/
 
 #ifdef GPU_GAUGE_FORCE
   profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
@@ -3454,19 +3460,22 @@ void computeKSOprodQuda(void* oprod,
 
 void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
 {
-
   bool use_resident_solution = false;
-  if (qudaQuark==NULL && solutionResident) {
+  if (solutionResident) {
     qudaQuark = solutionResident;
     use_resident_solution = true;
   } else {
     errorQuda("No input quark field defined");
   }
 
-  if (cudaMom==NULL && momResident) {
+  if (momResident) {
     cudaMom = momResident;
   } else {
     errorQuda("No input momentum defined");
+  }
+
+  if (!gaugePrecise) {
+    errorQuda("No resident gauge field");
   }
 
   int pad = 0;
@@ -3666,10 +3675,10 @@ void updateGaugeFieldQuda(void* gauge,
 
   profileGaugeUpdate.Start(QUDA_PROFILE_H2D);
 
-  printfQuda("UpdateGaugeFieldQuda use_resident_gauge = %d, make_resident_gauge = %d\n", 
+  /*printfQuda("UpdateGaugeFieldQuda use_resident_gauge = %d, make_resident_gauge = %d\n", 
 	     param->use_resident_gauge, param->make_resident_gauge);
   printfQuda("UpdateGaugeFieldQuda use_resident_mom = %d, make_resident_mom = %d\n", 
-	     param->use_resident_mom, param->make_resident_mom);
+  param->use_resident_mom, param->make_resident_mom);*/
 
   if (!param->use_resident_gauge) {   // load fields onto the device
     cudaInGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
@@ -3709,9 +3718,14 @@ void updateGaugeFieldQuda(void* gauge,
     delete cudaOutGauge;
   }
 
-  delete cudaInGauge;
-  delete cudaMom;
+  if (param->make_resident_mom) {
+    if (momResident != NULL && momResident != cudaMom) delete momResident;
+    momResident = cudaMom;
+  } else {
+    delete cudaMom;
+  }
 
+  delete cudaInGauge;
   delete cpuMom;
   delete cpuGauge;
 
@@ -3745,7 +3759,7 @@ void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 { MatDagMatQuda(h_out, h_in, inv_param); }
 void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
 { invertQuda(hp_x, hp_b, param); }    
-void invert_quda_md(void *hp_x, void *hp_b, QudaInvertParam *param) 
+void invert_md_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
 { invertMDQuda(hp_x, hp_b, param); }    
 void new_quda_gauge_param_(QudaGaugeParam *param) {
   *param = newQudaGaugeParam();
@@ -3787,7 +3801,7 @@ int compute_gauge_force_quda_(void *mom, void *gauge,  int *input_path_buf, int 
   return 0;
 }
 
-void compute_staggered_force_quda(void* cudaMom, void* qudaQuark, double *coeff) {
+void compute_staggered_force_quda_(void* cudaMom, void* qudaQuark, double *coeff) {
   computeStaggeredForceQuda(cudaMom, qudaQuark, *coeff);
 }
 

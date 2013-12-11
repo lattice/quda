@@ -157,6 +157,10 @@ namespace quda {
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
   void cudaGaugeField::exchangeGhost() {
+    if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD)
+      errorQuda("Cannot call exchangeGhost with ghostExchange=%d", 
+		ghostExchange);
+
     if (geometry != QUDA_VECTOR_GEOMETRY) 
       errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
@@ -336,8 +340,6 @@ namespace quda {
     } else {
       fat_link_max = 1.0;
     }
-
-    //if (src.Order() == QUDA_TIFR_GAUGE_ORDER) fat_link_max = src.Scale();
 
     if (typeid(src) == typeid(cudaGaugeField)) {
       // copy field and ghost zone into this field

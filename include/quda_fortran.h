@@ -155,6 +155,8 @@ extern "C" {
    */
   void invert_quda_(void *h_x, void *h_b, QudaInvertParam *param);
 
+  void invert_md_quda_(void *hp_x, void *hp_b, QudaInvertParam *param);
+
   /**
    * Evolve the gauge field by step size dt, using the momentum field
    * I.e., Evalulate U(t+dt) = e(dt pi) U(t) 
@@ -169,7 +171,7 @@ extern "C" {
   void update_gauge_field_quda_(void* gauge, void* momentum, double *dt, 
 				bool *conj_mom, bool *exact, QudaGaugeParam* param);
 
-  void compute_staggered_force_quda(void* cudaMom, void* qudaQuark, double *coeff);
+  void compute_staggered_force_quda_(void* cudaMom, void* qudaQuark, double *coeff);
 
   /**
    * Compute the gauge force and update the mometum field
