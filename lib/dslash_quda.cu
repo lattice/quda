@@ -1388,11 +1388,11 @@ namespace quda {
 
 #ifdef MULTI_GPU
 
-#ifndef GPU_COMMS
-    // Record the start of the dslash
-    PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
-	    profile, QUDA_PROFILE_EVENT_RECORD);
-#endif // GPU_COMMS
+    // Record the start of the dslash if doing communication in T and not kernel packing
+    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) {
+      PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
+	      profile, QUDA_PROFILE_EVENT_RECORD);
+    }
 
     bool pack = false;
     for (int i=3; i>=0; i--) 
