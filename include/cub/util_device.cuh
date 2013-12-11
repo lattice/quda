@@ -46,7 +46,7 @@ namespace cub {
 
 
 /**
- * \addtogroup UtilModule
+ * \addtogroup UtilMgmt
  * @{
  */
 
@@ -93,7 +93,7 @@ cudaError_t AliasTemporaries(
     // Check if enough storage provided
     if (temp_storage_bytes < bytes_needed)
     {
-        return CubDebug(cudaErrorMemoryAllocation);
+        return CubDebug(cudaErrorInvalidValue);
     }
 
     // Alias
@@ -112,14 +112,33 @@ cudaError_t AliasTemporaries(
 
 
 /**
- * \brief Retrieves the PTX version (major * 100 + minor * 10)
+ * \brief Retrieves the PTX version that will be used on the current device (major * 100 + minor * 10)
  */
 __host__ __device__ __forceinline__ cudaError_t PtxVersion(int &ptx_version)
 {
+    struct Dummy
+    {
+        /// Type definition of the EmptyKernel kernel entry point
+        typedef void (*EmptyKernelPtr)();
+
+        /// Force EmptyKernel<void> to be generated if this class is used
+        __host__ __device__ __forceinline__
+        EmptyKernelPtr Empty()
+        {
+            return EmptyKernel<void>;
+        }
+    };
+
+
 #ifndef CUB_RUNTIME_ENABLED
 
     // CUDA API calls not supported from this device
     return cudaErrorInvalidConfiguration;
+
+#elif defined(__CUDA_ARCH__)
+
+    ptx_version = CUB_PTX_VERSION;
+    return cudaSuccess;
 
 #else
 
@@ -139,6 +158,37 @@ __host__ __device__ __forceinline__ cudaError_t PtxVersion(int &ptx_version)
 
 
 /**
+ * \brief Retrieves the SM version (major * 100 + minor * 10)
+ */
+__host__ __device__ __forceinline__ cudaError_t SmVersion(int &sm_version, int device_ordinal)
+{
+#ifndef CUB_RUNTIME_ENABLED
+
+    // CUDA API calls not supported from this device
+    return cudaErrorInvalidConfiguration;
+
+#else
+
+    cudaError_t error = cudaSuccess;
+    do
+    {
+        // Fill in SM version
+        int major, minor;
+        if (CubDebug(error = cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device_ordinal))) break;
+        if (CubDebug(error = cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device_ordinal))) break;
+        sm_version = major * 100 + minor * 10;
+    }
+    while (0);
+
+    return error;
+
+#endif
+}
+
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
+/**
  * Synchronize the stream if specified
  */
 __host__ __device__ __forceinline__
@@ -153,226 +203,169 @@ static cudaError_t SyncStream(cudaStream_t stream)
 }
 
 
+/**
+ * \brief Computes maximum SM occupancy in thread blocks for the given kernel function pointer \p kernel_ptr.
+ */
+template <typename KernelPtr>
+__host__ __device__ __forceinline__
+cudaError_t MaxSmOccupancy(
+    int                 &max_sm_occupancy,          ///< [out] maximum number of thread blocks that can reside on a single SM
+    int                 sm_version,                 ///< [in] The SM architecture to run on
+    KernelPtr           kernel_ptr,                 ///< [in] Kernel pointer for which to compute SM occupancy
+    int                 block_threads)              ///< [in] Number of threads per thread block
+{
+#ifndef CUB_RUNTIME_ENABLED
+
+    // CUDA API calls not supported from this device
+    return CubDebug(cudaErrorInvalidConfiguration);
+
+#else
+
+    cudaError_t error = cudaSuccess;
+    do
+    {
+        int warp_threads        = 1 << CUB_LOG_WARP_THREADS(sm_version);
+        int max_sm_blocks       = CUB_MAX_SM_BLOCKS(sm_version);
+        int max_sm_warps        = CUB_MAX_SM_THREADS(sm_version) / warp_threads;
+        int regs_by_block       = CUB_REGS_BY_BLOCK(sm_version);
+        int max_sm_registers    = CUB_MAX_SM_REGISTERS(sm_version);
+        int warp_alloc_unit     = CUB_WARP_ALLOC_UNIT(sm_version);
+        int smem_alloc_unit     = CUB_SMEM_ALLOC_UNIT(sm_version);
+        int reg_alloc_unit      = CUB_REG_ALLOC_UNIT(sm_version);
+        int smem_bytes          = CUB_SMEM_BYTES(sm_version);
+
+        // Get kernel attributes
+        cudaFuncAttributes kernel_attrs;
+        if (CubDebug(error = cudaFuncGetAttributes(&kernel_attrs, kernel_ptr))) break;
+
+        // Number of warps per threadblock
+        int block_warps = (block_threads +  warp_threads - 1) / warp_threads;
+
+        // Max warp occupancy
+        int max_warp_occupancy = (block_warps > 0) ?
+            max_sm_warps / block_warps :
+            max_sm_blocks;
+
+        // Maximum register occupancy
+        int max_reg_occupancy;
+        if ((block_threads == 0) || (kernel_attrs.numRegs == 0))
+        {
+            // Prevent divide-by-zero
+            max_reg_occupancy = max_sm_blocks;
+        }
+        else if (regs_by_block)
+        {
+            // Allocates registers by threadblock
+            int block_regs = CUB_ROUND_UP_NEAREST(kernel_attrs.numRegs * warp_threads * block_warps, reg_alloc_unit);
+            max_reg_occupancy = max_sm_registers / block_regs;
+        }
+        else
+        {
+            // Allocates registers by warp
+            int sm_sides                = warp_alloc_unit;
+            int sm_registers_per_side   = max_sm_registers / sm_sides;
+            int regs_per_warp           = CUB_ROUND_UP_NEAREST(kernel_attrs.numRegs * warp_threads, reg_alloc_unit);
+            int warps_per_side          = sm_registers_per_side / regs_per_warp;
+            int warps                   = warps_per_side * sm_sides;
+            max_reg_occupancy           = warps / block_warps;
+        }
+
+        // Shared memory per threadblock
+        int block_allocated_smem = CUB_ROUND_UP_NEAREST(
+            kernel_attrs.sharedSizeBytes,
+            smem_alloc_unit);
+
+        // Max shared memory occupancy
+        int max_smem_occupancy = (block_allocated_smem > 0) ?
+            (smem_bytes / block_allocated_smem) :
+            max_sm_blocks;
+
+        // Max occupancy
+        max_sm_occupancy = CUB_MIN(
+            CUB_MIN(max_sm_blocks, max_warp_occupancy),
+            CUB_MIN(max_smem_occupancy, max_reg_occupancy));
+
+//            printf("max_smem_occupancy(%d), max_warp_occupancy(%d), max_reg_occupancy(%d) \n", max_smem_occupancy, max_warp_occupancy, max_reg_occupancy);
+
+    } while (0);
+
+    return error;
+
+#endif  // CUB_RUNTIME_ENABLED
+}
+
+#endif  // Do not document
+
 
 /**
- * \brief Properties of a given CUDA device and the corresponding PTX bundle
+ * \brief Computes maximum SM occupancy in thread blocks for executing the given kernel function pointer \p kernel_ptr on the current device with \p block_threads per thread block.
+ *
+ * \par
+ * The code snippet below illustrates the use of the MaxSmOccupancy function.
+ * \par
+ * \code
+ * #include <cub/cub.cuh>   // or equivalently <cub/util_device.cuh>
+ *
+ * template <typename T>
+ * __global__ void ExampleKernel()
+ * {
+ *     // Allocate shared memory for BlockScan
+ *     __shared__ volatile T buffer[4096];
+ *
+ *        ...
+ * }
+ *
+ *     ...
+ *
+ * // Determine SM occupancy for ExampleKernel specialized for unsigned char
+ * int max_sm_occupancy;
+ * MaxSmOccupancy(max_sm_occupancy, ExampleKernel<unsigned char>, 64);
+ *
+ * // max_sm_occupancy  <-- 4 on SM10
+ * // max_sm_occupancy  <-- 8 on SM20
+ * // max_sm_occupancy  <-- 12 on SM35
+ *
+ * \endcode
+ *
  */
-class Device
+template <typename KernelPtr>
+__host__ __device__ __forceinline__
+cudaError_t MaxSmOccupancy(
+    int                 &max_sm_occupancy,          ///< [out] maximum number of thread blocks that can reside on a single SM
+    KernelPtr           kernel_ptr,                 ///< [in] Kernel pointer for which to compute SM occupancy
+    int                 block_threads)              ///< [in] Number of threads per thread block
 {
-private:
+#ifndef CUB_RUNTIME_ENABLED
 
-    /// Type definition of the EmptyKernel kernel entry point
-    typedef void (*EmptyKernelPtr)();
+    // CUDA API calls not supported from this device
+    return CubDebug(cudaErrorInvalidConfiguration);
 
-    /// Force EmptyKernel<void> to be generated if this class is used
-    __host__ __device__ __forceinline__
-    EmptyKernelPtr Empty()
+#else
+
+    cudaError_t error = cudaSuccess;
+    do
     {
-        return EmptyKernel<void>;
-    }
+        // Get device ordinal
+        int device_ordinal;
+        if (CubDebug(error = cudaGetDevice(&device_ordinal))) break;
 
-public:
+        // Get device SM version
+        int sm_version;
+        if (CubDebug(error = SmVersion(sm_version, device_ordinal))) break;
 
-    // Version information
-    int     sm_version;             ///< SM version of target device (SM version X.YZ in XYZ integer form)
-    int     ptx_version;            ///< Bundled PTX version for target device (PTX version X.YZ in XYZ integer form)
+        // Get SM occupancy
+        if (CubDebug(error = MaxSmOccupancy(max_sm_occupancy, sm_version, kernel_ptr, block_threads))) break;
 
-    // Target device properties
-    int     sm_count;               ///< Number of SMs
-    int     warp_threads;           ///< Number of threads per warp
-    int     smem_bank_bytes;        ///< Number of bytes per SM bank
-    int     smem_banks;             ///< Number of smem banks
-    int     smem_bytes;             ///< Smem bytes per SM
-    int     smem_alloc_unit;        ///< Smem segment size
-    bool    regs_by_block;          ///< Whether registers are allocated by threadblock (or by warp)
-    int     reg_alloc_unit;         ///< Granularity of register allocation within the SM
-    int     warp_alloc_unit;        ///< Granularity of warp allocation within the SM
-    int     max_sm_threads;         ///< Maximum number of threads per SM
-    int     max_sm_blocks;          ///< Maximum number of threadblocks per SM
-    int     max_block_threads;      ///< Maximum number of threads per threadblock
-    int     max_sm_registers;       ///< Maximum number of registers per SM
-    int     max_sm_warps;           ///< Maximum number of warps per SM
+    } while (0);
 
-    /**
-     * Callback for initializing device properties
-     */
-    template <typename ArchProps>
-    __host__ __device__ __forceinline__ void Callback()
-    {
-        warp_threads        = ArchProps::WARP_THREADS;
-        smem_bank_bytes     = ArchProps::SMEM_BANK_BYTES;
-        smem_banks          = ArchProps::SMEM_BANKS;
-        smem_bytes          = ArchProps::SMEM_BYTES;
-        smem_alloc_unit     = ArchProps::SMEM_ALLOC_UNIT;
-        regs_by_block       = ArchProps::REGS_BY_BLOCK;
-        reg_alloc_unit      = ArchProps::REG_ALLOC_UNIT;
-        warp_alloc_unit     = ArchProps::WARP_ALLOC_UNIT;
-        max_sm_threads      = ArchProps::MAX_SM_THREADS;
-        max_sm_blocks       = ArchProps::MAX_SM_THREADBLOCKS;
-        max_block_threads   = ArchProps::MAX_BLOCK_THREADS;
-        max_sm_registers    = ArchProps::MAX_SM_REGISTERS;
-        max_sm_warps        = max_sm_threads / warp_threads;
-    }
+    return error;
+
+#endif  // CUB_RUNTIME_ENABLED
+
+}
 
 
-public:
-
-    /**
-     * Initializer.  Properties are retrieved for the specified GPU ordinal.
-     */
-    __host__ __device__ __forceinline__
-    cudaError_t Init(int device_ordinal)
-    {
-    #ifndef CUB_RUNTIME_ENABLED
-
-        // CUDA API calls not supported from this device
-        return CubDebug(cudaErrorInvalidConfiguration);
-
-    #else
-
-        cudaError_t error = cudaSuccess;
-        do
-        {
-            // Fill in SM version
-            int major, minor;
-            if (CubDebug(error = cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device_ordinal))) break;
-            if (CubDebug(error = cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, device_ordinal))) break;
-            sm_version = major * 100 + minor * 10;
-
-            // Fill in static SM properties
-            // Initialize our device properties via callback from static device properties
-            ArchProps<100>::Callback(*this, sm_version);
-
-            // Fill in SM count
-            if (CubDebug(error = cudaDeviceGetAttribute (&sm_count, cudaDevAttrMultiProcessorCount, device_ordinal))) break;
-
-            // Fill in PTX version
-        #if CUB_PTX_ARCH > 0
-            ptx_version = CUB_PTX_ARCH;
-        #else
-            if (CubDebug(error = PtxVersion(ptx_version))) break;
-        #endif
-
-        }
-        while (0);
-
-        return error;
-
-    #endif
-    }
-
-
-    /**
-     * Initializer.  Properties are retrieved for the current GPU ordinal.
-     */
-    __host__ __device__ __forceinline__
-    cudaError_t Init()
-    {
-    #ifndef CUB_RUNTIME_ENABLED
-
-        // CUDA API calls not supported from this device
-        return CubDebug(cudaErrorInvalidConfiguration);
-
-    #else
-
-        cudaError_t error = cudaSuccess;
-        do
-        {
-            int device_ordinal;
-            if ((error = CubDebug(cudaGetDevice(&device_ordinal)))) break;
-            if ((error = Init(device_ordinal))) break;
-        }
-        while (0);
-        return error;
-
-    #endif
-    }
-
-
-    /**
-     * Computes maximum SM occupancy in thread blocks for the given kernel
-     */
-    template <typename KernelPtr>
-    __host__ __device__ __forceinline__
-    cudaError_t MaxSmOccupancy(
-        int                 &max_sm_occupancy,          ///< [out] maximum number of thread blocks that can reside on a single SM
-        KernelPtr           kernel_ptr,                 ///< [in] Kernel pointer for which to compute SM occupancy
-        int                 block_threads)              ///< [in] Number of threads per thread block
-    {
-    #ifndef CUB_RUNTIME_ENABLED
-
-        // CUDA API calls not supported from this device
-        return CubDebug(cudaErrorInvalidConfiguration);
-
-    #else
-
-        cudaError_t error = cudaSuccess;
-        do
-        {
-            // Get kernel attributes
-            cudaFuncAttributes kernel_attrs;
-            if (CubDebug(error = cudaFuncGetAttributes(&kernel_attrs, kernel_ptr))) break;
-
-            // Number of warps per threadblock
-            int block_warps = (block_threads +  warp_threads - 1) / warp_threads;
-
-            // Max warp occupancy
-            int max_warp_occupancy = (block_warps > 0) ?
-                max_sm_warps / block_warps :
-                max_sm_blocks;
-
-            // Maximum register occupancy
-            int max_reg_occupancy;
-            if ((block_threads == 0) || (kernel_attrs.numRegs == 0))
-            {
-                // Prevent divide-by-zero
-                max_reg_occupancy = max_sm_blocks;
-            }
-            else if (regs_by_block)
-            {
-                // Allocates registers by threadblock
-                int block_regs = CUB_ROUND_UP_NEAREST(kernel_attrs.numRegs * warp_threads * block_warps, reg_alloc_unit);
-                max_reg_occupancy = max_sm_registers / block_regs;
-            }
-            else
-            {
-                // Allocates registers by warp
-                int sm_sides                = warp_alloc_unit;
-                int sm_registers_per_side   = max_sm_registers / sm_sides;
-                int regs_per_warp           = CUB_ROUND_UP_NEAREST(kernel_attrs.numRegs * warp_threads, reg_alloc_unit);
-                int warps_per_side          = sm_registers_per_side / regs_per_warp;
-                int warps                   = warps_per_side * sm_sides;
-                max_reg_occupancy           = warps / block_warps;
-            }
-
-            // Shared memory per threadblock
-            int block_allocated_smem = CUB_ROUND_UP_NEAREST(
-                kernel_attrs.sharedSizeBytes,
-                smem_alloc_unit);
-
-            // Max shared memory occupancy
-            int max_smem_occupancy = (block_allocated_smem > 0) ?
-                (smem_bytes / block_allocated_smem) :
-                max_sm_blocks;
-
-            // Max occupancy
-            max_sm_occupancy = CUB_MIN(
-                CUB_MIN(max_sm_blocks, max_warp_occupancy),
-                CUB_MIN(max_smem_occupancy, max_reg_occupancy));
-
-//            printf("max_smem_occupancy(%d), max_warp_occupancy(%d), max_reg_occupancy(%d)", max_smem_occupancy, max_warp_occupancy, max_reg_occupancy);
-
-        } while (0);
-
-        return error;
-
-    #endif
-    }
-
-};
-
-
-/** @} */       // end group UtilModule
+/** @} */       // end group UtilMgmt
 
 }               // CUB namespace
 CUB_NS_POSTFIX  // Optional outer namespace(s)

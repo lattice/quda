@@ -43,7 +43,7 @@ CUB_NS_PREFIX
 namespace cub {
 
 /**
- * \addtogroup ThreadModule
+ * \addtogroup UtilModule
  * @{
  */
 
@@ -51,6 +51,41 @@ namespace cub {
  * \name Sequential prefix scan over statically-sized array types
  * @{
  */
+
+template <
+    int         LENGTH,
+    typename    T,
+    typename    ScanOp>
+__device__ __forceinline__ T ThreadScanExclusive(
+    T                   inclusive,
+    T                   exclusive,
+    T                   *input,                 ///< [in] Input array
+    T                   *output,                ///< [out] Output array (may be aliased to \p input)
+    ScanOp              scan_op,                ///< [in] Binary scan operator
+    Int2Type<LENGTH>    length)
+{
+    T addend = *input;
+    inclusive = scan_op(exclusive, addend);
+    output[0] = exclusive;
+    exclusive = inclusive;
+
+    return ThreadScanExclusive(inclusive, exclusive, input + 1, output + 1, scan_op, Int2Type<LENGTH - 1>());
+}
+
+template <
+    typename    T,
+    typename    ScanOp>
+__device__ __forceinline__ T ThreadScanExclusive(
+    T                   inclusive,
+    T                   exclusive,
+    T                   *input,                 ///< [in] Input array
+    T                   *output,                ///< [out] Output array (may be aliased to \p input)
+    ScanOp              scan_op,                ///< [in] Binary scan operator
+    Int2Type<0>         length)
+{
+    return inclusive;
+}
+
 
 /**
  * \brief Perform a sequential exclusive prefix scan over \p LENGTH elements of the \p input array, seeded with the specified \p prefix.  The aggregate is returned.
@@ -78,15 +113,7 @@ __device__ __forceinline__ T ThreadScanExclusive(
     output[0] = prefix;
     T exclusive = inclusive;
 
-    #pragma unroll
-    for (int i = 1; i < LENGTH; ++i)
-    {
-        inclusive = scan_op(exclusive, input[i]);
-        output[i] = exclusive;
-        exclusive = inclusive;
-    }
-
-    return inclusive;
+    return ThreadScanExclusive(inclusive, exclusive, input + 1, output + 1, scan_op, Int2Type<LENGTH - 1>());
 }
 
 
@@ -112,6 +139,45 @@ __device__ __forceinline__ T ThreadScanExclusive(
 }
 
 
+
+
+
+
+
+
+
+template <
+    int         LENGTH,
+    typename    T,
+    typename    ScanOp>
+__device__ __forceinline__ T ThreadScanInclusive(
+    T                   inclusive,
+    T                   *input,                 ///< [in] Input array
+    T                   *output,                ///< [out] Output array (may be aliased to \p input)
+    ScanOp              scan_op,                ///< [in] Binary scan operator
+    Int2Type<LENGTH>    length)
+{
+    T addend = *input;
+    inclusive = scan_op(inclusive, addend);
+    output[0] = inclusive;
+
+    return ThreadScanInclusive(inclusive, input + 1, output + 1, scan_op, Int2Type<LENGTH - 1>());
+}
+
+template <
+    typename    T,
+    typename    ScanOp>
+__device__ __forceinline__ T ThreadScanInclusive(
+    T                   inclusive,
+    T                   *input,                 ///< [in] Input array
+    T                   *output,                ///< [out] Output array (may be aliased to \p input)
+    ScanOp              scan_op,                ///< [in] Binary scan operator
+    Int2Type<0>         length)
+{
+    return inclusive;
+}
+
+
 /**
  * \brief Perform a sequential inclusive prefix scan over \p LENGTH elements of the \p input array.  The aggregate is returned.
  *
@@ -132,14 +198,7 @@ __device__ __forceinline__ T ThreadScanInclusive(
     output[0] = inclusive;
 
     // Continue scan
-    #pragma unroll
-    for (int i = 0; i < LENGTH; ++i)
-    {
-        inclusive = scan_op(inclusive, input[i]);
-        output[i] = inclusive;
-    }
-
-    return inclusive;
+    return ThreadScanInclusive(inclusive, input + 1, output + 1, scan_op, Int2Type<LENGTH - 1>());
 }
 
 
@@ -189,14 +248,7 @@ __device__ __forceinline__ T ThreadScanInclusive(
     output[0] = inclusive;
 
     // Continue scan
-    #pragma unroll
-    for (int i = 1; i < LENGTH; ++i)
-    {
-        inclusive = scan_op(inclusive, input[i]);
-        output[i] = inclusive;
-    }
-
-    return inclusive;
+    return ThreadScanInclusive(inclusive, input + 1, output + 1, scan_op, Int2Type<LENGTH - 1>());
 }
 
 
@@ -224,7 +276,7 @@ __device__ __forceinline__ T ThreadScanInclusive(
 
 //@}  end member group
 
-/** @} */       // end group ThreadModule
+/** @} */       // end group UtilModule
 
 
 }               // CUB namespace

@@ -38,6 +38,7 @@
 #pragma once
 
 #include "../util_macro.cuh"
+#include "../util_type.cuh"
 #include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -48,7 +49,7 @@ namespace cub {
 
 
 /**
- * \addtogroup ThreadModule
+ * \addtogroup UtilModule
  * @{
  */
 
@@ -59,7 +60,7 @@ struct Equality
 {
     /// Boolean equality operator, returns <tt>(a == b)</tt>
     template <typename T>
-    __host__ __device__ __forceinline__ bool operator()(const T &a, const T &b)
+    __host__ __device__ __forceinline__ bool operator()(const T &a, const T &b) const
     {
         return a == b;
     }
@@ -73,9 +74,31 @@ struct Inequality
 {
     /// Boolean inequality operator, returns <tt>(a != b)</tt>
     template <typename T>
-    __host__ __device__ __forceinline__ bool operator()(const T &a, const T &b)
+    __host__ __device__ __forceinline__ bool operator()(const T &a, const T &b) const
     {
         return a != b;
+    }
+};
+
+
+/**
+ * \brief Inequality functor (wraps equality functor)
+ */
+template <typename EqualityOp>
+struct InequalityWrapper
+{
+    /// Wrapped equality operator
+    EqualityOp op;
+
+    /// Constructor
+    __host__ __device__ __forceinline__
+    InequalityWrapper(EqualityOp op) : op(op) {}
+
+    /// Boolean inequality operator, returns <tt>(a != b)</tt>
+    template <typename T>
+    __host__ __device__ __forceinline__ bool operator()(const T &a, const T &b) const
+    {
+        return !op(a, b);
     }
 };
 
@@ -87,7 +110,7 @@ struct Sum
 {
     /// Boolean sum operator, returns <tt>a + b</tt>
     template <typename T>
-    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b)
+    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b) const
     {
         return a + b;
     }
@@ -101,9 +124,28 @@ struct Max
 {
     /// Boolean max operator, returns <tt>(a > b) ? a : b</tt>
     template <typename T>
-    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b)
+    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b) const
     {
         return CUB_MAX(a, b);
+    }
+};
+
+
+/**
+ * \brief Arg max functor (keeps the value and offset of the first occurrence of the l item)
+ */
+struct ArgMax
+{
+    /// Boolean max operator, preferring the item having the smaller offset in case of ties
+    template <typename T, typename Offset>
+    __host__ __device__ __forceinline__ ItemOffsetPair<T, Offset> operator()(
+        const ItemOffsetPair<T, Offset> &a,
+        const ItemOffsetPair<T, Offset> &b) const
+    {
+        if (a.value == b.value)
+            return (b.offset < a.offset) ? b : a;
+
+        return (b.value > a.value) ? b : a;
     }
 };
 
@@ -115,9 +157,28 @@ struct Min
 {
     /// Boolean min operator, returns <tt>(a < b) ? a : b</tt>
     template <typename T>
-    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b)
+    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b) const
     {
         return CUB_MIN(a, b);
+    }
+};
+
+
+/**
+ * \brief Arg min functor (keeps the value and offset of the first occurrence of the smallest item)
+ */
+struct ArgMin
+{
+    /// Boolean min operator, preferring the item having the smaller offset in case of ties
+    template <typename T, typename Offset>
+    __host__ __device__ __forceinline__ ItemOffsetPair<T, Offset> operator()(
+        const ItemOffsetPair<T, Offset> &a,
+        const ItemOffsetPair<T, Offset> &b) const
+    {
+        if (a.value == b.value)
+            return (b.offset < a.offset) ? b : a;
+
+        return (b.value < a.value) ? b : a;
     }
 };
 
@@ -130,7 +191,7 @@ struct Cast
 {
     /// Boolean max operator, returns <tt>(a > b) ? a : b</tt>
     template <typename A>
-    __host__ __device__ __forceinline__ B operator()(const A &a)
+    __host__ __device__ __forceinline__ B operator()(const A &a) const
     {
         return (B) a;
     }
@@ -138,7 +199,7 @@ struct Cast
 
 
 
-/** @} */       // end group ThreadModule
+/** @} */       // end group UtilModule
 
 
 }               // CUB namespace

@@ -36,6 +36,7 @@
 #include <iostream>
 #include <limits>
 
+#include "util_macro.cuh"
 #include "util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -75,7 +76,6 @@ struct If<false, ThenType, ElseType>
 };
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
-
 
 /******************************************************************************
  * Conditional types
@@ -118,8 +118,14 @@ struct Equals <A, A>
 struct NullType
 {
 #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
     template <typename T>
     __host__ __device__ __forceinline__ NullType& operator =(const T& b) { return *this; }
+
+    __host__ __device__ __forceinline__ bool operator ==(const NullType& b) { return true; }
+
+    __host__ __device__ __forceinline__ bool operator !=(const NullType& b) { return false; }
+
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 };
 
@@ -134,14 +140,16 @@ struct Int2Type
 };
 
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
+
 /******************************************************************************
  * Size and alignment
  ******************************************************************************/
 
-#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
-
+/// Structure alignment
 template <typename T>
-struct WordAlignment
+struct AlignBytes
 {
     struct Pad
     {
@@ -154,54 +162,112 @@ struct WordAlignment
         /// The alignment of T in bytes
         ALIGN_BYTES = sizeof(Pad) - sizeof(T)
     };
+};
+
+// Specializations where host C++ compilers (e.g., Windows) may disagree with device C++ compilers (EDG)
+
+template <> struct AlignBytes<short4>               { enum { ALIGN_BYTES = 8 }; };
+template <> struct AlignBytes<ushort4>              { enum { ALIGN_BYTES = 8 }; };
+template <> struct AlignBytes<int2>                 { enum { ALIGN_BYTES = 8 }; };
+template <> struct AlignBytes<uint2>                { enum { ALIGN_BYTES = 8 }; };
+#ifdef _WIN32
+    template <> struct AlignBytes<long2>            { enum { ALIGN_BYTES = 8 }; };
+    template <> struct AlignBytes<ulong2>           { enum { ALIGN_BYTES = 8 }; };
+#endif
+template <> struct AlignBytes<long long>            { enum { ALIGN_BYTES = 8 }; };
+template <> struct AlignBytes<unsigned long long>   { enum { ALIGN_BYTES = 8 }; };
+template <> struct AlignBytes<float2>               { enum { ALIGN_BYTES = 8 }; };
+template <> struct AlignBytes<double>               { enum { ALIGN_BYTES = 8 }; };
+
+template <> struct AlignBytes<int4>                 { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<uint4>                { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<float4>               { enum { ALIGN_BYTES = 16 }; };
+#ifndef _WIN32
+    template <> struct AlignBytes<long2>            { enum { ALIGN_BYTES = 16 }; };
+    template <> struct AlignBytes<ulong2>           { enum { ALIGN_BYTES = 16 }; };
+#endif
+template <> struct AlignBytes<long4>                { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<ulong4>               { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<longlong2>            { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<ulonglong2>           { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<double2>              { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<longlong4>            { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<ulonglong4>           { enum { ALIGN_BYTES = 16 }; };
+template <> struct AlignBytes<double4>              { enum { ALIGN_BYTES = 16 }; };
+
+
+/// Unit-words of data movement
+template <typename T>
+struct UnitWord
+{
+    enum {
+        ALIGN_BYTES = AlignBytes<T>::ALIGN_BYTES
+    };
+
+    template <typename Unit>
+    struct IsMultiple
+    {
+        enum {
+            UNIT_ALIGN_BYTES    = AlignBytes<Unit>::ALIGN_BYTES,
+            IS_MULTIPLE         = (sizeof(T) % sizeof(Unit) == 0) && (ALIGN_BYTES % UNIT_ALIGN_BYTES == 0)
+        };
+    };
 
     /// Biggest shuffle word that T is a whole multiple of and is not larger than the alignment of T
-    typedef typename If<(ALIGN_BYTES % 4 == 0),
-        int,
-        typename If<(ALIGN_BYTES % 2 == 0),
-            short,
-            char>::Type>::Type                  ShuffleWord;
+    typedef typename If<IsMultiple<int>::IS_MULTIPLE,
+        unsigned int,
+        typename If<IsMultiple<short>::IS_MULTIPLE,
+            unsigned short,
+            unsigned char>::Type>::Type                  ShuffleWord;
 
     /// Biggest volatile word that T is a whole multiple of and is not larger than the alignment of T
-    typedef typename If<(ALIGN_BYTES % 8 == 0),
-        long long,
+    typedef typename If<IsMultiple<long long>::IS_MULTIPLE,
+        unsigned long long,
         ShuffleWord>::Type                      VolatileWord;
 
     /// Biggest memory-access word that T is a whole multiple of and is not larger than the alignment of T
-    typedef typename If<(ALIGN_BYTES % 16 == 0),
-        longlong2,
-        typename If<(ALIGN_BYTES % 8 == 0),
-            long long,                                 // needed to get heterogenous PODs to work on all platforms
-            ShuffleWord>::Type>::Type           DeviceWord;
+    typedef typename If<IsMultiple<longlong2>::IS_MULTIPLE,
+        ulonglong2,
+        VolatileWord>::Type                     DeviceWord;
 
-    enum
-    {
-        DEVICE_MULTIPLE = sizeof(DeviceWord) / sizeof(T)
-    };
-
-    struct UninitializedBytes
-    {
-        char buf[sizeof(T)];
-    };
-
-    struct UninitializedShuffleWords
-    {
-        ShuffleWord buf[sizeof(T) / sizeof(ShuffleWord)];
-    };
-
-    struct UninitializedVolatileWords
-    {
-        VolatileWord buf[sizeof(T) / sizeof(VolatileWord)];
-    };
-
-    struct UninitializedDeviceWords
-    {
-        DeviceWord buf[sizeof(T) / sizeof(DeviceWord)];
-    };
-
-
+    /// Biggest texture reference word that T is a whole multiple of and is not larger than the alignment of T
+    typedef typename If<IsMultiple<int4>::IS_MULTIPLE,
+        uint4,
+        typename If<IsMultiple<int2>::IS_MULTIPLE,
+            uint2,
+            ShuffleWord>::Type>::Type           TextureWord;
 };
 
+
+// float2 specialization workaround (for SM10-SM13)
+template <>
+struct UnitWord <float2>
+{
+    typedef int         ShuffleWord;
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ <= 130)
+    typedef float       VolatileWord;
+    typedef uint2       DeviceWord;
+#else
+    typedef unsigned long long   VolatileWord;
+    typedef unsigned long long   DeviceWord;
+#endif
+    typedef float2      TextureWord;
+};
+
+// float4 specialization workaround (for SM10-SM13)
+template <>
+struct UnitWord <float4>
+{
+    typedef int         ShuffleWord;
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ <= 130)
+    typedef float               VolatileWord;
+    typedef uint4               DeviceWord;
+#else
+    typedef unsigned long long  VolatileWord;
+    typedef ulonglong2          DeviceWord;
+#endif
+    typedef float4              TextureWord;
+};
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
@@ -211,13 +277,102 @@ struct WordAlignment
  ******************************************************************************/
 
 /**
+ * \brief An item value paired with a corresponding offset
+ */
+template <typename _T, typename _Offset>
+struct ItemOffsetPair
+{
+    typedef _T        T;        ///< Item data type
+    typedef _Offset   Offset;   ///< Integer offset data type
+
+    T       value;      ///< Item value
+    Offset  offset;     ///< Offset
+
+    /// Inequality operator
+    __host__ __device__ __forceinline__ bool operator !=(const ItemOffsetPair &b)
+    {
+        return (value != b.value) || (offset != b.offset);
+    }
+};
+
+
+/**
+ * \brief A key identifier paired with a corresponding value
+ */
+template <typename _Key, typename _Value>
+struct KeyValuePair
+{
+    typedef _Key        Key;        ///< Key data type
+    typedef _Value      Value;      ///< Value data type
+
+    Value   value;          ///< Value data
+    Key     key;            ///< Key identifier
+
+    /// Inequality operator
+    __host__ __device__ __forceinline__ bool operator !=(const KeyValuePair &b)
+    {
+        return (value != b.value) || (key != b.key);
+    }
+
+};
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
+/*
+template <>
+struct KeyValuePair<int, long long>
+{
+    typedef int         Key;
+    typedef long long   Value;
+
+    Value       value;          ///< Value
+    long long   key;            ///< Key identifier
+};
+
+
+template <>
+struct KeyValuePair<int, double>
+{
+    typedef int         Key;
+    typedef double      Value;
+
+    Value       value;          ///< Value
+    long long   key;            ///< Key identifier
+};
+*/
+
+
+
+template <typename T>
+__host__ __device__ __forceinline__ T ZeroInitialize()
+{
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ <= 130)
+
+    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
+    const int MULTIPLE = sizeof(T) / sizeof(ShuffleWord);
+    ShuffleWord words[MULTIPLE];
+    #pragma unroll
+    for (int i = 0; i < MULTIPLE; ++i)
+        words[i] = 0;
+    return *reinterpret_cast<T*>(words);
+
+#else
+
+    return T();
+
+#endif
+}
+
+#endif // DOXYGEN_SHOULD_SKIP_THIS
+
+/**
  * \brief A storage-backing wrapper that allows types with non-trivial constructors to be aliased in unions
  */
 template <typename T>
 struct Uninitialized
 {
     /// Biggest memory-access word that T is a whole multiple of and is not larger than the alignment of T
-    typedef typename WordAlignment<T>::DeviceWord DeviceWord;
+    typedef typename UnitWord<T>::DeviceWord DeviceWord;
 
     enum
     {
@@ -234,6 +389,8 @@ struct Uninitialized
     }
 };
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
 
 /**
  * \brief A wrapper for passing simple static arrays as kernel parameters
@@ -245,6 +402,7 @@ struct ArrayWrapper
     T array[COUNT];
 };
 
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 /**
  * \brief Double-buffer storage wrapper for multi-pass stream transformations that require more than one storage array for streaming intermediate results back and forth.
@@ -326,11 +484,12 @@ struct PowerOfTwo
 };
 
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
 
 /******************************************************************************
  * Pointer vs. iterator detection
  ******************************************************************************/
-
 
 /**
  * \brief Pointer vs. iterator
@@ -503,7 +662,7 @@ public:
     static const bool HAS_PARAM = sizeof(Test<BinaryOp>(NULL)) == sizeof(char);
 };
 
-
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 /******************************************************************************
  * Simple type traits utilities.

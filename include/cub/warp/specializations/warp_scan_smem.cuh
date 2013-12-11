@@ -55,7 +55,7 @@ template <
 struct WarpScanSmem
 {
     /******************************************************************************
-     * Constants and typedefs
+     * Constants and type definitions
      ******************************************************************************/
 
     enum
@@ -110,7 +110,7 @@ struct WarpScanSmem
     /// Initialize identity padding (specialized for operations that have identity)
     __device__ __forceinline__ void InitIdentity(Int2Type<true> has_identity)
     {
-        T identity = T();
+        T identity = ZeroInitialize<T>();
         ThreadStore<STORE_VOLATILE>(&temp_storage[warp_id][lane_id], identity);
     }
 

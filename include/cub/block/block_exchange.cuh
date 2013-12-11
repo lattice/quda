@@ -48,24 +48,22 @@ namespace cub {
  * \brief The BlockExchange class provides [<em>collective</em>](index.html#sec0) methods for rearranging data partitioned across a CUDA thread block. ![](transpose_logo.png)
  * \ingroup BlockModule
  *
- * \par Overview
- * It is commonplace for blocks of threads to rearrange data items between
- * threads.  For example, the global memory subsystem prefers access patterns
- * where data items are "striped" across threads (where consecutive threads access consecutive items),
- * yet most block-wide operations prefer a "blocked" partitioning of items across threads
- * (where consecutive items belong to a single thread).
- *
- * \par
- * BlockExchange supports the following types of data exchanges:
- * - Transposing between [<em>blocked</em>](index.html#sec5sec4) and [<em>striped</em>](index.html#sec5sec4) arrangements
- * - Transposing between [<em>blocked</em>](index.html#sec5sec4) and [<em>warp-striped</em>](index.html#sec5sec4) arrangements
- * - Scattering ranked items to a [<em>blocked arrangement</em>](index.html#sec5sec4)
- * - Scattering ranked items to a [<em>striped arrangement</em>](index.html#sec5sec4)
- *
  * \tparam T                    The data type to be exchanged.
  * \tparam BLOCK_THREADS        The thread block size in threads.
  * \tparam ITEMS_PER_THREAD     The number of items partitioned onto each thread.
  * \tparam WARP_TIME_SLICING    <b>[optional]</b> When \p true, only use enough shared memory for a single warp's worth of tile data, time-slicing the block-wide exchange over multiple synchronized rounds.  Yields a smaller memory footprint at the expense of decreased parallelism.  (Default: false)
+ *
+ * \par Overview
+ * - It is commonplace for blocks of threads to rearrange data items between
+ *   threads.  For example, the global memory subsystem prefers access patterns
+ *   where data items are "striped" across threads (where consecutive threads access consecutive items),
+ *   yet most block-wide operations prefer a "blocked" partitioning of items across threads
+ *   (where consecutive items belong to a single thread).
+ * - BlockExchange supports the following types of data exchanges:
+ *   - Transposing between [<em>blocked</em>](index.html#sec4sec3) and [<em>striped</em>](index.html#sec4sec3) arrangements
+ *   - Transposing between [<em>blocked</em>](index.html#sec4sec3) and [<em>warp-striped</em>](index.html#sec4sec3) arrangements
+ *   - Scattering ranked items to a [<em>blocked arrangement</em>](index.html#sec4sec3)
+ *   - Scattering ranked items to a [<em>striped arrangement</em>](index.html#sec4sec3)
  *
  * \par A Simple Example
  * \blockcollective{BlockExchange}
@@ -74,7 +72,7 @@ namespace cub {
  * of 512 integer items partitioned across 128 threads where each thread owns 4 items.
  * \par
  * \code
- * #include <cub/cub.cuh>
+ * #include <cub/cub.cuh>   // or equivalently <cub/block/block_exchange.cuh>
  *
  * __global__ void ExampleKernel(int *d_data, ...)
  * {
@@ -86,7 +84,7 @@ namespace cub {
  *
  *     // Load a tile of data striped across threads
  *     int thread_data[4];
- *     cub::LoadStriped<LOAD_DEFAULT, 128>(threadIdx.x, d_data, thread_data);
+ *     cub::LoadDirectStriped<128>(threadIdx.x, d_data, thread_data);
  *
  *     // Collectively exchange data into a blocked arrangement across threads
  *     BlockExchange(temp_storage).StripedToBlocked(thread_data);
@@ -117,11 +115,11 @@ private:
 
     enum
     {
-        LOG_WARP_THREADS            = PtxArchProps::LOG_WARP_THREADS,
+        LOG_WARP_THREADS            = CUB_PTX_LOG_WARP_THREADS,
         WARP_THREADS                = 1 << LOG_WARP_THREADS,
-        WARPS                       = (BLOCK_THREADS + PtxArchProps::WARP_THREADS - 1) / PtxArchProps::WARP_THREADS,
+        WARPS                       = (BLOCK_THREADS + CUB_PTX_WARP_THREADS - 1) / CUB_PTX_WARP_THREADS,
 
-        LOG_SMEM_BANKS              = PtxArchProps::LOG_SMEM_BANKS,
+        LOG_SMEM_BANKS              = CUB_PTX_LOG_SMEM_BANKS,
         SMEM_BANKS                  = 1 << LOG_SMEM_BANKS,
 
         TILE_ITEMS                  = BLOCK_THREADS * ITEMS_PER_THREAD,
@@ -706,13 +704,15 @@ public:
     /**
      * \brief Transposes data items from <em>striped</em> arrangement to <em>blocked</em> arrangement.
      *
-     * \smemreuse
+     * \par
+     * - \smemreuse
      *
+     * \par
      * The code snippet below illustrates the conversion from a "striped" to a "blocked" arrangement
      * of 512 integer items partitioned across 128 threads where each thread owns 4 items.
      * \par
      * \code
-     * #include <cub/cub.cuh>
+     * #include <cub/cub.cuh>   // or equivalently <cub/block/block_exchange.cuh>
      *
      * __global__ void ExampleKernel(int *d_data, ...)
      * {
@@ -724,7 +724,7 @@ public:
      *
      *     // Load a tile of ordered data into a striped arrangement across block threads
      *     int thread_data[4];
-     *     cub::LoadStriped<LOAD_DEFAULT, 128>(threadIdx.x, d_data, thread_data);
+     *     cub::LoadDirectStriped<128>(threadIdx.x, d_data, thread_data);
      *
      *     // Collectively exchange data into a blocked arrangement across threads
      *     BlockExchange(temp_storage).StripedToBlocked(thread_data);
@@ -746,13 +746,15 @@ public:
     /**
      * \brief Transposes data items from <em>blocked</em> arrangement to <em>striped</em> arrangement.
      *
-     * \smemreuse
+     * \par
+     * - \smemreuse
      *
+     * \par
      * The code snippet below illustrates the conversion from a "blocked" to a "striped" arrangement
      * of 512 integer items partitioned across 128 threads where each thread owns 4 items.
      * \par
      * \code
-     * #include <cub/cub.cuh>
+     * #include <cub/cub.cuh>   // or equivalently <cub/block/block_exchange.cuh>
      *
      * __global__ void ExampleKernel(int *d_data, ...)
      * {
@@ -770,7 +772,7 @@ public:
      *     BlockExchange(temp_storage).BlockedToStriped(thread_data);
      *
      *     // Store data striped across block threads into an ordered tile
-     *     cub::StoreStriped<STORE_DEFAULT, 128>(threadIdx.x, d_data, thread_data);
+     *     cub::StoreDirectStriped<STORE_DEFAULT, 128>(threadIdx.x, d_data, thread_data);
      *
      * \endcode
      * \par
@@ -791,13 +793,15 @@ public:
     /**
      * \brief Transposes data items from <em>warp-striped</em> arrangement to <em>blocked</em> arrangement.
      *
-     * \smemreuse
+     * \par
+     * - \smemreuse
      *
+     * \par
      * The code snippet below illustrates the conversion from a "warp-striped" to a "blocked" arrangement
      * of 512 integer items partitioned across 128 threads where each thread owns 4 items.
      * \par
      * \code
-     * #include <cub/cub.cuh>
+     * #include <cub/cub.cuh>   // or equivalently <cub/block/block_exchange.cuh>
      *
      * __global__ void ExampleKernel(int *d_data, ...)
      * {
@@ -833,13 +837,15 @@ public:
     /**
      * \brief Transposes data items from <em>blocked</em> arrangement to <em>warp-striped</em> arrangement.
      *
-     * \smemreuse
+     * \par
+     * - \smemreuse
      *
+     * \par
      * The code snippet below illustrates the conversion from a "blocked" to a "warp-striped" arrangement
      * of 512 integer items partitioned across 128 threads where each thread owns 4 items.
      * \par
      * \code
-     * #include <cub/cub.cuh>
+     * #include <cub/cub.cuh>   // or equivalently <cub/block/block_exchange.cuh>
      *
      * __global__ void ExampleKernel(int *d_data, ...)
      * {
@@ -857,7 +863,7 @@ public:
      *     BlockExchange(temp_storage).BlockedToWarpStriped(thread_data);
      *
      *     // Store data striped across warp threads into an ordered tile
-     *     cub::StoreStriped<STORE_DEFAULT, 128>(threadIdx.x, d_data, thread_data);
+     *     cub::StoreDirectStriped<STORE_DEFAULT, 128>(threadIdx.x, d_data, thread_data);
      *
      * \endcode
      * \par
@@ -886,7 +892,8 @@ public:
     /**
      * \brief Exchanges data items annotated by rank into <em>blocked</em> arrangement.
      *
-     * \smemreuse
+     * \par
+     * - \smemreuse
      */
     __device__ __forceinline__ void ScatterToBlocked(
         T               items[ITEMS_PER_THREAD],    ///< [in-out] Items to exchange
@@ -899,13 +906,53 @@ public:
     /**
      * \brief Exchanges data items annotated by rank into <em>striped</em> arrangement.
      *
-     * \smemreuse
+     * \par
+     * - \smemreuse
      */
     __device__ __forceinline__ void ScatterToStriped(
         T               items[ITEMS_PER_THREAD],    ///< [in-out] Items to exchange
         int             ranks[ITEMS_PER_THREAD])    ///< [in] Corresponding scatter ranks
     {
         ScatterToStriped(items, ranks, Int2Type<WARP_TIME_SLICING>());
+    }
+
+
+    /**
+     * \brief Exchanges valid data items annotated by rank into <em>striped</em> arrangement.
+     *
+     * \par
+     * - \smemreuse
+     *
+     * \tparam ValidFlag                            <b>[inferred]</b> Flag type denoting which items are valid
+     */
+    template <typename ValidFlag>
+    __device__ __forceinline__ void ScatterToStriped(
+        T               items[ITEMS_PER_THREAD],        ///< [in-out] Items to exchange
+        int             ranks[ITEMS_PER_THREAD],        ///< [in] Corresponding scatter ranks
+        ValidFlag       is_valid[ITEMS_PER_THREAD],     ///< [in] Corresponding flag denoting item validity
+        int             valid_items)                    ///< [in] Number of valid items held by all threads
+    {
+        #pragma unroll
+        for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+        {
+            int item_offset = ranks[ITEM];
+            if (INSERT_PADDING) item_offset = SHR_ADD(item_offset, LOG_SMEM_BANKS, item_offset);
+            if (is_valid[ITEM])
+                temp_storage[item_offset] = items[ITEM];
+        }
+
+        __syncthreads();
+
+        #pragma unroll
+        for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+        {
+            int item_offset = int(ITEM * BLOCK_THREADS) + linear_tid;
+            if (item_offset < valid_items)
+            {
+                if (INSERT_PADDING) item_offset = SHR_ADD(item_offset, LOG_SMEM_BANKS, item_offset);
+                items[ITEM] = temp_storage[item_offset];
+            }
+        }
     }
 
     //@}  end member group

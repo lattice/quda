@@ -48,7 +48,7 @@ CUB_NS_PREFIX
 namespace cub {
 
 /**
- * \addtogroup IoModule
+ * \addtogroup UtilIo
  * @{
  */
 
@@ -57,9 +57,9 @@ namespace cub {
 //-----------------------------------------------------------------------------
 
 /**
- * \brief Enumeration of PTX cache-modifiers for memory load operations.
+ * \brief Enumeration of cache modifiers for memory load operations.
  */
-enum PtxLoadModifier
+enum CacheLoadModifier
 {
     LOAD_DEFAULT,       ///< Default (no modifier)
     LOAD_CA,            ///< Cache at all levels
@@ -72,20 +72,16 @@ enum PtxLoadModifier
 
 
 /**
- * \name Simple I/O
+ * \name Thread I/O (cache modified)
  * @{
  */
 
 /**
- * \brief Thread utility for reading memory using cub::PtxLoadModifier cache modifiers.
+ * \brief Thread utility for reading memory using cub::CacheLoadModifier cache modifiers.  Can be used to load any data type.
  *
- * Cache modifiers will only be effected for built-in types (i.e., C++
- * primitives and CUDA vector-types).
- *
- * For example:
- * \par
+ * \par Example
  * \code
- * #include <cub/cub.cuh>
+ * #include <cub/cub.cuh>   // or equivalently <cub/thread/thread_load.cuh>
  *
  * // 32-bit load using cache-global modifier:
  * int *d_in;
@@ -99,35 +95,68 @@ enum PtxLoadModifier
  * double4 *d_in;
  * double4 val = cub::ThreadLoad<cub::LOAD_CV>(d_in + threadIdx.x);
  *
- * // 96-bit load using default cache modifier (ignoring LOAD_CS)
+ * // 96-bit load using cache-streaming modifier
  * struct TestFoo { bool a; short b; };
  * TestFoo *d_struct;
  * TestFoo val = cub::ThreadLoad<cub::LOAD_CS>(d_in + threadIdx.x);
  * \endcode
  *
+ * \tparam MODIFIER             <b>[inferred]</b> CacheLoadModifier enumeration
+ * \tparam InputIterator        <b>[inferred]</b> Input iterator type \iterator
  */
 template <
-    PtxLoadModifier MODIFIER,
-    typename InputIteratorRA>
-__device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value_type ThreadLoad(InputIteratorRA itr);
+    CacheLoadModifier MODIFIER,
+    typename InputIterator>
+__device__ __forceinline__ typename std::iterator_traits<InputIterator>::value_type ThreadLoad(InputIterator itr);
 
 
 //@}  end member group
 
 
-
 #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
 
+/// Helper structure for templated load iteration (inductive case)
+template <int COUNT, int MAX>
+struct IterateThreadLoad
+{
+    template <CacheLoadModifier MODIFIER, typename T>
+    static __device__ __forceinline__ void Load(T *ptr, T *vals)
+    {
+        vals[COUNT] = ThreadLoad<MODIFIER>(ptr + COUNT);
+        IterateThreadLoad<COUNT + 1, MAX>::template Load<MODIFIER>(ptr, vals);
+    }
+
+    template <typename InputIterator, typename T>
+    static __device__ __forceinline__ void Dereference(InputIterator ptr, T *vals)
+    {
+        vals[COUNT] = ptr[COUNT];
+        IterateThreadLoad<COUNT + 1, MAX>::Dereference(ptr, vals);
+    }
+};
+
+
+/// Helper structure for templated load iteration (termination case)
+template <int MAX>
+struct IterateThreadLoad<MAX, MAX>
+{
+    template <CacheLoadModifier MODIFIER, typename T>
+    static __device__ __forceinline__ void Load(T *ptr, T *vals) {}
+
+    template <typename InputIterator, typename T>
+    static __device__ __forceinline__ void Dereference(InputIterator ptr, T *vals) {}
+};
+
+
 /**
- * Define a int4 (16B) ThreadLoad specialization for the given PTX load modifier
+ * Define a uint4 (16B) ThreadLoad specialization for the given Cache load modifier
  */
 #define CUB_LOAD_16(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
-    __device__ __forceinline__ int4 ThreadLoad<cub_modifier, int4*>(int4* ptr)              \
+    __device__ __forceinline__ uint4 ThreadLoad<cub_modifier, uint4*>(uint4* ptr)           \
     {                                                                                       \
-        int4 retval;                                                                        \
-        asm volatile ("ld."#ptx_modifier".v4.s32 {%0, %1, %2, %3}, [%4];" :                 \
+        uint4 retval;                                                                       \
+        asm volatile ("ld."#ptx_modifier".v4.u32 {%0, %1, %2, %3}, [%4];" :                 \
             "=r"(retval.x),                                                                 \
             "=r"(retval.y),                                                                 \
             "=r"(retval.z),                                                                 \
@@ -136,10 +165,10 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
         return retval;                                                                      \
     }                                                                                       \
     template<>                                                                              \
-    __device__ __forceinline__ longlong2 ThreadLoad<cub_modifier, longlong2*>(longlong2* ptr)              \
+    __device__ __forceinline__ ulonglong2 ThreadLoad<cub_modifier, ulonglong2*>(ulonglong2* ptr)              \
     {                                                                                       \
-        longlong2 retval;                                                                   \
-        asm volatile ("ld."#ptx_modifier".v2.s64 {%0, %1}, [%2];" :                         \
+        ulonglong2 retval;                                                                  \
+        asm volatile ("ld."#ptx_modifier".v2.u64 {%0, %1}, [%2];" :                         \
             "=l"(retval.x),                                                                 \
             "=l"(retval.y) :                                                                \
             _CUB_ASM_PTR_(ptr));                                                            \
@@ -147,14 +176,14 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
     }
 
 /**
- * Define a int2 (8B) ThreadLoad specialization for the given PTX load modifier
+ * Define a uint2 (8B) ThreadLoad specialization for the given Cache load modifier
  */
 #define CUB_LOAD_8(cub_modifier, ptx_modifier)                                              \
     template<>                                                                              \
-    __device__ __forceinline__ short4 ThreadLoad<cub_modifier, short4*>(short4* ptr)        \
+    __device__ __forceinline__ ushort4 ThreadLoad<cub_modifier, ushort4*>(ushort4* ptr)     \
     {                                                                                       \
-        short4 retval;                                                                      \
-        asm volatile ("ld."#ptx_modifier".v4.s16 {%0, %1, %2, %3}, [%4];" :                 \
+        ushort4 retval;                                                                     \
+        asm volatile ("ld."#ptx_modifier".v4.u16 {%0, %1, %2, %3}, [%4];" :                 \
             "=h"(retval.x),                                                                 \
             "=h"(retval.y),                                                                 \
             "=h"(retval.z),                                                                 \
@@ -163,34 +192,34 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
         return retval;                                                                      \
     }                                                                                       \
     template<>                                                                              \
-    __device__ __forceinline__ int2 ThreadLoad<cub_modifier, int2*>(int2* ptr)              \
+    __device__ __forceinline__ uint2 ThreadLoad<cub_modifier, uint2*>(uint2* ptr)           \
     {                                                                                       \
-        int2 retval;                                                                        \
-        asm volatile ("ld."#ptx_modifier".v2.s32 {%0, %1}, [%2];" :                         \
+        uint2 retval;                                                                       \
+        asm volatile ("ld."#ptx_modifier".v2.u32 {%0, %1}, [%2];" :                         \
             "=r"(retval.x),                                                                 \
             "=r"(retval.y) :                                                                \
             _CUB_ASM_PTR_(ptr));                                                            \
         return retval;                                                                      \
     }                                                                                       \
     template<>                                                                              \
-    __device__ __forceinline__ long long ThreadLoad<cub_modifier, long long*>(long long* ptr)                 \
+    __device__ __forceinline__ unsigned long long ThreadLoad<cub_modifier, unsigned long long*>(unsigned long long* ptr)                 \
     {                                                                                       \
-        long long retval;                                                                   \
-        asm volatile ("ld."#ptx_modifier".s64 %0, [%1];" :                                  \
+        unsigned long long retval;                                                          \
+        asm volatile ("ld."#ptx_modifier".u64 %0, [%1];" :                                  \
             "=l"(retval) :                                                                  \
             _CUB_ASM_PTR_(ptr));                                                            \
         return retval;                                                                      \
     }
 
 /**
- * Define a int (4B) ThreadLoad specialization for the given PTX load modifier
+ * Define a uint (4B) ThreadLoad specialization for the given Cache load modifier
  */
 #define CUB_LOAD_4(cub_modifier, ptx_modifier)                                              \
     template<>                                                                              \
-    __device__ __forceinline__ int ThreadLoad<cub_modifier, int*>(int* ptr)                 \
+    __device__ __forceinline__ unsigned int ThreadLoad<cub_modifier, unsigned int*>(unsigned int* ptr)                 \
     {                                                                                       \
-        int retval;                                                                         \
-        asm volatile ("ld."#ptx_modifier".s32 %0, [%1];" :                                  \
+        unsigned int retval;                                                                \
+        asm volatile ("ld."#ptx_modifier".u32 %0, [%1];" :                                  \
             "=r"(retval) :                                                                  \
             _CUB_ASM_PTR_(ptr));                                                            \
         return retval;                                                                      \
@@ -198,14 +227,14 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
 
 
 /**
- * Define a short (2B) ThreadLoad specialization for the given PTX load modifier
+ * Define a unsigned short (2B) ThreadLoad specialization for the given Cache load modifier
  */
 #define CUB_LOAD_2(cub_modifier, ptx_modifier)                                              \
     template<>                                                                              \
-    __device__ __forceinline__ short ThreadLoad<cub_modifier, short*>(short* ptr)           \
+    __device__ __forceinline__ unsigned short ThreadLoad<cub_modifier, unsigned short*>(unsigned short* ptr)           \
     {                                                                                       \
-        short retval;                                                                       \
-        asm volatile ("ld."#ptx_modifier".s16 %0, [%1];" :                                  \
+        unsigned short retval;                                                              \
+        asm volatile ("ld."#ptx_modifier".u16 %0, [%1];" :                                  \
             "=h"(retval) :                                                                  \
             _CUB_ASM_PTR_(ptr));                                                            \
         return retval;                                                                      \
@@ -213,27 +242,27 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
 
 
 /**
- * Define a char (1B) ThreadLoad specialization for the given PTX load modifier
+ * Define an unsigned char (1B) ThreadLoad specialization for the given Cache load modifier
  */
 #define CUB_LOAD_1(cub_modifier, ptx_modifier)                                              \
     template<>                                                                              \
-    __device__ __forceinline__ char ThreadLoad<cub_modifier, char*>(char* ptr)              \
+    __device__ __forceinline__ unsigned char ThreadLoad<cub_modifier, unsigned char*>(unsigned char* ptr)              \
     {                                                                                       \
-        short retval;                                                                       \
+        unsigned short retval;                                                              \
         asm volatile (                                                                      \
         "{"                                                                                 \
-        "   .reg .s8 datum;"                                                                \
-        "    ld."#ptx_modifier".s8 datum, [%1];"                                            \
-        "    cvt.s16.s8 %0, datum;"                                                         \
+        "   .reg .u8 datum;"                                                                \
+        "    ld."#ptx_modifier".u8 datum, [%1];"                                            \
+        "    cvt.u16.u8 %0, datum;"                                                         \
         "}" :                                                                               \
             "=h"(retval) :                                                                  \
             _CUB_ASM_PTR_(ptr));                                                            \
-        return (char) retval;                                                               \
+        return (unsigned char) retval;                                                               \
     }
 
 
 /**
- * Define powers-of-two ThreadLoad specializations for the given PTX load modifier
+ * Define powers-of-two ThreadLoad specializations for the given Cache load modifier
  */
 #define CUB_LOAD_ALL(cub_modifier, ptx_modifier)                                            \
     CUB_LOAD_16(cub_modifier, ptx_modifier)                                                 \
@@ -244,50 +273,34 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
 
 
 /**
- * Define ThreadLoad specializations for the various PTX load modifiers
+ * Define powers-of-two ThreadLoad specializations for the various Cache load modifiers
  */
-#if CUB_PTX_ARCH >= 200
+#if CUB_PTX_VERSION >= 200
     CUB_LOAD_ALL(LOAD_CA, ca)
     CUB_LOAD_ALL(LOAD_CG, cg)
     CUB_LOAD_ALL(LOAD_CS, cs)
     CUB_LOAD_ALL(LOAD_CV, cv)
 #else
-    // LOAD_CV on SM10-13 uses "volatile.global" to ensure reads from last level
+    CUB_LOAD_ALL(LOAD_CA, global)
+    // Use volatile to ensure coherent reads when this PTX is JIT'd to run on newer architectures with L1
+    CUB_LOAD_ALL(LOAD_CG, volatile.global)
+    CUB_LOAD_ALL(LOAD_CS, global)
     CUB_LOAD_ALL(LOAD_CV, volatile.global)
 #endif
-#if CUB_PTX_ARCH >= 350
+
+#if CUB_PTX_VERSION >= 350
     CUB_LOAD_ALL(LOAD_LDG, global.nc)
+#else
+    CUB_LOAD_ALL(LOAD_LDG, global)
 #endif
-
-
-/// Helper structure for templated load iteration (inductive case)
-template <PtxLoadModifier MODIFIER, int COUNT, int MAX>
-struct IterateThreadLoad
-{
-    template <typename T>
-    static __device__ __forceinline__ void Load(T *ptr, T *vals)
-    {
-        vals[COUNT] = ThreadLoad<MODIFIER>(ptr + COUNT);
-        IterateThreadLoad<MODIFIER, COUNT + 1, MAX>::Load(ptr, vals);
-    }
-};
-
-/// Helper structure for templated load iteration (termination case)
-template <PtxLoadModifier MODIFIER, int MAX>
-struct IterateThreadLoad<MODIFIER, MAX, MAX>
-{
-    template <typename T>
-    static __device__ __forceinline__ void Load(T *ptr, T *vals) {}
-};
-
 
 
 /**
- * Load with LOAD_DEFAULT on iterator types
+ * ThreadLoad definition for LOAD_DEFAULT modifier on iterator types
  */
-template <typename InputIteratorRA>
-__device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value_type ThreadLoad(
-    InputIteratorRA         itr,
+template <typename InputIterator>
+__device__ __forceinline__ typename std::iterator_traits<InputIterator>::value_type ThreadLoad(
+    InputIterator           itr,
     Int2Type<LOAD_DEFAULT>  modifier,
     Int2Type<false>         is_pointer)
 {
@@ -296,7 +309,7 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
 
 
 /**
- * Load with LOAD_DEFAULT on pointer types
+ * ThreadLoad definition for LOAD_DEFAULT modifier on pointer types
  */
 template <typename T>
 __device__ __forceinline__ T ThreadLoad(
@@ -309,16 +322,16 @@ __device__ __forceinline__ T ThreadLoad(
 
 
 /**
- * Load with LOAD_VOLATILE on primitive pointer types
+ * ThreadLoad definition for LOAD_VOLATILE modifier on primitive pointer types
  */
 template <typename T>
-__device__ __forceinline__ T ThreadLoadVolatile(
+__device__ __forceinline__ T ThreadLoadVolatilePointer(
     T                       *ptr,
     Int2Type<true>          is_primitive)
 {
     T retval = *reinterpret_cast<volatile T*>(ptr);
 
-#if (CUB_PTX_ARCH <= 130)
+#if (CUB_PTX_VERSION <= 130)
     if (sizeof(T) == 1) __threadfence_block();
 #endif
 
@@ -327,30 +340,40 @@ __device__ __forceinline__ T ThreadLoadVolatile(
 
 
 /**
- * Load with LOAD_VOLATILE on non-primitive pointer types
+ * ThreadLoad definition for LOAD_VOLATILE modifier on non-primitive pointer types
  */
 template <typename T>
-__device__ __forceinline__ T ThreadLoadVolatile(
+__device__ __forceinline__ T ThreadLoadVolatilePointer(
     T                       *ptr,
     Int2Type<false>          is_primitive)
 {
-    typedef typename WordAlignment<T>::VolatileWord VolatileWord;   // Word type for memcopying
-    enum { NUM_WORDS = sizeof(T) / sizeof(VolatileWord) };
 
-    // Memcopy from aliased source into array of uninitialized words
-    typename WordAlignment<T>::UninitializedVolatileWords words;
+#if CUB_PTX_VERSION <= 130
 
-    #pragma unroll
-    for (int i = 0; i < NUM_WORDS; ++i)
-        words.buf[i] = reinterpret_cast<volatile VolatileWord*>(ptr)[i];
+    T retval = *ptr;
+    __threadfence_block();
+    return retval;
 
-    // Load from words
-    return *reinterpret_cast<T*>(words.buf);
+#else
+
+    typedef typename UnitWord<T>::VolatileWord VolatileWord;   // Word type for memcopying
+
+    const int VOLATILE_MULTIPLE = sizeof(T) / sizeof(VolatileWord);
+
+    VolatileWord words[VOLATILE_MULTIPLE];
+
+    IterateThreadLoad<0, VOLATILE_MULTIPLE>::Dereference(
+        reinterpret_cast<volatile VolatileWord*>(ptr),
+        words);
+
+    return *reinterpret_cast<T*>(words);
+
+#endif  // CUB_PTX_VERSION <= 130
 }
 
 
 /**
- * Load with LOAD_VOLATILE on pointer types
+ * ThreadLoad definition for LOAD_VOLATILE modifier on pointer types
  */
 template <typename T>
 __device__ __forceinline__ T ThreadLoad(
@@ -358,29 +381,13 @@ __device__ __forceinline__ T ThreadLoad(
     Int2Type<LOAD_VOLATILE> modifier,
     Int2Type<true>          is_pointer)
 {
-    return ThreadLoadVolatile(ptr, Int2Type<Traits<T>::PRIMITIVE>());
+    // Apply tags for partial-specialization
+    return ThreadLoadVolatilePointer(ptr, Int2Type<Traits<T>::PRIMITIVE>());
 }
 
 
-#if (CUB_PTX_ARCH <= 130)
-
 /**
- * Load with LOAD_CG uses LOAD_CV in pre-SM20 PTX to ensure coherent reads when run on newer architectures with L1
- */
-template <typename T>
-__device__ __forceinline__ T ThreadLoad(
-    T                       *ptr,
-    Int2Type<LOAD_CG>       modifier,
-    Int2Type<true>          is_pointer)
-{
-    return ThreadLoad<LOAD_CV>(ptr);
-}
-
-#endif  // (CUB_PTX_ARCH <= 130)
-
-
-/**
- * Load with arbitrary MODIFIER on pointer types
+ * ThreadLoad definition for generic modifiers on pointer types
  */
 template <typename T, int MODIFIER>
 __device__ __forceinline__ T ThreadLoad(
@@ -388,33 +395,33 @@ __device__ __forceinline__ T ThreadLoad(
     Int2Type<MODIFIER>      modifier,
     Int2Type<true>          is_pointer)
 {
-    typedef typename WordAlignment<T>::DeviceWord DeviceWord;
-    enum { NUM_WORDS = sizeof(T) / sizeof(DeviceWord) };
+    typedef typename UnitWord<T>::DeviceWord DeviceWord;
 
-    // Memcopy from aliased source into array of uninitialized words
-    typename WordAlignment<T>::UninitializedDeviceWords words;
+    const int DEVICE_MULTIPLE = sizeof(T) / sizeof(DeviceWord);
 
-    IterateThreadLoad<PtxLoadModifier(MODIFIER), 0, NUM_WORDS>::Load(
+    DeviceWord words[DEVICE_MULTIPLE];
+
+    IterateThreadLoad<0, DEVICE_MULTIPLE>::template Load<CacheLoadModifier(MODIFIER)>(
         reinterpret_cast<DeviceWord*>(ptr),
-        words.buf);
+        words);
 
-    // Load from words
-    return *reinterpret_cast<T*>(words.buf);
+    return *reinterpret_cast<T*>(words);
 }
 
 
 /**
- * Generic ThreadLoad definition
+ * ThreadLoad definition for generic modifiers
  */
 template <
-    PtxLoadModifier MODIFIER,
-    typename InputIteratorRA>
-__device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value_type ThreadLoad(InputIteratorRA itr)
+    CacheLoadModifier MODIFIER,
+    typename InputIterator>
+__device__ __forceinline__ typename std::iterator_traits<InputIterator>::value_type ThreadLoad(InputIterator itr)
 {
+    // Apply tags for partial-specialization
     return ThreadLoad(
         itr,
         Int2Type<MODIFIER>(),
-        Int2Type<IsPointer<InputIteratorRA>::VALUE>());
+        Int2Type<IsPointer<InputIterator>::VALUE>());
 }
 
 
@@ -422,7 +429,7 @@ __device__ __forceinline__ typename std::iterator_traits<InputIteratorRA>::value
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
 
-/** @} */       // end group IoModule
+/** @} */       // end group UtilIo
 
 
 }               // CUB namespace

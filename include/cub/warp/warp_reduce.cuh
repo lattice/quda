@@ -55,13 +55,24 @@ namespace cub {
 /**
  * \brief The WarpReduce class provides [<em>collective</em>](index.html#sec0) methods for computing a parallel reduction of items partitioned across CUDA warp threads. ![](warp_reduce_logo.png)
  *
- * \par Overview
- * A <a href="http://en.wikipedia.org/wiki/Reduce_(higher-order_function)"><em>reduction</em></a> (or <em>fold</em>)
- * uses a binary combining operator to compute a single aggregate from a list of input elements.
- *
  * \tparam T                        The reduction input/output element type
  * \tparam LOGICAL_WARPS            <b>[optional]</b> The number of entrant "logical" warps performing concurrent warp reductions.  Default is 1.
  * \tparam LOGICAL_WARP_THREADS     <b>[optional]</b> The number of threads per "logical" warp (may be less than the number of hardware warp threads).  Default is the warp size of the targeted CUDA compute-capability (e.g., 32 threads for SM20).
+ *
+ * \par Overview
+ * - A <a href="http://en.wikipedia.org/wiki/Reduce_(higher-order_function)"><em>reduction</em></a> (or <em>fold</em>)
+ *   uses a binary combining operator to compute a single aggregate from a list of input elements.
+ * - Supports "logical" warps smaller than the physical warp size (e.g., logical warps of 8 threads)
+ * - The number of entrant threads must be an multiple of \p LOGICAL_WARP_THREADS
+ *
+ * \par Performance Considerations
+ * - Warp reductions are concurrent if more than one logical warp is participating
+ * - Uses special instructions when applicable (e.g., warp \p SHFL instructions)
+ * - Uses synchronization-free communication between warp lanes when applicable
+ * - Incurs zero bank conflicts for most types
+ * - Computation is slightly more efficient (i.e., having lower instruction overhead) for:
+ *     - Summation (<b><em>vs.</em></b> generic reduction)
+ *     - The architecture's warp size is a whole multiple of \p LOGICAL_WARP_THREADS
  *
  * \par Simple Examples
  * \warpcollective{WarpReduce}
@@ -88,7 +99,7 @@ namespace cub {
  *
  * \endcode
  * \par
- * Suppose the set of input \p thread_data across the block of threads is <tt>0, 1, 2, 3, ..., 127</tt>.
+ * Suppose the set of input \p thread_data across the block of threads is <tt>{0, 1, 2, 3, ..., 127}</tt>.
  * The corresponding output \p aggregate in threads 0, 32, 64, and 96 will \p 496, \p 1520,
  * \p 2544, and \p 3568, respectively (and is undefined in other threads).
  *
@@ -119,31 +130,20 @@ namespace cub {
  *
  * \endcode
  * \par
- * Suppose the set of input \p thread_data across the warp of threads is <tt>0, 1, 2, 3, ..., 31</tt>.
+ * Suppose the set of input \p thread_data across the warp of threads is <tt>{0, 1, 2, 3, ..., 31}</tt>.
  * The corresponding output \p aggregate in thread0 will be \p 496 (and is undefined in other threads).
- *
- * \par Usage and Performance Considerations
- * - Supports "logical" warps smaller than the physical warp size (e.g., logical warps of 8 threads)
- * - The number of entrant threads must be an multiple of \p LOGICAL_WARP_THREADS
- * - Warp reductions are concurrent if more than one logical warp is participating
- * - Uses special instructions when applicable (e.g., warp \p SHFL instructions)
- * - Uses synchronization-free communication between warp lanes when applicable
- * - Zero bank conflicts for most types
- * - Computation is slightly more efficient (i.e., having lower instruction overhead) for:
- *     - Summation (<b><em>vs.</em></b> generic reduction)
- *     - The architecture's warp size is a whole multiple of \p LOGICAL_WARP_THREADS
  *
  */
 template <
     typename    T,
     int         LOGICAL_WARPS           = 1,
-    int         LOGICAL_WARP_THREADS    = PtxArchProps::WARP_THREADS>
+    int         LOGICAL_WARP_THREADS    = CUB_PTX_WARP_THREADS>
 class WarpReduce
 {
 private:
 
     /******************************************************************************
-     * Constants and typedefs
+     * Constants and type definitions
      ******************************************************************************/
 
     enum
@@ -156,7 +156,7 @@ public:
     #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
     /// Internal specialization.  Use SHFL-based reduction if (architecture is >= SM30) and ((only one logical warp) or (LOGICAL_WARP_THREADS is a power-of-two))
-    typedef typename If<(CUB_PTX_ARCH >= 300) && ((LOGICAL_WARPS == 1) || POW_OF_TWO),
+    typedef typename If<(CUB_PTX_VERSION >= 300) && ((LOGICAL_WARPS == 1) || POW_OF_TWO),
         WarpReduceShfl<T, LOGICAL_WARPS, LOGICAL_WARP_THREADS>,
         WarpReduceSmem<T, LOGICAL_WARPS, LOGICAL_WARP_THREADS> >::Type InternalWarpReduce;
 
@@ -217,7 +217,7 @@ public:
         warp_id((LOGICAL_WARPS == 1) ?
             0 :
             threadIdx.x / LOGICAL_WARP_THREADS),
-        lane_id(((LOGICAL_WARPS == 1) || (LOGICAL_WARP_THREADS == PtxArchProps::WARP_THREADS)) ?
+        lane_id(((LOGICAL_WARPS == 1) || (LOGICAL_WARP_THREADS == CUB_PTX_WARP_THREADS)) ?
             LaneId() :
             threadIdx.x % LOGICAL_WARP_THREADS)
     {}
@@ -233,7 +233,7 @@ public:
         warp_id((LOGICAL_WARPS == 1) ?
             0 :
             threadIdx.x / LOGICAL_WARP_THREADS),
-        lane_id(((LOGICAL_WARPS == 1) || (LOGICAL_WARP_THREADS == PtxArchProps::WARP_THREADS)) ?
+        lane_id(((LOGICAL_WARPS == 1) || (LOGICAL_WARP_THREADS == CUB_PTX_WARP_THREADS)) ?
             LaneId() :
             threadIdx.x % LOGICAL_WARP_THREADS)
     {}
@@ -301,7 +301,7 @@ public:
      *
      * \endcode
      * \par
-     * Suppose the set of input \p thread_data across the block of threads is <tt>0, 1, 2, 3, ..., 127</tt>.
+     * Suppose the set of input \p thread_data across the block of threads is <tt>{0, 1, 2, 3, ..., 127}</tt>.
      * The corresponding output \p aggregate in threads 0, 32, 64, and 96 will \p 496, \p 1520,
      * \p 2544, and \p 3568, respectively (and is undefined in other threads).
      *
@@ -344,7 +344,7 @@ public:
      *
      * \endcode
      * \par
-     * Suppose the input \p d_data is <tt>0, 1, 2, 3, 4, ...</tt> and \p valid_items
+     * Suppose the input \p d_data is <tt>{0, 1, 2, 3, 4, ...</tt> and \p valid_items
      * is \p 4.  The corresponding output \p aggregate in thread0 is \p 6 (and is
      * undefined in other threads).
      *
@@ -395,7 +395,7 @@ public:
      * \endcode
      * \par
      * Suppose the set of input \p thread_data and \p head_flag across the block of threads
-     * is <tt>0, 1, 2, 3, ..., 31</tt> and is <tt>1, 0, 0, 0, 1, 0, 0, 0, ..., 1, 0, 0, 0</tt>,
+     * is <tt>{0, 1, 2, 3, ..., 31</tt> and is <tt>{1, 0, 0, 0, 1, 0, 0, 0, ..., 1, 0, 0, 0</tt>,
      * respectively.  The corresponding output \p aggregate in threads 0, 4, 8, etc. will be
      * \p 6, \p 22, \p 38, etc. (and is undefined in other threads).
      *
@@ -442,7 +442,7 @@ public:
      * \endcode
      * \par
      * Suppose the set of input \p thread_data and \p tail_flag across the block of threads
-     * is <tt>0, 1, 2, 3, ..., 31</tt> and is <tt>0, 0, 0, 1, 0, 0, 0, 1, ..., 0, 0, 0, 1</tt>,
+     * is <tt>{0, 1, 2, 3, ..., 31</tt> and is <tt>{0, 0, 0, 1, 0, 0, 0, 1, ..., 0, 0, 0, 1</tt>,
      * respectively.  The corresponding output \p aggregate in threads 0, 4, 8, etc. will be
      * \p 6, \p 22, \p 38, etc. (and is undefined in other threads).
      *
@@ -495,7 +495,7 @@ public:
      *
      * \endcode
      * \par
-     * Suppose the set of input \p thread_data across the block of threads is <tt>0, 1, 2, 3, ..., 127</tt>.
+     * Suppose the set of input \p thread_data across the block of threads is <tt>{0, 1, 2, 3, ..., 127}</tt>.
      * The corresponding output \p aggregate in threads 0, 32, 64, and 96 will \p 31, \p 63,
      * \p 95, and \p 127, respectively  (and is undefined in other threads).
      *
@@ -543,7 +543,7 @@ public:
      *
      * \endcode
      * \par
-     * Suppose the input \p d_data is <tt>0, 1, 2, 3, 4, ...</tt> and \p valid_items
+     * Suppose the input \p d_data is <tt>{0, 1, 2, 3, 4, ...</tt> and \p valid_items
      * is \p 4.  The corresponding output \p aggregate in thread0 is \p 3 (and is
      * undefined in other threads).
      *
@@ -599,7 +599,7 @@ public:
      * \endcode
      * \par
      * Suppose the set of input \p thread_data and \p head_flag across the block of threads
-     * is <tt>0, 1, 2, 3, ..., 31</tt> and is <tt>1, 0, 0, 0, 1, 0, 0, 0, ..., 1, 0, 0, 0</tt>,
+     * is <tt>{0, 1, 2, 3, ..., 31</tt> and is <tt>{1, 0, 0, 0, 1, 0, 0, 0, ..., 1, 0, 0, 0</tt>,
      * respectively.  The corresponding output \p aggregate in threads 0, 4, 8, etc. will be
      * \p 3, \p 7, \p 11, etc. (and is undefined in other threads).
      *
@@ -649,7 +649,7 @@ public:
      * \endcode
      * \par
      * Suppose the set of input \p thread_data and \p tail_flag across the block of threads
-     * is <tt>0, 1, 2, 3, ..., 31</tt> and is <tt>0, 0, 0, 1, 0, 0, 0, 1, ..., 0, 0, 0, 1</tt>,
+     * is <tt>{0, 1, 2, 3, ..., 31</tt> and is <tt>{0, 0, 0, 1, 0, 0, 0, 1, ..., 0, 0, 0, 1</tt>,
      * respectively.  The corresponding output \p aggregate in threads 0, 4, 8, etc. will be
      * \p 3, \p 7, \p 11, etc. (and is undefined in other threads).
      *
