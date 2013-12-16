@@ -245,10 +245,8 @@ namespace quda {
       if (param.x[0] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
-//! for deflated solvers:
-    if(eigv_dim > 0 && eigv_id == -1) volume *= eigv_dim;
 
-  if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
+    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
 
   
     if (param.pad != 0) pad = param.pad;
@@ -263,6 +261,15 @@ namespace quda {
       //errorQuda("SiteSubset not defined %d", param.siteSubset);
       //do nothing, not an error (can't remember why - need to document this sometime! )
     }
+
+//! for deflated solvers:
+    if(eigv_dim > 0 && eigv_id == -1)
+    {
+      volume *= eigv_dim;
+      stride *= eigv_dim;
+      length *= eigv_dim;
+    }
+
 
     if (param.siteSubset != QUDA_INVALID_SITE_SUBSET) siteSubset = param.siteSubset;
     if (param.siteOrder != QUDA_INVALID_SITE_ORDER) siteOrder = param.siteOrder;

@@ -177,13 +177,13 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
+//  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH || multi_shift) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
     inv_param.inv_type = QUDA_CG_INVERTER;
-  } else {
-    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
-  }
+//  } else {
+//    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+//    inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+//  }
 
   inv_param.pipeline = 0;
 
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
   inv_param.rhs_idx = 0;
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.nev = 16;//not working for 64
+    inv_param.nev = 16; //16
     inv_param.max_vect_size = 144;
     inv_param.deflation_grid = 1;//to test the stuff
   }else{
@@ -243,7 +243,7 @@ int main(int argc, char **argv)
   inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
 
   gauge_param.ga_pad = 0; // 24*24*24/2;
-  inv_param.sp_pad = 0;//8*16*16; // 24*24*24/2;
+  inv_param.sp_pad = 8*16*16; // 24*24*24/2;
   inv_param.cl_pad = 0; // 24*24*24/2;
 
   // For multi-GPU, ga_pad must be large enough to store a time-slice
