@@ -251,10 +251,19 @@ namespace quda {
             F += Ftmp;
 
           }
-          F -= conj(F);
-
-          F *= 1.0/8.0;
-
+          // 3 matrix additions, 12 matrix-matrix multiplications, 8 matrix conjugations
+          // Each matrix conjugation involves 9 unary minus operations
+          // Each matrix addition involves 18 real additions
+          // Each matrix-matrix multiplication involves 9*3 complex multiplications and 9*2 complex additions 
+          // = 9*3*6 + 9*2*2 = 198 floating-point ops
+          // => Total number of floating point ops per site above is 
+          // 8*9 + 3*18 + 12*198 = 72 + 54 + 2376 = 2502 
+          
+          { 
+            F -= conj(F); // 18 real subtractions + one matrix conjugation (=9 unary minus ops)
+            F *= 1.0/8.0; // 18 real multiplications
+            // 45 floating point operations here
+          }
           
 
 
@@ -306,11 +315,9 @@ namespace quda {
       virtual ~FmunuCompute() {}
 
       void apply(const cudaStream_t &stream){
-        // No tuning for the time being
         if(location == QUDA_CUDA_FIELD_LOCATION){
-          dim3 blockDim(128, 1, 1);
-          dim3 gridDim((arg.threads + blockDim.x - 1) / blockDim.x, 1, 1);
-          computeFmunuKernel<<<gridDim,blockDim>>>(arg);
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          computeFmunuKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
         }else{
           computeFmunuCPU(arg);
         }
@@ -318,10 +325,15 @@ namespace quda {
 
       TuneKey tuneKey() const {
         std::stringstream vol, aux;
-        vol << arg.threads;
-        aux << "stride=" << arg.FmunuStride;
+        vol << arg.X[0] << "x";
+        vol << arg.X[1] << "x";
+        vol << arg.X[2] << "x";
+        vol << arg.X[3];
+        aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
+        aux << ",stride=" << arg.clover.stride;
         return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }
+
 
       std::string paramString(const TuneParam &param) const {
         std::stringstream ps;
@@ -330,8 +342,10 @@ namespace quda {
         return ps.str();
       }
 
-      long long flops() const { return 0; } // Fix this!
-      long long bytes() const { return 0; } // Fix this!
+      void preTune(){}
+      void postTune(){}
+      long long flops() const { return (2502 + 45)*6*arg.threads; }
+      long long bytes() const { return (4*4*18 + 18)*6*arg.threads*sizeof(Float); } // Only correct if there is no link reconstruction
 
     }; // FmunuCompute
 
@@ -362,7 +376,7 @@ namespace quda {
 
   // Core routine for constructing clover term from field strength
   template<typename Float, typename Clover, typename Gauge>
-    __device__ //__host__
+    __device__ __host__
     void cloverComputeCore(CloverArg<Float,Clover,Gauge>& arg, int idx){
 
       int parity = 0;  
@@ -383,10 +397,10 @@ namespace quda {
       Cmplx I; I.x = 0; I.y = 1.;
       Matrix<Cmplx,3> block1[2];
       Matrix<Cmplx,3> block2[2];
-      block1[0] =  cloverCoeff*I*(F[0]-F[5]);
-      block1[1] =  cloverCoeff*I*(F[0]+F[5]);
-      block2[0] = -cloverCoeff*I*(F[2]-F[3]) + cloverCoeff*(F[1]+F[4]);
-      block2[1] = -cloverCoeff*I*(F[2]+F[3]) + cloverCoeff*(F[1]-F[4]);
+      block1[0] =  cloverCoeff*I*(F[0]-F[5]); // (18 + 6*9 + 18 =) 90 floating-point ops 
+      block1[1] =  cloverCoeff*I*(F[0]+F[5]); // 90 floating-point ops 
+      block2[0] =  cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 108 floating-point ops
+      block2[1] =  cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 108 floating-point ops
 
 
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
@@ -434,6 +448,7 @@ namespace quda {
           A[ch*36+6+2*i + 1] = 0.5*triangle[idtab[i]].y;
         } 
       } // ch
+      // 96 floating-point ops
 
 
       arg.clover.save(A, idx, parity);
@@ -452,7 +467,7 @@ namespace quda {
   template<typename Float, typename Clover, typename Gauge>
     void cloverComputeCPU(CloverArg<Float,Clover,Gauge> arg){
       for(int idx=0; idx<arg.threads; ++idx){
-        //  cloverComputeCore(arg, idx);
+        cloverComputeCore(arg, idx);
       }
     }
 
@@ -478,19 +493,21 @@ namespace quda {
 
       void apply(const cudaStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
-          // Fix this
-          dim3 blockDim(128, 1, 1);
-          dim3 gridDim((arg.threads + blockDim.x - 1) / blockDim.x, 1, 1);
-          cloverComputeKernel<<<gridDim,blockDim>>>(arg);
-        }else{
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+        }else{ // run the CPU code
           cloverComputeCPU(arg);
         }
       }
 
       TuneKey tuneKey() const {
         std::stringstream vol, aux;
-        vol << arg.threads;
-        aux << "stride=" << arg.clover.stride;
+        vol << arg.X[0] << "x";
+        vol << arg.X[1] << "x";
+        vol << arg.X[2] << "x";
+        vol << arg.X[3];
+        aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
+        aux << ",stride=" << arg.clover.stride;
         return TuneKey(vol.str(), typeid(*this).name(), aux.str());
       }
 
@@ -501,8 +518,10 @@ namespace quda {
         return ps.str();
       }
 
-      long long flops() const { return 0; } // Fix this
-      long long bytes() const { return 0; } // Fix this
+      void preTune(){}
+      void postTune(){}
+      long long flops() const { return 492*arg.threads; } 
+      long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } 
     };
 
 

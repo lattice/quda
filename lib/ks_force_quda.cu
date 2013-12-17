@@ -214,7 +214,7 @@ namespace quda {
         }else{
           completeKSForce<Float>(FloatNOrder<Float, 18, 2, 18>(oprod),
               FloatNOrder<Float, 18, 2, 18>(gauge),
-              FloatNOrder<Float, 18, 2, 10>(mom),
+              FloatNOrder<Float, 10, 2, 10>(mom),
               const_cast<int*>(mom.X()),
               location);
         }
