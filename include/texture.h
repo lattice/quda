@@ -5,6 +5,7 @@
 #include <color_spinor_field.h>
 #include <convert.h>
 #include <register_traits.h>
+#include <float_vector.h>
 
 //namespace quda {
 
@@ -97,6 +98,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
   template<typename OutputType, typename InputType, int tex_id>
     class Texture {
+
   private: 
 #ifdef DIRECT_ACCESS_BLAS
   const InputType *spinor; // used when textures are disabled

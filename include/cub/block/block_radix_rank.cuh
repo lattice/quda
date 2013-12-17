@@ -55,14 +55,15 @@ namespace cub {
  * Blah...
  *
  * \tparam BLOCK_THREADS        The thread block size in threads
- * \tparam RADIX_BITS           <b>[optional]</b> The number of radix bits per digit place (default: 5 bits)
+ * \tparam RADIX_BITS           The number of radix bits per digit place
+ * \tparam DESCENDING           Whether or not the sorted-order is high-to-low
  * \tparam MEMOIZE_OUTER_SCAN   <b>[optional]</b> Whether or not to buffer outer raking scan partials to incur fewer shared memory reads at the expense of higher register pressure (default: true for architectures SM35 and newer, false otherwise).  See BlockScanAlgorithm::BLOCK_SCAN_RAKING_MEMOIZE for more details.
  * \tparam INNER_SCAN_ALGORITHM <b>[optional]</b> The cub::BlockScanAlgorithm algorithm to use (default: cub::BLOCK_SCAN_WARP_SCANS)
  * \tparam SMEM_CONFIG          <b>[optional]</b> Shared memory bank mode (default: \p cudaSharedMemBankSizeFourByte)
  *
  * \par Usage Considerations
  * - Keys must be in a form suitable for radix ranking (i.e., unsigned bits).
- * - Assumes a [<em>blocked arrangement</em>](index.html#sec5sec4) of elements across threads
+ * - Assumes a [<em>blocked arrangement</em>](index.html#sec4sec3) of elements across threads
  * - \smemreuse{BlockRadixRank::TempStorage}
  *
  * \par Performance Considerations
@@ -87,7 +88,8 @@ namespace cub {
 template <
     int                     BLOCK_THREADS,
     int                     RADIX_BITS,
-    bool                    MEMOIZE_OUTER_SCAN      = (CUB_PTX_ARCH >= 350) ? true : false,
+    bool                    DESCENDING,
+    bool                    MEMOIZE_OUTER_SCAN      = (CUB_PTX_VERSION >= 350) ? true : false,
     BlockScanAlgorithm      INNER_SCAN_ALGORITHM    = BLOCK_SCAN_WARP_SCANS,
     cudaSharedMemConfig     SMEM_CONFIG             = cudaSharedMemBankSizeFourByte>
 class BlockRadixRank
@@ -110,7 +112,7 @@ private:
     {
         RADIX_DIGITS                 = 1 << RADIX_BITS,
 
-        LOG_WARP_THREADS             = PtxArchProps::LOG_WARP_THREADS,
+        LOG_WARP_THREADS             = CUB_PTX_LOG_WARP_THREADS,
         WARP_THREADS                 = 1 << LOG_WARP_THREADS,
         WARPS                        = (BLOCK_THREADS + WARP_THREADS - 1) / WARP_THREADS,
 
@@ -126,7 +128,7 @@ private:
         // The number of packed counters per thread (plus one for padding)
         RAKING_SEGMENT               = COUNTER_LANES + 1,
 
-        LOG_SMEM_BANKS               = PtxArchProps::LOG_SMEM_BANKS,
+        LOG_SMEM_BANKS               = CUB_PTX_LOG_SMEM_BANKS,
         SMEM_BANKS                   = 1 << LOG_SMEM_BANKS,
     };
 
@@ -188,14 +190,20 @@ private:
             DigitCounter*   (&digit_counters)[KEYS_PER_THREAD],     // Counter smem offset (out parameter)
             int             current_bit)                            // The least-significant bit position of the current digit to extract
         {
-            // Add in sub-counter offset
+            // Get sub-counter
             UnsignedBits sub_counter = BFE(keys[COUNT], current_bit + LOG_COUNTER_LANES, LOG_PACKING_RATIO);
 
-            // Add in row offset
-            UnsignedBits row_offset = BFE(keys[COUNT], current_bit, LOG_COUNTER_LANES);
+            // Get counter lane
+            UnsignedBits counter_lane = BFE(keys[COUNT], current_bit, LOG_COUNTER_LANES);
+
+            if (DESCENDING)
+            {
+                sub_counter = PACKING_RATIO - 1 - sub_counter;
+                counter_lane = COUNTER_LANES - 1 - counter_lane;
+            }
 
             // Pointer to smem digit counter
-            digit_counters[COUNT] = &cta.temp_storage.digit_counters[row_offset][cta.linear_tid][sub_counter];
+            digit_counters[COUNT] = &cta.temp_storage.digit_counters[counter_lane][cta.linear_tid][sub_counter];
 
             // Load thread-exclusive prefix
             thread_prefixes[COUNT] = *digit_counters[COUNT];
@@ -335,20 +343,19 @@ private:
         // Upsweep scan
         PackedCounter raking_partial = Upsweep();
 
-        // Compute inclusive sum
-        PackedCounter inclusive_partial;
+        // Compute exclusive sum
+        PackedCounter exclusive_partial;
         PackedCounter packed_aggregate;
-        BlockScan(temp_storage.block_scan, linear_tid).InclusiveSum(raking_partial, inclusive_partial, packed_aggregate);
+        BlockScan(temp_storage.block_scan, linear_tid).ExclusiveSum(raking_partial, exclusive_partial, packed_aggregate);
 
         // Propagate totals in packed fields
         #pragma unroll
         for (int PACKED = 1; PACKED < PACKING_RATIO; PACKED++)
         {
-            inclusive_partial += packed_aggregate << (sizeof(DigitCounter) * 8 * PACKED);
+            exclusive_partial += packed_aggregate << (sizeof(DigitCounter) * 8 * PACKED);
         }
 
         // Downsweep scan with exclusive partial
-        PackedCounter exclusive_partial = inclusive_partial - raking_partial;
         ExclusiveDownsweep(exclusive_partial);
     }
 
@@ -464,10 +471,14 @@ public:
         // Get the inclusive and exclusive digit totals corresponding to the calling thread.
         if ((BLOCK_THREADS == RADIX_DIGITS) || (linear_tid < RADIX_DIGITS))
         {
+            int bin_idx = (DESCENDING) ?
+                RADIX_DIGITS - linear_tid - 1 :
+                linear_tid;
+
             // Obtain ex/inclusive digit counts.  (Unfortunately these all reside in the
             // first counter column, resulting in unavoidable bank conflicts.)
-            int counter_lane = (linear_tid & (COUNTER_LANES - 1));
-            int sub_counter = linear_tid >> (LOG_COUNTER_LANES);
+            int counter_lane = (bin_idx & (COUNTER_LANES - 1));
+            int sub_counter = bin_idx >> (LOG_COUNTER_LANES);
             inclusive_digit_prefix = temp_storage.digit_counters[counter_lane + 1][0][sub_counter];
         }
     }

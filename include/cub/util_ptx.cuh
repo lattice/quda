@@ -46,7 +46,7 @@ namespace cub {
 
 
 /**
- * \addtogroup UtilModule
+ * \addtogroup UtilPtx
  * @{
  */
 
@@ -54,6 +54,8 @@ namespace cub {
 /******************************************************************************
  * PTX helper macros
  ******************************************************************************/
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
 /**
  * Register modifier for pointer-types (for inlining PTX assembly)
@@ -70,13 +72,15 @@ namespace cub {
     #define _CUB_ASM_PTR_SIZE_ "u32"
 #endif
 
+#endif // DOXYGEN_SHOULD_SKIP_THIS
+
 
 /******************************************************************************
  * Inlined PTX intrinsics
  ******************************************************************************/
 
 /**
- * Shift-right then add.  Returns (x >> shift) + addend.
+ * \brief Shift-right then add.  Returns (\p x >> \p shift) + \p addend.
  */
 __device__ __forceinline__ unsigned int SHR_ADD(
     unsigned int x,
@@ -95,7 +99,7 @@ __device__ __forceinline__ unsigned int SHR_ADD(
 
 
 /**
- * Shift-left then add.  Returns (x << shift) + addend.
+ * \brief Shift-left then add.  Returns (\p x << \p shift) + \p addend.
  */
 __device__ __forceinline__ unsigned int SHL_ADD(
     unsigned int x,
@@ -112,15 +116,17 @@ __device__ __forceinline__ unsigned int SHL_ADD(
     return ret;
 }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
 /**
  * Bitfield-extract.
  */
-template <typename UnsignedBits>
+template <typename UnsignedBits, int BYTE_LEN>
 __device__ __forceinline__ unsigned int BFE(
-    UnsignedBits source,
-    unsigned int bit_start,
-    unsigned int num_bits)
+    UnsignedBits            source,
+    unsigned int            bit_start,
+    unsigned int            num_bits,
+    Int2Type<BYTE_LEN>      byte_len)
 {
     unsigned int bits;
 #if __CUDA_ARCH__ >= 200
@@ -136,18 +142,34 @@ __device__ __forceinline__ unsigned int BFE(
 /**
  * Bitfield-extract for 64-bit types.
  */
+template <typename UnsignedBits>
 __device__ __forceinline__ unsigned int BFE(
-    unsigned long long source,
-    unsigned int bit_start,
-    unsigned int num_bits)
+    UnsignedBits            source,
+    unsigned int            bit_start,
+    unsigned int            num_bits,
+    Int2Type<8>             byte_len)
 {
     const unsigned long long MASK = (1ull << num_bits) - 1;
     return (source >> bit_start) & MASK;
 }
 
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 /**
- * Bitfield insert.  Inserts the first num_bits of y into x starting at bit_start
+ * \brief Bitfield-extract.  Extracts \p num_bits from \p source starting at bit-offset \p bit_start.  The input \p source may be an 8b, 16b, 32b, or 64b unsigned integer type.
+ */
+template <typename UnsignedBits>
+__device__ __forceinline__ unsigned int BFE(
+    UnsignedBits source,
+    unsigned int bit_start,
+    unsigned int num_bits)
+{
+    return BFE(source, bit_start, num_bits, Int2Type<sizeof(UnsignedBits)>());
+}
+
+
+/**
+ * \brief Bitfield insert.  Inserts the \p num_bits least significant bits of \p y into \p x at bit-offset \p bit_start.
  */
 __device__ __forceinline__ void BFI(
     unsigned int &ret,
@@ -160,13 +182,16 @@ __device__ __forceinline__ void BFI(
     asm("bfi.b32 %0, %1, %2, %3, %4;" :
         "=r"(ret) : "r"(y), "r"(x), "r"(bit_start), "r"(num_bits));
 #else
-    // TODO
+    x <<= bit_start;
+    unsigned int MASK_X = ((1 << num_bits) - 1) << bit_start;
+    unsigned int MASK_Y = ~MASK_X;
+    ret = (y & MASK_Y) | (x & MASK_X);
 #endif
 }
 
 
 /**
- * Three-operand add
+ * \brief Three-operand add.  Returns \p x + \p y + \p z.
  */
 __device__ __forceinline__ unsigned int IADD3(unsigned int x, unsigned int y, unsigned int z)
 {
@@ -180,8 +205,30 @@ __device__ __forceinline__ unsigned int IADD3(unsigned int x, unsigned int y, un
 
 
 /**
- * Byte-permute. Pick four arbitrary bytes from two 32-bit registers, and
- * reassemble them into a 32-bit destination register
+ * \brief Byte-permute. Pick four arbitrary bytes from two 32-bit registers, and reassemble them into a 32-bit destination register.  For SM2.0 or later.
+ *
+ * \par
+ * The bytes in the two source registers \p a and \p b are numbered from 0 to 7:
+ * {\p b, \p a} = {{b7, b6, b5, b4}, {b3, b2, b1, b0}}. For each of the four bytes
+ * {b3, b2, b1, b0} selected in the return value, a 4-bit selector is defined within
+ * the four lower "nibbles" of \p index: {\p index } = {n7, n6, n5, n4, n3, n2, n1, n0}
+ *
+ * \par
+ * The code snippet below illustrates byte-permute.
+ * \par
+ * \code
+ * #include <cub/cub.cuh>
+ *
+ * __global__ void ExampleKernel(...)
+ * {
+ *     int a        = 0x03020100;
+ *     int b        = 0x07060504;
+ *     int index    = 0x00007531;
+ *
+ *     int selected = PRMT(a, b, index);    // 0x07050301
+ *
+ * \endcode
+ *
  */
 __device__ __forceinline__ int PRMT(unsigned int a, unsigned int b, unsigned int index)
 {
@@ -190,6 +237,7 @@ __device__ __forceinline__ int PRMT(unsigned int a, unsigned int b, unsigned int
     return ret;
 }
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
 /**
  * Sync-threads barrier.
@@ -221,9 +269,10 @@ __device__ __forceinline__ float FFMA_RZ(float a, float b, float c)
     return d;
 }
 
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 /**
- * Terminates the calling thread
+ * \brief Terminates the calling thread
  */
 __device__ __forceinline__ void ThreadExit() {
     asm("exit;");
@@ -231,7 +280,7 @@ __device__ __forceinline__ void ThreadExit() {
 
 
 /**
- * Returns the warp lane ID of the calling thread
+ * \brief Returns the warp lane ID of the calling thread
  */
 __device__ __forceinline__ unsigned int LaneId()
 {
@@ -242,7 +291,7 @@ __device__ __forceinline__ unsigned int LaneId()
 
 
 /**
- * Returns the warp ID of the calling thread
+ * \brief Returns the warp ID of the calling thread.  Warp ID is guaranteed to be unique among warps, but may not correspond to a zero-based ranking within the thread block.
  */
 __device__ __forceinline__ unsigned int WarpId()
 {
@@ -252,7 +301,7 @@ __device__ __forceinline__ unsigned int WarpId()
 }
 
 /**
- * Returns the warp lane mask of all lanes less than the calling thread
+ * \brief Returns the warp lane mask of all lanes less than the calling thread
  */
 __device__ __forceinline__ unsigned int LaneMaskLt()
 {
@@ -262,7 +311,7 @@ __device__ __forceinline__ unsigned int LaneMaskLt()
 }
 
 /**
- * Returns the warp lane mask of all lanes less than or equal to the calling thread
+ * \brief Returns the warp lane mask of all lanes less than or equal to the calling thread
  */
 __device__ __forceinline__ unsigned int LaneMaskLe()
 {
@@ -272,7 +321,7 @@ __device__ __forceinline__ unsigned int LaneMaskLe()
 }
 
 /**
- * Returns the warp lane mask of all lanes greater than the calling thread
+ * \brief Returns the warp lane mask of all lanes greater than the calling thread
  */
 __device__ __forceinline__ unsigned int LaneMaskGt()
 {
@@ -282,7 +331,7 @@ __device__ __forceinline__ unsigned int LaneMaskGt()
 }
 
 /**
- * Returns the warp lane mask of all lanes greater than or equal to the calling thread
+ * \brief Returns the warp lane mask of all lanes greater than or equal to the calling thread
  */
 __device__ __forceinline__ unsigned int LaneMaskGe()
 {
@@ -291,68 +340,50 @@ __device__ __forceinline__ unsigned int LaneMaskGe()
     return ret;
 }
 
-/**
- * Portable implementation of __all
- */
-__device__ __forceinline__ int WarpAll(int cond)
-{
-#if CUB_PTX_ARCH < 120
+/** @} */       // end group UtilPtx
 
-    __shared__ volatile int warp_signals[PtxArchProps::MAX_SM_THREADS / PtxArchProps::WARP_THREADS];
 
-    if (LaneId() == 0)
-        warp_signals[WarpId()] = 1;
-
-    if (cond == 0)
-        warp_signals[WarpId()] = 0;
-
-    return warp_signals[WarpId()];
-
-#else
-
-    return __all(cond);
-
-#endif
-}
 
 
 /**
- * Portable implementation of __any
+ * \brief Shuffle-up for any data type.  Each <em>warp-lane<sub>i</sub></em> obtains the value \p input contributed by <em>warp-lane</em><sub><em>i</em>-<tt>src_offset</tt></sub>.  For thread lanes \e i < src_offset, the thread's own \p input is returned to the thread. ![](shfl_up_logo.png)
+ * \ingroup WarpModule
+ *
+ * \par
+ * - Available only for SM3.0 or newer
+ *
+ * \par
+ * The code snippet below illustrates each thread obtaining a \p double value from the
+ * predecessor of its predecessor.
+ * \par
+ * \code
+ * #include <cub/cub.cuh>   // or equivalently <cub/util_ptx.cuh>
+ *
+ * __global__ void ExampleKernel(...)
+ * {
+ *     // Obtain one input item per thread
+ *     double thread_data = ...
+ *
+ *     // Obtain item from two ranks below
+ *     double peer_data = ShuffleUp(thread_data, 2);
+ *
+ * \endcode
+ * \par
+ * Suppose the set of input \p thread_data across the first warp of threads is <tt>{1.0, 2.0, 3.0, 4.0, 5.0, ..., 32.0}</tt>.
+ * The corresponding output \p peer_data will be <tt>{1.0, 2.0, 1.0, 2.0, 3.0, ..., 30.0}</tt>.
+ *
  */
-__device__ __forceinline__ int WarpAny(int cond)
-{
-#if CUB_PTX_ARCH < 120
-
-    __shared__ volatile int warp_signals[PtxArchProps::MAX_SM_THREADS / PtxArchProps::WARP_THREADS];
-
-    if (LaneId() == 0)
-        warp_signals[WarpId()] = 0;
-
-    if (cond)
-        warp_signals[WarpId()] = 1;
-
-    return warp_signals[WarpId()];
-
-#else
-
-    return __any(cond);
-
-#endif
-}
-
-
-/// Generic shuffle-up
 template <typename T>
 __device__ __forceinline__ T ShuffleUp(
     T               input,              ///< [in] The value to broadcast
-    int             src_offset)         ///< [in] The up-offset of the peer to read from
+    int             src_offset)         ///< [in] The relative down-offset of the peer to read from
 {
     enum
     {
         SHFL_C = 0,
     };
 
-    typedef typename WordAlignment<T>::ShuffleWord ShuffleWord;
+    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
 
     const int       WORDS           = (sizeof(T) + sizeof(ShuffleWord) - 1) / sizeof(ShuffleWord);
     T               output;
@@ -373,8 +404,194 @@ __device__ __forceinline__ T ShuffleUp(
 }
 
 
+/**
+ * \brief Shuffle-down for any data type.  Each <em>warp-lane<sub>i</sub></em> obtains the value \p input contributed by <em>warp-lane</em><sub><em>i</em>+<tt>src_offset</tt></sub>.  For thread lanes \e i >= WARP_THREADS, the thread's own \p input is returned to the thread.  ![](shfl_down_logo.png)
+ * \ingroup WarpModule
+ *
+ * \par
+ * - Available only for SM3.0 or newer
+ *
+ * \par
+ * The code snippet below illustrates each thread obtaining a \p double value from the
+ * successor of its successor.
+ * \par
+ * \code
+ * #include <cub/cub.cuh>   // or equivalently <cub/util_ptx.cuh>
+ *
+ * __global__ void ExampleKernel(...)
+ * {
+ *     // Obtain one input item per thread
+ *     double thread_data = ...
+ *
+ *     // Obtain item from two ranks below
+ *     double peer_data = ShuffleDown(thread_data, 2);
+ *
+ * \endcode
+ * \par
+ * Suppose the set of input \p thread_data across the first warp of threads is <tt>{1.0, 2.0, 3.0, 4.0, 5.0, ..., 32.0}</tt>.
+ * The corresponding output \p peer_data will be <tt>{3.0, 4.0, 5.0, 6.0, 7.0, ..., 32.0}</tt>.
+ *
+ */
+template <typename T>
+__device__ __forceinline__ T ShuffleDown(
+    T               input,              ///< [in] The value to broadcast
+    int             src_offset)         ///< [in] The relative up-offset of the peer to read from
+{
+    enum
+    {
+        SHFL_C = CUB_PTX_WARP_THREADS - 1,
+    };
 
-/** @} */       // end group UtilModule
+    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
+
+    const int       WORDS           = (sizeof(T) + sizeof(ShuffleWord) - 1) / sizeof(ShuffleWord);
+    T               output;
+    ShuffleWord     *output_alias   = reinterpret_cast<ShuffleWord *>(&output);
+    ShuffleWord     *input_alias    = reinterpret_cast<ShuffleWord *>(&input);
+
+    #pragma unroll
+    for (int WORD = 0; WORD < WORDS; ++WORD)
+    {
+        unsigned int shuffle_word = input_alias[WORD];
+        asm(
+            "  shfl.down.b32 %0, %1, %2, %3;"
+            : "=r"(shuffle_word) : "r"(shuffle_word), "r"(src_offset), "r"(SHFL_C));
+        output_alias[WORD] = (ShuffleWord) shuffle_word;
+    }
+
+    return output;
+}
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
+/**
+ * \brief Shuffle-broadcast for any data type.  Each <em>warp-lane<sub>i</sub></em> obtains the value \p input contributed by <em>warp-lane</em><sub><tt>src_lane</tt></sub>.  For \p src_lane < 0 or \p src_lane >= WARP_THREADS, then the thread's own \p input is returned to the thread.  ![](shfl_broadcast_logo.png)
+ * \ingroup WarpModule
+ *
+ * \par
+ * - Available only for SM3.0 or newer
+ */
+template <typename T>
+__device__ __forceinline__ T ShuffleBroadcast(
+    T               input,                  ///< [in] The value to broadcast
+    int             src_lane,               ///< [in] Which warp lane is to do the broadcasting
+    int             logical_warp_threads)   ///< [in] Number of threads per logical warp
+{
+    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
+
+    const int       WORDS           = (sizeof(T) + sizeof(ShuffleWord) - 1) / sizeof(ShuffleWord);
+    T               output;
+    ShuffleWord     *output_alias   = reinterpret_cast<ShuffleWord *>(&output);
+    ShuffleWord     *input_alias    = reinterpret_cast<ShuffleWord *>(&input);
+
+    #pragma unroll
+    for (int WORD = 0; WORD < WORDS; ++WORD)
+    {
+        unsigned int shuffle_word = input_alias[WORD];
+        asm("shfl.idx.b32 %0, %1, %2, %3;"
+            : "=r"(shuffle_word) : "r"(shuffle_word), "r"(src_lane), "r"(logical_warp_threads - 1));
+        output_alias[WORD] = (ShuffleWord) shuffle_word;
+    }
+
+    return output;
+}
+
+#endif // DOXYGEN_SHOULD_SKIP_THIS
+
+
+ /**
+ * \brief Shuffle-broadcast for any data type.  Each <em>warp-lane<sub>i</sub></em> obtains the value \p input contributed by <em>warp-lane</em><sub><tt>src_lane</tt></sub>.  For \p src_lane < 0 or \p src_lane >= WARP_THREADS, then the thread's own \p input is returned to the thread. ![](shfl_broadcast_logo.png)
+ * \ingroup WarpModule
+ *
+ * \par
+ * - Available only for SM3.0 or newer
+ *
+ * \par
+ * The code snippet below illustrates each thread obtaining a \p double value from <em>warp-lane</em><sub>0</sub>.
+ *
+ * Blah
+ *
+ * \par
+ * \code
+ * #include <cub/cub.cuh>   // or equivalently <cub/util_ptx.cuh>
+ *
+ * __global__ void ExampleKernel(...)
+ * {
+ *     // Obtain one input item per thread
+ *     double thread_data = ...
+ *
+ *     // Obtain item from thread 0
+ *     double peer_data = ShuffleBroadcast(thread_data, 0);
+ *
+ * \endcode
+ * \par
+ * Suppose the set of input \p thread_data across the first warp of threads is <tt>{1.0, 2.0, 3.0, 4.0, 5.0, ..., 32.0}</tt>.
+ * The corresponding output \p peer_data will be <tt>{1.0, 1.0, 1.0, 1.0, 1.0, ..., 1.0}</tt>.
+ *
+ */
+template <typename T>
+__device__ __forceinline__ T ShuffleBroadcast(
+    T               input,              ///< [in] The value to broadcast
+    int             src_lane)           ///< [in] Which warp lane is to do the broadcasting
+{
+    return ShuffleBroadcast(input, src_lane, CUB_PTX_WARP_THREADS);
+}
+
+
+
+
+
+/**
+ * \brief Portable implementation of __all
+ * \ingroup WarpModule
+ */
+__device__ __forceinline__ int WarpAll(int cond)
+{
+#if CUB_PTX_VERSION < 120
+
+    __shared__ volatile int warp_signals[CUB_PTX_MAX_SM_THREADS / CUB_PTX_WARP_THREADS];
+
+    if (LaneId() == 0)
+        warp_signals[WarpId()] = 1;
+
+    if (cond == 0)
+        warp_signals[WarpId()] = 0;
+
+    return warp_signals[WarpId()];
+
+#else
+
+    return __all(cond);
+
+#endif
+}
+
+
+/**
+ * \brief Portable implementation of __any
+ * \ingroup WarpModule
+ */
+__device__ __forceinline__ int WarpAny(int cond)
+{
+#if CUB_PTX_VERSION < 120
+
+    __shared__ volatile int warp_signals[CUB_PTX_MAX_SM_THREADS / CUB_PTX_WARP_THREADS];
+
+    if (LaneId() == 0)
+        warp_signals[WarpId()] = 0;
+
+    if (cond)
+        warp_signals[WarpId()] = 1;
+
+    return warp_signals[WarpId()];
+
+#else
+
+    return __any(cond);
+
+#endif
+}
+
 
 }               // CUB namespace
 CUB_NS_POSTFIX  // Optional outer namespace(s)

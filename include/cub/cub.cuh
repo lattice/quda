@@ -44,12 +44,15 @@
 #include "block/block_reduce.cuh"
 #include "block/block_scan.cuh"
 #include "block/block_store.cuh"
+#include "block/block_shift.cuh"
 
 // Device
 #include "device/device_histogram.cuh"
+#include "device/device_partition.cuh"
 #include "device/device_radix_sort.cuh"
 #include "device/device_reduce.cuh"
 #include "device/device_scan.cuh"
+#include "device/device_select.cuh"
 
 // Grid
 //#include "grid/grid_barrier.cuh"
@@ -71,6 +74,16 @@
 #include "warp/warp_reduce.cuh"
 #include "warp/warp_scan.cuh"
 
+// Iterator
+#include "iterator/arg_index_input_iterator.cuh"
+#include "iterator/cache_modified_input_iterator.cuh"
+#include "iterator/cache_modified_output_iterator.cuh"
+#include "iterator/constant_input_iterator.cuh"
+#include "iterator/counting_input_iterator.cuh"
+#include "iterator/tex_obj_input_iterator.cuh"
+#include "iterator/tex_ref_input_iterator.cuh"
+#include "iterator/transform_input_iterator.cuh"
+
 // Util
 #include "util_allocator.cuh"
 #include "util_arch.cuh"
@@ -79,6 +92,5 @@
 #include "util_macro.cuh"
 #include "util_ptx.cuh"
 #include "util_type.cuh"
-#include "util_iterator.cuh"
 #include "util_vector.cuh"
 

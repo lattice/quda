@@ -61,47 +61,32 @@ namespace cub {
  * the scheduling grain size.
  *
  * \par
- * Before invoking a child grid, a parent thread will typically construct and initialize an instance of
- * GridEvenShare using \p GridInit().  The instance can be passed to child threadblocks which can
+ * Before invoking a child grid, a parent thread will typically construct an instance of
+ * GridEvenShare.  The instance can be passed to child threadblocks which can
  * initialize their per-threadblock offsets using \p BlockInit().
  *
- * \tparam SizeT Integer type for array indexing
+ * \tparam Offset       Signed integer type for global offsets
  */
-template <typename SizeT>
-class GridEvenShare
+template <typename Offset>
+struct GridEvenShare
 {
-private:
-
-    SizeT   total_grains;
-    int     big_blocks;
-    SizeT   big_share;
-    SizeT   normal_share;
-    SizeT   normal_base_offset;
-
-
-public:
+    Offset      total_grains;
+    int         big_blocks;
+    Offset      big_share;
+    Offset      normal_share;
+    Offset      normal_base_offset;
 
     /// Total number of input items
-    SizeT   num_items;
+    Offset      num_items;
 
     /// Grid size in threadblocks
-    int     grid_size;
+    int         grid_size;
 
     /// Offset into input marking the beginning of the owning thread block's segment of input tiles
-    SizeT   block_offset;
+    Offset      block_offset;
 
     /// Offset into input of marking the end (one-past) of the owning thread block's segment of input tiles
-    SizeT   block_oob;
-
-    /**
-     * \brief Block-based constructor for single-block grids.
-     */
-    __device__ __forceinline__ GridEvenShare(SizeT num_items) :
-        num_items(num_items),
-        grid_size(1),
-        block_offset(0),
-        block_oob(num_items) {}
-
+    Offset      block_end;
 
     /**
      * \brief Default constructor.  Zero-initializes block-specific fields.
@@ -110,23 +95,22 @@ public:
         num_items(0),
         grid_size(0),
         block_offset(0),
-        block_oob(0) {}
-
+        block_end(0) {}
 
     /**
-     * \brief Initializes the grid-specific members \p num_items and \p grid_size. To be called prior prior to kernel launch)
+     * \brief Constructor.  Initializes the grid-specific members \p num_items and \p grid_size. To be called prior prior to kernel launch)
      */
-    __host__ __device__ __forceinline__ void GridInit(
-        SizeT   num_items,                  ///< Total number of input items
+    __host__ __device__ __forceinline__ GridEvenShare(
+        Offset   num_items,                 ///< Total number of input items
         int     max_grid_size,              ///< Maximum grid size allowable (actual grid size may be less if not warranted by the the number of input items)
         int     schedule_granularity)       ///< Granularity by which the input can be parcelled into and distributed among threablocks.  Usually the thread block's native tile size (or a multiple thereof.
     {
         this->num_items             = num_items;
-        this->block_offset          = 0;
-        this->block_oob             = 0;
+        this->block_offset          = num_items;
+        this->block_end             = num_items;
         this->total_grains          = (num_items + schedule_granularity - 1) / schedule_granularity;
         this->grid_size             = CUB_MIN(total_grains, max_grid_size);
-        SizeT grains_per_block      = total_grains / grid_size;
+        Offset grains_per_block     = total_grains / grid_size;
         this->big_blocks            = total_grains - (grains_per_block * grid_size);        // leftover grains go to big blocks
         this->normal_share          = grains_per_block * schedule_granularity;
         this->normal_base_offset    = big_blocks * schedule_granularity;
@@ -134,29 +118,33 @@ public:
     }
 
 
+
     /**
-     * \brief Initializes the threadblock-specific details (e.g., to be called by each threadblock after startup)
+     * \brief Initializes ranges for the specified partition index
+     */
+    __device__ __forceinline__ void Init(int partition_id)
+    {
+        if (partition_id < big_blocks)
+        {
+            // This threadblock gets a big share of grains (grains_per_block + 1)
+            block_offset = (partition_id * big_share);
+            block_end = block_offset + big_share;
+        }
+        else if (partition_id < total_grains)
+        {
+            // This threadblock gets a normal share of grains (grains_per_block)
+            block_offset = normal_base_offset + (partition_id * normal_share);
+            block_end = CUB_MIN(num_items, block_offset + normal_share);
+        }
+    }
+
+
+    /**
+     * \brief Initializes ranges for the current thread block (e.g., to be called by each threadblock after startup)
      */
     __device__ __forceinline__ void BlockInit()
     {
-        if (blockIdx.x < big_blocks)
-        {
-            // This threadblock gets a big share of grains (grains_per_block + 1)
-            block_offset = (blockIdx.x * big_share);
-            block_oob = block_offset + big_share;
-        }
-        else if (blockIdx.x < total_grains)
-        {
-            // This threadblock gets a normal share of grains (grains_per_block)
-            block_offset = normal_base_offset + (blockIdx.x * normal_share);
-            block_oob = block_offset + normal_share;
-        }
-
-        // Last threadblock
-        if (blockIdx.x == grid_size - 1)
-        {
-            block_oob = num_items;
-        }
+        Init(blockIdx.x);
     }
 
 
@@ -169,7 +157,7 @@ public:
 #ifdef __CUDA_ARCH__
             "\tthreadblock(%d) "
             "block_offset(%lu) "
-            "block_oob(%lu) "
+            "block_end(%lu) "
 #endif
             "num_items(%lu)  "
             "total_grains(%lu)  "
@@ -179,7 +167,7 @@ public:
 #ifdef __CUDA_ARCH__
                 blockIdx.x,
                 (unsigned long) block_offset,
-                (unsigned long) block_oob,
+                (unsigned long) block_end,
 #endif
                 (unsigned long) num_items,
                 (unsigned long) total_grains,

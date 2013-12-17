@@ -56,10 +56,10 @@ struct BlockReduceWarpReductions
     enum
     {
         /// Number of active warps
-        WARPS = (BLOCK_THREADS + PtxArchProps::WARP_THREADS - 1) / PtxArchProps::WARP_THREADS,
+        WARPS = (BLOCK_THREADS + CUB_PTX_WARP_THREADS - 1) / CUB_PTX_WARP_THREADS,
 
         /// The logical warp size for warp reductions
-        LOGICAL_WARP_SIZE = CUB_MIN(BLOCK_THREADS, PtxArchProps::WARP_THREADS),
+        LOGICAL_WARP_SIZE = CUB_MIN(BLOCK_THREADS, CUB_PTX_WARP_THREADS),
 
         /// Whether or not the logical warp size evenly divides the threadblock size
         EVEN_WARP_MULTIPLE = (BLOCK_THREADS % LOGICAL_WARP_SIZE == 0)
@@ -96,13 +96,39 @@ struct BlockReduceWarpReductions
     :
         temp_storage(temp_storage.Alias()),
         linear_tid(linear_tid),
-        warp_id((BLOCK_THREADS <= PtxArchProps::WARP_THREADS) ?
+        warp_id((BLOCK_THREADS <= CUB_PTX_WARP_THREADS) ?
             0 :
-            linear_tid / PtxArchProps::WARP_THREADS),
-        lane_id((BLOCK_THREADS <= PtxArchProps::WARP_THREADS) ?
+            linear_tid / CUB_PTX_WARP_THREADS),
+        lane_id((BLOCK_THREADS <= CUB_PTX_WARP_THREADS) ?
             linear_tid :
-            linear_tid % PtxArchProps::WARP_THREADS)
+            linear_tid % CUB_PTX_WARP_THREADS)
     {}
+
+
+    template <bool FULL_TILE, typename ReductionOp, int SUCCESSOR_WARP>
+    __device__ __forceinline__ T ApplyWarpAggregates(
+        ReductionOp                 reduction_op,       ///< [in] Binary scan operator
+        T                           warp_aggregate,     ///< [in] <b>[<em>lane</em><sub>0</sub>s only]</b> Warp-wide aggregate reduction of input items
+        int                         num_valid,          ///< [in] Number of valid elements (may be less than BLOCK_THREADS)
+        Int2Type<SUCCESSOR_WARP>    successor_warp)
+    {
+        if (FULL_TILE || (SUCCESSOR_WARP * LOGICAL_WARP_SIZE < num_valid))
+        {
+            T addend = temp_storage.warp_aggregates[SUCCESSOR_WARP];
+            warp_aggregate = reduction_op(warp_aggregate, addend);
+        }
+        return ApplyWarpAggregates<FULL_TILE>(reduction_op, warp_aggregate, num_valid, Int2Type<SUCCESSOR_WARP + 1>());
+    }
+
+    template <bool FULL_TILE, typename ReductionOp>
+    __device__ __forceinline__ T ApplyWarpAggregates(
+        ReductionOp         reduction_op,       ///< [in] Binary scan operator
+        T                   warp_aggregate,     ///< [in] <b>[<em>lane</em><sub>0</sub>s only]</b> Warp-wide aggregate reduction of input items
+        int                 num_valid,          ///< [in] Number of valid elements (may be less than BLOCK_THREADS)
+        Int2Type<WARPS>     successor_warp)
+    {
+        return warp_aggregate;
+    }
 
 
     /// Returns block-wide aggregate in <em>thread</em><sub>0</sub>.
@@ -125,14 +151,7 @@ struct BlockReduceWarpReductions
         // Update total aggregate in warp 0, lane 0
         if (linear_tid == 0)
         {
-            #pragma unroll
-            for (int SUCCESSOR_WARP = 1; SUCCESSOR_WARP < WARPS; SUCCESSOR_WARP++)
-            {
-                if (FULL_TILE || (SUCCESSOR_WARP * LOGICAL_WARP_SIZE < num_valid))
-                {
-                    warp_aggregate = reduction_op(warp_aggregate, temp_storage.warp_aggregates[SUCCESSOR_WARP]);
-                }
-            }
+            warp_aggregate = ApplyWarpAggregates<FULL_TILE>(reduction_op, warp_aggregate, num_valid, Int2Type<1>());
         }
 
         return warp_aggregate;

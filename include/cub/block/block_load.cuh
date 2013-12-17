@@ -39,7 +39,6 @@
 #include "../util_macro.cuh"
 #include "../util_type.cuh"
 #include "../util_vector.cuh"
-#include "../thread/thread_load.cuh"
 #include "block_exchange.cuh"
 
 /// Optional outer namespace(s)
@@ -49,64 +48,60 @@ CUB_NS_PREFIX
 namespace cub {
 
 /**
- * \addtogroup IoModule
+ * \addtogroup UtilIo
  * @{
  */
 
 
 /******************************************************************//**
- * \name Blocked I/O
+ * \name Blocked arrangement I/O (direct)
  *********************************************************************/
 //@{
 
 
 /**
- * \brief Load a linear segment of items into a blocked arrangement across the thread block using the specified cache modifier.
+ * \brief Load a linear segment of items into a blocked arrangement across the thread block.
  *
  * \blocked
  *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
  * \tparam T                    <b>[inferred]</b> The data type to load.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
  */
 template <
-    PtxLoadModifier MODIFIER,
     typename        T,
     int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadBlocked(
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectBlocked(
     int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
     T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
 {
     // Load directly in thread-blocked order
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        items[ITEM] = ThreadLoad<MODIFIER>(block_itr + (linear_tid * ITEMS_PER_THREAD) + ITEM);
+        items[ITEM] = block_itr[(linear_tid * ITEMS_PER_THREAD) + ITEM];
     }
 }
 
 
 /**
- * \brief Load a linear segment of items into a blocked arrangement across the thread block using the specified cache modifier, guarded by range.
+ * \brief Load a linear segment of items into a blocked arrangement across the thread block, guarded by range.
  *
  * \blocked
  *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
  * \tparam T                    <b>[inferred]</b> The data type to load.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
  */
 template <
-    PtxLoadModifier MODIFIER,
     typename        T,
     int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadBlocked(
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectBlocked(
     int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
     T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
     int             valid_items)                ///< [in] Number of valid items to load
 {
@@ -117,291 +112,44 @@ __device__ __forceinline__ void LoadBlocked(
     {
         if (ITEM < bounds)
         {
-            items[ITEM] = ThreadLoad<MODIFIER>(block_itr + (linear_tid * ITEMS_PER_THREAD) + ITEM);
+            items[ITEM] = block_itr[(linear_tid * ITEMS_PER_THREAD) + ITEM];
         }
     }
 }
 
 
 /**
- * \brief Load a linear segment of items into a blocked arrangement across the thread block using the specified cache modifier, guarded by range, with a fall-back assignment of out-of-bound elements..
+ * \brief Load a linear segment of items into a blocked arrangement across the thread block, guarded by range, with a fall-back assignment of out-of-bound elements..
  *
  * \blocked
  *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
  * \tparam T                    <b>[inferred]</b> The data type to load.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
  */
 template <
-    PtxLoadModifier MODIFIER,
     typename        T,
     int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadBlocked(
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectBlocked(
     int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
     T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
     int             valid_items,                ///< [in] Number of valid items to load
     T               oob_default)                ///< [in] Default value to assign out-of-bound items
 {
-    int bounds = valid_items - (linear_tid * ITEMS_PER_THREAD);
-
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        items[ITEM] = (ITEM < bounds) ?
-            ThreadLoad<MODIFIER>(block_itr + (linear_tid * ITEMS_PER_THREAD) + ITEM) :
-            oob_default;
+        items[ITEM] = oob_default;
     }
-}
 
-
-
-//@}  end member group
-/******************************************************************//**
- * \name Striped I/O
- *********************************************************************/
-//@{
-
-
-/**
- * \brief Load a linear segment of items into a striped arrangement across the thread block using the specified cache modifier.
- *
- * \striped
- *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
- * \tparam BLOCK_THREADS        The thread block size in threads
- * \tparam T                    <b>[inferred]</b> The data type to load.
- * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
- */
-template <
-    PtxLoadModifier MODIFIER,
-    int             BLOCK_THREADS,
-    typename        T,
-    int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadStriped(
-    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
-    T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
-{
-    #pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
-    {
-        items[ITEM] = ThreadLoad<MODIFIER>(block_itr + (ITEM * BLOCK_THREADS) + linear_tid);
-    }
+    LoadDirectBlocked(linear_tid, block_itr, items, valid_items);
 }
 
 
 /**
- * \brief Load a linear segment of items into a striped arrangement across the thread block using the specified cache modifier, guarded by range
- *
- * \striped
- *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
- * \tparam BLOCK_THREADS        The thread block size in threads
- * \tparam T                    <b>[inferred]</b> The data type to load.
- * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
- */
-template <
-    PtxLoadModifier MODIFIER,
-    int             BLOCK_THREADS,
-    typename        T,
-    int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadStriped(
-    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
-    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
-    int             valid_items)                ///< [in] Number of valid items to load
-{
-    int bounds = valid_items - linear_tid;
-
-    #pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
-    {
-        if (ITEM * BLOCK_THREADS < bounds)
-        {
-            items[ITEM] = ThreadLoad<MODIFIER>(block_itr + linear_tid + (ITEM * BLOCK_THREADS));
-        }
-    }
-}
-
-
-/**
- * \brief Load a linear segment of items into a striped arrangement across the thread block using the specified cache modifier, guarded by range, with a fall-back assignment of out-of-bound elements.
- *
- * \striped
- *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
- * \tparam BLOCK_THREADS        The thread block size in threads
- * \tparam T                    <b>[inferred]</b> The data type to load.
- * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
- */
-template <
-    PtxLoadModifier MODIFIER,
-    int             BLOCK_THREADS,
-    typename        T,
-    int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadStriped(
-    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
-    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
-    int             valid_items,                ///< [in] Number of valid items to load
-    T               oob_default)                ///< [in] Default value to assign out-of-bound items
-{
-    int bounds = valid_items - linear_tid;
-
-    #pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
-    {
-        items[ITEM] = (ITEM * BLOCK_THREADS < bounds) ?
-             ThreadLoad<MODIFIER>(block_itr + linear_tid + (ITEM * BLOCK_THREADS)) :
-             oob_default;
-    }
-}
-
-
-
-//@}  end member group
-/******************************************************************//**
- * \name Warp-striped I/O
- *********************************************************************/
-//@{
-
-
-/**
- * \brief Load a linear segment of items into a warp-striped arrangement across the thread block using the specified cache modifier.
- *
- * \warpstriped
- *
- * \par Usage Considerations
- * The number of threads in the thread block must be a multiple of the architecture's warp size.
- *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
- * \tparam T                    <b>[inferred]</b> The data type to load.
- * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
- */
-template <
-    PtxLoadModifier MODIFIER,
-    typename        T,
-    int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadWarpStriped(
-    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
-    T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
-{
-    int tid         = linear_tid & (PtxArchProps::WARP_THREADS - 1);
-    int wid         = linear_tid >> PtxArchProps::LOG_WARP_THREADS;
-    int warp_offset = wid * PtxArchProps::WARP_THREADS * ITEMS_PER_THREAD;
-
-    // Load directly in warp-striped order
-    #pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
-    {
-        items[ITEM] = ThreadLoad<MODIFIER>(block_itr + warp_offset + tid + (ITEM * PtxArchProps::WARP_THREADS));
-    }
-}
-
-
-/**
- * \brief Load a linear segment of items into a warp-striped arrangement across the thread block using the specified cache modifier, guarded by range
- *
- * \warpstriped
- *
- * \par Usage Considerations
- * The number of threads in the thread block must be a multiple of the architecture's warp size.
- *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
- * \tparam T                    <b>[inferred]</b> The data type to load.
- * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
- */
-template <
-    PtxLoadModifier MODIFIER,
-    typename        T,
-    int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadWarpStriped(
-    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
-    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
-    int             valid_items)               ///< [in] Number of valid items to load
-{
-    int tid                 = linear_tid & (PtxArchProps::WARP_THREADS - 1);
-    int wid                 = linear_tid >> PtxArchProps::LOG_WARP_THREADS;
-    int warp_offset         = wid * PtxArchProps::WARP_THREADS * ITEMS_PER_THREAD;
-    int bounds              = valid_items - warp_offset - tid;
-
-    // Load directly in warp-striped order
-    #pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
-    {
-        if ((ITEM * PtxArchProps::WARP_THREADS) < bounds)
-        {
-            items[ITEM] = ThreadLoad<MODIFIER>(block_itr + warp_offset + tid + (ITEM * PtxArchProps::WARP_THREADS));
-        }
-    }
-}
-
-
-/**
- * \brief Load a linear segment of items into a warp-striped arrangement across the thread block using the specified cache modifier, guarded by range, with a fall-back assignment of out-of-bound elements.
- *
- * \warpstriped
- *
- * \par Usage Considerations
- * The number of threads in the thread block must be a multiple of the architecture's warp size.
- *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
- * \tparam T                    <b>[inferred]</b> The data type to load.
- * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam InputIteratorRA      <b>[inferred]</b> The random-access iterator type for input (may be a simple pointer type).
- */
-template <
-    PtxLoadModifier MODIFIER,
-    typename        T,
-    int             ITEMS_PER_THREAD,
-    typename        InputIteratorRA>
-__device__ __forceinline__ void LoadWarpStriped(
-    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
-    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
-    int             valid_items,               ///< [in] Number of valid items to load
-    T               oob_default)                ///< [in] Default value to assign out-of-bound items
-{
-    int tid         = linear_tid & (PtxArchProps::WARP_THREADS - 1);
-    int wid         = linear_tid >> PtxArchProps::LOG_WARP_THREADS;
-    int warp_offset = wid * PtxArchProps::WARP_THREADS * ITEMS_PER_THREAD;
-    int bounds      = valid_items - warp_offset - tid;
-
-    // Load directly in warp-striped order
-    #pragma unroll
-    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
-    {
-        items[ITEM] = ((ITEM * PtxArchProps::WARP_THREADS) < bounds) ?
-            ThreadLoad<MODIFIER>(block_itr + warp_offset + tid + (ITEM * PtxArchProps::WARP_THREADS)) :
-            oob_default;
-    }
-}
-
-
-
-//@}  end member group
-/******************************************************************//**
- * \name Blocked, vectorized I/O
- *********************************************************************/
-//@{
-
-/**
- * \brief Load a linear segment of items into a blocked arrangement across the thread block using the specified cache modifier.
+ * \brief Load a linear segment of items into a blocked arrangement across the thread block.
  *
  * \blocked
  *
@@ -411,15 +159,13 @@ __device__ __forceinline__ void LoadWarpStriped(
  *   - \p ITEMS_PER_THREAD is odd
  *   - The data type \p T is not a built-in primitive or CUDA vector type (e.g., \p short, \p int2, \p double, \p float2, etc.)
  *
- * \tparam MODIFIER             cub::PtxLoadModifier cache modifier.
  * \tparam T                    <b>[inferred]</b> The data type to load.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
  */
 template <
-    PtxLoadModifier MODIFIER,
     typename        T,
     int             ITEMS_PER_THREAD>
-__device__ __forceinline__ void LoadBlockedVectorized(
+__device__ __forceinline__ void LoadDirectBlockedVectorized(
     int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
     T               *block_ptr,                 ///< [in] Input pointer for loading from
     T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
@@ -438,29 +184,249 @@ __device__ __forceinline__ void LoadBlockedVectorized(
     };
 
     // Vector type
-    typedef typename VectorHelper<T, VEC_SIZE>::Type Vector;
+    typedef typename CubVector<T, VEC_SIZE>::Type Vector;
 
-    // Alias local data (use raw_items array here which should get optimized away to prevent conservative PTXAS lmem spilling)
-    T raw_items[ITEMS_PER_THREAD];
+    // Vector items
+    Vector vec_items[VECTORS_PER_THREAD];
 
-    // Direct-load using vector types
-    LoadBlocked<MODIFIER>(
-        linear_tid,
-        reinterpret_cast<Vector *>(block_ptr),
-        reinterpret_cast<Vector (&)[VECTORS_PER_THREAD]>(raw_items));
+    // Aliased input ptr
+    Vector *ptr = reinterpret_cast<Vector*>(block_ptr + (linear_tid * VEC_SIZE * VECTORS_PER_THREAD));
+
+    // Load directly in thread-blocked order
+    #pragma unroll
+    for (int ITEM = 0; ITEM < VECTORS_PER_THREAD; ITEM++)
+    {
+        vec_items[ITEM] = ptr[ITEM];
+    }
 
     // Copy
     #pragma unroll
     for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
     {
-        items[ITEM] = raw_items[ITEM];
+        items[ITEM] = reinterpret_cast<T*>(vec_items)[ITEM];
     }
+}
+
+
+
+//@}  end member group
+/******************************************************************//**
+ * \name Striped arrangement I/O (direct)
+ *********************************************************************/
+//@{
+
+
+/**
+ * \brief Load a linear segment of items into a striped arrangement across the thread block.
+ *
+ * \striped
+ *
+ * \tparam BLOCK_THREADS        The thread block size in threads
+ * \tparam T                    <b>[inferred]</b> The data type to load.
+ * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
+ */
+template <
+    int             BLOCK_THREADS,
+    typename        T,
+    int             ITEMS_PER_THREAD,
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectStriped(
+    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
+{
+    #pragma unroll
+    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    {
+        items[ITEM] = block_itr[(ITEM * BLOCK_THREADS) + linear_tid];
+    }
+}
+
+
+/**
+ * \brief Load a linear segment of items into a striped arrangement across the thread block, guarded by range
+ *
+ * \striped
+ *
+ * \tparam BLOCK_THREADS        The thread block size in threads
+ * \tparam T                    <b>[inferred]</b> The data type to load.
+ * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
+ */
+template <
+    int             BLOCK_THREADS,
+    typename        T,
+    int             ITEMS_PER_THREAD,
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectStriped(
+    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
+    int             valid_items)                ///< [in] Number of valid items to load
+{
+    int bounds = valid_items - linear_tid;
+
+    #pragma unroll
+    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    {
+        if (ITEM * BLOCK_THREADS < bounds)
+        {
+            items[ITEM] = block_itr[linear_tid + (ITEM * BLOCK_THREADS)];
+        }
+    }
+}
+
+
+/**
+ * \brief Load a linear segment of items into a striped arrangement across the thread block, guarded by range, with a fall-back assignment of out-of-bound elements.
+ *
+ * \striped
+ *
+ * \tparam BLOCK_THREADS        The thread block size in threads
+ * \tparam T                    <b>[inferred]</b> The data type to load.
+ * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
+ */
+template <
+    int             BLOCK_THREADS,
+    typename        T,
+    int             ITEMS_PER_THREAD,
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectStriped(
+    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
+    int             valid_items,                ///< [in] Number of valid items to load
+    T               oob_default)                ///< [in] Default value to assign out-of-bound items
+{
+    #pragma unroll
+    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    {
+        items[ITEM] = oob_default;
+    }
+
+    LoadDirectStriped<BLOCK_THREADS>(linear_tid, block_itr, items, valid_items);
+}
+
+
+
+//@}  end member group
+/******************************************************************//**
+ * \name Warp-striped arrangement I/O (direct)
+ *********************************************************************/
+//@{
+
+
+/**
+ * \brief Load a linear segment of items into a warp-striped arrangement across the thread block.
+ *
+ * \warpstriped
+ *
+ * \par Usage Considerations
+ * The number of threads in the thread block must be a multiple of the architecture's warp size.
+ *
+ * \tparam T                    <b>[inferred]</b> The data type to load.
+ * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
+ */
+template <
+    typename        T,
+    int             ITEMS_PER_THREAD,
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectWarpStriped(
+    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
+{
+    int tid         = linear_tid & (CUB_PTX_WARP_THREADS - 1);
+    int wid         = linear_tid >> CUB_PTX_LOG_WARP_THREADS;
+    int warp_offset = wid * CUB_PTX_WARP_THREADS * ITEMS_PER_THREAD;
+
+    // Load directly in warp-striped order
+    #pragma unroll
+    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    {
+        items[ITEM] = block_itr[warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS)];
+    }
+}
+
+
+/**
+ * \brief Load a linear segment of items into a warp-striped arrangement across the thread block, guarded by range
+ *
+ * \warpstriped
+ *
+ * \par Usage Considerations
+ * The number of threads in the thread block must be a multiple of the architecture's warp size.
+ *
+ * \tparam T                    <b>[inferred]</b> The data type to load.
+ * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
+ */
+template <
+    typename        T,
+    int             ITEMS_PER_THREAD,
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectWarpStriped(
+    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
+    int             valid_items)                ///< [in] Number of valid items to load
+{
+    int tid                 = linear_tid & (CUB_PTX_WARP_THREADS - 1);
+    int wid                 = linear_tid >> CUB_PTX_LOG_WARP_THREADS;
+    int warp_offset         = wid * CUB_PTX_WARP_THREADS * ITEMS_PER_THREAD;
+    int bounds              = valid_items - warp_offset - tid;
+
+    // Load directly in warp-striped order
+    #pragma unroll
+    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    {
+        if ((ITEM * CUB_PTX_WARP_THREADS) < bounds)
+        {
+            items[ITEM] = block_itr[warp_offset + tid + (ITEM * CUB_PTX_WARP_THREADS)];
+        }
+    }
+}
+
+
+/**
+ * \brief Load a linear segment of items into a warp-striped arrangement across the thread block, guarded by range, with a fall-back assignment of out-of-bound elements.
+ *
+ * \warpstriped
+ *
+ * \par Usage Considerations
+ * The number of threads in the thread block must be a multiple of the architecture's warp size.
+ *
+ * \tparam T                    <b>[inferred]</b> The data type to load.
+ * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
+ * \tparam InputIterator        <b>[inferred]</b> The random-access iterator type for input \iterator.
+ */
+template <
+    typename        T,
+    int             ITEMS_PER_THREAD,
+    typename        InputIterator>
+__device__ __forceinline__ void LoadDirectWarpStriped(
+    int             linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
+    InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
+    T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
+    int             valid_items,               ///< [in] Number of valid items to load
+    T               oob_default)                ///< [in] Default value to assign out-of-bound items
+{
+    #pragma unroll
+    for (int ITEM = 0; ITEM < ITEMS_PER_THREAD; ITEM++)
+    {
+        items[ITEM] = oob_default;
+    }
+
+    LoadDirectWarpStriped(linear_tid, block_itr, items, valid_items);
 }
 
 
 //@}  end member group
 
-/** @} */       // end group IoModule
+/** @} */       // end group UtilIo
 
 
 
@@ -476,7 +442,7 @@ enum BlockLoadAlgorithm
     /**
      * \par Overview
      *
-     * A [<em>blocked arrangement</em>](index.html#sec5sec4) of data is read
+     * A [<em>blocked arrangement</em>](index.html#sec4sec3) of data is read
      * directly from memory.  The thread block reads items in a parallel "raking" fashion: thread<sub><em>i</em></sub>
      * reads the <em>i</em><sup>th</sup> segment of consecutive elements.
      *
@@ -489,7 +455,7 @@ enum BlockLoadAlgorithm
     /**
      * \par Overview
      *
-     * A [<em>blocked arrangement</em>](index.html#sec5sec4) of data is read directly
+     * A [<em>blocked arrangement</em>](index.html#sec4sec3) of data is read directly
      * from memory using CUDA's built-in vectorized loads as a coalescing optimization.
      * The thread block reads items in a parallel "raking" fashion: thread<sub><em>i</em></sub> uses vector loads to
      * read the <em>i</em><sup>th</sup> segment of consecutive elements.
@@ -502,7 +468,7 @@ enum BlockLoadAlgorithm
      *   maximum vector load width (typically 4 items or 64B, whichever is lower).
      * - The following conditions will prevent vectorization and loading will fall back to cub::BLOCK_LOAD_DIRECT:
      *   - \p ITEMS_PER_THREAD is odd
-     *   - The \p InputIteratorRA is not a simple pointer type
+     *   - The \p InputIterator is not a simple pointer type
      *   - The block input offset is not quadword-aligned
      *   - The data type \p T is not a built-in primitive or CUDA vector type (e.g., \p short, \p int2, \p double, \p float2, etc.)
      */
@@ -511,13 +477,13 @@ enum BlockLoadAlgorithm
     /**
      * \par Overview
      *
-     * A [<em>striped arrangement</em>](index.html#sec5sec4) of data is read
+     * A [<em>striped arrangement</em>](index.html#sec4sec3) of data is read
      * directly from memory and then is locally transposed into a
-     * [<em>blocked arrangement</em>](index.html#sec5sec4). The thread block
+     * [<em>blocked arrangement</em>](index.html#sec4sec3). The thread block
      * reads items in a parallel "strip-mining" fashion:
      * thread<sub><em>i</em></sub> reads items having stride \p BLOCK_THREADS
      * between them. cub::BlockExchange is then used to locally reorder the items
-     * into a [<em>blocked arrangement</em>](index.html#sec5sec4).
+     * into a [<em>blocked arrangement</em>](index.html#sec4sec3).
      *
      * \par Performance Considerations
      * - The utilization of memory transactions (coalescing) remains high regardless
@@ -531,13 +497,13 @@ enum BlockLoadAlgorithm
     /**
      * \par Overview
      *
-     * A [<em>warp-striped arrangement</em>](index.html#sec5sec4) of data is read
+     * A [<em>warp-striped arrangement</em>](index.html#sec4sec3) of data is read
      * directly from memory and then is locally transposed into a
-     * [<em>blocked arrangement</em>](index.html#sec5sec4). Each warp reads its own
+     * [<em>blocked arrangement</em>](index.html#sec4sec3). Each warp reads its own
      * contiguous segment in a parallel "strip-mining" fashion: lane<sub><em>i</em></sub>
      * reads items having stride \p WARP_THREADS between them. cub::BlockExchange
      * is then used to locally reorder the items into a
-     * [<em>blocked arrangement</em>](index.html#sec5sec4).
+     * [<em>blocked arrangement</em>](index.html#sec4sec3).
      *
      * \par Usage Considerations
      * - BLOCK_THREADS must be a multiple of WARP_THREADS
@@ -553,34 +519,32 @@ enum BlockLoadAlgorithm
 
 
 /**
- * \brief The BlockLoad class provides [<em>collective</em>](index.html#sec0) data movement methods for loading a linear segment of items from memory into a [<em>blocked arrangement</em>](index.html#sec5sec4) across a CUDA thread block.  ![](block_load_logo.png)
+ * \brief The BlockLoad class provides [<em>collective</em>](index.html#sec0) data movement methods for loading a linear segment of items from memory into a [<em>blocked arrangement</em>](index.html#sec4sec3) across a CUDA thread block.  ![](block_load_logo.png)
  * \ingroup BlockModule
+ * \ingroup UtilIo
  *
- * \par Overview
- * The BlockLoad class provides a single data movement abstraction that can be specialized
- * to implement different cub::BlockLoadAlgorithm strategies.  This facilitates different
- * performance policies for different architectures, data types, granularity sizes, etc.
- *
- * \par
- * Optionally, BlockLoad can be specialized by different data movement strategies:
- *   -# <b>cub::BLOCK_LOAD_DIRECT</b>.  A [<em>blocked arrangement</em>](index.html#sec5sec4)
- *      of data is read directly from memory.  [More...](\ref cub::BlockLoadAlgorithm)
- *   -# <b>cub::BLOCK_LOAD_VECTORIZE</b>.  A [<em>blocked arrangement</em>](index.html#sec5sec4)
- *      of data is read directly from memory using CUDA's built-in vectorized loads as a
- *      coalescing optimization.    [More...](\ref cub::BlockLoadAlgorithm)
- *   -# <b>cub::BLOCK_LOAD_TRANSPOSE</b>.  A [<em>striped arrangement</em>](index.html#sec5sec4)
- *      of data is read directly from memory and is then locally transposed into a
- *      [<em>blocked arrangement</em>](index.html#sec5sec4).  [More...](\ref cub::BlockLoadAlgorithm)
- *   -# <b>cub::BLOCK_LOAD_WARP_TRANSPOSE</b>.  A [<em>warp-striped arrangement</em>](index.html#sec5sec4)
- *      of data is read directly from memory and is then locally transposed into a
- *      [<em>blocked arrangement</em>](index.html#sec5sec4).  [More...](\ref cub::BlockLoadAlgorithm)
- *
- * \tparam InputIteratorRA      The input iterator type (may be a simple pointer type).
+ * \tparam InputIterator      The input iterator type \iterator.
  * \tparam BLOCK_THREADS        The thread block size in threads.
  * \tparam ITEMS_PER_THREAD     The number of consecutive items partitioned onto each thread.
  * \tparam ALGORITHM            <b>[optional]</b> cub::BlockLoadAlgorithm tuning policy.  default: cub::BLOCK_LOAD_DIRECT.
- * \tparam MODIFIER             <b>[optional]</b> cub::PtxLoadModifier cache modifier.  default: cub::LOAD_DEFAULT.
- * \tparam WARP_TIME_SLICING    <b>[optional]</b> For transposition-based cub::BlockLoadAlgorithm parameterizations that utilize shared memory: When \p true, only use enough shared memory for a single warp's worth of data, time-slicing the block-wide exchange over multiple synchronized rounds (default: false)
+ * \tparam WARP_TIME_SLICING    <b>[optional]</b> Whether or not only one warp's worth of shared memory should be allocated and time-sliced among block-warps during any load-related data transpositions (versus each warp having its own storage). (default: false)
+ *
+ * \par Overview
+ * - The BlockLoad class provides a single data movement abstraction that can be specialized
+ *   to implement different cub::BlockLoadAlgorithm strategies.  This facilitates different
+ *   performance policies for different architectures, data types, granularity sizes, etc.
+ * - BlockLoad can be optionally specialized by different data movement strategies:
+ *   -# <b>cub::BLOCK_LOAD_DIRECT</b>.  A [<em>blocked arrangement</em>](index.html#sec4sec3)
+ *      of data is read directly from memory.  [More...](\ref cub::BlockLoadAlgorithm)
+ *   -# <b>cub::BLOCK_LOAD_VECTORIZE</b>.  A [<em>blocked arrangement</em>](index.html#sec4sec3)
+ *      of data is read directly from memory using CUDA's built-in vectorized loads as a
+ *      coalescing optimization.    [More...](\ref cub::BlockLoadAlgorithm)
+ *   -# <b>cub::BLOCK_LOAD_TRANSPOSE</b>.  A [<em>striped arrangement</em>](index.html#sec4sec3)
+ *      of data is read directly from memory and is then locally transposed into a
+ *      [<em>blocked arrangement</em>](index.html#sec4sec3).  [More...](\ref cub::BlockLoadAlgorithm)
+ *   -# <b>cub::BLOCK_LOAD_WARP_TRANSPOSE</b>.  A [<em>warp-striped arrangement</em>](index.html#sec4sec3)
+ *      of data is read directly from memory and is then locally transposed into a
+ *      [<em>blocked arrangement</em>](index.html#sec4sec3).  [More...](\ref cub::BlockLoadAlgorithm)
  *
  * \par A Simple Example
  * \blockcollective{BlockLoad}
@@ -592,7 +556,7 @@ enum BlockLoadAlgorithm
  * pattern (after which items are locally reordered among threads).
  * \par
  * \code
- * #include <cub/cub.cuh>
+ * #include <cub/cub.cuh>   // or equivalently <cub/block/block_load.cuh>
  *
  * __global__ void ExampleKernel(int *d_data, ...)
  * {
@@ -614,12 +578,11 @@ enum BlockLoadAlgorithm
  *
  */
 template <
-    typename            InputIteratorRA,
+    typename            InputIterator,
     int                 BLOCK_THREADS,
     int                 ITEMS_PER_THREAD,
-    BlockLoadAlgorithm  ALGORITHM = BLOCK_LOAD_DIRECT,
-    PtxLoadModifier     MODIFIER = LOAD_DEFAULT,
-    bool                WARP_TIME_SLICING = false>
+    BlockLoadAlgorithm  ALGORITHM           = BLOCK_LOAD_DIRECT,
+    bool                WARP_TIME_SLICING   = false>
 class BlockLoad
 {
 private:
@@ -629,7 +592,7 @@ private:
      ******************************************************************************/
 
     // Data type of input iterator
-    typedef typename std::iterator_traits<InputIteratorRA>::value_type T;
+    typedef typename std::iterator_traits<InputIterator>::value_type T;
 
 
     /******************************************************************************
@@ -663,29 +626,29 @@ private:
 
         /// Load a linear segment of items from memory
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD])     ///< [out] Data to load
         {
-            LoadBlocked<MODIFIER>(linear_tid, block_itr, items);
+            LoadDirectBlocked(linear_tid, block_itr, items);
         }
 
         /// Load a linear segment of items from memory, guarded by range
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items)                    ///< [in] Number of valid items to load
         {
-            LoadBlocked<MODIFIER>(linear_tid, block_itr, items, valid_items);
+            LoadDirectBlocked(linear_tid, block_itr, items, valid_items);
         }
 
         /// Load a linear segment of items from memory, guarded by range, with a fall-back assignment of out-of-bound elements
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items,                    ///< [in] Number of valid items to load
             T               oob_default)                    ///< [in] Default value to assign out-of-bound items
         {
-            LoadBlocked<MODIFIER>(linear_tid, block_itr, items, valid_items, oob_default);
+            LoadDirectBlocked(linear_tid, block_itr, items, valid_items, oob_default);
         }
 
     };
@@ -716,37 +679,37 @@ private:
             T               *block_ptr,                     ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD])     ///< [out] Data to load
         {
-            LoadBlockedVectorized<MODIFIER>(linear_tid, block_ptr, items);
+            LoadDirectBlockedVectorized(linear_tid, block_ptr, items);
         }
 
         /// Load a linear segment of items from memory, specialized for opaque input iterators (skips vectorization)
         template <
             typename T,
-            typename _InputIteratorRA>
+            typename _InputIterator>
         __device__ __forceinline__ void Load(
-            _InputIteratorRA    block_itr,                  ///< [in] The thread block's base input iterator for loading from
+            _InputIterator    block_itr,                  ///< [in] The thread block's base input iterator for loading from
             T                   (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
         {
-            LoadBlocked<MODIFIER>(linear_tid, block_itr, items);
+            LoadDirectBlocked(linear_tid, block_itr, items);
         }
 
         /// Load a linear segment of items from memory, guarded by range (skips vectorization)
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items)                    ///< [in] Number of valid items to load
         {
-            LoadBlocked<MODIFIER>(linear_tid, block_itr, items, valid_items);
+            LoadDirectBlocked(linear_tid, block_itr, items, valid_items);
         }
 
         /// Load a linear segment of items from memory, guarded by range, with a fall-back assignment of out-of-bound elements (skips vectorization)
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items,                    ///< [in] Number of valid items to load
             T               oob_default)                    ///< [in] Default value to assign out-of-bound items
         {
-            LoadBlocked<MODIFIER>(linear_tid, block_itr, items, valid_items, oob_default);
+            LoadDirectBlocked(linear_tid, block_itr, items, valid_items, oob_default);
         }
 
     };
@@ -784,31 +747,31 @@ private:
 
         /// Load a linear segment of items from memory
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD])     ///< [out] Data to load{
         {
-            LoadStriped<MODIFIER, BLOCK_THREADS>(linear_tid, block_itr, items);
+            LoadDirectStriped<BLOCK_THREADS>(linear_tid, block_itr, items);
             BlockExchange(temp_storage, linear_tid).StripedToBlocked(items);
         }
 
         /// Load a linear segment of items from memory, guarded by range
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items)                    ///< [in] Number of valid items to load
         {
-            LoadStriped<MODIFIER, BLOCK_THREADS>(linear_tid, block_itr, items, valid_items);
+            LoadDirectStriped<BLOCK_THREADS>(linear_tid, block_itr, items, valid_items);
             BlockExchange(temp_storage, linear_tid).StripedToBlocked(items);
         }
 
         /// Load a linear segment of items from memory, guarded by range, with a fall-back assignment of out-of-bound elements
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items,                    ///< [in] Number of valid items to load
             T               oob_default)                    ///< [in] Default value to assign out-of-bound items
         {
-            LoadStriped<MODIFIER, BLOCK_THREADS>(linear_tid, block_itr, items, valid_items, oob_default);
+            LoadDirectStriped<BLOCK_THREADS>(linear_tid, block_itr, items, valid_items, oob_default);
             BlockExchange(temp_storage, linear_tid).StripedToBlocked(items);
         }
 
@@ -823,7 +786,7 @@ private:
     {
         enum
         {
-            WARP_THREADS = PtxArchProps::WARP_THREADS
+            WARP_THREADS = CUB_PTX_WARP_THREADS
         };
 
         // Assert BLOCK_THREADS must be a multiple of WARP_THREADS
@@ -855,32 +818,32 @@ private:
 
         /// Load a linear segment of items from memory
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD])     ///< [out] Data to load{
         {
-            LoadWarpStriped<MODIFIER>(linear_tid, block_itr, items);
+            LoadDirectWarpStriped(linear_tid, block_itr, items);
             BlockExchange(temp_storage, linear_tid).WarpStripedToBlocked(items);
         }
 
         /// Load a linear segment of items from memory, guarded by range
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items)                    ///< [in] Number of valid items to load
         {
-            LoadWarpStriped<MODIFIER>(linear_tid, block_itr, items, valid_items);
+            LoadDirectWarpStriped(linear_tid, block_itr, items, valid_items);
             BlockExchange(temp_storage, linear_tid).WarpStripedToBlocked(items);
         }
 
 
         /// Load a linear segment of items from memory, guarded by range, with a fall-back assignment of out-of-bound elements
         __device__ __forceinline__ void Load(
-            InputIteratorRA block_itr,                      ///< [in] The thread block's base input iterator for loading from
+            InputIterator   block_itr,                      ///< [in] The thread block's base input iterator for loading from
             T               (&items)[ITEMS_PER_THREAD],     ///< [out] Data to load
             int             valid_items,                    ///< [in] Number of valid items to load
             T               oob_default)                    ///< [in] Default value to assign out-of-bound items
         {
-            LoadWarpStriped<MODIFIER>(linear_tid, block_itr, items, valid_items, oob_default);
+            LoadDirectWarpStriped(linear_tid, block_itr, items, valid_items, oob_default);
             BlockExchange(temp_storage, linear_tid).WarpStripedToBlocked(items);
         }
     };
@@ -986,8 +949,11 @@ public:
     /**
      * \brief Load a linear segment of items from memory.
      *
-     * \blocked
+     * \par
+     * - \blocked
+     * - \smemreuse
      *
+     * \par
      * The code snippet below illustrates the loading of a linear
      * segment of 512 integers into a "blocked" arrangement across 128 threads where each
      * thread owns 4 consecutive items.  The load is specialized for \p BLOCK_LOAD_WARP_TRANSPOSE,
@@ -995,7 +961,7 @@ public:
      * pattern (after which items are locally reordered among threads).
      * \par
      * \code
-     * #include <cub/cub.cuh>
+     * #include <cub/cub.cuh>   // or equivalently <cub/block/block_load.cuh>
      *
      * __global__ void ExampleKernel(int *d_data, ...)
      * {
@@ -1017,7 +983,7 @@ public:
      *
      */
     __device__ __forceinline__ void Load(
-        InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
+        InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
         T               (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
     {
         InternalLoad(temp_storage, linear_tid).Load(block_itr, items);
@@ -1027,8 +993,11 @@ public:
     /**
      * \brief Load a linear segment of items from memory, guarded by range.
      *
-     * \blocked
+     * \par
+     * - \blocked
+     * - \smemreuse
      *
+     * \par
      * The code snippet below illustrates the guarded loading of a linear
      * segment of 512 integers into a "blocked" arrangement across 128 threads where each
      * thread owns 4 consecutive items.  The load is specialized for \p BLOCK_LOAD_WARP_TRANSPOSE,
@@ -1036,7 +1005,7 @@ public:
      * pattern (after which items are locally reordered among threads).
      * \par
      * \code
-     * #include <cub/cub.cuh>
+     * #include <cub/cub.cuh>   // or equivalently <cub/block/block_load.cuh>
      *
      * __global__ void ExampleKernel(int *d_data, int valid_items, ...)
      * {
@@ -1059,7 +1028,7 @@ public:
      *
      */
     __device__ __forceinline__ void Load(
-        InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
+        InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
         T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
         int             valid_items)                ///< [in] Number of valid items to load
     {
@@ -1070,8 +1039,11 @@ public:
     /**
      * \brief Load a linear segment of items from memory, guarded by range, with a fall-back assignment of out-of-bound elements
      *
-     * \blocked
+     * \par
+     * - \blocked
+     * - \smemreuse
      *
+     * \par
      * The code snippet below illustrates the guarded loading of a linear
      * segment of 512 integers into a "blocked" arrangement across 128 threads where each
      * thread owns 4 consecutive items.  The load is specialized for \p BLOCK_LOAD_WARP_TRANSPOSE,
@@ -1079,7 +1051,7 @@ public:
      * pattern (after which items are locally reordered among threads).
      * \par
      * \code
-     * #include <cub/cub.cuh>
+     * #include <cub/cub.cuh>   // or equivalently <cub/block/block_load.cuh>
      *
      * __global__ void ExampleKernel(int *d_data, int valid_items, ...)
      * {
@@ -1103,7 +1075,7 @@ public:
      *
      */
     __device__ __forceinline__ void Load(
-        InputIteratorRA block_itr,                  ///< [in] The thread block's base input iterator for loading from
+        InputIterator   block_itr,                  ///< [in] The thread block's base input iterator for loading from
         T               (&items)[ITEMS_PER_THREAD], ///< [out] Data to load
         int             valid_items,                ///< [in] Number of valid items to load
         T               oob_default)                ///< [in] Default value to assign out-of-bound items

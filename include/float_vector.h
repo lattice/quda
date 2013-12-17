@@ -131,6 +131,12 @@ __device__ inline float2 operator*=(float2 &x, const float a) {
   return x;
 }
 
+__device__ inline double2 operator*=(double2 &x, const float a) {
+  x.x *= a;
+  x.y *= a;
+  return x;
+}
+
 __device__ inline float4 operator*=(float4 &a, const float &b) {
   a.x *= b;
   a.y *= b;

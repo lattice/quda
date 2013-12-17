@@ -1,8 +1,7 @@
 include ../make.inc
 
 QUDA = libquda.a
-QUDA_OBJS = clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
-	extract_gauge_ghost_extended.o timer.o malloc.o solver.o	\
+QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
 	inv_gcr_quda.o inv_mr_quda.o inv_mre.o interface_quda.o		\
 	util_quda.o color_spinor_field.o color_spinor_util.o		\
@@ -15,7 +14,9 @@ QUDA_OBJS = clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	dirac_twisted_mass.o tune.o fat_force_quda.o llfat_quda_itf.o	\
 	clover_quda.o dslash_quda.o blas_quda.o copy_quda.o		\
 	reduce_quda.o face_buffer.o face_gauge.o comm_common.o		\
-	${COMM_OBJS} ${NUMA_AFFINITY_OBJS} copy_color_spinor.o		\
+	${COMM_OBJS} ${NUMA_AFFINITY_OBJS} clover_deriv_quda.o		\
+	clover_invert.o copy_gauge_extended.o				\
+	extract_gauge_ghost_extended.o copy_color_spinor.o		\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
 	clover_trace_quda.o ks_force_quda.o
 

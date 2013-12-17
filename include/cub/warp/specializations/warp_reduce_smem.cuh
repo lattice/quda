@@ -55,7 +55,7 @@ template <
 struct WarpReduceSmem
 {
     /******************************************************************************
-     * Constants and typedefs
+     * Constants and type definitions
      ******************************************************************************/
 
     enum
@@ -155,7 +155,7 @@ struct WarpReduceSmem
         Flag            flag,               ///< [in] Whether or not the current lane is a segment head/tail
         ReductionOp     reduction_op)       ///< [in] Reduction operator
     {
-    #if CUB_PTX_ARCH >= 200
+    #if CUB_PTX_VERSION >= 200
 
         // Ballot-based segmented reduce
 

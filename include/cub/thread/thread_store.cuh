@@ -46,7 +46,7 @@ CUB_NS_PREFIX
 namespace cub {
 
 /**
- * \addtogroup IoModule
+ * \addtogroup UtilIo
  * @{
  */
 
@@ -56,9 +56,9 @@ namespace cub {
 //-----------------------------------------------------------------------------
 
 /**
- * \brief Enumeration of PTX cache-modifiers for memory store operations.
+ * \brief Enumeration of cache modifiers for memory store operations.
  */
-enum PtxStoreModifier
+enum CacheStoreModifier
 {
     STORE_DEFAULT,              ///< Default (no modifier)
     STORE_WB,                   ///< Cache write-back all coherent levels
@@ -70,20 +70,16 @@ enum PtxStoreModifier
 
 
 /**
- * \name Simple I/O
+ * \name Thread I/O (cache modified)
  * @{
  */
 
 /**
- * \brief Thread utility for writing memory using cub::PtxStoreModifier cache modifiers.
+ * \brief Thread utility for writing memory using cub::CacheStoreModifier cache modifiers.  Can be used to store any data type.
  *
- * Cache modifiers will only be effected for built-in types (i.e., C++
- * primitives and CUDA vector-types).
- *
- * For example:
- * \par
+ * \par Example
  * \code
- * #include <cub/cub.cuh>
+ * #include <cub/cub.cuh>   // or equivalently <cub/thread/thread_store.cuh>
  *
  * // 32-bit store using cache-global modifier:
  * int *d_out;
@@ -100,19 +96,22 @@ enum PtxStoreModifier
  * double4 val;
  * cub::ThreadStore<cub::STORE_WT>(d_out + threadIdx.x, val);
  *
- * // 96-bit store using default cache modifier (ignoring STORE_CS)
+ * // 96-bit store using cache-streaming cache modifier
  * struct TestFoo { bool a; short b; };
  * TestFoo *d_struct;
  * TestFoo val;
  * cub::ThreadStore<cub::STORE_CS>(d_out + threadIdx.x, val);
  * \endcode
  *
+ * \tparam MODIFIER             <b>[inferred]</b> CacheStoreModifier enumeration
+ * \tparam InputIterator        <b>[inferred]</b> Output iterator type \iterator
+ * \tparam T                    <b>[inferred]</b> Data type of output value
  */
 template <
-    PtxStoreModifier MODIFIER,
-    typename OutputIteratorRA,
-    typename T>
-__device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val);
+    CacheStoreModifier  MODIFIER,
+    typename            OutputIterator,
+    typename            T>
+__device__ __forceinline__ void ThreadStore(OutputIterator itr, T val);
 
 
 //@}  end member group
@@ -121,14 +120,46 @@ __device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val);
 #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
 
+/// Helper structure for templated store iteration (inductive case)
+template <int COUNT, int MAX>
+struct IterateThreadStore
+{
+    template <CacheStoreModifier MODIFIER, typename T>
+    static __device__ __forceinline__ void Store(T *ptr, T *vals)
+    {
+        ThreadStore<MODIFIER>(ptr + COUNT, vals[COUNT]);
+        IterateThreadStore<COUNT + 1, MAX>::template Store<MODIFIER>(ptr, vals);
+    }
+
+    template <typename OutputIterator, typename T>
+    static __device__ __forceinline__ void Dereference(OutputIterator ptr, T *vals)
+    {
+        ptr[COUNT] = vals[COUNT];
+        IterateThreadStore<COUNT + 1, MAX>::Dereference(ptr, vals);
+    }
+
+};
+
+/// Helper structure for templated store iteration (termination case)
+template <int MAX>
+struct IterateThreadStore<MAX, MAX>
+{
+    template <CacheStoreModifier MODIFIER, typename T>
+    static __device__ __forceinline__ void Store(T *ptr, T *vals) {}
+
+    template <typename OutputIterator, typename T>
+    static __device__ __forceinline__ void Dereference(OutputIterator ptr, T *vals) {}
+};
+
+
 /**
- * Define a int4 (16B) ThreadStore specialization for the given PTX load modifier
+ * Define a uint4 (16B) ThreadStore specialization for the given Cache load modifier
  */
 #define CUB_STORE_16(cub_modifier, ptx_modifier)                                            \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, int4*, int4>(int4* ptr, int4 val)              \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, uint4*, uint4>(uint4* ptr, uint4 val)                         \
     {                                                                                       \
-        asm volatile ("st."#ptx_modifier".v4.s32 [%0], {%1, %2, %3, %4};" : :               \
+        asm volatile ("st."#ptx_modifier".v4.u32 [%0], {%1, %2, %3, %4};" : :               \
             _CUB_ASM_PTR_(ptr),                                                             \
             "r"(val.x),                                                                     \
             "r"(val.y),                                                                     \
@@ -136,9 +167,9 @@ __device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val);
             "r"(val.w));                                                                    \
     }                                                                                       \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, longlong2*, longlong2>(longlong2* ptr, longlong2 val)              \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, ulonglong2*, ulonglong2>(ulonglong2* ptr, ulonglong2 val)     \
     {                                                                                       \
-        asm volatile ("st."#ptx_modifier".v2.s64 [%0], {%1, %2};" : :                       \
+        asm volatile ("st."#ptx_modifier".v2.u64 [%0], {%1, %2};" : :                       \
             _CUB_ASM_PTR_(ptr),                                                             \
             "l"(val.x),                                                                     \
             "l"(val.y));                                                                    \
@@ -146,13 +177,13 @@ __device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val);
 
 
 /**
- * Define a int2 (8B) ThreadStore specialization for the given PTX load modifier
+ * Define a uint2 (8B) ThreadStore specialization for the given Cache load modifier
  */
 #define CUB_STORE_8(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, short4*, short4>(short4* ptr, short4 val)              \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, ushort4*, ushort4>(ushort4* ptr, ushort4 val)                 \
     {                                                                                       \
-        asm volatile ("st."#ptx_modifier".v4.s16 [%0], {%1, %2, %3, %4};" : :               \
+        asm volatile ("st."#ptx_modifier".v4.u16 [%0], {%1, %2, %3, %4};" : :               \
             _CUB_ASM_PTR_(ptr),                                                             \
             "h"(val.x),                                                                     \
             "h"(val.y),                                                                     \
@@ -160,66 +191,66 @@ __device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val);
             "h"(val.w));                                                                    \
     }                                                                                       \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, int2*, int2>(int2* ptr, int2 val)              \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, uint2*, uint2>(uint2* ptr, uint2 val)                         \
     {                                                                                       \
-        asm volatile ("st."#ptx_modifier".v2.s32 [%0], {%1, %2};" : :                       \
+        asm volatile ("st."#ptx_modifier".v2.u32 [%0], {%1, %2};" : :                       \
             _CUB_ASM_PTR_(ptr),                                                             \
             "r"(val.x),                                                                     \
             "r"(val.y));                                                                    \
     }                                                                                       \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, long long*, long long>(long long* ptr, long long val)                 \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, unsigned long long*, unsigned long long>(unsigned long long* ptr, unsigned long long val)     \
     {                                                                                       \
-        asm volatile ("st."#ptx_modifier".s64 [%0], %1;" : :                                \
+        asm volatile ("st."#ptx_modifier".u64 [%0], %1;" : :                                \
             _CUB_ASM_PTR_(ptr),                                                             \
             "l"(val));                                                                      \
     }
 
 /**
- * Define a int (4B) ThreadStore specialization for the given PTX load modifier
+ * Define a unsigned int (4B) ThreadStore specialization for the given Cache load modifier
  */
 #define CUB_STORE_4(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, int*, int>(int* ptr, int val)                 \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, unsigned int*, unsigned int>(unsigned int* ptr, unsigned int val)                             \
     {                                                                                       \
-        asm volatile ("st."#ptx_modifier".s32 [%0], %1;" : :                                \
+        asm volatile ("st."#ptx_modifier".u32 [%0], %1;" : :                                \
             _CUB_ASM_PTR_(ptr),                                                             \
             "r"(val));                                                                      \
     }
 
 
 /**
- * Define a short (2B) ThreadStore specialization for the given PTX load modifier
+ * Define a unsigned short (2B) ThreadStore specialization for the given Cache load modifier
  */
 #define CUB_STORE_2(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, short*, short>(short* ptr, short val)           \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, unsigned short*, unsigned short>(unsigned short* ptr, unsigned short val)                     \
     {                                                                                       \
-        asm volatile ("st."#ptx_modifier".s16 [%0], %1;" : :                                \
+        asm volatile ("st."#ptx_modifier".u16 [%0], %1;" : :                                \
             _CUB_ASM_PTR_(ptr),                                                             \
             "h"(val));                                                                      \
     }
 
 
 /**
- * Define a char (1B) ThreadStore specialization for the given PTX load modifier
+ * Define a unsigned char (1B) ThreadStore specialization for the given Cache load modifier
  */
 #define CUB_STORE_1(cub_modifier, ptx_modifier)                                             \
     template<>                                                                              \
-    __device__ __forceinline__ void ThreadStore<cub_modifier, char*, char>(char* ptr, char val)              \
+    __device__ __forceinline__ void ThreadStore<cub_modifier, unsigned char*, unsigned char>(unsigned char* ptr, unsigned char val)                         \
     {                                                                                       \
         asm volatile (                                                                      \
         "{"                                                                                 \
-        "   .reg .s8 datum;"                                                                \
-        "   cvt.s8.s16 datum, %1;"                                                          \
-        "   st."#ptx_modifier".s8 [%0], datum;"                                             \
+        "   .reg .u8 datum;"                                                                \
+        "   cvt.u8.u16 datum, %1;"                                                          \
+        "   st."#ptx_modifier".u8 [%0], datum;"                                             \
         "}" : :                                                                             \
             _CUB_ASM_PTR_(ptr),                                                             \
-            "h"(short(val)));                                                               \
+            "h"((unsigned short) val));                                                               \
     }
 
 /**
- * Define powers-of-two ThreadStore specializations for the given PTX load modifier
+ * Define powers-of-two ThreadStore specializations for the given Cache load modifier
  */
 #define CUB_STORE_ALL(cub_modifier, ptx_modifier)                                           \
     CUB_STORE_16(cub_modifier, ptx_modifier)                                                \
@@ -230,49 +261,27 @@ __device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val);
 
 
 /**
- * Define ThreadStore specializations for the various PTX load modifiers
+ * Define ThreadStore specializations for the various Cache load modifiers
  */
-#if CUB_PTX_ARCH >= 200
+#if CUB_PTX_VERSION >= 200
     CUB_STORE_ALL(STORE_WB, ca)
     CUB_STORE_ALL(STORE_CG, cg)
     CUB_STORE_ALL(STORE_CS, cs)
-    CUB_STORE_ALL(STORE_WT, cv)
+    CUB_STORE_ALL(STORE_WT, wt)
 #else
-    // STORE_WT on SM10-13 uses "volatile.global" to ensure writes to last level
+    CUB_STORE_ALL(STORE_WB, global)
+    CUB_STORE_ALL(STORE_CG, global)
+    CUB_STORE_ALL(STORE_CS, global)
     CUB_STORE_ALL(STORE_WT, volatile.global)
 #endif
 
 
-
-/// Helper structure for templated store iteration (inductive case)
-template <PtxStoreModifier MODIFIER, int COUNT, int MAX>
-struct IterateThreadStore
-{
-    template <typename T>
-    static __device__ __forceinline__ void Store(T *ptr, T *vals)
-    {
-        ThreadStore<MODIFIER>(ptr + COUNT, vals[COUNT]);
-        IterateThreadStore<MODIFIER, COUNT + 1, MAX>::Store(ptr, vals);
-    }
-};
-
-/// Helper structure for templated store iteration (termination case)
-template <PtxStoreModifier MODIFIER, int MAX>
-struct IterateThreadStore<MODIFIER, MAX, MAX>
-{
-    template <typename T>
-    static __device__ __forceinline__ void Store(T *ptr, T *vals) {}
-};
-
-
-
-
 /**
- * Store with STORE_DEFAULT on iterator types
+ * ThreadStore definition for STORE_DEFAULT modifier on iterator types
  */
-template <typename OutputIteratorRA, typename T>
+template <typename OutputIterator, typename T>
 __device__ __forceinline__ void ThreadStore(
-    OutputIteratorRA            itr,
+    OutputIterator              itr,
     T                           val,
     Int2Type<STORE_DEFAULT>     modifier,
     Int2Type<false>             is_pointer)
@@ -282,7 +291,7 @@ __device__ __forceinline__ void ThreadStore(
 
 
 /**
- * Store with STORE_DEFAULT on pointer types
+ * ThreadStore definition for STORE_DEFAULT modifier on pointer types
  */
 template <typename T>
 __device__ __forceinline__ void ThreadStore(
@@ -296,10 +305,10 @@ __device__ __forceinline__ void ThreadStore(
 
 
 /**
- * Store with STORE_VOLATILE on primitive pointer types
+ * ThreadStore definition for STORE_VOLATILE modifier on primitive pointer types
  */
 template <typename T>
-__device__ __forceinline__ void ThreadStoreVolatile(
+__device__ __forceinline__ void ThreadStoreVolatilePtr(
     T                           *ptr,
     T                           val,
     Int2Type<true>              is_primitive)
@@ -309,30 +318,39 @@ __device__ __forceinline__ void ThreadStoreVolatile(
 
 
 /**
- * Store with STORE_VOLATILE on non-primitive pointer types
+ * ThreadStore definition for STORE_VOLATILE modifier on non-primitive pointer types
  */
 template <typename T>
-__device__ __forceinline__ void ThreadStoreVolatile(
+__device__ __forceinline__ void ThreadStoreVolatilePtr(
     T                           *ptr,
     T                           val,
     Int2Type<false>             is_primitive)
 {
-    typedef typename WordAlignment<T>::VolatileWord VolatileWord;   // Word type for memcopying
-    enum { NUM_WORDS = sizeof(T) / sizeof(VolatileWord) };
+#if CUB_PTX_VERSION <= 130
 
-    // Store into array of uninitialized words
-    typename WordAlignment<T>::UninitializedVolatileWords words;
-    *reinterpret_cast<T*>(words.buf) = val;
+    *ptr = val;
+    __threadfence_block();
 
-    // Memcopy words to aliased destination
-    #pragma unroll
-    for (int i = 0; i < NUM_WORDS; ++i)
-        reinterpret_cast<volatile VolatileWord*>(ptr)[i] = words.buf[i];
+#else
+
+    typedef typename UnitWord<T>::VolatileWord VolatileWord;   // Word type for memcopying
+
+    const int VOLATILE_MULTIPLE = sizeof(T) / sizeof(VolatileWord);
+
+    VolatileWord words[VOLATILE_MULTIPLE];
+    *reinterpret_cast<T*>(words) = val;
+
+    IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
+        reinterpret_cast<volatile VolatileWord*>(ptr),
+        words);
+
+#endif  // CUB_PTX_VERSION <= 130
+
 }
 
 
 /**
- * Store with STORE_VOLATILE on pointer types
+ * ThreadStore definition for STORE_VOLATILE modifier on pointer types
  */
 template <typename T>
 __device__ __forceinline__ void ThreadStore(
@@ -341,30 +359,12 @@ __device__ __forceinline__ void ThreadStore(
     Int2Type<STORE_VOLATILE>    modifier,
     Int2Type<true>              is_pointer)
 {
-    ThreadStoreVolatile(ptr, val, Int2Type<Traits<T>::PRIMITIVE>());
+    ThreadStoreVolatilePtr(ptr, val, Int2Type<Traits<T>::PRIMITIVE>());
 }
 
 
-#if (CUB_PTX_ARCH <= 350)
-
 /**
- * Store with STORE_CG on pointer types (uses STORE_DEFAULT on current architectures)
- */
-template <typename T>
-__device__ __forceinline__ void ThreadStore(
-    T                           *ptr,
-    T                           val,
-    Int2Type<STORE_CG>          modifier,
-    Int2Type<true>              is_pointer)
-{
-    ThreadStore<STORE_DEFAULT>(ptr, val);
-}
-
-#endif  // (CUB_PTX_ARCH <= 350)
-
-
-/**
- * Store with arbitrary MODIFIER on pointer types
+ * ThreadStore definition for generic modifiers on pointer types
  */
 template <typename T, int MODIFIER>
 __device__ __forceinline__ void ThreadStore(
@@ -373,31 +373,31 @@ __device__ __forceinline__ void ThreadStore(
     Int2Type<MODIFIER>          modifier,
     Int2Type<true>              is_pointer)
 {
-    typedef typename WordAlignment<T>::DeviceWord DeviceWord;   // Word type for memcopying
-    enum { NUM_WORDS = sizeof(T) / sizeof(DeviceWord) };
+    typedef typename UnitWord<T>::DeviceWord DeviceWord;   // Word type for memcopying
 
-    // Store into array of uninitialized words
-    typename WordAlignment<T>::UninitializedDeviceWords words;
-    *reinterpret_cast<T*>(words.buf) = val;
+    const int DEVICE_MULTIPLE = sizeof(T) / sizeof(DeviceWord);
 
-    // Memcopy words to aliased destination
-    IterateThreadStore<PtxStoreModifier(MODIFIER), 0, NUM_WORDS>::Store(
+    DeviceWord words[DEVICE_MULTIPLE];
+
+    *reinterpret_cast<T*>(words) = val;
+
+    IterateThreadStore<0, DEVICE_MULTIPLE>::template Store<CacheStoreModifier(MODIFIER)>(
         reinterpret_cast<DeviceWord*>(ptr),
-        words.buf);
+        words);
 }
 
 
 /**
- * Generic ThreadStore definition
+ * ThreadStore definition for generic modifiers
  */
-template <PtxStoreModifier MODIFIER, typename OutputIteratorRA, typename T>
-__device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val)
+template <CacheStoreModifier MODIFIER, typename OutputIterator, typename T>
+__device__ __forceinline__ void ThreadStore(OutputIterator itr, T val)
 {
     ThreadStore(
         itr,
         val,
         Int2Type<MODIFIER>(),
-        Int2Type<IsPointer<OutputIteratorRA>::VALUE>());
+        Int2Type<IsPointer<OutputIterator>::VALUE>());
 }
 
 
@@ -405,7 +405,7 @@ __device__ __forceinline__ void ThreadStore(OutputIteratorRA itr, T val)
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
 
-/** @} */       // end group IoModule
+/** @} */       // end group UtilIo
 
 
 }               // CUB namespace

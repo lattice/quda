@@ -86,6 +86,14 @@ extern "C" {
 
     int preserve_gauge; /**< Used by link fattening */
 
+    QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
+    int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
+
+    int use_resident_gauge;  /**< Use the resident gauge field */
+    int use_resident_mom;    /**< Use the resident mom field */
+    int make_resident_gauge; /**< Make the gauge field resident */
+    int make_resident_mom;   /**< Make the mom field resident */
+
   } QudaGaugeParam;
 
 

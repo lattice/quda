@@ -39,11 +39,21 @@ namespace quda {
     Float phase = 1.0;
     if (phaseType == QUDA_MILC_STAGGERED_PHASE) {
       if (dim==0) {
-	phase = (1.0 - 2.0 * ((0 + t + z + y) % 2) );		
+	phase = (1.0 - 2.0 * (t % 2) );		
       } else if (dim == 1) {
-	phase = (1.0 - 2.0 * ((0 + t + z) % 2) );	
+	phase = (1.0 - 2.0 * ((t + x) % 2) );	
       } else if (dim == 2) {
-	phase = (1.0 - 2.0 * ((0 + t) % 2) );
+	phase = (1.0 - 2.0 * ((t + x + y) % 2) );
+      } else if (dim == 3) { // also apply boundary condition
+	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
+      }
+    } if (phaseType == QUDA_TIFR_STAGGERED_PHASE) {
+      if (dim==0) {
+	phase = (1.0 - 2.0 * ((3 + t + z + y) % 2) );		
+      } else if (dim == 1) {
+	phase = (1.0 - 2.0 * ((2 + t + z) % 2) );	
+      } else if (dim == 2) {
+	phase = (1.0 - 2.0 * ((1 + t) % 2) );
       } else if (dim == 3) { // also apply boundary condition
 	phase = (t == arg.X[3]-1) ? arg.tBoundary : 1.0;
       }
@@ -130,7 +140,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.volume; }
+    unsigned int minThreads() const { return arg.volume>>1; }
 
   public:
     GaugePhase(Arg &arg, QudaFieldLocation location) : arg(arg), location(location) { }
@@ -181,6 +191,11 @@ namespace quda {
     } else if (phaseType == QUDA_CPS_STAGGERED_PHASE) {
       GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
       GaugePhase<Float,length,QUDA_CPS_STAGGERED_PHASE,
+		 GaugePhaseArg<Float,Order> > phase(arg, location);
+      phase.apply(0);
+    } else if (phaseType == QUDA_TIFR_STAGGERED_PHASE) {
+      GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
+      GaugePhase<Float,length,QUDA_TIFR_STAGGERED_PHASE,
 		 GaugePhaseArg<Float,Order> > phase(arg, location);
       phase.apply(0);
     } else {
