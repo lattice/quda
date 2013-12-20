@@ -54,7 +54,7 @@ namespace quda {
       
       //methods for constructing Lanczos matrix:
       void LoadLanczosDiag(int idx, double alpha, double alpha0, double beta0);
-      void LoadLanczosOffDiag(int idx, double alpha0, double beta0);
+      void LoadLanczosOffDiag(int idx, double alpha, double beta);
       
       //methods for Rayleigh Ritz procedure: 
       int  RunRayleighRitz();
@@ -119,9 +119,9 @@ namespace quda {
   } 
 
   template<typename Float, typename CudaComplex>
-  void EigCGArgs<Float, CudaComplex>::LoadLanczosOffDiag(int idx, double alpha0, double beta0)
+  void EigCGArgs<Float, CudaComplex>::LoadLanczosOffDiag(int idx, double alpha, double beta)
   {
-    hTm[(idx+1)*ldTm+idx] = std::complex<Float>((Float)(sqrt(beta0)/alpha0), 0.0f);//'U' 
+    hTm[(idx+1)*ldTm+idx] = std::complex<Float>((Float)(-sqrt(beta)/alpha), 0.0f);//'U' 
     hTm[idx*ldTm+(idx+1)] = hTm[(idx+1)*ldTm+idx];//'L'
     return;
   }
@@ -341,6 +341,7 @@ namespace quda {
       double scale = 1.0;
 
       if(k > 0){
+        beta0 = beta;
         if(!relup_flag){
            beta = sigma / r2_old;
            axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
@@ -395,7 +396,7 @@ namespace quda {
          l = _2nev;
       } else{ //no-RR branch:
          if(k > 0){
-            eigcg_args->LoadLanczosOffDiag(l-1, alpha0, beta0);
+            eigcg_args->LoadLanczosOffDiag(l-1, alpha, beta);
          }
       }
       l += 1;
@@ -406,9 +407,8 @@ namespace quda {
       axCuda(scale, Vm->Eigenvec(l-1));
 
       //end of RR-procedure
-      alpha0 = alpha;
-      beta0  = beta;
 
+      alpha0 = alpha;
       pAp    = reDotProductCuda(p, Ap);
       alpha  = r2 / pAp; 
          
