@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <cuda.h>
 
+#include <quda_matrix.h>
+
 #include <complex_quda.h>
 
 namespace quda{

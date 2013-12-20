@@ -1006,7 +1006,7 @@ template<class RealA, class RealB,  int oddBit>
   __global__ void 
   HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* const linkOdd,
 				     const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
-				     int sig, typename RealTypeId<RealA>::Type coeff,
+				     typename RealTypeId<RealA>::Type coeff,
 				     RealA* const outputEven, RealA* const outputOdd,
 				     hisq_kernel_param_t kparam)
 {
@@ -1039,31 +1039,7 @@ template<class RealA, class RealB,  int oddBit>
   int X = 2*sid + x1odd;
   int new_sid = sid;
 #endif
-  new_x[0] = x[0];
-  new_x[1] = x[1];
-  new_x[2] = x[2];
-  new_x[3] = x[3];
-  int new_mem_idx = X;
-  
 
-  RealA ab_link[ArrayLength<RealA>::result];
-  RealA bc_link[ArrayLength<RealA>::result];
-  RealA de_link[ArrayLength<RealA>::result];
-  RealA ef_link[ArrayLength<RealA>::result];
-
-#if(RECON == 12)  
-  int ab_link_sign =1;
-  int bc_link_sign =1;
-  int de_link_sign =1;
-  int ef_link_sign =1;
-#endif
-  
-  RealA COLOR_MAT_U[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_V[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_W[ArrayLength<RealA>::result]; // used as a temporary
-  RealA COLOR_MAT_X[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
-  RealA COLOR_MAT_Z[ArrayLength<RealA>::result];
 
 
   const int & point_c = new_sid;
@@ -1081,61 +1057,42 @@ template<class RealA, class RealB,  int oddBit>
    *
    */
 
+
+  Matrix<RealA,3> Uab, Ubc, Ude, Uef;
+  Matrix<RealA,3> Ox, Oy, Oz;
+
   // compute the force for forward long links
-  if(GOES_FORWARDS(sig))
-    {
+  for(int sig=0; sig<4; ++sig){
 
-      FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, X, new_mem_idx);
-      point_d = (new_mem_idx >> 1);
-      COMPUTE_LINK_SIGN(&de_link_sign, sig, new_x);
- 
+      int dx[4] = {0,0,0,0};
+      dx[sig]++;
+      point_d = linkIndex(x,dx,E);
 
-      FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
-      point_e = (new_mem_idx >> 1);
-      COMPUTE_LINK_SIGN(&ef_link_sign, sig, new_x);
-	  
+      dx[sig]++;
+      point_e = linkIndex(x,dx,E);	  
       
-      new_x[0] = x[0];
-      new_x[1] = x[1];
-      new_x[2] = x[2];
-      new_x[3] = x[3];
+      dx[sig] = -1;
+      point_b = linkIndex(x,dx,E);	  
 
-      FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(sig, X, new_mem_idx);
-      point_b = (new_mem_idx >> 1);
-      COMPUTE_LINK_SIGN(&bc_link_sign, sig, new_x);
+      dx[sig]--;
+      point_a = linkIndex(x,dx,E);	  
+      dx[sig]=0;
 
 
-      FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(sig, new_mem_idx, new_mem_idx);
-      point_a = (new_mem_idx >> 1);
-      COMPUTE_LINK_SIGN(&ab_link_sign, sig, new_x);
-      
-      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_a, ab_link, oddBit); 
-      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_b, bc_link, 1-oddBit);
-      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_d, de_link, 1-oddBit);
-      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_e, ef_link, oddBit);
-      
-      RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign);
-      RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign);
-      RECONSTRUCT_SITE_LINK(de_link, de_link_sign);
-      RECONSTRUCT_SITE_LINK(ef_link, ef_link_sign);
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_a, Uab.data, oddBit); 
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_b, Ubc.data, 1-oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_d, Ude.data, 1-oddBit);
+      HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_e, Uef.data, oddBit);
 
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, COLOR_MAT_Z, oddBit, hf.color_matrix_stride);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
-      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, COLOR_MAT_X, oddBit, hf.color_matrix_stride);
-      
-      MAT_MUL_MAT(ef_link, COLOR_MAT_Z, COLOR_MAT_W); // link(d)*link(e)*Naik(c)
-      MAT_MUL_MAT(de_link, COLOR_MAT_W, COLOR_MAT_V);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, Oz.data, oddBit, hf.color_matrix_stride);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, Oy.data, 1-oddBit, hf.color_matrix_stride);
+      loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_a, Ox.data, oddBit, hf.color_matrix_stride);
 
-      MAT_MUL_MAT(de_link, COLOR_MAT_Y, COLOR_MAT_W);  // link(d)*Naik(b)*link(b)
-      MAT_MUL_MAT(COLOR_MAT_W, bc_link, COLOR_MAT_U);
-      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, -1, COLOR_MAT_V);
+      Matrix<RealA,3> temp = Ude*Uef*Oz - Ude*Oy*Ubc + Ox*Uab*Ubc;
 
-      MAT_MUL_MAT(COLOR_MAT_X, ab_link, COLOR_MAT_W); // Naik(a)*link(a)*link(b)
-      MAT_MUL_MAT(COLOR_MAT_W, bc_link, COLOR_MAT_U);
-      SCALAR_MULT_ADD_MATRIX(COLOR_MAT_V, COLOR_MAT_U, 1, COLOR_MAT_V);
+      addMatrixToField(temp.data, sig, new_sid,  coeff, outputEven, outputOdd, oddBit);
+    } // loop over sig
 
-      addMatrixToField(COLOR_MAT_V, sig, new_sid,  coeff, outputEven, outputOdd, oddBit);
-    }
 #endif
   return;
 }

@@ -143,9 +143,9 @@ namespace quda {
 
 
 
-
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
     class KSForceComplete : Tunable {
+
       KSForceArg<Oprod, Gauge, Mom> arg;
       const QudaFieldLocation location;
 
@@ -202,6 +202,7 @@ namespace quda {
       cudaDeviceSynchronize();
     }
 
+
   template<typename Float>
     void completeKSForce(GaugeField& mom, const GaugeField& oprod, const GaugeField& gauge, QudaFieldLocation location)
     {
@@ -219,10 +220,12 @@ namespace quda {
               location);
         }
       }
+      return;
     }
 
 
-  void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location){
+  void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location)
+  {
     if(mom.Precision() == QUDA_HALF_PRECISION){
       errorQuda("Half precision not supported");
     }
@@ -234,9 +237,230 @@ namespace quda {
     }else{
       errorQuda("Precision %d not supported", mom.Precision());
     }
-
-
+    return;
   }
 
+
+
+
+  template<typename Result, typename Oprod, typename Gauge>
+    struct KSLongLinkArg {
+      int threads; 
+      int X[4]; // grid dimensions
+#ifdef MULTI_GPU
+      int border[4];
+#endif
+      double coeff;
+      Result res;
+      Oprod oprod;
+      Gauge gauge;
+
+      KSLongLinkArg(Result& res, Oprod& oprod, Gauge &gauge, int dim[4]) 
+        : coeff(1.0), res(res), oprod(oprod), gauge(gauge){
+
+          threads = 1;
+#ifdef MULTI_GPU
+          for(int dir=0; dir<4; ++dir) threads *= (dim[dir]-2);
+          for(int dir=0; dir<4; ++dir) X[dir] = dim[dir]-2;
+          for(int dir=0; dir<4; ++dir) border[dir] = 2;
+#else
+          for(int dir=0; dir<4; ++dir) threads *= dim[dir];
+          for(int dir=0; dir<4; ++dir) X[dir] = dim[dir];
+          for(int dir=0; dir<4; ++dir) border[dir] = 0;
+#endif
+        }
+
+    };
+
+
+
+  template<typename Float, typename Result, typename Oprod, typename Gauge>
+    __host__ __device__ void computeKSLongLinkForceCore(KSLongLinkArg<Result,Oprod,Gauge>& arg, int idx){
+
+      /*
+         int parity = 0;
+         if(idx >= arg.threads/2){
+         parity = 1;
+         idx -= arg.threads/2;
+         }
+
+         int X[4];
+         for(int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
+
+         int x[4];
+         getCoords(x, idx, X, parity);
+#ifndef BUILD_TIFR_INTERFACE
+#ifdef MULTI_GPU
+for(int dir=0; dir<4; ++dir){
+x[dir] += arg.border[dir];
+X[dir] += 2*arg.border[dir];
+}
+#endif
+#endif
+
+typedef typename ComplexTypeId<Float>::Type Cmplx;
+
+Matrix<Cmplx,3> O;
+Matrix<Cmplx,3> G;
+Matrix<Cmplx,3> M;
+
+
+int dx[4] = {0,0,0,0};
+for(int dir=0; dir<4; ++dir){
+arg.gauge.load((Float*)(G.data), linkIndex(x,dx,X), dir, parity); 
+arg.oprod.load((Float*)(O.data), linkIndex(x,dx,X), dir, parity); 
+if(parity==0){
+M = G*O; 
+}else{
+M = -G*O;
+}
+
+Float sub = getTrace(M).y/(static_cast<Float>(3));
+Float temp[10];
+
+
+temp[0] = (M.data[1].x - M.data[3].x)*0.5;
+temp[1] = (M.data[1].y + M.data[3].y)*0.5;
+
+temp[2] = (M.data[2].x - M.data[6].x)*0.5;
+temp[3] = (M.data[2].y + M.data[6].y)*0.5;
+
+temp[4] = (M.data[5].x - M.data[7].x)*0.5;
+temp[5] = (M.data[5].y + M.data[7].y)*0.5;
+
+temp[6] = (M.data[0].y-sub);
+temp[7] = (M.data[4].y-sub);
+temp[8] = (M.data[8].y-sub);
+temp[9] = 0.0;
+
+arg.mom.save(temp, idx, dir, parity);
+}
+       */
+    }
+
+  template<typename Float, typename Result, typename Oprod, typename Gauge>
+__global__ void computeKSLongLinkForceKernel(KSLongLinkArg<Result,Oprod,Gauge> arg)
+{
+  int idx = threadIdx.x + blockIdx.x*blockDim.x;
+
+  if(idx >= arg.threads) return;
+  computeKSLongLinkForceCore<Float,Result,Oprod,Gauge>(arg,idx);
+}
+
+
+
+
+  template<typename Float, typename Result, typename Oprod, typename Gauge>
+void computeKSLongLinkForceCPU(KSLongLinkArg<Result,Oprod,Gauge>& arg)
+{
+  for(int idx=0; idx<arg.threads; idx++){
+    computeKSLongLinkForceCore<Float,Result,Oprod,Gauge>(arg,idx);
+  }
+}
+
+
+
+// should be tunable
+template<typename Float, typename Result, typename Oprod, typename Gauge>
+class KSLongLinkForce : Tunable {
+
+
+  KSLongLinkArg<Result,Oprod,Gauge> arg;
+  const QudaFieldLocation location;
+
+  private:
+  unsigned int sharedBytesPerThread() const { return 0; }
+  unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+  bool tuneSharedBytes() const { return false; } // Don't tune the shared memory.
+  bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+  unsigned int minThreads() const { return arg.threads; }
+
+  public:
+  KSLongLinkForce(KSLongLinkArg<Result,Oprod,Gauge> &arg, QudaFieldLocation location)
+    : arg(arg), location(location) {}
+
+  virtual ~KSLongLinkForce() {}
+
+  void apply(const cudaStream_t &stream) {
+    if(location == QUDA_CUDA_FIELD_LOCATION){
+      // Fix this
+      dim3 blockDim(128, 1, 1);
+      dim3 gridDim((arg.threads + blockDim.x - 1) / blockDim.x, 1, 1);
+      computeKSLongLinkForceKernel<Float><<<gridDim,blockDim>>>(arg);
+    }else{
+      computeKSLongLinkForceCPU<Float>(arg);
+    }
+  }
+
+  TuneKey tuneKey() const {
+    std::stringstream vol, aux;
+    vol << arg.threads;
+    aux << "stride=" << arg.res.stride;
+    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+  }
+
+  std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
+    std::stringstream ps;
+    ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
+    ps << "shared=" << param.shared_bytes;
+    return ps.str();
+  }
+
+
+  void preTune(){}
+  void postTune(){}
+  long long flops() const { return 0; } // Fix this
+  long long bytes() const { return 0; } // Fix this
+}; 
+
+
+
+
+  template<typename Float, typename Result, typename Oprod, typename Gauge>
+void computeKSLongLinkForce(Result res, Oprod oprod, Gauge gauge, int dim[4], QudaFieldLocation location)
+{
+  KSLongLinkArg<Result,Oprod,Gauge> arg(res, oprod, gauge, dim);
+  KSLongLinkForce<Float,Result,Oprod,Gauge> computeLongLink(arg,location);
+  computeLongLink.apply(0);
+  cudaDeviceSynchronize();
+}
+
+  template<typename Float>
+void computeKSLongLinkForce(GaugeField& result, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location)
+{
+  if(location != QUDA_CUDA_FIELD_LOCATION){
+    errorQuda("Only QUDA_CUDA_FIELD_LOCATION currently supported");
+  }else{
+    if((oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) || (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) || 
+        (result.Reconstruct() != QUDA_RECONSTRUCT_10)){
+
+      errorQuda("Reconstruct type not supported");
+    }else{
+      computeKSLongLinkForce<Float>(FloatNOrder<Float, 18, 2, 18>(result), 
+          FloatNOrder<Float, 18, 2, 18>(oprod),
+          FloatNOrder<Float, 18, 2, 18>(gauge),
+          const_cast<int*>(result.X()),
+          location);
+    }
+  }
+  return;
+}
+
+
+void computeKSLongLinkForce(GaugeField &result, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location)
+{
+  if(result.Precision() == QUDA_HALF_PRECISION){
+    errorQuda("Half precision not supported");
+  }
+
+  if(result.Precision() == QUDA_SINGLE_PRECISION){
+    computeKSLongLinkForce<float>(result, oprod, gauge, location);
+  }else if(result.Precision() == QUDA_DOUBLE_PRECISION){
+    computeKSLongLinkForce<double>(result, oprod, gauge, location);
+  }
+  errorQuda("Precision %d not supported", result.Precision());
+  return;
+}
 
 } // namespace quda
