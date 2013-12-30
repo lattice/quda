@@ -67,9 +67,24 @@ namespace quda {
     }
 
 
+    __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity)
+    {
+      x[3] = cb_index/(X[2]*X[1]*X[0]/2);
+      x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
+      x[1] = (cb_index/(X[0]/2)) % X[1];
+      x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+
+      return;
+    }
+
+
+    __device__ __host__ inline int posDir(int dir){
+      return (dir >= 4) ? 7-dir : dir;
+    }
+
 
     //struct for holding the fattening path coefficients
-      template<class Real>
+    template<class Real>
       struct PathCoefficients
       {
         Real one; 
@@ -526,9 +541,9 @@ do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOd
 #define PRECISION 0
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -543,9 +558,9 @@ do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOd
 #define PRECISION 0
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
@@ -573,9 +588,9 @@ do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOd
 #define PRECISION 1
 #define RECON 18
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
@@ -590,9 +605,9 @@ do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOd
 #define PRECISION 1
 #define RECON 12
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, hf.site_ga_stride)        
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, stride)        
 #else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, hf.site_ga_stride)  
+#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride)  
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
