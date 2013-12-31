@@ -106,9 +106,11 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 {
 
 #ifdef KERNEL_ENABLED		
+
   int oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
+/*
   int x[4];
   int z1 = sid/D1h;
   int x1h = sid - z1*D1h;
@@ -118,6 +120,12 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   x[2] = z2 - x[3]*D3;
   int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
+*/
+  int Y[4] = {X1,X2,X3,X4};
+  int dx[4] = {0,0,0,0};
+  int x[4];
+
+  getCoords(x, sid, Y, oddBit);
 
   int new_x[4];
   int new_mem_idx;
@@ -146,6 +154,11 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   int point_b, point_c, point_d;
   int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
   int mymu;
+
+  
+
+
+
 #ifdef MULTI_GPU
   int E[4]= {E1,E2,E3,E4};
   x[0] = x[0] + kparam.base_idx[0];
@@ -238,37 +251,24 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   // load the link variable connecting a and b 
   // Store in ab_link 
-/*
-  if(sig_positive){
-    HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, oddBit, hf.site_ga_stride);
-  }else{
-    HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, 1-oddBit, hf.site_ga_stride);
-  }
-  RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign)
-*/
   
- HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, sig_positive^(1-oddBit), hf.site_ga_stride);
+   HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, sig_positive^(1-oddBit), hf.site_ga_stride);
   
 
 
     // load the link variable connecting b and c 
     // Store in bc_link
-/*
-    if(mu_positive){
-      HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, oddBit, hf.site_ga_stride);
-    }else{ 
-      HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, 1-oddBit, hf.site_ga_stride);
-    }
-  RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign)
-*/
 
    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, mu_positive^(1-oddBit), hf.site_ga_stride);
 
     if(QprevOdd == NULL){
+
+      loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), (sig_positive ? point_d : point_c), COLOR_MAT_Y, sig_positive^oddBit, hf.color_matrix_stride);
+      
       if(sig_positive){
-        loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), point_d, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
+   //     loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), point_d, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
       }else{
-        loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
+   //     loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
         adjointMatrix(COLOR_MAT_Y);
       }
     }else{ // QprevOdd != NULL
@@ -283,15 +283,15 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   MATRIX_PRODUCT(ab_link, COLOR_MAT_W, sig_positive,COLOR_MAT_Y);
   storeMatrixToField(COLOR_MAT_Y, new_sid, P3Even, P3Odd, oddBit);
 
+  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, mu_positive^oddBit, hf.site_ga_stride);
 
   if(mu_positive){
-    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit, hf.site_ga_stride);
-    RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)    
+ //   HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit, hf.site_ga_stride);
+ //   RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)    
   }else{
-    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit, hf.site_ga_stride);
-    RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
-      adjointMatrix(ad_link);
-
+ //   HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit, hf.site_ga_stride);
+ //   RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
+    adjointMatrix(ad_link);
   }
 
 
