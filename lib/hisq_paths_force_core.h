@@ -238,21 +238,31 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   // load the link variable connecting a and b 
   // Store in ab_link 
+/*
   if(sig_positive){
     HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, oddBit, hf.site_ga_stride);
   }else{
     HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, 1-oddBit, hf.site_ga_stride);
   }
   RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign)
+*/
+  
+ HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, sig_positive^(1-oddBit), hf.site_ga_stride);
+  
+
 
     // load the link variable connecting b and c 
     // Store in bc_link
+/*
     if(mu_positive){
       HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, oddBit, hf.site_ga_stride);
     }else{ 
       HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, 1-oddBit, hf.site_ga_stride);
     }
   RECONSTRUCT_SITE_LINK(bc_link, bc_link_sign)
+*/
+
+   HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, mu_positive^(1-oddBit), hf.site_ga_stride);
 
     if(QprevOdd == NULL){
       if(sig_positive){
@@ -329,9 +339,10 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 {
 
 #ifdef KERNEL_ENABLED   
-  int oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
+  int oddBit = _oddBit;
+/*
   int x[4];
   int z1 = sid/D1h;
   int x1h = sid - z1*D1h;
@@ -341,7 +352,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   x[2] = z2 - x[3]*D3;
   int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
-
+*/
   int new_x[4];
   int new_mem_idx;
 #if(RECON == 12)
@@ -369,6 +380,12 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   int point_b, point_c, point_d;
   int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
   int mymu;
+
+  int Y[4] = {X1,X2,X3,X4};
+  int x[4];
+  int dx[4] = {0,0,0,0};
+  getCoords(x, sid, Y, oddBit);
+
 #ifdef MULTI_GPU
   int E[4]= {E1,E2,E3,E4};
   x[0] = x[0] + kparam.base_idx[0];
@@ -380,8 +397,10 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   new_x[2] = x[2];
   new_x[3] = x[3];
   new_mem_idx = new_x[3]*E3E2E1 + new_x[2]*E2E1 + new_x[1]*E1 + new_x[0];
-  int new_sid=(new_mem_idx >> 1);
-  oddBit = _oddBit ^ oddness_change;
+//  int new_sid=(new_mem_idx >> 1);
+//
+  int new_sid = linkIndex(x,dx,E);
+//  oddBit = _oddBit ^ oddness_change;
 #else
   int X = 2*sid + x1odd;
   new_x[0] = x[0];
@@ -391,6 +410,18 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   new_mem_idx = X;
   int new_sid = sid;
 #endif
+
+/*
+  int dx[4] = {0,0,0,0};
+
+  if(mu_positive){
+    dx[mu] = -1;
+  }else{
+    dx[OPP_DIR(mu)] = +1;
+  }
+ */
+
+
   if(mu_positive){
     mymu = mu;
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, new_mem_idx, new_mem_idx);
@@ -399,6 +430,11 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(OPP_DIR(mu), new_mem_idx, new_mem_idx); 
   }
   point_d = (new_mem_idx >> 1);
+
+//  point_d = linkIndex(x,dx,E);
+
+
+
   if (mu_positive){
     ad_link_nbr_idx = point_d;
     COMPUTE_LINK_SIGN(&ad_link_sign, mymu, new_x);
