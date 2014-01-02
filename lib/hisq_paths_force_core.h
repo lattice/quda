@@ -143,6 +143,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result];
   RealA COLOR_MAT_X[ArrayLength<RealA>::result];
 
+  Matrix<RealA,3> Uab, Ubc, Uad;
+  Matrix<RealA,3> Ow, Ox, Oy;
+
+
   /*        A________B
    *   mu   |        |
    *  	   D|        |C
@@ -252,73 +256,82 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   // load the link variable connecting a and b 
   // Store in ab_link 
   
-   HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, ab_link, sig_positive^(1-oddBit), hf.site_ga_stride);
+   HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
   
 
 
     // load the link variable connecting b and c 
     // Store in bc_link
 
-   HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, bc_link, mu_positive^(1-oddBit), hf.site_ga_stride);
+   HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, Ubc.data, mu_positive^(1-oddBit), hf.site_ga_stride);
 
     if(QprevOdd == NULL){
 
-      loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), (sig_positive ? point_d : point_c), COLOR_MAT_Y, sig_positive^oddBit, hf.color_matrix_stride);
-      
-      if(sig_positive){
-   //     loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), point_d, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
-      }else{
-   //     loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
-        adjointMatrix(COLOR_MAT_Y);
-      }
+      loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), (sig_positive ? point_d : point_c), Oy.data, sig_positive^oddBit, hf.color_matrix_stride);
+     // if(!sig_positive) adjointMatrix(COLOR_MAT_Y);
+      if(!sig_positive) Oy = conj(Oy);
+
     }else{ // QprevOdd != NULL
-      loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
+      loadMatrixFromField(oprodEven, oprodOdd, point_c, Oy.data, oddBit, hf.color_matrix_stride);
     }
 
 
-  MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, !mu_positive, COLOR_MAT_W);
-  if(PmuOdd){
-    storeMatrixToField(COLOR_MAT_W, point_b, PmuEven, PmuOdd, 1-oddBit);
-  }
-  MATRIX_PRODUCT(ab_link, COLOR_MAT_W, sig_positive,COLOR_MAT_Y);
-  storeMatrixToField(COLOR_MAT_Y, new_sid, P3Even, P3Odd, oddBit);
-
-  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, mu_positive^oddBit, hf.site_ga_stride);
-
-  if(mu_positive){
- //   HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit, hf.site_ga_stride);
- //   RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)    
+//  MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, !mu_positive, COLOR_MAT_W);
+  if(!mu_positive){
+    Ow = Ubc*Oy;
   }else{
- //   HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit, hf.site_ga_stride);
- //   RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign)
-    adjointMatrix(ad_link);
+    Ow = conj(Ubc)*Oy;
   }
+
+  if(PmuOdd){
+    //storeMatrixToField(COLOR_MAT_W, point_b, PmuEven, PmuOdd, 1-oddBit);
+    storeMatrixToField(Ow.data, point_b, PmuEven, PmuOdd, 1-oddBit);
+  }
+//  MATRIX_PRODUCT(ab_link, COLOR_MAT_W, sig_positive,COLOR_MAT_Y);
+  if(sig_positive){
+    Oy = Uab*Ow;
+  }else{
+    Oy = conj(Uab)*Ow;
+  }
+
+  storeMatrixToField(Oy.data, new_sid, P3Even, P3Odd, oddBit);
+
+  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
+  //if(!mu_positive)  adjointMatrix(ad_link);
+  if(!mu_positive)  Uad = conj(Uad);
 
 
   if(QprevOdd == NULL){
     if(sig_positive){
-      MAT_MUL_MAT(COLOR_MAT_W, ad_link, COLOR_MAT_Y);
+  //    MAT_MUL_MAT(COLOR_MAT_W, ad_link, COLOR_MAT_Y);
+      Oy = Ow*Uad;
     }
 
     if(QmuEven){
-      ASSIGN_MAT(ad_link, COLOR_MAT_X); 
-      storeMatrixToField(COLOR_MAT_X, new_sid, QmuEven, QmuOdd, oddBit);
+//      ASSIGN_MAT(ad_link, COLOR_MAT_X); 
+      Ox = Uad;
+      storeMatrixToField(Ox.data, new_sid, QmuEven, QmuOdd, oddBit);
     }
   }else{ 
     if(QmuEven || sig_positive){
-      loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
-      MAT_MUL_MAT(COLOR_MAT_Y, ad_link, COLOR_MAT_X);
+      //loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_Y, 1-oddBit, hf.color_matrix_stride);
+      loadMatrixFromField(QprevEven, QprevOdd, point_d, Oy.data, 1-oddBit, hf.color_matrix_stride);
+   //   MAT_MUL_MAT(COLOR_MAT_Y, ad_link, COLOR_MAT_X);
+      Ox = Oy*Uad;
     }
     if(QmuEven){
-      storeMatrixToField(COLOR_MAT_X, new_sid, QmuEven, QmuOdd, oddBit);
+      //storeMatrixToField(COLOR_MAT_X, new_sid, QmuEven, QmuOdd, oddBit);
+      storeMatrixToField(Ox.data, new_sid, QmuEven, QmuOdd, oddBit);
     }
     if(sig_positive){
-      MAT_MUL_MAT(COLOR_MAT_W, COLOR_MAT_X, COLOR_MAT_Y);
+  //    MAT_MUL_MAT(COLOR_MAT_W, COLOR_MAT_X, COLOR_MAT_Y);
+      Oy = Ow*Ox;
     }	
   }
 
   if(sig_positive){
-    addMatrixToNewOprod(COLOR_MAT_Y, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit);
+    //addMatrixToNewOprod(COLOR_MAT_Y, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit);
   }
 
 #endif  
