@@ -744,6 +744,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
+/*
   int x[4];
   int z1 = sid/D1h;
   int x1h = sid - z1*D1h;
@@ -753,6 +754,15 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   x[2] = z2 - x[3]*D3;
   int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
+*/
+
+  int Y[4] = {X1,X2,X3,X4};
+  int x[4];
+  int dx[4] = {0,0,0,0};
+  getCoords(x, sid, Y, oddBit);
+
+
+
 
 #if(RECON == 12)
   int ad_link_sign;
@@ -791,8 +801,18 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_X[ArrayLength<RealA>::result]; 
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
+
+
+  Matrix<RealA,3> Uad;
+  Matrix<RealA,3> Ow, Ox, Oy;
+
+
+
+
+
   // The compiler probably knows to reorder so that loads are done early on
-  loadMatrixFromField(P3Even, P3Odd, new_sid, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
+  //loadMatrixFromField(P3Even, P3Odd, new_sid, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
+  loadMatrixFromField(P3Even, P3Odd, new_sid, Oy.data, oddBit, hf.color_matrix_stride);
 
   /*      compute the side link contribution to the momentum
    *
@@ -821,33 +841,51 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
 
   if (mu_positive){
     ad_link_nbr_idx = point_d;
-    COMPUTE_LINK_SIGN(&ad_link_sign, mymu, new_x);
+//    COMPUTE_LINK_SIGN(&ad_link_sign, mymu, new_x);
   }else{
     ad_link_nbr_idx = new_sid;
-    COMPUTE_LINK_SIGN(&ad_link_sign, mymu, x);	
+//    COMPUTE_LINK_SIGN(&ad_link_sign, mymu, x);	
   }
 
+  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
 
+/*
   if(mu_positive){
     HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, 1-oddBit, hf.site_ga_stride);
   }else{
     HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, ad_link, oddBit, hf.site_ga_stride);
   }
   RECONSTRUCT_SITE_LINK(ad_link, ad_link_sign);
+*/
 
-  MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, mu_positive, COLOR_MAT_W);
-  addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
+
+  if(mu_positive){
+    Ow = Uad*Oy;
+  }else{
+    Ow = conj(Uad)*Oy;
+  }
+
+
+
+//  MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, mu_positive, COLOR_MAT_W);
+//  addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
+  addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
   mycoeff = CoeffSign<sig_positive,_oddBit ^ oddness_change>::result*coeff;
 
-  loadMatrixFromField(QprodEven, QprodOdd, point_d, COLOR_MAT_X, 1-oddBit, hf.color_matrix_stride);
+//  loadMatrixFromField(QprodEven, QprodOdd, point_d, COLOR_MAT_X, 1-oddBit, hf.color_matrix_stride);
+  loadMatrixFromField(QprodEven, QprodOdd, point_d, Ox.data, 1-oddBit, hf.color_matrix_stride);
+
   if(mu_positive){
-    MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
+  //  MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
+    Ow = Oy*Ox;
     if(!oddBit){ mycoeff = -mycoeff; }
-    addMatrixToNewOprod(COLOR_MAT_W, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    addMatrixToNewOprod(Ow.data, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+  //  addMatrixToNewOprod(COLOR_MAT_W, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
   }else{
-    ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);
+    Ow = conj(Ox)*conj(Oy);
+   // ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);
     if(oddBit){ mycoeff = -mycoeff; }
-    addMatrixToNewOprod(COLOR_MAT_W, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd, oddBit);
   } 
 #endif
   return;
@@ -870,6 +908,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
+/*
   int x[4];
   int z1 = sid/D1h;
   int x1h = sid - z1*D1h;
@@ -879,6 +918,14 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   x[2] = z2 - x[3]*D3;
   int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
+*/
+
+  int Y[4] = {X1,X2,X3,X4};
+  int x[4];
+  int dx[4] = {0,0,0,0};
+  getCoords(x, sid, Y, oddBit);
+
+
 
   int new_mem_idx;
   int new_x[4];
@@ -920,7 +967,12 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
 
   RealA COLOR_MAT_W[ArrayLength<RealA>::result];
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
-  loadMatrixFromField(P3Even, P3Odd, new_sid, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
+
+  Matrix<RealA,3> Ow, Oy;
+
+
+  //loadMatrixFromField(P3Even, P3Odd, new_sid, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);
+  loadMatrixFromField(P3Even, P3Odd, new_sid, Oy.data, oddBit, hf.color_matrix_stride);
 
   typename RealTypeId<RealA>::Type mycoeff;
   int point_d;
@@ -938,11 +990,12 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
 
   if(mu_positive){
     if(!oddBit){ mycoeff = -mycoeff;} // need to change this to get away from oddBit
-    addMatrixToNewOprod(COLOR_MAT_Y, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    addMatrixToNewOprod(Oy.data, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
   }else{
     if(oddBit){ mycoeff = -mycoeff; }
-    ADJ_MAT(COLOR_MAT_Y, COLOR_MAT_W);
-    addMatrixToNewOprod(COLOR_MAT_W, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
+//    ADJ_MAT(COLOR_MAT_Y, COLOR_MAT_W);
+    Ow = conj(Oy);
+    addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
   }
 #endif // KERNEL_ENABLED
   return;
