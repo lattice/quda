@@ -570,6 +570,7 @@ do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOd
 #undef HISQ_LOAD_LINK
 #undef COMPUTE_LINK_SIGN
 #undef RECONSTRUCT_SITE_LINK       
+
 #undef NEWOPROD_EVEN_TEX 
 #undef NEWOPROD_ODD_TEX 
 #undef LOAD_TEX_ENTRY
@@ -617,6 +618,8 @@ do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOd
 #undef HISQ_LOAD_LINK
 #undef COMPUTE_LINK_SIGN
 #undef RECONSTRUCT_SITE_LINK
+
+
 #undef NEWOPROD_EVEN_TEX 
 #undef NEWOPROD_ODD_TEX 
 #undef LOAD_TEX_ENTRY
