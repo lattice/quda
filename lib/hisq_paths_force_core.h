@@ -21,23 +21,25 @@
 #define KERNEL_ENABLED
 #endif
 #endif
-
+/*
 #undef D1
 #undef D1h
 #undef D2
 #undef D3
 #undef D4
+*/
 #undef xcomm
 #undef ycomm
 #undef zcomm
 #undef tcomm
 
-
+/*
 #define D1 kparam.D1
 #define D1h kparam.D1h
 #define D2 kparam.D2
 #define D3 kparam.D3
 #define D4 kparam.D4
+*/
 #define xcomm kparam.ghostDim[0]
 #define ycomm kparam.ghostDim[1]
 #define zcomm kparam.ghostDim[2]
@@ -283,7 +285,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   }
 
   if(sig_positive){
-    addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
   }
 
 #endif  
@@ -468,7 +470,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
     Ox = Oy*Uad;
     Oy = Ow*Ox;
 
-    addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
   }
 
 #endif  
@@ -627,11 +629,11 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   if(mu_positive){
     Ow = Oy*Ox;
     if(!oddBit){ mycoeff = -mycoeff; }
-    addMatrixToNewOprod(Ow.data, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    addMatrixToNewOprod(Ow.data, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit, hf.color_matrix_stride);
   }else{
     Ow = conj(Ox)*conj(Oy);
     if(oddBit){ mycoeff = -mycoeff; }
-    addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
   } 
 #endif
   return;
@@ -724,11 +726,11 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
 
   if(mu_positive){
     if(!oddBit){ mycoeff = -mycoeff;} // need to change this to get away from oddBit
-    addMatrixToNewOprod(Oy.data, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    addMatrixToNewOprod(Oy.data, mu, point_d, mycoeff, newOprodEven, newOprodOdd, 1-oddBit, hf.color_matrix_stride);
   }else{
     if(oddBit){ mycoeff = -mycoeff; }
     Ow = conj(Oy);
-    addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd,  oddBit);
+    addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd,  oddBit, hf.color_matrix_stride);
   }
 #endif // KERNEL_ENABLED
   return;
@@ -879,7 +881,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     if (sig_positive)
     {
       Ow = Oz*Ox*Uad;
-      addMatrixToNewOprod(Ow.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+      addMatrixToNewOprod(Ow.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
     }
 
     
@@ -893,7 +895,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
 
     Ow = Oy*Ox;
-    addMatrixToNewOprod(Ow.data, mu, point_d, -Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    addMatrixToNewOprod(Ow.data, mu, point_d, -Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit, hf.color_matrix_stride);
     Ow = Uad*Oy;
     addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
 
@@ -924,7 +926,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
     if (sig_positive){	
       Oy = Oz*Ow;
-      addMatrixToNewOprod(Oy.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+      addMatrixToNewOprod(Oy.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
     }
     HISQ_LOAD_LINK(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride); 
 
@@ -937,7 +939,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
     Ow = conj(Ox)*conj(Oy);
 
-    addMatrixToNewOprod(Ow.data, mu, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+    addMatrixToNewOprod(Ow.data, mu, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
 
     Ow = conj(Uad)*Oy;
 
@@ -1085,11 +1087,13 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
 
 #undef EXT
 #undef KERNEL_ENABLED
+/*
 #undef D1
 #undef D2
 #undef D3
 #undef D4
 #undef D1h
+*/
 #undef xcomm
 #undef ycomm
 #undef zcomm
