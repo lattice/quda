@@ -225,13 +225,13 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   // load the link variable connecting a and b 
   // Store in ab_link 
-  HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
-
+  //loadLink<18>(linkEven, linkOdd, mysig, ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
+  loadLink<18>(linkEven, linkOdd, mysig, ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
 
 
   // load the link variable connecting b and c 
   // Store in bc_link
-  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, Ubc.data, mu_positive^(1-oddBit), hf.site_ga_stride);
+  loadLink<18>(linkEven, linkOdd, mymu, bc_link_nbr_idx, Ubc.data, mu_positive^(1-oddBit), hf.site_ga_stride);
 
   if(QprevOdd == NULL){
     loadMatrixFromField(oprodEven, oprodOdd, posDir(sig), (sig_positive ? point_d : point_c), Oy.data, sig_positive^oddBit, hf.color_matrix_stride);
@@ -258,7 +258,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   storeMatrixToField(Oy.data, new_sid, P3Even, P3Odd, oddBit);
 
-  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
+  loadLink<18>(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
   if(!mu_positive)  Uad = conj(Uad);
 
 
@@ -438,11 +438,11 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   //
   // load the link variable connecting a and b 
   // Store in ab_link 
-  HISQ_LOAD_LINK(linkEven, linkOdd, mysig, ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
+  loadLink<18>(linkEven, linkOdd, mysig, ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
 
   // load the link variable connecting b and c 
   // Store in bc_link
-  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, bc_link_nbr_idx, Ubc.data, mu_positive^(1-oddBit), hf.site_ga_stride);
+  loadLink<18>(linkEven, linkOdd, mymu, bc_link_nbr_idx, Ubc.data, mu_positive^(1-oddBit), hf.site_ga_stride);
 
 
   loadMatrixFromField(oprodEven, oprodOdd, point_c, Oy.data, oddBit, hf.color_matrix_stride);
@@ -462,7 +462,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 
   storeMatrixToField(Oy.data, new_sid, P3Even, P3Odd, oddBit);
   if(sig_positive){
-    HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
+    loadLink<18>(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
     if(!mu_positive) Uad = conj(Uad);
 
     loadMatrixFromField(QprevEven, QprevOdd, point_d, Oy.data, 1-oddBit, hf.color_matrix_stride);
@@ -610,7 +610,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     ad_link_nbr_idx = new_sid;
   }
 
-  HISQ_LOAD_LINK(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
+  loadLink<18>(linkEven, linkOdd, mymu, ad_link_nbr_idx, Uad.data, mu_positive^oddBit, hf.site_ga_stride);
 
 
   if(mu_positive){
@@ -871,10 +871,10 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     point_c = (new_mem_idx >> 1);
 
     loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, hf.color_matrix_stride);	   // COLOR_MAT_X
-    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_d, Uad.data, 1-oddBit, hf.site_ga_stride); 
+    loadLink<18>(linkEven, linkOdd, mu, point_d, Uad.data, 1-oddBit, hf.site_ga_stride); 
 
     loadMatrixFromField(oprodEven,oprodOdd,  point_c, Oy.data, oddBit, hf.color_matrix_stride);		// COLOR_MAT_Y
-    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_c, Ubc.data, oddBit, hf.site_ga_stride);   
+    loadLink<18>(linkEven, linkOdd, mu, point_c, Ubc.data, oddBit, hf.site_ga_stride);   
 
     Oz = conj(Ubc)*Oy;
 
@@ -885,7 +885,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     }
 
     
-    HISQ_LOAD_LINK(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
+    loadLink<18>(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
 
     if(sig_positive){
       Oy = Uab*Oz;
@@ -913,10 +913,10 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
     loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, hf.color_matrix_stride);         // COLOR_MAT_X used!
 
-    HISQ_LOAD_LINK(linkEven, linkOdd, mu, new_sid, Uad.data, oddBit, hf.site_ga_stride);  
+    loadLink<18>(linkEven, linkOdd, mu, new_sid, Uad.data, oddBit, hf.site_ga_stride);  
 
     loadMatrixFromField(oprodEven, oprodOdd, point_c, Oy.data, oddBit, hf.color_matrix_stride);	     // COLOR_MAT_Y used
-    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_b, Ubc.data, 1-oddBit, hf.site_ga_stride);    
+    loadLink<18>(linkEven, linkOdd, mu, point_b, Ubc.data, 1-oddBit, hf.site_ga_stride);    
 
 
     if(sig_positive){
@@ -928,7 +928,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
       Oy = Oz*Ow;
       addMatrixToNewOprod(Oy.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
     }
-    HISQ_LOAD_LINK(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride); 
+    loadLink<18>(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride); 
 
  
     if(sig_positive){ 
@@ -1018,10 +1018,10 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
     dx[sig]=0;
 
 
-    HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_a, Uab.data, oddBit, hf.site_ga_stride); 
-    HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_b, Ubc.data, 1-oddBit, hf.site_ga_stride);
-    HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_d, Ude.data, 1-oddBit, hf.site_ga_stride);
-    HISQ_LOAD_LINK(linkEven, linkOdd, sig, point_e, Uef.data, oddBit, hf.site_ga_stride);
+    loadLink<18>(linkEven, linkOdd, sig, point_a, Uab.data, oddBit, hf.site_ga_stride); 
+    loadLink<18>(linkEven, linkOdd, sig, point_b, Ubc.data, 1-oddBit, hf.site_ga_stride);
+    loadLink<18>(linkEven, linkOdd, sig, point_d, Ude.data, 1-oddBit, hf.site_ga_stride);
+    loadLink<18>(linkEven, linkOdd, sig, point_e, Uef.data, oddBit, hf.site_ga_stride);
 
     loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_c, Oz.data, oddBit, hf.color_matrix_stride);
     loadMatrixFromField(naikOprodEven, naikOprodOdd, sig, point_b, Oy.data, 1-oddBit, hf.color_matrix_stride);
@@ -1074,7 +1074,7 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
   Matrix<RealA,3> Uw, Ow, Ox;
 
 
-  HISQ_LOAD_LINK(linkEven, linkOdd, sig, new_sid, Uw.data, oddBit, hf.site_ga_stride);  
+  loadLink<18>(linkEven, linkOdd, sig, new_sid, Uw.data, oddBit, hf.site_ga_stride);  
 
   loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, Ox.data, oddBit, hf.color_matrix_stride);
   typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;

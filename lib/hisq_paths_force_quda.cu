@@ -566,28 +566,39 @@ namespace quda {
       }
 
     template<int N>
-      __device__ void loadLinkTex(const double2* const linkEven, const double2* const linkOdd, int dir, int idx, double2* const var, int oddness, int stride){
-        //  HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride);        
+      __device__ void loadLink(const double2* const linkEven, const double2* const linkOdd, int dir, int idx, double2* const var, int oddness, int stride){
+#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
+        HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride);        
+#else
         loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride);
+#endif
       }
 
-    /*
-       template<>
-       void loadLinkTex<12>(double2* linkEven, double2* linkOdd, int dir, int idx, int var, int oddness, int stride){
-       HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, stride)        
-
-    //  HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride);        
-    }
-
-    template<int N>
-    __device__ void loadLinkTex(float4* linkEven, float4* linkOdd, int dir, int idx, int var, int oddness, int stride){
-    HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, stride)        
-    }
-     */
+    template<>
+      void loadLink<12>(const double2* const linkEven, const double2* const linkOdd, int dir, int idx, double2* const var, int oddness, int stride){
+#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
+        HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, stride);        
+#else
+          loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, stride);
+#endif
+      }
 
     template<int N>
-      __device__ void loadLinkTex(const float2* const linkEven, const float2* const linkOdd, int dir, int idx, float2* const var , int oddness, int stride){
+      __device__ void loadLink(const float4* const linkEven, const float4* const linkOdd, int dir, int idx, float2* const var, int oddness, int stride){
+#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
+        HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, stride);  
+#else
+        loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride);      
+#endif  
+      }
+
+    template<int N>
+      __device__ void loadLink(const float2* const linkEven, const float2* const linkOdd, int dir, int idx, float2* const var , int oddness, int stride){
+#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
         HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, stride);        
+#else
+        loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride);        
+#endif
       }
 
 
@@ -597,6 +608,7 @@ namespace quda {
 #define HISQ_KERNEL_NAME(a,b) DD_CONCAT(a,b)
     //precision: 0 is for double, 1 is for single
 
+/*
 #define NEWOPROD_EVEN_TEX newOprod0TexDouble
 #define NEWOPROD_ODD_TEX newOprod1TexDouble
 #if (HISQ_NEW_OPROD_LOAD_TEX == 1)
@@ -604,10 +616,11 @@ namespace quda {
 #else
 #define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
 #endif
-
+*/
     //double precision, recon=18
 #define PRECISION 0
 #define RECON 18
+/*
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride)        
 #else
@@ -615,16 +628,18 @@ namespace quda {
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
+*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-#undef HISQ_LOAD_LINK
-#undef COMPUTE_LINK_SIGN
-#undef RECONSTRUCT_SITE_LINK
+//#undef HISQ_LOAD_LINK
+//#undef COMPUTE_LINK_SIGN
+//#undef RECONSTRUCT_SITE_LINK
 
     //double precision, recon=12
 #define PRECISION 0
 #define RECON 12
+/*
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, stride)        
 #else
@@ -632,30 +647,33 @@ namespace quda {
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
+*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-#undef HISQ_LOAD_LINK
-#undef COMPUTE_LINK_SIGN
-#undef RECONSTRUCT_SITE_LINK       
+//#undef HISQ_LOAD_LINK
+//#undef COMPUTE_LINK_SIGN
+//#undef RECONSTRUCT_SITE_LINK       
 
-#undef NEWOPROD_EVEN_TEX 
-#undef NEWOPROD_ODD_TEX 
-#undef LOAD_TEX_ENTRY
+//#undef NEWOPROD_EVEN_TEX 
+//#undef NEWOPROD_ODD_TEX 
+//#undef LOAD_TEX_ENTRY
 
 
-#define NEWOPROD_EVEN_TEX newOprod0TexSingle
-#define NEWOPROD_ODD_TEX newOprod1TexSingle
+//#define NEWOPROD_EVEN_TEX newOprod0TexSingle
+//#define NEWOPROD_ODD_TEX newOprod1TexSingle
 
+/*
 #if (HISQ_NEW_OPROD_LOAD_TEX==1)
 #define LOAD_TEX_ENTRY(tex, field, idx)  tex1Dfetch(tex,idx)
 #else
 #define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
 #endif
-
+*/
     //single precision, recon=18  
 #define PRECISION 1
 #define RECON 18
+/*
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, stride)        
 #else
@@ -663,16 +681,18 @@ namespace quda {
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) 
 #define RECONSTRUCT_SITE_LINK(var, sign)
+*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-#undef HISQ_LOAD_LINK
-#undef COMPUTE_LINK_SIGN
-#undef RECONSTRUCT_SITE_LINK
+//#undef HISQ_LOAD_LINK
+//#undef COMPUTE_LINK_SIGN
+//#undef RECONSTRUCT_SITE_LINK
 
     //single precision, recon=12
 #define PRECISION 1
 #define RECON 12
+/*
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
 #define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, stride)        
 #else
@@ -680,17 +700,18 @@ namespace quda {
 #endif
 #define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
 #define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
+*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-#undef HISQ_LOAD_LINK
-#undef COMPUTE_LINK_SIGN
-#undef RECONSTRUCT_SITE_LINK
+//#undef HISQ_LOAD_LINK
+//#undef COMPUTE_LINK_SIGN
+//#undef RECONSTRUCT_SITE_LINK
 
 
-#undef NEWOPROD_EVEN_TEX 
-#undef NEWOPROD_ODD_TEX 
-#undef LOAD_TEX_ENTRY
+//#undef NEWOPROD_EVEN_TEX 
+//#undef NEWOPROD_ODD_TEX 
+//#undef LOAD_TEX_ENTRY
 
 
 
