@@ -996,6 +996,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
+/*
   SHORT x[4];
   int z1 = sid/D1h;
   SHORT x1h = sid - z1*D1h;
@@ -1005,6 +1006,12 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   x[2] = z2 - x[3]*D3;
   SHORT x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
   x[0] = 2*x1h + x1odd;
+*/
+
+  int Y[4] = {X1,X2,X3,X4};
+  int x[4];
+  int dx[4] = {0,0,0,0};
+  getCoords(x, sid, Y, oddBit);
 
 #if(RECON == 12)
   int ad_link_sign;
@@ -1022,6 +1029,10 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   RealA COLOR_MAT_Y[ArrayLength<RealA>::result]; 
   RealA COLOR_MAT_Z[ArrayLength<RealA>::result]; 
   RealA COLOR_MAT_W[ArrayLength<RealA>::result]; 
+
+
+  Matrix<RealA,3> Uab, Ubc, Uad;
+  Matrix<RealA,3> Ow, Ox, Oy, Oz;
 
 
   /*            sig
@@ -1069,6 +1080,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   }
   point_b = (new_mem_idx >> 1);
   ab_link_nbr_idx = (sig_positive) ? new_sid : point_b;
+/*
   if(sig_positive){
     COMPUTE_LINK_SIGN(&ab_link_sign, sig, x);
   }else{
@@ -1077,6 +1089,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   if(!mu_positive){
     COMPUTE_LINK_SIGN(&bc_link_sign, OPP_DIR(mu),  new_x);
   }
+*/
 #ifdef MULTI_GPU
   new_x[0] = x[0];
   new_x[1] = x[1];
@@ -1097,7 +1110,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, new_mem_idx, new_mem_idx);
     point_d = (new_mem_idx >> 1);
 
-    COMPUTE_LINK_SIGN(&ad_link_sign, mu, new_x);   
+//    COMPUTE_LINK_SIGN(&ad_link_sign, mu, new_x);   
 
     if(sig_positive){
       FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
@@ -1105,7 +1118,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
       FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
     }
     point_c = (new_mem_idx >> 1);
-
+/*
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit, hf.color_matrix_stride);	   // COLOR_MAT_X
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_d, ad_link, 1-oddBit, hf.site_ga_stride); 
 
@@ -1113,9 +1126,26 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_c, bc_link, oddBit, hf.site_ga_stride);   
     COMPUTE_LINK_SIGN(&bc_link_sign, mu, new_x);  
 
-      MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, 0, COLOR_MAT_Z); // COMPUTE_LINK_X
+    MATRIX_PRODUCT(bc_link, COLOR_MAT_Y, 0, COLOR_MAT_Z); // COMPUTE_LINK_X
+*/
 
+    loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, hf.color_matrix_stride);	   // COLOR_MAT_X
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_d, Uad.data, 1-oddBit, hf.site_ga_stride); 
 
+    loadMatrixFromField(oprodEven,oprodOdd,  point_c, Oy.data, oddBit, hf.color_matrix_stride);		// COLOR_MAT_Y
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_c, Ubc.data, oddBit, hf.site_ga_stride);   
+
+    Oz = conj(Ubc)*Oy;
+
+    if (sig_positive)
+    {
+      Ow = Oz*Ox*Uad;
+      addMatrixToNewOprod(Ow.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+    }
+
+    
+    HISQ_LOAD_LINK(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride);
+/*
     if (sig_positive)
     {
       MAT_MUL_MAT(COLOR_MAT_X, ad_link, COLOR_MAT_Y);
@@ -1126,7 +1156,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
     
     HISQ_LOAD_LINK(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, ab_link, sig_positive^(1-oddBit), hf.site_ga_stride);
-
+*/
 /*
     if (sig_positive){
       HISQ_LOAD_LINK(linkEven, linkOdd, sig, ab_link_nbr_idx, ab_link, oddBit, hf.site_ga_stride);
@@ -1136,19 +1166,33 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign)
 */
 
-    MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y); // COLOR_MAT_Y is assigned here
+//    MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y); // COLOR_MAT_Y is assigned here
 
+    if(sig_positive){
+      Oy = Uab*Oz;
+    }else{
+      Oy = conj(Uab)*Oz;
+    }
+
+
+    Ow = Oy*Ox;
+    addMatrixToNewOprod(Ow.data, mu, point_d, -Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
+    Ow = Uad*Oy;
+    addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
+
+/*
     MAT_MUL_MAT(COLOR_MAT_Y, COLOR_MAT_X, COLOR_MAT_W);
     //addMatrixToField(COLOR_MAT_W, mu, point_d, -Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
     addMatrixToNewOprod(COLOR_MAT_W, mu, point_d, -Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit);
 
     MAT_MUL_MAT(ad_link, COLOR_MAT_Y, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
+*/
   } else{ //negative mu
     mu = OPP_DIR(mu);
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mu, new_mem_idx, new_mem_idx);	
     point_d = (new_mem_idx >> 1);
-    COMPUTE_LINK_SIGN(&ad_link_sign, mu, x);
+//    COMPUTE_LINK_SIGN(&ad_link_sign, mu, x);
 
     if(sig_positive){
       FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
@@ -1156,18 +1200,38 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
       FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
     }
     point_c = (new_mem_idx >> 1);
-
+/*
     loadMatrixFromField(QprevEven, QprevOdd, point_d, COLOR_MAT_X, 1-oddBit, hf.color_matrix_stride);         // COLOR_MAT_X used!
 
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, new_sid, ad_link, oddBit, hf.site_ga_stride);  
 
     loadMatrixFromField(oprodEven, oprodOdd, point_c, COLOR_MAT_Y, oddBit, hf.color_matrix_stride);	     // COLOR_MAT_Y used
     HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_b, bc_link, 1-oddBit, hf.site_ga_stride);    
+*/
+
+    loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, hf.color_matrix_stride);         // COLOR_MAT_X used!
+
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, new_sid, Uad.data, oddBit, hf.site_ga_stride);  
+
+    loadMatrixFromField(oprodEven, oprodOdd, point_c, Oy.data, oddBit, hf.color_matrix_stride);	     // COLOR_MAT_Y used
+    HISQ_LOAD_LINK(linkEven, linkOdd, mu, point_b, Ubc.data, 1-oddBit, hf.site_ga_stride);    
+
 
     if(sig_positive){
-      MAT_MUL_ADJ_MAT(COLOR_MAT_X, ad_link, COLOR_MAT_W);
+   //   MAT_MUL_ADJ_MAT(COLOR_MAT_X, ad_link, COLOR_MAT_W);
+      Ow = Ox*conj(Uad);
     }
-    MAT_MUL_MAT(bc_link, COLOR_MAT_Y, COLOR_MAT_Z);
+    Oz = Ubc*Oy;
+
+//    MAT_MUL_MAT(bc_link, COLOR_MAT_Y, COLOR_MAT_Z);
+    if (sig_positive){	
+      Oy = Oz*Ow;
+      addMatrixToNewOprod(Oy.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+    }
+    HISQ_LOAD_LINK(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), hf.site_ga_stride); 
+
+
+/*
     if (sig_positive){	
       MAT_MUL_MAT(COLOR_MAT_Z, COLOR_MAT_W, COLOR_MAT_Y);
       //addMatrixToField(COLOR_MAT_Y, sig, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
@@ -1175,6 +1239,10 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     }
 
     HISQ_LOAD_LINK(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, ab_link, sig_positive^(1-oddBit), hf.site_ga_stride); 
+*/
+
+
+
 /*
     if (sig_positive){
       HISQ_LOAD_LINK(linkEven, linkOdd, sig, ab_link_nbr_idx, ab_link, oddBit, hf.site_ga_stride); 
@@ -1183,13 +1251,35 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     }
     RECONSTRUCT_SITE_LINK(ab_link, ab_link_sign)
 */
-      MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y);
-    ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);	
+//    MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y);
+//    ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);	
+ 
+    if(sig_positive){ 
+      Oy = Uab*Oz;
+    }else{
+      Oy = conj(Uab)*Oz;
+    }
+
+    Ow = conj(Ox)*conj(Oy);
+
+//    MATRIX_PRODUCT(ab_link, COLOR_MAT_Z, sig_positive, COLOR_MAT_Y);
+//    ADJ_MAT_MUL_ADJ_MAT(COLOR_MAT_X, COLOR_MAT_Y, COLOR_MAT_W);	
     //addMatrixToField(COLOR_MAT_W, mu, sid, Sign<oddBit>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+
+    addMatrixToNewOprod(Ow.data, mu, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
+
+    Ow = conj(Uad)*Oy;
+
+//    MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, 0, COLOR_MAT_W);
+    addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
+
+
+/*
     addMatrixToNewOprod(COLOR_MAT_W, mu, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit);
 
     MATRIX_PRODUCT(ad_link, COLOR_MAT_Y, 0, COLOR_MAT_W);
     addMatrixToField(COLOR_MAT_W, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
+*/
   } 
 #endif
   return;
