@@ -2,24 +2,24 @@
 //macro KERNEL_ENABLED is used to control compile time, debug purpose only
 #if (PRECISION == 0 && RECON == 18)
 #define EXT _dp_18_
-#ifdef  COMPILE_HISQ_DP_18
-#define KERNEL_ENABLED
-#endif
+//#ifdef  COMPILE_HISQ_DP_18
+//#define KERNEL_ENABLED
+//#endif
 #elif (PRECISION == 0 && RECON == 12)
 #define EXT _dp_12_
-#ifdef  COMPILE_HISQ_DP_12
-#define KERNEL_ENABLED
-#endif
+//#ifdef  COMPILE_HISQ_DP_12
+//#define KERNEL_ENABLED
+//#endif
 #elif (PRECISION == 1 && RECON == 18)
 #define EXT _sp_18_
-#ifdef  COMPILE_HISQ_SP_18
-#define KERNEL_ENABLED
-#endif
+//#ifdef  COMPILE_HISQ_SP_18
+//#define KERNEL_ENABLED
+//#endif
 #else 
 #define EXT _sp_12_
-#ifdef  COMPILE_HISQ_SP_12
-#define KERNEL_ENABLED
-#endif
+//#ifdef  COMPILE_HISQ_SP_12
+//#define KERNEL_ENABLED
+//#endif
 #endif
 /*
 #undef D1
@@ -47,7 +47,7 @@
 
 
 #define print_matrix(mul)                                               \
-  printf(" (%f %f) (%f %f) (%f %f)\n", mul##00_re, mul##00_im, mul##01_re, mul##01_im, mul##02_re, mul##02_im); \
+printf(" (%f %f) (%f %f) (%f %f)\n", mul##00_re, mul##00_im, mul##01_re, mul##01_im, mul##02_re, mul##02_im); \
 printf(" (%f %f) (%f %f) (%f %f)\n", mul##10_re, mul##10_im, mul##11_re, mul##11_im, mul##12_re, mul##12_im); \
 printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21_im, mul##22_re, mul##22_im);
 
@@ -107,7 +107,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
                      hisq_kernel_param_t kparam) 
 {
 
-#ifdef KERNEL_ENABLED		
+//#ifdef KERNEL_ENABLED		
 
   int oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -116,7 +116,16 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   int dx[4] = {0,0,0,0};
   int x[4];
 
-  getCoords(x, sid, Y, oddBit);
+
+  if(sid == 0){
+    printf("X = (%d %d %d %d)\n", X1, X2, X3, X4);
+  }
+
+
+
+
+  getCoords(x, sid, kparam.D, oddBit);
+  //getCoords(x, sid, kparam.D, oddBit);
 
   int new_x[4];
   int new_mem_idx;
@@ -141,6 +150,13 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
 #ifdef MULTI_GPU
   int E[4]= {E1,E2,E3,E4};
+
+  if(sid == 0){
+    printf("E = %d %d %d %d\n", E1, E2, E3, E4);
+
+  }
+
+
   x[0] = x[0] + kparam.base_idx[0];
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
@@ -288,7 +304,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
     addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
   }
 
-#endif  
+//#endif  
   return;
 }
 
@@ -305,7 +321,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
     hisq_kernel_param_t kparam) 
 {
 
-#ifdef KERNEL_ENABLED   
+//#ifdef KERNEL_ENABLED   
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
   int oddBit = _oddBit;
@@ -334,7 +350,8 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
-  getCoords(x, sid, Y, oddBit);
+  getCoords(x, sid, kparam.D, oddBit);
+ // getCoords(x, sid, Y, oddBit);
 
 #ifdef MULTI_GPU
   int E[4]= {E1,E2,E3,E4};
@@ -350,7 +367,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   //  int new_sid=(new_mem_idx >> 1);
   //
   int new_sid = linkIndex(x,dx,E);
-  //  oddBit = _oddBit ^ oddness_change;
+  oddBit = _oddBit ^ oddness_change;
 #else
   int X = 2*sid + x1odd;
   new_x[0] = x[0];
@@ -473,7 +490,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
     addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
   }
 
-#endif  
+//#endif  
   return;
 }
 
@@ -526,7 +543,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
-#ifdef KERNEL_ENABLED		
+//#ifdef KERNEL_ENABLED		
   int oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
@@ -535,7 +552,8 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
-  getCoords(x, sid, Y, oddBit);
+  //getCoords(x, sid, Y, oddBit);
+  getCoords(x, sid, kparam.D, oddBit);
 
 
 
@@ -635,7 +653,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     if(oddBit){ mycoeff = -mycoeff; }
     addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd, oddBit, hf.color_matrix_stride);
   } 
-#endif
+//#endif
   return;
 }
 
@@ -651,7 +669,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
-#ifdef KERNEL_ENABLED		
+//#ifdef KERNEL_ENABLED		
   int oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
@@ -660,7 +678,8 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
-  getCoords(x, sid, Y, oddBit);
+  //getCoords(x, sid, Y, oddBit);
+  getCoords(x, sid, kparam.D, oddBit);
 
 
 
@@ -732,7 +751,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
     Ow = conj(Oy);
     addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd,  oddBit, hf.color_matrix_stride);
   }
-#endif // KERNEL_ENABLED
+//#endif // KERNEL_ENABLED
   return;
 }
 
@@ -765,22 +784,21 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
  *
  ************************************************************************************************/
 
-#define SHORT int 
 
-template<class RealA, class RealB, SHORT sig_positive, SHORT mu_positive, SHORT _oddBit, int oddness_change>
+template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
   __global__ void
 HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd, 
     const RealA* const QprevEven, const RealA* const QprevOdd,
     const RealB* const linkEven, const RealB* const linkOdd,
-    SHORT sig, SHORT mu, 
+    int sig, int mu, 
     typename RealTypeId<RealA>::Type coeff, 
     typename RealTypeId<RealA>::Type accumu_coeff,
     RealA* const shortPEven, RealA* const shortPOdd,
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
-#ifdef KERNEL_ENABLED		
-  SHORT oddBit = _oddBit;
+//#ifdef KERNEL_ENABLED		
+  int oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
@@ -788,10 +806,11 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
-  getCoords(x, sid, Y, oddBit);
+ // getCoords(x, sid, Y, oddBit);
+  getCoords(x, sid, kparam.D, oddBit);
 
 
-  SHORT new_x[4];
+  int new_x[4];
 
   Matrix<RealA,3> Uab, Ubc, Uad;
   Matrix<RealA,3> Ow, Ox, Oy, Oz;
@@ -946,7 +965,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
 
   } 
-#endif
+//#endif
   return;
 }
 
@@ -962,7 +981,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
     RealA* const outputEven, RealA* const outputOdd,
     hisq_kernel_param_t kparam)
 {
-#ifdef KERNEL_ENABLED		       
+//#ifdef KERNEL_ENABLED		       
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if (sid >= kparam.threads) return;
 
@@ -971,7 +990,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
   int x[4];
   int dx[4] = {0,0,0,0};
 
-  getCoords(x, sid, Y, oddBit);
+  getCoords(x, sid, kparam.X, oddBit);
 #ifdef MULTI_GPU
   int E[4]= {E1,E2,E3,E4};
   for(int i=0; i<4; ++i) x[i] += 2;
@@ -1032,7 +1051,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
     addMatrixToField(temp.data, sig, new_sid,  coeff, outputEven, outputOdd, oddBit);
   } // loop over sig
 
-#endif
+//#endif
   return;
 }
 
@@ -1043,18 +1062,18 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
     const RealA* const oprodEven, const RealA* const oprodOdd,
     int sig,
     RealA* const forceEven, RealA* const forceOdd,
-    const int threads)
+    hisq_kernel_param_t kparam)
 {
-#ifdef KERNEL_ENABLED		
+//#ifdef KERNEL_ENABLED		
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
-  if (sid >= threads) return;
+  if (sid >= kparam.threads) return;
 
 
   int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
 
-  getCoords(x, sid, Y, oddBit);
+  getCoords(x, sid, kparam.X, oddBit);
 
 
   int new_sid=sid;
@@ -1081,12 +1100,12 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
   Ow = Uw*Ox;
 
   storeMatrixToMomentumField(Ow.data, sig, sid, coeff, forceEven, forceOdd, oddBit); 
-#endif
+//#endif
   return;
 }
 
 #undef EXT
-#undef KERNEL_ENABLED
+//#undef KERNEL_ENABLED
 /*
 #undef D1
 #undef D2

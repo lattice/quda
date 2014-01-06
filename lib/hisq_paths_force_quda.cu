@@ -1,11 +1,18 @@
+#include <quda_internal.h>
+#include <lattice_field.h>
 #include <read_gauge.h>
 #include <gauge_field.h>
 #include <hisq_force_quda.h>
 #include <hw_quda.h>
 #include <hisq_force_macros.h>
-#include<utility>
+#include <utility>
 #include <quda_matrix.h>
+#include <force_common.h>
+#include <tune_quda.h>
+#include <color_spinor_field.h>
 
+#include <face_quda.h>
+//#include <dslash_constants.h>
 //DEBUG : control compile 
 #define COMPILE_HISQ_DP_18 
 #define COMPILE_HISQ_DP_12 
@@ -21,15 +28,31 @@ namespace quda {
 
     typedef struct hisq_kernel_param_s{
       unsigned long threads;
-      int D1, D2,D3, D4, D1h;
+      int X[4];
+      int D[4];
+      int D1h;
       int base_idx[4];
       int ghostDim[4];
     }hisq_kernel_param_t;
+
+
+    //Double precision for site link
+    texture<int4, 1> thinLink0TexDouble;
+    texture<int4, 1> thinLink1TexDouble;
+
+    //Single precision for site link
+    texture<float2, 1, cudaReadModeElementType> thinLink0TexSingle;
+    texture<float2, 1, cudaReadModeElementType> thinLink1TexSingle;
+
+    texture<float4, 1, cudaReadModeElementType> thinLink0TexSingle_recon;
+    texture<float4, 1, cudaReadModeElementType> thinLink1TexSingle_recon;
+
 
     texture<int4, 1> newOprod0TexDouble;
     texture<int4, 1> newOprod1TexDouble;
     texture<float2, 1, cudaReadModeElementType>  newOprod0TexSingle;
     texture<float2, 1, cudaReadModeElementType> newOprod1TexSingle;
+
 
 
     void hisqForceInitCuda(QudaGaugeParam* param)
@@ -537,12 +560,18 @@ namespace quda {
       __global__ void 
       do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOdd,
           int sig, typename RealTypeId<RealA>::Type coeff,
-          RealA* const outputEven, RealA* const outputOdd, const int threads)
+          RealA* const outputEven, RealA* const outputOdd, hisq_kernel_param_t kparam)
       {
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
-        if (sid >= threads) return;
+        if (sid >= kparam.threads) return;
 #ifdef MULTI_GPU
+
+        
+
         int x[4];
+
+        getCoords(x, sid, kparam.X, oddBit);
+/*
         int z1 = sid/X1h;
         int x1h = sid - z1*X1h;
         int z2 = z1/X2;
@@ -552,7 +581,7 @@ namespace quda {
         int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
         x[0] = 2*x1h + x1odd;
         //int X = 2*sid + x1odd;
-
+*/
         int new_sid = ( (x[3]+2)*E3E2E1+(x[2]+2)*E2E1+(x[1]+2)*E1+(x[0]+2))>>1 ;
 #else
         int new_sid = sid;
@@ -565,10 +594,11 @@ namespace quda {
         return;
       }
 
+
     template<int N>
       __device__ void loadLink(const double2* const linkEven, const double2* const linkOdd, int dir, int idx, double2* const var, int oddness, int stride){
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-        HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride);        
+        HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?thinLink1TexDouble:thinLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride);        
 #else
         loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride);
 #endif
@@ -577,16 +607,16 @@ namespace quda {
     template<>
       void loadLink<12>(const double2* const linkEven, const double2* const linkOdd, int dir, int idx, double2* const var, int oddness, int stride){
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-        HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, stride);        
+        HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?thinLink1TexDouble:thinLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, stride);        
 #else
-          loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, stride);
+        loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, stride);
 #endif
       }
 
     template<int N>
       __device__ void loadLink(const float4* const linkEven, const float4* const linkOdd, int dir, int idx, float2* const var, int oddness, int stride){
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-        HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, stride);  
+        HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?thinLink1TexSingle_recon:thinLink0TexSingle_recon, dir, idx, var, stride);  
 #else
         loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride);      
 #endif  
@@ -595,7 +625,7 @@ namespace quda {
     template<int N>
       __device__ void loadLink(const float2* const linkEven, const float2* const linkOdd, int dir, int idx, float2* const var , int oddness, int stride){
 #if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-        HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, stride);        
+        HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?thinLink1TexSingle:thinLink0TexSingle, dir, idx, var, stride);        
 #else
         loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride);        
 #endif
@@ -608,110 +638,34 @@ namespace quda {
 #define HISQ_KERNEL_NAME(a,b) DD_CONCAT(a,b)
     //precision: 0 is for double, 1 is for single
 
-/*
-#define NEWOPROD_EVEN_TEX newOprod0TexDouble
-#define NEWOPROD_ODD_TEX newOprod1TexDouble
-#if (HISQ_NEW_OPROD_LOAD_TEX == 1)
-#define LOAD_TEX_ENTRY(tex, field, idx)  READ_DOUBLE2_TEXTURE(tex, field, idx)
-#else
-#define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
-#endif
-*/
     //double precision, recon=18
 #define PRECISION 0
 #define RECON 18
-/*
-#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_18_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven, dir, idx, var, stride)        
-#else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride)  
-#endif
-#define COMPUTE_LINK_SIGN(sign, dir, x) 
-#define RECONSTRUCT_SITE_LINK(var, sign)
-*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-//#undef HISQ_LOAD_LINK
-//#undef COMPUTE_LINK_SIGN
-//#undef RECONSTRUCT_SITE_LINK
 
     //double precision, recon=12
 #define PRECISION 0
 #define RECON 12
-/*
-#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_12_DOUBLE_TEX((oddness)?siteLink1TexDouble:siteLink0TexDouble,  (oddness)?linkOdd:linkEven,dir, idx, var, stride)        
-#else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField<6>(linkEven, linkOdd, dir, idx, var, oddness, stride)  
-#endif
-#define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
-#define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
-*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-//#undef HISQ_LOAD_LINK
-//#undef COMPUTE_LINK_SIGN
-//#undef RECONSTRUCT_SITE_LINK       
 
-//#undef NEWOPROD_EVEN_TEX 
-//#undef NEWOPROD_ODD_TEX 
-//#undef LOAD_TEX_ENTRY
-
-
-//#define NEWOPROD_EVEN_TEX newOprod0TexSingle
-//#define NEWOPROD_ODD_TEX newOprod1TexSingle
-
-/*
-#if (HISQ_NEW_OPROD_LOAD_TEX==1)
-#define LOAD_TEX_ENTRY(tex, field, idx)  tex1Dfetch(tex,idx)
-#else
-#define LOAD_TEX_ENTRY(tex, field, idx) field[idx]
-#endif
-*/
     //single precision, recon=18  
 #define PRECISION 1
 #define RECON 18
-/*
-#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_18_SINGLE_TEX((oddness)?siteLink1TexSingle:siteLink0TexSingle, dir, idx, var, stride)        
-#else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride)  
-#endif
-#define COMPUTE_LINK_SIGN(sign, dir, x) 
-#define RECONSTRUCT_SITE_LINK(var, sign)
-*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-//#undef HISQ_LOAD_LINK
-//#undef COMPUTE_LINK_SIGN
-//#undef RECONSTRUCT_SITE_LINK
 
     //single precision, recon=12
 #define PRECISION 1
 #define RECON 12
-/*
-#if (HISQ_SITE_MATRIX_LOAD_TEX == 1)
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   HISQ_LOAD_MATRIX_12_SINGLE_TEX((oddness)?siteLink1TexSingle_recon:siteLink0TexSingle_recon, dir, idx, var, stride)        
-#else
-#define HISQ_LOAD_LINK(linkEven, linkOdd, dir, idx, var, oddness, stride)   loadMatrixFromField(linkEven, linkOdd, dir, idx, var, oddness, stride)  
-#endif
-#define COMPUTE_LINK_SIGN(sign, dir, x) reconstructSign(sign, dir, x)
-#define RECONSTRUCT_SITE_LINK(var, sign)  FF_RECONSTRUCT_LINK_12(var, sign)
-*/
 #include "hisq_paths_force_core.h"
 #undef PRECISION
 #undef RECON
-//#undef HISQ_LOAD_LINK
-//#undef COMPUTE_LINK_SIGN
-//#undef RECONSTRUCT_SITE_LINK
 
-
-//#undef NEWOPROD_EVEN_TEX 
-//#undef NEWOPROD_ODD_TEX 
-//#undef LOAD_TEX_ENTRY
 
 
 
@@ -771,10 +725,10 @@ namespace quda {
 
           TuneKey tuneKey() const {
             std::stringstream vol, aux;
-            vol << kparam.D1 << "x";
-            vol << kparam.D2 << "x";
-            vol << kparam.D3 << "x";
-            vol << kparam.D4;    
+            vol << kparam.D[0] << "x";
+            vol << kparam.D[1] << "x";
+            vol << kparam.D[2] << "x";
+            vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
             return TuneKey(vol.str(), typeid(*this).name(), aux.str());
@@ -911,10 +865,10 @@ namespace quda {
 
           TuneKey tuneKey() const {
             std::stringstream vol, aux;
-            vol << kparam.D1 << "x";
-            vol << kparam.D2 << "x";
-            vol << kparam.D3 << "x";
-            vol << kparam.D4;    
+            vol << kparam.D[0] << "x";
+            vol << kparam.D[1] << "x";
+            vol << kparam.D[2] << "x";
+            vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
             return TuneKey(vol.str(), typeid(*this).name(), aux.str());
@@ -1043,10 +997,10 @@ namespace quda {
 
           TuneKey tuneKey() const {
             std::stringstream vol, aux;
-            vol << kparam.D1 << "x";
-            vol << kparam.D2 << "x";
-            vol << kparam.D3 << "x";
-            vol << kparam.D4;    
+            vol << kparam.D[0] << "x";
+            vol << kparam.D[1] << "x";
+            vol << kparam.D[2] << "x";
+            vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
             return TuneKey(vol.str(), typeid(*this).name(), aux.str());
@@ -1165,10 +1119,10 @@ namespace quda {
 
           TuneKey tuneKey() const {
             std::stringstream vol, aux;
-            vol << kparam.D1 << "x";
-            vol << kparam.D2 << "x";
-            vol << kparam.D3 << "x";
-            vol << kparam.D4;    
+            vol << kparam.D[0] << "x";
+            vol << kparam.D[1] << "x";
+            vol << kparam.D[2] << "x";
+            vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
             return TuneKey(vol.str(), typeid(*this).name(), aux.str());
@@ -1292,10 +1246,10 @@ namespace quda {
 
           TuneKey tuneKey() const {
             std::stringstream vol, aux;
-            vol << kparam.D1 << "x";
-            vol << kparam.D2 << "x";
-            vol << kparam.D3 << "x";
-            vol << kparam.D4;    
+            vol << kparam.D[0] << "x";
+            vol << kparam.D[1] << "x";
+            vol << kparam.D[2] << "x";
+            vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
             return TuneKey(vol.str(), typeid(*this).name(), aux.str());
@@ -1406,6 +1360,7 @@ namespace quda {
           const typename RealTypeId<RealA>::Type &coeff; 
           cudaGaugeField &ForceMatrix;
           const int* X;
+          hisq_kernel_param_t kparam;
 
           unsigned int sharedBytesPerThread() const { return 0; }
           unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
@@ -1419,7 +1374,13 @@ namespace quda {
               const typename RealTypeId<RealA>::Type &coeff, 
               cudaGaugeField &ForceMatrix, const int* _X) :
             oprod(oprod), sig(sig), coeff(coeff), ForceMatrix(ForceMatrix), X(_X)
-        { ; }
+        { 
+
+          kparam.threads = X[0]*X[1]*X[2]*X[3]/2;
+          for(int dir=0; dir<4; ++dir){
+            kparam.X[dir] = X[dir];
+          }
+        }
 
           virtual ~OneLinkTerm() { ; }
 
@@ -1438,7 +1399,8 @@ namespace quda {
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-            int threads = X[0]*X[1]*X[2]*X[3]/2;
+
+
 
             if(GOES_FORWARDS(sig)){
               do_one_link_term_kernel<RealA,0><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
@@ -1446,13 +1408,13 @@ namespace quda {
                   sig, coeff,
                   static_cast<RealA*>(ForceMatrix.Even_p()), 
                   static_cast<RealA*>(ForceMatrix.Odd_p()),
-                  threads);
+                  kparam);
               do_one_link_term_kernel<RealA,1><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
                   static_cast<const RealA*>(oprod.Odd_p()), 
                   sig, coeff,
                   static_cast<RealA*>(ForceMatrix.Even_p()), 
                   static_cast<RealA*>(ForceMatrix.Odd_p()),
-                  threads);
+                  kparam);
 
             }
           }
@@ -1563,6 +1525,7 @@ namespace quda {
           const int sig;
           cudaGaugeField &mom;
           const int* X;
+          hisq_kernel_param_t kparam;
 
           unsigned int sharedBytesPerThread() const { return 0; }
           unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
@@ -1575,7 +1538,11 @@ namespace quda {
           CompleteForce(const cudaGaugeField &link, const cudaGaugeField &oprod, 
               int sig, cudaGaugeField &mom, const int* _X) :
             link(link), oprod(oprod), sig(sig), mom(mom), X(_X)
-        { ; }
+        {  
+          for(int dir=0; dir<4; ++dir){
+            kparam.X[dir] = X[dir];
+          }
+        }
 
           virtual ~CompleteForce() { ; }
 
@@ -1595,11 +1562,14 @@ namespace quda {
            (typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
            sig,								\
            (typeA*)mom.Even_p(), (typeA*)mom.Odd_p(),			\
-           X[0] * X[1] * X[2] * X[3]/2);		
+           kparam);		
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();;
+
+
+
 
             if(sizeof(RealA) == sizeof(float2)){
               if(recon == QUDA_RECONSTRUCT_NO){
@@ -1638,18 +1608,18 @@ namespace quda {
       bind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
       {
         if(link.Precision() == QUDA_DOUBLE_PRECISION){
-          cudaBindTexture(0, siteLink0TexDouble, link.Even_p(), link.Bytes()/2);
-          cudaBindTexture(0, siteLink1TexDouble, link.Odd_p(), link.Bytes()/2);
+          cudaBindTexture(0, thinLink0TexDouble, link.Even_p(), link.Bytes()/2);
+          cudaBindTexture(0, thinLink1TexDouble, link.Odd_p(), link.Bytes()/2);
 
           cudaBindTexture(0, newOprod0TexDouble, newOprod.Even_p(), newOprod.Bytes()/2);
           cudaBindTexture(0, newOprod1TexDouble, newOprod.Odd_p(), newOprod.Bytes()/2);
         }else{
           if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
-            cudaBindTexture(0, siteLink0TexSingle, link.Even_p(), link.Bytes()/2);      
-            cudaBindTexture(0, siteLink1TexSingle, link.Odd_p(), link.Bytes()/2);      
+            cudaBindTexture(0, thinLink0TexSingle, link.Even_p(), link.Bytes()/2);      
+            cudaBindTexture(0, thinLink1TexSingle, link.Odd_p(), link.Bytes()/2);      
           }else{
-            cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);      
-            cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);            
+            cudaBindTexture(0, thinLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);      
+            cudaBindTexture(0, thinLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);            
           }
           cudaBindTexture(0, newOprod0TexSingle, newOprod.Even_p(), newOprod.Bytes()/2);
           cudaBindTexture(0, newOprod1TexSingle, newOprod.Odd_p(), newOprod.Bytes()/2);
@@ -1661,17 +1631,17 @@ namespace quda {
       unbind_tex_link(const cudaGaugeField& link, const cudaGaugeField& newOprod)
       {
         if(link.Precision() == QUDA_DOUBLE_PRECISION){
-          cudaUnbindTexture(siteLink0TexDouble);
-          cudaUnbindTexture(siteLink1TexDouble);
+          cudaUnbindTexture(thinLink0TexDouble);
+          cudaUnbindTexture(thinLink1TexDouble);
           cudaUnbindTexture(newOprod0TexDouble);
           cudaUnbindTexture(newOprod1TexDouble);
         }else{
           if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
-            cudaUnbindTexture(siteLink0TexSingle);
-            cudaUnbindTexture(siteLink1TexSingle);      
+            cudaUnbindTexture(thinLink0TexSingle);
+            cudaUnbindTexture(thinLink1TexSingle);      
           }else{
-            cudaUnbindTexture(siteLink0TexSingle_recon);
-            cudaUnbindTexture(siteLink1TexSingle_recon);      
+            cudaUnbindTexture(thinLink0TexSingle_recon);
+            cudaUnbindTexture(thinLink1TexSingle_recon);      
           }
           cudaUnbindTexture(newOprod0TexSingle);
           cudaUnbindTexture(newOprod1TexSingle);
@@ -1723,29 +1693,35 @@ namespace quda {
 
         hisq_kernel_param_t kparam_1g, kparam_2g;
 
+        for(int dir=0; dir<4; ++dir){
+          kparam_1g.X[dir] = param.X[dir];
+          kparam_2g.X[dir] = param.X[dir];
+        }
+
+
 
 #ifdef MULTI_GPU
-        kparam_1g.D1 = commDimPartitioned(0)?(param.X[0]+2):(param.X[0]);
-        kparam_1g.D2 = commDimPartitioned(1)?(param.X[1]+2):(param.X[1]);
-        kparam_1g.D3 = commDimPartitioned(2)?(param.X[2]+2):(param.X[2]);
-        kparam_1g.D4 = commDimPartitioned(3)?(param.X[3]+2):(param.X[3]);
-        kparam_1g.D1h =  kparam_1g.D1/2;
+        kparam_1g.D[0] = commDimPartitioned(0)?(param.X[0]+2):(param.X[0]);
+        kparam_1g.D[1] = commDimPartitioned(1)?(param.X[1]+2):(param.X[1]);
+        kparam_1g.D[2] = commDimPartitioned(2)?(param.X[2]+2):(param.X[2]);
+        kparam_1g.D[3] = commDimPartitioned(3)?(param.X[3]+2):(param.X[3]);
+        kparam_1g.D1h =  kparam_1g.D[0]/2;
         kparam_1g.base_idx[0]=commDimPartitioned(0)?1:2;
         kparam_1g.base_idx[1]=commDimPartitioned(1)?1:2;
         kparam_1g.base_idx[2]=commDimPartitioned(2)?1:2;
         kparam_1g.base_idx[3]=commDimPartitioned(3)?1:2;
-        kparam_1g.threads = kparam_1g.D1*kparam_1g.D2*kparam_1g.D3*kparam_1g.D4/2;
+        kparam_1g.threads = kparam_1g.D[0]*kparam_1g.D[1]*kparam_1g.D[2]*kparam_1g.D[3]/2;
 
-        kparam_2g.D1 = commDimPartitioned(0)?(param.X[0]+4):(param.X[0]);
-        kparam_2g.D2 = commDimPartitioned(1)?(param.X[1]+4):(param.X[1]);
-        kparam_2g.D3 = commDimPartitioned(2)?(param.X[2]+4):(param.X[2]);
-        kparam_2g.D4 = commDimPartitioned(3)?(param.X[3]+4):(param.X[3]);
-        kparam_2g.D1h = kparam_2g.D1/2;
+        kparam_2g.D[0] = commDimPartitioned(0)?(param.X[0]+4):(param.X[0]);
+        kparam_2g.D[1] = commDimPartitioned(1)?(param.X[1]+4):(param.X[1]);
+        kparam_2g.D[2] = commDimPartitioned(2)?(param.X[2]+4):(param.X[2]);
+        kparam_2g.D[3] = commDimPartitioned(3)?(param.X[3]+4):(param.X[3]);
+        kparam_2g.D1h = kparam_2g.D[0]/2;
         kparam_2g.base_idx[0]=commDimPartitioned(0)?0:2;
         kparam_2g.base_idx[1]=commDimPartitioned(1)?0:2;
         kparam_2g.base_idx[2]=commDimPartitioned(2)?0:2;
         kparam_2g.base_idx[3]=commDimPartitioned(3)?0:2;
-        kparam_2g.threads = kparam_2g.D1*kparam_2g.D2*kparam_2g.D3*kparam_2g.D4/2;
+        kparam_2g.threads = kparam_2g.D[0]*kparam_2g.D[1]*kparam_2g.D[2]*kparam_2g.D[3]/2;
 
 
         for(int i=0;i < 4; i++){
@@ -1753,10 +1729,10 @@ namespace quda {
         }
 #else
         hisq_kernel_param_t kparam;
-        kparam.D1 = param.X[0];
-        kparam.D2 = param.X[1];
-        kparam.D3 = param.X[2];
-        kparam.D4 = param.X[3];
+        kparam.D[0] = param.X[0];
+        kparam.D[1] = param.X[1];
+        kparam.D[2] = param.X[2];
+        kparam.D[3] = param.X[3];
         kparam.D1h = param.X[0]/2;
         kparam.threads=param.X[0]*param.X[1]*param.X[2]*param.X[3]/2;
         kparam.base_idx[0]=0;
@@ -1903,7 +1879,8 @@ namespace quda {
       bind_tex_link(link, *newOprod);
       const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
       hisq_kernel_param_t kparam;
-      for(int i =0;i < 4;i++){
+      for(int i=0; i<4; i++){
+        kparam.X[i] = param.X[i];
         kparam.ghostDim[i] = commDimPartitioned(i);
       }
       kparam.threads = volume/2;
