@@ -112,20 +112,10 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   int oddBit = _oddBit;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
-  int Y[4] = {X1,X2,X3,X4};
   int dx[4] = {0,0,0,0};
   int x[4];
 
-
-  if(sid == 0){
-    printf("X = (%d %d %d %d)\n", X1, X2, X3, X4);
-  }
-
-
-
-
   getCoords(x, sid, kparam.D, oddBit);
-  //getCoords(x, sid, kparam.D, oddBit);
 
   int new_x[4];
   int new_mem_idx;
@@ -144,18 +134,12 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   int point_b, point_c, point_d;
   int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
-  int mymu;
+  int mymu = posDir(mu);
 
 
 
 #ifdef MULTI_GPU
-  int E[4]= {E1,E2,E3,E4};
-
-  if(sid == 0){
-    printf("E = %d %d %d %d\n", E1, E2, E3, E4);
-
-  }
-
+  int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
 
   x[0] = x[0] + kparam.base_idx[0];
   x[1] = x[1] + kparam.base_idx[1];
@@ -166,6 +150,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   new_x[2] = x[2];
   new_x[3] = x[3];
   new_mem_idx = new_x[3]*E3E2E1 + new_x[2]*E2E1 + new_x[1]*E1 + new_x[0];
+
+
+
   int new_sid=(new_mem_idx >> 1);
   oddBit = _oddBit ^ oddness_change;
 
@@ -179,16 +166,33 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   int new_sid = sid;
 #endif
 
+  int y[4] = {x[0], x[1], x[2], x[3]};
+  int y_idx;
 
   mymu = posDir(mu);
 
+/*
   if(mu_positive){
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mymu, new_mem_idx, new_mem_idx);
   }else{
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mymu, new_mem_idx, new_mem_idx);	
   }
+*/  
+  updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
 
+/*
+  if(new_x[mymu] != y[mymu]){
+      printf("Error: updated coords do not match! %d %d\n", new_x[mymu], y[mymu]);
+  }
+
+  if((new_mem_idx>>1) != linkIndex(y, dx, E)){
+    printf("Error: updated indices do not match! %d %d\n", (new_mem_idx>>1), linkIndex(y, dx, E));
+  }
   point_d = (new_mem_idx >> 1);
+*/
+
+  point_d = linkIndex(y, dx, E);
+
   if (mu_positive){
     ad_link_nbr_idx = point_d;
   }else{
@@ -196,12 +200,18 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   }
 
   int mysig = posDir(sig);
+/*
   if(sig_positive){
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mysig, new_mem_idx, new_mem_idx);
   }else{
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mysig, new_mem_idx, new_mem_idx);	
   }
-  point_c = (new_mem_idx >> 1);
+*/
+
+  updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
+  point_c = linkIndex(y, dx, E);
+
+//  point_c = (new_mem_idx >> 1);
   if (mu_positive){
     bc_link_nbr_idx = point_c;	
   }
@@ -220,12 +230,19 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   new_mem_idx = X;
 #endif
 
+
+  for(int dir=0; dir<4; ++dir) y[dir] = x[dir];
+  updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
+  point_b = linkIndex(y, dx, E);
+
+/*
   if(sig_positive){
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mysig, new_mem_idx, new_mem_idx);
   }else{
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mysig, new_mem_idx, new_mem_idx);	
   }
   point_b = (new_mem_idx >> 1); 
+*/
 
   if (!mu_positive){
     bc_link_nbr_idx = point_b;
@@ -347,14 +364,12 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
   int mymu;
 
-  int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
   getCoords(x, sid, kparam.D, oddBit);
- // getCoords(x, sid, Y, oddBit);
 
 #ifdef MULTI_GPU
-  int E[4]= {E1,E2,E3,E4};
+  int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   x[0] = x[0] + kparam.base_idx[0];
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
@@ -388,7 +403,8 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
      }
      */
 
-
+  mymu = posDir(mu);
+/*
   if(mu_positive){
     mymu = mu;
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, new_mem_idx, new_mem_idx);
@@ -398,6 +414,14 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   }
   point_d = (new_mem_idx >> 1);
 
+*/
+  
+  int y[4] = {x[0], x[1], x[2], x[3]};
+
+  updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
+  point_d = linkIndex(y, dx, E);
+
+
   //  point_d = linkIndex(x,dx,E);
 
   if (mu_positive){
@@ -406,7 +430,8 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
     ad_link_nbr_idx = new_sid;
   }
 
-  int mysig; 
+  int mysig = posDir(sig);
+/*
   if(sig_positive){
     mysig = sig;
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
@@ -415,6 +440,13 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx); 
   }
   point_c = (new_mem_idx >> 1);
+*/
+
+  updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
+  point_c = linkIndex(y, dx, E);
+
+
+
   if (mu_positive){
     bc_link_nbr_idx = point_c;  
   }
@@ -433,13 +465,18 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   new_mem_idx = X;
 #endif
 
+  for(int dir=0; dir<4; ++dir) y[dir] = x[dir];
+  updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
+  point_b = linkIndex(y, dx, E);
 
+/*
   if(sig_positive){
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
   }else{
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx); 
   }
   point_b = (new_mem_idx >> 1); 
+*/
 
   if (!mu_positive){
     bc_link_nbr_idx = point_b;
@@ -549,10 +586,8 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   if(sid >= kparam.threads) return;
 
 
-  int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
-  //getCoords(x, sid, Y, oddBit);
   getCoords(x, sid, kparam.D, oddBit);
 
 
@@ -562,7 +597,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   int new_mem_idx;
   int new_x[4];
 #ifdef MULTI_GPU
-  int E[4]= {E1,E2,E3,E4};
+  int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   x[0] = x[0] + kparam.base_idx[0];
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
@@ -608,11 +643,15 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
    *
    */
 
+
+  int y[4] = {x[0], x[1], x[2], x[3]}; 
+
   typename RealTypeId<RealA>::Type mycoeff;
   int point_d;
   int ad_link_nbr_idx;
-  int mymu;
+  int mymu = posDir(mu);
 
+/*
   if(mu_positive){
     mymu=mu;
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mymu,new_mem_idx, new_mem_idx);
@@ -621,6 +660,12 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mymu, new_mem_idx, new_mem_idx);
   }
   point_d = (new_mem_idx >> 1);
+*/
+
+  updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
+  point_d = linkIndex(y,dx,E);
+
+
 
   if (mu_positive){
     ad_link_nbr_idx = point_d;
@@ -675,10 +720,8 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   if(sid >= kparam.threads) return;
 
 
-  int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
-  //getCoords(x, sid, Y, oddBit);
   getCoords(x, sid, kparam.D, oddBit);
 
 
@@ -686,7 +729,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   int new_mem_idx;
   int new_x[4];
 #ifdef MULTI_GPU
-  int E[4]= {E1,E2,E3,E4};
+  int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   x[0] = x[0] + kparam.base_idx[0];
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
@@ -731,8 +774,15 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
 
   typename RealTypeId<RealA>::Type mycoeff;
   int point_d;
-  int mymu;
+  int mymu = posDir(mu);
+  int y[4] = {x[0], x[1], x[2], x[3]};  
 
+  updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
+  point_d = linkIndex(y,dx,E);
+
+  
+
+/*
   if(mu_positive){
     mymu=mu;
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mymu,new_mem_idx, new_mem_idx);
@@ -741,6 +791,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mymu, new_mem_idx, new_mem_idx);
   }
   point_d = (new_mem_idx >> 1);
+*/
   mycoeff = CoeffSign<sig_positive,_oddBit ^ oddness_change>::result*coeff;
 
   if(mu_positive){
@@ -803,7 +854,6 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   if(sid >= kparam.threads) return;
 
 
-  int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
  // getCoords(x, sid, Y, oddBit);
@@ -835,7 +885,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
 
-  int E[4]= {E1,E2,E3,E4};
+  int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   new_x[0] = x[0];
   new_x[1] = x[1];
   new_x[2] = x[2];
@@ -854,12 +904,19 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   int new_sid = sid;
 #endif
 
+  int y[4] = {x[0], x[1], x[2], x[3]};
+  int mysig = posDir(sig);
+  updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
+  point_b = linkIndex(y,dx,E);
+/*
   if(sig_positive){
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
   }else{
     FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
   }
   point_b = (new_mem_idx >> 1);
+*/
+
   ab_link_nbr_idx = (sig_positive) ? new_sid : point_b;
 #ifdef MULTI_GPU
   new_x[0] = x[0];
@@ -876,18 +933,28 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   new_mem_idx = X;
 #endif
 
+  for(int dir=0; dir<4; ++dir) y[dir] = x[dir];
+
+
   const typename RealTypeId<RealA>::Type & mycoeff = CoeffSign<sig_positive,_oddBit ^ oddness_change>::result*coeff;
   if(mu_positive){ //positive mu
-    FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, new_mem_idx, new_mem_idx);
-    point_d = (new_mem_idx >> 1);
+//    FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(mu, new_mem_idx, new_mem_idx);
+//    point_d = (new_mem_idx >> 1);
 
+    updateCoords(y, mu, -1, kparam.X, kparam.ghostDim[mu]);
+    point_d = linkIndex(y,dx,E);
 
+    updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
+    point_c = linkIndex(y,dx,E);
+
+/*
     if(sig_positive){
       FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(sig, new_mem_idx, new_mem_idx);
     }else{
       FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
     }
     point_c = (new_mem_idx >> 1);
+*/
 
     loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, hf.color_matrix_stride);	   // COLOR_MAT_X
     loadLink<18>(linkEven, linkOdd, mu, point_d, Uad.data, 1-oddBit, hf.site_ga_stride); 
@@ -919,7 +986,14 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit);
 
   } else{ //negative mu
+
     mu = OPP_DIR(mu);
+    updateCoords(y, mu, 1, kparam.X, kparam.ghostDim[mu]);
+    point_d = linkIndex(y,dx,E);
+    updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
+    point_c = linkIndex(y,dx,E);
+  
+/*
     FF_COMPUTE_NEW_FULL_IDX_PLUS_UPDATE(mu, new_mem_idx, new_mem_idx);	
     point_d = (new_mem_idx >> 1);
 
@@ -929,6 +1003,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
       FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE(OPP_DIR(sig), new_mem_idx, new_mem_idx);	
     }
     point_c = (new_mem_idx >> 1);
+*/
 
     loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, hf.color_matrix_stride);         // COLOR_MAT_X used!
 
@@ -986,13 +1061,12 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
   if (sid >= kparam.threads) return;
 
 
-  int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
 
   getCoords(x, sid, kparam.X, oddBit);
 #ifdef MULTI_GPU
-  int E[4]= {E1,E2,E3,E4};
+  int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   for(int i=0; i<4; ++i) x[i] += 2;
   int new_sid = linkIndex(x,dx,E);
 #else
@@ -1069,7 +1143,6 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
   if (sid >= kparam.threads) return;
 
 
-  int Y[4] = {X1,X2,X3,X4};
   int x[4];
   int dx[4] = {0,0,0,0};
 

@@ -89,6 +89,16 @@ namespace quda {
       return idx;
     }
 
+    // Need to look at this again.
+    inline __device__ __host__ int updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned){
+      if(shift == 1){
+        x[dir] = (partitioned || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
+      }else if(shift == -1){
+        x[dir] = (partitioned || (x[dir] != 2)) ? x[dir]-1 : X[dir]+1;
+      }
+      return;
+    }
+
 
     __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity)
     {
