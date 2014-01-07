@@ -69,7 +69,7 @@ namespace quda {
       fat_force_const_t hf_h;
 #ifdef MULTI_GPU
       int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
-      hf_h.site_ga_stride = Vh_ex + param->site_ga_pad;;
+      hf_h.site_ga_stride = Vh_ex + param->site_ga_pad;
       hf_h.color_matrix_stride = Vh_ex;
 #else
       hf_h.site_ga_stride = Vh + param->site_ga_pad;
@@ -340,18 +340,18 @@ namespace quda {
     template<class T, class U>   
       inline __device__
       void addMatrixToField(const T* const mat, int dir, int idx, U coeff, 
-          T* const field_even, T* const field_odd, int oddness)
+          T* const field_even, T* const field_odd, int oddness, int stride)
       {
         T* const field = (oddness)?field_odd: field_even;
-        field[idx + dir*hf.color_matrix_stride*9]          += coeff*mat[0];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     += coeff*mat[1];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   += coeff*mat[2];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   += coeff*mat[3];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   += coeff*mat[4];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   += coeff*mat[5];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   += coeff*mat[6];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   += coeff*mat[7];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   += coeff*mat[8];
+        field[idx + dir*stride*9]          += coeff*mat[0];
+        field[idx + dir*stride*9 + stride]     += coeff*mat[1];
+        field[idx + dir*stride*9 + stride*2]   += coeff*mat[2];
+        field[idx + dir*stride*9 + stride*3]   += coeff*mat[3];
+        field[idx + dir*stride*9 + stride*4]   += coeff*mat[4];
+        field[idx + dir*stride*9 + stride*5]   += coeff*mat[5];
+        field[idx + dir*stride*9 + stride*6]   += coeff*mat[6];
+        field[idx + dir*stride*9 + stride*7]   += coeff*mat[7];
+        field[idx + dir*stride*9 + stride*8]   += coeff*mat[8];
 
         return;
       }
@@ -360,18 +360,18 @@ namespace quda {
     template<class T, class U>
       inline __device__
       void addMatrixToField(const T* const mat, int idx, U coeff, T* const field_even,
-          T* const field_odd, int oddness)
+          T* const field_odd, int oddness, int stride)
       {
         T* const field = (oddness)?field_odd: field_even;
         field[idx ]         += coeff*mat[0];
-        field[idx + hf.color_matrix_stride]     += coeff*mat[1];
-        field[idx + hf.color_matrix_stride*2]   += coeff*mat[2];
-        field[idx + hf.color_matrix_stride*3]   += coeff*mat[3];
-        field[idx + hf.color_matrix_stride*4]   += coeff*mat[4];
-        field[idx + hf.color_matrix_stride*5]   += coeff*mat[5];
-        field[idx + hf.color_matrix_stride*6]   += coeff*mat[6];
-        field[idx + hf.color_matrix_stride*7]   += coeff*mat[7];
-        field[idx + hf.color_matrix_stride*8]   += coeff*mat[8];
+        field[idx + stride]     += coeff*mat[1];
+        field[idx + stride*2]   += coeff*mat[2];
+        field[idx + stride*3]   += coeff*mat[3];
+        field[idx + stride*4]   += coeff*mat[4];
+        field[idx + stride*5]   += coeff*mat[5];
+        field[idx + stride*6]   += coeff*mat[6];
+        field[idx + stride*7]   += coeff*mat[7];
+        field[idx + stride*8]   += coeff*mat[8];
 
         return;
       }
@@ -379,19 +379,19 @@ namespace quda {
     template<class T, class U>
       inline __device__
       void addMatrixToField_test(const T* const mat, int idx, U coeff, T* const field_even,
-          T* const field_odd, int oddness)
+          T* const field_odd, int oddness, int stride)
       {
         T* const field = (oddness)?field_odd: field_even;
         //T oldvalue=field[idx];
         field[idx ]         += coeff*mat[0];
-        field[idx + hf.color_matrix_stride]     += coeff*mat[1];
-        field[idx + hf.color_matrix_stride*2]   += coeff*mat[2];
-        field[idx + hf.color_matrix_stride*3]   += coeff*mat[3];
-        field[idx + hf.color_matrix_stride*4]   += coeff*mat[4];
-        field[idx + hf.color_matrix_stride*5]   += coeff*mat[5];
-        field[idx + hf.color_matrix_stride*6]   += coeff*mat[6];
-        field[idx + hf.color_matrix_stride*7]   += coeff*mat[7];
-        field[idx + hf.color_matrix_stride*8]   += coeff*mat[8];
+        field[idx + stride]     += coeff*mat[1];
+        field[idx + stride*2]   += coeff*mat[2];
+        field[idx + stride*3]   += coeff*mat[3];
+        field[idx + stride*4]   += coeff*mat[4];
+        field[idx + stride*5]   += coeff*mat[5];
+        field[idx + stride*6]   += coeff*mat[6];
+        field[idx + stride*7]   += coeff*mat[7];
+        field[idx + stride*8]   += coeff*mat[8];
 
 #if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
         printf("value is  coeff(%f) * mat[0].x(%f)=%f\n", coeff, mat[0].x, field[idx].x);
@@ -401,18 +401,18 @@ namespace quda {
 
     template<class T>
       inline __device__
-      void storeMatrixToField(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness)
+      void storeMatrixToField(const T* const mat, int dir, int idx, T* const field_even, T* const field_odd, int oddness, int stride)
       {
         T* const field = (oddness)?field_odd: field_even;
-        field[idx + dir*hf.color_matrix_stride*9]          = mat[0];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride]     = mat[1];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*2]   = mat[2];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*3]   = mat[3];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*4]   = mat[4];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*5]   = mat[5];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*6]   = mat[6];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*7]   = mat[7];
-        field[idx + dir*hf.color_matrix_stride*9 + hf.color_matrix_stride*8]   = mat[8];
+        field[idx + dir*stride*9]          = mat[0];
+        field[idx + dir*stride*9 + stride]     = mat[1];
+        field[idx + dir*stride*9 + stride*2]   = mat[2];
+        field[idx + dir*stride*9 + stride*3]   = mat[3];
+        field[idx + dir*stride*9 + stride*4]   = mat[4];
+        field[idx + dir*stride*9 + stride*5]   = mat[5];
+        field[idx + dir*stride*9 + stride*6]   = mat[6];
+        field[idx + dir*stride*9 + stride*7]   = mat[7];
+        field[idx + dir*stride*9 + stride*8]   = mat[8];
 
         return;
       }
@@ -420,18 +420,18 @@ namespace quda {
 
     template<class T>
       inline __device__
-      void storeMatrixToField(const T* const mat, int idx, T* const field_even, T* const field_odd, int oddness)
+      void storeMatrixToField(const T* const mat, int idx, T* const field_even, T* const field_odd, int oddness, int stride)
       {
         T* const field = (oddness)?field_odd: field_even;
         field[idx]          = mat[0];
-        field[idx + hf.color_matrix_stride]     = mat[1];
-        field[idx + hf.color_matrix_stride*2]   = mat[2];
-        field[idx + hf.color_matrix_stride*3]   = mat[3];
-        field[idx + hf.color_matrix_stride*4]   = mat[4];
-        field[idx + hf.color_matrix_stride*5]   = mat[5];
-        field[idx + hf.color_matrix_stride*6]   = mat[6];
-        field[idx + hf.color_matrix_stride*7]   = mat[7];
-        field[idx + hf.color_matrix_stride*8]   = mat[8];
+        field[idx + stride]     = mat[1];
+        field[idx + stride*2]   = mat[2];
+        field[idx + stride*3]   = mat[3];
+        field[idx + stride*4]   = mat[4];
+        field[idx + stride*5]   = mat[5];
+        field[idx + stride*6]   = mat[6];
+        field[idx + stride*7]   = mat[7];
+        field[idx + stride*8]   = mat[8];
 
         return;
       }
@@ -440,30 +440,30 @@ namespace quda {
     template<class T, class U> 
       inline __device__
       void storeMatrixToMomentumField(const T* const mat, int dir, int idx, U coeff, 
-          T* const mom_even, T* const mom_odd, int oddness)
+          T* const mom_even, T* const mom_odd, int oddness, int stride)
       {
         T* const mom_field = (oddness)?mom_odd:mom_even;
         T temp2;
         temp2.x = (mat[1].x - mat[3].x)*0.5*coeff;
         temp2.y = (mat[1].y + mat[3].y)*0.5*coeff;
-        mom_field[idx + dir*hf.mom_ga_stride*5] = temp2;	
+        mom_field[idx + dir*stride*5] = temp2;	
 
         temp2.x = (mat[2].x - mat[6].x)*0.5*coeff;
         temp2.y = (mat[2].y + mat[6].y)*0.5*coeff;
-        mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride] = temp2;
+        mom_field[idx + dir*stride*5 + stride] = temp2;
 
         temp2.x = (mat[5].x - mat[7].x)*0.5*coeff;
         temp2.y = (mat[5].y + mat[7].y)*0.5*coeff;
-        mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*2] = temp2;
+        mom_field[idx + dir*stride*5 + stride*2] = temp2;
 
         const typename RealTypeId<T>::Type temp = (mat[0].y + mat[4].y + mat[8].y)*0.3333333333333333333333333;
         temp2.x =  (mat[0].y-temp)*coeff; 
         temp2.y =  (mat[4].y-temp)*coeff;
-        mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*3] = temp2;
+        mom_field[idx + dir*stride*5 + stride*3] = temp2;
 
         temp2.x = (mat[8].y - temp)*coeff;
         temp2.y = 0.0;
-        mom_field[idx + dir*hf.mom_ga_stride*5 + hf.mom_ga_stride*4] = temp2;
+        mom_field[idx + dir*stride*5 + stride*4] = temp2;
 
         return;
       }
@@ -599,7 +599,7 @@ namespace quda {
         RealA COLOR_MAT_W[ArrayLength<RealA>::result];
         if(GOES_FORWARDS(sig)){
           loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, hf.color_matrix_stride);
-          addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit);
+          addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit, hf.color_matrix_stride);
         }
         return;
       }
