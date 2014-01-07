@@ -26,14 +26,30 @@
 namespace quda {
   namespace fermion_force {
 
-    typedef struct hisq_kernel_param_s{
+    struct hisq_kernel_param_t{
       unsigned long threads;
       int X[4];
       int D[4];
       int D1h;
       int base_idx[4];
       int ghostDim[4];
-    }hisq_kernel_param_t;
+      int color_matrix_stride;
+      int thin_link_stride;
+      int momentum_stride;
+
+      void setStride(const QudaGaugeParam& param){
+        int half_volume = param.X[0]*param.X[1]*param.X[2]*param.X[3]/2;
+#ifdef MULTI_GPU
+        int extended_half_volume = (param.X[0]+4)*(param.X[1]+4)*(param.X[2]+4)*(param.X[3]+4)/2;
+        thin_link_stride = extended_half_volume + param.site_ga_pad;
+        color_matrix_stride = extended_half_volume;
+#else
+        thin_link_stride + param.site_ga_pad;
+        color_matrix_stride = half_volume;
+#endif
+        momentum_stride = half_volume + param.mom_ga_pad;
+      }
+    };
 
 
     //Double precision for site link
@@ -575,24 +591,13 @@ namespace quda {
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
         if (sid >= kparam.threads) return;
 #ifdef MULTI_GPU
-
-        
-
+        int dx[4] = {0,0,0,0};
         int x[4];
-
         getCoords(x, sid, kparam.X, oddBit);
-/*
-        int z1 = sid/X1h;
-        int x1h = sid - z1*X1h;
-        int z2 = z1/X2;
-        x[1] = z1 - z2*X2;
-        x[3] = z2/X3;
-        x[2] = z2 - x[3]*X3;
-        int x1odd = (x[1] + x[2] + x[3] + oddBit) & 1;
-        x[0] = 2*x1h + x1odd;
-        //int X = 2*sid + x1odd;
-*/
-        int new_sid = ( (x[3]+2)*E3E2E1+(x[2]+2)*E2E1+(x[1]+2)*E1+(x[0]+2))>>1 ;
+        int E[4] = {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
+        for(int dir=0; dir<4; ++dir) x[dir] += 2; 
+        int new_sid = linkIndex(x,dx,E);
+//        int new_sid = ( (x[3]+2)*E3E2E1+(x[2]+2)*E2E1+(x[1]+2)*E1+(x[0]+2))>>1 ;
 #else
         int new_sid = sid;
 #endif
@@ -1449,7 +1454,7 @@ namespace quda {
           const cudaGaugeField &naikOprod;
           const typename RealTypeId<RealA>::Type &naik_coeff;
           cudaGaugeField &output;
-          const int * X;
+          int X[4];
           const hisq_kernel_param_t &kparam;
 
           unsigned int sharedBytesPerThread() const { return 0; }
@@ -1462,10 +1467,10 @@ namespace quda {
         public:
           LongLinkTerm(const cudaGaugeField &link, const cudaGaugeField &naikOprod,
               const typename RealTypeId<RealA>::Type &naik_coeff,
-              cudaGaugeField &output, const int* _X, const hisq_kernel_param_t &kparam) :
+              cudaGaugeField &output, const hisq_kernel_param_t &kparam) :
             link(link), naikOprod(naikOprod),  naik_coeff(naik_coeff), output(output),
-            X(_X), kparam(kparam)
-        { ; }
+            kparam(kparam)
+        { for(int dir=0; dir<4; ++dir) X[dir] = kparam.X[dir]; }
 
           virtual ~LongLinkTerm() { ; }
 
@@ -1534,7 +1539,7 @@ namespace quda {
           const cudaGaugeField &oprod;
           const int sig;
           cudaGaugeField &mom;
-          const int* X;
+          int X[4];
           hisq_kernel_param_t kparam;
 
           unsigned int sharedBytesPerThread() const { return 0; }
@@ -1546,12 +1551,14 @@ namespace quda {
 
         public:
           CompleteForce(const cudaGaugeField &link, const cudaGaugeField &oprod, 
-              int sig, cudaGaugeField &mom, const int* _X) :
-            link(link), oprod(oprod), sig(sig), mom(mom), X(_X)
+              int sig, cudaGaugeField &mom, const QudaGaugeParam &param) :
+            link(link), oprod(oprod), sig(sig), mom(mom)
         {  
           for(int dir=0; dir<4; ++dir){
+            X[dir] = param.X[dir];
             kparam.X[dir] = X[dir];
           }
+          kparam.setStride(param);
         }
 
           virtual ~CompleteForce() { ; }
@@ -1708,6 +1715,8 @@ namespace quda {
           kparam_2g.X[dir] = param.X[dir];
         }
 
+        kparam_1g.setStride(param);
+        kparam_2g.setStride(param);
 
 
 #ifdef MULTI_GPU
@@ -1861,13 +1870,14 @@ namespace quda {
     {
       bind_tex_link(link, oprod);
 
+
       for(int sig=0; sig<4; sig++){
         if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-          CompleteForce<double2,double2> completeForce(link, oprod, sig, *force, param.X);
+          CompleteForce<double2,double2> completeForce(link, oprod, sig, *force, param);
           completeForce.apply(0);
           checkCudaError();
         }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-          CompleteForce<float2,float2> completeForce(link, oprod, sig, *force, param.X);
+          CompleteForce<float2,float2> completeForce(link, oprod, sig, *force, param);
           completeForce.apply(0);
           checkCudaError();
         }else{
@@ -1894,14 +1904,14 @@ namespace quda {
         kparam.ghostDim[i] = commDimPartitioned(i);
       }
       kparam.threads = volume/2;
+      kparam.setStride(param);
 
       if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-        LongLinkTerm<double2,double2> longLink(link, oldOprod, coeff, *newOprod, param.X, kparam);
+        LongLinkTerm<double2,double2> longLink(link, oldOprod, coeff, *newOprod, kparam);
         longLink.apply(0);
         checkCudaError();
       }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-        LongLinkTerm<float2,float2> longLink(link, oldOprod, static_cast<float>(coeff), 
-            *newOprod, param.X, kparam);
+        LongLinkTerm<float2,float2> longLink(link, oldOprod, static_cast<float>(coeff), *newOprod, kparam);
         longLink.apply(0);
         checkCudaError();
       }else{
