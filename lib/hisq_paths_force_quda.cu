@@ -73,6 +73,7 @@ namespace quda {
 
     void hisqForceInitCuda(QudaGaugeParam* param)
     {
+/*
       static int hisq_force_init_cuda_flag = 0; 
 
       if (hisq_force_init_cuda_flag){
@@ -96,6 +97,7 @@ namespace quda {
       cudaMemcpyToSymbol(hf, &hf_h, sizeof(fat_force_const_t));
 
       checkCudaError();
+*/
     }
 
     inline __device__  __host__ int linkIndex(int x[], int dx[], const int X[4]) {
@@ -597,14 +599,13 @@ namespace quda {
         int E[4] = {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
         for(int dir=0; dir<4; ++dir) x[dir] += 2; 
         int new_sid = linkIndex(x,dx,E);
-//        int new_sid = ( (x[3]+2)*E3E2E1+(x[2]+2)*E2E1+(x[1]+2)*E1+(x[0]+2))>>1 ;
 #else
         int new_sid = sid;
 #endif
         RealA COLOR_MAT_W[ArrayLength<RealA>::result];
         if(GOES_FORWARDS(sig)){
-          loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, hf.color_matrix_stride);
-          addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit, hf.color_matrix_stride);
+          loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, kparam.color_matrix_stride);
+          addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit, kparam.color_matrix_stride);
         }
         return;
       }
@@ -1374,7 +1375,7 @@ namespace quda {
           const int sig;
           const typename RealTypeId<RealA>::Type &coeff; 
           cudaGaugeField &ForceMatrix;
-          const int* X;
+          int X[4];
           hisq_kernel_param_t kparam;
 
           unsigned int sharedBytesPerThread() const { return 0; }
@@ -1387,14 +1388,16 @@ namespace quda {
         public:
           OneLinkTerm(const cudaGaugeField &oprod, int sig, 
               const typename RealTypeId<RealA>::Type &coeff, 
-              cudaGaugeField &ForceMatrix, const int* _X) :
-            oprod(oprod), sig(sig), coeff(coeff), ForceMatrix(ForceMatrix), X(_X)
+              cudaGaugeField &ForceMatrix, const QudaGaugeParam& param) :
+            oprod(oprod), sig(sig), coeff(coeff), ForceMatrix(ForceMatrix)
         { 
+          for(int dir=0; dir<4; ++dir) X[dir] = param.X[dir];
 
           kparam.threads = X[0]*X[1]*X[2]*X[3]/2;
           for(int dir=0; dir<4; ++dir){
             kparam.X[dir] = X[dir];
           }
+          kparam.setStride(param);
         }
 
           virtual ~OneLinkTerm() { ; }
@@ -1694,7 +1697,7 @@ namespace quda {
 
         for(int sig=0; sig<8; ++sig){
           if(GOES_FORWARDS(sig)){
-            OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, newOprod, param.X);
+            OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, newOprod, param);
             oneLink.apply(0);
             checkCudaError();
           } // GOES_FORWARDS(sig)
