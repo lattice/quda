@@ -18,7 +18,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	clover_invert.o copy_gauge_extended.o				\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
-	clover_trace_quda.o ks_force_quda.o
+	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -46,9 +46,9 @@ DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h		\
 	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h		\
 	pack_face_def.h hisq_force_macros.h llfat_quda.cu		\
 	unitarize_links_quda.cu fermion_force_quda.cu			\
-	gauge_force_quda.cu hisq_paths_force_quda.cu			\
+	gauge_force_quda.cu 						\
 	unitarize_force_quda.cu gauge_force_core.h			\
-	hisq_paths_force_core.h llfat_core.h svd_quda.h read_clover.h	\
+	llfat_core.h svd_quda.h read_clover.h				\
 	read_gauge.h misc_helpers.cu
 
 

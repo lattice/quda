@@ -12,7 +12,9 @@
 #include <color_spinor_field.h>
 
 #include <face_quda.h>
-//#include <dslash_constants.h>
+
+#ifdef GPU_HISQ_FORCE
+
 //DEBUG : control compile 
 #define COMPILE_HISQ_DP_18 
 #define COMPILE_HISQ_DP_12 
@@ -22,6 +24,41 @@
 // Disable texture read for now. Need to revisit this.
 #define HISQ_SITE_MATRIX_LOAD_TEX 1
 #define HISQ_NEW_OPROD_LOAD_TEX 1
+
+#ifdef USE_TEXTURE_OBJECTS
+#define TEX1DFETCH(type, tex, idx) tex1Dfetch<type>((tex), idx)
+#else
+#define TEX1DFETCH(type, tex, idx) tex1Dfetch((tex), idx)
+#endif
+
+
+#if (__COMPUTE_CAPABILITY__ >= 130)
+
+  template<typename Tex>
+static __inline__ __device__ double fetch_double(Tex t, int i)
+{
+  int2 v = TEX1DFETCH(int2, t, i);
+  return __hiloint2double(v.y, v.x);
+}
+
+  template <typename Tex>
+static __inline__ __device__ double2 fetch_double2(Tex t, int i)
+{
+  int4 v = TEX1DFETCH(int4, t, i);
+  return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
+}
+
+static __inline__ __device__ double2 fetch_double2_old(texture<int4, 1> t, int i)
+{
+  int4 v = tex1Dfetch(t,i);
+  return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
+}
+
+#endif //__COMPUTE_CAPABILITY__ >= 130
+
+
+
+
 
 namespace quda {
   namespace fermion_force {
@@ -71,35 +108,6 @@ namespace quda {
 
 
 
-    void hisqForceInitCuda(QudaGaugeParam* param)
-    {
-/*
-      static int hisq_force_init_cuda_flag = 0; 
-
-      if (hisq_force_init_cuda_flag){
-        return;
-      }
-      hisq_force_init_cuda_flag=1;
-
-      int Vh = param->X[0]*param->X[1]*param->X[2]*param->X[3]/2;
-
-      fat_force_const_t hf_h;
-#ifdef MULTI_GPU
-      int Vh_ex = (param->X[0]+4)*(param->X[1]+4)*(param->X[2]+4)*(param->X[3]+4)/2;
-      hf_h.site_ga_stride = Vh_ex + param->site_ga_pad;
-      hf_h.color_matrix_stride = Vh_ex;
-#else
-      hf_h.site_ga_stride = Vh + param->site_ga_pad;
-      hf_h.color_matrix_stride = Vh;
-#endif
-      hf_h.mom_ga_stride = Vh + param->mom_ga_pad;
-
-      cudaMemcpyToSymbol(hf, &hf_h, sizeof(fat_force_const_t));
-
-      checkCudaError();
-*/
-    }
-
     inline __device__  __host__ int linkIndex(int x[], int dx[], const int X[4]) {
       int y[4];
       for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
@@ -108,7 +116,7 @@ namespace quda {
     }
 
     // Need to look at this again.
-    inline __device__ __host__ int updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned){
+    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned){
       if(shift == 1){
         x[dir] = (partitioned || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
       }else if(shift == -1){
@@ -534,51 +542,6 @@ namespace quda {
       {
         static const int result=5;
       };
-
-
-
-
-
-    // reconstructSign doesn't do anything right now, 
-    // but it will, soon.
-    template<typename T>
-      __device__ void reconstructSign(int* const sign, int dir, const T i[4]){
-
-
-        *sign=1;
-
-        switch(dir){
-          case XUP:
-            if( (i[3]&1)==1) *sign=-1;
-            break;	  
-
-          case YUP:
-            if( ((i[3]+i[0])&1) == 1) *sign=-1; 
-            break;
-
-          case ZUP:
-            if( ((i[3]+i[0]+i[1])&1) == 1) *sign=-1; 
-            break;
-
-          case TUP:
-#ifdef MULTI_GPU	
-            if( (i[3] == X4+1 && PtNm1)
-                || (i[3] == 1 && Pt0)) {
-              *sign=-1; 
-            }
-#else
-            if(i[3] == X4m1) *sign=-1; 
-#endif
-            break;
-
-          default:
-#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
-            printf("Error: invalid dir\n");
-#endif
-            break;
-        }
-        return;
-      }
 
 
 
@@ -2030,3 +1993,5 @@ namespace quda {
 
   } // namespace fermion_force
 } // namespace quda
+
+#endif // GPU_HISQ_FORCE

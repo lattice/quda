@@ -145,7 +145,6 @@ static void
 hisq_force_test()
 {
   hisq_force_init();
-  fermion_force::hisqForceInitCuda(&gaugeParam);
 
   TimeProfile profile("dummy");
 #define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)

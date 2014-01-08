@@ -115,7 +115,6 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 #endif
 
   int y[4] = {x[0], x[1], x[2], x[3]};
-  int y_idx;
 
   mymu = posDir(mu);
 
@@ -219,7 +218,6 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
     addMatrixToNewOprod(Oy.data, sig, new_sid, coeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
   }
 
-//#endif  
   return;
 }
 
@@ -248,12 +246,12 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 
 
   /*        A________B
-   *           *   mu   |        |
-   *              *      D|        |C
-   *                 *    
-   *                    *   A is the current point (sid)
-   *                       *
-   *                          */
+   *   mu   |        |
+   *       D|        |C
+   *    
+   *   A is the current point (sid)
+   *
+   */
 
   int point_b, point_c, point_d;
   int ad_link_nbr_idx, ab_link_nbr_idx, bc_link_nbr_idx;
