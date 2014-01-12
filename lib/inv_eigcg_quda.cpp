@@ -27,6 +27,7 @@ A. Stathopolous and K. Orginos, arXiv:0707.0131
 
 namespace quda {
  
+
    template<typename Float, typename CudaComplex>
    class EigCGArgs{
      
@@ -35,18 +36,17 @@ namespace quda {
     
       //host Lanczos matrice, and its eigenvalue/vector arrays:
       std::complex<Float> *hTm;//VH A V
-      std::complex<Float> *hTvecm;//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
       Float  *hTvalm;   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
 
       //device Lanczos matrix, and its eigenvalue/vector arrays:
       CudaComplex *dTm;     //VH A V
-      CudaComplex *dTvecm0; //eigenvectors of T[m,  m  ]
+      CudaComplex *dTvecm; //eigenvectors of T[m,  m  ]
       CudaComplex *dTvecm1; //eigenvectors of T[m-1,m-1]
 
       int m;
       int nev;
-      int ldTm;
-
+      int ldm;
+      
       public:
 
       EigCGArgs(int m, int nev);
@@ -54,11 +54,10 @@ namespace quda {
       
       //methods for constructing Lanczos matrix:
       void LoadLanczosDiag(int idx, double alpha, double alpha0, double beta0);
-      void LoadLanczosOffDiag(int idx, double alpha, double beta);
+      void LoadLanczosOffDiag(int idx, double alpha0, double beta0);
       
       //methods for Rayleigh Ritz procedure: 
-      int  RunRayleighRitz();
-      void RestartVm(CudaComplex* vm, const int complex_eigv_len);
+      int RestartVm(CudaComplex* vm, int len);//complex length
 
       //methods 
       void FillLanczosDiag(const int _2nev);
@@ -67,46 +66,42 @@ namespace quda {
 
    template<typename Float, typename CudaComplex>
    EigCGArgs<Float, CudaComplex>::EigCGArgs(int m, int nev): m(m), nev(nev){
+    //include pad?
+    ldm    = m;//naive
        
     //magma initialization:
     const int prec = sizeof(Float);
-    eigcg_magma_args = new BlasMagmaArgs(m, nev, prec);
+    eigcg_magma_args = new BlasMagmaArgs(m, nev, ldm, prec);
 
-    //include pad?
-    ldTm    = m;//naive
-    hTm     = new std::complex<Float>[ldTm*m];//VH A V
-    hTvecm  = new std::complex<Float>[ldTm*m];//eigenvectors of both T[m,  m  ] and T[m-1, m-1] (re-used)
+    hTm     = new std::complex<Float>[ldm*m];//VH A V
     hTvalm  = new Float[m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
 
     //allocate dTm etc. buffers on GPU:
-    cudaMalloc(&dTm, ldTm*m*sizeof(CudaComplex));//  
-    cudaMalloc(&dTvecm0, ldTm*m*sizeof(CudaComplex));  
-    cudaMalloc(&dTvecm1, ldTm*m*sizeof(CudaComplex));  
+    cudaMalloc(&dTm, ldm*m*sizeof(CudaComplex));//  
+    cudaMalloc(&dTvecm, ldm*m*sizeof(CudaComplex));  
+    cudaMalloc(&dTvecm1, ldm*m*sizeof(CudaComplex));  
 
     //set everything to zero:
-    cudaMemset(dTm, 0, ldTm*m*sizeof(CudaComplex));//?
-    cudaMemset(dTvecm0, 0, ldTm*m*sizeof(CudaComplex));
-    cudaMemset(dTvecm1, 0, ldTm*m*sizeof(CudaComplex));
+    cudaMemset(dTm, 0, ldm*m*sizeof(CudaComplex));//?
+    cudaMemset(dTvecm, 0, ldm*m*sizeof(CudaComplex));
+    cudaMemset(dTvecm1, 0, ldm*m*sizeof(CudaComplex));
 
     //Error check...
     checkCudaError();
-   
+
     return;
   }
 
   template<typename Float, typename CudaComplex>
   EigCGArgs<Float, CudaComplex>::~EigCGArgs() {
     delete[] hTm;
-    delete[] hTvecm;
     delete[] hTvalm;
 
     cudaFree(dTm);
-    cudaFree(dTvecm0);
+    cudaFree(dTvecm);
     cudaFree(dTvecm1);
 
     delete eigcg_magma_args;
-
-    checkCudaError();
 
     return;
   }
@@ -114,42 +109,59 @@ namespace quda {
   template<typename Float, typename CudaComplex>
   void EigCGArgs<Float, CudaComplex>::LoadLanczosDiag(int idx, double alpha, double alpha0, double beta0)
   {
-    hTm[idx*ldTm+idx] = std::complex<Float>((Float)(1.0/alpha + beta0/alpha0), 0.0);
+    hTm[idx*ldm+idx] = std::complex<Float>((Float)(1.0/alpha + beta0/alpha0), 0.0);
     return;
   } 
 
   template<typename Float, typename CudaComplex>
   void EigCGArgs<Float, CudaComplex>::LoadLanczosOffDiag(int idx, double alpha, double beta)
   {
-    hTm[(idx+1)*ldTm+idx] = std::complex<Float>((Float)(-sqrt(beta)/alpha), 0.0f);//'U' 
-    hTm[idx*ldTm+(idx+1)] = hTm[(idx+1)*ldTm+idx];//'L'
+    hTm[(idx+1)*ldm+idx] = std::complex<Float>((Float)(-sqrt(beta)/alpha), 0.0f);//'U' 
+    hTm[idx*ldm+(idx+1)] = hTm[(idx+1)*ldm+idx];//'L'
     return;
   }
 
   template<typename Float, typename CudaComplex>
-  int EigCGArgs<Float, CudaComplex>::RunRayleighRitz() 
-  { 
-    //Create device version of the Lanczos matrix:
-    cudaMemcpy(dTm, hTm, ldTm*m*sizeof(CudaComplex), cudaMemcpyDefault);//!
-           
-    //run RayleighRitz: 
-    int _2nev = eigcg_magma_args->RayleighRitz((void*)dTm, (void*)dTvecm0, (void*)dTvecm1, (void*)hTvecm, (void*)hTvalm);
-
-    return _2nev; 
-  }
-
-  template<typename Float, typename CudaComplex>
-  void EigCGArgs<Float, CudaComplex>::RestartVm(CudaComplex* v, const int complex_eigv_len) 
+  int EigCGArgs<Float, CudaComplex>::RestartVm(CudaComplex* v, int len) 
   {
-    eigcg_magma_args->Restart_2nev_vectors((void*)v, (void*)dTm, complex_eigv_len);
-    return;
+    //Create device version of the Lanczos matrix:
+    cudaMemcpy(dTm, hTm, ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);//!
+
+    //Solve m-dimensional eigenproblem:
+    cudaMemcpy(dTvecm, dTm,   ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);
+    eigcg_magma_args->MagmaHEEVD((void*)dTvecm, (void*)hTvalm, m);
+
+    //Solve (m-1)-dimensional eigenproblem:
+    cudaMemcpy(dTvecm1, dTm,   ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);
+    eigcg_magma_args->MagmaHEEVD((void*)dTvecm1, (void*)hTvalm, m-1);
+
+    //Zero the last row (coloumn-major format of the matrix re-interpreted as 2D row-major formated):
+    cudaMemset2D(&dTvecm1[(m-1)], ldm*sizeof(CudaComplex), 0, sizeof(CudaComplex),  (m-1));
+
+    //Attach nev old vectors to nev new vectors (note 2*nev << m):
+    cudaMemcpy(&dTvecm[ldm*nev], dTvecm1, ldm*nev*sizeof(CudaComplex), cudaMemcpyDefault);
+
+    //Perform QR-factorization and compute QH*Tm*Q:
+    int i = eigcg_magma_args->MagmaORTH_2nev((void*)dTvecm, (void*)dTm);
+
+    //Solve 2nev-dimensional eigenproblem:
+    eigcg_magma_args->MagmaHEEVD((void*)dTm, (void*)hTvalm, i);
+
+    //solve zero unused part of the eigenvectors in dTm:
+    cudaMemset2D(&(dTm[i]), ldm*sizeof(CudaComplex), 0, (m-i)*sizeof(CudaComplex), i);//check..
+
+    //Restart V:
+    eigcg_magma_args->RestartV((void*)v, len, (void*)dTvecm, (void*)dTm);
+
+    return i;
   }
+
 
   template<typename Float, typename CudaComplex>
   void EigCGArgs<Float, CudaComplex>::FillLanczosDiag(const int _2nev)
  {
-    memset(hTm, 0, ldTm*m*sizeof(std::complex<Float>));
-    for (int i = 0; i < _2nev; i++) hTm[i*ldTm+i]= hTvalm[i];//fill-up diagonal
+    memset(hTm, 0, ldm*m*sizeof(std::complex<Float>));
+    for (int i = 0; i < _2nev; i++) hTm[i*ldm+i]= hTvalm[i];//fill-up diagonal
 
     return;
  }
@@ -161,8 +173,8 @@ namespace quda {
     for (int i = 0; i < _2nev; i++){
        std::complex<double> s = cDotProductCuda(*v, u->Eigenvec(i));
        s *= inv_sqrt_r2;
-       hTm[_2nev*ldTm+i] = std::complex<Float>((Float)s.real(), (Float)s.imag());
-       hTm[i*ldTm+_2nev] = conj(hTm[_2nev*ldTm+i]);
+       hTm[_2nev*ldm+i] = std::complex<Float>((Float)s.real(), (Float)s.imag());
+       hTm[i*ldm+_2nev] = conj(hTm[_2nev*ldm+i]);
     }
   }
 
@@ -186,7 +198,7 @@ namespace quda {
        if(param.nev >= param.m / 2 ) errorQuda("\nThe eigenvector window is too big! (Or the search space is too small..)\n");
        //Create an eigenvector set:
        eigvParam->create   = QUDA_ZERO_FIELD_CREATE;
-       eigvParam->setPrecision(QUDA_SINGLE_PRECISION);//eigCG internal search space is in single precision (currently)
+       eigvParam->setPrecision(QUDA_SINGLE_PRECISION);//eigCG internal search space precision: must be adjustable.
        eigvParam->eigv_dim = param.m;
 
        Vm = new cudaColorSpinorField(*eigvParam); //search space for Ritz vectors
@@ -373,11 +385,9 @@ namespace quda {
 
       //Begin Rayleigh-Ritz procedure:
       if (l == param.m){
-         int _2nev = eigcg_args->RunRayleighRitz();
-
-         //Compute Ritz vectors : V=V(n, m)*dTm(m, l)
-         int complex_eigv_len = Vm->EigvLength() / 2;//EigvLength() includes complex
-         eigcg_args->RestartVm((cuComplex*)Vm->V(), complex_eigv_len);           
+         //Restart search space : 
+         int complex_len = Vm->EigvLength() / 2;
+         int _2nev = eigcg_args->RestartVm((cuComplex*)Vm->V(), complex_len);           
 
          //Fill-up diagonal elements of the matrix T
          eigcg_args->FillLanczosDiag(_2nev);
@@ -407,8 +417,8 @@ namespace quda {
       axCuda(scale, Vm->Eigenvec(l-1));
 
       //end of RR-procedure
-
       alpha0 = alpha;
+
       pAp    = reDotProductCuda(p, Ap);
       alpha  = r2 / pAp; 
          
@@ -470,7 +480,9 @@ namespace quda {
     delete eigcg_args;
 
 //Copy nev eigvectors:
-    Vm->CopyEigenvecSubset(e, param.nev);
+
+    //Vm->CopyEigenvecSubset(e, param.nev);//bug here... temporal solution:
+    for(int i = 0; i < param.nev; i++) copyCuda(e.Eigenvec(i), Vm->Eigenvec(i));
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
@@ -675,6 +687,7 @@ namespace quda {
         //launch initCG:
         (*initCG)(*out, *in);
      } 
+
 //in main routine don't forget: solverParam.updateInvertParam(*param);
      param.rhs_idx++;
 

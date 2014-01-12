@@ -13,7 +13,7 @@
 #endif
 
 //magma library interface 
-//required for Incremental EigCG solver
+//required for (incremental) EigCG solver
 
    class BlasMagmaArgs{
     private:
@@ -22,7 +22,7 @@
       int m;
       int nev;
       int prec;
-      int complex_prec;
+      int ldm;//(may include padding)
 
       //general magma library parameters:	
       int info;
@@ -31,40 +31,39 @@
       bool alloc;
 
       //magma params/objects:
-      int ldTm;//hTm (host/device)ld (may include padding)
-
-      int nb;
-
       int llwork; 
       int lrwork;
       int liwork;
 
       int sideLR;
 
-      int htsize;//MIN(l,k)-number of Householder vectors, but we always have k <= MIN(m,n)
+      int htsize;//MIN(l,k)-number of Householder reflectors, but we always have k <= MIN(m,n)
       int dtsize;//in general: MIN(m,k) for side = 'L' and MIN(n,k) for side = 'R'
 
       int lwork_max; 
 
       void *W;
+      void *W2;
       void *hTau;
       void *dTau;
 
       void *lwork;
       void *rwork;
-      int       *iwork;
+      int  *iwork;
 
     public:
       BlasMagmaArgs(const int prec);
-      BlasMagmaArgs(const int m, const int nev, const int prec);
+      BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec);
 
       ~BlasMagmaArgs();
 
       //Collection of methods for EigCG solver:
-      int RayleighRitz(void *dTm, void *dTvecm0, void *dTvecm1,  void *hTvecm,  void *hTvalm);
+      void MagmaHEEVD(void *dTvecm, void *hTvalm, const int problem_size);
+      //
+      int  MagmaORTH_2nev(void *dTvecm, void *dTm);
+      //
+      void RestartV(void *dV, int ldn, void *dTevecm, void *dTm);
 
-      void Restart_2nev_vectors(void *dVm, void *dQ, const int len);
-      
       //Collection of methods used for the initial guess vector deflation:
 
       //this accepts host routines, and employ either CPU or GPU, depending on problem size etc.
