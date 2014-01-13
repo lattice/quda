@@ -22,6 +22,8 @@
 #include <hisq_links_quda.h>
 #include <algorithm>
 #include <staggered_oprod.h>
+#include <ks_improved_force.h>
+#include <ks_force_quda.h>
 
 #ifdef NUMA_AFFINITY
 #include <numa_affinity.h>
@@ -137,6 +139,8 @@ static TimeProfile profileCloverTrace("computeCloverTraceQuda");
 //!<Profiler for computeStaggeredOprodQuda
 static TimeProfile profileStaggeredOprod("computeStaggeredOprodQuda");
 
+//!<Profiler for computeAsqtadForceQuda
+static TimeProfile profileAsqtadForce("computeAsqtadForceQuda");
 
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
@@ -833,6 +837,7 @@ void endQuda(void)
     profileCloverDerivative.Print();
     profileCloverTrace.Print();
     profileStaggeredOprod.Print();
+    profileAsqtadForce.Print();
     profileEnd.Print();
 
     printfQuda("\n");
@@ -951,8 +956,8 @@ namespace quda {
   }
 
   void massRescale(QudaDslashType dslash_type, double &kappa, double &mass, 
-		   QudaSolutionType solution_type, 
-		   QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
+      QudaSolutionType solution_type, 
+      QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
   {   
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
@@ -1501,7 +1506,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   massRescale(param->dslash_type, param->kappa, param->mass, 
-	      param->solution_type, param->mass_normalization, *in);
+      param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -1996,7 +2001,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   setTuning(param->tune);
 
   massRescale(param->dslash_type, param->kappa, param->mass,
-	      param->solution_type, param->mass_normalization, *b);
+      param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];
   for(int i=0; i < param->num_offset; i++){ 
     unscaled_shifts[i] = param->offset[i];
@@ -2321,7 +2326,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   setTuning(param->tune);
 
   massRescale(param->dslash_type, param->kappa, param->mass,
-	      param->solution_type, param->mass_normalization, *b);
+      param->solution_type, param->mass_normalization, *b);
   double *unscaled_shifts = new double [param->num_offset];
   for(int i=0; i < param->num_offset; i++){ 
     unscaled_shifts[i] = param->offset[i];
@@ -2913,9 +2918,9 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
 {
 
   /*printfQuda("GaugeForce: use_resident_gauge = %d, make_resident_gauge = %d\n", 
-	     qudaGaugeParam->use_resident_gauge, qudaGaugeParam->make_resident_gauge);
-  printfQuda("GaugeForce: use_resident_mom = %d, make_resident_mom = %d\n", 
-  qudaGaugeParam->use_resident_mom, qudaGaugeParam->make_resident_mom);*/
+    qudaGaugeParam->use_resident_gauge, qudaGaugeParam->make_resident_gauge);
+    printfQuda("GaugeForce: use_resident_mom = %d, make_resident_mom = %d\n", 
+    qudaGaugeParam->use_resident_mom, qudaGaugeParam->make_resident_mom);*/
 
 #ifdef GPU_GAUGE_FORCE
   profileGaugeForce.Start(QUDA_PROFILE_TOTAL);
@@ -2947,9 +2952,9 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct = qudaGaugeParam->reconstruct;
     gParam.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
-		    qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
+        qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
       QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
-    
+
     cudaSiteLink = new cudaGaugeField(gParam);  
     profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
 
@@ -3508,8 +3513,163 @@ void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
 }
 
 
+void computeAsqtadForce(void* const milc_momentum,
+    const double act_path_coeff[6],
+    const void* const one_link_src[4],
+    const void* const naik_src[4],
+    const void* const link,
+    const QudaGaugeParam* gParam)
+{
 
+  using namespace quda::fermion_force;
+  profileAsqtadForce.Start(QUDA_PROFILE_TOTAL);
+  profileAsqtadForce.Start(QUDA_PROFILE_INIT);
 
+  cudaGaugeField *cudaGauge = NULL;
+  cpuGaugeField *cpuGauge = NULL;
+  cudaGaugeField *cudaInForce = NULL;
+  cpuGaugeField *cpuOneLinkInForce = NULL;
+  cpuGaugeField *cpuNaikInForce = NULL;
+  cudaGaugeField *cudaOutForce = NULL;
+  cudaGaugeField *cudaMom = NULL;
+  cpuGaugeField *cpuMom = NULL;
+
+#ifdef MULTI_GPU
+  cudaGaugeField *cudaGauge_ex = NULL;
+  cudaGaugeField *cudaInForce_ex = NULL;
+  cudaGaugeField *cudaOutForce_ex = NULL;
+#endif
+
+  GaugeFieldParam param(0, *gParam);
+  param.create = QUDA_NULL_FIELD_CREATE;
+  param.anisotropy = 1.0;
+  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  param.t_boundary = QUDA_PERIODIC_T;
+  param.nFace = 1;
+
+  param.link_type = QUDA_GENERAL_LINKS;
+  param.reconstruct = QUDA_RECONSTRUCT_NO;
+  param.create = QUDA_REFERENCE_FIELD_CREATE;
+
+  // create host fields
+  param.gauge = (void*)link;
+  cpuGauge = new cpuGaugeField(param);
+
+  param.order = QUDA_QDP_GAUGE_ORDER;  
+  param.gauge = (void*)one_link_src;
+  cpuOneLinkInForce = new cpuGaugeField(param);
+
+  param.gauge = (void*)naik_src;
+  cpuNaikInForce = new cpuGaugeField(param);
+
+  param.order = QUDA_MILC_GAUGE_ORDER;
+  param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  param.reconstruct = QUDA_RECONSTRUCT_10;
+  param.gauge = milc_momentum;
+  cpuMom = new cpuGaugeField(param);
+
+  // create device fields
+  param.create = QUDA_NULL_FIELD_CREATE;
+  param.link_type = QUDA_GENERAL_LINKS;
+  param.reconstruct = QUDA_RECONSTRUCT_NO;
+  param.order =  QUDA_FLOAT2_GAUGE_ORDER;
+
+  cudaGauge    = new cudaGaugeField(param);
+  cudaInForce  = new cudaGaugeField(param);
+  cudaOutForce = new cudaGaugeField(param);
+
+  param.link_type = QUDA_ASQTAD_MOM_LINKS;
+  param.reconstruct = QUDA_RECONSTRUCT_10;
+  cudaMom = new cudaGaugeField(param);
+
+#ifdef MULTI_GPU
+  for(int dir=0; dir<4; ++dir) param.x[dir] += 4;
+  param.link_type = QUDA_GENERAL_LINKS;
+  param.create = QUDA_ZERO_FIELD_CREATE;
+  param.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  cudaGauge_ex    = new cudaGaugeField(param);
+  cudaInForce_ex  = new cudaGaugeField(param);
+  cudaOutForce_ex = new cudaGaugeField(param);
+#endif
+  profileAsqtadForce.Stop(QUDA_PROFILE_INIT);
+
+#ifdef MULTI_GPU
+  int R[4] = {2, 2, 2, 2};
+#endif
+
+  profileAsqtadForce.Start(QUDA_PROFILE_H2D);
+  cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  profileAsqtadForce.Stop(QUDA_PROFILE_H2D);
+#ifdef MULTI_GPU
+  cudaMemset((void**)(cudaInForce_ex->Gauge_p()), 0, cudaInForce_ex->Bytes());
+  copyExtendedGauge(*cudaGauge_ex, *cudaGauge, QUDA_CUDA_FIELD_LOCATION);
+  cudaGauge_ex->exchangeExtendedGhost(R,true);
+#endif
+
+  profileAsqtadForce.Start(QUDA_PROFILE_H2D);
+  cudaInForce->loadCPUField(*cpuOneLinkInForce, QUDA_CPU_FIELD_LOCATION);
+  profileAsqtadForce.Stop(QUDA_PROFILE_H2D);
+#ifdef MULTI_GPU
+  cudaMemset((void**)(cudaInForce_ex->Gauge_p()), 0, cudaInForce_ex->Bytes());
+  copyExtendedGauge(*cudaInForce_ex, *cudaInForce, QUDA_CUDA_FIELD_LOCATION);
+  cudaInForce_ex->exchangeExtendedGhost(R,true);
+#endif
+
+  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  cudaMemset((void**)(cudaOutForce_ex->Gauge_p()), 0, cudaOutForce_ex->Bytes());
+  profileAsqtadForce.Start(QUDA_PROFILE_COMPUTE);
+#ifdef MULTI_GPU
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex);
+#else
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
+#endif
+  profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
+
+  profileAsqtadForce.Start(QUDA_PROFILE_H2D);
+  cudaInForce->loadCPUField(*cpuNaikInForce, QUDA_CPU_FIELD_LOCATION); 
+#ifdef MULTI_GPU
+  copyExtendedGauge(*cudaInForce_ex, *cudaInForce, QUDA_CUDA_FIELD_LOCATION);
+  cudaInForce_ex->exchangeExtendedGhost(R,true);
+#endif
+  profileAsqtadForce.Stop(QUDA_PROFILE_H2D);
+
+  profileAsqtadForce.Start(QUDA_PROFILE_COMPUTE);
+#ifdef MULTI_GPU
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex);
+  completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION);
+#else
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
+  hisqCompleteForceCuda(gaugeParam, *cudaOutForce, *cudaGauge, cudaMom);
+#endif
+  profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
+
+  profileAsqtadForce.Start(QUDA_PROFILE_D2H);
+  cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  profileAsqtadForce.Stop(QUDA_PROFILE_D2H);
+
+  profileAsqtadForce.Start(QUDA_PROFILE_FREE);
+  delete cudaInForce;
+  delete cudaOutForce;
+  delete cudaGauge;
+  delete cudaMom;
+#ifdef MULTI_GPU
+  delete cudaInForce_ex;
+  delete cudaOutForce_ex;
+  delete cudaGauge_ex;
+#endif
+
+  delete cpuGauge;
+  delete cpuOneLinkInForce;
+  delete cpuNaikInForce;
+  delete cpuMom;
+
+  profileAsqtadForce.Stop(QUDA_PROFILE_FREE);
+
+  profileAsqtadForce.Stop(QUDA_PROFILE_TOTAL);
+  return;
+}
 
 
 
@@ -3676,9 +3836,9 @@ void updateGaugeFieldQuda(void* gauge,
   profileGaugeUpdate.Start(QUDA_PROFILE_H2D);
 
   /*printfQuda("UpdateGaugeFieldQuda use_resident_gauge = %d, make_resident_gauge = %d\n", 
-	     param->use_resident_gauge, param->make_resident_gauge);
-  printfQuda("UpdateGaugeFieldQuda use_resident_mom = %d, make_resident_mom = %d\n", 
-  param->use_resident_mom, param->make_resident_mom);*/
+    param->use_resident_gauge, param->make_resident_gauge);
+    printfQuda("UpdateGaugeFieldQuda use_resident_mom = %d, make_resident_mom = %d\n", 
+    param->use_resident_mom, param->make_resident_mom);*/
 
   if (!param->use_resident_gauge) {   // load fields onto the device
     cudaInGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
@@ -3701,7 +3861,7 @@ void updateGaugeFieldQuda(void* gauge,
   // perform the update
   profileGaugeUpdate.Start(QUDA_PROFILE_COMPUTE);
   updateGaugeField(*cudaOutGauge, dt, *cudaInGauge, *cudaMom, 
-		   (bool)conj_mom, (bool)exact);
+      (bool)conj_mom, (bool)exact);
   profileGaugeUpdate.Stop(QUDA_PROFILE_COMPUTE);
 
   // copy the gauge field back to the host

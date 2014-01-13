@@ -8,7 +8,7 @@
 #include "fat_force_quda.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
-#include "hisq_force_quda.h"
+#include "ks_improved_force.h"
 #include "hw_quda.h"
 #include <fat_force_quda.h>
 #include <face_quda.h>

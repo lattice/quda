@@ -172,7 +172,7 @@ extern "C" {
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
-  
+
     double clover_coeff;                   /**< Coefficient of the clover term */
 
     int compute_clover_trlog;              /**< Whether to compute the trace log of the clover term */
@@ -432,7 +432,7 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, 
-			      void **_hp_yo, void *_hp_b, QudaInvertParam *param);
+      void **_hp_yo, void *_hp_b, QudaInvertParam *param);
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -513,8 +513,8 @@ extern "C" {
    * @param timeinfo
    */
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
-			    void* loop_coeff, int num_paths, int max_length, double dt,
-			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
+      void* loop_coeff, int num_paths, int max_length, double dt,
+      QudaGaugeParam* qudaGaugeParam, double* timeinfo);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
@@ -528,7 +528,7 @@ extern "C" {
    * @param param The parameters of the external fields and the computation settings
    */
   void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, 
-			    int conj_mom, int exact, QudaGaugeParam* param);
+      int conj_mom, int exact, QudaGaugeParam* param);
 
 
   /**
@@ -536,7 +536,7 @@ extern "C" {
    * Return a pointer to the extended gauge field.
    */
   void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
-  
+
   void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
 
   void  saveGaugeField(void* outGauge, void* inGauge, QudaGaugeParam* param);
@@ -555,8 +555,8 @@ extern "C" {
   void computeCloverTraceQuda(void* out, void* clover, int mu, int nu, int dim[4]);
 
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
-                                   double coeff,
-                                   QudaParity parity, QudaGaugeParam* param, int conjugate);
+      double coeff,
+      QudaParity parity, QudaGaugeParam* param, int conjugate);
 
   /**
    * Compute the quark-field outer product needed for gauge generation
@@ -571,6 +571,21 @@ extern "C" {
 
   void computeStaggeredForceQuda(void* mom, void* quark, double* coeff);
 
+  /**
+   * Compute the fermion force for the asqtad quark action. 
+   * @param momentum          The momentum contribution from the quark action.
+   * @param act_path_coeff    The coefficients that define the asqtad action.
+   * @param one_link_src      The quark field outer product corresponding to the one-link term in the action. 
+   * @param naik_src          The quark field outer product corresponding to the naik term in the action.
+   * @param link              The gauge field.
+   * @param param             The field parameters.
+   */
+  void computeAsqtadForceQuda(void* const momentum,
+        const double act_path_coeff[6],
+        const void* const one_link_src[4],
+        const void* const naik_src[4],
+        const void* const link,
+        const QudaGaugeParam* gParam);
 
 #ifdef __cplusplus
 }

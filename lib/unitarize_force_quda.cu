@@ -4,9 +4,12 @@
 #include <iomanip>
 #include <cuda.h>
 #include <gauge_field.h>
+#include <tune_quda.h>
 
 #include <quda_matrix.h>
 #include <svd_quda.h>
+
+#ifdef GPU_HISQ_FORCE
 
 namespace quda{
 
@@ -22,8 +25,6 @@ __constant__ bool DEV_REUNIT_SVD_ONLY;
 __constant__ double DEV_REUNIT_SVD_REL_ERROR;
 __constant__ double DEV_REUNIT_SVD_ABS_ERROR;
 
-
- 
 static double HOST_HISQ_UNITARIZE_EPS;
 static double HOST_HISQ_FORCE_FILTER;
 static double HOST_MAX_DET_ERROR;
@@ -31,7 +32,6 @@ static bool   HOST_REUNIT_ALLOW_SVD;
 static bool   HOST_REUNIT_SVD_ONLY;
 static double HOST_REUNIT_SVD_REL_ERROR;
 static double HOST_REUNIT_SVD_ABS_ERROR;
-
 
 
  
@@ -47,6 +47,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       static bool not_set=true;
 		
       if(not_set){
+
 	cudaMemcpyToSymbol(DEV_HISQ_UNITARIZE_EPS, &unitarize_eps_h, sizeof(double));
 	cudaMemcpyToSymbol(DEV_HISQ_FORCE_FILTER, &hisq_force_filter_h, sizeof(double));
 	cudaMemcpyToSymbol(DEV_MAX_DET_ERROR, &max_det_error_h, sizeof(double));
@@ -54,7 +55,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ONLY, &svd_only_h, sizeof(bool));
 	cudaMemcpyToSymbol(DEV_REUNIT_SVD_REL_ERROR, &svd_rel_error_h, sizeof(double));
 	cudaMemcpyToSymbol(DEV_REUNIT_SVD_ABS_ERROR, &svd_abs_error_h, sizeof(double));
-	
+
 	HOST_HISQ_UNITARIZE_EPS = unitarize_eps_h;
 	HOST_HISQ_FORCE_FILTER = hisq_force_filter_h;
 	HOST_MAX_DET_ERROR = max_det_error_h;     
@@ -62,7 +63,6 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	HOST_REUNIT_SVD_ONLY = svd_only_h;
 	HOST_REUNIT_SVD_REL_ERROR = svd_rel_error_h;
 	HOST_REUNIT_SVD_ABS_ERROR = svd_abs_error_h;
-
 	not_set = false;
       }
       checkCudaError();
@@ -541,7 +541,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     } // getUnitarizeForceField
 
 
-    void unitarizeForceCPU(const QudaGaugeParam& param, cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
+    void unitarizeForceCPU(cpuGaugeField& cpuOldForce, cpuGaugeField& cpuGauge, cpuGaugeField* cpuNewForce)
     {
       
       int num_failures = 0;	
@@ -554,12 +554,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       if(order == QUDA_MILC_GAUGE_ORDER){
         for(int i=0; i<cpuGauge.Volume(); ++i){
 	  for(int dir=0; dir<4; ++dir){
-	    if(param.cpu_prec == QUDA_SINGLE_PRECISION){
+	    if(cpuGauge.Precision() == QUDA_SINGLE_PRECISION){
 	      copyArrayToLink(&old_force, ((float*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
 	      copyArrayToLink(&v, ((float*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
 	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
 	      copyLinkToArray(((float*)(cpuNewForce->Gauge_p()) + (i*4 + dir)*18), new_force); 
-	    }else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
+	    }else if(cpuGauge.Precision() == QUDA_DOUBLE_PRECISION){
 	      copyArrayToLink(&old_force, ((double*)(cpuOldForce.Gauge_p()) + (i*4 + dir)*18)); 
 	      copyArrayToLink(&v, ((double*)(cpuGauge.Gauge_p()) + (i*4 + dir)*18)); 
 	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
@@ -570,12 +570,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       }else if(order == QUDA_QDP_GAUGE_ORDER){
         for(int dir=0; dir<4; ++dir){
           for(int i=0; i<cpuGauge.Volume(); ++i){
-	    if(param.cpu_prec == QUDA_SINGLE_PRECISION){
+	    if(cpuGauge.Precision() == QUDA_SINGLE_PRECISION){
 	      copyArrayToLink(&old_force, ((float**)(cpuOldForce.Gauge_p()))[dir] + i*18);
 	      copyArrayToLink(&v, ((float**)(cpuGauge.Gauge_p()))[dir] + i*18);
 	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
 	      copyLinkToArray(((float**)(cpuNewForce->Gauge_p()))[dir] + i*18, new_force);
-	    }else if(param.cpu_prec == QUDA_DOUBLE_PRECISION){
+	    }else if(cpuGauge.Precision() == QUDA_DOUBLE_PRECISION){
 	      copyArrayToLink(&old_force, ((double**)(cpuOldForce.Gauge_p()))[dir] + i*18);
 	      copyArrayToLink(&v, ((double**)(cpuGauge.Gauge_p()))[dir] + i*18);
 	      getUnitarizeForceSite<double2>(v, old_force, &new_force, &num_failures);
@@ -642,9 +642,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       }  
     }; // UnitarizeForceCuda
 
-    void unitarizeForceCuda(const QudaGaugeParam &param, cudaGaugeField &cudaOldForce,
+    void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
                             cudaGaugeField &cudaGauge, cudaGaugeField *cudaNewForce, int* unitarization_failed) {
+
+      checkCudaError();
       UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
+      checkCudaError();
       unitarizeForce.apply(0);
       checkCudaError();
     }
@@ -653,4 +656,4 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
   } // namespace fermion_force
 } // namespace quda
 
-
+#endif
