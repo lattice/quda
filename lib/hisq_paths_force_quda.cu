@@ -1520,10 +1520,12 @@ namespace quda {
               int sig, cudaGaugeField &mom, const QudaGaugeParam &param) :
             link(link), oprod(oprod), sig(sig), mom(mom)
         {  
+
           for(int dir=0; dir<4; ++dir){
             X[dir] = param.X[dir];
             kparam.X[dir] = X[dir];
           }
+          kparam.threads = X[0]*X[1]*X[2]*X[3]/2;
           kparam.setStride(param);
         }
 
