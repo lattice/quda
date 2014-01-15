@@ -3641,7 +3641,7 @@ void computeAsqtadForce(void* const milc_momentum,
   completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION);
 #else
   hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
-  hisqCompleteForceCuda(gParam, *cudaOutForce, *cudaGauge, cudaMom);
+  hisqCompleteForceCuda(*gParam, *cudaOutForce, *cudaGauge, cudaMom);
 #endif
   profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
 
