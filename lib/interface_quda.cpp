@@ -1705,9 +1705,9 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       CG cg(m, mSloppy, solverParam, profileMulti);
       cg(*x[i], *b);        
 
-      solverParam.updateInvertParam(*param);
-      param->true_res_offset[i] = param->true_res;
-      param->true_res_hq_offset[i] = param->true_res_hq;
+      solverParam.true_res_offset[i] = solverParam.true_res;
+      solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
+      solverParam.updateInvertParam(*param, i);
 
       if (param->dslash_type == QUDA_ASQTAD_DSLASH ) { 
         dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
