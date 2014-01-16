@@ -2702,7 +2702,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     }
 #endif
     profileFatLink.Start(QUDA_PROFILE_H2D);
-    loadLinkToGPU(cudaSiteLink, cpuSiteLink, qudaGaugeParam);
+    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
     profileFatLink.Stop(QUDA_PROFILE_H2D);
 
   } else {
