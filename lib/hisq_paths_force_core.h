@@ -111,6 +111,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   oddBit = _oddBit ^ oddness_change;
 
 #else
+  int E[4] = {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
 #endif
 
@@ -270,6 +271,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   int new_sid = linkIndex(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
+  int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
 #endif
 
@@ -426,6 +428,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   int new_sid = linkIndex(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
+  int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
 #endif
 
@@ -528,6 +531,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   int new_sid = linkIndex(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
+  int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
 #endif
 
@@ -646,6 +650,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   int new_sid = linkIndex(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
+  int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
 #endif
 
@@ -768,6 +773,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
   for(int i=0; i<4; ++i) x[i] += 2;
   int new_sid = linkIndex(x,dx,E);
 #else
+  int E[4] = {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
 #endif
 
