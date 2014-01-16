@@ -7,11 +7,14 @@
 #include <tune_quda.h>
 
 #include <quda_matrix.h>
-#include <svd_quda.h>
 
 #ifdef GPU_HISQ_FORCE
 
 namespace quda{
+
+namespace { // anonymous
+#include <svd_quda.h>
+}
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0

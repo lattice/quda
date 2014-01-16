@@ -5,12 +5,17 @@
 #include <cuda.h>
 #include <gauge_field.h>
 
+#include <tune_quda.h>
 #include <quda_matrix.h>
-#include <svd_quda.h>
 #include <hisq_links_quda.h>
+
+#ifdef GPU_UNITARIZE
 
 namespace quda{
 
+namespace{
+  #include <svd_quda.h>
+}
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
@@ -360,8 +365,8 @@ namespace quda{
     inlink  = inlink_even;
     outlink = outlink_even;
     
-    if(mem_idx >= Vh){
-      mem_idx = mem_idx - Vh;
+    if(mem_idx >= threads/2){
+      mem_idx = mem_idx - (threads/2);
       inlink  = inlink_odd;
       outlink = outlink_odd;
     }
@@ -369,7 +374,7 @@ namespace quda{
     // Unitarization is always done in double precision
     Matrix<double2,3> v, result;
     for(int dir=0; dir<4; ++dir){
-      loadLinkVariableFromArray(inlink, dir, mem_idx, Vh+INPUT_PADDING, &v); 
+      loadLinkVariableFromArray(inlink, dir, mem_idx, (threads/2)+INPUT_PADDING, &v); 
       unitarizeLinkMILC(v, &result);
 #ifdef __CUDA_ARCH__
 #define FL_MAX_ERROR DEV_FL_MAX_ERROR
@@ -388,7 +393,7 @@ namespace quda{
 #endif
 	  }
       }
-      writeLinkVariableToArray(result, dir, mem_idx, Vh+OUTPUT_PADDING, outlink); 
+      writeLinkVariableToArray(result, dir, mem_idx, (threads/2)+OUTPUT_PADDING, outlink); 
     }
     return;
   }
@@ -501,3 +506,5 @@ namespace quda{
   } // is unitary
     
 } // namespace quda
+
+#endif

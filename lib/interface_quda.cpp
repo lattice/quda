@@ -2605,7 +2605,12 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
   qudaGaugeParam_ex->staple_pad   = qudaGaugeParam->staple_pad;
   qudaGaugeParam_ex->site_ga_pad  = qudaGaugeParam->site_ga_pad;
 
+ 
+
+
   GaugeFieldParam gParam(0, *qudaGaugeParam);
+
+
 
   // create the host fatlink
   if (cpuFatLink == NULL) {
@@ -2619,6 +2624,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     cpuFatLink->setGauge((void**)fatlink);
   }
 
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   // create the device fatlink
   if(cudaFatLink == NULL){
     gParam.pad    = qudaGaugeParam->llfat_ga_pad;
@@ -2679,6 +2685,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     gParam.reconstruct = qudaGaugeParam->reconstruct;      
     gParam.order       = (gParam.reconstruct == QUDA_RECONSTRUCT_12) ? 
       QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cudaSiteLink = new cudaGaugeField(gParam);
   }
 

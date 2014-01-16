@@ -282,7 +282,7 @@ llfat_test(int test)
 
     {
       int R[4] = {2,2,2,2};
-      exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, sitelink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0);
+      exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, sitelink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
       computeLongLinkCPU(long_reflink, sitelink_ex, qudaGaugeParam.cpu_prec, coeff);
     }
 #else

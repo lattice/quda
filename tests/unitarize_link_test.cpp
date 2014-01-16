@@ -15,7 +15,7 @@
 #include "fat_force_quda.h"
 #include "hisq_links_quda.h"
 #include "dslash_quda.h"
-#include "hisq_force_quda.h"
+#include "ks_improved_force.h"
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
