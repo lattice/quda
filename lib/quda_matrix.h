@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <cuda.h>
 
-#include <quda_matrix.h>
+#include <float_vector.h>
 
 #include <complex_quda.h>
 
@@ -170,6 +170,7 @@ namespace quda{
       return makeComplex(a.x-b.x,a.y-b.y);
     }
 
+#ifdef __GNU_C__
   template<class Cmplx>
     __device__ __host__ inline Cmplx operator*(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
     {
@@ -177,15 +178,48 @@ namespace quda{
     }
 
   template<class Cmplx>
-    __device__ __host__ inline Cmplx operator/(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
-    {
-      return makeComplex(a.x/scalar,a.y/scalar);
-    }
-
-  template<class Cmplx>
     __device__ __host__ inline Cmplx operator+(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
     {
       return makeComplex(a.x+scalar,a.y);
+    }
+
+  template<class Cmplx>
+    __device__ __host__ inline Cmplx operator*(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & b)
+    {
+      return operator*(b,scalar);
+    }
+#else
+    __device__ __host__ inline double2 operator*(const double2 & a, const double & scalar)
+    {
+      return makeComplex(a.x*scalar,a.y*scalar);
+    }
+
+    __device__ __host__ inline float2 operator*(const float2 & a, const float & scalar)
+    {
+      return makeComplex(a.x*scalar,a.y*scalar);
+    }
+
+  template<class Cmplx, class Float>
+    __device__ __host__ inline Cmplx operator+(const Cmplx & a, const Float & scalar)
+    {
+      return makeComplex(a.x+scalar,a.y);
+    }
+
+  /*__device__ __host__ inline float2 operator*(const float & scalar, const float2 & b)
+  {
+    return makeComplex(b.x*scalar,b.y*scalar);
+  }
+  
+    __device__ __host__ inline double2 operator*(const double & scalar, const double2 & b)
+  {
+    return makeComplex(b.x*scalar,b.y*scalar);
+    }*/
+#endif
+
+  template<class Cmplx>
+    __device__ __host__ inline Cmplx operator/(const Cmplx & a, const typename RealTypeId<Cmplx>::Type & scalar)
+    {
+      return makeComplex(a.x/scalar,a.y/scalar);
     }
 
   template<class Cmplx>
@@ -204,13 +238,6 @@ namespace quda{
     __device__ __host__ inline Cmplx operator-(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & a)
     {
       return makeComplex(scalar-a.x,-a.y);
-    }
-
-
-  template<class Cmplx>
-    __device__ __host__ inline Cmplx operator*(const typename RealTypeId<Cmplx>::Type & scalar, const Cmplx & b)
-    {
-      return operator*(b,scalar);
     }
 
   template<class Cmplx>
