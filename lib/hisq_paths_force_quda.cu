@@ -115,13 +115,16 @@ namespace quda {
       return idx;
     }
 
-    // Need to look at this again.
     inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned){
+#ifdef MULTI_GPU
       if(shift == 1){
         x[dir] = (partitioned || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
       }else if(shift == -1){
         x[dir] = (partitioned || (x[dir] != 2)) ? x[dir]-1 : X[dir]+1;
       }
+#else 
+      x[dir] = (x[dir]+shift + X[dir])%X[dir];
+#endif
       return;
     }
 
