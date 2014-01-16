@@ -3521,6 +3521,7 @@ void computeAsqtadForce(void* const milc_momentum,
     const QudaGaugeParam* gParam)
 {
 
+#ifdef GPU_HISQ_FORCE
   using namespace quda::fermion_force;
   profileAsqtadForce.Start(QUDA_PROFILE_TOTAL);
   profileAsqtadForce.Start(QUDA_PROFILE_INIT);
@@ -3669,6 +3670,11 @@ void computeAsqtadForce(void* const milc_momentum,
 
   profileAsqtadForce.Stop(QUDA_PROFILE_TOTAL);
   return;
+
+#else
+  errorQuda("HISQ force has not been built");
+#endif
+
 }
 
 
