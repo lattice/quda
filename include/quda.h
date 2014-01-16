@@ -221,7 +221,7 @@ extern "C" {
 
     /**Parameters for deflated solvers*/
     int nev;
-    int max_vect_size;//for magma library this parameter must be multiple 16
+    int max_search_dim;//for magma library this parameter must be multiple 16?
     int rhs_idx;
     int deflation_grid;//total deflation space is nev*deflation_grid
 

@@ -480,8 +480,7 @@ namespace quda {
     delete eigcg_args;
 
 //Copy nev eigvectors:
-
-    //Vm->CopyEigenvecSubset(e, param.nev);//bug here... temporal solution:
+    //Vm->CopyEigenvecSubset(e, param.nev);//Warning:currently QUDA cannot copy eigenvector sets ... here is a temporal solution:
     for(int i = 0; i < param.nev; i++) copyCuda(e.Eigenvec(i), Vm->Eigenvec(i));
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);

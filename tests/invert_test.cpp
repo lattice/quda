@@ -197,11 +197,11 @@ int main(int argc, char **argv)
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
     inv_param.nev = 16; //16
-    inv_param.max_vect_size = 144;
+    inv_param.max_search_dim = 144;
     inv_param.deflation_grid = 1;//to test the stuff
   }else{
     inv_param.nev = 0;
-    inv_param.max_vect_size = 0;
+    inv_param.max_search_dim = 0;
   }
 
 #if __COMPUTE_CAPABILITY__ >= 200

@@ -149,7 +149,7 @@ namespace quda {
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      nev(param.nev), m(param.max_vect_size), deflation_grid(param.deflation_grid), rhs_idx(0) //! for IncEigCG
+      nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0) //! for IncEigCG
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
