@@ -266,7 +266,6 @@ namespace quda {
 #else
           for(int dir=0; dir<4; ++dir) threads *= dim[dir];
           for(int dir=0; dir<4; ++dir) X[dir] = dim[dir];
-          for(int dir=0; dir<4; ++dir) border[dir] = 0;
 #endif
         }
 
