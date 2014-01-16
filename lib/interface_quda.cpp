@@ -2711,13 +2711,11 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
 #ifdef MULTI_GPU
     profileFatLink.Start(QUDA_PROFILE_COMMS);
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
-    exchange_cpu_sitelink_ex(qudaGaugeParam->X, R, (void**)cpuSiteLink->Gauge_p(), 
-        cpuSiteLink->Order(),qudaGaugeParam->cpu_prec, 0, 4);
+    cpuSiteLink->exchangeExtendedGhost(R,true);
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
 #endif
-
     profileFatLink.Start(QUDA_PROFILE_H2D);
-    loadLinkToGPU_ex(cudaSiteLink, cpuSiteLink);
+    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
     profileFatLink.Stop(QUDA_PROFILE_H2D);
   }
 
@@ -2727,8 +2725,8 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
 
   // Transfer back to the host
   profileFatLink.Start(QUDA_PROFILE_D2H);
-  storeLinkToCPU(cpuFatLink, cudaFatLink, qudaGaugeParam);
-  if(longlink) storeLinkToCPU(cpuLongLink, cudaLongLink, qudaGaugeParam);
+  cudaFatLink->saveCPUField(*cpuFatLink, QUDA_CPU_FIELD_LOCATION);
+  if(longlink) cudaLongLink->saveCPUField(*cpuLongLink, QUDA_CPU_FIELD_LOCATION);
   profileFatLink.Stop(QUDA_PROFILE_D2H);
 
   profileFatLink.Start(QUDA_PROFILE_FREE);
