@@ -3528,6 +3528,7 @@ void computeAsqtadForce(void* const milc_momentum,
     const QudaGaugeParam* gParam)
 {
 
+#ifdef GPU_HISQ_FORCE
   using namespace quda::fermion_force;
   profileAsqtadForce.Start(QUDA_PROFILE_TOTAL);
   profileAsqtadForce.Start(QUDA_PROFILE_INIT);
@@ -3625,9 +3626,9 @@ void computeAsqtadForce(void* const milc_momentum,
 #endif
 
   cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
-  cudaMemset((void**)(cudaOutForce_ex->Gauge_p()), 0, cudaOutForce_ex->Bytes());
   profileAsqtadForce.Start(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
+  cudaMemset((void**)(cudaOutForce_ex->Gauge_p()), 0, cudaOutForce_ex->Bytes());
   hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex);
 #else
   hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
@@ -3648,7 +3649,7 @@ void computeAsqtadForce(void* const milc_momentum,
   completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION);
 #else
   hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
-  hisqCompleteForceCuda(gaugeParam, *cudaOutForce, *cudaGauge, cudaMom);
+  hisqCompleteForceCuda(*gParam, *cudaOutForce, *cudaGauge, cudaMom);
 #endif
   profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
 
@@ -3676,6 +3677,11 @@ void computeAsqtadForce(void* const milc_momentum,
 
   profileAsqtadForce.Stop(QUDA_PROFILE_TOTAL);
   return;
+
+#else
+  errorQuda("HISQ force has not been built");
+#endif
+
 }
 
 
