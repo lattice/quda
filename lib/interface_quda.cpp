@@ -2573,9 +2573,10 @@ namespace quda {
 } // namespace quda
 
 
+//computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_path_coeff, 
 
   int
-computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_path_coeff, 
+computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_path_coeff, 
     QudaGaugeParam* qudaGaugeParam, 
     QudaComputeFatMethod method)
 {
@@ -2586,6 +2587,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
 
   static cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL, *cpuLongLink=NULL;
   static cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL, *cudaLongLink=NULL;
+  static cudaGaugeField* cudaSiteLink_ex=NULL;
   int flag = qudaGaugeParam->preserve_gauge;
 
   QudaGaugeParam qudaGaugeParam_ex_buf;
@@ -2605,12 +2607,8 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
   qudaGaugeParam_ex->staple_pad   = qudaGaugeParam->staple_pad;
   qudaGaugeParam_ex->site_ga_pad  = qudaGaugeParam->site_ga_pad;
 
- 
-
 
   GaugeFieldParam gParam(0, *qudaGaugeParam);
-
-
 
   // create the host fatlink
   if (cpuFatLink == NULL) {
@@ -2667,15 +2665,13 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     gParam.pad = 0; 
     gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
     gParam.link_type = qudaGaugeParam->type;
-    gParam.order     = qudaGaugeParam->gauge_order;
+    gParam.order      = QUDA_MILC_GAUGE_ORDER;
     gParam.gauge     = sitelink;
-    if(method != QUDA_COMPUTE_FAT_STANDARD){
-      for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam_ex->X[dir];	
-    }
+    for(int dir=0; dir<4; dir++) gParam.x[dir] = qudaGaugeParam->X[dir];
     cpuSiteLink      = new cpuGaugeField(gParam);
     if(cpuSiteLink == NULL) errorQuda("ERROR: Creating cpuSiteLink failed\n");
   } else {
-    cpuSiteLink->setGauge(sitelink);
+    cpuSiteLink->setGauge((void**)sitelink);
   }
 
   if(cudaSiteLink == NULL){
@@ -2688,6 +2684,14 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     cudaSiteLink = new cudaGaugeField(gParam);
   }
+
+  if(cudaSiteLink_ex == NULL){
+  //  gParam.pad = 0;
+    for(int dir=0; dir<4; dir++) gParam.x[dir] = qudaGaugeParam_ex->X[dir];
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    cudaSiteLink_ex = new cudaGaugeField(gParam);
+  }
+
 
   profileFatLink.Stop(QUDA_PROFILE_INIT);
 
@@ -2710,17 +2714,17 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
 
 #ifdef MULTI_GPU
     profileFatLink.Start(QUDA_PROFILE_COMMS);
+    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
-    cpuSiteLink->exchangeExtendedGhost(R,true);
+    copyExtendedGauge(*cudaSiteLink_ex, *cudaSiteLink, QUDA_CUDA_FIELD_LOCATION);
+    cudaSiteLink_ex->exchangeExtendedGhost(R,true);
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
 #endif
-    profileFatLink.Start(QUDA_PROFILE_H2D);
-    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
-    profileFatLink.Stop(QUDA_PROFILE_H2D);
+
   }
 
   // Actually do the fattening
-  computeFatLinkCore(cudaSiteLink, act_path_coeff, qudaGaugeParam, method, 
+  computeFatLinkCore(cudaSiteLink_ex, act_path_coeff, qudaGaugeParam, method, 
       cudaFatLink, cudaLongLink, profileFatLink);
 
   // Transfer back to the host
@@ -2740,6 +2744,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_pa
   if (!(flag & QUDA_FAT_PRESERVE_GPU_GAUGE) ){
     delete cudaFatLink; cudaFatLink = NULL;
     delete cudaSiteLink; cudaSiteLink = NULL;
+    delete cudaSiteLink_ex; cudaSiteLink_ex = NULL;
     if(longlink){
       delete cudaLongLink; cudaLongLink = NULL;
     }
