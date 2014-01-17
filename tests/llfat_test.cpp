@@ -28,7 +28,8 @@ extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
+//static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
+static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static size_t gSize;
 
@@ -197,7 +198,8 @@ llfat_test(int test)
 #endif
 
   gettimeofday(&t0, NULL);
-  computeKSLinkQuda(fatlink, longlink_ptr, sitelink_ptr, act_path_coeff, &qudaGaugeParam, method);
+  //computeKSLinkQuda(fatlink, longlink_ptr, sitelink_ptr, act_path_coeff, &qudaGaugeParam, method);
+  computeKSLinkQuda(fatlink, longlink_ptr, milc_sitelink, act_path_coeff, &qudaGaugeParam, method);
   gettimeofday(&t1, NULL);
 
 
