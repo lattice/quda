@@ -2673,7 +2673,13 @@ computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_pat
     cudaInLinkEx = new cudaGaugeField(gParam);
   }
 
+  profileFatLink.Stop(QUDA_PROFILE_INIT);
+
+
+
   initLatticeConstants(*cudaFatLink, profileFatLink);  
+
+  profileFatLink.Start(QUDA_PROFILE_INIT);
   cudaGaugeField* inlinkPtr;
 
   if(method == QUDA_COMPUTE_FAT_STANDARD){
@@ -2685,13 +2691,12 @@ computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_pat
   }
   profileFatLink.Stop(QUDA_PROFILE_INIT);
 
-  if (method == QUDA_COMPUTE_FAT_STANDARD) {
-    profileFatLink.Start(QUDA_PROFILE_H2D);
-    cudaInLink->loadCPUField(*cpuInLink, QUDA_CPU_FIELD_LOCATION);
-    profileFatLink.Stop(QUDA_PROFILE_H2D);
-  } else {
+  profileFatLink.Start(QUDA_PROFILE_H2D);
+  cudaInLink->loadCPUField(*cpuInLink, QUDA_CPU_FIELD_LOCATION);
+  profileFatLink.Stop(QUDA_PROFILE_H2D);
+
+  if(method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME){
     profileFatLink.Start(QUDA_PROFILE_COMMS);
-    cudaInLink->loadCPUField(*cpuInLink, QUDA_CPU_FIELD_LOCATION);
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
     copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
     cudaInLinkEx->exchangeExtendedGhost(R,true);
@@ -2709,6 +2714,7 @@ computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_pat
   profileFatLink.Stop(QUDA_PROFILE_D2H);
 
   profileFatLink.Start(QUDA_PROFILE_FREE);
+
   delete cpuFatLink; cpuFatLink = NULL;
   delete cpuInLink; cpuInLink = NULL;
   if(longlink){
