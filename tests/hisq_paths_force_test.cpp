@@ -219,6 +219,7 @@ hisq_force_init()
   gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
+  gParam_ex.order = gauge_order;
   cpuGauge_ex = new cpuGaugeField(gParam_ex);
 #endif
 
@@ -340,6 +341,7 @@ hisq_force_init()
 
   
 #ifdef MULTI_GPU
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam_ex.precision = prec;
   gParam_ex.reconstruct = link_recon;
   //gParam_ex.pad = E1*E2*E3/2;
@@ -349,6 +351,7 @@ hisq_force_init()
   //record gauge pad size  
 
 #else
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.precision = qudaGaugeParam.cuda_prec;
   gParam.reconstruct = link_recon;
   gParam.pad = X1*X2*X3/2;
@@ -362,16 +365,20 @@ hisq_force_init()
   gParam_ex.pad = 0;
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.create = QUDA_ZERO_FIELD_CREATE;
+  gParam_ex.order = gauge_order;
   cpuForce_ex = new cpuGaugeField(gParam_ex); 
-  
+ 
+  gParam_ex.order = QUDA_QDP_FLOAT2_ORDER; 
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaForce_ex = new cudaGaugeField(gParam_ex); 
 #else
   gParam.pad = 0;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.order = gauge_order;
   cpuForce = new cpuGaugeField(gParam); 
   
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaForce = new cudaGaugeField(gParam); 
 #endif
@@ -410,10 +417,8 @@ hisq_force_init()
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   gParam_ex.order = gauge_order;
   cpuOprod_ex = new cpuGaugeField(gParam_ex);
-  //computeLinkOrderedOuterProduct(hw, cpuOprod_ex->Gauge_p(), hw_prec, 1, gauge_order);
   
   cpuLongLinkOprod_ex = new cpuGaugeField(gParam_ex);
-  //computeLinkOrderedOuterProduct(hw, cpuLongLinkOprod_ex->Gauge_p(), hw_prec, 3, gauge_order);
   
   for(int i=0; i < V_ex; i++){
     int sid = i;
@@ -464,10 +469,11 @@ hisq_force_init()
   }//i
 
 
-
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaOprod_ex = new cudaGaugeField(gParam_ex);
 #else
 
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaOprod = new cudaGaugeField(gParam);
   cudaLongLinkOprod = new cudaGaugeField(gParam);
 
@@ -566,7 +572,8 @@ hisq_force_test(void)
   exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuGauge_ex->Gauge_p(), cpuGauge->Order(), qudaGaugeParam.cpu_prec, optflag, 4);
   loadLinkToGPU_ex(cudaGauge_ex, cpuGauge_ex);  
 #else
-  loadLinkToGPU(cudaGauge, cpuGauge, &qudaGaugeParam);  
+//  loadLinkToGPU(cudaGauge, cpuGauge, &qudaGaugeParam);  
+  cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
 #endif
 
   
@@ -576,7 +583,8 @@ hisq_force_test(void)
   exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuOprod_ex->Gauge_p(), cpuOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag, 4);
   loadLinkToGPU_ex(cudaOprod_ex, cpuOprod_ex); 
 #else
-  loadLinkToGPU(cudaOprod, cpuOprod, &qudaGaugeParam);
+//  loadLinkToGPU(cudaOprod, cpuOprod, &qudaGaugeParam);
+  cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
 #endif
   
 
@@ -639,12 +647,10 @@ hisq_force_test(void)
   gettimeofday(&t1, NULL);
 
   checkCudaError();
-  loadLinkToGPU(cudaLongLinkOprod, cpuLongLinkOprod, &qudaGaugeParam);
-
+  cudaLongLinkOprod->loadCPUField(*cpuLongLinkOprod,QUDA_CPU_FIELD_LOCATION);
   fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod, *cudaGauge, cudaForce);
   cudaDeviceSynchronize(); 
   gettimeofday(&t2, NULL);
-  
 #endif
 
   gParam.create = QUDA_NULL_FIELD_CREATE;
