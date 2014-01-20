@@ -217,6 +217,7 @@ hisq_force_init()
   
 #ifdef MULTI_GPU
   gParam_ex = GaugeFieldParam(0, qudaGaugeParam_ex);
+  gParam_ex.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam_ex.create = QUDA_NULL_FIELD_CREATE;
   gParam_ex.link_type = QUDA_GENERAL_LINKS;
   gParam_ex.order = gauge_order;
@@ -368,7 +369,7 @@ hisq_force_init()
   gParam_ex.order = gauge_order;
   cpuForce_ex = new cpuGaugeField(gParam_ex); 
  
-  gParam_ex.order = QUDA_QDP_FLOAT2_ORDER; 
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER; 
   gParam_ex.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaForce_ex = new cudaGaugeField(gParam_ex); 
 #else
@@ -542,7 +543,6 @@ hisq_force_test(void)
 
   TimeProfile profile("dummy");
   initLatticeConstants(*cpuMom, profile);
-//  fermion_force::hisqForceInitCuda(&qudaGaugeParam);
 
 
    
@@ -569,10 +569,9 @@ hisq_force_test(void)
 #ifdef MULTI_GPU
   int optflag = 0;
   int R[4] = {2, 2, 2, 2};
-  exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuGauge_ex->Gauge_p(), cpuGauge->Order(), qudaGaugeParam.cpu_prec, optflag, 4);
-  loadLinkToGPU_ex(cudaGauge_ex, cpuGauge_ex);  
+  cpuGauge_ex->exchangeExtendedGhost(R,true);
+  cudaGauge_ex->loadCPUField(*cpuGauge_ex, QUDA_CPU_FIELD_LOCATION);
 #else
-//  loadLinkToGPU(cudaGauge, cpuGauge, &qudaGaugeParam);  
   cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
 #endif
 
@@ -580,10 +579,9 @@ hisq_force_test(void)
 
 
 #ifdef MULTI_GPU
-  exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuOprod_ex->Gauge_p(), cpuOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag, 4);
-  loadLinkToGPU_ex(cudaOprod_ex, cpuOprod_ex); 
+  cpuOprod_ex->exchangeExtendedGhost(R,true);
+  cudaOprod_ex->loadCPUField(*cpuOprod_ex, QUDA_CPU_FIELD_LOCATION);
 #else
-//  loadLinkToGPU(cudaOprod, cpuOprod, &qudaGaugeParam);
   cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
 #endif
   
@@ -591,23 +589,13 @@ hisq_force_test(void)
 
  
 #ifdef MULTI_GPU
-  exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, (void**)cpuLongLinkOprod_ex->Gauge_p(), cpuLongLinkOprod_ex->Order(), qudaGaugeParam.cpu_prec, optflag, 4);
+  cpuLongLinkOprod_ex->exchangeExtendedGhost(R,true);
 #endif
 
   
   struct timeval ht0, ht1;
   gettimeofday(&ht0, NULL);
   if (verify_results){
-    /*
-    if(cpu_hw_prec == QUDA_SINGLE_PRECISION){
-      const float eps = 0.5;
-      fermion_force_reference(eps, weight, 0, act_path_coeff, hw, siteLink_1d, refMom->Gauge_p());
-    }else if(cpu_hw_prec == QUDA_DOUBLE_PRECISION){
-      const double eps = 0.5;
-      fermion_force_reference(eps, d_weight, 0, d_act_path_coeff, hw, siteLink_1d, refMom->Gauge_p());
-    }
-    */
-    
 #ifdef MULTI_GPU
     hisqStaplesForceCPU(d_act_path_coeff, qudaGaugeParam, *cpuOprod_ex, *cpuGauge_ex, cpuForce_ex);
     hisqLongLinkForceCPU(d_act_path_coeff[1], qudaGaugeParam, *cpuLongLinkOprod_ex, *cpuGauge_ex, cpuForce_ex);
@@ -635,7 +623,7 @@ hisq_force_test(void)
   
   delete cudaOprod_ex; //doing this to lower the peak memory usage
   cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
-  loadLinkToGPU_ex(cudaLongLinkOprod_ex, cpuLongLinkOprod_ex);
+  cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod_ex, QUDA_CPU_FIELD_LOCATION);
   fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  
   cudaDeviceSynchronize(); 
   
