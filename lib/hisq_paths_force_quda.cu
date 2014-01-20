@@ -81,7 +81,7 @@ namespace quda {
         thin_link_stride = extended_half_volume + param.site_ga_pad;
         color_matrix_stride = extended_half_volume;
 #else
-        thin_link_stride + param.site_ga_pad;
+        thin_link_stride  = half_volume + param.site_ga_pad;
         color_matrix_stride = half_volume;
 #endif
         momentum_stride = half_volume + param.mom_ga_pad;
@@ -1729,8 +1729,14 @@ namespace quda {
         kparam.base_idx[1]=0;
         kparam.base_idx[2]=0;
         kparam.base_idx[3]=0;
-        kparam_2g = kparam_1g = kparam;
-
+        kparam_2g.threads = kparam_1g.threads = kparam.threads;
+  
+        for(int i=0; i<4; ++i){
+          kparam_2g.D[i] = kparam_1g.D[i] = kparam.D[i];
+          kparam_2g.D1h  = kparam_1g.D1h  = kparam.D1h;
+          kparam_2g.base_idx[i] = kparam_1g.base_idx[i] = 0;
+          kparam_2g.ghostDim[i] = kparam_1g.ghostDim[i] = 0;
+        }
 #endif
         for(int sig=0; sig<8; sig++){
           for(int mu=0; mu<8; mu++){
