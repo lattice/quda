@@ -585,7 +585,34 @@ extern "C" {
         const void* const one_link_src[4],
         const void* const naik_src[4],
         const void* const link,
-        const QudaGaugeParam* gParam);
+        const QudaGaugeParam* param);
+
+
+  /**
+   * Compute the fermion force for the HISQ quark action. 
+   * @param momentum        The momentum contribution from the quark action.
+   * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
+   * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
+   * @param staple_src      Quark outer-product for the staple.
+   * @param one_link_src    Quark outer-product for the one-link term in the action.
+   * @param naik_src        Quark outer-product for the three-hop term in the action.
+   * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
+   * @param v_link          Fat7 link variables. 
+   * @param u_link          SU(3) think link variables. 
+   * @param param.          The field parameters.
+   */
+
+  void computeHISQForce(void* momentum,
+    const double level2_coeff[6],
+    const double fat7_coeff[6],
+    const void* const staple_src[4],
+    const void* const one_link_src[4],
+    const void* const naik_src[4],
+    const void* const w_link,
+    const void* const v_link,
+    const void* const u_link,
+    const QudaGaugeParam* param);
+
 
 #ifdef __cplusplus
 }
