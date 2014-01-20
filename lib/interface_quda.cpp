@@ -2573,7 +2573,6 @@ namespace quda {
 } // namespace quda
 
 
-//computeKSLinkQuda(void* fatlink, void* longlink, void** sitelink, double* act_path_coeff, 
 
   int
 computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_path_coeff, 
@@ -2585,9 +2584,9 @@ computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_pat
 
   profileFatLink.Start(QUDA_PROFILE_INIT);
 
-  static cpuGaugeField* cpuFatLink=NULL, *cpuSiteLink=NULL, *cpuLongLink=NULL;
-  static cudaGaugeField* cudaFatLink=NULL, *cudaSiteLink=NULL, *cudaLongLink=NULL;
-  static cudaGaugeField* cudaSiteLink_ex=NULL;
+  cpuGaugeField* cpuFatLink=NULL, *cpuInLink=NULL, *cpuLongLink=NULL;
+  cudaGaugeField* cudaFatLink=NULL, *cudaInLink=NULL, *cudaLongLink=NULL;
+  cudaGaugeField* cudaInLinkEx=NULL;
   int flag = qudaGaugeParam->preserve_gauge;
 
   QudaGaugeParam qudaGaugeParam_ex_buf;
@@ -2611,120 +2610,92 @@ computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_pat
   GaugeFieldParam gParam(0, *qudaGaugeParam);
 
   // create the host fatlink
-  if (cpuFatLink == NULL) {
-    gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-    gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
-    gParam.order = QUDA_MILC_GAUGE_ORDER;
-    gParam.gauge= fatlink;
-    cpuFatLink = new cpuGaugeField(gParam);
-    if(cpuFatLink == NULL) errorQuda("ERROR: Creating cpuFatLink failed\n");
-  } else {
-    cpuFatLink->setGauge((void**)fatlink);
-  }
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.gauge= fatlink;
+  cpuFatLink = new cpuGaugeField(gParam);
+  if(cpuFatLink == NULL) errorQuda("ERROR: Creating cpuFatLink failed\n");
 
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   // create the device fatlink
-  if(cudaFatLink == NULL){
-    gParam.pad    = qudaGaugeParam->llfat_ga_pad;
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
-    gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    cudaFatLink = new cudaGaugeField(gParam);
-  }
+  gParam.pad    = qudaGaugeParam->llfat_ga_pad;
+  gParam.create = QUDA_ZERO_FIELD_CREATE;
+  gParam.link_type = QUDA_ASQTAD_FAT_LINKS;
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  cudaFatLink = new cudaGaugeField(gParam);
 
   if(longlink){
     // create the host longlink
-    if(cpuLongLink == NULL){
-      gParam.pad    = 0;
-      gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      gParam.link_type = QUDA_ASQTAD_LONG_LINKS;
-      gParam.order = QUDA_MILC_GAUGE_ORDER;
-      gParam.gauge = longlink;
-      cpuLongLink = new cpuGaugeField(gParam);
-      if(cpuLongLink == NULL) errorQuda("Error: Creating cpuLongLink failed\n");
-    }else{
-      cpuLongLink->setGauge((void**)longlink);
-    }
-  }
+    gParam.pad    = 0;
+    gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+    gParam.link_type = QUDA_ASQTAD_LONG_LINKS;
+    gParam.order = QUDA_MILC_GAUGE_ORDER;
+    gParam.gauge = longlink;
+    cpuLongLink = new cpuGaugeField(gParam);
+    if(cpuLongLink == NULL) errorQuda("Error: Creating cpuLongLink failed\n");
 
-  if(longlink){
-    // create the device longlink
-    if(cudaLongLink == NULL){
-      gParam.pad = qudaGaugeParam->llfat_ga_pad; // same padding as for the fatlink - for the time being
-      gParam.create = QUDA_ZERO_FIELD_CREATE;
-      gParam.link_type = QUDA_ASQTAD_LONG_LINKS;
-      gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-      gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-      cudaLongLink = new cudaGaugeField(gParam);
-    }
+    gParam.pad = qudaGaugeParam->llfat_ga_pad; // same padding as for the fatlink - for the time being
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
+    gParam.link_type = QUDA_ASQTAD_LONG_LINKS;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+    cudaLongLink = new cudaGaugeField(gParam);
   }
 
   // create the host sitelink	
-  if (cpuSiteLink == NULL) {
-    gParam.pad = 0; 
-    gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
-    gParam.link_type = qudaGaugeParam->type;
-    gParam.order      = QUDA_MILC_GAUGE_ORDER;
-    gParam.gauge     = sitelink;
-    for(int dir=0; dir<4; dir++) gParam.x[dir] = qudaGaugeParam->X[dir];
-    cpuSiteLink      = new cpuGaugeField(gParam);
-    if(cpuSiteLink == NULL) errorQuda("ERROR: Creating cpuSiteLink failed\n");
-  } else {
-    cpuSiteLink->setGauge((void**)sitelink);
-  }
+  gParam.pad = 0; 
+  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = qudaGaugeParam->type;
+  gParam.order      = QUDA_MILC_GAUGE_ORDER;
+  gParam.gauge     = sitelink;
+  for(int dir=0; dir<4; dir++) gParam.x[dir] = qudaGaugeParam->X[dir];
+  cpuInLink      = new cpuGaugeField(gParam);
+  if(cpuInLink == NULL) errorQuda("ERROR: Creating cpuSiteLink failed\n");
 
-  if(cudaSiteLink == NULL){
-    gParam.pad         = qudaGaugeParam->site_ga_pad;
-    gParam.create      = QUDA_NULL_FIELD_CREATE;
-    gParam.link_type   = qudaGaugeParam->type;
-    gParam.reconstruct = qudaGaugeParam->reconstruct;      
-    gParam.order       = (gParam.reconstruct == QUDA_RECONSTRUCT_12) ? 
-      QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
-    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-    cudaSiteLink = new cudaGaugeField(gParam);
-  }
+  gParam.pad         = qudaGaugeParam->site_ga_pad;
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
+  gParam.link_type   = qudaGaugeParam->type;
+  gParam.reconstruct = qudaGaugeParam->reconstruct;      
+  gParam.order       = (gParam.reconstruct == QUDA_RECONSTRUCT_12) ? 
+    QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cudaInLink = new cudaGaugeField(gParam);
 
-  if(cudaSiteLink_ex == NULL){
-  //  gParam.pad = 0;
+  if(method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME){
     for(int dir=0; dir<4; dir++) gParam.x[dir] = qudaGaugeParam_ex->X[dir];
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    cudaSiteLink_ex = new cudaGaugeField(gParam);
+    cudaInLinkEx = new cudaGaugeField(gParam);
   }
 
+  initLatticeConstants(*cudaFatLink, profileFatLink);  
+  cudaGaugeField* inlinkPtr;
 
+  if(method == QUDA_COMPUTE_FAT_STANDARD){
+    llfat_init_cuda(qudaGaugeParam);
+    inlinkPtr = cudaInLink;
+  }else{
+    llfat_init_cuda_ex(qudaGaugeParam_ex);
+    inlinkPtr = cudaInLinkEx;
+  }
   profileFatLink.Stop(QUDA_PROFILE_INIT);
 
-  initLatticeConstants(*cudaFatLink, profileFatLink);  
-
   if (method == QUDA_COMPUTE_FAT_STANDARD) {
-    llfat_init_cuda(qudaGaugeParam);
-
-#ifdef MULTI_GPU
-    if(qudaGaugeParam->gauge_order == QUDA_MILC_GAUGE_ORDER){
-      errorQuda("Only QDP-ordered site links are supported in the multi-gpu standard fattening code\n");
-    }
-#endif
     profileFatLink.Start(QUDA_PROFILE_H2D);
-    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
+    cudaInLink->loadCPUField(*cpuInLink, QUDA_CPU_FIELD_LOCATION);
     profileFatLink.Stop(QUDA_PROFILE_H2D);
-
   } else {
-    llfat_init_cuda_ex(qudaGaugeParam_ex);
-
-#ifdef MULTI_GPU
     profileFatLink.Start(QUDA_PROFILE_COMMS);
-    cudaSiteLink->loadCPUField(*cpuSiteLink, QUDA_CPU_FIELD_LOCATION);
+    cudaInLink->loadCPUField(*cpuInLink, QUDA_CPU_FIELD_LOCATION);
     int R[4] = {2, 2, 2, 2}; // radius of the extended region in each dimension / direction
-    copyExtendedGauge(*cudaSiteLink_ex, *cudaSiteLink, QUDA_CUDA_FIELD_LOCATION);
-    cudaSiteLink_ex->exchangeExtendedGhost(R,true);
+    copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
+    cudaInLinkEx->exchangeExtendedGhost(R,true);
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
-#endif
-
   }
 
   // Actually do the fattening
-  computeFatLinkCore(cudaSiteLink_ex, act_path_coeff, qudaGaugeParam, method, 
+  computeFatLinkCore(inlinkPtr, act_path_coeff, qudaGaugeParam, method, 
       cudaFatLink, cudaLongLink, profileFatLink);
 
   // Transfer back to the host
@@ -2734,20 +2705,16 @@ computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink, double* act_pat
   profileFatLink.Stop(QUDA_PROFILE_D2H);
 
   profileFatLink.Start(QUDA_PROFILE_FREE);
-  if (!(flag & QUDA_FAT_PRESERVE_CPU_GAUGE) ){
-    delete cpuFatLink; cpuFatLink = NULL;
-    delete cpuSiteLink; cpuSiteLink = NULL;
-    if(longlink){
-      delete cpuLongLink; cpuLongLink = NULL;
-    }
-  }  
-  if (!(flag & QUDA_FAT_PRESERVE_GPU_GAUGE) ){
-    delete cudaFatLink; cudaFatLink = NULL;
-    delete cudaSiteLink; cudaSiteLink = NULL;
-    delete cudaSiteLink_ex; cudaSiteLink_ex = NULL;
-    if(longlink){
-      delete cudaLongLink; cudaLongLink = NULL;
-    }
+  delete cpuFatLink; cpuFatLink = NULL;
+  delete cpuInLink; cpuInLink = NULL;
+  if(longlink){
+    delete cpuLongLink; cpuLongLink = NULL;
+  }
+  delete cudaFatLink; cudaFatLink = NULL;
+  delete cudaInLink; cudaInLink = NULL;
+  delete cudaInLinkEx; cudaInLinkEx = NULL;
+  if(longlink){
+    delete cudaLongLink; cudaLongLink = NULL;
   }
   profileFatLink.Stop(QUDA_PROFILE_FREE);
 
