@@ -497,6 +497,12 @@ extern "C" {
    *  Update the gauge field.
    */
   void updateGaugeFieldQuda(void* gauge, void* momentum, double eps, QudaGaugeParam* param);
+  
+  //
+  void openMagma();
+
+  //
+  void closeMagma();
 
 #ifdef __cplusplus
 }

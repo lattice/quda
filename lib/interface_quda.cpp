@@ -64,6 +64,30 @@ int numa_affinity_enabled = 1;
 
 using namespace quda;
 
+//for MAGMA lib:
+#include <blas_magma.h>
+
+static bool InitMagma = false;
+
+void openMagma(){  
+
+   if(!InitMagma){
+      BlasMagmaArgs::OpenMagma();
+      InitMagma = true;
+   }
+   else printfQuda("\nMAGMA library was already initialized..\n");
+
+   return;
+}
+
+void closeMagma(){  
+
+   if(InitMagma) BlasMagmaArgs::CloseMagma();
+   else printfQuda("\nMAGMA library was not initialized..\n");
+
+   return;
+}
+
 cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
@@ -1768,6 +1792,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
 void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaInvertParam *param)
 {
+  if(!InitMagma) openMagma();
+
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
@@ -1799,9 +1825,9 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
   if (!pc_solve) param->spinorGiB *= 2;
   param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
   if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
-    param->spinorGiB *= (param->inv_type == QUDA_EIGCG_INVERTER ? 5 : 7)/(double)(1<<30);
+    param->spinorGiB *= ((param->inv_type == QUDA_EIGCG_INVERTER || param->inv_type == QUDA_INC_EIGCG_INVERTER) ? 5 : 7)/(double)(1<<30);
   } else {
-    param->spinorGiB *= (param->inv_type == QUDA_EIGCG_INVERTER ? 8 : 9)/(double)(1<<30);
+    param->spinorGiB *= ((param->inv_type == QUDA_EIGCG_INVERTER || param->inv_type == QUDA_INC_EIGCG_INVERTER) ? 8 : 9)/(double)(1<<30);
   }
 
   param->secs = 0;
@@ -1925,7 +1951,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
     cudaColorSpinorField *ritzvects = 0;
 
     //temporal trick, create host spinors to accomodate eigenvector window:
-    const int tot_eigv_dim    = param->nev*(param->rhs_idx+1);
+    const int tot_eigv_dim    = (param->rhs_idx < param->deflation_grid) ? param->nev*(param->rhs_idx+1) : param->nev*param->deflation_grid;
 
     ColorSpinorField *h_u[tot_eigv_dim];
      
@@ -1940,7 +1966,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
     //ColorSpinorParam cudaEigvParam(cpuEigvParam, *param);
     cudaParam.setPrecision(param->cuda_prec);//the same as for full precision iterations (see diracDeflateParam)
     cudaParam.create   = QUDA_ZERO_FIELD_CREATE;
-    cudaParam.eigv_dim = param->nev*(param->rhs_idx+1);
+    cudaParam.eigv_dim = tot_eigv_dim;
 
     ritzvects = new cudaColorSpinorField(cudaParam);//check!
 

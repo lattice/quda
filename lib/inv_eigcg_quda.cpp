@@ -222,9 +222,10 @@ namespace quda {
   }
 
   IncEigCG::~IncEigCG() {
-    if(eigcg_alloc) delete Vm;
 
-    delete initCG;
+    if(eigcg_alloc) delete Vm;
+    if(initCG) delete initCG;
+
     delete pM;
   }
 
@@ -581,6 +582,8 @@ namespace quda {
  
     if(pM->prev_dim == 0) return;//nothing to do
 
+    const int _complex = 2;
+
     //magma initialization:
     const int prec = in.Precision();
     BlasMagmaArgs *magma_args = new BlasMagmaArgs(prec);//new
@@ -588,23 +591,30 @@ namespace quda {
     Complex *vec = new Complex[pM->tot_dim];
     memset(vec, 0, pM->tot_dim*sizeof(Complex));
 
-    for(int i = 0; i < pM->prev_dim; i++) vec[i] = cDotProductCuda(in, u.Eigenvec(i));
+    void *buff;
+    cudaMalloc((void**)&buff, pM->tot_dim*_complex*prec);
+
+    for(int i = 0; i < pM->prev_dim; i++) vec[i] = cDotProductCuda(u.Eigenvec(i), in);
 
     //Solve Hx=y:
     magma_args->SolveProjMatrix((void*)vec, pM->tot_dim, pM->prev_dim, (void*)pM->hproj, pM->tot_dim);
 
     //
     const int complex_len = u.EigvLength() / 2;
+
     if(in.Precision() == QUDA_DOUBLE_PRECISION)
     {
-      magma_args->SpinorMatVec(in.V(), u.V(), (void*)vec, complex_len, pM->prev_dim);
+      cudaMemcpy(buff, vec, pM->prev_dim*_complex*prec, cudaMemcpyDefault);
+      magma_args->SpinorMatVec(in.V(), u.V(), buff, complex_len, pM->prev_dim);
     }
     else if (in.Precision() == QUDA_SINGLE_PRECISION) 
     {
       std::complex<float> *tmp = new std::complex<float>[pM->tot_dim];
 
       for(int i = 0; i < pM->prev_dim; i++) tmp[i] = std::complex<float>((float)vec[i].real(), (float)vec[i].imag()); 
-      magma_args->SpinorMatVec(in.V(), u.V(), (void*)tmp, complex_len, pM->prev_dim); 
+      cudaMemcpy(buff, tmp, pM->prev_dim*_complex*prec, cudaMemcpyDefault);
+
+      magma_args->SpinorMatVec(in.V(), u.V(), buff, complex_len, pM->prev_dim); 
    
       delete[] tmp;
     }
@@ -615,6 +625,9 @@ namespace quda {
 
     delete[] vec;
     delete magma_args;
+
+    cudaFree(buff);
+    checkCudaError();
 
     return;
   }

@@ -1,6 +1,10 @@
 #include "blas_magma.h"
 #include <string.h>
 
+#ifndef MAX
+#define MAX(a, b) (a > b) ? a : b;
+#endif
+
 #ifdef MAGMA_LIB
 #include "magma.h"
 #endif
@@ -12,14 +16,40 @@ const char cL = 'L';
 const char cN = 'N';
 const char cC = 'C';
 
-BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0), llwork(0), lrwork(0), liwork(0), htsize(0), dtsize(0),  sideLR(0), lwork_max(0), W(0), hTau(0), dTau(0), lwork(0), rwork(0), iwork(0),  info(-1)
+void BlasMagmaArgs::OpenMagma(){ 
+ 
+    magma_err_t err;
+    err = magma_init(); 
+    if(err != MAGMA_SUCCESS) printf("\nError: cannot initialize MAGMA library\n");
+
+    int major, minor, micro;
+    magma_version( &major, &minor, &micro);
+    printf("\nMAGMA library version: %d.%d\n\n", major,  minor);
+
+}
+
+void BlasMagmaArgs::CloseMagma(){  
+
+    magma_err_t err; 
+    err = magma_finalize();
+    if(err != MAGMA_SUCCESS) printf("\nError: cannot close MAGMA library\n");
+}
+
+BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0), llwork(0), lrwork(0), liwork(0), htsize(0), dtsize(0),  sideLR(0), lwork_max(0), W(0), W2(0), hTau(0), dTau(0), lwork(0), rwork(0), iwork(0),  info(-1)
 {
+
 #ifdef MAGMA_LIB
-    magma_init();
+    //magma_init();
+    magma_int_t dev_info;
+    dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+    if(dev_info == 0)  exit(-1);
+
+    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+
     alloc = false;
     init  = true;
 #else
-    printf("\nError: Magma library was not compiled, check your compilation options...\n");
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
     exit(-1);
     //init = false;
 #endif    
@@ -30,7 +60,12 @@ BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0),
 BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec) : m(m), nev(nev), ldm(ldm), prec(prec), info(-1)
 {
 #ifdef MAGMA_LIB
-    magma_init();
+    //magma_init();
+    magma_int_t dev_info;
+    dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+    if(dev_info == 0)  exit(-1);
+
+    printf("\nMAGMA will use device architecture %d.\n", dev_info);
 
     const int complex_prec = 2*prec;
 
@@ -58,7 +93,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const in
     init  = true;
     alloc = true;
 #else
-    printf("\nError: Magma library was not compiled, check your compilation options...\n");
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
     exit(-1);
     //init = false;
 #endif    
@@ -68,7 +103,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const in
 BlasMagmaArgs::~BlasMagmaArgs()
 {
 #ifdef MAGMA_LIB
-   if(!init) printf("\n\nError: Magma was not initialized..\n"), exit(-1);
+   //if(!init) printf("\n\nError: MAGMA was not initialized..\n"), exit(-1);
    if(alloc == true)
    {
      magma_free(dTau);
@@ -82,7 +117,7 @@ BlasMagmaArgs::~BlasMagmaArgs()
      magma_free_cpu(iwork);
      alloc = false;
    }
-   magma_finalize();
+   //magma_finalize();
    init  = false;
 #endif
    return;

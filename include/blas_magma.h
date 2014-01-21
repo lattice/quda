@@ -8,11 +8,7 @@
 #include <cuComplex.h>
 #include <stdio.h>
 
-#ifndef MAX
-#define MAX(a, b) (a > b) ? a : b;
-#endif
-
-//magma library interface 
+//MAGMA library interface 
 //required for (incremental) EigCG solver
 
    class BlasMagmaArgs{
@@ -56,6 +52,11 @@
       BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec);
 
       ~BlasMagmaArgs();
+
+      //Initialization methods:
+      static void OpenMagma();
+      //
+      static void CloseMagma();
 
       //Collection of methods for EigCG solver:
       void MagmaHEEVD(void *dTvecm, void *hTvalm, const int problem_size);

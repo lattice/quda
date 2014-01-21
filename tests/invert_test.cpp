@@ -196,7 +196,7 @@ int main(int argc, char **argv)
   inv_param.rhs_idx = 0;
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-    inv_param.nev = 16; //16
+    inv_param.nev = 8; //16
     inv_param.max_search_dim = 144;
     inv_param.deflation_grid = 1;//to test the stuff
   }else{
@@ -398,6 +398,8 @@ int main(int argc, char **argv)
   // initialize the QUDA library
   initQuda(device);
 
+  if(deflated) openMagma(); //Warning: must be after Quda initialization, otherwise may choose "wrong" device
+
   // load the gauge field
   loadGaugeQuda((void*)gauge, &gauge_param);
 
@@ -559,6 +561,8 @@ int main(int argc, char **argv)
 
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) freeCloverQuda();
+
+  if(deflated) closeMagma();
 
   // finalize the QUDA library
   endQuda();
