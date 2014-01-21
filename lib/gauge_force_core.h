@@ -471,13 +471,13 @@
 
 //FloatN can be float2/float4/double2
 //Float2 can be float2/double2
-template<int oddBit, typename Float2, typename FloatN, typename Float>
+template<int oddBit, typename Float, typename Float2, typename FloatN>
   __global__ void
   GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd,
 			const int dir, const double eb3,
 			const FloatN* linkEven, const FloatN* linkOdd,
 			const int* input_path, 
-			const int* length, const Float* path_coeff, const int num_paths, const kernel_param_t kparam)
+			const int* length, const double* path_coeff, const int num_paths, const kernel_param_t kparam)
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -513,8 +513,10 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
     
     
   SET_SU3_MATRIX(staple, 0);
+
   for(i=0;i < num_paths; i++){
-    if(path_coeff[i] == 0) continue;
+    Float coeff = path_coeff[i];
+    if(coeff == 0) continue;
 
     int nbr_oddbit = (oddBit^1 );
 	
@@ -588,7 +590,7 @@ template<int oddBit, typename Float2, typename FloatN, typename Float>
       }
 	    
     }//j
-    SCALAR_MULT_ADD_SU3_MATRIX(staple, linka, path_coeff[i], staple);
+    SCALAR_MULT_ADD_SU3_MATRIX(staple, linka, coeff, staple);
   }//i
     
 

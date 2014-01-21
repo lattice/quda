@@ -515,7 +515,7 @@ extern "C" {
    * @param timeinfo
    */
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
-      void* loop_coeff, int num_paths, int max_length, double dt,
+      double* loop_coeff, int num_paths, int max_length, double dt,
       QudaGaugeParam* qudaGaugeParam, double* timeinfo);
 
   /**

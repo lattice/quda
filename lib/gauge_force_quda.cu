@@ -134,7 +134,7 @@ namespace quda {
     const cudaGaugeField &link;
     const int *input_path;
     const int *length;
-    const void *path_coeff;
+    const double *path_coeff;
     const int num_paths;
     const kernel_param_t &kparam;
 
@@ -147,7 +147,7 @@ namespace quda {
 
   public:
     GaugeForceCuda(cudaGaugeField &mom, const int dir, const double &eb3, const cudaGaugeField &link,
-		   const int *input_path, const int *length, const void *path_coeff, 
+		   const int *input_path, const int *length, const double *path_coeff, 
 		   const int num_paths, const kernel_param_t &kparam) :
       mom(mom), dir(dir), eb3(eb3), link(link), input_path(input_path), length(length), 
       path_coeff(path_coeff), num_paths(num_paths), kparam(kparam) { 
@@ -185,57 +185,57 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());    
       if(link.Precision() == QUDA_DOUBLE_PRECISION){      
 	if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	  parity_compute_gauge_force_kernel_dp18<0><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_dp18<0,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
 									   dir, eb3,
 									   (double2*)link.Even_p(), (double2*)link.Odd_p(), 
-									   input_path, length, (double*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam);   
-	  parity_compute_gauge_force_kernel_dp18<1><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_dp18<1,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
 									   dir, eb3,
 									   (double2*)link.Even_p(), (double2*)link.Odd_p(), 
-									   input_path, length, (double*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam);  
 	
 	}else{ //QUDA_RECONSTRUCT_12
-	  parity_compute_gauge_force_kernel_dp12<0><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_dp12<0,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
 									   dir, eb3,
 									   (double2*)link.Even_p(), (double2*)link.Odd_p(), 
-									   input_path, length, (double*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam);   
-	  parity_compute_gauge_force_kernel_dp12<1><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_dp12<1,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
 									   dir, eb3,
 									   (double2*)link.Even_p(), (double2*)link.Odd_p(), 
-									   input_path, length, (double*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam);    
 	}
       }else{ //QUDA_SINGLE_PRECISION
 	if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
 	
-	  parity_compute_gauge_force_kernel_sp18<0><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_sp18<0,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
 									   dir, eb3,
 									   (float2*)link.Even_p(), (float2*)link.Odd_p(), 
-									   input_path, length, (float*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam);   
-	  parity_compute_gauge_force_kernel_sp18<1><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_sp18<1,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
 									   dir, eb3,
 									   (float2*)link.Even_p(), (float2*)link.Odd_p(), 
-									   input_path, length, (float*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam); 
 	
 	}else{ //QUDA_RECONSTRUCT_12
-	  parity_compute_gauge_force_kernel_sp12<0><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_sp12<0,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
 									   dir, eb3,
 									   (float4*)link.Even_p(), (float4*)link.Odd_p(), 
-									   input_path, length, (float*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam);   
 	  //odd
 	  /* The reason we do not switch the even/odd function input paramemters and the texture binding
 	   * is that we use the oddbit to decided where to load, in the kernel function
 	   */
-	  parity_compute_gauge_force_kernel_sp12<1><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+	  parity_compute_gauge_force_kernel_sp12<1,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
 									   dir, eb3,
 									   (float4*)link.Even_p(), (float4*)link.Odd_p(), 
-									   input_path, length, (float*)path_coeff,
+									   input_path, length, path_coeff,
 									   num_paths, kparam);  
 	}
       }
@@ -262,7 +262,7 @@ namespace quda {
   
   void
   gauge_force_cuda_dir(cudaGaugeField& cudaMom, const int dir, const double eb3, const cudaGaugeField& cudaSiteLink,
-		       const QudaGaugeParam* param, int** input_path, const int* length, const void* path_coeff, 
+		       const QudaGaugeParam* param, int** input_path, const int* length, const double* path_coeff, 
 		       const int num_paths, const int max_length)
   {
     //input_path
@@ -288,9 +288,8 @@ namespace quda {
     cudaMemcpy(length_d, length, num_paths*sizeof(int), cudaMemcpyHostToDevice);
     
     //path_coeff
-    int gsize = param->cuda_prec;
-    void* path_coeff_d = device_malloc(num_paths*gsize);
-    cudaMemcpy(path_coeff_d, path_coeff, num_paths*gsize, cudaMemcpyHostToDevice); 
+    void* path_coeff_d = device_malloc(num_paths*sizeof(double));
+    cudaMemcpy(path_coeff_d, path_coeff, num_paths*sizeof(double), cudaMemcpyHostToDevice); 
 
     //compute the gauge forces
     int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];
@@ -304,7 +303,7 @@ namespace quda {
     kparam.threads = volume/2;
 
     GaugeForceCuda gaugeForce(cudaMom, dir, eb3, cudaSiteLink, input_path_d, 
-			      length_d, path_coeff_d, num_paths, kparam);
+			      length_d, reinterpret_cast<double*>(path_coeff_d), num_paths, kparam);
     gaugeForce.apply(0);
     checkCudaError();
     
@@ -318,7 +317,7 @@ namespace quda {
   void
   gauge_force_cuda(cudaGaugeField&  cudaMom, double eb3, cudaGaugeField& cudaSiteLink,
 		   QudaGaugeParam* param, int*** input_path, 
-		   int* length, void* path_coeff, int num_paths, int max_length)
+		   int* length, double* path_coeff, int num_paths, int max_length)
   {  
     for(int dir=0; dir < 4; dir++){
       gauge_force_cuda_dir(cudaMom, dir, eb3, cudaSiteLink, param, input_path[dir], 
