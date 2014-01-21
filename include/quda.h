@@ -494,9 +494,11 @@ extern "C" {
   void pack_ghost(void **cpuLink, void **cpuGhost, int nFace,
       QudaPrecision precision);
   void setFatLinkPadding(QudaComputeFatMethod method, QudaGaugeParam* param);
-  int computeKSLinkQuda(void* fatlink, void* longlink, void* sitelink,
-      double* act_path_coeff, QudaGaugeParam* param, 
-      QudaComputeFatMethod method);
+
+  void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, 
+                         double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method);
+
+
 
   /**
    * Compute the gauge force and update the mometum field

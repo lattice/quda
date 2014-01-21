@@ -198,8 +198,7 @@ llfat_test(int test)
 #endif
 
   gettimeofday(&t0, NULL);
-  //computeKSLinkQuda(fatlink, longlink_ptr, sitelink_ptr, act_path_coeff, &qudaGaugeParam, method);
-  computeKSLinkQuda(fatlink, longlink_ptr, milc_sitelink, act_path_coeff, &qudaGaugeParam, method);
+  computeKSLinkQuda(fatlink, longlink_ptr, NULL, milc_sitelink, act_path_coeff, &qudaGaugeParam, method);
   gettimeofday(&t1, NULL);
 
 

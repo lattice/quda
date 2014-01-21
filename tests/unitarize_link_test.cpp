@@ -179,18 +179,12 @@ unitarize_link_test()
   act_path_coeff[5] = -0.123113;
 
 
-//  qudaGaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  //only record the last call's performance
-  //the first one is for creating the cpu/cuda data structures
-
-//  if(gauge_order == QUDA_QDP_GAUGE_ORDER){
 
   printfQuda("Calling computeKSLinkQuda\n");
   fflush(stdout);
-    computeKSLinkQuda(fatlink, NULL, inlink, act_path_coeff, &qudaGaugeParam,
+    computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
         QUDA_COMPUTE_FAT_STANDARD);
   printfQuda("Call to computeKSLinkQuda complete\n");
-//  } // gauge order is QDP_GAUGE_ORDER
 
 
   void* fatlink_2d[4];
