@@ -18,6 +18,7 @@ namespace quda {
     std::cout << "MG: level " << param.level << " smoother has operator " << typeid(param.matSmooth).name() << std::endl;
     param.inv_type = param.smoother;
     if (param.level == 1) param.inv_type_precondition = QUDA_GCR_INVERTER;
+    param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
     smoother = Solver::create(param, param.matResidual, param.matSmooth, param.matSmooth, profile);
 
     // if not on the coarsest level, construct it
@@ -59,10 +60,10 @@ namespace quda {
       csParam.setPrecision(csParam.precision);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       hack3 = new cudaColorSpinorField(csParam);  // FIXME allocate cudaSpinorFields
-      //hack4 = new cudaColorSpinorField(csParam);   // FIXME allocate cudaSpinorFields
+      hack4 = new cudaColorSpinorField(csParam);   // FIXME allocate cudaSpinorFields
 
       // note last two fields are cpu fields!
-      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack1);
+      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack4);
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
 
       // coarse null space vectors (dummy for now)
@@ -104,7 +105,7 @@ namespace quda {
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
 
-    printfQuda("MG: level %d, x.order = %d b.order = %d\n", x.FieldOrder(), b.FieldOrder());
+    printfQuda("MG: level %d, x.order = %d b.order = %d\n", param.level, x.FieldOrder(), b.FieldOrder());
 
     printfQuda("MG: level %d, entering V-cycle with x2=%e, r2=%e\n", 
 	       param.level, blas::norm2(x), blas::norm2(b));
@@ -128,13 +129,16 @@ namespace quda {
       // recurse to the next lower level
       printfQuda("MG: level %d solving coarse operator\n", param.level);
       blas::zero(*x_coarse);
-      (*coarse)(*x_coarse, *r_coarse); 
+      (*coarse)(*x_coarse, *r_coarse);
+      printfQuda("MG: after coarse solve x_coarse2 %e r_coarse2 = %e\n", blas::norm2(*x_coarse), blas::norm2(*r_coarse)); 
 
       // prolongate back to this grid
       printfQuda("MG: level %d, prolongation\n", param.level);
       transfer->P(*r, *x_coarse); // repurpose residual storage
+      printfQuda("MG: Prolongated coarse solution r2 = %e\n", blas::norm2(*r)); 
+      printfQuda("MG: Old fine solution x2 = %e\n", blas::norm2(x));
       blas::xpy(*r, x); // sum to solution
-
+      printfQuda("MG: New fine solution x2 = %e\n", blas::norm2(x));       
       // FIXME - residual computation should be in the previous smoother
       param.matResidual(*r, x);
       r2 = blas::xmyNorm(b, *r);

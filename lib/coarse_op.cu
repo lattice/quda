@@ -570,7 +570,7 @@ namespace quda {
 
       for(int s = 0; s < Ns; s++) { //Spin out
         for(int c = 0; c < Nc; c++) { //Color out
-	  out(i,s,c) += mass*in(i,s,c);
+	  out(i,s,c) += in(i,s,c);
 	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
 	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
 	      out(i,s,c) -= X[gauge_site_offset+Nc*Nc*(Ns*s+s_col)+Nc*c+c_col]*in(i,s_col,c_col);

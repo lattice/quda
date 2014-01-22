@@ -96,7 +96,8 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if(b2 == 0){
-      profile.Stop(QUDA_PROFILE_INIT);
+      //This timer is never started - MC
+      //profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -164,7 +165,8 @@ namespace quda {
     }
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    //FIXME: Temporary hack to fix nested profilers in MG - MC
+    //profile.Start(QUDA_PROFILE_COMPUTE);
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
@@ -260,10 +262,11 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.Stop(QUDA_PROFILE_COMPUTE);
+    //FIXME: Temporary hack to fix nested profilers in MG - MC
+    //profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
-    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+    //param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 

@@ -118,7 +118,7 @@ namespace quda {
     }
 
     void Stop() {
-      if (!running) errorQuda("Cannot start an already running timer");
+      if (!running) errorQuda("Cannot stop a non-running timer");
       gettimeofday(&stop, NULL);
 
       long ds = stop.tv_sec - start.tv_sec;

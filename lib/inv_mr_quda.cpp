@@ -59,7 +59,7 @@ namespace quda {
     blas::zero(x);  // can get rid of this for a special first update kernel  
     double b2 = blas::norm2(b);
     if (&r != &b) blas::copy(r, b);
-
+   
     // domain-wise normalization of the initial residual to prevent underflow
     double r2=0.0; // if zero source then we will exit immediately doing no work
     if (b2 > 0.0) {
@@ -111,11 +111,14 @@ namespace quda {
       printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
     }
 
+
     // Obtain global solution by rescaling
     if (b2 > 0.0) blas::ax(sqrt(b2), x);
 
+
     if (k>=param.maxiter && param.verbosity >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
+
   
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
         profile.Stop(QUDA_PROFILE_COMPUTE);
@@ -147,7 +150,6 @@ namespace quda {
     }
 
     globalReduce = true; // renable global reductions for outer solver
-
     return;
   }
 

@@ -187,11 +187,19 @@ namespace quda {
     // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
     {
+      //errorQuda("Not implemented");
+      //printfQuda("Starting DiracCoarse()\n");
+      //printfQuda("Prolongate\n");
       t->P(tmp, in);
-      dummy = tmp;
-      dirac->M(tmp3, dummy);
+      //printfQuda("tmp4 = tmp\n");
+      tmp4 = tmp;
+      //printfQuda("Find dirac(tmp3,dummy)\n");
+      dirac->M(tmp3, tmp4);
+      //printfQuda("tmp2 = tmp3\n");
       tmp2 = tmp3;
+      //printfQuda("Restriction\n");
       t->R(out, tmp2);
+      //printfQuda("End DiracCoarse()\n");
     }
 
     // FIXME - additional dummy fields not used

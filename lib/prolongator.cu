@@ -18,9 +18,13 @@ namespace quda {
     int spin_map[4];
     ProlongateArg(Out &out, const In &in, const int *geo_map, const int *spin_map) : 
       out(out), in(in), geo_map(geo_map)  {
+      //for (int x=0; x<out.Volume(); x++) printfQuda("geo_map[%d] = %d\n",x,this->geo_map[x]);
       for (int s=0; s<4; s++) this->spin_map[s] = spin_map[s];
     }
-    ProlongateArg(const ProlongateArg<Out,In> &arg) : out(arg.out), in(arg.in), geo_map(geo_map) {
+    ProlongateArg(const ProlongateArg<Out,In> &arg) : out(arg.out), in(arg.in), geo_map(arg.geo_map) {
+      //for (int x=0; x<out.Volume(); x++) printfQuda("geo_map[%d] = %d\n",x,this->geo_map[x]);
+
+//      for (int x=0; x<arg.out.Volume(); x++) this->geo_map[x] = arg.geo_map[x];
       for (int s=0; s<4; s++) this->spin_map[s] = arg.spin_map[s];      
     }
   };
@@ -32,6 +36,7 @@ namespace quda {
     for (int x=0; x<arg.out.Volume(); x++) {
       for (int s=0; s<arg.out.Nspin(); s++) {
 	for (int c=0; c<arg.out.Ncolor(); c++) {
+	//printfQuda("x=%d, s=%d, c=%d, arg.geo_map[x] = %d, arg.spin_map[s] = %d\n",x,s,c,0,arg.spin_map[s]);
 	  arg.out(x, s, c) = arg.in(arg.geo_map[x], arg.spin_map[s], c);
 	}
       }
@@ -150,6 +155,7 @@ namespace quda {
 		  ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+	printfQuda("out.Precision() = QUDA_DOUBLE_PRECISION\n");
       FieldOrder<double> *outOrder = createOrder<double>(out);
       FieldOrder<double> *inOrder = createOrder<double>(in);
       FieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
@@ -169,6 +175,7 @@ namespace quda {
       delete vOrder;
       delete tmpOrder;
     } else {
+	//printfQuda("out.Precision() = %d\n", out.Precision());
       FieldOrder<float> *outOrder = createOrder<float>(out);
       FieldOrder<float> *inOrder = createOrder<float>(in);
       FieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
@@ -176,9 +183,14 @@ namespace quda {
       ProlongateArg<FieldOrder<float>, FieldOrder<float> > 
 	arg(*tmpOrder, *inOrder, geo_map, spin_map);
       if (Location(out, in, v) == QUDA_CPU_FIELD_LOCATION) {
+	//printfQuda("tmpOrder = %p, inOrder = %p\n", (void *)tmpOrder, (void *)inOrder);
+	//printfQuda("Location(out,in,v) == QUDA_CPU_FIELD_LOCATION\n");
 	prolongate(arg);
+	//printfQuda("Now rotate fine color\n");
 	rotateFineColor(*outOrder, *tmpOrder, *vOrder);
+	//printfQuda("End location\n");
       } else {
+	//printfQuda("Location(out,in,v) == %d\n",Location(out,in,v));
 	ProlongateLaunch<ProlongateArg<FieldOrder<float>, FieldOrder<float> > > prolongator(arg);
 	prolongator.apply(0);
 	errorQuda("Need rotation");

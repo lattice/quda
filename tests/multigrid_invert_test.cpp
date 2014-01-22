@@ -111,10 +111,13 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+  //QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+ QudaPrecision cpu_prec = QUDA_SINGLE_PRECISION;
   QudaPrecision cuda_prec = prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
-  QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
+  QudaPrecision cuda_prec_precondition = QUDA_SINGLE_PRECISION;
+  //QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
+
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
@@ -284,7 +287,11 @@ int main(int argc, char **argv)
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    //generate a random SU(3) field
+    //construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    //generate a unit SU(3) field
+    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -376,8 +383,10 @@ int main(int argc, char **argv)
   printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
+  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+  //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, 0.0);
 
   if (multi_shift) {
 
