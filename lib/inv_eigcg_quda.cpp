@@ -482,7 +482,7 @@ namespace quda {
 
 //Copy nev eigvectors:
     //Vm->CopyEigenvecSubset(e, param.nev);//Warning:currently QUDA cannot copy eigenvector sets ... here is a temporal solution:
-    for(int i = 0; i < param.nev; i++) copyCuda(e.Eigenvec(i), Vm->Eigenvec(i));
+    for(int i = param.rhs_idx*param.nev; i < (param.rhs_idx+1)*param.nev; i++) copyCuda(e.Eigenvec(i), Vm->Eigenvec(i));
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
@@ -575,7 +575,7 @@ namespace quda {
      return;
   }
 
-  void IncEigCG::DeflateSpinor(cudaColorSpinorField &in, const cudaColorSpinorField &u)
+  void IncEigCG::DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, const cudaColorSpinorField &u)
   {
     if(pM->curr_dim > u.EigvDim()) errorQuda("\nProjection matrix dimension does not match eigenspace dimension.\n");
     if(in.Precision() > u.Precision()) errorQuda("\nPrecisions does not match.\n");
@@ -605,7 +605,7 @@ namespace quda {
     if(in.Precision() == QUDA_DOUBLE_PRECISION)
     {
       cudaMemcpy(buff, vec, pM->prev_dim*_complex*prec, cudaMemcpyDefault);
-      magma_args->SpinorMatVec(in.V(), u.V(), buff, complex_len, pM->prev_dim);
+      magma_args->SpinorMatVec(out.V(), u.V(), buff, complex_len, pM->prev_dim);
     }
     else if (in.Precision() == QUDA_SINGLE_PRECISION) 
     {
@@ -614,7 +614,7 @@ namespace quda {
       for(int i = 0; i < pM->prev_dim; i++) tmp[i] = std::complex<float>((float)vec[i].real(), (float)vec[i].imag()); 
       cudaMemcpy(buff, tmp, pM->prev_dim*_complex*prec, cudaMemcpyDefault);
 
-      magma_args->SpinorMatVec(in.V(), u.V(), buff, complex_len, pM->prev_dim); 
+      magma_args->SpinorMatVec(out.V(), u.V(), buff, complex_len, pM->prev_dim); 
    
       delete[] tmp;
     }
@@ -644,12 +644,12 @@ namespace quda {
     {
       for(int j = 0; j < i; j++)
       {
-        Complex tmp = cDotProductCuda(u.Eigenvec(j), u.Eigenvec(i));
+        Complex tmp = cDotProductCuda(u.Eigenvec(i), u.Eigenvec(j));
         caxpyCuda(-tmp, u.Eigenvec(j), u.Eigenvec(i));
       }
       //normalize vector:
-      double tmp = normCuda(u.Eigenvec(i));//sqrt?
-      axCuda(tmp, u.Eigenvec(i));
+      double tmp = norm2(u.Eigenvec(i));//sqrt?
+      axCuda(1.0/tmp, u.Eigenvec(i));
     }
 
     return;
@@ -675,7 +675,7 @@ namespace quda {
      //then: call eigCG inverter 
      if(param.rhs_idx < param.deflation_grid || param.inv_type == QUDA_EIGCG_INVERTER){
         //deflate initial guess:
-        DeflateSpinor(*in, *u);
+        DeflateSpinor(*out, *in, *u);
 
         //compute current nev Ritz vectors:
         EigCG(*out, *u, *in);        
@@ -694,7 +694,7 @@ namespace quda {
           eigcg_alloc = false;
         }
 
-        DeflateSpinor(*in, *u);
+        DeflateSpinor(*out, *in, *u);
 
         //launch initCG:
         (*initCG)(*out, *in);

@@ -338,13 +338,14 @@ int main(int argc, char **argv)
     spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   }
 
+  const int defl_dim = inv_param.nev * inv_param.deflation_grid;
   void *ritzVects = 0;
   void *projMat   = 0;
   if(deflated){
-    ritzVects = malloc(inv_param.nev*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
-    projMat   = malloc(inv_param.nev*inv_param.nev*2*sSize);
-    memset(ritzVects, 0, inv_param.nev*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
-    memset(projMat, 0, inv_param.nev*inv_param.nev*2*sSize);
+    ritzVects = malloc(defl_dim*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
+    projMat   = malloc(defl_dim*defl_dim*2*sSize);
+    memset(ritzVects, 0, defl_dim*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+    memset(projMat, 0, defl_dim*defl_dim*2*sSize);
 
 //for test only:
     double nrm = 0.0;

@@ -499,7 +499,7 @@ included into the framework, though.
     //For small dim: use CPU
     //For big dim: use GPU (e.g., dim > 128)
     //output: complex vector y
-    void DeflateSpinor(cudaColorSpinorField &in, const cudaColorSpinorField &u);
+    void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, const cudaColorSpinorField &u);
 
     //extend projection matrix:
     //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
