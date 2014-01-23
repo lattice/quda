@@ -121,6 +121,9 @@ cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
 dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
+milc_interface.o: milc_interface.cpp $(HDRS) $(CORE)
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@
 

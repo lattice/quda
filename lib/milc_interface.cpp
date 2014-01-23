@@ -334,9 +334,9 @@ void qudaGaugeForce( int precision,
 
   const int numPaths = 48;
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
-                                                    (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
-                                                    QUDA_SU3_LINKS);
-  
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
+      QUDA_SU3_LINKS);
+
   static double loop_coeff[numPaths];
   static int length[numPaths];
 
@@ -364,8 +364,8 @@ void qudaGaugeForce( int precision,
 
   memset(milc_momentum, 0, 4*getVolume(localDim)*10*qudaGaugeParam.cpu_prec);
   computeGaugeForceQuda(milc_momentum, milc_sitelink,  input_path_buf, length,
-        loop_coeff, numPaths, max_length, eb3, 
-        &qudaGaugeParam, timeinfo);
+      loop_coeff, numPaths, max_length, eb3, 
+      &qudaGaugeParam, timeinfo);
 
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<numPaths; ++i){
@@ -656,12 +656,11 @@ void qudaMultishiftInvert(int external_precision,
   void** sln_pointer = (void**)malloc(num_offsets*sizeof(void*));
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
   void* src_pointer = (char*)source + quark_offset;
-  for(int i=0; i<num_offsets; ++i){
-    sln_pointer[i] = (char*)solutionArray[i] + quark_offset;
-  }
+
+  for(int i=0; i<num_offsets; ++i) sln_pointer[i] = (char*)solutionArray[i] + quark_offset;
 
 
-  invertMultiShiftQuda(sln_pointer, src_pointer, &invertParam);
+  //  invertMultiShiftQuda(sln_pointer, src_pointer, &invertParam);
   free(sln_pointer); 
 
   // return the number of iterations taken by the inverter
@@ -748,10 +747,72 @@ void qudaInvert(int external_precision,
   *final_fermilab_residual = invertParam.true_res_hq;
 
   freeGaugeQuda(); // free up the gauge-field objects allocated in loadGaugeQuda        
-
   return;
 } // qudaInvert
 
 #endif
+
+#ifdef GPU_CLOVER_DIRAC
+
+void qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
+{
+
+  QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION; 
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
+                                                (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
+
+  return createExtendedGaugeField(gauge, geometry, &gaugeParam);
+}
+
+
+void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
+{
+
+  QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
+                                                (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
+
+  return createGaugeField(gauge, geometry, &gaugeParam);
+}
+
+
+void qudaSaveGaugeField(void* gauge, void* inGauge)
+{
+  cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS);
+  saveGaugeField(gauge, inGauge, &gaugeParam);
+  return;
+}
+
+
+void qudaDestroyGaugeField(void* gauge)
+{
+  destroyQudaGaugeField(gauge);
+  return;
+}
+
+
+void qudaCloverTrace(void* out, void* clover, int mu, int nu)
+{
+  computeCloverTraceQuda(out, clover, mu, nu, const_cast<int*>(localDim));
+  return;
+}
+
+
+
+void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, double coeff, int precision, int parity, int conjugate)
+{
+
+  QudaParity qudaParity = (parity==2) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
+                                                (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+                                                QUDA_GENERAL_LINKS);
+  
+  computeCloverDerivativeQuda(out, gauge, oprod, mu, nu, coeff, qudaParity, &gaugeParam, conjugate);
+
+  return;
+}
+
+#endif // GPU_CLOVER_DIRAC
 
 #endif // BUILD_MILC_INTERFACE
