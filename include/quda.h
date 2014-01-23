@@ -604,7 +604,7 @@ extern "C" {
    * @param param.          The field parameters.
    */
 
-  void computeHISQForce(void* momentum,
+  void computeHISQForceQuda(void* momentum,
     const double level2_coeff[6],
     const double fat7_coeff[6],
     const void* const staple_src[4],

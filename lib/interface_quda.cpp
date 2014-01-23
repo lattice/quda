@@ -3001,7 +3001,7 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
     printfQuda("GaugeForce: Using resident mom field\n");
     profileGaugeForce.Stop(QUDA_PROFILE_INIT);
   } else {
-    gParamMom.create = QUDA_NULL_FIELD_CREATE;  
+    gParamMom.create = QUDA_ZERO_FIELD_CREATE;  
     gParamMom.order = QUDA_FLOAT2_GAUGE_ORDER;
     gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
     gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
@@ -3505,7 +3505,7 @@ void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
 }
 
 
-void computeAsqtadForce(void* const milc_momentum,
+void computeAsqtadForceQuda(void* const milc_momentum,
     const double act_path_coeff[6],
     const void* const one_link_src[4],
     const void* const naik_src[4],
@@ -3671,7 +3671,7 @@ void computeAsqtadForce(void* const milc_momentum,
 
 
   void
-computeHISQForce(void* const milc_momentum,
+computeHISQForceQuda(void* const milc_momentum,
     const double level2_coeff[6],
     const double fat7_coeff[6],
     const void* const staple_src[4],

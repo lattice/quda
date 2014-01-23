@@ -526,7 +526,7 @@ gauge_force_test(void)
   for (int i =0;i < attempts; i++){
     gettimeofday(&t0, NULL);
     computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
-			  loop_coeff, num_paths, max_length, eb3,
+			  loop_coeff_d, num_paths, max_length, eb3,
 			  &qudaGaugeParam, timeinfo);
     gettimeofday(&t1, NULL);
   }
