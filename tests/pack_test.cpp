@@ -124,7 +124,7 @@ void packTest() {
   
 #ifdef BUILD_CPS_INTERFACE
   {
-    param.gauge_order = QUDA_CPS_GAUGE_ORDER;
+    param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
     
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
     cpuGaugeField cpsCpuGauge(cpsParam);
