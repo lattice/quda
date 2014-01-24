@@ -1,5 +1,5 @@
 
-Version 0.6.0 - 23rd January 2013
+Version 0.6.0 - 23rd January 2014
 
 - Support for reconstruct 9/13 for the long link in HISQ fermions.
   This provides up to a 25% speedup over using no reconstruction.
