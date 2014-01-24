@@ -6,6 +6,10 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <string.h>
+#include <hisq_links_quda.h>
+#include <ks_improved_force.h>
+
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 #ifdef BUILD_MILC_INTERFACE
 
@@ -13,10 +17,13 @@ static bool initialized = false;
 static int gridDim[4];
 static int localDim[4];
 static int clover_alloc = 0;
+static bool invalidate_quda_gauge = true;
+static bool create_quda_gauge = false;
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
 
 using namespace quda;
+using namespace quda::fermion_force;
+
 
 void qudaInit(QudaInitArgs_t input)
 {
@@ -91,26 +98,26 @@ void qudaHisqParamsInit(QudaHisqParams_t params)
 
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
-  /*
+
 #ifdef GPU_HISQ_FORCE
-quda::fermion_force::setUnitarizeForceConstants(unitarize_eps,
-params.force_filter,
-max_error,
-reunit_allow_svd,
-reunit_svd_only,
-params.reunit_svd_rel_error,
-params.reunit_svd_abs_error);
+  quda::fermion_force::setUnitarizeForceConstants(unitarize_eps,
+      params.force_filter,
+      max_error,
+      reunit_allow_svd,
+      reunit_svd_only,
+      params.reunit_svd_rel_error,
+      params.reunit_svd_abs_error);
 #endif
 
 #ifdef GPU_UNITARIZE
-quda::setUnitarizeLinksConstants(unitarize_eps,
-max_error,
-reunit_allow_svd,
-reunit_svd_only,
-params.reunit_svd_rel_error,
-params.reunit_svd_abs_error);
+  setUnitarizeLinksConstants(unitarize_eps,
+      max_error,
+      reunit_allow_svd,
+      reunit_svd_only,
+      params.reunit_svd_rel_error,
+      params.reunit_svd_abs_error);
 #endif // UNITARIZE_GPU                            
-*/
+
   initialized = true;
 
   return;
@@ -141,11 +148,22 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
   return gParam;
 }
 
+
+static  void invalidateGaugeQuda() {
+  freeGaugeQuda();
+  invalidate_quda_gauge = true;
+}
+
+
+
 #ifdef GPU_FATLINK
 
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
     const double act_path_coeff[6], void* inlink, void* fatlink, void* longlink)
 {
+
+  create_quda_gauge = true;
+
 #ifdef MULTI_GPU  
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
 #else
@@ -157,6 +175,9 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
       QUDA_GENERAL_LINKS);
 
   computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
+
+  // require loadGaugeQuda to be called in subsequent solve
+  invalidateGaugeQuda(); 
 }
 
 
@@ -642,17 +663,20 @@ void qudaMultishiftInvert(int external_precision,
 
   const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-  const int fat_pad  = getFatLinkPadding(localDim);
-  gaugeParam.type = QUDA_GENERAL_LINKS;
-  gaugeParam.ga_pad = fat_pad;  // don't know if this is correct
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
+  if(invalidate_quda_gauge){
+    const int fat_pad  = getFatLinkPadding(localDim);
+    gaugeParam.type = QUDA_GENERAL_LINKS;
+    gaugeParam.ga_pad = fat_pad;  // don't know if this is correct
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
 
-  const int long_pad = 3*fat_pad;
-  gaugeParam.type = QUDA_THREE_LINKS;
-  gaugeParam.ga_pad = long_pad; 
-  loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    const int long_pad = 3*fat_pad;
+    gaugeParam.type = QUDA_THREE_LINKS;
+    gaugeParam.ga_pad = long_pad; 
+    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
 
+    invalidate_quda_gauge = false;
+  }
 
   void** sln_pointer = (void**)malloc(num_offsets*sizeof(void*));
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
@@ -670,7 +694,7 @@ void qudaMultishiftInvert(int external_precision,
     final_fermilab_residual[i] = invertParam.true_res_hq_offset[i];
   } // end loop over number of offsets
 
-  freeGaugeQuda(); // free up the gauge-field objects allocated
+  if(!create_quda_gauge) invalidateGaugeQuda();
   return;
 } // qudaMultiShiftInvert
 
@@ -725,15 +749,19 @@ void qudaInvert(int external_precision,
   const int fat_pad  = getFatLinkPadding(localDim);
   const int long_pad = 3*fat_pad;
 
-  gaugeParam.type = QUDA_GENERAL_LINKS;
-  gaugeParam.ga_pad = fat_pad; 
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
+  if(invalidate_quda_gauge){
+    gaugeParam.type = QUDA_GENERAL_LINKS;
+    gaugeParam.ga_pad = fat_pad; 
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
 
-  gaugeParam.type = QUDA_THREE_LINKS;
-  gaugeParam.ga_pad = long_pad; 
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+    gaugeParam.type = QUDA_THREE_LINKS;
+    gaugeParam.ga_pad = long_pad; 
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
+
+    invalidate_quda_gauge = false;
+  }
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
 
@@ -746,7 +774,7 @@ void qudaInvert(int external_precision,
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  freeGaugeQuda(); // free up the gauge-field objects allocated in loadGaugeQuda        
+  if(!create_quda_gauge) invalidateGaugeQuda();
   return;
 } // qudaInvert
 
@@ -899,8 +927,8 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.clover_cuda_prec_sloppy       = device_precision_sloppy;
   invertParam.clover_cuda_prec_precondition = device_precision_sloppy;
   invertParam.clover_order                  = QUDA_PACKED_CLOVER_ORDER;
-
 }
+
 
 void qudaLoadGaugeField(int external_precision, 
     int quda_precision,
