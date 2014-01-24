@@ -1,4 +1,67 @@
 
+Version 0.6.0 - 23rd January 2014
+
+- Support for reconstruct 9/13 for the long link in HISQ fermions.
+  This provides up to a 25% speedup over using no reconstruction.
+  Owing to architecture constraints, reconstruct 9/13 is not supported
+  on "Tesla" architectures, and is only supported on superceding
+  architectures (Fermi, Kepler, etc.).
+
+- Implemented the long link calculation for HISQ and asqtad fermions.
+  This has the net result of speeding up the gauge fattening by
+  about a factor 1.6x.
+
+- Implemented a gauge field update routine that evolves the gauge
+  field by a given step size using a momentum field.  This is exposed
+  as the function updateGaugeFieldQuda(...).
+
+- Added support for qdpjit field ordering.  When used in conjuction
+  with the device interface, this allows Chroma (when compiled using
+  qdpjit) to avoid all CPU <-> GPU transfers.
+
+- Completely rewritten gauge and clover field copying routines using a
+  generic template-driven approach.  Due the large number of possible
+  input / output combinations to keep the compilation time under
+  control, the different interfaces need to be opted in at configure
+  time (MILC and QDP interfaces are enabled by default).
+
+- The QUDA interface (loadGaugeQuda, loadCloverQuda, invertQuda and
+  invertMultishiftQuda) now supports device-side pointers as well as
+  host-size pointers.  The location of a given pointer is set by the
+  QudaFieldLocation members of QudaGaugeParam (location) and
+  QudaInvertParam (input_location, output_location, clover_location).
+
+- Added new interface support for QDPJIT ordered fields (dirac, clover
+  and gauge fields).
+
+- When doing mixed-precision solvers, all low-precision copies of
+  gauge and clover fields are created from the pre-existing GPU copies
+  instead of re-copying from the CPU.  This lowers the PCIe overhead
+  by up to 1.75x.
+
+- Significantly improved performance of both degenerate and
+  non-degenerate twisted-mass CG solver (up to 17% and 32%, respectively).
+
+- ColorSpinorField is now derived from LatticeField, with all
+  LatticeField derivations now using common page-locked and device memory
+  buffers.  This has the effect of reducing the overall packed-locked
+  memory footprint.
+
+- The source vector is now scaled such that it is equal to unity.
+  This prevents underflow from occuring when the source vector is too
+  small.
+
+- Fixed double precision definition of *= vector operator, which caused a
+  truncation to single precision for certain solver types.
+
+- Fixed memory overalloction when doing clover fermions in half precision.
+
+- Memory leak fix to clover fermions.
+
+- Added work around to allow QUDA to compile with GCC 4.7.x.
+
+- Many small fixes and overall code cleanup.
+
 Version 0.5.0 - 20 March 2013
 
 - Added full support for CUDA 5.0, including the Tesla K20 and other
