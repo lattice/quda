@@ -163,7 +163,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.005;
+  double mass = 0.5;
 
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
