@@ -179,7 +179,8 @@ namespace quda {
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
     void copyGauge(OutOrder outOrder, const InOrder inOrder, int volume, 
-		   const int *faceVolumeCB, int nDim, QudaFieldLocation location, int type) {
+		   const int *faceVolumeCB, int nDim, QudaFieldLocation location, 
+		   int type, bool doGhost) {
     
     if (nDim != 4) errorQuda("Unsupported number of dimensions %d", nDim);
     
@@ -188,7 +189,7 @@ namespace quda {
     if (location == QUDA_CPU_FIELD_LOCATION) {
       if (type == 0) copyGauge<FloatOut, FloatIn, length, 4>(arg);
 #ifdef MULTI_GPU // only copy the ghost zone if doing multi-gpu
-    if(arg.in.ghostInit && arg.out.ghostInit){
+    if(doGhost){
       copyGhost<FloatOut, FloatIn, length, 4>(arg);
     }
 #endif
@@ -200,7 +201,7 @@ namespace quda {
       }
 #ifdef MULTI_GPU
       // now copy ghost
-      if(arg.in.ghostInit && arg.out.ghostInit){
+      if(doGhost){
         CopyGauge<FloatOut, FloatIn, length, 4, OutOrder, InOrder, 1> ghostCopier(arg);
         ghostCopier.apply(0);
       }
@@ -213,31 +214,31 @@ namespace quda {
   
   template <typename FloatOut, typename FloatIn, int length, typename InOrder>
   void copyGauge(const InOrder &inOrder, GaugeField &out, QudaFieldLocation location, 
-		 FloatOut *Out, FloatOut **outGhost, int type) {
+		 FloatOut *Out, FloatOut **outGhost, int type, bool doGhost) {
     int faceVolumeCB[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
     if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  copyGauge<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,2,19>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	    (FloatNOrder<FloatOut,length,2,19>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 	} else {
 	  copyGauge<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,2,18>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	    (FloatNOrder<FloatOut,length,2,18>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	copyGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,2,12>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);	   
+	  (FloatNOrder<FloatOut,length,2,12>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);	   
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,2,8>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);	   
+	  (FloatNOrder<FloatOut,length,2,8>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);	   
 #if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
         copyGauge<FloatOut,FloatIn,length>
-	  (FloatNOrder<FloatOut,length,2,13>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);	   
+	  (FloatNOrder<FloatOut,length,2,13>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);	   
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
         copyGauge<FloatOut,FloatIn,length>
-	  (FloatNOrder<FloatOut,length,2,9>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);	   
+	  (FloatNOrder<FloatOut,length,2,9>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);	   
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
@@ -245,17 +246,17 @@ namespace quda {
     } else if (out.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	copyGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,12>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	  (FloatNOrder<FloatOut,length,4,12>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,8>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	  (FloatNOrder<FloatOut,length,4,8>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 #if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,13>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	  (FloatNOrder<FloatOut,length,4,13>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	copyGauge<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,9>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	  (FloatNOrder<FloatOut,length,4,9>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
@@ -264,7 +265,7 @@ namespace quda {
 
 #ifdef BUILD_QDP_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
-	(QDPOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	(QDPOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -273,7 +274,7 @@ namespace quda {
 
 #ifdef BUILD_QDPJIT_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
-	(QDPJITOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	(QDPJITOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
@@ -282,7 +283,7 @@ namespace quda {
 
 #ifdef BUILD_CPS_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
-	(CPSOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	(CPSOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 #else
       errorQuda("CPS interface has not been built\n");
 #endif
@@ -291,7 +292,7 @@ namespace quda {
 
 #ifdef BUILD_MILC_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
-	(MILCOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	(MILCOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 #else
       errorQuda("MILC interface has not been built\n");
 #endif
@@ -300,7 +301,7 @@ namespace quda {
 
 #ifdef BUILD_BQCD_INTERFACE
       copyGauge<FloatOut,FloatIn,length>
-	(BQCDOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type);
+	(BQCDOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), faceVolumeCB, out.Ndim(), location, type, doGhost);
 #else
       errorQuda("BQCD interface has not been built\n");
 #endif
@@ -313,31 +314,34 @@ namespace quda {
 
   template <typename FloatOut, typename FloatIn, int length>
     void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
-		   FloatOut *Out, FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
+		   FloatOut *Out, FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, 
+		   int type) {
+
+    bool doGhost = in.GhostInit() && out.GhostInit();
 
     // reconstruction only supported on FloatN fields currently
     if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,19>(in, In, inGhost), 
-					      out, location, Out, outGhost, type);
+					      out, location, Out, outGhost, type, doGhost);
 	} else {
 	  copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,18>(in, In, inGhost),
-					      out, location, Out, outGhost, type);
+					      out, location, Out, outGhost, type, doGhost);
 	}
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,12>(in, In, inGhost),
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,8>(in, In, inGhost), 
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
 #if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,13>(in, In, inGhost), 
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,9>(in, In, inGhost), 
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
@@ -345,17 +349,17 @@ namespace quda {
     } else if (in.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,12>(in, In, inGhost), 
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,8>(in, In, inGhost), 
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
 #if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,13>(in, In, inGhost), 
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,9>(in, In, inGhost), 
-					    out, location, Out, outGhost, type);
+					    out, location, Out, outGhost, type, doGhost);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
@@ -364,7 +368,7 @@ namespace quda {
 
 #ifdef BUILD_QDP_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In, inGhost), 
-					 out, location, Out, outGhost, type);
+					 out, location, Out, outGhost, type, doGhost);
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -373,7 +377,7 @@ namespace quda {
 
 #ifdef BUILD_QDPJIT_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(QDPJITOrder<FloatIn,length>(in, In, inGhost), 
-					 out, location, Out, outGhost, type);
+					 out, location, Out, outGhost, type, doGhost);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
@@ -382,7 +386,7 @@ namespace quda {
 
 #ifdef BUILD_CPS_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(CPSOrder<FloatIn,length>(in, In, inGhost), 
-					 out, location, Out, outGhost, type);
+					 out, location, Out, outGhost, type, doGhost);
 #else
       errorQuda("CPS interface has not been built\n");
 #endif
@@ -391,7 +395,7 @@ namespace quda {
 
 #ifdef BUILD_MILC_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(MILCOrder<FloatIn,length>(in, In, inGhost), 
-					 out, location, Out, outGhost, type);
+					 out, location, Out, outGhost, type, doGhost);
 #else
       errorQuda("MILC interface has not been built\n");
 #endif
@@ -400,7 +404,7 @@ namespace quda {
 
 #ifdef BUILD_BQCD_INTERFACE
       copyGauge<FloatOut,FloatIn,length>(BQCDOrder<FloatIn,length>(in, In, inGhost), 
-					 out, location, Out, outGhost, type);
+					 out, location, Out, outGhost, type, doGhost);
 #else
       errorQuda("BQCD interface has not been built\n");
 #endif
