@@ -99,9 +99,9 @@ hisq_force_init()
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.anisotropy = 1;
   
-  cpuFatLink = new cpuGaugeField(gParam);
-  cpuOprod   = new cpuGaugeField(gParam);
-  cpuResult  = new cpuGaugeField(gParam); 
+  cpuFatLink   = new cpuGaugeField(gParam);
+  cpuOprod     = new cpuGaugeField(gParam);
+  cpuResult    = new cpuGaugeField(gParam); 
   cpuReference = new cpuGaugeField(gParam);
  
   // create "gauge fields"
@@ -117,6 +117,7 @@ hisq_force_init()
   cudaFatLink = new cudaGaugeField(gParam);
   cudaOprod   = new cudaGaugeField(gParam); 
   cudaResult  = new cudaGaugeField(gParam);
+  gParam.order = QUDA_QDP_GAUGE_ORDER;
 
   cudaFatLink->loadCPUField(*cpuFatLink, QUDA_CPU_FIELD_LOCATION);
   cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);

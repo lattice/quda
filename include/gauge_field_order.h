@@ -382,13 +382,18 @@ namespace quda {
       const int volumeCB;
       const int stride;
       const int geometry;
+#if __COMPUTE_CAPABILITY__ >= 200
       const int hasPhase; 
       const size_t phaseOffset;
+#endif
 
     FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
-      reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()), 
-	hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), 
-	phaseOffset(u.PhaseOffset()) {
+      reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry())
+#if __COMPUTE_CAPABILITY__ >= 200
+	, hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), 
+	phaseOffset(u.PhaseOffset())
+#endif
+      {
 	if (gauge_) { gauge[0] = gauge_; gauge[1] = (Float*)((char*)gauge_ + u.Bytes()/2);
 	} else { gauge[0] = (Float*)u.Gauge_p(); gauge[1] = (Float*)((char*)u.Gauge_p() + u.Bytes()/2);	}
 
@@ -399,19 +404,21 @@ namespace quda {
       }
 
 
-
     FloatNOrder(const FloatNOrder &order) 
     : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), 
-	geometry(order.geometry), hasPhase(order.hasPhase), phaseOffset(order.phaseOffset) {
-      gauge[0] = order.gauge[0];
-      gauge[1] = order.gauge[1];
-      for (int i=0; i<4; i++) {
-	ghost[i] = order.ghost[i];
-	faceVolumeCB[i] = order.faceVolumeCB[i];
+	geometry(order.geometry) 
+#if __COMPUTE_CAPABILITY__ >= 200
+	, hasPhase(order.hasPhase), phaseOffset(order.phaseOffset) 
+#endif
+      {
+	gauge[0] = order.gauge[0];
+	gauge[1] = order.gauge[1];
+	for (int i=0; i<4; i++) {
+	  ghost[i] = order.ghost[i];
+	  faceVolumeCB[i] = order.faceVolumeCB[i];
+	}
       }
-    }
-
-      virtual ~FloatNOrder() { ; }
+      virtual ~FloatNOrder() { ; } 
 
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
         const int M = reconLen / N;
@@ -424,8 +431,10 @@ namespace quda {
           }
         }
         RegType phase = 0.;
+#if __COMPUTE_CAPABILITY__ >= 200
         if(hasPhase) copy(phase, gauge[parity][phaseOffset/sizeof(Float) + stride*dir + x]);
         // The phases come after the ghost matrices
+#endif
         reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);
       }
 
@@ -440,11 +449,13 @@ namespace quda {
             copy(gauge[parity][dir*stride*M*N + (padIdx*stride + x)*N + intIdx%N], tmp[i*N+j]);
           }
         }
+#if __COMPUTE_CAPABILITY__ >= 200
         if(hasPhase){
           RegType phase;
           reconstruct.getPhase(&phase,v);
           copy(gauge[parity][phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI))); 
         }        
+#endif
       }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
@@ -458,11 +469,16 @@ namespace quda {
             for (int j=0; j<N; j++) {
               int intIdx = i*N + j; // internal dof index
               int padIdx = intIdx / N;
+#if __COMPUTE_CAPABILITY__ < 200
+	      const int hasPhase = 0;
+#endif
               copy(tmp[i*N+j], ghost[dir][parity*faceVolumeCB[dir]*(M*N + hasPhase) + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N]);
             }
           }
           RegType phase=0.; 
+#if __COMPUTE_CAPABILITY__ >= 200
           if(hasPhase) copy(phase, ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x]); 
+#endif
           reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);	 
         }
       }
@@ -478,14 +494,20 @@ namespace quda {
             for (int j=0; j<N; j++) {
               int intIdx = i*N + j;
               int padIdx = intIdx / N;
+#if __COMPUTE_CAPABILITY__ < 200
+	      const int hasPhase = 0;
+#endif
               copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + hasPhase) + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
             }
           }
+
+#if __COMPUTE_CAPABILITY__ >= 200
           if(hasPhase){
             RegType phase=0.;
             reconstruct.getPhase(&phase, v); 
             copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], static_cast<RegType>(phase/(2.*M_PI)));
           }
+#endif
         }
       }
 

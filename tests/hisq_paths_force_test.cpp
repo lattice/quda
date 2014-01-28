@@ -213,6 +213,7 @@ hisq_force_init()
   gParam = GaugeFieldParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.order  = QUDA_QDP_GAUGE_ORDER;
   cpuGauge = new cpuGaugeField(gParam);
   
 #ifdef MULTI_GPU
@@ -347,6 +348,8 @@ hisq_force_init()
   gParam_ex.reconstruct = link_recon;
   //gParam_ex.pad = E1*E2*E3/2;
   gParam_ex.pad = 0;
+  gParam_ex.ghostInit = false;
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaGauge_ex = new cudaGaugeField(gParam_ex);
   qudaGaugeParam.site_ga_pad = gParam_ex.pad;
   //record gauge pad size  
@@ -472,6 +475,7 @@ hisq_force_init()
 
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaOprod_ex = new cudaGaugeField(gParam_ex);
+  gParam_ex.order = gauge_order;
 #else
 
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
@@ -536,6 +540,7 @@ hisq_force_end()
 static int 
 hisq_force_test(void)
 {
+  tune = false;
   if (tune) setTuning(QUDA_TUNE_YES);
   setVerbosity(QUDA_VERBOSE);
 
@@ -622,6 +627,7 @@ hisq_force_test(void)
   gettimeofday(&t1, NULL);
   
   delete cudaOprod_ex; //doing this to lower the peak memory usage
+  gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaLongLinkOprod_ex = new cudaGaugeField(gParam_ex);
   cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod_ex, QUDA_CPU_FIELD_LOCATION);
   fermion_force::hisqLongLinkForceCuda(d_act_path_coeff[1], qudaGaugeParam, *cudaLongLinkOprod_ex, *cudaGauge_ex, cudaForce_ex);  

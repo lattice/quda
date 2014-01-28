@@ -1434,6 +1434,7 @@ __device__ void packFaceStaggeredCore(short2 *out, float *outNorm, const int out
   outNorm[out_idx] = inNorm[in_idx];
 }
 #else
+#if __COMPUTE_CAPABILITY__ >= 130
 __device__ void packFaceStaggeredCore(double2 *out, float *outNorm, const int out_idx, 
     const int out_stride, const double2 *in, const float *inNorm, 
     const int in_idx, const PackParam<double2> &param) {
@@ -1441,6 +1442,7 @@ __device__ void packFaceStaggeredCore(double2 *out, float *outNorm, const int ou
   out[out_idx + 1*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx + 1*param.stride);
   out[out_idx + 2*out_stride] = fetch_double2(SPINORTEXDOUBLE, in_idx + 2*param.stride);
 }	
+#endif
 __device__ void packFaceStaggeredCore(float2 *out, float *outNorm, const int out_idx, 
     const int out_stride, const float2 *in, 
     const float *inNorm, const int in_idx, 
@@ -1575,8 +1577,10 @@ void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, int nFace,
   switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
+#if __COMPUTE_CAPABILITY__ >= 130
         PackFaceStaggered<double2, double> pack((double2*)ghost_buf, &in, nFace, dagger, parity, dim, face_num);
         pack.apply(stream);
+#endif
       }
       break;
     case QUDA_SINGLE_PRECISION:

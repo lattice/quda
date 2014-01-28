@@ -170,10 +170,15 @@ namespace quda {
 	sites = 0;
 	for (int d=0; d<4; d++) sites += arg.faceVolumeCB[d];
       }
+#if __COMPUTE_CAPABILITY__ >= 200
       return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
-                          + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
+			    + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
+#else      
+      return 2 * sites * (  arg.in.Bytes() + arg.out.Bytes() );
+#endif
     } 
   };
+
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
     void copyGauge(OutOrder outOrder, const InOrder inOrder, int volume, const int *faceVolumeCB, 
@@ -238,7 +243,7 @@ namespace quda {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (FloatNOrder<FloatOut,length,2,8>(out, Out, outGhost), inOrder, out.Volume(), 
 	   faceVolumeCB, out.Ndim(), out.Geometry(), location, type);	   
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
         copyGauge<FloatOut,FloatIn,length>
 	  (FloatNOrder<FloatOut,length,2,13>(out, Out, outGhost), inOrder, out.Volume(), 
@@ -260,7 +265,7 @@ namespace quda {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (FloatNOrder<FloatOut,length,4,8>(out, Out, outGhost), inOrder, out.Volume(), 
 	   faceVolumeCB, out.Ndim(), out.Geometry(), location, type);
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (FloatNOrder<FloatOut,length,4,13>(out, Out, outGhost), inOrder, out.Volume(), 
@@ -359,7 +364,7 @@ namespace quda {
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,8>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,13>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
@@ -377,7 +382,7 @@ namespace quda {
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,8>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	copyGauge<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,13>(in, In, inGhost), 
 					    out, location, Out, outGhost, type);
@@ -474,6 +479,12 @@ namespace quda {
     if (out.Geometry() != in.Geometry()) {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
     }
+
+#if __COMPUTE_CAPABILITY__ < 200
+    if (in.Reconstruct() == QUDA_RECONSTRUCT_13 || in.Reconstruct() == QUDA_RECONSTRUCT_9 ||
+	out.Reconstruct() == QUDA_RECONSTRUCT_13 || out.Reconstruct() == QUDA_RECONSTRUCT_9)
+      errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
+#endif
 
     if (in.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
       // we are doing gauge field packing

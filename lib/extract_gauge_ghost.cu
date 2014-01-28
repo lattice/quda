@@ -4,14 +4,14 @@ namespace quda {
   template <typename Order, int nDim>
   struct ExtractGhostArg {
     Order order;
-    const int nFace;
-    int X[nDim];
-    int surfaceCB[nDim];
-    int A[nDim];
-    int B[nDim];
-    int C[nDim];
+    const unsigned char nFace;
+    unsigned short X[nDim];
+    unsigned short surfaceCB[nDim];
+    unsigned short A[nDim];
+    unsigned short B[nDim];
+    unsigned short C[nDim];
     int f[nDim][nDim];
-    int localParity[nDim];
+    bool localParity[nDim];
     ExtractGhostArg(const Order &order, int nFace, const int *X_, const int *surfaceCB_, const int *A_,
 		    const int *B_, const int *C_, const int f_[nDim][nDim], const int *localParity_) 
   : order(order), nFace(nFace) { 
@@ -63,7 +63,8 @@ namespace quda {
 	  } // a
 	} // d
 
-	assert(indexDst == arg.nFace*arg.surfaceCB[dim]);
+	//assert(indexDst == arg.nFace*arg.surfaceCB[dim]);
+	assert(indexDst == arg.order.faceVolumeCB[dim]);
       } // dim
 
     } // parity
@@ -84,7 +85,8 @@ namespace quda {
 
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
-	if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
+	//if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
+	if (X >= 2*arg.order.faceVolumeCB[dim]) continue;
 	// X = ((d * A + a)*B + b)*C + c
 	int dab = X/arg.C[dim];
 	int c = X - dab*arg.C[dim];
@@ -154,7 +156,7 @@ namespace quda {
     long long flops() const { return 0; } 
     long long bytes() const { 
       int sites = 0;
-      for (int d=0; d<nDim; d++) sites += arg.nFace*arg.surfaceCB[d];
+      for (int d=0; d<nDim; d++) sites += arg.order.faceVolumeCB[d];
       return 2 * sites * 2 * arg.order.Bytes(); // parity * sites * i/o * vec size
     } 
   };
@@ -194,7 +196,6 @@ namespace quda {
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
     ExtractGhostArg<Order, nDim> arg(order, nFace, X, surfaceCB, A, B, C, f, localParity);
-
     if (location==QUDA_CPU_FIELD_LOCATION) {
       extractGhost<Float,length,nDim,Order>(arg);
     } else {
@@ -318,6 +319,12 @@ namespace quda {
   }
 
   void extractGaugeGhost(const GaugeField &u, void **ghost) {
+
+#if __COMPUTE_CAPABILITY__ < 200
+    if (u.Reconstruct() == QUDA_RECONSTRUCT_13 || u.Reconstruct() == QUDA_RECONSTRUCT_9)
+      errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
+#endif
+
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       extractGhost(u, (double**)ghost);
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {

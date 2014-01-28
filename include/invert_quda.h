@@ -158,15 +158,20 @@ namespace quda {
        Update the QudaInvertParam with the data from this
        @param param the QudaInvertParam to be updated
      */
-    void updateInvertParam(QudaInvertParam &param) {
+    void updateInvertParam(QudaInvertParam &param, int offset=-1) {
       param.true_res = true_res;
       param.true_res_hq = true_res_hq;
       param.iter += iter;
       param.gflops = (param.gflops*param.secs + gflops*secs) / (param.secs + secs);
       param.secs += secs;
-      for (int i=0; i<num_offset; i++) {
-	param.true_res_offset[i] = true_res_offset[i];
-	param.true_res_hq_offset[i] = true_res_hq_offset[i];
+      if (offset >= 0) {
+	param.true_res_offset[offset] = true_res_offset[offset];
+	param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
+      } else {
+	for (int i=0; i<num_offset; i++) {
+	  param.true_res_offset[i] = true_res_offset[i];
+	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
+	}
       }
     }
 

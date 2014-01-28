@@ -1,9 +1,23 @@
 
-Version 0.6.0 - xx September 2013
+Version 0.6.0 - 23rd January 2014
+
+- Support for reconstruct 9/13 for the long link in HISQ fermions.
+  This provides up to a 25% speedup over using no reconstruction.
+  Owing to architecture constraints, reconstruct 9/13 is not supported
+  on "Tesla" architectures, and is only supported on superceding
+  architectures (Fermi, Kepler, etc.).
+
+- Implemented the long link calculation for HISQ and asqtad fermions.
+  This has the net result of speeding up the gauge fattening by
+  about a factor 1.6x.
 
 - Implemented a gauge field update routine that evolves the gauge
   field by a given step size using a momentum field.  This is exposed
   as the function updateGaugeFieldQuda(...).
+
+- Added support for qdpjit field ordering.  When used in conjuction
+  with the device interface, this allows Chroma (when compiled using
+  qdpjit) to avoid all CPU <-> GPU transfers.
 
 - Completely rewritten gauge and clover field copying routines using a
   generic template-driven approach.  Due the large number of possible
@@ -43,6 +57,10 @@ Version 0.6.0 - xx September 2013
 - Fixed memory overalloction when doing clover fermions in half precision.
 
 - Memory leak fix to clover fermions.
+
+- Added work around to allow QUDA to compile with GCC 4.7.x.
+
+- Many small fixes and overall code cleanup.
 
 Version 0.5.0 - 20 March 2013
 
