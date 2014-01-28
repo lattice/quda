@@ -782,7 +782,7 @@ void qudaInvert(int external_precision,
 
 #ifdef GPU_CLOVER_DIRAC
 
-void qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
+void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
 {
 
   QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION; 
