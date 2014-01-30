@@ -35,14 +35,12 @@ namespace quda {
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2; // used by Wilson-like kernels only
 
-    QudaVerbosity verbose;
-
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
       dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), epsilon(0.0),
-      tmp1(0), tmp2(0), verbose(QUDA_SILENT)
+      tmp1(0), tmp2(0)
     {
 
     }
@@ -94,7 +92,6 @@ namespace quda {
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
 
     QudaTune tune;
-    QudaVerbosity verbose;  
 
     int commDim[QUDA_MAX_DIM]; // whether do comms or not
 
@@ -130,7 +127,8 @@ namespace quda {
     static Dirac* create(const DiracParam &param);
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
-    QudaVerbosity Verbose() const { return verbose; }
+
+    void Dagger(QudaDagType dag) { dagger = dag; }
   };
 
   //Forward declaration of multigrid Transfer class
@@ -363,8 +361,6 @@ namespace quda {
   class DiracStaggered : public Dirac {
 
   protected:
-    cudaGaugeField &fatGauge;
-    cudaGaugeField &longGauge;
     FaceBuffer face; // multi-gpu communication buffers
 
   public:
@@ -399,6 +395,57 @@ namespace quda {
     DiracStaggeredPC(const DiracStaggeredPC &dirac);
     virtual ~DiracStaggeredPC();
     DiracStaggeredPC& operator=(const DiracStaggeredPC &dirac);
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b, 
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
+  // Full staggered
+  class DiracImprovedStaggered : public Dirac {
+
+  protected:
+    cudaGaugeField &fatGauge;
+    cudaGaugeField &longGauge;
+    FaceBuffer face; // multi-gpu communication buffers
+
+  public:
+    DiracImprovedStaggered(const DiracParam &param);
+    DiracImprovedStaggered(const DiracImprovedStaggered &dirac);
+    virtual ~DiracImprovedStaggered();
+    DiracImprovedStaggered& operator=(const DiracImprovedStaggered &dirac);
+
+    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+  
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+			const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b, 
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+  };
+
+  // Even-odd preconditioned staggered
+  class DiracImprovedStaggeredPC : public DiracImprovedStaggered {
+
+  protected:
+
+  public:
+    DiracImprovedStaggeredPC(const DiracParam &param);
+    DiracImprovedStaggeredPC(const DiracImprovedStaggeredPC &dirac);
+    virtual ~DiracImprovedStaggeredPC();
+    DiracImprovedStaggeredPC& operator=(const DiracImprovedStaggeredPC &dirac);
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;

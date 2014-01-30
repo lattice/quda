@@ -247,6 +247,32 @@ MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t 
 }
 
 
+/**
+ * Strided send to the "dir" direction in the "dim" dimension
+ */
+MsgHandle *comm_declare_strided_send_relative(void *buffer, int dim, int dir, 
+					      size_t blksize, int nblocks, size_t stride)
+{
+  int disp[QUDA_MAX_DIM] = {0};
+  disp[dim] = dir;
+
+  return comm_declare_strided_send_displaced(buffer, disp, blksize, nblocks, stride);
+}
+
+
+/**
+ * Strided receive from the "dir" direction in the "dim" dimension
+ */
+MsgHandle *comm_declare_strided_receive_relative(void *buffer, int dim, int dir, 
+						 size_t blksize, int nblocks, size_t stride)
+{
+  int disp[QUDA_MAX_DIM] = {0};
+  disp[dim] = dir;
+
+  return comm_declare_strided_receive_displaced(buffer, disp, blksize, nblocks, stride);
+}
+
+
 void comm_finalize(void)
 {
   Topology *topo = comm_default_topology();

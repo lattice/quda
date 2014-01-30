@@ -16,7 +16,7 @@
 
   /********************** Staple code, used by link fattening **************/
 
-#if defined(GPU_FATLINK)||defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) ||defined(GPU_HISQ_FORCE)
+#if defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE)|| defined(GPU_FERMION_FORCE) || defined(GPU_HISQ_FORCE) || defined(GPU_CLOVER_DIRAC)
 
 namespace quda {
 
@@ -549,7 +549,7 @@ namespace quda {
 	cudaMemcpy(tmp_even + i*(len+glen_sum), cpuGauge[i], len, cudaMemcpyHostToDevice); 
 #endif
       }
-    } else { //QUDA_MILC_GAUGE_ORDER
+    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
     
 #ifdef MULTI_GPU
       errorQuda("Multi-GPU for MILC gauge order is not supported");
@@ -559,6 +559,8 @@ namespace quda {
 #else
       cudaMemcpy(tmp_even, ((char*)cpuGauge), 4*len, cudaMemcpyHostToDevice);
 #endif
+    } else {								\
+      errorQuda("Unsupported gauge order\n");				\
     }
 
 
@@ -618,12 +620,14 @@ namespace quda {
 	cudaMemcpy(tmp_odd + i*(len+glen_sum), ((char*)cpuGauge[i]) + Vh*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
       }
-    }else{  //QUDA_MILC_GAUGE_ORDER
+    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
 #ifdef GPU_DIRECT 
       cudaMemcpyAsync(tmp_odd , ((char*)cpuGauge)+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice, streams[0]);
 #else
       cudaMemcpy(tmp_odd, (char*)cpuGauge+4*Vh*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
+    } else {								
+      errorQuda("Unsupported gauge order\n");				
     }
   
 
@@ -803,12 +807,17 @@ namespace quda {
 #endif
       
       }
-    } else { //QUDA_MILC_GAUGE_ORDER
+    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) { //[parity][dim][volumecb][row][col] 
 #ifdef GPU_DIRECT 
       cudaMemcpyAsync(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
 #else
       cudaMemcpy(tmp_even, (char*)cpuGauge, 4*len, cudaMemcpyHostToDevice);
 #endif
+    } 
+
+    // TIFR [mu][parity][volumecb][col][row]
+else {
+      errorQuda("Unsupported gauge order");
     }
   
     link_format_cpu_to_gpu((void*)even, (void*)tmp_even,  reconstruct, Vh_ex, pad, 0, prec, cpu_order, 0/*default stream*/);
@@ -822,12 +831,14 @@ namespace quda {
 	cudaMemcpy(tmp_odd + i*len, ((char*)cpuGauge[i]) + Vh_ex*gaugeSiteSize*prec, len, cudaMemcpyHostToDevice);
 #endif
       }
-    } else {//QUDA_MILC_GAUGE_ORDER
+    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER) {
 #ifdef GPU_DIRECT 
       cudaMemcpyAsync(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #else
       cudaMemcpy(tmp_odd, ((char*)cpuGauge) + 4*Vh_ex*gaugeSiteSize*prec, 4*len, cudaMemcpyHostToDevice);
 #endif    
+    } else {
+      errorQuda("Unsupported gauge order");
     }
     link_format_cpu_to_gpu((void*)odd, (void*)tmp_odd, reconstruct, Vh_ex, pad, 0, prec, cpu_order, 0 /*default stream*/);
   

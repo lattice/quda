@@ -6,6 +6,12 @@
 #include <enum_quda.h>
 #include <comm_quda.h>
 
+QudaTune getTuning();
+
+/**
+   @param tune Sets the whether to tune the cuda kernels or not
+*/
+void setTuning(QudaTune tune);
 
 QudaVerbosity getVerbosity();
 char *getOutputPrefix();

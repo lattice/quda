@@ -219,6 +219,7 @@ namespace quda {
 	virtual ~FloatNOrder() { ; }
 
 	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+	  if (x >= volumeCB) return;
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -232,6 +233,7 @@ namespace quda {
 	}
 
 	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+	  if (x >= volumeCB) return;
 	  RegType scale = 0.0;
 	  if (sizeof(Float)==sizeof(short)) {
 	    for (int i=0; i<2*Ns*Nc; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
@@ -269,6 +271,7 @@ namespace quda {
 
     /**! float4 load specialization to obtain full coalescing. */
     template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::load(float v[24], int x) const {
+      if (x >= volumeCB) return;
 #pragma unroll
       for (int i=0; i<4*3*2; i+=4) {
 	float4 tmp = ((float4*)field)[i/4 * stride + x];
@@ -278,6 +281,7 @@ namespace quda {
 
     /**! float4 save specialization to obtain full coalescing. */
     template<> __device__ inline void FloatNOrder<float, 4, 3, 4>::save(const float v[24], int x) {
+      if (x >= volumeCB) return;
 #pragma unroll
       for (int i=0; i<4*3*2; i+=4) {
 	float4 tmp = make_float4(v[i], v[i+1], v[i+2], v[i+3]);
@@ -297,6 +301,7 @@ namespace quda {
 	virtual ~SpaceColorSpinorOrder() { ; }
 
 	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+	  if (x >= volumeCB) return;
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -307,6 +312,7 @@ namespace quda {
 	}
 
 	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+	  if (x >= volumeCB) return;
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -402,6 +408,7 @@ namespace quda {
 #ifdef __CUDA_ARCH__
       load_shared<float, 4, 3>(v, field, x, volumeCB);
 #else
+      if (x >= volumeCB) return;
       const int Ns=4;
       const int Nc=3;
       for (int s=0; s<Ns; s++) {
@@ -419,6 +426,7 @@ namespace quda {
 #ifdef __CUDA_ARCH__
       save_shared<float, 4, 3>(field, v, x, volumeCB);
 #else
+      if (x >= volumeCB) return;
       const int Ns=4;
       const int Nc=3;
       for (int s=0; s<Ns; s++) {
@@ -443,6 +451,7 @@ namespace quda {
 	virtual ~SpaceSpinorColorOrder() { ; }
 
 	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+	  if (x >= volumeCB) return;
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -453,6 +462,7 @@ namespace quda {
 	}
 
 	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+	  if (x >= volumeCB) return;
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -488,6 +498,7 @@ namespace quda {
 	virtual ~QDPJITDiracOrder() { ; }
 
 	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
+	  if (x >= volumeCB) return;
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -498,6 +509,7 @@ namespace quda {
 	}
 
 	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
+	  if (x >= volumeCB) return;
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {

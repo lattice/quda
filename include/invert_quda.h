@@ -25,9 +25,10 @@ namespace quda {
     QudaInverterType inv_type_precondition;
     
     /**
-     * Whether to use the L2 relative residual, Fermilab heavy-quark
-     * residual, or both to determine convergence.  To require that both
-     * stopping conditions are satisfied, use a bitwise OR as follows:
+     * Whether to use the L2 relative residual, L2 absolute residual
+     * or Fermilab heavy-quark residual, or combinations therein to
+     * determine convergence.  To require that multiple stopping
+     * conditions are satisfied, use a bitwise OR as follows:
      *
      * p.residual_type = (QudaResidualType) (QUDA_L2_RELATIVE_RESIDUAL
      *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
@@ -39,6 +40,12 @@ namespace quda {
 
     /**< Reliable update tolerance */
     double delta;           
+
+    /**< Whether to keep the partial solution accumulator in sloppy precision */
+    bool use_sloppy_partial_accumulator;
+
+    /**< Enable pipeline solver */
+    int pipeline;
 
     /**< Solver tolerance in the L2 residual norm */
     double tol;             
@@ -91,7 +98,7 @@ namespace quda {
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
 
-
+    
 
     /** Maximum size of Krylov space used by solver */
     int Nkrylov;
@@ -119,12 +126,6 @@ namespace quda {
     /**< The Gflops rate of the solver */
     double gflops;
     
-    /**< The verbosity setting to use in the solver */
-    QudaVerbosity verbosity;
-
-    /**< The verbosity setting to use in the preconditioner */
-    QudaVerbosity verbosity_precondition;
-
     /**
        Default constructor
      */
@@ -138,8 +139,9 @@ namespace quda {
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type), 
       inv_type_precondition(param.inv_type_precondition), 
-      residual_type(param.residual_type), delta(param.reliable_delta), 
-      tol(param.tol), tol_hq(param.tol_hq), 
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
+      pipeline(param.pipeline), tol(param.tol), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
@@ -147,8 +149,8 @@ namespace quda {
       preserve_source(param.preserve_source), num_offset(param.num_offset), 
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops), 
-      verbosity(param.verbosity), verbosity_precondition(param.verbosity_precondition) { 
+      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops)
+    { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
 	tol_offset[i] = param.tol_offset[i];
@@ -161,15 +163,20 @@ namespace quda {
        Update the QudaInvertParam with the data from this
        @param param the QudaInvertParam to be updated
      */
-    void updateInvertParam(QudaInvertParam &param) {
+    void updateInvertParam(QudaInvertParam &param, int offset=-1) {
       param.true_res = true_res;
       param.true_res_hq = true_res_hq;
       param.iter += iter;
       param.gflops = (param.gflops*param.secs + gflops*secs) / (param.secs + secs);
       param.secs += secs;
-      for (int i=0; i<num_offset; i++) {
-	param.true_res_offset[i] = true_res_offset[i];
-	param.true_res_hq_offset[i] = true_res_hq_offset[i];
+      if (offset >= 0) {
+	param.true_res_offset[offset] = true_res_offset[offset];
+	param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
+      } else {
+	for (int i=0; i<num_offset; i++) {
+	  param.true_res_offset[i] = true_res_offset[i];
+	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
+	}
       }
     }
 
@@ -191,6 +198,19 @@ namespace quda {
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			  DiracMatrix &matPrecon, TimeProfile &profile);
 
+    /**
+       Set the solver stopping condition
+       @param b2 L2 norm squared of the source vector
+     */
+    static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
+
+    /**
+       Test for solver convergence
+       @param r2 L2 norm squared of the residual 
+       @param hq2 Heavy quark residual
+       @param r2_tol Solver L2 tolerance
+       @param hq_tol Solver heavy-quark tolerance
+     */
     bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
 		     const double &hq_tol);
  
@@ -230,7 +250,7 @@ namespace quda {
     const DiracMatrix &matPrecon;
 
     // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp, *wp, *zp;
+    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
     bool init;
 
   public:

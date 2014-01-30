@@ -1,5 +1,6 @@
 #include <multigrid.h>
 #include <qio_field.h>
+#include <string.h>
 
 namespace quda {
   

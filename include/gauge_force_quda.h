@@ -12,7 +12,7 @@ namespace quda {
   void gauge_force_init_cuda(QudaGaugeParam* param, int max_length);
   void gauge_force_cuda(cudaGaugeField& cudaMom, double eb3, cudaGaugeField& cudaSiteLink,
 			QudaGaugeParam* param, int*** input_path, int* length,
-			void* path_coeff, int num_paths, int max_length);
+			double* path_coeff, int num_paths, int max_length);
 
 } // namespace quda
 

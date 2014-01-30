@@ -8,6 +8,14 @@
 #endif
 
 #if (__COMPUTE_CAPABILITY__ >= 130)
+
+template<typename Tex>
+static __inline__ __device__ double fetch_double(Tex t, int i)
+{
+  int2 v = TEX1DFETCH(int2, t, i);
+  return __hiloint2double(v.y, v.x);
+}
+
 template <typename Tex>
 static __inline__ __device__ double2 fetch_double2(Tex t, int i)
 {
@@ -41,15 +49,24 @@ texture<short2, 1, cudaReadModeNormalizedFloat> gauge1TexHalf2;
 
 texture<int4, 1> longGauge0TexDouble;
 texture<int4, 1> longGauge1TexDouble;
+texture<int2, 1> longPhase0TexDouble;
+texture<int2, 1> longPhase1TexDouble;
+
 texture<float4, 1, cudaReadModeElementType> longGauge0TexSingle;
 texture<float4, 1, cudaReadModeElementType> longGauge1TexSingle;
 texture<float2, 1, cudaReadModeElementType> longGauge0TexSingle_norecon;
 texture<float2, 1, cudaReadModeElementType> longGauge1TexSingle_norecon;
+texture<float, 1, cudaReadModeElementType> longPhase0TexSingle;
+texture<float, 1, cudaReadModeElementType> longPhase1TexSingle;
+
 
 texture<short4, 1, cudaReadModeNormalizedFloat> longGauge0TexHalf;
 texture<short4, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf;
 texture<short2, 1, cudaReadModeNormalizedFloat> longGauge0TexHalf_norecon;
 texture<short2, 1, cudaReadModeNormalizedFloat> longGauge1TexHalf_norecon;
+texture<short, 1, cudaReadModeNormalizedFloat> longPhase0TexHalf;
+texture<short, 1, cudaReadModeNormalizedFloat> longPhase1TexHalf;
+
 
 // Double precision input spinor field
 texture<int4, 1> spinorTexDouble;
@@ -249,10 +266,19 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
 #ifdef USE_TEXTURE_OBJECTS
   dslashParam.longGauge0Tex = oddBit ? gauge.OddTex() : gauge.EvenTex();
   dslashParam.longGauge1Tex = oddBit ? gauge.EvenTex() : gauge.OddTex();
+
+  if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){ 
+    dslashParam.longPhase0Tex = oddBit ? gauge.OddPhaseTex() : gauge.EvenPhaseTex();
+    dslashParam.longPhase1Tex = oddBit ? gauge.EvenPhaseTex() : gauge.OddPhaseTex();
+  }
 #else
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaBindTexture(0, longGauge0TexDouble, *gauge0, gauge.bytes/2); 
     cudaBindTexture(0, longGauge1TexDouble, *gauge1, gauge.bytes/2);
+    if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
+      cudaBindTexture(0, longPhase0TexDouble, (char*)(*gauge0) + gauge.phase_offset, gauge.phase_bytes/2);
+      cudaBindTexture(0, longPhase1TexDouble, (char*)(*gauge1) + gauge.phase_offset, gauge.phase_bytes/2);
+    }
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_NO) { //18 reconstruct
       cudaBindTexture(0, longGauge0TexSingle_norecon, *gauge0, gauge.bytes/2); 
@@ -260,6 +286,10 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
     } else {
       cudaBindTexture(0, longGauge0TexSingle, *gauge0, gauge.bytes/2); 
       cudaBindTexture(0, longGauge1TexSingle, *gauge1, gauge.bytes/2);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
+        cudaBindTexture(0, longPhase0TexSingle, (char*)(*gauge0) + gauge.phase_offset, gauge.phase_bytes/2);
+        cudaBindTexture(0, longPhase1TexSingle, (char*)(*gauge1) + gauge.phase_offset, gauge.phase_bytes/2);
+      }
     }
   } else {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_NO) { //18 reconstruct
@@ -268,6 +298,10 @@ void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gaug
     } else {
       cudaBindTexture(0, longGauge0TexHalf, *gauge0, gauge.bytes/2); 
       cudaBindTexture(0, longGauge1TexHalf, *gauge1, gauge.bytes/2);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
+        cudaBindTexture(0, longPhase0TexHalf, (char*)(*gauge0) + gauge.phase_offset, gauge.phase_bytes/2);
+	cudaBindTexture(0, longPhase1TexHalf, (char*)(*gauge1) + gauge.phase_offset, gauge.phase_bytes/2);
+      }
     }
   }
 #endif // USE_TEXTURE_OBJECTS
@@ -279,6 +313,10 @@ void unbindLongGaugeTex(const cudaGaugeField &gauge)
   if (gauge.precision == QUDA_DOUBLE_PRECISION) {
     cudaUnbindTexture(longGauge0TexDouble);
     cudaUnbindTexture(longGauge1TexDouble);
+    if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
+      cudaUnbindTexture(longPhase0TexDouble);
+      cudaUnbindTexture(longPhase1TexDouble);
+    }
   } else if (gauge.precision == QUDA_SINGLE_PRECISION) {
     if (gauge.reconstruct == QUDA_RECONSTRUCT_NO) { //18 reconstruct
       cudaUnbindTexture(longGauge0TexSingle_norecon);
@@ -286,14 +324,22 @@ void unbindLongGaugeTex(const cudaGaugeField &gauge)
     } else {
       cudaUnbindTexture(longGauge0TexSingle);
       cudaUnbindTexture(longGauge1TexSingle);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() == QUDA_RECONSTRUCT_9){
+        cudaUnbindTexture(longPhase0TexSingle);
+        cudaUnbindTexture(longPhase1TexSingle);
+      }
     }
-  } else {
+  } else { // half precision
     if (gauge.reconstruct == QUDA_RECONSTRUCT_NO) { //18 reconstruct
       cudaUnbindTexture(longGauge0TexHalf_norecon);
       cudaUnbindTexture(longGauge1TexHalf_norecon);
     } else {
       cudaUnbindTexture(longGauge0TexHalf);
       cudaUnbindTexture(longGauge1TexHalf);
+      if(gauge.Reconstruct() == QUDA_RECONSTRUCT_13 || gauge.Reconstruct() ==  QUDA_RECONSTRUCT_9){
+        cudaUnbindTexture(longPhase0TexHalf);
+        cudaUnbindTexture(longPhase1TexHalf);
+      }
     }
   }
 #endif

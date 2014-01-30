@@ -8,7 +8,7 @@
 #include "fat_force_quda.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
-#include "hisq_force_quda.h"
+#include "ks_improved_force.h"
 #include "hw_quda.h"
 #include <sys/time.h>
 #include <dslash_quda.h>
@@ -95,12 +95,14 @@ hisq_force_init()
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   GaugeFieldParam gParam(0, gaugeParam);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.anisotropy = 1;
   
-  cpuFatLink = new cpuGaugeField(gParam);
-  cpuOprod   = new cpuGaugeField(gParam);
-  cpuResult  = new cpuGaugeField(gParam); 
+  cpuFatLink   = new cpuGaugeField(gParam);
+  cpuOprod     = new cpuGaugeField(gParam);
+  cpuResult    = new cpuGaugeField(gParam); 
+  cpuReference = new cpuGaugeField(gParam);
  
   // create "gauge fields"
   int seed=0;
@@ -110,16 +112,17 @@ hisq_force_init()
 
   createNoisyLinkCPU((void**)cpuFatLink->Gauge_p(), gaugeParam.cpu_prec, seed);
   createNoisyLinkCPU((void**)cpuOprod->Gauge_p(), gaugeParam.cpu_prec, seed+1);
- 
+
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER; 
   cudaFatLink = new cudaGaugeField(gParam);
   cudaOprod   = new cudaGaugeField(gParam); 
   cudaResult  = new cudaGaugeField(gParam);
+  gParam.order = QUDA_QDP_GAUGE_ORDER;
 
   cudaFatLink->loadCPUField(*cpuFatLink, QUDA_CPU_FIELD_LOCATION);
   cudaOprod->loadCPUField(*cpuOprod, QUDA_CPU_FIELD_LOCATION);
 
 
-  cpuReference = new cpuGaugeField(gParam);
   return;
 }
 
@@ -145,7 +148,6 @@ static void
 hisq_force_test()
 {
   hisq_force_init();
-  fermion_force::hisqForceInitCuda(&gaugeParam);
 
   TimeProfile profile("dummy");
 #define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
@@ -176,12 +178,12 @@ hisq_force_test()
   cudaMemset(num_failures_dev, 0, sizeof(int));
 
   printfQuda("Calling unitarizeForceCuda\n");
-  fermion_force::unitarizeForceCuda(gaugeParam, *cudaOprod, *cudaFatLink, cudaResult, num_failures_dev);
+  fermion_force::unitarizeForceCuda(*cudaOprod, *cudaFatLink, cudaResult, num_failures_dev);
 
 
   if(verify_results){
 	  printfQuda("Calling unitarizeForceCPU\n");
-    fermion_force::unitarizeForceCPU(gaugeParam, *cpuOprod, *cpuFatLink, cpuResult);
+    fermion_force::unitarizeForceCPU(*cpuOprod, *cpuFatLink, cpuResult);
   }
   cudaResult->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION);
 

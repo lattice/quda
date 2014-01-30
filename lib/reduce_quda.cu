@@ -40,8 +40,6 @@ static cudaEvent_t reduceEnd;
 namespace quda {
   namespace blas {
 
-    QudaTune getTuning();
-    QudaVerbosity getVerbosity();
     cudaStream_t* getStream();
     
     void initReduce()
@@ -252,7 +250,7 @@ namespace quda {
 
     double caxpyNorm(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
       return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyNorm2,0,1,0,0,0,false>
-	(make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, x, x, x);
+	(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, x, x, x);
     }
       
     /**
@@ -278,7 +276,7 @@ namespace quda {
       double caxpyXmazNormX(const Complex &a, ColorSpinorField &x, 
 			    ColorSpinorField &y, ColorSpinorField &z) {
 	return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,caxpyxmaznormx,1,1,0,0,0,false>
-	  (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
+	  (make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
       }
 	
       /**
@@ -305,7 +303,7 @@ namespace quda {
       double cabxpyAxNorm(const double &a, const Complex &b, 
 			  ColorSpinorField &x, ColorSpinorField &y) {
 	return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,cabxpyaxnorm,1,1,0,0,0,false>
-	  (make_double2(a, 0.0), make_double2(b.real(), b.imag()), x, y, x, x, x);
+	  (make_double2(a, 0.0), make_double2(REAL(b), IMAG(b)), x, y, x, x, x);
       }
 	
       /**
@@ -383,7 +381,7 @@ namespace quda {
       Complex caxpyDotzy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y,
 			 ColorSpinorField &z) {
 	double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,caxpydotzy,0,1,0,0,0,false>
-	  (make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), x, y, z, x, x);
+	  (make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), x, y, z, x, x);
 	return Complex(cdot.x, cdot.y);
       }
 	
@@ -469,9 +467,8 @@ namespace quda {
 					     ColorSpinorField &z, ColorSpinorField &w,
 					     ColorSpinorField &u) {
 	return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY_,0,1,1,0,0,false>
-	  (make_double2(a.real(), a.imag()), make_double2(b.real(), b.imag()), x, y, z, w, u);
+	  (make_double2(REAL(a), IMAG(a)), make_double2(b.real(), b.imag()), x, y, z, w, u);
       }
-
     
       /**
 	 Specialized kernel for the modified CG norm computation for

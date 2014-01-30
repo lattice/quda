@@ -15,8 +15,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) 
-    : LatticeField(param), verbose(param.verbosity), 
-      init(false), v(0), norm(0), even(0), odd(0) 
+    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0) 
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, 
 	   param.precision, param.pad, param.siteSubset, param.siteOrder, 
@@ -24,8 +23,7 @@ namespace quda {
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) 
-    : LatticeField(field), verbose(field.verbose), init(false), 
-      v(0), norm(0), even(0), odd(0)
+    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, 
 	   field.precision, field.pad, field.siteSubset, field.siteOrder, 
@@ -36,17 +34,46 @@ namespace quda {
     destroy();
   }
 
+  static bool createSpinorGhost = true;
+  void setGhostSpinor(bool value) { createSpinorGhost = value; }
+
   void ColorSpinorField::createGhostZone() {
 
-    if (verbose == QUDA_DEBUG_VERBOSE) 
+    if (!createSpinorGhost) {
+      total_length = length;
+      total_norm_length = 2*stride;
+      return;
+    }
+
+    if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
       printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
 
     int num_faces = 1;
     int num_norm_faces=2;
+
+    // FIXME - this is a hack from hell that needs to be fixed.  When
+    // the TIFR interface is enabled we are forcing naive staggered
+    // support which breaks asqtad/hisq fermions.  The problem occurs
+    // because the ghost zone is allocated before we know which
+    // operator (and hence number of faces are needed).  One solution
+    // may be to separate the ghost zone memory allocation from the
+    // field itself, which has other benefits (1. on multi-gpu
+    // machines with UVA, we can read the ghost zone directly from the
+    // neighbouring field and 2.) we can use a single contiguous
+    // buffer for the ghost zone and its norm which will reduce
+    // latency for half precision and allow us to enable GPU_COMMS
+    // support for half precision).
+#ifdef BUILD_TIFR_INTERFACE
     if (nSpin == 1) { //staggered
+      num_faces=2;
+      num_norm_faces=2;
+    }
+#else
+    if (nSpin == 1) { // improved staggered
       num_faces=6;
       num_norm_faces=6;
     }
+#endif
 
     // calculate size of ghost zone required
     int ghostVolume = 0;
@@ -75,7 +102,7 @@ namespace quda {
       }
 
 #ifdef MULTI_GPU
-      if (verbose == QUDA_DEBUG_VERBOSE) 
+      if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
 	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
 		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
 #endif
@@ -83,7 +110,7 @@ namespace quda {
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
-    if (verbose == QUDA_DEBUG_VERBOSE) 
+    if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
       printfQuda("Allocated ghost volume = %d, ghost norm volume %d\n", ghostVolume, ghostNormVolume);
 
     // ghost zones are calculated on c/b volumes
@@ -105,7 +132,7 @@ namespace quda {
 
     if (precision != QUDA_HALF_PRECISION) total_norm_length = 0;
 
-    if (verbose == QUDA_DEBUG_VERBOSE) {
+    if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
       printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
@@ -146,6 +173,7 @@ namespace quda {
       x[d] = X[d];
       volume *= x[d];
     }
+    volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
 
@@ -201,6 +229,8 @@ namespace quda {
       if (param.x[0] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
+    volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
+
   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
 
   
@@ -238,7 +268,7 @@ namespace quda {
 
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 
-    if (verbose >= QUDA_DEBUG_VERBOSE) {
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("\nPrinting out reset field\n");
       std::cout << *this << std::endl;
       printfQuda("\n");
@@ -260,7 +290,6 @@ namespace quda {
     param.fieldOrder = fieldOrder;
     param.gammaBasis = gammaBasis;
     param.create = QUDA_INVALID_FIELD_CREATE;
-    param.verbosity = verbose;
   }
 
   // For kernels with precision conversion built in

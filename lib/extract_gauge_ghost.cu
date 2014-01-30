@@ -7,14 +7,14 @@ namespace quda {
   template <typename Order, int nDim>
   struct ExtractGhostArg {
     Order order;
-    const int nFace;
-    int X[nDim];
-    int surfaceCB[nDim];
-    int A[nDim];
-    int B[nDim];
-    int C[nDim];
+    const unsigned char nFace;
+    unsigned short X[nDim];
+    unsigned short surfaceCB[nDim];
+    unsigned short A[nDim];
+    unsigned short B[nDim];
+    unsigned short C[nDim];
     int f[nDim][nDim];
-    int localParity[nDim];
+    bool localParity[nDim];
     ExtractGhostArg(const Order &order, int nFace, const int *X_, const int *surfaceCB_, const int *A_,
 		    const int *B_, const int *C_, const int f_[nDim][nDim], const int *localParity_) 
   : order(order), nFace(nFace) { 
@@ -46,6 +46,7 @@ namespace quda {
 	int indexDst = 0;
 	// the following 4-way loop means this is specialized for 4 dimensions 
 
+	// FIXME redefine a, b, c, d such that we always optimize for locality
 	for (int d=arg.X[dim]-arg.nFace; d<arg.X[dim]; d++) { // loop over last nFace faces in this dimension
 	  for (int a=0; a<arg.A[dim]; a++) { // loop over the surface elements of this face
 	    for (int b=0; b<arg.B[dim]; b++) { // loop over the surface elements of this face
@@ -53,11 +54,11 @@ namespace quda {
 		// index is a checkboarded spacetime coordinate
 		int indexCB = (a*arg.f[dim][0] + b*arg.f[dim][1] + c*arg.f[dim][2] + d*arg.f[dim][3]) >> 1;
 		// we only do the extraction for parity we are currently working on
-		int oddness = (a+b+c+d)%2;
+		int oddness = (a+b+c+d) & 1;
 		if (oddness == parity) {
 		  RegType u[length];
 		  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-		  arg.order.saveGhost(u, indexDst, dim, (parity+arg.localParity[dim])%2);
+		  arg.order.saveGhost(u, indexDst, dim, (parity+arg.localParity[dim])&1);
 		  indexDst++;
 		} // oddness == parity
 	      } // c
@@ -65,7 +66,8 @@ namespace quda {
 	  } // a
 	} // d
 
-	assert(indexDst == arg.nFace*arg.surfaceCB[dim]);
+	//assert(indexDst == arg.nFace*arg.surfaceCB[dim]);
+	assert(indexDst == arg.order.faceVolumeCB[dim]);
       } // dim
 
     } // parity
@@ -86,7 +88,8 @@ namespace quda {
 
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
-	if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
+	//if (X >= 2*arg.nFace*arg.surfaceCB[dim]) continue;
+	if (X >= 2*arg.order.faceVolumeCB[dim]) continue;
 	// X = ((d * A + a)*B + b)*C + c
 	int dab = X/arg.C[dim];
 	int c = X - dab*arg.C[dim];
@@ -99,11 +102,11 @@ namespace quda {
 	// index is a checkboarded spacetime coordinate
 	int indexCB = (a*arg.f[dim][0] + b*arg.f[dim][1] + c*arg.f[dim][2] + d*arg.f[dim][3]) >> 1;
 	// we only do the extraction for parity we are currently working on
-	int oddness = (a+b+c+d)%2;
+	int oddness = (a+b+c+d)&1;
 	if (oddness == parity) {
 	  RegType u[length];
 	  arg.order.load(u, indexCB, dim, parity); // load the ghost element from the bulk
-	  arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])%2);
+	  arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
 	} // oddness == parity
 
       } // dim
@@ -118,27 +121,23 @@ namespace quda {
     int size;
 
   private:
-    int sharedBytesPerThread() const { return 0; }
-    int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
 
-    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
-    bool advanceBlockDim(TuneParam &param) const {
-      bool advance = Tunable::advanceBlockDim(param);
-      if (advance) param.grid = dim3( (size+param.block.x-1) / param.block.x, 1, 1);
-      return advance;
-    }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return size; }
 
   public:
     ExtractGhost(ExtractGhostArg<Order,nDim> &arg) : arg(arg) { 
       int faceMax = 0;
       for (int d=0; d<nDim; d++) 
 	faceMax = (arg.surfaceCB[d] > faceMax ) ? arg.surfaceCB[d] : faceMax;
-      size = 2 * arg.nFace * faceMax; // factor of comes from parity
+      size = 2 * arg.nFace * faceMax; // factor 2 of comes from parity
     }
     virtual ~ExtractGhost() { ; }
   
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       extractGhostKernel<Float, length, nDim, Order> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
@@ -157,21 +156,10 @@ namespace quda {
       return ps.str();
     }
 
-    virtual void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.grid = dim3( (size+param.block.x-1) / param.block.x, 1, 1);
-    }
-
-    /** sets default values for when tuning is disabled */
-    virtual void defaultTuneParam(TuneParam &param) const {
-      Tunable::defaultTuneParam(param);
-      param.grid = dim3( (size+param.block.x-1) / param.block.x, 1, 1);
-    }
-
     long long flops() const { return 0; } 
     long long bytes() const { 
       int sites = 0;
-      for (int d=0; d<nDim; d++) sites += arg.nFace*arg.surfaceCB[d];
+      for (int d=0; d<nDim; d++) sites += arg.order.faceVolumeCB[d];
       return 2 * sites * 2 * arg.order.Bytes(); // parity * sites * i/o * vec size
     } 
   };
@@ -206,7 +194,9 @@ namespace quda {
     //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
     // FIXME - I don't understand this, shouldn't it be commDim(dim) == 0 ?
     int localParity[nDim];
-    for (int dim=0; dim<nDim; dim++) localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
+    for (int dim=0; dim<nDim; dim++) 
+      //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
+      localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
     ExtractGhostArg<Order, nDim> arg(order, nFace, X, surfaceCB, A, B, C, f, localParity);
     if (location==QUDA_CPU_FIELD_LOCATION) {
@@ -242,6 +232,12 @@ namespace quda {
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	extractGhost<Float,length>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), 
 				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
+	extractGhost<Float,length>(FloatNOrder<Float,length,2,13>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
+	extractGhost<Float,length>(FloatNOrder<Float,length,2,9>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
       }
     } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
@@ -255,8 +251,14 @@ namespace quda {
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	extractGhost<Float,length>(FloatNOrder<Float,length,4,12>(u, 0, Ghost),
 				   u.Nface(), u.SurfaceCB(), u.X(), location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) { 
 	extractGhost<Float,length>(FloatNOrder<Float,length,4,8>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_13){
+	extractGhost<Float,length>(FloatNOrder<Float,length,4,13>(u, 0, Ghost),
+				   u.Nface(), u.SurfaceCB(), u.X(), location);
+      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_9){
+	extractGhost<Float,length>(FloatNOrder<Float,length,4,9>(u, 0, Ghost),
 				   u.Nface(), u.SurfaceCB(), u.X(), location);
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
@@ -304,6 +306,15 @@ namespace quda {
       errorQuda("BQCD interface has not been built\n");
 #endif
 
+    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      extractGhost<Float,length>(TIFROrder<Float,length>(u, 0, Ghost),
+				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("TIFR interface has not been built\n");
+#endif
+
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }
@@ -311,6 +322,12 @@ namespace quda {
   }
 
   void extractGaugeGhost(const GaugeField &u, void **ghost) {
+
+#if __COMPUTE_CAPABILITY__ < 200
+    if (u.Reconstruct() == QUDA_RECONSTRUCT_13 || u.Reconstruct() == QUDA_RECONSTRUCT_9)
+      errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
+#endif
+
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       extractGhost(u, (double**)ghost);
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {

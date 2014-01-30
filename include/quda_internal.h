@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <sys/time.h>
 #include <string>
+#include <complex>
 
 #if ((defined(QMP_COMMS) || defined(MPI_COMMS)) && !defined(MULTI_GPU))
 #error "MULTI_GPU must be enabled to use MPI or QMP"
@@ -14,9 +15,9 @@
 #error "MPI or QMP must be enabled to use MULTI_GPU"
 #endif
 
-#ifdef USE_QDPJIT
-#include "qdp_quda.h"
-#endif
+//#ifdef USE_QDPJIT
+//#include "qdp_quda.h"
+//#endif
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -83,7 +84,12 @@ extern "C" {
 }
 #endif
 
+#define REAL(a) (*((double*)&a))
+#define IMAG(a) (*((double*)&a+1))
+
 namespace quda {
+
+  typedef std::complex<double> Complex;
 
   /**
    * Use this for recording a fine-grained profile of a QUDA
@@ -210,6 +216,4 @@ namespace quda {
 
 } // namespace quda
 
-extern int verbose;
-  
 #endif // _QUDA_INTERNAL_H

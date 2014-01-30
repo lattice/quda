@@ -14,9 +14,6 @@
 namespace quda {
 
   namespace blas {
-
-    QudaTune getTuning();
-    QudaVerbosity getVerbosity();
     cudaStream_t* getStream();
     
     namespace copy_ns {
@@ -49,8 +46,8 @@ namespace quda {
 	Output &Y;
 	const int length;
 
-	int sharedBytesPerThread() const { return 0; }
-	int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+	unsigned int sharedBytesPerThread() const { return 0; }
+	unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
 	virtual bool advanceSharedBytes(TuneParam &param) const
 	{
@@ -77,7 +74,7 @@ namespace quda {
 	}  
 
 	void apply(const cudaStream_t &stream) {
-	  TuneParam tp = tuneLaunch(*this, blas::getTuning(), blas::getVerbosity());
+	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
 	}
 

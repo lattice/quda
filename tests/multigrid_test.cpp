@@ -199,7 +199,6 @@ void init(int argc, char **argv) {
 
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, 0);
-    diracParam.verbose = QUDA_VERBOSE;
     //diracParam.tmp1 = tmp1;
     //diracParam.tmp2 = tmp2;
     

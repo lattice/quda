@@ -15,7 +15,7 @@
 #include "fat_force_quda.h"
 #include "hisq_links_quda.h"
 #include "dslash_quda.h"
-#include "hisq_force_quda.h"
+#include "ks_improved_force.h"
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
@@ -49,7 +49,7 @@ static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 static size_t gSize;
 
 
-static int
+  static int
 unitarize_link_test()
 {
 
@@ -60,14 +60,14 @@ unitarize_link_test()
   cpu_prec = prec;
   gSize = cpu_prec;  
   qudaGaugeParam.anisotropy = 1.0;
-  
+
   qudaGaugeParam.X[0] = xdim;
   qudaGaugeParam.X[1] = ydim;
   qudaGaugeParam.X[2] = zdim;
   qudaGaugeParam.X[3] = tdim;
 
   setDims(qudaGaugeParam.X);
-  
+
   QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
   QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 
@@ -77,7 +77,7 @@ unitarize_link_test()
   qudaGaugeParam.type = QUDA_WILSON_LINKS;
 
 
-  
+
   qudaGaugeParam.t_boundary  	   = QUDA_PERIODIC_T;
   qudaGaugeParam.anisotropy  	   = 1.0;
   qudaGaugeParam.cuda_prec_sloppy   = prec;
@@ -87,7 +87,7 @@ unitarize_link_test()
   qudaGaugeParam.gaugeGiB    	   = 0;
   qudaGaugeParam.preserve_gauge             = false;
 
-   
+
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
   qudaGaugeParam.gauge_order = gauge_order;
@@ -98,19 +98,20 @@ unitarize_link_test()
     | QUDA_FAT_PRESERVE_COMM_MEM;
 
   setFatLinkPadding(QUDA_COMPUTE_FAT_STANDARD, &qudaGaugeParam);
- 
+
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
-  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
   gParam.order     = QUDA_QDP_GAUGE_ORDER;
-
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = QUDA_ASQTAD_MOM_LINKS;
-  gParam.order       = QUDA_QDP_GAUGE_ORDER;
+  gParam.link_type   = QUDA_GENERAL_LINKS;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.order       = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
+  
+  gParam.order = QUDA_QDP_GAUGE_ORDER;
 
   TimeProfile profile("dummy");
 
@@ -129,7 +130,7 @@ unitarize_link_test()
   if(fatlink == NULL){
     errorQuda("ERROR: allocating fatlink failed\n");
   }
-  
+
   void* sitelink[4];
   for(int i=0;i < 4;i++){
     cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*gSize);
@@ -137,9 +138,37 @@ unitarize_link_test()
       errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
     }
   }
-  
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
+  void* inlink =  (void*)malloc(4*V*gaugeSiteSize*gSize);
+
+  printfQuda("About to assign values to inlink\n");
+  fflush(stdout);
+
+  if(prec == QUDA_DOUBLE_PRECISION){
+    double* link = reinterpret_cast<double*>(inlink);
+    for(int dir=0; dir<4; ++dir){
+      double* slink = reinterpret_cast<double*>(sitelink[dir]);
+      for(int i=0; i<V; ++i){
+        for(int j=0; j<gaugeSiteSize; j++){
+          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        }
+      }
+    }
+  }else if(prec == QUDA_SINGLE_PRECISION){
+    float* link = reinterpret_cast<float*>(inlink);
+    for(int dir=0; dir<4; ++dir){
+      float* slink = reinterpret_cast<float*>(sitelink[dir]);
+      for(int i=0; i<V; ++i){
+        for(int j=0; j<gaugeSiteSize; j++){
+          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        }
+      }
+    }
+  }
+
+  printfQuda("Values assigned to inlink\n");
+  fflush(stdout);
 
   double act_path_coeff[6];
   act_path_coeff[0] = 0.625000;
@@ -150,13 +179,12 @@ unitarize_link_test()
   act_path_coeff[5] = -0.123113;
 
 
-  //only record the last call's performance
-  //the first one is for creating the cpu/cuda data structures
-  
-  if(gauge_order == QUDA_QDP_GAUGE_ORDER){
-    computeFatLinkQuda(fatlink, sitelink, act_path_coeff, &qudaGaugeParam,
-			   QUDA_COMPUTE_FAT_STANDARD);
-  } // gauge order is QDP_GAUGE_ORDER
+
+  printfQuda("Calling computeKSLinkQuda\n");
+  fflush(stdout);
+    computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
+        QUDA_COMPUTE_FAT_STANDARD);
+  printfQuda("Call to computeKSLinkQuda complete\n");
 
 
   void* fatlink_2d[4];
@@ -169,77 +197,92 @@ unitarize_link_test()
   gParam.gauge     = fatlink_2d;
   cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
 
+  printfQuda("About to call cudaFatLink->loadCPUField\n");
+  printfQuda("cudaFatLink->Order() = %d\n", cudaFatLink->Order());
+  printfQuda("cpuOutLink->Order() = %d\n", cpuOutLink->Order());
+  fflush(stdout);
+  
+
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
+  printfQuda("Call to cudFatLink->loadCPUField complete\n"); 
+ 
 
   delete cpuOutLink;
 
   setUnitarizeLinksConstants(unitarize_eps,
-				   max_allowed_error,
-				   reunit_allow_svd,
-				   reunit_svd_only,
-				   svd_rel_error,
-				   svd_abs_error);
- 
+      max_allowed_error,
+      reunit_allow_svd,
+      reunit_svd_only,
+      svd_rel_error,
+      svd_abs_error);
+
   setUnitarizeLinksPadding(0,0);
 
   int* num_failures_dev;
   if(cudaMalloc(&num_failures_dev, sizeof(int)) != cudaSuccess){
-	errorQuda("cudaMalloc failed for num_failures_dev\n");
+    errorQuda("cudaMalloc failed for num_failures_dev\n");
   }
   cudaMemset(num_failures_dev, 0, sizeof(int));
 
   struct timeval t0, t1;
 
+  printfQuda("About to call unitarizeLinksCuda\n");
+  fflush(stdout);
   gettimeofday(&t0,NULL);
   unitarizeLinksCuda(qudaGaugeParam,*cudaFatLink, cudaULink, num_failures_dev);
   cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
+ 
+  printfQuda("Call to unitarizeLinksCuda complete\n");
+  fflush(stdout); 
 
   int num_failures=0;
   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
- delete cpuOutLink;
- delete cudaFatLink;
- delete cudaULink;
- for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
+  delete cpuOutLink;
+  delete cudaFatLink;
+  delete cudaULink;
+  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
   cudaFree(num_failures_dev); 
+
+  free(inlink);
 #ifdef MULTI_GPU
   exchange_llfat_cleanup();
 #endif
   endQuda();
-   
+
   printfQuda("Unitarization time: %g ms\n", TDIFF(t0,t1)*1000); 
   return num_failures;
 }
 
-static void
+  static void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
+
   printfQuda("link_precision           link_reconstruct           space_dimension        T_dimension       algorithm     max allowed error\n");
   printfQuda("%s                       %s                         %d/%d/%d/                  %d               %s             %g \n", 
-	     get_prec_str(prec),
-	     get_recon_str(link_recon), 
-	     xdim, ydim, zdim, tdim, 
-	     get_unitarization_str(reunit_svd_only),
-	     max_allowed_error);
+      get_prec_str(prec),
+      get_recon_str(link_recon), 
+      xdim, ydim, zdim, tdim, 
+      get_unitarization_str(reunit_svd_only),
+      max_allowed_error);
 
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n",
-             dimPartitioned(0),
-             dimPartitioned(1),
-             dimPartitioned(2),
-             dimPartitioned(3));
+      dimPartitioned(0),
+      dimPartitioned(1),
+      dimPartitioned(2),
+      dimPartitioned(3));
 #endif
 
   return ;
-  
+
 }
 
 
-int
+  int
 main(int argc, char **argv)
 {
   //default to 18 reconstruct, 8^3 x 8
@@ -252,7 +295,7 @@ main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }
-    
+
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }

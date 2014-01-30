@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.5.1                           xx May 2013
+Release Notes for QUDA v0.6.0                           23rd January 2014
 -----------------------------
 
 Overview:
@@ -26,10 +26,12 @@ supported throughout, with communication handled by QMP or MPI.
 Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.8 and Ubuntu 12.04)
-using release 4.0, 4.1, 4.2, and 5.0 of the CUDA toolkit.  CUDA 3.x
+using release 4.0, 4.1, 4.2, 5.0 and 5.5 of the CUDA toolkit.  CUDA 3.x
 and earlier are not supported.  The library also works under Mac OS X
 10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
-Intel-based Macs.
+Intel-based Macs.  Due to issues with compilation using LLVM, under
+Mac OS X 10.9.x it is required to install and use GCC instead of the
+default clang compiler.
 
 See also "Known Issues" below.
 
@@ -127,16 +129,12 @@ Known Issues:
 * Issues affecting devices with compute capability 1.1, 1.2, or 1.3
   (i.e., those predating the "Fermi" architecture):
 
-  1. Building for these targets results in a large number of warnings
-     that the compiler "Cannot tell what pointer points to, assuming
-     global memory space."  The warnings are annoying but harmless.
-
-  2. Computation of the Fermilab heavy-quark residual (and its use as
+  1. Computation of the Fermilab heavy-quark residual (and its use as
      a stopping condition in the solvers) is not supported on these
      devices.  Selecting it will result in a run-time error.
 
-  3. It is anticipated that QUDA 0.6.0 will drop support for pre-Fermi
-     cards completely.  QUDA 0.5.x will continue to be maintained as a
+  2. It is anticipated that QUDA 0.7.0 will drop support for pre-Fermi
+     cards completely.  QUDA 0.6.x will continue to be maintained as a
      separate branch (with bug fixes but minimal new features) for
      those needing this support.
 
@@ -159,10 +157,6 @@ Known Issues:
   Dslash kernels (visible if the verbosity is set to at least
   QUDA_SUMMARIZE), rather than the correct values.  This does not
   affect the tuning process or actual performance.
-
-* Attempts to compile with GCC 4.7.x will fail due to bugs in the
-  compiler.
-
 
 Getting Help:
 
