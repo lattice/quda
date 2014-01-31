@@ -605,7 +605,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   CloverFieldParam clover_param;
-  CloverField *in;
+  CloverField *in = NULL;
 
   if(!device_calc){
     // create a param for the cpu clover field
@@ -1698,11 +1698,12 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   // rescale the source and solution vectors to help prevent the onset of underflow
-  blas::ax(1.0/sqrt(nb), *b);
-  blas::ax(1.0/sqrt(nb), *x);
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    blas::ax(1.0/sqrt(nb), *b);
+    blas::ax(1.0/sqrt(nb), *x);
+  }
 
-  setDslashTuning(param->tune, getVerbosity());
-  blas::setTuning(param->tune, getVerbosity());
+  setTuning(param->tune);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
 
@@ -1713,7 +1714,8 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared solution = %g\n", nout);   
   }
 
-  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
+  massRescale(param->dslash_type, param->kappa, param->mass,
+	      param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = blas::norm2(*in);
@@ -1792,9 +1794,11 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   dirac.reconstruct(*x, *b, param->solution_type);
-  
-  // rescale the solution
-  blas::ax(sqrt(nb), *x);
+
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    // rescale the solution
+    blas::ax(sqrt(nb), *x);
+  }
 
   profileInvert.Start(QUDA_PROFILE_D2H);
   *h_x = *x;
@@ -1880,23 +1884,20 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.Start(QUDA_PROFILE_H2D);
 
-  cudaColorSpinorField *b = NULL;
-  cudaColorSpinorField *x = NULL;
-  cudaColorSpinorField *in = NULL;
-  cudaColorSpinorField *out = NULL;
+  ColorSpinorField *b = NULL;
+  ColorSpinorField *x = NULL;
+  ColorSpinorField *in = NULL;
+  ColorSpinorField *out = NULL;
 
   const int *X = cudaGauge->X();
 
   // wrap CPU host side pointers
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
-  ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
+  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
 
   cpuParam.v = hp_x;
-  ColorSpinorField *h_x = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  cpuParam.location = param->output_location;
+  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
 
   // download source
   ColorSpinorParam cudaParam(cpuParam, *param);
@@ -1918,13 +1919,13 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
-  double nb = norm2(*b);
+  double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nh_b = norm2(*h_b);
-    double nh_x = norm2(*h_x);
-    double nx = norm2(*x);
+    double nh_b = blas::norm2(*h_b);
+    double nh_x = blas::norm2(*h_x);
+    double nx = blas::norm2(*x);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
     printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
   }
@@ -1932,15 +1933,16 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     blas::ax(1.0/sqrt(nb), *b);
-    blas::ax1.0/sqrt(nb), *x);
+    blas::ax(1.0/sqrt(nb), *x);
   }
 
   setTuning(param->tune);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
+
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = norm2(*in);
-    double nout = norm2(*out);
+    double nin = blas::norm2(*in);
+    double nout = blas::norm2(*out);
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
@@ -1949,7 +1951,7 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
-    double nin = norm2(*in);
+    double nin = blas::norm2(*in);
     printfQuda("Prepared source post mass rescale = %g\n", nin);   
   }
 
@@ -2011,7 +2013,7 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = norm2(*x);
+    double nx = blas::norm2(*x);
     printfQuda("Solution = %g\n",nx);
   }
   dirac.reconstruct(*x, *b, param->solution_type);
@@ -2036,8 +2038,8 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_D2H);
 
   if (getVerbosity() >= QUDA_VERBOSE){
-    double nx = norm2(*x);
-    double nh_x = norm2(*h_x);
+    double nx = blas::norm2(*x);
+    double nh_x = blas::norm2(*h_x);
     printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
   }
 
@@ -2160,7 +2162,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   Dirac &diracSloppy = *dSloppy;
 
   cudaColorSpinorField *b = NULL;   // Cuda RHS
-  cudaColorSpinorField **x = NULL;  // Cuda Solutions
+  std::vector<ColorSpinorField*> x;  // Cuda Solutions
+  x.resize(param->num_offset);
 
   // Grab the dimension array of the input gauge field.
   const int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ? 
@@ -2171,17 +2174,16 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // the solution is on a checkerboard instruction or not. These can
   // then be used as 'instructions' to create the actual
   // ColorSpinorField
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
-  ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
+  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
 
-  ColorSpinorField **h_x = new ColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
-  for(int i=0; i < param->num_offset; i++) { 
+  std::vector<ColorSpinorField*> h_x;
+  h_x.resize(param->num_offset);
+
+  cpuParam.location = param->output_location;
+  for(int i=0; i < param->num_offset; i++) {
     cpuParam.v = hp_x[i];
-    h_x[i] = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-      static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-      static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+    h_x[i] = ColorSpinorField::Create(cpuParam);
   }
 
   profileMulti.Start(QUDA_PROFILE_H2D);
@@ -2193,18 +2195,17 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   profileMulti.Stop(QUDA_PROFILE_H2D);
 
   // Create the solution fields filled with zero
-  x = new cudaColorSpinorField* [ param->num_offset ];
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   for(int i=0; i < param->num_offset; i++) { 
     x[i] = new cudaColorSpinorField(cudaParam);
   }
 
   // Check source norms
-  double nb = norm2(*b);
+  double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Solution has zero norm");
 
   if(getVerbosity() >= QUDA_VERBOSE ) {
-    double nh_b = norm2(*h_b);
+    double nh_b = blas::norm2(*h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
@@ -2329,7 +2330,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     }
 
     if (getVerbosity() >= QUDA_VERBOSE){
-      double nx = norm2(*x[i]);
+      double nx = blas::norm2(*x[i]);
       printfQuda("Solution %d = %g\n", i, nx);
     }
 
@@ -2344,9 +2345,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   delete h_b;
   delete b;
-
-  delete [] h_x;
-  delete [] x;
 
   delete [] hp_x;
 
@@ -2462,7 +2460,6 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   Dirac &diracSloppy = *dSloppy;
 
   cudaColorSpinorField *b = NULL;   // Cuda RHS
-  cudaColorSpinorField **xe = NULL;  // Cuda Solutions
   cudaColorSpinorField *xo, *ye, *yo = NULL;  // Cuda Solutions
 
   // Grab the dimension array of the input gauge field.
@@ -2474,35 +2471,21 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   // the solution is on a checkerboard instruction or not. These can
   // then be used as 'instructions' to create the actual
   // ColorSpinorField
-  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution);
-  ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
-    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
-  ColorSpinorField **h_xe = new ColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
-  ColorSpinorField **h_xo = new ColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
-  ColorSpinorField **h_ye = new ColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
-  ColorSpinorField **h_yo = new ColorSpinorField* [ param->num_offset ]; // DYNAMIC ALLOCATION
+  ColorSpinorParam cpuParam(hp_b, *param, X, pc_solution, param->input_location);
+  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+  std::vector<ColorSpinorField*> h_xe; h_xe.resize(param->num_offset);
+  std::vector<ColorSpinorField*> h_xo; h_xo.resize(param->num_offset);
+  std::vector<ColorSpinorField*> h_ye; h_ye.resize(param->num_offset);
+  std::vector<ColorSpinorField*> h_yo; h_yo.resize(param->num_offset);
   for(int i=0; i < param->num_offset; i++) { 
     cpuParam.v = hp_xe[i];
-    h_xe[i] = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-      static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-      static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
+    h_xe[i] = ColorSpinorField::Create(cpuParam);
     cpuParam.v = hp_xo[i];
-    h_xo[i] = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-      static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-      static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
+    h_xo[i] = ColorSpinorField::Create(cpuParam);
     cpuParam.v = hp_ye[i];
-    h_ye[i] = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-      static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-      static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
-
+    h_ye[i] = ColorSpinorField::Create(cpuParam);
     cpuParam.v = hp_yo[i];
-    h_yo[i] = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
-      static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
-      static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+    h_yo[i] = ColorSpinorField::Create(cpuParam);
   }
 
   profileMulti.Start(QUDA_PROFILE_H2D);
@@ -2514,7 +2497,8 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   profileMulti.Stop(QUDA_PROFILE_H2D);
 
   // Create the solution fields filled with zero
-  xe = new cudaColorSpinorField* [ param->num_offset ];
+  std::vector<ColorSpinorField*> xe;  // Cuda Solutions
+  xe.resize(param->num_offset);
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   for(int i=0; i < param->num_offset; i++) { 
     xe[i] = new cudaColorSpinorField(cudaParam);
@@ -2525,11 +2509,11 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   yo = new cudaColorSpinorField(cudaParam);
 
   // Check source norms
-  double nb = norm2(*b);
+  double nb = blas::norm2(*b);
   if (nb==0.0) errorQuda("Solution has zero norm");
 
   if(getVerbosity() >= QUDA_VERBOSE ) {
-    double nh_b = norm2(*h_b);
+    double nh_b = blas::norm2(*h_b);
     printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
   }
 
@@ -2624,7 +2608,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
     }
 
     if (getVerbosity() >= QUDA_VERBOSE){
-      double nx = norm2(*xe[i]);
+      double nx = blas::norm2(*xe[i]);
       printfQuda("Solution %d = %g\n", i, nx);
     }
 
@@ -2652,12 +2636,6 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   delete h_b;
   delete b;
 
-  delete [] h_xe;
-  delete [] h_xo;
-  delete [] h_ye;
-  delete [] h_yo;
-
-  delete [] xe;
   delete xo;
   delete ye;
   delete yo;
@@ -3439,8 +3417,8 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
     errorQuda("Only scalar and vector geometries are supported");
   }
 
-  cpuGaugeField* cpuGauge;
-  cudaGaugeField* cudaGauge;
+  cpuGaugeField* cpuGauge = NULL;
+  cudaGaugeField* cudaGauge = NULL;
 
 
   // Create the unextended cpu field 
