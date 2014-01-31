@@ -144,12 +144,8 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-<<<<<<< HEAD
   //double mass = -0.4125;
   double mass = 0.1;
-=======
-  double mass = -0.585;
->>>>>>> 39c13ac50c5934f93917936d5f0a7da33ef1ce06
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
