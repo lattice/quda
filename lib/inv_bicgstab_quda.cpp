@@ -161,7 +161,8 @@ namespace quda {
     }
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    //FIXME: MC - Hack to fix nested profilers in MG V-cycle
+    //profile.Start(QUDA_PROFILE_COMPUTE);
     
     rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
     blas::copy(p, rSloppy);

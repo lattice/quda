@@ -148,9 +148,18 @@ namespace quda {
       // do the post smoothing
       printfQuda("MG: level %d, post smoothing\n", param.level);
       param.maxiter = param.nu_post;
-      param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+
+      //FIXME: MC - MR inverter does not support initial guess.
+      //param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      
+      
+
       (*smoother)(x, b);
+      printfQuda("MG: Post smoothing fine solution x2 = %e\n", blas::norm2(*r));
+      blas:xpy(*r, x);
+      param.matResidual(*r, x);
       r2 = blas::xmyNorm(b, *r);
+
       printfQuda("MG: level %d, leaving V-cycle with x2=%e, r2=%e\n", 
 		 param.level, blas::norm2(x), blas::norm2(*r));
 
