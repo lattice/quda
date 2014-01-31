@@ -33,8 +33,6 @@ namespace quda {
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
   
-    inner.verbosity = outer.verbosity_precondition;
-  
     inner.iter = 0;
     inner.gflops = 0;
     inner.secs = 0;
@@ -217,38 +215,54 @@ namespace quda {
     }
     ColorSpinorField &rPre = *r_pre;
 
+    cudaColorSpinorField *rM = param.precondition_cycle > 1 ? new cudaColorSpinorField(rSloppy) : 0;
+
     Complex *alpha = new Complex[Nkrylov];
     Complex **beta = new Complex*[Nkrylov];
     for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
     double *gamma = new double[Nkrylov];
-
-    double b2 = blas::norm2(b);
-
-    const bool use_heavy_quark_res = 
-      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-    double stop = b2*param.tol*param.tol; // stopping condition of solver
-    double heavy_quark_res = 0.0; // heavy quark residual
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
-
-    int k = 0;
 
     // compute parity of the node
     int parity = 0;
     for (int i=0; i<4; i++) parity += commCoords(i);
     parity = parity % 2;
 
-    cudaColorSpinorField rM(rSloppy);
-    cudaColorSpinorField xM(rSloppy);
+    double b2 = blas::norm2(b);  // norm sq of source
+    double r2;                // norm sq of residual
+
+    // compute initial residual depending on whether we have an initial guess or not
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      mat(r, x, y);
+      r2 = blas::xmyNorm(b, r);
+      blas::copy(y, x);
+      if (&x == &xSloppy) blas::zero(x); // need to zero x when doing uni-precision solver
+    } else {
+      blas::copy(r, b);
+      r2 = b2;
+    }
+
+    // Check to see that we're not trying to invert on a zero-field source
+    if (b2 == 0) {
+      profile.Stop(QUDA_PROFILE_INIT);
+      warningQuda("inverting on zero-field source\n");
+      x = b;
+      param.true_res = 0.0;
+      param.true_res_hq = 0.0;
+      return;
+    }
+
+    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+
+    const bool use_heavy_quark_res = 
+      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    double heavy_quark_res = 0.0; // heavy quark residual
+    if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
     blas::flops = 0;
 
-    // calculate initial residual
-    mat(r, x, y);
-    blas::zero(y);
-    double r2 = blas::xmyNorm(b, r);  
     blas::copy(rSloppy, r);
 
     int total_iter = 0;
@@ -259,6 +273,7 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
 
+    int k = 0;
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    total_iter < param.maxiter) {
@@ -270,9 +285,9 @@ namespace quda {
 	  if (m==0) { // residual is just source
 	    blas::copy(rPre, rSloppy);
 	  } else { // compute residual
-	    blas::copy(rM,rSloppy);
-	    blas::axpy(-1.0, *Ap[k], rM);
-	    blas::copy(rPre, rM);
+	    blas::copy(*rM, rSloppy);
+	    blas::axpy(-1.0, *Ap[k], *rM);
+	    blas::copy(rPre, *rM);
 	  }
 
 	  printfQuda("GCR: pPre.order = %d rPre.order = %d\n", pPre.FieldOrder(), rPre.FieldOrder());
@@ -291,7 +306,7 @@ namespace quda {
 	} 
       
 	matSloppy(*Ap[k], *p[k], tmp);
-	if (param.verbosity>= QUDA_DEBUG_VERBOSE)
+	if (getVerbosity()>= QUDA_DEBUG_VERBOSE)
 	  printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, rPre2=%e\n", 
 		     total_iter, blas::norm2(*Ap[k]), blas::norm2(*p[k]), blas::norm2(rPre));
       }
@@ -300,7 +315,7 @@ namespace quda {
 
       double3 Apr = blas::cDotProductNormA(*Ap[k], rSloppy);
 
-      if (param.verbosity>= QUDA_DEBUG_VERBOSE) {
+      if (getVerbosity()>= QUDA_DEBUG_VERBOSE) {
 	printfQuda("GCR debug iter=%d: Apr=(%e,%e,%e)\n", total_iter, Apr.x, Apr.y, Apr.z);
 	for (int i=0; i<k; i++)
 	  for (int j=0; j<=k; j++)
@@ -330,14 +345,11 @@ namespace quda {
 	// recalculate residual in high precision
 	blas::copy(x, xSloppy);
 	blas::xpy(x, y);
-
-	k = 0;
 	mat(r, y, x);
 	r2 = blas::xmyNorm(b, r);  
 
-	if (use_heavy_quark_res) { 
-	  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
-	}
+	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
 	  restart++; // restarting if residual is still too great
@@ -366,10 +378,10 @@ namespace quda {
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
 
-    if (k>=param.maxiter && param.verbosity >= QUDA_SUMMARIZE) 
+    if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (param.verbosity >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
   
     // Calculate the true residual
     mat(r, x);
@@ -395,12 +407,14 @@ namespace quda {
 
     PrintSummary("GCR", total_iter, r2, b2);
 
+    if (param.precondition_cycle > 1) delete rM;
+
     if (param.precision_sloppy != param.precision) {
       delete x_sloppy;
       delete r_sloppy;
     }
 
-    if (param.precision_precondition != param.precision_sloppy) {
+    if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
       delete p_pre;
       delete r_pre;
     }

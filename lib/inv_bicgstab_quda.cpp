@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <complex>
-
 #include <quda_internal.h>
 #include <blas_quda.h>
 #include <dslash_quda.h>
@@ -28,8 +26,6 @@ namespace quda {
     profile.Start(QUDA_PROFILE_FREE);
 
     if(init) {
-      if (wp && wp != pp) delete wp;
-      if (zp && zp != pp) delete zp;
       delete yp;
       delete rp;
       delete pp;
@@ -39,6 +35,20 @@ namespace quda {
     }
 
     profile.Stop(QUDA_PROFILE_FREE);
+  }
+
+  int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
+    // reliable updates
+    rNorm = sqrt(r2);
+    if (rNorm > maxrx) maxrx = rNorm;
+    if (rNorm > maxrr) maxrr = rNorm;
+    //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
+    //int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0
+    int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+    
+    //printf("reliable %d %e %e %e %e\n", updateR, rNorm, maxrx, maxrr, r2);
+
+    return updateR;
   }
 
   void BiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b) 
@@ -56,15 +66,6 @@ namespace quda {
       tmpp = ColorSpinorField::Create(csParam);
       tp = ColorSpinorField::Create(csParam);
 
-      // MR preconditioner - we need extra vectors
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	wp = ColorSpinorField::Create(csParam);
-	zp = ColorSpinorField::Create(csParam);
-      } else { // dummy assignments
-	wp = pp;
-	zp = pp;
-      }
-
       init = true;
     }
 
@@ -74,31 +75,26 @@ namespace quda {
     ColorSpinorField &v = *vp;
     ColorSpinorField &tmp = *tmpp;
     ColorSpinorField &t = *tp;
-    ColorSpinorField &w = *wp;
-    ColorSpinorField &z = *zp;
 
     ColorSpinorField *x_sloppy, *r_sloppy, *r_0;
 
-    double b2; // norm sq of source
-    double r2; // norm sq of residual
+    double b2 = blas::norm2(b); // norm sq of source
+    double r2;               // norm sq of residual
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, y);
       r2 = blas::xmyNorm(b, r);
-      b2 = blas::norm2(b);
       blas::copy(y, x);
     } else {
       blas::copy(r, b);
-      r2 = blas::norm2(b);
-      b2 = r2;
+      r2 = b2;
     }
 
     // Check to see that we're not trying to invert on a zero-field source
-    if(b2 == 0){
-      //This timer is never started - MC
-      //profile.Stop(QUDA_PROFILE_INIT);
-      printfQuda("Warning: inverting on zero-field source\n");
+    if (b2 == 0) {
+      profile.Stop(QUDA_PROFILE_PREAMBLE);
+      warningQuda("inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
       param.true_res_hq = 0.0;
@@ -131,7 +127,7 @@ namespace quda {
     SolverParam solve_param_inner(param);
     fillInnerSolveParam(solve_param_inner, param);
 
-    double stop = b2*param.tol*param.tol; // stopping condition of solver
+    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -165,76 +161,75 @@ namespace quda {
     }
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
-    //FIXME: Temporary hack to fix nested profilers in MG - MC
-    //profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.Start(QUDA_PROFILE_COMPUTE);
+    
+    rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
+    blas::copy(p, rSloppy);
+
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) 
+      printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n", 
+		 blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p), 
+		 blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
 
     while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
 	    k < param.maxiter) {
     
-      if (k==0) {
-	rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
-	blas::copy(p, rSloppy);
-      } else {
-	if (abs(rho*alpha) == 0.0) beta = 0.0;
-	else beta = (rho/rho0) * (alpha/omega);
+      matSloppy(v, p, tmp);
 
-	blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
-      }
-    
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	errorQuda("Temporary disabled");
-	//invertMRCuda(*matPrecon, w, p, &invert_param_inner);
-	matSloppy(v, w, tmp);
+      Complex r0v;
+      if (param.pipeline) {
+	r0v = blas::cDotProduct(r0, v);
+	if (k>0) rho = blas::cDotProduct(r0, r);
       } else {
-	matSloppy(v, p, tmp);
+	r0v = blas::cDotProduct(r0, v);
       }
-
       if (abs(rho) == 0.0) alpha = 0.0;
-      else alpha = rho / blas::cDotProduct(r0, v);
+      else alpha = rho / r0v;
 
       // r -= alpha*v
       blas::caxpy(-alpha, v, rSloppy);
 
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	errorQuda("Temporary disabled");
-	//invertMRCuda(*matPrecon, z, rSloppy, &invert_param_inner);
-	matSloppy(t, z, tmp);
+      matSloppy(t, rSloppy, tmp);
+    
+      int updateR = 0;
+      if (param.pipeline) {
+	// omega = (t, r) / (t, t)
+	omega_t2 = blas::cDotProductNormA(t, rSloppy);
+	Complex tr = Complex(omega_t2.x, omega_t2.y);
+	double t2 = omega_t2.z;
+	omega = tr / t2;
+	double s2 = blas::norm2(rSloppy);
+	Complex r0t = blas::cDotProduct(r0, t);
+	beta = -r0t / r0v;
+	r2 = s2 - real(omega * conj(tr)) ;
+
+	// now we can work out if we need to do a reliable update
+        updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
       } else {
-	matSloppy(t, rSloppy, tmp);
+	// omega = (t, r) / (t, t)
+	omega_t2 = blas::cDotProductNormA(t, rSloppy);
+	omega = Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
       }
 
-      // omega = (t, r) / (t, t)
-      omega_t2 = blas::cDotProductNormA(t, rSloppy);
-      omega = quda::Complex(omega_t2.x / omega_t2.z, omega_t2.y / omega_t2.z);
-
-      if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-	//x += alpha*w + omega*z, r -= omega*t, r2 = (r,r), rho = (r0, r)
-	blas::caxpy(alpha, w, xSloppy);
-	blas::caxpy(omega, z, xSloppy);
-	blas::caxpy(-omega, t, rSloppy);
-	rho_r2 = blas::cDotProductNormB(r0, rSloppy);
+      if (param.pipeline && !updateR) {
+	//x += alpha*p + omega*r, r -= omega*t, p = r - beta*omega*v + beta*p
+	blas::caxpbypzYmbw(alpha, p, omega, rSloppy, xSloppy, t);
+	blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
+	//tripleBiCGstabUpdate(alpha, p, omega, rSloppy, xSloppy, t, -beta*omega, v, beta, p
       } else {
 	//x += alpha*p + omega*r, r -= omega*t, r2 = (r,r), rho = (r0, r)
 	rho_r2 = blas::caxpbypzYmbwcDotProductUYNormY(alpha, p, omega, rSloppy, xSloppy, t, r0);
+	rho0 = rho;
+	rho = Complex(rho_r2.x, rho_r2.y);
+	r2 = rho_r2.z;
       }
-
-      rho0 = rho;
-      rho = quda::Complex(rho_r2.x, rho_r2.y);
-      r2 = rho_r2.z;
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	blas::copy(tmp,y);
 	heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
       }
 
-      // reliable updates
-      rNorm = sqrt(r2);
-      if (rNorm > maxrx) maxrx = rNorm;
-      if (rNorm > maxrr) maxrr = rNorm;
-      //int updateR = (rNorm < delta*maxrr && r0Norm <= maxrr) ? 1 : 0;
-      //int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-    
-      int updateR = (rNorm < delta*maxrr) ? 1 : 0;
+      if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
 
       if (updateR) {
 	if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
@@ -257,6 +252,18 @@ namespace quda {
       k++;
 
       PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) 
+	printfQuda("BiCGstab debug: x2=%e, r2=%e, v2=%e, p2=%e, tmp2=%e r0=%e t2=%e\n", 
+		   blas::norm2(x), blas::norm2(rSloppy), blas::norm2(v), blas::norm2(p), 
+		   blas::norm2(tmp), blas::norm2(r0), blas::norm2(t));
+
+      // update p
+      if (!param.pipeline || updateR) {// need to update if not pipeline or did a reliable update
+	if (abs(rho*alpha) == 0.0) beta = 0.0;
+	else beta = (rho/rho0) * (alpha/omega);      
+	blas::cxpaypbz(rSloppy, -beta*omega, v, beta, p);
+      }
+
     }
 
     if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
@@ -275,7 +282,7 @@ namespace quda {
 
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
-    if (param.verbosity >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
       // Calculate the true residual

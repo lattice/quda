@@ -202,11 +202,12 @@ namespace quda {
 	    for (int i=0; i<30; i++) {
 	      int z = i%2;
 	      int off = i/2;
-	      offdiag[(((z*15 + off)*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
+	      const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
+	      offdiag[(((z*15 + idtab[off])*2 + chirality)*2 + parity)*volumeCB + x] = 2.0*v[chirality*36 + 6 + i];
 	    }
 	  }
 	}
-
+	
 	size_t Bytes() const { return length*sizeof(Float); }
       };
       

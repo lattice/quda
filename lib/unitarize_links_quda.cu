@@ -5,12 +5,17 @@
 #include <cuda.h>
 #include <gauge_field.h>
 
+#include <tune_quda.h>
 #include <quda_matrix.h>
-#include <svd_quda.h>
 #include <hisq_links_quda.h>
+
+#ifdef GPU_UNITARIZE
 
 namespace quda{
 
+namespace{
+  #include <svd_quda.h>
+}
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
@@ -360,8 +365,8 @@ namespace quda{
     inlink  = inlink_even;
     outlink = outlink_even;
     
-    if(mem_idx >= Vh){
-      mem_idx = mem_idx - Vh;
+    if(mem_idx >= threads/2){
+      mem_idx = mem_idx - (threads/2);
       inlink  = inlink_odd;
       outlink = outlink_odd;
     }
@@ -369,7 +374,7 @@ namespace quda{
     // Unitarization is always done in double precision
     Matrix<double2,3> v, result;
     for(int dir=0; dir<4; ++dir){
-      loadLinkVariableFromArray(inlink, dir, mem_idx, Vh+INPUT_PADDING, &v); 
+      loadLinkVariableFromArray(inlink, dir, mem_idx, (threads/2)+INPUT_PADDING, &v); 
       unitarizeLinkMILC(v, &result);
 #ifdef __CUDA_ARCH__
 #define FL_MAX_ERROR DEV_FL_MAX_ERROR
@@ -388,7 +393,7 @@ namespace quda{
 #endif
 	  }
       }
-      writeLinkVariableToArray(result, dir, mem_idx, Vh+OUTPUT_PADDING, outlink); 
+      writeLinkVariableToArray(result, dir, mem_idx, (threads/2)+OUTPUT_PADDING, outlink); 
     }
     return;
   }
@@ -399,33 +404,12 @@ namespace quda{
     cudaGaugeField &outField;
     int *fails;
     
-    int sharedBytesPerThread() const { return 0; }
-    int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     
     // don't tune the grid dimension
-    bool advanceGridDim(TuneParam &param) const { return false; }
-
-    // generalize Tunable::advanceBlockDim() to also set gridDim, with extra checking to ensure that gridDim isn't too large for the device
-    bool advanceBlockDim(TuneParam &param) const
-    {
-      const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
-      const unsigned int max_shared = 16384; // FIXME: use deviceProp.sharedMemPerBlock;
-      const int step = deviceProp.warpSize;
-      const int threads = inField.Volume();
-      bool ret;
-      param.block.x += step;
-      if (param.block.x > max_threads || sharedBytesPerThread()*param.block.x > max_shared) {
-	param.block = dim3((threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-	param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-	ret = false;
-      } else {
-	ret = true;
-      }
-      param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      return ret;
-    }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return inField.Volume(); }
 
   public:
     UnitarizeLinksCuda(const cudaGaugeField& inField, cudaGaugeField& outField,  int* fails) : 
@@ -433,7 +417,7 @@ namespace quda{
     virtual ~UnitarizeLinksCuda() { ; }
     
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
       if(inField.Precision() == QUDA_SINGLE_PRECISION){
 	getUnitarizedField<<<tp.grid,tp.block>>>((float2*)inField.Even_p(), (float2*)inField.Odd_p(),
@@ -451,25 +435,6 @@ namespace quda{
     void preTune() { ; }
     void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
     
-    virtual void initTuneParam(TuneParam &param) const
-    {
-      const unsigned int max_threads = deviceProp.maxThreadsDim[0];
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
-      const int threads = inField.Volume();
-      const int step = deviceProp.warpSize;
-      param.block = dim3((threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
-      param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
-      if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
-      param.grid = dim3((threads+param.block.x-1)/param.block.x, 1, 1);
-      param.shared_bytes = sharedBytesPerThread()*param.block.x > sharedBytesPerBlock(param) ?
-	sharedBytesPerThread()*param.block.x : sharedBytesPerBlock(param);
-    }
-      
-    /** sets default values for when tuning is disabled */
-    void defaultTuneParam(TuneParam &param) const {
-      initTuneParam(param);
-    }
-      
     long long flops() const { return 0; } // FIXME: add flops counter
 
     TuneKey tuneKey() const {
@@ -541,3 +506,5 @@ namespace quda{
   } // is unitary
     
 } // namespace quda
+
+#endif

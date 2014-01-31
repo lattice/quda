@@ -150,7 +150,7 @@ namespace quda {
     double r2[QUDA_MAX_MULTI_SHIFT];
     for (int i=0; i<num_offset; i++) {
       r2[i] = b2;
-      stop[i] = r2[i] * param.tol_offset[i] * param.tol_offset[i];
+      stop[i] = Solver::stopping(param.tol_offset[i], b2, param.residual_type);
     }
 
     double r2_old;
@@ -175,7 +175,7 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
 
-    if (param.verbosity >= QUDA_VERBOSE) 
+    if (getVerbosity() >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
     while (r2[0] > stop[0] &&  k < param.maxiter) {
@@ -264,7 +264,7 @@ namespace quda {
       for (int j=1; j<num_offset_now; j++) {
 	r2[j] = zeta[j] * zeta[j] * r2[0];
 	if (r2[j] < stop[j]) {
-	  if (param.verbosity >= QUDA_VERBOSE)
+	  if (getVerbosity() >= QUDA_VERBOSE)
 	    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
 	  num_offset_now--;
 	}
@@ -272,7 +272,7 @@ namespace quda {
 
       k++;
       
-      if (param.verbosity >= QUDA_VERBOSE) 
+      if (getVerbosity() >= QUDA_VERBOSE) 
 	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }
     
@@ -309,7 +309,7 @@ namespace quda {
 #endif   
     }
 
-    if (param.verbosity >= QUDA_SUMMARIZE){
+    if (getVerbosity() >= QUDA_SUMMARIZE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
       for(int i=0; i < num_offset; i++) { 
 	printfQuda(" shift=%d, relative residua: iterated = %e, true = %e\n", 

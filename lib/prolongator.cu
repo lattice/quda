@@ -111,8 +111,8 @@ namespace quda {
 
     long long flops() const { return 0; }
     long long bytes() const { return 0; }
-    int sharedBytesPerThread() const { return 0; }
-    int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
     bool advanceBlockDim(TuneParam &param) const {

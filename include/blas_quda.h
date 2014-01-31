@@ -14,7 +14,6 @@ namespace quda {
     void init(); 
     void end(void);
 
-    void setTuning(QudaTune tune, QudaVerbosity verbose);
     void setParam(int kernel, int prec, int threads, int blocks);
 
     extern unsigned long long flops;

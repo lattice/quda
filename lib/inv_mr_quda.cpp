@@ -75,7 +75,7 @@ namespace quda {
     double omega = 1.0;
 
     int k = 0;
-    if (param.verbosity >= QUDA_DEBUG_VERBOSE) {
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double x2 = blas::norm2(x);
       double3 Ar3 = blas::cDotProductNormB(Ar, r);
       printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e, %e), x2 = %e\n", 
@@ -93,19 +93,19 @@ namespace quda {
       //r2 = blas::caxpyXmazNormX(omega*alpha, r, x, Ar);
       blas::caxpyXmaz(omega*alpha, r, x, Ar);
 
-      if (param.verbosity >= QUDA_DEBUG_VERBOSE) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	double x2 = blas::norm2(x);
 	double r2 = blas::norm2(r);
 	printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e,%e) x2 = %e\n", 
 		   k+1, r2, Ar3.x, Ar3.y, x2);
-      } else if (param.verbosity >= QUDA_VERBOSE) {
+      } else if (getVerbosity() >= QUDA_VERBOSE) {
 	printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, Ar3.x, Ar3.y);
       }
 
       k++;
     }
   
-    if (param.verbosity >= QUDA_VERBOSE) {
+    if (getVerbosity() >= QUDA_VERBOSE) {
       mat(Ar, r, tmp);    
       Complex Ar2 = blas::cDotProduct(Ar, r);
       printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
@@ -115,11 +115,6 @@ namespace quda {
     // Obtain global solution by rescaling
     if (b2 > 0.0) blas::ax(sqrt(b2), x);
 
-
-    if (k>=param.maxiter && param.verbosity >= QUDA_SUMMARIZE) 
-      warningQuda("Exceeded maximum iterations %d", param.maxiter);
-
-  
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
         profile.Stop(QUDA_PROFILE_COMPUTE);
         profile.Start(QUDA_PROFILE_EPILOGUE);
@@ -138,7 +133,7 @@ namespace quda {
 	param.true_res = sqrt(true_res / b2);
 	printfQuda("test %10e %10e %10e\n", sqrt(blas::norm2(r)), sqrt(blas::norm2(x)), sqrt(true_res));
 
-	if (param.verbosity >= QUDA_SUMMARIZE) {
+	if (getVerbosity() >= QUDA_SUMMARIZE) {
 	  printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
 	  k, sqrt(r2/b2), param.true_res);    
 	}

@@ -4,17 +4,14 @@
 namespace quda {
 
   DiracStaggered::DiracStaggered(const DiracParam &param) : 
-    Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
-    face(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
+    Dirac(param), face(param.gauge->X(), 4, 6, 1, param.gauge->Precision()) 
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
-    initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
-  DiracStaggered::DiracStaggered(const DiracStaggered &dirac) : Dirac(dirac),
-								fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face)
+  DiracStaggered::DiracStaggered(const DiracStaggered &dirac) 
+  : Dirac(dirac), face(dirac.face)
   {
-    initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracStaggered::~DiracStaggered() { }
@@ -23,8 +20,6 @@ namespace quda {
   {
     if (&dirac != this) {
       Dirac::operator=(dirac);
-      fatGauge = dirac.fatGauge;
-      longGauge = dirac.longGauge;
       face = dirac.face;
     }
     return *this;
@@ -44,11 +39,6 @@ namespace quda {
       errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
     }
-
-    if ((out.Volume() != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	(out.Volume() != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge.VolumeCB());
-    }
   }
 
 
@@ -61,13 +51,13 @@ namespace quda {
       initSpinorConstants(in, profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
-			  fatGauge, longGauge, 
-			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0, commDim, profile);
+			  gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
+			  dagger, 0, 0, commDim, profile);
     } else {
       errorQuda("Not supported");
     }  
 
-    flops += 1146ll*in.Volume();
+    flops += 654ll*in.Volume();
   }
 
   void DiracStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -79,15 +69,14 @@ namespace quda {
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       initSpinorConstants(in, profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-      staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
-			  fatGauge, longGauge, 
+      staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
     } else {
       errorQuda("Not supported");
     }  
 
-    flops += 1158ll*in.Volume();
+    flops += 666ll*in.Volume();
   }
 
   // Full staggered operator

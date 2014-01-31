@@ -13,7 +13,8 @@ bool globalReduce = true;
 
 FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal, 
 		       const int nFace, const QudaPrecision precision, const int Ls) :
-  Ninternal(Ninternal), precision(precision), nDim(nDim), nDimComms(nDim), nFace(nFace)
+  my_face(0), from_face(0), Ninternal(Ninternal), precision(precision), nDim(nDim), 
+  nDimComms(nDim), nFace(nFace)
 {
   setupDims(X, Ls);
 
@@ -24,16 +25,33 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
   recFwdStrmIdx = sendBackStrmIdx;
   recBackStrmIdx = sendFwdStrmIdx;
 
-  // Buffers hold half spinors
+  // allocate a single contiguous buffer for the buffers
+  size_t faceBytes = 0;
   for (int i=0; i<nDimComms; i++) {
     nbytes[i] = nFace*faceVolumeCB[i]*Ninternal*precision;
     // add extra space for the norms for half precision
     if (precision == QUDA_HALF_PRECISION) nbytes[i] += nFace*faceVolumeCB[i]*sizeof(float);
+    if(!commDimPartitioned(i)) continue;
+    faceBytes += 2*nbytes[i];
+  }
 
-    my_back_face[i] = allocatePinned(2*nbytes[i]);
-    my_fwd_face[i] = (char*)my_back_face[i] + nbytes[i];
-    from_back_face[i] = allocatePinned(2*nbytes[i]);
-    from_fwd_face[i] = (char*)from_back_face[i] + nbytes[i];
+  if (faceBytes > 0) {
+    my_face = allocatePinned(faceBytes);
+    from_face = allocatePinned(faceBytes);
+  }
+
+  // assign Buffers hold half spinors
+  size_t offset = 0;
+  for (int i=0; i<nDimComms; i++) {
+    if (!commDimPartitioned(i)) continue;
+
+    my_back_face[i] = (char*)my_face + offset;
+    from_back_face[i] = (char*)from_face + offset;
+    offset += nbytes[i];
+
+    my_fwd_face[i] = (char*)my_face + offset;
+    from_fwd_face[i] = (char*)from_face + offset;
+    offset += nbytes[i];
 
 #ifdef GPU_DIRECT //  just alias the pointer
     ib_my_fwd_face[i] = my_fwd_face[i];
@@ -46,7 +64,6 @@ FaceBuffer::FaceBuffer(const int *X, const int nDim, const int Ninternal,
     ib_from_fwd_face[i] = safe_malloc(nbytes[i]);
     ib_from_back_face[i] = safe_malloc(nbytes[i]);
 #endif
-
   }
 
   for (int i=0; i<nDimComms; i++) {
@@ -69,25 +86,21 @@ FaceBuffer::FaceBuffer(const FaceBuffer &face) {
 FaceBuffer::~FaceBuffer()
 {  
   for (int i=0; i<nDimComms; i++) {
-
-#ifndef GPU_DIRECT
-    host_free(ib_my_fwd_face[i]);
-    host_free(ib_my_back_face[i]);
-    host_free(ib_from_fwd_face[i]);
-    host_free(ib_from_back_face[i]);
-#endif
-
     if (commDimPartitioned(i)) {
+#ifndef GPU_DIRECT
+      host_free(ib_my_fwd_face[i]);
+      host_free(ib_my_back_face[i]);
+      host_free(ib_from_fwd_face[i]);
+      host_free(ib_from_back_face[i]);
+#endif
       comm_free(mh_send_fwd[i]);
       comm_free(mh_send_back[i]);
       comm_free(mh_recv_fwd[i]);
       comm_free(mh_recv_back[i]);
     }
 
-    freePinned(from_back_face[i]);
-    freePinned(my_back_face[i]);
   }
-
+  
   for (int i=0; i<nDimComms; i++) {
     ib_my_fwd_face[i] = NULL;
     ib_my_back_face[i] = NULL;
@@ -104,6 +117,9 @@ FaceBuffer::~FaceBuffer()
     mh_send_fwd[i] = NULL;
     mh_send_back[i] = NULL;
   }
+
+  if (from_face) freePinned(from_face);
+  if (my_face) freePinned(my_face);
 
   checkCudaError();
 }
@@ -188,35 +204,59 @@ void FaceBuffer::flushPinnedCache()
 }
 
 
-void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, cudaStream_t *stream_p)
+void FaceBuffer::pack(cudaColorSpinorField &in, int dim, int dir,  int parity, int dagger, 
+		      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
 {
-  in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated  
+  in.allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
   stream = stream_p;
-  in.packGhost((QudaParity)parity, dagger, &stream[Nstream-1]);
+
+  if (zeroCopyPack) {
+    void *my_face_d;
+    cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
+    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[0], my_face_d, a, b);
+  } else {
+    in.packGhost(nFace, (QudaParity)parity, dim, (QudaDirection)dir, dagger, &stream[Nstream-1], 0, a, b);
+  }
 }
 
-void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, double a, double b, cudaStream_t *stream_p)
+void FaceBuffer::pack(cudaColorSpinorField &in, int dir, int parity, int dagger, 
+                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
 {
-  in.allocateGhostBuffer();   // allocate the ghost buffer if not yet allocated  
-  stream = stream_p;
-  in.packTwistedGhost((QudaParity)parity, dagger, a, b, &stream[Nstream-1]);
+  const int dim = -1;
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+}
+
+void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, 
+                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
+{
+  const int dim = -1; // pack all partitioned space-time dimensions
+  const int dir = 2; // pack both forward and backwards directions
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+
 }
 
 
-void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir)
-{
+void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir, int stream_idx){
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
   if (dir%2==0) {
     // backwards copy to host
-    in.sendGhost(my_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim+sendBackStrmIdx]); 
+    in.sendGhost(my_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[stream_idx]); 
   } else {
     // forwards copy to host
-    in.sendGhost(my_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim+sendFwdStrmIdx]);
+    in.sendGhost(my_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[stream_idx]);
   }
 }
 
+
+void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir){
+  
+  if(!commDimPartitioned(dir/2)) return;
+
+  const int stream_idx = (dir%2 == 0) ? dir+sendBackStrmIdx : dir-1+sendFwdStrmIdx;
+  gather(in, dagger, dir, stream_idx);
+}
 
 // experimenting with callbacks for GPU -> MPI interaction.
 // much slower though because callbacks are done on a background thread
@@ -318,17 +358,20 @@ int FaceBuffer::commsQuery(int dir)
 }
 
 
-void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir)
+void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir, int stream_idx)
 {
   int dim = dir/2;
   if(!commDimPartitioned(dim)) return;
 
-  // both scattering occurances now go through the same stream
-  if (dir%2==0) {// receive from forwards
-    out.unpackGhost(from_fwd_face[dim], dim, QUDA_FORWARDS, dagger, &stream[2*dim/*+recFwdStrmIdx*/]); // 0, 2, 4, 6
-  } else { // receive from backwards
-    out.unpackGhost(from_back_face[dim], dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+recBackStrmIdx*/]); // 1, 3, 5, 7
+  if(dir%2==0) { // receive from forwards
+    out.unpackGhost(from_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[stream_idx]); 
+  }else{ // receive from backwards 
+    out.unpackGhost(from_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[stream_idx]);
   }
+}
+
+void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir){
+  scatter(out, dagger, dir, (dir/2)*2);
 }
 
 

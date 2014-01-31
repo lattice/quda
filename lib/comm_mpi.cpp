@@ -21,6 +21,7 @@
 
 struct MsgHandle_s {
   MPI_Request request;
+  MPI_Datatype datatype;
 };
 
 
@@ -124,6 +125,50 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
   int tag = rank;
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+
+  return mh;
+}
+
+
+/**
+ * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
+					       size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  int tag = comm_rank();
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  // create a new strided MPI type
+  MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
+  MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+
+  MPI_CHECK( MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+
+  return mh;
+}
+
+
+/**
+ * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
+						  size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  int tag = rank;
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  // create a new strided MPI type
+  MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
+  MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+
+  MPI_CHECK( MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
 
   return mh;
 }

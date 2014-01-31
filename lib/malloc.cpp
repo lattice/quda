@@ -5,6 +5,10 @@
 #include <unistd.h> // for getpagesize()
 #include <quda_internal.h>
 
+#ifdef USE_QDPJIT
+#include "qdp_quda.h"
+#endif
+
 namespace quda {
 
   enum AllocType {
