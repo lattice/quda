@@ -1183,7 +1183,7 @@ void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLin
 
   BIND_SITE_AND_FAT_LINK;
   int volume = param->X[0]*param->X[1]*param->X[2]*param->X[3];  
-  dim3 gridDim(volume/BLOCK_DIM,1,1);
+  dim3 gridDim((volume + BLOCK_DIM-1)/BLOCK_DIM,1,1);
   dim3 blockDim(BLOCK_DIM , 1, 1);
 
   staple_bytes = cudaStaple.Bytes();
@@ -1192,23 +1192,23 @@ void llfatOneLinkKernel(cudaGaugeField& cudaFatLink, cudaGaugeField& cudaSiteLin
     if(recon == QUDA_RECONSTRUCT_NO){
       llfatOneLink18Kernel<<<gridDim, blockDim>>>((const double2*)cudaSiteLink.Even_p(), (const double2*)cudaSiteLink.Odd_p(),
           (double2*)cudaFatLink.Even_p(), (double2*)cudaFatLink.Odd_p(),
-          (double)act_path_coeff[0], (double)act_path_coeff[5]);    
+          (double)act_path_coeff[0], (double)act_path_coeff[5], volume);    
     }else{
 
       llfatOneLink12Kernel<<<gridDim, blockDim>>>((const double2*)cudaSiteLink.Even_p(), (const double2*)cudaSiteLink.Odd_p(),
           (double2*)cudaFatLink.Even_p(), (double2*)cudaFatLink.Odd_p(),
-          (double)act_path_coeff[0], (double)act_path_coeff[5]);    
+          (double)act_path_coeff[0], (double)act_path_coeff[5], volume);    
 
     }
   }else{ //single precision
     if(recon == QUDA_RECONSTRUCT_NO){    
       llfatOneLink18Kernel<<<gridDim, blockDim>>>((const float2*)cudaSiteLink.Even_p(), (const float2*)cudaSiteLink.Odd_p(),
           (float2*)cudaFatLink.Even_p(), (float2*)cudaFatLink.Odd_p(),
-          (float)act_path_coeff[0], (float)act_path_coeff[5]);    						  
+          (float)act_path_coeff[0], (float)act_path_coeff[5], volume);    						  
     }else{
       llfatOneLink12Kernel<<<gridDim, blockDim>>>((const float4*)cudaSiteLink.Even_p(), (const float4*)cudaSiteLink.Odd_p(),
           (float2*)cudaFatLink.Even_p(), (float2*)cudaFatLink.Odd_p(),
-          (float)act_path_coeff[0], (float)act_path_coeff[5]);    
+          (float)act_path_coeff[0], (float)act_path_coeff[5], volume);    
     }
   }
 }

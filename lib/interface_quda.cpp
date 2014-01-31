@@ -2686,7 +2686,9 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     profileFatLink.Start(QUDA_PROFILE_COMMS);
     int R[4] = {2, 2, 2, 2}; 
     copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
+#ifdef MULTI_GPU
     cudaInLinkEx->exchangeExtendedGhost(R,true); // instead of exchange_cpu_sitelink_ex 
+#endif
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
   } // Initialise and load siteLinks
 
