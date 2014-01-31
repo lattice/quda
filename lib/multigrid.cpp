@@ -149,7 +149,7 @@ namespace quda {
       param.maxiter = param.nu_post;
       param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
       (*smoother)(x, b);
-
+      r2 = blas::xmyNorm(b, *r);
       printfQuda("MG: level %d, leaving V-cycle with x2=%e, r2=%e\n", 
 		 param.level, blas::norm2(x), blas::norm2(*r));
 
@@ -194,7 +194,30 @@ namespace quda {
       }
 #endif
     } else {
-      errorQuda("No nullspace file defined");
+      printfQuda("Using %d constant nullvectors\n", Nvec);
+      //errorQuda("No nullspace file defined");
+      for (int i = 0; i < Nvec; i++) {
+	int length = B[i]->Length();
+	if(B[i]->Precision() == QUDA_SINGLE_PRECISION) {
+	  printfQuda("Single precision\n");
+	  for(int index = 0; index < length; index+=2) {
+	    static_cast<float *>(V[i])[index] = 1.0;
+	    static_cast<float *>(V[i])[index+1] = 0.0;
+	  }
+
+	}
+	else if(B[i]->Precision() == QUDA_DOUBLE_PRECISION) {
+	  printfQuda("Double precision\n");
+	  for(int index = 0; index < length; index+=2) {
+	    static_cast<double *>(V[i])[index] = 1.0;
+	    static_cast<double *>(V[i])[index+1] = 0.0;
+	  }
+	}
+	else {
+	  errorQuda("Constant null vectors not supported for precision = %d\n", B[i]->Precision());
+	}
+
+      }
     }
 
     printfQuda("Done loading vectors\n");

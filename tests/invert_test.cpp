@@ -127,7 +127,8 @@ int main(int argc, char **argv)
   gauge_param.X[3] = tdim;
   inv_param.Ls = 1;
 
-  gauge_param.anisotropy = 2.38;
+  //  gauge_param.anisotropy = 2.38;
+  gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -143,7 +144,8 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.4125;
+  //double mass = -0.4125;
+  double mass = 0.1;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -180,7 +182,8 @@ int main(int argc, char **argv)
     inv_param.inv_type = QUDA_CG_INVERTER;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+    //inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
+    inv_param.inv_type = QUDA_MR_INVERTER;
   }
 
   inv_param.gcrNkrylov = 10;
@@ -278,7 +281,7 @@ int main(int argc, char **argv)
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
