@@ -574,14 +574,13 @@ namespace quda {
               cudaEventRecord(scatterEnd[i], streams[2*i]);
               cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[i],0);
 
-              printf("Calling exterior oprod kernel\n");
-
               arg.dir = i;
               arg.ghostOffset = ghostOffset[i];
               const unsigned int volume = arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3];
               arg.inB.setStride(3*volume/(2*arg.X[arg.dir]));
               // First, do the one hop term
               {
+
                 arg.length = faceVolumeCB[i];
                 arg.displacement = 1;
                 dim3 blockDim(128, 1, 1);
@@ -590,7 +589,8 @@ namespace quda {
                 exteriorOprodKernel<<<gridDim, blockDim, 0, streams[Nstream-1]>>>(arg);              
               }
               // Now do the 3 hop term - Try putting this in a separate stream
-              { 
+              {
+
                 arg.displacement = 3;                      
                 arg.length = arg.displacement*faceVolumeCB[i];
                 dim3 blockDim(128, 1, 1);
