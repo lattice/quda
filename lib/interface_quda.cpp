@@ -2702,12 +2702,12 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     cudaMemset(num_failures_dev, 0, sizeof(int));
     if(num_failures_dev == NULL) errorQuda("cudaMalloc fialed for dev_pointer\n");
     profileFatLink.Stop(QUDA_PROFILE_INIT);
-    
+
     profileFatLink.Start(QUDA_PROFILE_COMPUTE);
     quda::unitarizeLinksCuda(*param, *cudaFatLink, cudaUnitarizedLink, num_failures_dev); // unitarize on the gpu
     profileFatLink.Stop(QUDA_PROFILE_COMPUTE);
 
-   
+
     profileFatLink.Start(QUDA_PROFILE_D2H); 
     cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     profileFatLink.Stop(QUDA_PROFILE_D2H); 
@@ -3921,7 +3921,6 @@ computeHISQForceQuda(void* const milc_momentum,
 #endif    
 }
 
-
 void computeStaggeredOprodQuda(void** oprod,   
     void** fermion,
     int num_terms,
@@ -3955,15 +3954,18 @@ void computeStaggeredOprodQuda(void** oprod,
   oParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaGaugeField cudaOprod0(oParam);
   cudaGaugeField cudaOprod1(oParam);
+  profileStaggeredOprod.Stop(QUDA_PROFILE_INIT); 
   initLatticeConstants(cudaOprod0, profileStaggeredOprod);
 
-  profileStaggeredOprod.Stop(QUDA_PROFILE_INIT); 
 
 
   profileStaggeredOprod.Start(QUDA_PROFILE_H2D);
   cudaOprod0.loadCPUField(cpuOprod0,QUDA_CPU_FIELD_LOCATION);
   cudaOprod1.loadCPUField(cpuOprod1,QUDA_CPU_FIELD_LOCATION);
   profileStaggeredOprod.Stop(QUDA_PROFILE_H2D);
+
+
+  profileStaggeredOprod.Start(QUDA_PROFILE_INIT);
 
 
 
@@ -3983,31 +3985,36 @@ void computeStaggeredOprodQuda(void** oprod,
   qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   cudaColorSpinorField cudaQuark(qParam); 
 
-
-  cudaColorSpinorField**dQuark = new cudaColorSpinorField*[num_terms];
-  for(int i=0; i<num_terms; ++i){
-    dQuark[i] = new cudaColorSpinorField(qParam);
-  }
-
-  double* new_coeff  = new double[num_terms];
-
   // create the host quark field
   qParam.create = QUDA_REFERENCE_FIELD_CREATE;
   qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
-  for(int i=0; i<num_terms; ++i){
-    qParam.v = fermion[i];
-    cpuColorSpinorField cpuQuark(qParam);
-    *(dQuark[i]) = cpuQuark;
-    new_coeff[i] = coeff[i][0];
-  }
 
-
+  const int Ls = 1;
+  const int Ninternal = 6;
+  FaceBuffer faceBuffer1(cudaOprod0.X(), 4, Ninternal, 3, cudaOprod0.Precision(), Ls);
+  FaceBuffer faceBuffer2(cudaOprod0.X(), 4, Ninternal, 3, cudaOprod0.Precision(), Ls);
+  profileStaggeredOprod.Stop(QUDA_PROFILE_INIT);
 
   // loop over different quark fields
   for(int i=0; i<num_terms; ++i){
-    computeKSOprodQuda(&cudaOprod0, dQuark[i], new_coeff[i], oParam.x, oParam.precision);
-  }
 
+    profileStaggeredOprod.Start(QUDA_PROFILE_INIT);
+    qParam.v = fermion[i];
+    cpuColorSpinorField cpuQuark(qParam); // create host quark field
+    profileStaggeredOprod.Stop(QUDA_PROFILE_INIT);
+
+    profileStaggeredOprod.Start(QUDA_PROFILE_H2D);
+    cudaQuark = cpuQuark;
+    profileStaggeredOprod.Stop(QUDA_PROFILE_H2D);
+
+    profileStaggeredOprod.Start(QUDA_PROFILE_COMPUTE);
+    // Operate on even-parity sites
+    computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuark, faceBuffer1, 0, coeff[i]);
+
+    // Operate on odd-parity sites
+    computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuark, faceBuffer2, 1, coeff[i]);
+    profileStaggeredOprod.Stop(QUDA_PROFILE_COMPUTE);
+  }
 
 
   // copy the outer product field back to the host
@@ -4017,17 +4024,121 @@ void computeStaggeredOprodQuda(void** oprod,
   profileStaggeredOprod.Stop(QUDA_PROFILE_D2H); 
 
 
-  for(int i=0; i<num_terms; ++i){
-    delete dQuark[i];
-  }
-  delete[] dQuark;
-  delete[] new_coeff;
-
   profileStaggeredOprod.Stop(QUDA_PROFILE_TOTAL);
 
   checkCudaError();
   return;
 }
+
+
+/*
+   void computeStaggeredOprodQuda(void** oprod,   
+   void** fermion,
+   int num_terms,
+   double** coeff,
+   QudaGaugeParam* param)
+   {
+   using namespace quda;
+   profileStaggeredOprod.Start(QUDA_PROFILE_TOTAL);
+
+   checkGaugeParam(param);
+
+   profileStaggeredOprod.Start(QUDA_PROFILE_INIT);
+   GaugeFieldParam oParam(0, *param);
+
+   oParam.nDim = 4;
+   oParam.nFace = 0; 
+// create the host outer-product field
+oParam.pad = 0;
+oParam.create = QUDA_REFERENCE_FIELD_CREATE;
+oParam.link_type = QUDA_GENERAL_LINKS;
+oParam.reconstruct = QUDA_RECONSTRUCT_NO;
+oParam.order = QUDA_QDP_GAUGE_ORDER;
+oParam.gauge = oprod[0];
+cpuGaugeField cpuOprod0(oParam);
+
+oParam.gauge = oprod[1];
+cpuGaugeField cpuOprod1(oParam);
+
+// create the device outer-product field
+oParam.create = QUDA_ZERO_FIELD_CREATE;
+oParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+cudaGaugeField cudaOprod0(oParam);
+cudaGaugeField cudaOprod1(oParam);
+initLatticeConstants(cudaOprod0, profileStaggeredOprod);
+
+profileStaggeredOprod.Stop(QUDA_PROFILE_INIT); 
+
+
+profileStaggeredOprod.Start(QUDA_PROFILE_H2D);
+cudaOprod0.loadCPUField(cpuOprod0,QUDA_CPU_FIELD_LOCATION);
+cudaOprod1.loadCPUField(cpuOprod1,QUDA_CPU_FIELD_LOCATION);
+profileStaggeredOprod.Stop(QUDA_PROFILE_H2D);
+
+
+
+ColorSpinorParam qParam;
+qParam.nColor = 3;
+qParam.nSpin = 1;
+qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+qParam.nDim = 4;
+qParam.precision = oParam.precision;
+qParam.pad = 0;
+for(int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir];
+
+// create the device quark field
+qParam.create = QUDA_NULL_FIELD_CREATE;
+qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+cudaColorSpinorField cudaQuark(qParam); 
+
+
+cudaColorSpinorField**dQuark = new cudaColorSpinorField*[num_terms];
+for(int i=0; i<num_terms; ++i){
+dQuark[i] = new cudaColorSpinorField(qParam);
+}
+
+double* new_coeff  = new double[num_terms];
+
+// create the host quark field
+qParam.create = QUDA_REFERENCE_FIELD_CREATE;
+qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+for(int i=0; i<num_terms; ++i){
+  qParam.v = fermion[i];
+  cpuColorSpinorField cpuQuark(qParam);
+  *(dQuark[i]) = cpuQuark;
+  new_coeff[i] = coeff[i][0];
+}
+
+
+
+// loop over different quark fields
+for(int i=0; i<num_terms; ++i){
+  computeKSOprodQuda(&cudaOprod0, dQuark[i], new_coeff[i], oParam.x, oParam.precision);
+}
+
+
+
+// copy the outer product field back to the host
+profileStaggeredOprod.Start(QUDA_PROFILE_D2H);
+cudaOprod0.saveCPUField(cpuOprod0,QUDA_CPU_FIELD_LOCATION);
+cudaOprod1.saveCPUField(cpuOprod1,QUDA_CPU_FIELD_LOCATION);
+profileStaggeredOprod.Stop(QUDA_PROFILE_D2H); 
+
+
+for(int i=0; i<num_terms; ++i){
+  delete dQuark[i];
+}
+delete[] dQuark;
+delete[] new_coeff;
+
+profileStaggeredOprod.Stop(QUDA_PROFILE_TOTAL);
+
+checkCudaError();
+return;
+}
+*/
 
 
 
@@ -4108,7 +4219,7 @@ void updateGaugeFieldQuda(void* gauge,
   }
 
   profileGaugeUpdate.Stop(QUDA_PROFILE_H2D);
-  
+
   // perform the update
   profileGaugeUpdate.Start(QUDA_PROFILE_COMPUTE);
   updateGaugeField(*cudaOutGauge, dt, *cudaInGauge, *cudaMom, 

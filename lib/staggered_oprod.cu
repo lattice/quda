@@ -209,39 +209,42 @@ namespace quda {
 
             break;
         }
-      }else if(Nspin == 4){
+      }else if(Nspin == 3){
         // currently unsupported
       }
       return;
     }
 
 
+  template<int Nspin, int Nface> 
+    __device__  int ghostIndexFromCoords(const unsigned int x[4], const unsigned int X[4], const unsigned int dir, const int shift){
+      return 0;
+    }
 
 
-  template<int Nface>
-    __device__  int ghostIndexFromCoords(
+
+  template<>
+    __device__  int ghostIndexFromCoords<3,3>(
         const unsigned int x[4],
         const unsigned int X[4], 
         unsigned int dir, 
         const int shift)
     {
-      
       unsigned int ghost_idx;
       if(shift > 0){
         if((x[dir] + shift) >= X[dir]){
-          // 3*3 => Nface*Ncolor
           switch(dir){
             case 0:
-              ghost_idx = (3*Nface + (x[0]-X[0]+shift))*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
+              ghost_idx = (3*3 + (x[0]-X[0]+shift))*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
               break;          
             case 1:
-              ghost_idx = (3*Nface + (x[1]-X[1]+shift))*(X[3]*X[2]*X[0])/2 + (x[3]*X[2]*X[0] + x[2]*X[0] + x[0])/2;
+              ghost_idx = (3*3 + (x[1]-X[1]+shift))*(X[3]*X[2]*X[0])/2 + (x[3]*X[2]*X[0] + x[2]*X[0] + x[0])/2;
               break;
             case 2:
-              ghost_idx = (3*Nface + (x[2]-X[2]+shift))*(X[3]*X[1]*X[0])/2 + (x[3]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
+              ghost_idx = (3*3 + (x[2]-X[2]+shift))*(X[3]*X[1]*X[0])/2 + (x[3]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
               break;
             case 3:
-              ghost_idx = (3*Nface + (x[3]-X[3]+shift))*(X[2]*X[1]*X[0])/2 + (x[2]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
+              ghost_idx = (3*3 + (x[3]-X[3]+shift))*(X[2]*X[1]*X[0])/2 + (x[2]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
               break;
             default:
               break;
@@ -251,16 +254,16 @@ namespace quda {
         if(static_cast<int>(x[dir]) + shift < 0){
           switch(dir){
             case 0:
-              ghost_idx = (Nface + shift)*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
+              ghost_idx = (3 + shift)*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
               break;
             case 1:
-              ghost_idx = (Nface + shift)*(X[3]*X[2]*X[0])/2 + ((x[3]*X[2] + x[2])*X[0] + x[0])/2;
+              ghost_idx = (3 + shift)*(X[3]*X[2]*X[0])/2 + ((x[3]*X[2] + x[2])*X[0] + x[0])/2;
               break;
             case 2:
-              ghost_idx = (Nface + shift)*(X[3]*X[1]*X[0])/2 + ((x[3]*X[1] + x[1])*X[0]  + x[0])/2;
+              ghost_idx = (3 + shift)*(X[3]*X[1]*X[0])/2 + ((x[3]*X[1] + x[1])*X[0]  + x[0])/2;
               break;
             case 3:
-              ghost_idx = (Nface + shift)*(X[2]*X[1]*X[0])/2 + ((x[2]*X[1] + x[1])*X[0] + x[0])/2;
+              ghost_idx = (3 + shift)*(X[2]*X[1]*X[0])/2 + ((x[2]*X[1] + x[1])*X[0] + x[0])/2;
               break;
           } // switch(dir)
         }
@@ -306,8 +309,9 @@ namespace quda {
       typedef typename RealTypeId<Complex>::Type real;
       Complex x[3];
       Complex y[3];
+      Complex z[3];
       Matrix<Complex,3> result;
-      Matrix<Complex,3> tempA;
+      Matrix<Complex,3> tempA, tempB; // input
 
 
       while(idx<arg.length){
@@ -322,7 +326,17 @@ namespace quda {
             arg.outA.load(reinterpret_cast<real*>(tempA.data), idx, dir, arg.parity); 
             result = tempA + result*arg.coeff[0];
             arg.outA.save(reinterpret_cast<real*>(result.data), idx, dir, arg.parity); 
-          } // if first_nbr_idx >= 0
+
+            shift[dir] = 3;
+            const int third_nbr_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity, arg.X);
+            if(third_nbr_idx >= 0){
+              arg.inB.load(z, third_nbr_idx);
+              outerProd(z, x, &result);
+              arg.outB.load(reinterpret_cast<real*>(tempB.data), idx, dir, arg.parity); 
+              result = tempB + result*arg.coeff[1];
+              arg.outB.save(reinterpret_cast<real*>(result.data), idx, dir, arg.parity); 
+            }
+          }
         } // dir
         idx += gridSize;
       }
@@ -354,11 +368,8 @@ namespace quda {
 
         out.load(reinterpret_cast<real*>(inmatrix.data), bulk_cb_idx, arg.dir, arg.parity); 
         arg.inA.load(a, bulk_cb_idx);
-#ifdef BUILD_TIFR_INTERFACE
-        const unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<1>(x, arg.X, arg.dir, arg.displacement);
-#else
-        const unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<3>(x, arg.X, arg.dir, arg.displacement);
-#endif
+
+        const unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<3,3>(x, arg.X, arg.dir, arg.displacement);
         arg.inB.load(b, ghost_idx);
 
         outerProd(b,a,&result);
@@ -563,6 +574,8 @@ namespace quda {
               cudaEventRecord(scatterEnd[i], streams[2*i]);
               cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[i],0);
 
+              printf("Calling exterior oprod kernel\n");
+
               arg.dir = i;
               arg.ghostOffset = ghostOffset[i];
               const unsigned int volume = arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3];
@@ -576,6 +589,15 @@ namespace quda {
                 dim3 gridDim(gridSize, 1, 1);               
                 exteriorOprodKernel<<<gridDim, blockDim, 0, streams[Nstream-1]>>>(arg);              
               }
+              // Now do the 3 hop term - Try putting this in a separate stream
+              { 
+                arg.displacement = 3;                      
+                arg.length = arg.displacement*faceVolumeCB[i];
+                dim3 blockDim(128, 1, 1);
+                const int gridSize = (arg.length + (blockDim.x-1))/blockDim.x;
+                dim3 gridDim(gridSize, 1, 1);               
+                exteriorOprodKernel<<<gridDim, blockDim, 0, streams[Nstream-1]>>>(arg);              
+              } 
               arg.inB.setStride(arg.inA.Stride());
 
               oprodCompleted[i] = 1;
