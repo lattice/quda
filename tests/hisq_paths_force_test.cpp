@@ -348,7 +348,6 @@ hisq_force_init()
   gParam_ex.reconstruct = link_recon;
   //gParam_ex.pad = E1*E2*E3/2;
   gParam_ex.pad = 0;
-  gParam_ex.ghostInit = false;
   gParam_ex.order = QUDA_FLOAT2_GAUGE_ORDER;
   cudaGauge_ex = new cudaGaugeField(gParam_ex);
   qudaGaugeParam.site_ga_pad = gParam_ex.pad;
