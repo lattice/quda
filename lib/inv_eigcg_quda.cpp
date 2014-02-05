@@ -18,11 +18,8 @@
 #include <blas_magma.h>
 
 /*
-Base eigCG(nev, m) algorithm:
+Based on  eigCG(nev, m) algorithm:
 A. Stathopolous and K. Orginos, arXiv:0707.0131
-//Note: 
-1) magma matrices are in coloumn-major format...
-2) for coalescing the search space dimension m must be multiple of 16 (use pad or adjust dimension?)
 */
 
 namespace quda {
@@ -482,7 +479,8 @@ namespace quda {
 
 //Copy nev eigvectors:
     //Vm->CopyEigenvecSubset(e, param.nev);//Warning:currently QUDA cannot copy eigenvector sets ... here is a temporal solution:
-    for(int i = param.rhs_idx*param.nev; i < (param.rhs_idx+1)*param.nev; i++) copyCuda(e.Eigenvec(i), Vm->Eigenvec(i));
+    const int offset = param.rhs_idx*param.nev;
+    for(int i = 0; i < param.nev; i++) copyCuda(e.Eigenvec(i+offset), Vm->Eigenvec(i));
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
@@ -644,12 +642,13 @@ namespace quda {
     {
       for(int j = 0; j < i; j++)
       {
-        Complex tmp = cDotProductCuda(u.Eigenvec(i), u.Eigenvec(j));
+        Complex tmp = cDotProductCuda(u.Eigenvec(j), u.Eigenvec(i));
         caxpyCuda(-tmp, u.Eigenvec(j), u.Eigenvec(i));
       }
       //normalize vector:
-      double tmp = norm2(u.Eigenvec(i));//sqrt?
-      axCuda(1.0/tmp, u.Eigenvec(i));
+      double tmp = norm2(u.Eigenvec(i));
+      if((tmp > 1e-12 && u->Precision() == QUDA_SINGLE_PRECISION) || (tmp > 1e-18 && u->Precision() == QUDA_DOUBLE_PRECISION) )
+         axCuda(1.0/sqrt(tmp), u.Eigenvec(i));
     }
 
     return;
