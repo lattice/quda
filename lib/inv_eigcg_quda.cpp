@@ -54,7 +54,7 @@ namespace quda {
       void LoadLanczosOffDiag(int idx, double alpha0, double beta0);
       
       //methods for Rayleigh Ritz procedure: 
-      int RestartVm(CudaComplex* vm, int len);//complex length
+      int RestartVm(CudaComplex* vm, const int cld, const int clen);//complex length
 
       //methods 
       void FillLanczosDiag(const int _2nev);
@@ -120,7 +120,7 @@ namespace quda {
   }
 
   template<typename Float, typename CudaComplex>
-  int EigCGArgs<Float, CudaComplex>::RestartVm(CudaComplex* v, int len) 
+  int EigCGArgs<Float, CudaComplex>::RestartVm(CudaComplex* v, const int cld, const int clen) 
   {
     //Create device version of the Lanczos matrix:
     cudaMemcpy(dTm, hTm, ldm*m*sizeof(CudaComplex), cudaMemcpyDefault);//!
@@ -149,7 +149,7 @@ namespace quda {
     cudaMemset2D(&(dTm[i]), ldm*sizeof(CudaComplex), 0, (m-i)*sizeof(CudaComplex), i);//check..
 
     //Restart V:
-    eigcg_magma_args->RestartV((void*)v, len, (void*)dTvecm, (void*)dTm);
+    eigcg_magma_args->RestartV((void*)v, cldn, clen, (void*)dTvecm, (void*)dTm);
 
     return i;
   }
@@ -385,8 +385,9 @@ namespace quda {
       //Begin Rayleigh-Ritz procedure:
       if (l == param.m){
          //Restart search space : 
-         int complex_len = Vm->EigvLength() / 2;
-         int _2nev = eigcg_args->RestartVm((cuComplex*)Vm->V(), complex_len);           
+         int cldn = Vm->EigTotalLength() / 2; //complex leading dimension
+         int clen = Vm->EigvLength() / 2; // complex vector length
+         int _2nev = eigcg_args->RestartVm((cuComplex*)Vm->V(), cldn, clen);           
 
          //Fill-up diagonal elements of the matrix T
          eigcg_args->FillLanczosDiag(_2nev);
@@ -599,12 +600,13 @@ namespace quda {
     magma_args->SolveProjMatrix((void*)vec, pM->tot_dim, pM->prev_dim, (void*)pM->hproj, pM->tot_dim);
 
     //
-    const int complex_len = u.EigvLength() / 2;
+    const int cld  = u.EigvTotalLength() / 2; //complex leading dimension
+    const int clen = u.EigvLength() / 2; //complex dimension
 
     if(in.Precision() == QUDA_DOUBLE_PRECISION)
     {
       cudaMemcpy(buff, vec, pM->prev_dim*_complex*prec, cudaMemcpyDefault);
-      magma_args->SpinorMatVec(out.V(), u.V(), buff, complex_len, pM->prev_dim);
+      magma_args->SpinorMatVec(out.V(), u.V(), cld, clen, buff, pM->prev_dim);
     }
     else if (in.Precision() == QUDA_SINGLE_PRECISION) 
     {
@@ -613,7 +615,7 @@ namespace quda {
       for(int i = 0; i < pM->prev_dim; i++) tmp[i] = std::complex<float>((float)vec[i].real(), (float)vec[i].imag()); 
       cudaMemcpy(buff, tmp, pM->prev_dim*_complex*prec, cudaMemcpyDefault);
 
-      magma_args->SpinorMatVec(out.V(), u.V(), buff, complex_len, pM->prev_dim); 
+      magma_args->SpinorMatVec(out.V(), u.V(), cld, clen, buff, pM->prev_dim); 
    
       delete[] tmp;
     }

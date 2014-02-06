@@ -741,8 +741,9 @@ namespace quda {
     exit(-1);
   }
 
+//copyCuda currently cannot not work with set of spinor fields..
   void cudaColorSpinorField::CopyEigenvecSubset(cudaColorSpinorField &dst, const int range, const int first_element) const{
-
+#if 0
     if(first_element < 0) errorQuda("\nError: trying to set negative first element.\n");
     if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
       if (first_element == 0 && range == this->EigvDim())
@@ -798,6 +799,7 @@ namespace quda {
       errorQuda("Eigenvector must be a parity spinor");
       exit(-1);
     }
+#endif
   }
 
   void cudaColorSpinorField::getTexObjectInfo() const

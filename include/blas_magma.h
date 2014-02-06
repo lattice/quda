@@ -63,7 +63,7 @@
       //
       int  MagmaORTH_2nev(void *dTvecm, void *dTm);
       //
-      void RestartV(void *dV, int ldn, void *dTevecm, void *dTm);
+      void RestartV(void *dV, const int vld, const int vlen, void *dTevecm, void *dTm);
 
       //Collection of methods used for the initial guess vector deflation:
 
@@ -74,7 +74,7 @@
       void SolveGPUProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH);
       
       //Spinor matrix vector product:
-      void SpinorMatVec(void *spinorOut, const void *spinorSetIn, const void *vec, const int slen, const int vlen);
+      void SpinorMatVec(void *spinorOut, const void *spinorSetIn, const int sld, const int slen, const void *vec, const int vlen);
    };
 
 
