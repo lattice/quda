@@ -182,7 +182,13 @@ namespace quda {
       eigv_volume = volume;
       eigv_stride = stride;
       eigv_length = length;
-      eigv_real_length = real_length;//?
+      eigv_real_length = real_length;
+//multi-gpu:
+      eigv_total_length      = total_length;
+      eigv_total_norm_length = total_norm_length;
+
+      eigv_ghost_length      = ghost_length;
+      eigv_ghost_norm_length = ghost_norm_length; 
 
       eigv_bytes       = bytes;
       eigv_norm_bytes  = norm_bytes; 
@@ -191,14 +197,27 @@ namespace quda {
       stride *= evdim;
       length *= evdim;
       real_length *= evdim;
+      
+      total_length *= evdim;
+      total_norm_length *= evdim;
+//won't be used.
+      ghost_length *= evdim;
+      ghost_norm_length *= evdim;  
 
       bytes *= evdim;
       norm_bytes *= evdim;
     }else{
+
       eigv_volume = 0;
       eigv_stride = 0;
       eigv_length = 0;
       eigv_real_length = 0;
+
+      eigv_total_length      = 0;
+      eigv_total_norm_length = 0;
+
+      eigv_ghost_length      = 0;
+      eigv_ghost_norm_length = 0;
 
       eigv_bytes       = 0;
       eigv_norm_bytes  = 0; 
@@ -262,21 +281,12 @@ namespace quda {
       //do nothing, not an error (can't remember why - need to document this sometime! )
     }
 
-//! for deflated solvers:
-    if(eigv_dim > 0 && eigv_id == -1)
-    {
-      volume *= eigv_dim;
-      stride *= eigv_dim;
-      length *= eigv_dim;
-    }
-
-
     if (param.siteSubset != QUDA_INVALID_SITE_SUBSET) siteSubset = param.siteSubset;
     if (param.siteOrder != QUDA_INVALID_SITE_ORDER) siteOrder = param.siteOrder;
     if (param.fieldOrder != QUDA_INVALID_FIELD_ORDER) fieldOrder = param.fieldOrder;
     if (param.gammaBasis != QUDA_INVALID_GAMMA_BASIS) gammaBasis = param.gammaBasis;
 
-    createGhostZone();
+    createGhostZone();//Warning: for eigenvectors clear ghost pointers...
 
     real_length = volume*nColor*nSpin*2;
 
@@ -290,17 +300,58 @@ namespace quda {
       norm_bytes = 0;
     }
 
-//for deflated solvers:
-    if(eigv_dim > 0 && eigv_id > -1){
-      eigv_volume      = volume;
-      eigv_stride      = stride;
-      eigv_length      = length;
-      eigv_real_length = real_length;
 
-      eigv_bytes       = bytes;
-      eigv_norm_bytes  = norm_bytes; 
+//! for deflated solvers:
+    if(eigv_dim > 0)
+    {
+       if(eigv_id == -1)
+       {
+          eigv_volume            = volume;
+          eigv_stride            = stride;
+          eigv_length            = length;
+          eigv_real_length       = real_length;
+
+          eigv_total_length      = total_length;
+          eigv_total_norm_length = total_norm_length;
+
+          eigv_ghost_length      = ghost_length;
+          eigv_ghost_norm_length = ghost_norm_length;
+
+          eigv_bytes             = bytes;
+          eigv_norm_bytes        = norm_bytes;
+
+          volume            *= eigv_dim;
+          stride            *= eigv_dim;
+          length            *= eigv_dim;
+          real_length       *= eigv_dim;
+
+          total_length      *= eigv_dim;
+          total_norm_length *= eigv_dim;
+          ghost_length      *= eigv_dim;
+          ghost_norm_length *= eigv_dim;
+       }
+       else if(eigv_id > -1)
+       {
+ // just to be safe...
+          eigv_volume            = 0;
+          eigv_stride            = 0;
+          eigv_length            = 0;
+          eigv_real_length       = 0;
+
+          eigv_total_length      = 0;
+          eigv_total_norm_length = 0;
+
+          eigv_ghost_length      = 0;
+          eigv_ghost_norm_length = 0;  
+
+          eigv_bytes             = 0;
+          eigv_norm_bytes        = 0; 
+       }
+       else
+       {
+          errorQuda("\nIncorrect eigenvector index.\n");
+       }
     }
-
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

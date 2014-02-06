@@ -71,7 +71,7 @@ namespace quda {
     eigcg_magma_args = new BlasMagmaArgs(m, nev, ldm, prec);
 
     hTm     = new std::complex<Float>[ldm*m];//VH A V
-    hTvalm  = new Float[m];   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
+    hTvalm  = (Float*)malloc(m*sizeof(Float));   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
 
     //allocate dTm etc. buffers on GPU:
     cudaMalloc(&dTm, ldm*m*sizeof(CudaComplex));//  
@@ -92,7 +92,8 @@ namespace quda {
   template<typename Float, typename CudaComplex>
   EigCGArgs<Float, CudaComplex>::~EigCGArgs() {
     delete[] hTm;
-    delete[] hTvalm;
+
+    free(hTvalm);
 
     cudaFree(dTm);
     cudaFree(dTvecm);
@@ -647,7 +648,7 @@ namespace quda {
       }
       //normalize vector:
       double tmp = norm2(u.Eigenvec(i));
-      if((tmp > 1e-12 && u->Precision() == QUDA_SINGLE_PRECISION) || (tmp > 1e-18 && u->Precision() == QUDA_DOUBLE_PRECISION) )
+      if((tmp > 1e-12 && u.Precision() == QUDA_SINGLE_PRECISION) || (tmp > 1e-18 && u.Precision() == QUDA_DOUBLE_PRECISION) )
          axCuda(1.0/sqrt(tmp), u.Eigenvec(i));
     }
 

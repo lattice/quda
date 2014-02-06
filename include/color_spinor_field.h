@@ -187,6 +187,14 @@ namespace quda {
     size_t norm_bytes; // size in bytes of norm field
 
     /*Warning: we need copies of the above params for eigenvectors*/
+    //multi_GPU parameters:
+
+    //ghost pointers are always for single eigenvector..
+    int eigv_total_length;
+    int eigv_total_norm_length;
+    int eigv_ghost_length;
+    int eigv_ghost_norm_length;
+
     size_t eigv_bytes;      // size in bytes of spinor field
     size_t eigv_norm_bytes; // makes no sense but let's keep it...
 
@@ -248,9 +256,12 @@ namespace quda {
     int EigvVolume() const { return eigv_volume; }
     int EigvStride() const { return eigv_stride; }
     int EigvLength() const { return eigv_length; }
+    int EigvRealLength() const { return eigv_real_length; } 
+    int EigvTotalLength() const { return eigv_total_length; }
 
     size_t EigvBytes() const { return eigv_bytes; }
     size_t EigvNormBytes() const { return eigv_norm_bytes; }
+    int EigvGhostLength() const { return eigv_ghost_length; }
 
     virtual QudaFieldLocation Location() const = 0;
     QudaSiteSubset SiteSubset() const { return siteSubset; }
