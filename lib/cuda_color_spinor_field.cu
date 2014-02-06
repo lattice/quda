@@ -83,19 +83,15 @@ namespace quda {
 	errorQuda("Cannot reference a non-cuda field");
       }
 
-      if (this->EigvDim() > 0) {//setup eigenvector form the set
-         eigv_dim    = this->EigvDim();
-       if(this->EigvId() > -1){
-         eigv_id    = this->EigvId();
-         volume     = this->EigvVolume(); 
-         stride     = this->EigvStride();
-         length     = this->EigvLength();
-         bytes      = this->EigvBytes();
-         norm_bytes = this->EigvNormBytes(); 
-         //v = (char*)v + eigv_id*length*this->Precision();//previous version...
-         v    = (void*)((char*)v + eigv_id*bytes);         
-         norm = (void*)((char*)norm + eigv_id*norm_bytes);         
-       }
+      if (this->EigvDim() > 0) 
+      {//setup eigenvector form the set
+         if(eigv_dim != this->EigvDim()) errorQuda("\nEigenvector set does not match..\n") ;//for debug only.
+         if(eigv_id > -1)
+         {
+           printfQuda("\nSetting pointers for vector id %d\n", eigv_id); //for debug only.
+           v    = (void*)((char*)v + eigv_id*bytes);         
+           norm = (void*)((char*)norm + eigv_id*norm_bytes);         
+         }
        //do nothing for the eigenvector subset...
       }
     }
@@ -115,7 +111,7 @@ namespace quda {
       errorQuda("CreateType %d not implemented", param.create);
     }
 
-    clearGhostPointers();
+    clearGhostPointers();//?
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
