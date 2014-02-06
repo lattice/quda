@@ -149,7 +149,7 @@ namespace quda {
     cudaMemset2D(&(dTm[i]), ldm*sizeof(CudaComplex), 0, (m-i)*sizeof(CudaComplex), i);//check..
 
     //Restart V:
-    eigcg_magma_args->RestartV((void*)v, cldn, clen, (void*)dTvecm, (void*)dTm);
+    eigcg_magma_args->RestartV((void*)v, cld, clen, (void*)dTvecm, (void*)dTm);
 
     return i;
   }
@@ -385,7 +385,7 @@ namespace quda {
       //Begin Rayleigh-Ritz procedure:
       if (l == param.m){
          //Restart search space : 
-         int cldn = Vm->EigTotalLength() / 2; //complex leading dimension
+         int cldn = Vm->EigvTotalLength() / 2; //complex leading dimension
          int clen = Vm->EigvLength() / 2; // complex vector length
          int _2nev = eigcg_args->RestartVm((cuComplex*)Vm->V(), cldn, clen);           
 
