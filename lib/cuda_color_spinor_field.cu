@@ -268,7 +268,8 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    createTexObject();
+    if((eigv_dim == 0) || (eigv_dim > 0 && eigv_id > -1))
+       createTexObject();
 #endif
 
     checkCudaError();
@@ -370,7 +371,8 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    destroyTexObject();
+    if((eigv_dim == 0) || (eigv_dim > 0 && eigv_id > -1))
+       destroyTexObject();
 #endif
 
   }

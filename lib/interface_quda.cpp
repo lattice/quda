@@ -1960,6 +1960,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
       size_t offset = i*in->Volume()*in->Precision()*24;
       void *host_ptr = (char*)_h_u + offset;
       ColorSpinorParam cpuEigvParam(host_ptr, *param, X, true); //Eigenvector set is always a parity spinor.
+
       h_u[i] = static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuEigvParam));
     }
 
@@ -1967,11 +1968,17 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, void *_h_u, void *_h_p, QudaI
     cudaParam.setPrecision(param->cuda_prec);//the same as for full precision iterations (see diracDeflateParam)
     cudaParam.create   = QUDA_ZERO_FIELD_CREATE;
     cudaParam.eigv_dim = tot_eigv_dim;
+   
+    printfQuda("\nLoad Ritz vectors\n");
+  
+    if(cudaParam.siteSubset == QUDA_FULL_SITE_SUBSET) cudaParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
 
     ritzvects = new cudaColorSpinorField(cudaParam);//check!
 
-    //now copy host spinors to device (temporal solution):
+    //now copy host spinors to device (temporary solution):
     for (int i = 0; i < tot_eigv_dim; i++) ritzvects->Eigenvec(i) = *h_u[i];
+
+    printfQuda("\n..done\n");
 
     DiracMdagM m(dirac), mSloppy(diracSloppy), mDeflate(diracDeflate);
     SolverParam solverParam(*param);
