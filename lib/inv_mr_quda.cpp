@@ -28,6 +28,9 @@ namespace quda {
       if (allocate_r) delete rp;
       delete Arp;
       delete tmpp;
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+	delete yp;
+      }
     }
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
   }
@@ -41,29 +44,44 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      if (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
+      //Source needs to be preserved if initial guess is used.
+      if ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)){
 	rp = new cudaColorSpinorField(x, csParam); 
 	allocate_r = true;
       }
       Arp = new cudaColorSpinorField(x);
       tmpp = new cudaColorSpinorField(x, csParam); //temporary for mat-vec
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+	yp = new cudaColorSpinorField(x, csParam);
+      }
 
       init = true;
     }
     ColorSpinorField &r = 
-      (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) ? *rp : b;
+      ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)) ? *rp : b;
     ColorSpinorField &Ar = *Arp;
     ColorSpinorField &tmp = *tmpp;
+    //y is used to store initial guess, otherwise it is unused.
+    ColorSpinorField &y = (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) ? *yp : *tmpp;  
+    double r2=0.0; // if zero source then we will exit immediately doing no work
 
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      mat(y, x, tmp);    
+      r2 = blas::xmyNorm(b, y);   //y = b - Ax
+      blas::copy(r, y);            //Copy y to r
+      blas::copy(y, x);           //Save initial guess
+    } else {
+      if (&r != &b) blas::copy(r, b);
+      r2 = blas::norm2(r);
+    }
     // set initial guess to zero and thus the residual is just the source
     blas::zero(x);  // can get rid of this for a special first update kernel  
-    double b2 = blas::norm2(b);
-    if (&r != &b) blas::copy(r, b);
+    double b2 = blas::norm2(b);  //Save norm of b
+    double c2 = r2;  //c2 holds the initial r2 after (possible) subtraction of initial guess
    
     // domain-wise normalization of the initial residual to prevent underflow
-    double r2=0.0; // if zero source then we will exit immediately doing no work
-    if (b2 > 0.0) {
-      blas::ax(1/sqrt(b2), r); // can merge this with the prior copy
+    if (c2 > 0.0) {
+      blas::ax(1/sqrt(c2), r); // can merge this with the prior copy
       r2 = 1.0; // by definition by this is now true
     }
 
@@ -113,7 +131,13 @@ namespace quda {
 
 
     // Obtain global solution by rescaling
-    if (b2 > 0.0) blas::ax(sqrt(b2), x);
+    if (c2 > 0.0) blas::ax(sqrt(c2), x);
+
+    //Add back initial guess (if appropriate)
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      blas::xpy(y,x);
+    }
+    
 
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
         profile.Stop(QUDA_PROFILE_COMPUTE);
@@ -127,15 +151,17 @@ namespace quda {
 	param.iter += k;
 	
 	// Calculate the true residual
+
+	//FIXME: Does not work if QUDA_PRESERVE_SOURCE_NO
 	r2 = blas::norm2(r);
 	mat(r, x);
 	double true_res = blas::xmyNorm(b, r);
 	param.true_res = sqrt(true_res / b2);
-	printfQuda("test %10e %10e %10e\n", sqrt(blas::norm2(r)), sqrt(blas::norm2(x)), sqrt(true_res));
+	printfQuda("test norm(r2/c2)=%10e norm(x)=%10e norm((b-Ax)/b2)=%10e\n", sqrt(r2/c2), sqrt(blas::norm2(x)), sqrt(true_res));
 
 	if (getVerbosity() >= QUDA_SUMMARIZE) {
 	  printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-	  k, sqrt(r2/b2), param.true_res);    
+	  k, sqrt(r2/c2), param.true_res);    
 	}
 
 	// reset the flops counters

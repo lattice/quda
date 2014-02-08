@@ -292,6 +292,7 @@ namespace quda {
     ColorSpinorField *rp;
     ColorSpinorField *Arp;
     ColorSpinorField *tmpp;
+    ColorSpinorField *yp;  //Holds initial guess if applicable
     bool init;
     bool allocate_r;
 
