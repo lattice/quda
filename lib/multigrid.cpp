@@ -151,12 +151,14 @@ namespace quda {
 
       //FIXME: MC - MR inverter does not support initial guess.
       //param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      
-      
 
-      (*smoother)(x, b);
-      printfQuda("MG: Post smoothing fine solution x2 = %e\n", blas::norm2(*r));
-      blas:xpy(*r, x);
+      //FIXME: MC - Use hack3 dummy field to store x because MR does not support initial guess
+      blas::copy(*hack3,x);
+      printfQuda("MG: norm check x2 = %e r2 = %e\n", blas::norm2(*hack3),blas::norm2(*r));
+      (*smoother)(x, *r);
+      printfQuda("MG: Post smoothing fine solution x2 = %e\n", blas::norm2(x));
+      //Sum to solution
+      blas::xpy(*hack3, x);
       param.matResidual(*r, x);
       r2 = blas::xmyNorm(b, *r);
 
