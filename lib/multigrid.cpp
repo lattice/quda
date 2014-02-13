@@ -20,6 +20,7 @@ namespace quda {
     param.inv_type = param.smoother;
     if (param.level == 1) param.inv_type_precondition = QUDA_GCR_INVERTER;
     param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+    //param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     smoother = Solver::create(param, param.matResidual, param.matSmooth, param.matSmooth, profile);
 
     // if not on the coarsest level, construct it
@@ -149,16 +150,19 @@ namespace quda {
       printfQuda("MG: level %d, post smoothing\n", param.level);
       param.maxiter = param.nu_post;
 
-      //FIXME: MC - MR inverter does not support initial guess.
-      //param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
-      //FIXME: MC - Use hack3 dummy field to store x because MR does not support initial guess
-      blas::copy(*hack3,x);
-      printfQuda("MG: norm check x2 = %e r2 = %e\n", blas::norm2(*hack3),blas::norm2(*r));
-      (*smoother)(x, *r);
+      printfQuda("MG: norm check x2 = %e r2 = %e\n", blas::norm2(x),blas::norm2(*r));
+      if(param.use_init_guess == QUDA_USE_INIT_GUESS_NO) {
+        //FIXME: MC - Use hack3 dummy field to store x because MR does not support initial guess
+        blas::copy(*hack3,x);
+        (*smoother)(x, *r);
+        blas::xpy(*hack3, x);
+      }
+      else {
+	(*smoother)(x,b);
+      }
       printfQuda("MG: Post smoothing fine solution x2 = %e\n", blas::norm2(x));
-      //Sum to solution
-      blas::xpy(*hack3, x);
       param.matResidual(*r, x);
       r2 = blas::xmyNorm(b, *r);
 

@@ -295,6 +295,7 @@ namespace quda {
     ColorSpinorField *yp;  //Holds initial guess if applicable
     bool init;
     bool allocate_r;
+    bool allocate_y;
 
   public:
     MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);

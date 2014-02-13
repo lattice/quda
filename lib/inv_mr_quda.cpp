@@ -17,7 +17,7 @@
 namespace quda {
 
   MR::MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), init(false), allocate_r(false)
+    Solver(param, profile), mat(mat), init(false), allocate_r(false), allocate_y(false)
   {
  
   }
@@ -28,9 +28,8 @@ namespace quda {
       if (allocate_r) delete rp;
       delete Arp;
       delete tmpp;
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-	delete yp;
-      }
+      if (allocate_y) delete yp;
+
     }
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
   }
@@ -44,18 +43,24 @@ namespace quda {
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      //Source needs to be preserved if initial guess is used.
-      if ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)){
-	rp = new cudaColorSpinorField(x, csParam); 
-	allocate_r = true;
-      }
       Arp = new cudaColorSpinorField(x);
       tmpp = new cudaColorSpinorField(x, csParam); //temporary for mat-vec
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-	yp = new cudaColorSpinorField(x, csParam);
-      }
-
       init = true;
+    }
+
+      //Source needs to be preserved if initial guess is used.
+    if(!allocate_r && ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES))) {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      rp = new cudaColorSpinorField(x, csParam);
+      allocate_r = true;
+    }
+
+    if (!allocate_y && (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)) {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      yp = new cudaColorSpinorField(x, csParam);
+      allocate_y = true;
     }
     ColorSpinorField &r = 
       ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)) ? *rp : b;
@@ -64,7 +69,6 @@ namespace quda {
     //y is used to store initial guess, otherwise it is unused.
     ColorSpinorField &y = (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) ? *yp : *tmpp;  
     double r2=0.0; // if zero source then we will exit immediately doing no work
-
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(y, x, tmp);    
       r2 = blas::xmyNorm(b, y);   //y = b - Ax
