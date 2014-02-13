@@ -64,6 +64,9 @@ namespace quda {
       hack3 = new cudaColorSpinorField(csParam);  // FIXME allocate cudaSpinorFields
       hack4 = new cudaColorSpinorField(csParam);   // FIXME allocate cudaSpinorFields
 
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      y = new cudaColorSpinorField(csParam);
+
       // note last two fields are cpu fields!
       DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack4);
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
@@ -103,6 +106,7 @@ namespace quda {
     if (hack2) delete hack2;
     if (hack3) delete hack3;
     if (hack4) delete hack4;
+    if (y) delete y;
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
@@ -116,6 +120,7 @@ namespace quda {
       
       // do the pre smoothing
       printfQuda("MG: level %d, pre smoothing\n", param.level);
+      param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
       param.maxiter = param.nu_pre;
       (*smoother)(x, b);
 
@@ -150,14 +155,14 @@ namespace quda {
       printfQuda("MG: level %d, post smoothing\n", param.level);
       param.maxiter = param.nu_post;
 
-      param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
 
       printfQuda("MG: norm check x2 = %e r2 = %e\n", blas::norm2(x),blas::norm2(*r));
       if(param.use_init_guess == QUDA_USE_INIT_GUESS_NO) {
         //FIXME: MC - Use hack3 dummy field to store x because MR does not support initial guess
-        blas::copy(*hack3,x);
+        blas::copy(*y,x);
         (*smoother)(x, *r);
-        blas::xpy(*hack3, x);
+        blas::xpy(*y, x);
       }
       else {
 	(*smoother)(x,b);

@@ -119,6 +119,9 @@ namespace quda {
     // hack vectors
     ColorSpinorField *hack1, *hack2, *hack3, *hack4;
 
+    //Auxiliary field to preserve solution vector
+    ColorSpinorField *y;
+
   public:
     /** 
       Constructor for MG class
