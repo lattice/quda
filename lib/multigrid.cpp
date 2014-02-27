@@ -7,8 +7,8 @@ namespace quda {
   // FIXME - do basis check
 
   MG::MG(MGParam &param, TimeProfile &profile) 
-    : Solver(param, profile), param(param), smoother(0), coarse(0), fine(param.fine), 
-      param_coarse(0), r(0), r_coarse(0), matCoarse(0), hack1(0), hack2(0), hack3(0), hack4(0) {
+    : Solver(param, profile), param(param), presmoother(0), postsmoother(0), coarse(0), fine(param.fine), 
+      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), matCoarse(0), hack1(0), hack2(0), hack3(0), hack4(0) {
 
     printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
 
@@ -17,11 +17,23 @@ namespace quda {
 
     // create the smoother for this level
     std::cout << "MG: level " << param.level << " smoother has operator " << typeid(param.matSmooth).name() << std::endl;
-    param.inv_type = param.smoother;
-    if (param.level == 1) param.inv_type_precondition = QUDA_GCR_INVERTER;
-    param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-    //param.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    smoother = Solver::create(param, param.matResidual, param.matSmooth, param.matSmooth, profile);
+    MGParam *param_presmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
+
+    //param_presmooth.inv_type = param.smoother;
+    if (param_presmooth->level == 1) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
+    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+    param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
+    param_presmooth->maxiter = param.nu_pre;
+    presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual, param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
+
+    //Create the post smoother
+    MGParam *param_postsmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
+
+    if (param_postsmooth->level == 1) param_postsmooth->inv_type_precondition = QUDA_GCR_INVERTER;
+    param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+    param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    param_postsmooth->maxiter = param.nu_post;
+    postsmoother = Solver::create(*param_postsmooth, param_postsmooth->matResidual, param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile);
 
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel) {
@@ -92,13 +104,16 @@ namespace quda {
       if (coarse) delete coarse;
       if (transfer) delete transfer;
     }
-    if (smoother) delete smoother;
+    if (presmoother) delete presmoother;
+    if (postsmoother) delete postsmoother;
 
     if (r) delete r;
     if (r_coarse) delete r_coarse;
     if (x_coarse) delete x_coarse;
 
     if (param_coarse) delete param_coarse;
+    if (param_presmooth) delete param_presmooth;
+    if (param_postsmooth) delete param_postsmooth;
 
     if (matCoarse) delete matCoarse;
 
@@ -120,9 +135,9 @@ namespace quda {
       
       // do the pre smoothing
       printfQuda("MG: level %d, pre smoothing\n", param.level);
-      param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
-      param.maxiter = param.nu_pre;
-      (*smoother)(x, b);
+      //param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+      //param.maxiter = param.nu_pre;
+      (*presmoother)(x, b);
 
       // FIXME - residual computation should be in the previous smoother
       param.matResidual(*r, x);
@@ -153,19 +168,17 @@ namespace quda {
 
       // do the post smoothing
       printfQuda("MG: level %d, post smoothing\n", param.level);
-      param.maxiter = param.nu_post;
-
-      param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+      //param.maxiter = param.nu_post;
+      //param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
 
       printfQuda("MG: norm check x2 = %e r2 = %e\n", blas::norm2(x),blas::norm2(*r));
-      if(param.use_init_guess == QUDA_USE_INIT_GUESS_NO) {
-        //FIXME: MC - Use hack3 dummy field to store x because MR does not support initial guess
+      if(param_postsmooth->use_init_guess == QUDA_USE_INIT_GUESS_NO) {
         blas::copy(*y,x);
-        (*smoother)(x, *r);
+        (*postsmoother)(x, *r);
         blas::xpy(*y, x);
       }
       else {
-	(*smoother)(x,b);
+	(*postsmoother)(x,b);
       }
       printfQuda("MG: Post smoothing fine solution x2 = %e\n", blas::norm2(x));
       param.matResidual(*r, x);
@@ -177,8 +190,8 @@ namespace quda {
     } else { // do the coarse grid solve
 
       printfQuda("MG: level %d starting coarsest solve\n", param.level);
-      param.maxiter = 10;
-      (*smoother)(x, b);
+      //param.maxiter = 10;
+      (*presmoother)(x, b);
       printfQuda("MG: level %d finished coarsest solve\n", param.level);
 
     }

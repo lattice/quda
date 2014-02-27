@@ -29,11 +29,11 @@ namespace quda {
 	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
     SolverParam(invParam), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
 
-    MGParam(const MGParam &param, std::vector<ColorSpinorField*> &B, 
+    MGParam(const MGParam &param, const std::vector<ColorSpinorField*> &B, 
 	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
     SolverParam(param), level(param.level), Nlevel(param.Nlevel), spinBlockSize(param.spinBlockSize),
       Nvec(param.Nvec), coarse(param.coarse), fine(param.fine),  B(B), nu_pre(param.nu_pre), 
-      nu_post(param.nu_post),  matResidual(matResidual), matSmooth(matSmooth), smoother(param.smoother) { 
+    nu_post(param.nu_post),  matResidual(matResidual), matSmooth(matSmooth), smoother(param.smoother) { 
       for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geoBlockSize[i];
     }
 
@@ -93,7 +93,7 @@ namespace quda {
     Transfer *transfer;
 
     /** This is the smoother used */
-    Solver *smoother;
+    Solver *presmoother, *postsmoother;
 
     /** This is the next lower level */
     MG *coarse;
@@ -103,6 +103,12 @@ namespace quda {
 
     /** Storage for the parameter struct for the coarse grid */
     MGParam *param_coarse;
+
+    /** Storage for the parameter struct for the pre-smoother */
+    MGParam *param_presmooth;
+
+    /** Storage for the parameter struct for the post-smoother */
+    MGParam *param_postsmooth;
 
     /** Residual vector */
     ColorSpinorField *r;
