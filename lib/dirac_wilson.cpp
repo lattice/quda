@@ -31,7 +31,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(in, profile);
+      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
@@ -50,7 +50,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(in, profile);
+      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 

@@ -58,7 +58,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(in, profile);
+      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
@@ -77,7 +77,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(in, profile);
+      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
