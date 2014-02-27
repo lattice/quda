@@ -17,23 +17,28 @@ namespace quda {
 
     // create the smoother for this level
     std::cout << "MG: level " << param.level << " smoother has operator " << typeid(param.matSmooth).name() << std::endl;
-    MGParam *param_presmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
 
-    //param_presmooth.inv_type = param.smoother;
+    param_presmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
+
+    param_presmooth->inv_type = param.smoother;
     if (param_presmooth->level == 1) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual, param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
 
-    //Create the post smoother
-    MGParam *param_postsmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
+    if (param.level < param.Nlevel) {
 
-    if (param_postsmooth->level == 1) param_postsmooth->inv_type_precondition = QUDA_GCR_INVERTER;
-    param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
-    param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-    param_postsmooth->maxiter = param.nu_post;
-    postsmoother = Solver::create(*param_postsmooth, param_postsmooth->matResidual, param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile);
+      //Create the post smoother
+      param_postsmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
+      
+      param_postsmooth->inv_type = param.smoother;
+      if (param_postsmooth->level == 1) param_postsmooth->inv_type_precondition = QUDA_GCR_INVERTER;
+      param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+      param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+      param_postsmooth->maxiter = param.nu_post;
+      postsmoother = Solver::create(*param_postsmooth, param_postsmooth->matResidual, param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile);
+    }
 
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel) {
@@ -87,7 +92,7 @@ namespace quda {
       std::vector<ColorSpinorField*> B_coarse;
 
       // create the next multigrid level
-      MGParam *param_coarse = new MGParam(param, B_coarse, *matCoarse, *matCoarse);
+      param_coarse = new MGParam(param, B_coarse, *matCoarse, *matCoarse);
       param_coarse->level++;
 
       param_coarse->fine = this;
