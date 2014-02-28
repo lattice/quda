@@ -726,12 +726,29 @@ int main(int argc, char** argv)
   for (int prec = 0; prec < Nprec; prec++) {
     printfQuda("\nTesting %s precision...\n\n", prec_str[prec]);
     initFields(prec);
-    
+
+    double tol;
+    switch(prec) {
+    case 0: // half precision
+      tol = 1e-3;
+      break;
+    case 1:
+      tol = 1e-5;
+      break;
+    case 2:
+      tol = 1e-12;
+      break;
+    default:
+      errorQuda("Unsupported precision");
+    }
+
     for (int kernel = 0; kernel < Nkernels; kernel++) {
       // only benchmark "high precision" copyCuda() if double is supported
       if ((Nprec < 3) && (kernel == 0)) continue;
+      double tol_kernel = (kernel < 2) ? 1e-4 : tol; // use different tolerance for mixed-precision copy 
       double error = test(kernel);
-      printfQuda("%-35s error = %e, \n", names[kernel], error);
+      const char *result = error < tol_kernel ? "PASS" : "FAIL";
+      printfQuda("%-35s error = %e, %s\n", names[kernel], error, result);
     }
     freeFields();
   }
