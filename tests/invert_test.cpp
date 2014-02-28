@@ -185,8 +185,6 @@ int main(int argc, char **argv)
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    //inv_param.inv_type = QUDA_BICGSTAB_INVERTER;
-    inv_param.inv_type = QUDA_MR_INVERTER;
   }
 
   inv_param.pipeline = 0;
