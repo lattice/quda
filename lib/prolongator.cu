@@ -36,8 +36,12 @@ namespace quda {
     for (int x=0; x<arg.out.Volume(); x++) {
       for (int s=0; s<arg.out.Nspin(); s++) {
 	for (int c=0; c<arg.out.Ncolor(); c++) {
-	//printfQuda("x=%d, s=%d, c=%d, arg.geo_map[x] = %d, arg.spin_map[s] = %d\n",x,s,c,0,arg.spin_map[s]);
 	  arg.out(x, s, c) = arg.in(arg.geo_map[x], arg.spin_map[s], c);
+	  /*if (x==0) 
+	    printfQuda("x=%d, s=%d, c=%d, arg.geo_map[x] = %d, arg.spin_map[s] = %d (%e %e) (%e %e)\n",
+		       x,s,c,0,arg.spin_map[s], arg.out(x,s,c).real(), arg.out(x,s,c).imag(),
+		       arg.in(arg.geo_map[x], arg.spin_map[s], c).real(), 
+	  	       arg.in(arg.geo_map[x], arg.spin_map[s], c).imag());*/
 	}
       }
     }
@@ -73,6 +77,9 @@ namespace quda {
 	  for (int j=0; j<in.Ncolor(); j++) { 
 	    // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 	    out(x, s, i) += V(x, s, i, j) * in(x, s, j);
+	    /*if (x==0) 
+	      printfQuda("%d out=(%e,%e), V=(%e,%e), in(%e,%e)\n", x, out(x,s,i).real(), out(x,s,i).imag(),
+	      V(x,s,i,j).real(), V(x,s,i,j).imag(), in(x,s,j).real(), in(x,s,j).imag());*/
 	  }
 	}
       }
@@ -155,13 +162,13 @@ namespace quda {
 		  ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-	printfQuda("out.Precision() = QUDA_DOUBLE_PRECISION\n");
+      //printfQuda("out.Precision() = QUDA_DOUBLE_PRECISION\n");
       FieldOrder<double> *outOrder = createOrder<double>(out);
       FieldOrder<double> *inOrder = createOrder<double>(in);
       FieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
       FieldOrder<double> *tmpOrder = createOrder<double>(tmp);
       ProlongateArg<FieldOrder<double>, FieldOrder<double> > 
-	arg(*outOrder, *inOrder, geo_map, spin_map);
+	arg(*tmpOrder, *inOrder, geo_map, spin_map);
       if (Location(out, in, v) == QUDA_CPU_FIELD_LOCATION) {
 	prolongate(arg);
 	rotateFineColor(*outOrder, *tmpOrder, *vOrder);
