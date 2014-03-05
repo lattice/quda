@@ -140,11 +140,10 @@ namespace quda {
     for (int s=0; s<o.Nspin(); s++) {
       std::cout << "x = " << x << ", s = " << s << ", { ";
       for (int c=0; c<o.Ncolor(); c++) {
-	std::cout << " ( " << o(x, s, c, 0) << " , " ;
-	if (c<o.Ncolor()-1) std::cout << o(x, s, c, 1) << " ) ," ;
-	else std::cout << o(x, s, c, 1) << " ) " ;
+	std::cout << o(x, s, c) ;
+	std::cout << ((c<o.Ncolor()-1) ? " , "  : " " ) ;
       }
-      std::cout << " } " << std::endl;
+      std::cout << "}" << std::endl;
     }
 
   }
@@ -159,6 +158,7 @@ namespace quda {
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       FieldOrder<float> *A = createOrder<float>(a);
       print_vector(*A, x);
+
       delete A;
     } else {
       errorQuda("Precision %d not implemented", a.Precision()); 
