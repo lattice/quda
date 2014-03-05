@@ -43,7 +43,7 @@ cudaGaugeField *cudaOprod = NULL;
 cpuGaugeField *cpuLongLinkOprod = NULL;
 cudaGaugeField *cudaLongLinkOprod = NULL;
 
-int verify_results = 1;
+extern bool verify_results = 0;
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
 extern int gridsize_from_cmdline[];
@@ -719,13 +719,6 @@ display_test_info()
     
 }
 
-void
-usage_extra(char** argv )
-{
-  printfQuda("Extra options: \n");
-  printfQuda("    --no_verify                                  # Do not verify the GPU results using CPU results\n");
-  return ;
-}
 int 
 main(int argc, char **argv) 
 {
@@ -753,10 +746,6 @@ main(int argc, char **argv)
       continue;
     }
 
-    if( strcmp(argv[i], "--no_verify") == 0){
-      verify_results=0;
-      continue;	    
-    }	
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }

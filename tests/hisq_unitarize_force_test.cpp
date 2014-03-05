@@ -30,7 +30,7 @@ cpuGaugeField *cpuReference = NULL;
 static QudaGaugeParam gaugeParam;
 
 
-int verify_results = 1;
+extern bool verify_results = 0;
 double accuracy = 1e-5;
 int ODD_BIT = 1;
 extern int device;
@@ -220,14 +220,6 @@ display_test_info()
     
 }
 
-void
-usage_extra(char** argv )
-{
-  printf("Extra options: \n");
-  printf("    --no_verify                                  # Do not verify the GPU results using CPU results\n");
-  return ;
-}
-
 int 
 main(int argc, char **argv) 
 {
@@ -237,12 +229,6 @@ main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }  
-
-    if( strcmp(argv[i], "--no_verify") == 0){
-      verify_results=0;
-      continue;	    
-    }	
-
 
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);

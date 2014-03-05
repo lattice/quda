@@ -30,7 +30,7 @@ static void* hw; //the array of half_wilson_vector
 
 extern int gridsize_from_cmdline[];
 
-int verify_results = 0;
+extern bool verify_results = 0;
 
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
@@ -256,10 +256,6 @@ main(int argc, char **argv)
       continue;
     }
         
-    if( strcmp(argv[i], "--verify") == 0){
-      verify_results=1;
-      continue;	    
-    }	
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }

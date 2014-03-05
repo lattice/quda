@@ -19,7 +19,7 @@
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
 extern void usage(char** argv);
-static int verify_results = 1;
+extern bool verify_results = 1;
 
 extern int device;
 extern int xdim, ydim, zdim, tdim;
@@ -445,7 +445,6 @@ usage_extra(char** argv )
   printfQuda("    --test <0/1>                             # Test method\n");
   printfQuda("                                                0: standard method\n");
   printfQuda("                                                1: extended volume method\n");
-  printfQuda("    --verify                                 # Verify the GPU results using CPU results\n");
   printfQuda("    --gauge-order <qdp/milc>		   # ordering of the input gauge-field\n");
   return ;
 }
@@ -485,12 +484,6 @@ main(int argc, char **argv)
         exit(1);
       }
       i++;	
-      continue;
-    }
-
-
-    if( strcmp(argv[i], "--verify") == 0){
-      verify_results=1;
       continue;
     }
 

@@ -20,7 +20,7 @@ extern int device;
 
 static QudaGaugeParam qudaGaugeParam;
 QudaGaugeFieldOrder gauge_order =  QUDA_QDP_GAUGE_ORDER;
-static int verify_results = 0;
+extern bool verify_results = 0;
 extern int tdim;
 extern QudaPrecision prec;
 extern int xdim;
@@ -672,7 +672,6 @@ usage_extra(char** argv )
   printf("Extra options:\n");
   printf("    --gauge-order  <qdp/milc>                 # Gauge storing order in CPU\n");
   printf("    --attempts  <n>                           # Number of tests\n");
-  printf("    --verify                                  # Verify the GPU results using CPU results\n");
   return ;
 }
 
@@ -715,11 +714,6 @@ main(int argc, char **argv)
 	continue;
       }
      
-      if( strcmp(argv[i], "--verify") == 0){
-	verify_results=1;
-	continue;	    
-      }	
-      
       fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
       usage(argv);
     }
