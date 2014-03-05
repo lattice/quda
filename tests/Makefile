@@ -15,13 +15,13 @@ TESTS = su3_test pack_test blas_test dslash_test invert_test	\
 
 all: $(TESTS)
 
-dslash_test: dslash_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o misc.o $(QIO_UTIL) $(QUDA)
+dslash_test: dslash_test.o test_util.o gtest-all.o wilson_dslash_reference.o domain_wall_dslash_reference.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
+staggered_dslash_test: staggered_dslash_test.o gtest-all.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS) 
 
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
