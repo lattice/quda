@@ -17,6 +17,9 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
+// google test frame work
+#include <gtest.h>
+
 #include <gauge_qio.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -60,6 +63,7 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern QudaDagType dagger;
 
+extern bool verify_results;
 extern int niter;
 extern char latfile[];
 
@@ -558,6 +562,23 @@ void display_test_info()
 
 extern void usage(char**);
 
+void verify() {
+    double norm2_cpu = norm2(*spinorRef);
+    double norm2_cpu_cuda= norm2(*spinorOut);
+    if (!transfer) {
+      double norm2_cuda= norm2(*cudaSpinorOut);
+      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+    } else {
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+    }
+    
+    double rel_dev = sqrt((norm2_cpu - norm2_cpu_cuda) / norm2_cpu);
+    printfQuda("Relative deviation = %e\n", rel_dev);
+
+    double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+		  (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-5 : 1e-2));		   
+    ASSERT_LE(rel_dev, tol) << "CPU and CUDA implementations do not agree";
+}
 
 int main(int argc, char **argv)
 {
@@ -613,18 +634,10 @@ int main(int argc, char **argv)
     printfQuda("GB/s = %f\n\n", 
 	       (double)Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
     
-    if (!transfer) {
-      double norm2_cpu = norm2(*spinorRef);
-      double norm2_cuda= norm2(*cudaSpinorOut);
-      double norm2_cpu_cuda= norm2(*spinorOut);
-      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
-    } else {
-      double norm2_cpu = norm2(*spinorRef);
-      double norm2_cpu_cuda= norm2(*spinorOut);
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+    verify();
+    if (verify_results) {
+      cpuColorSpinorField::Compare(*spinorRef, *spinorOut);
     }
-    
-    cpuColorSpinorField::Compare(*spinorRef, *spinorOut);
   }    
   end();
 
