@@ -30,7 +30,7 @@ static void* hw; //the array of half_wilson_vector
 
 extern int gridsize_from_cmdline[];
 
-extern bool verify_results = 0;
+extern bool verify_results;
 
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
@@ -101,8 +101,11 @@ fermion_force_init()
 
   gParam.precision = gaugeParam.cuda_prec;
   gParam.reconstruct = link_recon;
+  gaugeParam.gauge_order = (gaugeParam.cuda_prec == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_GAUGE_ORDER 
+    : (link_recon == QUDA_RECONSTRUCT_12) ? QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
   cudaGauge = new cudaGaugeField(gParam);
 
+  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.precision = gaugeParam.cpu_prec;
   cpuMom = new cpuGaugeField(gParam);
