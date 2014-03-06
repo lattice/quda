@@ -405,23 +405,14 @@ void staggeredDslashRef()
 
 }
 
-void verify() {
-    double norm2_cpu = norm2(*spinorRef);
-    double norm2_cpu_cuda= norm2(*spinorOut);
-    if (!transfer) {
-      double norm2_cuda= norm2(*cudaSpinorOut);
-      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
-    } else {
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
-    }
-    
-    double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
-    double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
-		  (inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));		   
-    ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+TEST(dslash, verify) {
+  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-static int dslashTest() 
+static int dslashTest(int argc, char **argv) 
 {
   int accuracy_level = 0;
 
@@ -459,7 +450,19 @@ static int dslashTest()
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*1e+9));
 
-    if (verify_results) verify();
+    double norm2_cpu = norm2(*spinorRef);
+    double norm2_cpu_cuda= norm2(*spinorOut);
+    if (!transfer) {
+      double norm2_cuda= norm2(*cudaSpinorOut);
+      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+    } else {
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+    }
+  
+    if (verify_results) {
+      ::testing::InitGoogleTest(&argc, argv);
+      return RUN_ALL_TESTS();
+    }
   }
   end();
 
@@ -516,7 +519,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   int ret =1;
-  int accuracy_level = dslashTest();
+  int accuracy_level = dslashTest(argc, argv);
 
   printfQuda("accuracy_level =%d\n", accuracy_level);
 
