@@ -32,10 +32,11 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	gauge_update_quda.h						\
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
-	gauge_field.h double_single.h texture.h numa_affinity.h	\
-	misc_helpers.h fermion_force_quda.h malloc_quda.h	\
-	gauge_field_order.h clover_field_order.h		\
-	color_spinor_field_order.h staggered_oprod.h transfer.h
+	gauge_field.h double_single.h texture.h numa_affinity.h		\
+	misc_helpers.h fermion_force_quda.h malloc_quda.h		\
+	gauge_field_order.h clover_field_order.h			\
+	color_spinor_field_order.h staggered_oprod.h transfer.h 	\
+	multigrid.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h 
