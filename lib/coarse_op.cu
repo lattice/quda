@@ -20,7 +20,7 @@ namespace quda {
 
 	//The basis to be used.
 	//QUDA_DEGRAND_ROSSI_GAMMA_BASIS is the chiral basis
-	//QUDA_UKQCD_GAMMA_BASIS is the non-relativistic basis?
+	//QUDA_UKQCD_GAMMA_BASIS is the non-relativistic basis.
 	QudaGammaBasis basis;
 
 	//The column with the non-zero element for each row
@@ -89,7 +89,7 @@ namespace quda {
 	    elem[2] = 1;
 	    elem[3] = -1;
 	  }
-	  else if((dir==1) && (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS)) {
+	  else if((dir==1) && (basis == QUDA_UKQCD_GAMMA_BASIS)) {
 	    elem[0] = 1;
 	    elem[1] = -1;
 	    elem[2] = -1;
@@ -107,7 +107,7 @@ namespace quda {
 	    elem[2] = 1;
 	    elem[3] = 1;
 	  }
-	  else if((dir==3) && (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS)) {
+	  else if((dir==3) && (basis == QUDA_UKQCD_GAMMA_BASIS)) {
 	    elem[0] = 1;
 	    elem[1] = 1;
 	    elem[2] = -1;
@@ -119,11 +119,11 @@ namespace quda {
 	    elem[2] = 1;
 	    elem[3] = 1;
 	  }
-	  else if((dir==4) && (basis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS)) {
-	    elem[0] = -1;
-	    elem[1] = -1;
-	    elem[2] = -1;
-	    elem[3] = -1;
+	  else if((dir==4) && (basis == QUDA_UKQCD_GAMMA_BASIS)) {
+	    elem[0] = 1;
+	    elem[1] = 1;
+	    elem[2] = 1;
+	    elem[3] = 1;
 	  }
 	  else {
 	    elem[0] = 0;
