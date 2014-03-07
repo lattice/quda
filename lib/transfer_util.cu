@@ -106,6 +106,12 @@ namespace quda {
 		count, checkLength);
     }
 
+    for (int i=0; i<checkLength; i++) {
+      for (int j=0; j<i; j++) {
+	if (check[i] == check[j]) errorQuda("Collision detected in block ordering\n");
+      }
+    }
+
     delete []check;
   }
 
@@ -123,21 +129,20 @@ namespace quda {
 	  Complex dot = 0.0;
 	  for (int i=0; i<blockSize; i++) 
 	    dot += conj(v[(b*Nc+ic)*blockSize+i]) * v[(b*Nc+jc)*blockSize+i];
-	
+	  
 	  // Subtract the blocks to orthogonalise
 	  for (int i=0; i<blockSize; i++) 
 	    v[(b*Nc+jc)*blockSize+i] -= dot * v[(b*Nc+ic)*blockSize+i];
 	}
-      
+	
 	// Normalize the block
-	// Again, nrm2 is pure real, but need to use Complex because of template.
+	// nrm2 is pure real, but need to use Complex because of template.
 	Complex nrm2 = 0.0;
 	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*Nc+jc)*blockSize+i]);
-	nrm2 = 1.0/sqrt(nrm2.real());
-      
-	for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] = nrm2 * v[(b*Nc+jc)*blockSize+i];
-
+	double scale = real(nrm2) > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
+	for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] *= scale;
       }
+
     }
 
   }
@@ -156,6 +161,8 @@ namespace quda {
       int blocksize = geo_blocksize * vOrder->NcolorPacked() * spin_bs; 
       int chiralBlocks = vOrder->NspinPacked() / spin_bs;
       int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
+
+      printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, Nvec);
 
       blockOrderV<true>(Vblock, *vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
       blockGramSchmidt(Vblock, numblocks, Nvec, blocksize);  
