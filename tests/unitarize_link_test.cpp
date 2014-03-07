@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <cuda.h>
+
+ #include <cuda.h>
 #include <cuda_runtime.h>
 
 #include "quda.h"
@@ -170,7 +171,6 @@ unitarize_link_test()
 
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
 
-  delete cpuOutLink;
 
   setUnitarizeLinksConstants(unitarize_eps,
 			     max_allowed_error,
@@ -200,6 +200,9 @@ unitarize_link_test()
  delete cpuOutLink;
  delete cudaFatLink;
  delete cudaULink;
+
+ 
+ free(fatlink);
  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
   cudaFree(num_failures_dev); 
 #ifdef MULTI_GPU
