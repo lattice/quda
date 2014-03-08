@@ -103,6 +103,7 @@ unitarize_link_test()
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
   gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.ghostInit = false;
 
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
