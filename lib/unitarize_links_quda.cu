@@ -6,10 +6,15 @@
 #include <gauge_field.h>
 
 #include <quda_matrix.h>
-#include <svd_quda.h>
 #include <hisq_links_quda.h>
 
+
 namespace quda{
+
+namespace {
+#include <svd_quda.h>
+}
+
 
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846

@@ -1,19 +1,12 @@
 #ifndef _SVD_QUDA_H_
 #define _SVD_QUDA_H_
 
-#include "quda_matrix.h"
-
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <sstream>
-
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11
 #define LOG2 0.69314718055994530942
 
 
-namespace quda{
+//namespace quda{
 
   template<class Cmplx> 
     inline DEVICEHOST
@@ -660,7 +653,7 @@ namespace quda{
       return;
     }
 
-} // end namespace quda
+//} // end namespace quda
 
 
 #endif // _SVD_QUDA_H
