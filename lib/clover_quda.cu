@@ -252,17 +252,17 @@ namespace quda {
 
           }
           // 3 matrix additions, 12 matrix-matrix multiplications, 8 matrix conjugations
-          // Each matrix conjugation involves 9 unary minus operations
+          // Each matrix conjugation involves 9 unary minus operations but these ar not included in the operation count
           // Each matrix addition involves 18 real additions
           // Each matrix-matrix multiplication involves 9*3 complex multiplications and 9*2 complex additions 
           // = 9*3*6 + 9*2*2 = 198 floating-point ops
           // => Total number of floating point ops per site above is 
-          // 8*9 + 3*18 + 12*198 = 72 + 54 + 2376 = 2502 
+          // 3*18 + 12*198 =  54 + 2376 = 2430
           
           { 
-            F -= conj(F); // 18 real subtractions + one matrix conjugation (=9 unary minus ops)
+            F -= conj(F); // 18 real subtractions + one matrix conjugation
             F *= 1.0/8.0; // 18 real multiplications
-            // 45 floating point operations here
+            // 36 floating point operations here
           }
           
 
@@ -344,8 +344,8 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return (2502 + 45)*6*arg.threads; }
-      long long bytes() const { return (4*4*18 + 18)*6*arg.threads*sizeof(Float); } // Only correct if there is no link reconstruction
+      long long flops() const { return (2430 + 36)*6*arg.threads; }
+      long long bytes() const { return (4*4*18 + 18)*6*arg.threads*sizeof(Float); } //  Ignores link reconstruction
 
     }; // FmunuCompute
 
@@ -386,7 +386,6 @@ namespace quda {
       }
       typedef typename ComplexTypeId<Float>::Type Cmplx;
 
-      Float cloverCoeff = arg.cloverCoeff;
 
       // Load the field-strength tensor from global memory
       Matrix<Cmplx,3> F[6];
@@ -394,13 +393,14 @@ namespace quda {
         loadLinkVariableFromArray(arg.Fmunu + parity*arg.FmunuOffset, i, idx, arg.FmunuStride, &F[i]); 
       }
 
-      Cmplx I; I.x = 0; I.y = 1.;
+      Complex I; I.x = 0; I.y = 1.0;
+      Cmplx coeff; coeff.x = 0; coeff.y = arg.cloverCoeff;
       Matrix<Cmplx,3> block1[2];
       Matrix<Cmplx,3> block2[2];
-      block1[0] =  cloverCoeff*I*(F[0]-F[5]); // (18 + 6*9 + 18 =) 90 floating-point ops 
-      block1[1] =  cloverCoeff*I*(F[0]+F[5]); // 90 floating-point ops 
-      block2[0] =  cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 108 floating-point ops
-      block2[1] =  cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 108 floating-point ops
+      block1[0] =  coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops 
+      block1[1] =  coeff*(F[0]+F[5]); // 72 floating-point ops 
+      block2[0] =  arg.cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
+      block2[1] =  arg.cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
 
 
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
@@ -448,7 +448,7 @@ namespace quda {
           A[ch*36+6+2*i + 1] = 0.5*triangle[idtab[i]].y;
         } 
       } // ch
-      // 96 floating-point ops
+      // 84 floating-point ops
 
 
       arg.clover.save(A, idx, parity);
@@ -520,7 +520,7 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return 492*arg.threads; } 
+      long long flops() const { return 480*arg.threads; } 
       long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } 
     };
 

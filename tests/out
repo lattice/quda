@@ -1,0 +1,2 @@
+g++			 -Wall -O3 -D__COMPUTE_CAPABILITY__=350 -DGPU_STAGGERED_DIRAC -DGPU_HISQ_FORCE -DGPU_DIRECT -DBUILD_QDP_INTERFACE -DBUILD_MILC_INTERFACE -DNUMA_AFFINITY -I/usr/local/cuda/include -I../include -I.  hisq_unitarize_force_test.cpp -c -o hisq_unitarize_force_test.o
+g++			 -fPIC -L/usr/local/cuda/lib64 -lcudart hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o ../lib/libquda.a  -o hisq_unitarize_force_test  -fPIC -L/usr/local/cuda/lib64 -lcudart
