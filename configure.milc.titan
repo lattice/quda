@@ -1,2 +1,2 @@
 # Example configure script for building QUDA for MILC running on Titan
-./configure --enable-os=linux --enable-cpu-arch=x86_64 --enable-gpu-arch=sm_35  --enable-multi-gpu --disable-wilson-dirac --disable-twisted-mass-dirac --disable-ndeg-twisted-mass --disable-domain-wall-dirac --enable-hisq-fatlink --enable-gauge-force --enable-hisq-force --disable-qdp-interface --with-cuda=${CUDATOOLKIT_HOME} --with-mpi= CC=cc CXX=CC 
+./configure --enable-os=linux --enable-cpu-arch=x86_64 --enable-gpu-arch=sm_35  --enable-multi-gpu --disable-wilson-dirac --disable-twisted-mass-dirac --disable-ndeg-twisted-mass-dirac --disable-domain-wall-dirac --enable-hisq-fatlink --enable-gauge-force --enable-hisq-force --with-cuda=${CUDATOOLKIT_HOME} --with-mpi= CC=cc CXX=CC 

@@ -20,7 +20,7 @@ extern int device;
 
 static QudaGaugeParam qudaGaugeParam;
 QudaGaugeFieldOrder gauge_order =  QUDA_QDP_GAUGE_ORDER;
-static int verify_results = 0;
+extern bool verify_results;
 extern int tdim;
 extern QudaPrecision prec;
 extern int xdim;
@@ -348,7 +348,7 @@ int path_dir_t[][5] = {
 
 
 
-static int
+static void
 gauge_force_test(void) 
 {
   int max_length = 6;    
@@ -591,21 +591,20 @@ gauge_force_test(void)
 			    input_path_buf, length, loop_coeff, num_paths);
 #endif
     }
-  }
   
-  int res;
-  res = compare_floats(mom, refmom, 4*V*momSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
-  
-  int accuracy_level;
-  accuracy_level = strong_check_mom(mom, refmom, 4*V, qudaGaugeParam.cpu_prec);
-  
-  printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");	    
-  
+    int res;
+    res = compare_floats(mom, refmom, 4*V*momSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+    
+    strong_check_mom(mom, refmom, 4*V, qudaGaugeParam.cpu_prec);
+    
+    printf("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
+  }  
+
   double perf = 1.0* flops*V/(total_time*1e+9);
   double kernel_perf = 1.0*flops*V/(timeinfo[1]*1e+9);
   printf("init and cpu->gpu time: %.2f ms, kernel time: %.2f ms, gpu->cpu and cleanup time: %.2f  total time =%.2f ms\n", 
 	 timeinfo[0]*1e+3, timeinfo[1]*1e+3, timeinfo[2]*1e+3, total_time*1e+3);
-  printf("kernel performance: %.2f GFLOPS, overall performance : %.2f GFOPS\n", kernel_perf, perf);
+  printf("kernel performance: %.2f GFLOPS, overall performance : %.2f GFLOPS\n", kernel_perf, perf);
   
   for(int dir = 0; dir < 4; dir++){
     for(int i=0;i < num_paths; i++){
@@ -638,15 +637,6 @@ gauge_force_test(void)
   free(mom);
   free(refmom);
   endQuda();
-  
-  if (res == 0){//failed
-    printf("\n");
-    printf("Warning: you test failed. \n");
-    printf("        Did you use --verify?\n");
-    printf("        Did you check the GPU health by running cuda memtest?\n");
-    }
-  
-  return accuracy_level;
 }            
 
 
@@ -672,7 +662,6 @@ usage_extra(char** argv )
   printf("Extra options:\n");
   printf("    --gauge-order  <qdp/milc>                 # Gauge storing order in CPU\n");
   printf("    --attempts  <n>                           # Number of tests\n");
-  printf("    --verify                                  # Verify the GPU results using CPU results\n");
   return ;
 }
 
@@ -715,11 +704,6 @@ main(int argc, char **argv)
 	continue;
       }
      
-      if( strcmp(argv[i], "--verify") == 0){
-	verify_results=1;
-	continue;	    
-      }	
-      
       fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
       usage(argv);
     }
@@ -731,17 +715,9 @@ main(int argc, char **argv)
 
     display_test_info();
     
-    int accuracy_level = gauge_force_test();
-    printfQuda("accuracy_level=%d\n", accuracy_level);
+    gauge_force_test();
 
     finalizeComms();
     
-    int ret;
-    if(accuracy_level >=3 ){
-      ret = 0; 
-    }else{
-      ret = 1; //we delclare the test failed
-    }
-
-    return ret;
+    return 0;
 }

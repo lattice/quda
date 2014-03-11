@@ -105,6 +105,7 @@ fermion_force_init()
   cudaGauge = new cudaGaugeField(gParam);
 
   gParam.order = QUDA_MILC_GAUGE_ORDER;
+
   gParam.reconstruct = QUDA_RECONSTRUCT_10;
   gParam.precision = gaugeParam.cpu_prec;
   gParam.link_type = QUDA_ASQTAD_MOM_LINKS;

@@ -1513,6 +1513,7 @@ char latfile[256] = "";
 bool tune = true;
 int niter = 10;
 int test_type = 0;
+bool verify_results;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1554,6 +1555,7 @@ void usage(char** argv )
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
+  printf("    --verify <true/false>                     # Verify the GPU results using CPU results\n");
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -1582,6 +1584,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     usage(argv);
   }
 
+  if( strcmp(argv[i], "--verify") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      verify_results = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      verify_results = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid verify type\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--device") == 0){
     if (i+1 >= argc){
       usage(argv);

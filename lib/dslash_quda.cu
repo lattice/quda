@@ -2123,6 +2123,6 @@ namespace quda {
 
 #ifdef GPU_HISQ_FORCE
 #include "hisq_paths_force_quda.cu"
-#include "unitarize_force_quda.cu"
+//#include "unitarize_force_quda.cu"
 #endif
 

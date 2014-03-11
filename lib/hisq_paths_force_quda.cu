@@ -4,7 +4,7 @@
 #include <hw_quda.h>
 #include <hisq_force_macros.h>
 #include<utility>
-
+#include <quda_matrix.h>
 
 //DEBUG : control compile 
 #define COMPILE_HISQ_DP_18 
