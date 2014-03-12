@@ -5,10 +5,15 @@
 #include <cuda.h>
 #include <gauge_field.h>
 
+#include <tune_quda.h>
 #include <quda_matrix.h>
-#include <svd_quda.h>
 
 namespace quda{
+namespace {
+  #include <svd_quda.h>
+}
+
+//#ifdef GPU_HISQ_FORCE
 
 #define HISQ_UNITARIZE_PI 3.14159265358979323846
 #define HISQ_UNITARIZE_PI23 HISQ_UNITARIZE_PI*2.0/3.0
@@ -651,6 +656,8 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     
     
   } // namespace fermion_force
+
+//#endif
 } // namespace quda
 
 
