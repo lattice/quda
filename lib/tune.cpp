@@ -288,6 +288,13 @@ static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VER
 	cudaEventElapsedTime(&elapsed_time, start, end);
 	cudaDeviceSynchronize();
 	error = cudaGetLastError();
+
+	{ // check that error state is cleared
+	  cudaDeviceSynchronize();
+	  cudaError_t error = cudaGetLastError();
+	  if (error != cudaSuccess) errorQuda("Failed to clear error state %s\n", cudaGetErrorString(error));
+	}
+
 	elapsed_time /= (1e3 * tunable.tuningIter());
 	if ((elapsed_time < best_time) && (error == cudaSuccess)) {
 	  best_time = elapsed_time;
