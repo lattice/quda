@@ -616,6 +616,19 @@ extern "C" {
     const QudaGaugeParam* param);
 
 
+
+  void computeHISQForceCompleteQuda(void* momentum,
+                      const double level2_coeff[6],
+                      const double fat7_coeff[6],
+                      void** quark_array,
+                      int num_terms,
+                      double** quark_coeff,
+                      const void* const w_link,
+                      const void* const v_link,
+                      const void* const u_link,
+                      const QudaGaugeParam* param);
+
+
 #ifdef __cplusplus
 }
 #endif

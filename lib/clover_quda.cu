@@ -393,7 +393,7 @@ namespace quda {
         loadLinkVariableFromArray(arg.Fmunu + parity*arg.FmunuOffset, i, idx, arg.FmunuStride, &F[i]); 
       }
 
-      Complex I; I.x = 0; I.y = 1.0;
+      Cmplx I; I.x = 0; I.y = 1.0;
       Cmplx coeff; coeff.x = 0; coeff.y = arg.cloverCoeff;
       Matrix<Cmplx,3> block1[2];
       Matrix<Cmplx,3> block2[2];

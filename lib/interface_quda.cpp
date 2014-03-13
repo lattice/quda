@@ -145,6 +145,10 @@ static TimeProfile profileAsqtadForce("computeAsqtadForceQuda");
 //!<Profiler for computeAsqtadForceQuda
 static TimeProfile profileHISQForce("computeHISQForceQuda");
 
+//!<Profiler for computeHISQForceCompleteQuda
+static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
+
+
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
@@ -3670,6 +3674,45 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 #endif
 
 }
+
+void 
+computeHISQForceCompleteQuda(void* const milc_momentum,
+                             const double level2_coeff[6],
+                             const double fat7_coeff[6],
+                             void** quark_array,
+                             int num_terms,
+                             double** quark_coeff,
+                             const void* const w_link,
+                             const void* const v_link,
+                             const void* const u_link,
+                             const QudaGaugeParam* gParam)
+{
+
+  void* oprod[2];
+
+/*
+  computeStaggeredOprodQuda(void** oprod,
+    void** fermion,
+    int num_terms,
+    double** coeff,
+    QudaGaugeParam* gParam)
+
+  computeHISQForceQuda(milc_momentum,
+                       level2_coeff,
+                       fat7_coeff,
+                       staple_src,
+                       one_link_src,
+                       naik_src,
+                       w_link, 
+                       v_link,
+                       u_link,
+                       gParam);
+
+*/
+  return;
+}
+
+
 
 
   void

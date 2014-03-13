@@ -207,7 +207,6 @@ unitarize_link_test()
   printfQuda("Call to cudFatLink->loadCPUField complete\n"); 
  
 
-  delete cpuOutLink;
 
   setUnitarizeLinksConstants(unitarize_eps,
       max_allowed_error,
