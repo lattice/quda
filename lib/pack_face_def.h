@@ -2,11 +2,11 @@
 // compute an index into the local volume from an index into the face (used by the face packing routines)
 
   template <int dim, int nLayers, int face_num>
-static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_volume, const int &parity)
+static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_volume, const int &parity, const int X[])
 {
   // dimensions of the face (FIXME: optimize using constant cache)
 
-  int face_X = X1, face_Y = X2, face_Z = X3; // face_T = X4;
+  int face_X = X[0], face_Y = X[1], face_Z = X[2]; // face_T = X[3]
   switch (dim) {
     case 0:
       face_X = nLayers;
@@ -26,22 +26,7 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 
   // intrinsic parity of the face depends on offset of first element
 
-  int face_parity;
-  switch (dim) {
-    case 0:
-      face_parity = (parity + face_num * (X1 - nLayers)) & 1;
-      break;
-    case 1:
-      face_parity = (parity + face_num * (X2 - nLayers)) & 1;
-      break;
-    case 2:
-      face_parity = (parity + face_num * (X3 - nLayers)) & 1;
-      break;
-    case 3:
-      face_parity = (parity + face_num * (X4 - nLayers)) & 1;
-      break;
-  }
-
+  int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
   // reconstruct full face index from index into the checkerboard
 
   face_idx *= 2;
@@ -72,26 +57,23 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
   // compute index into the full local volume
 
   int idx = face_idx;
-  int gap, aux;
+  int aux;
 
+  int gap = X[dim] - nLayers;
   switch (dim) {
     case 0:
-      gap = X1 - nLayers;
       aux = face_idx / face_X;
       idx += (aux + face_num) * gap;
       break;
     case 1:
-      gap = X2 - nLayers;
       aux = face_idx / face_XY;
       idx += (aux + face_num) * gap * face_X;
       break;
     case 2:
-      gap = X3 - nLayers;
       aux = face_idx / face_XYZ;
       idx += (aux + face_num) * gap * face_XY;
       break;
     case 3:
-      gap = X4 - nLayers;
       idx += face_num * gap * face_XYZ;
       break;
   }
@@ -943,41 +925,41 @@ __global__ void packFaceWilsonKernel(PackParam<FloatN> param)
   // read spinor, spin-project, and write half spinor to face
   if (dim == 0) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<0,nFace,0>(face_idx,ghostFace[0],param.parity);
+      const int idx = indexFromFaceIndex<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X);
       packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
           param.inNorm,idx, face_idx, ghostFace[0], param);
     } else {
-      const int idx = indexFromFaceIndex<0,nFace,1>(face_idx,ghostFace[0],param.parity);
+      const int idx = indexFromFaceIndex<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X);
       packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
           param.inNorm,idx, face_idx, ghostFace[0], param);
     }
   } else if (dim == 1) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<1,nFace,0>(face_idx,ghostFace[1],param.parity);
+      const int idx = indexFromFaceIndex<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X);
       packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
           param.inNorm,idx, face_idx, ghostFace[1], param);
     } else {
-      const int idx = indexFromFaceIndex<1,nFace,1>(face_idx,ghostFace[1],param.parity);
+      const int idx = indexFromFaceIndex<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X);
       packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
           param.inNorm,idx, face_idx, ghostFace[1], param);
     }
   } else if (dim == 2) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<2,nFace,0>(face_idx,ghostFace[2],param.parity);
+      const int idx = indexFromFaceIndex<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X);
       packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
           param.inNorm,idx, face_idx, ghostFace[2], param);
     } else {
-      const int idx = indexFromFaceIndex<2,nFace,1>(face_idx,ghostFace[2],param.parity);
+      const int idx = indexFromFaceIndex<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X);
       packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
           param.inNorm,idx, face_idx, ghostFace[2], param);
     }
   } else {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<3,nFace,0>(face_idx,ghostFace[3],param.parity);
+      const int idx = indexFromFaceIndex<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X);
       packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
           param.inNorm,idx, face_idx, ghostFace[3], param);
     } else {
-      const int idx = indexFromFaceIndex<3,nFace,1>(face_idx,ghostFace[3],param.parity);
+      const int idx = indexFromFaceIndex<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X);
       packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
           param.inNorm,idx, face_idx, ghostFace[3], param);
     }
@@ -1121,41 +1103,41 @@ __global__ void packTwistedFaceWilsonKernel(Float a, Float b, PackParam<FloatN> 
   // read spinor, spin-project, and write half spinor to face
   if (dim == 0) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<0,nFace,0>(face_idx,ghostFace[0],param.parity);
+      const int idx = indexFromFaceIndex<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X);
       packTwistedFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
           param.inNorm, a, b, idx, face_idx, ghostFace[0], param);
     } else {
-      const int idx = indexFromFaceIndex<0,nFace,1>(face_idx,ghostFace[0],param.parity);
+      const int idx = indexFromFaceIndex<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X);
       packTwistedFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
           param.inNorm, a, b, idx, face_idx, ghostFace[0], param);
     }
   } else if (dim == 1) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<1,nFace,0>(face_idx,ghostFace[1],param.parity);
+      const int idx = indexFromFaceIndex<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X);
       packTwistedFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
           param.inNorm, a, b, idx, face_idx, ghostFace[1], param);
     } else {
-      const int idx = indexFromFaceIndex<1,nFace,1>(face_idx,ghostFace[1],param.parity);
+      const int idx = indexFromFaceIndex<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X);
       packTwistedFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
           param.inNorm, a, b, idx, face_idx, ghostFace[1], param);
     }
   } else if (dim == 2) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<2,nFace,0>(face_idx,ghostFace[2],param.parity);
+      const int idx = indexFromFaceIndex<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X);
       packTwistedFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
           param.inNorm, a, b, idx, face_idx, ghostFace[2], param);
     } else {
-      const int idx = indexFromFaceIndex<2,nFace,1>(face_idx,ghostFace[2],param.parity);
+      const int idx = indexFromFaceIndex<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X);
       packTwistedFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
           param.inNorm, a, b, idx, face_idx, ghostFace[2], param);
     }
   } else {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndex<3,nFace,0>(face_idx,ghostFace[3],param.parity);
+      const int idx = indexFromFaceIndex<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X);
       packTwistedFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
           param.inNorm, a, b,idx, face_idx, ghostFace[3], param);
     } else {
-      const int idx = indexFromFaceIndex<3,nFace,1>(face_idx,ghostFace[3],param.parity);
+      const int idx = indexFromFaceIndex<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X);
       packTwistedFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
           param.inNorm, a, b, idx, face_idx, ghostFace[3], param);
     }
