@@ -117,7 +117,7 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int
 
   // intrinsic parity of the face depends on offset of first element
   int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
-  
+
   // reconstruct full face index from index into the checkerboard
   face_idx *= 2;
   /*y,z,t here are face indexes in new order*/
@@ -189,7 +189,7 @@ static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, c
 
   // intrinsic parity of the face depends on offset of first element
   int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
-  
+
   // reconstruct full face index from index into the checkerboard
   face_idx *= 2;
   /*y,z,t here are face indexes in new order*/
@@ -844,8 +844,17 @@ struct PackParam {
   int face_num;
   int X[QUDA_MAX_DIM]; // lattice dimensions
 
-
   int stride;
+};
+
+
+// Extend the PackParam class to PackExtendedParam
+template<typename Float>
+struct PackExtendedParam : public PackParam<Float>
+{
+  PackExtendedParam(){}
+  PackExtendedParam(const PackParam<Float>& base) : PackParam<Float>(base) {}
+  int R[QUDA_MAX_DIM]; // boundary dimensions
 };
 
 /**
@@ -1266,6 +1275,7 @@ class PackFace : public Tunable {
       param.inNorm = (float*)in->Norm();
       param.parity = parity;
       param.dim = dim;
+      param.face_num = face_num;
       param.parity = parity;
       for(int d=0; d<QUDA_MAX_DIM; d++) param.X[d] = in->X()[d];
       param.X[0] *= 2;
@@ -1459,6 +1469,24 @@ void packTwistedFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int 
 #define SPINORTEXHALFNORM spinorTexHalf2Norm
 #endif
 
+template <typename Float2>
+__device__ void packFaceStaggeredCore(Float2 *out, float *outNorm, const int out_idx, 
+    const int out_stride, const Float2 *in, const float *inNorm, 
+    const int in_idx, const int in_stride) {
+  out[out_idx + 0*out_stride] = in[in_idx + 0*in_stride];
+  out[out_idx + 1*out_stride] = in[in_idx + 1*in_stride];
+  out[out_idx + 2*out_stride] = in[in_idx + 2*in_stride];
+}	
+template<> 
+__device__ void packFaceStaggeredCore(short2 *out, float *outNorm, const int out_idx, 
+    const int out_stride, const short2 *in, const float *inNorm, 
+    const int in_idx, const int in_stride) {
+  out[out_idx + 0*out_stride] = in[in_idx + 0*in_stride];
+  out[out_idx + 1*out_stride] = in[in_idx + 1*in_stride];
+  out[out_idx + 2*out_stride] = in[in_idx + 2*in_stride];
+  outNorm[out_idx] = inNorm[in_idx];
+}
+
 #if (defined DIRECT_ACCESS_PACK) || (defined FERMI_NO_DBLE_TEX)
 template <typename Float2>
 __device__ void packFaceStaggeredCore(Float2 *out, float *outNorm, const int out_idx, 
@@ -1477,6 +1505,8 @@ __device__ void packFaceStaggeredCore(short2 *out, float *outNorm, const int out
   out[out_idx + 2*out_stride] = in[in_idx + 2*param.stride];
   outNorm[out_idx] = inNorm[in_idx];
 }
+
+
 #else
 #if __COMPUTE_CAPABILITY__ >= 130
 __device__ void packFaceStaggeredCore(double2 *out, float *outNorm, const int out_idx, 
@@ -1524,8 +1554,8 @@ __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
   const int dim = dimFromFaceIndex(face_idx, param);
 
   // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-  const int face_num = (face_idx >= nFace*ghostFace[dim]) ? 1 : 0;
-  face_idx -= face_num*nFace*ghostFace[dim];
+  const int face_num = (param.face_num==2) ? ((face_idx >= nFace*ghostFace[dim]) ? 1 : 0) : param.face_num;
+  if(param.face_num==2) face_idx -= face_num*nFace*ghostFace[dim];
 
   // compute where the output is located
   // compute an index into the local volume from the index into the face
@@ -1576,7 +1606,7 @@ __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
 
 
   template <typename FloatN, int nFace>
-__global__ void packFaceExtendedStaggeredKernel(PackParam<FloatN> param)
+__global__ void packFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
 {
   int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
   if (face_idx >= param.threads) return;
@@ -1585,53 +1615,116 @@ __global__ void packFaceExtendedStaggeredKernel(PackParam<FloatN> param)
   const int dim = dimFromFaceIndex(face_idx, param);
 
   // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-  const int face_num = (face_idx >= nFace*ghostFace[dim]) ? 1 : 0;
-  face_idx -= face_num*nFace*ghostFace[dim];
-
-  const int R[4] = {nFace,nFace,nFace,nFace};
+  // if param.face_num==2 pack both the start and the end, otherwist pack the region of the 
+  // lattice specified by param.face_num
+  const int face_num = (param.face_num==2) ? ((face_idx >= nFace*ghostFace[dim]) ? 1 : 0) : param.face_num;
+  if(param.face_num==2) face_idx -= face_num*nFace*ghostFace[dim];
 
   // compute where the output is located
   // compute an index into the local volume from the index into the face
   // read spinor, spin-project, and write half spinor to face
   if (dim == 0) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[0], param.outNorm[0], face_idx, 
           nFace*ghostFace[0], param.in, param.inNorm, idx, param);
     } else {
-      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[1], param.outNorm[1], face_idx,
           nFace*ghostFace[0], param.in, param.inNorm, idx, param);
     }
   } else if (dim == 1) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[2], param.outNorm[2], face_idx, 
           nFace*ghostFace[1], param.in, param.inNorm, idx, param);
     } else {
-      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[3], param.outNorm[3], face_idx, 
           nFace*ghostFace[1], param.in, param.inNorm, idx, param);
     }
   } else if (dim == 2) {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[4], param.outNorm[4], face_idx,
           nFace*ghostFace[2], param.in, param.inNorm, idx, param);
     } else {
-      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[5], param.outNorm[5], face_idx,
           nFace*ghostFace[2], param.in, param.inNorm, idx, param);
     }
   } else {
     if (face_num == 0) {
-      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[6], param.outNorm[6], face_idx,
           nFace*ghostFace[3], param.in, param.inNorm,idx, param);
     } else {
-      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X,R);
+      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X,param.R);
       packFaceStaggeredCore(param.out[7], param.outNorm[7], face_idx, 
           nFace*ghostFace[3], param.in, param.inNorm, idx, param);
+    }
+  }
+
+}
+
+
+  template <typename FloatN, int nFace>
+__global__ void unpackFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
+{
+  int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+  if (face_idx >= param.threads) return;
+
+  // determine which dimension we are packing
+  const int dim = dimFromFaceIndex(face_idx, param);
+
+  // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
+  // if param.face_num==2 pack both the start and the end, otherwist pack the region of the 
+  // lattice specified by param.face_num
+  const int face_num = (param.face_num==2) ? ((face_idx >= nFace*ghostFace[dim]) ? 1 : 0) : param.face_num;
+  if(param.face_num==2) face_idx -= face_num*nFace*ghostFace[dim];
+
+  // compute where the output is located
+  // compute an index into the local volume from the index into the face
+  // read spinor, spin-project, and write half spinor to face
+  if (dim == 0) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[0], param.outNorm[0], face_idx, nFace*ghostFace[0]);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[1], param.outNorm[1], face_idx, nFace*ghostFace[0]);
+    }
+  } else if (dim == 1) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[2], param.outNorm[2], face_idx, nFace*ghostFace[1]);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[3], param.outNorm[3], face_idx, nFace*ghostFace[1]);
+    }
+  } else if (dim == 2) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[4], param.outNorm[4], face_idx, nFace*ghostFace[2]);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[5], param.outNorm[5], face_idx, nFace*ghostFace[2]);
+    }
+  } else {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[6], param.outNorm[6], face_idx, nFace*ghostFace[3]);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X,param.R);
+      packFaceStaggeredCore(param.in, param.inNorm, idx, 
+          param.stride, param.out[7], param.outNorm[7], face_idx, nFace*ghostFace[3]);
     }
   }
 
@@ -1649,26 +1742,48 @@ template <typename FloatN, typename Float>
 class PackFaceStaggered : public PackFace<FloatN, Float> {
 
   private:
+    const int* R; // boundary dimensions for extended field
+    const bool unpack; 
 
     int inputPerSite() const { return 6; } // input is full spinor
     int outputPerSite() const { return 6; } // output is full spinor
 
+
   public:
     PackFaceStaggered(FloatN *faces, const cudaColorSpinorField *in, 
         const int nFace, const int dagger, const int parity, 
-        const int dim, const int face_num)
-      : PackFace<FloatN, Float>(faces, in, dagger, parity, nFace, dim, face_num) { }
+        const int dim, const int face_num, const int* R=NULL, const bool unpack=false)
+      : PackFace<FloatN, Float>(faces, in, dagger, parity, nFace, dim, face_num), R(R), unpack(unpack) { }
     virtual ~PackFaceStaggered() { }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 #ifdef GPU_STAGGERED_DIRAC
+
       PackParam<FloatN> param = this->prepareParam(this->dim, this->face_num);
-      if (PackFace<FloatN,Float>::nFace==1) {
-        packFaceStaggeredKernel<FloatN, 1> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
-      } else {
-        packFaceStaggeredKernel<FloatN, 3> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
+      if(!R){
+        if (PackFace<FloatN,Float>::nFace==1) {
+          packFaceStaggeredKernel<FloatN, 1> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
+        } else {
+          packFaceStaggeredKernel<FloatN, 3> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(param);
+        }
+      }else{ // R!=NULL => this is an extended field
+        PackExtendedParam<FloatN> extendedParam(param);
+        if(!unpack){
+          for(int d=0; d<QUDA_MAX_DIM; ++d) extendedParam.R[d] = R[d];
+          if(PackFace<FloatN,Float>::nFace==1){
+            packFaceExtendedStaggeredKernel<FloatN,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+          }else{
+            packFaceExtendedStaggeredKernel<FloatN,3><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+          }
+        }else{
+          if(PackFace<FloatN,Float>::nFace==1){
+            unpackFaceExtendedStaggeredKernel<FloatN,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+          }else{
+            unpackFaceExtendedStaggeredKernel<FloatN,3><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+          }
+        }
       }
 #else
       errorQuda("Staggered face packing kernel is not built");
@@ -1679,6 +1794,7 @@ class PackFaceStaggered : public PackFace<FloatN, Float> {
 
     long long flops() const { return 0; }
 };
+
 
 void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, int nFace, 
     int dagger, int parity, const int dim, const int face_num, const cudaStream_t &stream) {
@@ -1705,7 +1821,34 @@ void packFaceStaggered(void *ghost_buf, cudaColorSpinorField &in, int nFace,
       }
       break;
   }  
+}
 
+void packFaceExtendedStaggered(void *buffer, cudaColorSpinorField &field, const int nFace, const int R[],
+    int dagger, int parity, const int dim, const int face_num, const cudaStream_t &stream, bool unpack=false)
+{
+  switch(field.Precision()){
+    case QUDA_DOUBLE_PRECISION:
+      {
+#if __COMPUTE_CAPABILITY__ >= 130
+        PackFaceStaggered<double2,double> pack(static_cast<double2*>(buffer), &field, nFace, dagger, parity, dim, face_num, R, unpack);
+        pack.apply(stream);  
+#endif
+      }
+      break;
+    case QUDA_SINGLE_PRECISION:
+      {
+        PackFaceStaggered<float2,float> pack(static_cast<float2*>(buffer), &field, nFace, dagger, parity, dim, face_num, R, unpack);
+        pack.apply(stream);  
+      } 
+      break;
+    case QUDA_HALF_PRECISION:
+      {
+        PackFaceStaggered<short2,float> pack(static_cast<short2*>(buffer), &field, nFace, dagger, parity, dim, face_num, R, unpack);
+        pack.apply(stream);  
+      }
+      break;
+
+  } // switch(field.Precision())
 }
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
@@ -1958,7 +2101,7 @@ void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, const int dagger,
 
 void packFace(void *ghost_buf, cudaColorSpinorField &in, const int nFace, 
     const int dagger, const int parity, 
-     const int dim, const int face_num, 
+    const int dim, const int face_num, 
     const cudaStream_t &stream, 
     const double a, const double b)
 {
@@ -1997,6 +2140,31 @@ void packFace(void *ghost_buf, cudaColorSpinorField &in, const int nFace,
   } else {
     packFaceWilson(ghost_buf, in, dagger, parity, stream);
   }
+}
+
+
+
+void packFaceExtended(void* buffer, cudaColorSpinorField &field, const int nFace, const int R[],
+    const int dagger, const int parity, const int dim, const int face_num, 
+    const cudaStream_t &stream, const bool unpack)
+{
+  int nDimPack = 0;
+  if(dim < 0){
+    for(int d=0; d<4; d++){
+      if(R[d]) nDimPack++;
+    }
+  }else{
+    if(R[dim]) nDimPack++;
+  }
+
+  if(!nDimPack) return; // if zero then we have nothing to pack
+  if(field.Nspin() == 1){
+    packFaceExtendedStaggered(buffer, field, nFace, R, dagger, parity, dim, face_num, stream, unpack);
+  }else{
+    errorQuda("Extended quark field is not supported");
+  }
+
+
 }
 
 #endif // MULTI_GPU

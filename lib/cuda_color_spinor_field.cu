@@ -642,6 +642,7 @@ namespace quda {
   }
 
 
+
   void cudaColorSpinorField::unpackGhost(const void* ghost_spinor, const int nFace, 
 					 const int dim, const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
@@ -668,8 +669,67 @@ namespace quda {
       const void *src = static_cast<const char*>(ghost_spinor)+nFace*Nint*ghostFace[dim]*precision; 
       cudaMemcpyAsync(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
     }
+  }
+
+
+
+
+   // pack the ghost zone into a contiguous buffer for communications
+  void cudaColorSpinorField::packGhostExtended(const int nFace, const int R[], const QudaParity parity,
+                                       const int dim, const QudaDirection dir,
+                                       const int dagger, cudaStream_t *stream,
+                                       void *buffer)
+  {
+    int face_num;
+    if(dir == QUDA_BACKWARDS){
+      face_num = 0;
+    }else if(dir == QUDA_FORWARDS){
+      face_num = 1;
+    }else{
+      face_num = 2;
+    }
+#ifdef MULTI_GPU
+    void *packBuffer = buffer ? buffer : ghostFaceBuffer;
+    packFaceExtended(packBuffer, *this, nFace, R, dagger, parity, dim, face_num, *stream);
+#else
+    errorQuda("packGhostExtended not built on single-GPU build");
+#endif
 
   }
+
+
+  
+
+  // copy data from host buffer into boundary region of device field
+  void cudaColorSpinorField::unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
+                                                 const int dim, const QudaDirection dir, 
+                                                 const int dagger, cudaStream_t* stream)
+  {
+
+     
+     
+    // First call the regular unpackGhost routine to copy data into the `usual' ghost-zone region 
+    // of the data array 
+    unpackGhost(ghost_spinor, nFace, dim, dir, dagger, stream);
+
+    // Next step is to copy data from the ghost zone back to the interior region
+    int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
+
+    int len = nFace*ghostFace[dim]*Nint;
+    int offset = length + ghostOffset[dim]*nColor*nSpin*2;
+    offset += (dir == QUDA_BACKWARDS) ? 0 : len;
+
+#ifdef MULTI_GPU
+    const int face_num = 2;
+    const bool unpack = true;
+    const int R[4] = {0,0,0,0};
+    packFaceExtended(ghostFaceBuffer, *this, nFace, R, dagger, parity, dim, face_num, *stream, unpack); 
+#else
+    errorQuda("unpackGhostExtended not built on single-GPU build");
+#endif
+  }
+
+
 
   cudaStream_t *stream;
 
@@ -955,6 +1015,7 @@ namespace quda {
       unpackGhost(from_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
     }
   }
+
 
   // Return the location of the field
   QudaFieldLocation cudaColorSpinorField::Location() const { return QUDA_CUDA_FIELD_LOCATION; }
