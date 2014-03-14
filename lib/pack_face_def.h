@@ -90,7 +90,7 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
 static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int &face_volume,
     const int &parity, const int X[])
 {
-  // dimensions of the face (FIXME: optimize using constant cache)
+  // dimensions of the face
   int dims[3];
   int V = X[0]*X[1]*X[2]*X[3];
   int face_X = X[0], face_Y = X[1], face_Z = X[2]; // face_T = X[3];
@@ -118,9 +118,7 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int
   // intrinsic parity of the face depends on offset of first element
   int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
   
-
   // reconstruct full face index from index into the checkerboard
-
   face_idx *= 2;
   /*y,z,t here are face indexes in new order*/
   int aux1 = face_idx / dims[0];
@@ -138,7 +136,7 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int
     case 0:
       aux = face_idx;
       idx += face_num*gap + aux*(X[0]-1);
-      idx += idx/V*(1-V);    
+      idx += (idx/V)*(1-V);    
       break;
     case 1:
       aux = face_idx / face_X;
@@ -159,6 +157,84 @@ static inline __device__ int indexFromFaceIndexStaggered(int face_idx, const int
 
   return idx >> 1;
 }
+
+  template <int dim, int nLayers, int face_num>
+static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, const int &face_volume,
+    const int &parity, const int X[], const int R[])
+{
+  // dimensions of the face
+  int dims[3];
+  int V = X[0]*X[1]*X[2]*X[3];
+  int face_X = X[0], face_Y = X[1], face_Z = X[2]; // face_T = X[3];
+  switch (dim) {
+    case 0:
+      face_X = nLayers;
+      dims[0]=X[1]; dims[1]=X[2]; dims[2]=X[3];
+      break;
+    case 1:
+      face_Y = nLayers;
+      dims[0]=X[0];dims[1]=X[2]; dims[2]=X[3];
+      break;
+    case 2:
+      face_Z = nLayers;
+      dims[0]=X[0]; dims[1]=X[1]; dims[2]=X[3];
+      break;
+    case 3:
+      // face_T = nLayers;
+      dims[0]=X[0]; dims[1]=X[1]; dims[2]=X[3];
+      break;
+  }
+  int face_XYZ = face_X * face_Y * face_Z;
+  int face_XY = face_X * face_Y;
+
+  // intrinsic parity of the face depends on offset of first element
+  int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
+  
+  // reconstruct full face index from index into the checkerboard
+  face_idx *= 2;
+  /*y,z,t here are face indexes in new order*/
+  int aux1 = face_idx / dims[0];
+  int aux2 = aux1 / dims[1];
+  int y = aux1 - aux2 * dims[1];
+  int t = aux2 / dims[2];
+  int z = aux2 - t * dims[2];
+  face_idx += (face_parity + t + z + y) & 1;
+
+  int idx = face_idx;
+  int aux;
+
+  int gap = X[dim] - nLayers - 2*R[dim];
+  switch (dim) {
+    case 0:
+      aux = face_idx;
+      idx += face_num*gap + aux*(X[0]-1);
+      idx += (idx/V)*(1-V);    
+      idx += R[0];
+      break;
+    case 1:
+      aux = face_idx / face_X;
+      idx += face_num * gap * face_X + aux*(X[1]-1)*face_X;
+      idx += idx/V*(X[0]-V);
+      idx += R[1]*X[0];
+      break;
+    case 2:
+      aux = face_idx / face_XY;    
+      idx += face_num * gap * face_XY +aux*(X[2]-1)*face_XY;
+      idx += idx/V*(face_XY-V);
+      idx += R[2]*face_XY;
+      break;
+    case 3:
+      idx += ((face_num*gap) + R[3])*face_XYZ;
+      break;
+  }
+
+  // return index into the checkerboard
+
+  return idx >> 1;
+}
+
+
+
 
 
 // compute full coordinates from an index into the face (used by the exterior Dslash kernels)
@@ -1437,6 +1513,7 @@ __device__ void packFaceStaggeredCore(short2 *out, float *outNorm, const int out
 }
 #endif
 
+
   template <typename FloatN, int nFace>
 __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
 {
@@ -1496,6 +1573,70 @@ __global__ void packFaceStaggeredKernel(PackParam<FloatN> param)
   }
 
 }
+
+
+  template <typename FloatN, int nFace>
+__global__ void packFaceExtendedStaggeredKernel(PackParam<FloatN> param)
+{
+  int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+  if (face_idx >= param.threads) return;
+
+  // determine which dimension we are packing
+  const int dim = dimFromFaceIndex(face_idx, param);
+
+  // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
+  const int face_num = (face_idx >= nFace*ghostFace[dim]) ? 1 : 0;
+  face_idx -= face_num*nFace*ghostFace[dim];
+
+  const int R[4] = {nFace,nFace,nFace,nFace};
+
+  // compute where the output is located
+  // compute an index into the local volume from the index into the face
+  // read spinor, spin-project, and write half spinor to face
+  if (dim == 0) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[0], param.outNorm[0], face_idx, 
+          nFace*ghostFace[0], param.in, param.inNorm, idx, param);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[1], param.outNorm[1], face_idx,
+          nFace*ghostFace[0], param.in, param.inNorm, idx, param);
+    }
+  } else if (dim == 1) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[2], param.outNorm[2], face_idx, 
+          nFace*ghostFace[1], param.in, param.inNorm, idx, param);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[3], param.outNorm[3], face_idx, 
+          nFace*ghostFace[1], param.in, param.inNorm, idx, param);
+    }
+  } else if (dim == 2) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[4], param.outNorm[4], face_idx,
+          nFace*ghostFace[2], param.in, param.inNorm, idx, param);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[5], param.outNorm[5], face_idx,
+          nFace*ghostFace[2], param.in, param.inNorm, idx, param);
+    }
+  } else {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[6], param.outNorm[6], face_idx,
+          nFace*ghostFace[3], param.in, param.inNorm,idx, param);
+    } else {
+      const int idx = indexFromFaceIndexExtendedStaggered<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X,R);
+      packFaceStaggeredCore(param.out[7], param.outNorm[7], face_idx, 
+          nFace*ghostFace[3], param.in, param.inNorm, idx, param);
+    }
+  }
+
+}
+
 
 #undef SPINORTEXDOUBLE
 #undef SPINORTEXSINGLE
