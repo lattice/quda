@@ -356,17 +356,17 @@ namespace quda {
         const QudaDirection dir, const int dagger, cudaStream_t* stream);
 
     /**
-     Initiate the cpu to gpu copy of the extended border region
-     @param ghost_spinor Source of the ghost zone
-     @param parity Parity of the field
-     @param nFace Number of face to send
-     @param dim The lattice dimension we are sending
-     @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
-     @param dagger Whether the operator is daggered or not
-     @param stream The array of streams to use
-     */
+      Initiate the cpu to gpu copy of the extended border region
+      @param ghost_spinor Source of the ghost zone
+      @param parity Parity of the field
+      @param nFace Number of face to send
+      @param dim The lattice dimension we are sending
+      @param dir The direction (QUDA_BACKWARDS or QUDA_FORWARDS)
+      @param dagger Whether the operator is daggered or not
+      @param stream The array of streams to use
+      */
     void unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
-         const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream);
+        const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream);
 
 
 
@@ -374,10 +374,19 @@ namespace quda {
 
     void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
         double a=0, double b=0);
-    void gather(int nFace, int dagger, int dir);
+
+    void packExtended(const int nFace, const int R[], const int parity, const int dagger,
+        const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
+
+    void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
+
     void commsStart(int nFace, int dir, int dagger=0);
     int commsQuery(int nFace, int dir, int dagger=0); 
     void scatter(int nFace, int dagger, int dir);
+
+    void scatterExtended(int nFace, int parity, int dagger, int dir);
+
+
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
