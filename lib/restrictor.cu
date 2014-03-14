@@ -8,13 +8,13 @@ namespace quda {
 
   // Applies the grid restriction operator (fine to coarse)
   template <class CoarseSpinor, class FineSpinor>
-  void restrict(CoarseSpinor &out, const FineSpinor &in, const int* geo_map, const int* spin_map) {
+  void restrict(CoarseSpinor &out, const FineSpinor &in, const int* fine_to_coarse, const int* spin_map) {
 
     // We need to zero all elements first, since this is a reduction operation
     for (int x=0; x<in.Volume(); x++) {
       for (int s=0; s<in.Nspin(); s++) {
 	for (int c=0; c<in.Ncolor(); c++) {
-	  out(geo_map[x], spin_map[s], c) = 0.0;
+	  out(fine_to_coarse[x], spin_map[s], c) = 0.0;
 	}
       }
     }
@@ -22,7 +22,7 @@ namespace quda {
     for (int x=0; x<in.Volume(); x++) {
       for (int s=0; s<in.Nspin(); s++) {
 	for (int c=0; c<in.Ncolor(); c++) {
-	  out(geo_map[x], spin_map[s], c) += in(x, s, c);
+	  out(fine_to_coarse[x], spin_map[s], c) += in(x, s, c);
 	}
       }
     }
@@ -51,7 +51,7 @@ namespace quda {
   }
 
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       FieldOrder<double> *outOrder = createOrder<double>(out);
@@ -59,7 +59,7 @@ namespace quda {
       FieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
       FieldOrder<double> *tmpOrder = createOrder<double>(tmp);
       rotateCoarseColor(*tmpOrder, *inOrder, *vOrder);
-      restrict(*outOrder, *tmpOrder, geo_map, spin_map);
+      restrict(*outOrder, *tmpOrder, fine_to_coarse, spin_map);
       delete outOrder;
       delete inOrder;
       delete vOrder;
@@ -70,7 +70,7 @@ namespace quda {
       FieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
       FieldOrder<float> *tmpOrder = createOrder<float>(tmp);
       rotateCoarseColor(*tmpOrder, *inOrder, *vOrder);
-      restrict(*outOrder, *tmpOrder, geo_map, spin_map);
+      restrict(*outOrder, *tmpOrder, fine_to_coarse, spin_map);
       delete outOrder;
       delete inOrder;
       delete vOrder;
