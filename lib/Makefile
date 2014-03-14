@@ -101,7 +101,7 @@ clean:
 	-rm -f *.o $(QUDA)
 
 tune.o: tune.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -std=c++11 -DQUDA_HASH=$(HASH) $< -c -o $@
+	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@

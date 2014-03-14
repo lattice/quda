@@ -9,13 +9,12 @@
 #include <typeinfo>
 #include <map>
 #include <unistd.h>
-#include <unordered_map>
 #include <loki.h>
 
 namespace quda {
 
-  typedef Loki::AssocVector<TuneKey, TuneParam> map;
-  //typedef std::map<TuneKey, TuneParam> map;
+  //typedef Loki::AssocVector<TuneKey, TuneParam> map;
+  typedef std::map<TuneKey, TuneParam> map;
   
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
   static std::string resource_path;
