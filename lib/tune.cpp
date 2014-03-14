@@ -9,17 +9,22 @@
 #include <typeinfo>
 #include <map>
 #include <unistd.h>
+#include <unordered_map>
+#include <loki.h>
 
 namespace quda {
 
-static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
-static std::string resource_path;
-static std::map<TuneKey, TuneParam> tunecache;
-static size_t initial_cache_size = 0;
+  typedef Loki::AssocVector<TuneKey, TuneParam> map;
+  //typedef std::map<TuneKey, TuneParam> map;
+  
+  static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
+  static std::string resource_path;
+  static map tunecache;
+  static size_t initial_cache_size = 0;
 
 #define STR_(x) #x
 #define STR(x) STR_(x)
-static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
+  static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
 #undef STR
 #undef STR_
 
@@ -53,7 +58,7 @@ static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VER
    */
   static void serializeTuneCache(std::ostream &out)
   {
-    std::map<TuneKey, TuneParam>::iterator entry;
+    map::iterator entry;
 
     for (entry = tunecache.begin(); entry != tunecache.end(); entry++) {
       TuneKey key = entry->first;
