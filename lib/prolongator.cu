@@ -10,131 +10,100 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Out, typename In>
+  template <typename Out, typename In, typename Rotator, typename Tmp>
   struct ProlongateArg {
     Out &out;
+    Tmp &tmp;
     const In &in;
-    const int *geo_map;
+    const Rotator &V;
+    const int *geo_map;  // need to make a device copy of this
     int spin_map[4];
-    ProlongateArg(Out &out, const In &in, const int *geo_map, const int *spin_map) : 
-      out(out), in(in), geo_map(geo_map)  {
-      //for (int x=0; x<out.Volume(); x++) printfQuda("geo_map[%d] = %d\n",x,this->geo_map[x]);
+    ProlongateArg(Out &out, const In &in, const Rotator &V, 
+		  Tmp &tmp, const int *geo_map, const int *spin_map) : 
+      out(out), tmp(tmp), in(in), V(V), geo_map(geo_map)  {
       for (int s=0; s<4; s++) this->spin_map[s] = spin_map[s];
     }
-    ProlongateArg(const ProlongateArg<Out,In> &arg) : out(arg.out), in(arg.in), geo_map(arg.geo_map) {
-      //for (int x=0; x<out.Volume(); x++) printfQuda("geo_map[%d] = %d\n",x,this->geo_map[x]);
 
-//      for (int x=0; x<arg.out.Volume(); x++) this->geo_map[x] = arg.geo_map[x];
+    ProlongateArg(const ProlongateArg<Out,In,Rotator,Tmp> &arg) : 
+      out(arg.out), in(arg.in), V(arg.V), tmp(arg.tmp), geo_map(arg.geo_map) {
       for (int s=0; s<4; s++) this->spin_map[s] = arg.spin_map[s];      
     }
   };
 
-  // Applies the grid prolongation operator (coarse to fine)
-  template <typename Arg>
-  void prolongate(Arg arg) {
-
-    for (int x=0; x<arg.out.Volume(); x++) {
-      for (int s=0; s<arg.out.Nspin(); s++) {
-	for (int c=0; c<arg.out.Ncolor(); c++) {
-	  arg.out(x, s, c) = arg.in(arg.geo_map[x], arg.spin_map[s], c);
-	  /*if (x==0) 
-	    printfQuda("x=%d, s=%d, c=%d, arg.geo_map[x] = %d, arg.spin_map[s] = %d (%e %e) (%e %e)\n",
-		       x,s,c,0,arg.spin_map[s], arg.out(x,s,c).real(), arg.out(x,s,c).imag(),
-		       arg.in(arg.geo_map[x], arg.spin_map[s], c).real(), 
-	  	       arg.in(arg.geo_map[x], arg.spin_map[s], c).imag());*/
-	}
+  /**
+     Applies the grid prolongation operator (coarse to fine)
+  */
+  template <class Fine, class Coarse>
+  __device__ __host__ void prolongate(Fine &out, const Coarse &in, int x, const int *geo_map, const int *spin_map) {
+    for (int s=0; s<out.Nspin(); s++) {
+      for (int c=0; c<in.Ncolor(); c++) {
+	out(x, s, c) = in(geo_map[x], spin_map[s], c);
       }
     }
-
   }
 
-  // Applies the grid prolongation operator (coarse to fine)
-  template <typename Arg>
-  __global__ void prolongateKernel(Arg arg) {
-
-    int x = blockIdx.x*blockDim.x + threadIdx.x;
-    for (int s=0; s<arg.out.Nspin(); s++) {
-      for (int c=0; c<arg.out.Ncolor(); c++) {
-	arg.out(x, s, c) = arg.in(arg.geo_map[x], arg.spin_map[s], c);
-      }
-    }
-
-  }
-  
-  /*
-    Rotates from the coarse-color basis into the fine-color basis.  This
-    is the second step of applying the prolongator.
+  /**
+     Rotates from the coarse-color basis into the fine-color basis.  This
+     is the second step of applying the prolongator.
   */
   template <class FineColor, class CoarseColor, class Rotator>
-  void rotateFineColor(FineColor &out, const CoarseColor &in, const Rotator &V) {
-
-    for(int x=0; x<in.Volume(); x++) {
-
-      for (int s=0; s<out.Nspin(); s++) for (int i=0; i<out.Ncolor(); i++) out(x, s, i) = 0.0;
-
-      for (int i=0; i<out.Ncolor(); i++) {
-	for (int s=0; s<in.Nspin(); s++) {
-	  for (int j=0; j<in.Ncolor(); j++) { 
-	    // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
-	    out(x, s, i) += V(x, s, i, j) * in(x, s, j);
-	    /*if (x==0) 
-	      printfQuda("%d out=(%e,%e), V=(%e,%e), in(%e,%e)\n", x, out(x,s,i).real(), out(x,s,i).imag(),
-	      V(x,s,i,j).real(), V(x,s,i,j).imag(), in(x,s,j).real(), in(x,s,j).imag());*/
-	  }
-	}
-      }
-      
-    }
-
-  }
-
-  /*
-    Rotates from the coarse-color basis into the fine-color basis.  This
-    is the second step of applying the prolongator.
-  */
-  template <class FineColor, class CoarseColor, class Rotator>
-  __global__ void rotateFineColorKernel(FineColor out, const CoarseColor in, const Rotator V) {
-
-    int x = blockIdx.x*blockDim.x + threadIdx.x;
-
-    for (int s=0; s<out.Nspin(); s++) for (int i=0; i<out.Ncolor(); i++) out(x, s, i) = 0.0;
+  __device__ __host__ void rotateFineColor(FineColor &out, const CoarseColor &in, const Rotator &V, int x) {
+    for (int s=0; s<out.Nspin(); s++) 
+      for (int i=0; i<out.Ncolor(); i++) out(x, s, i) = 0.0;
     
     for (int i=0; i<out.Ncolor(); i++) {
-      for (int s=0; s<in.Nspin(); s++) {
+      for (int s=0; s<out.Nspin(); s++) {
 	for (int j=0; j<in.Ncolor(); j++) { 
 	  // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 	  out(x, s, i) += V(x, s, i, j) * in(x, s, j);
 	}
       }
     }
-    
   }
 
+  template <typename Arg>
+  void Prolongate(Arg &arg) {
+    for (int x=0; x<arg.out.Volume(); x++) {
+      prolongate(arg.tmp, arg.in, x, arg.geo_map, arg.spin_map);
+      rotateFineColor(arg.out, arg.tmp, arg.V, x);
+    }
+  }
+
+  template <typename Arg>
+  __global__ void ProlongateKernel(Arg arg) {
+    int x = blockIdx.x*blockDim.x + threadIdx.x;
+    if (x >= arg.out.Volume()) return;
+    prolongate(arg.tmp, arg.in, x, arg.geo_map, arg.spin_map);
+    rotateFineColor(arg.out, arg.tmp, arg.V, x);    
+  }
+  
   template <typename Arg>
   class ProlongateLaunch : public Tunable {
 
   protected:
     const Arg &arg;
+    QudaFieldLocation location;
 
     long long flops() const { return 0; }
     long long bytes() const { return 0; }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-    bool advanceGridDim(TuneParam &param) const { return false; } // Don't tune the grid dimensions.
-    bool advanceBlockDim(TuneParam &param) const {
-      bool advance = Tunable::advanceBlockDim(param);
-      if (advance) param.grid = dim3( (arg.out.Volume()+param.block.x-1) / param.block.x, 1, 1);
-      return advance;
-    }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return arg.out.Volume(); }
 
   public:
-    ProlongateLaunch(const Arg &arg) : arg(arg) { }
+    ProlongateLaunch(const Arg &arg, const QudaFieldLocation location) 
+      : arg(arg), location(location) { }
     virtual ~ProlongateLaunch() { }
 
     void apply(const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_YES, QUDA_VERBOSE);
-      prolongateKernel<Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+	Prolongate(arg);
+      } else {
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	ProlongateKernel<Arg> 
+	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      }
     }
 
     TuneKey tuneKey() const {
@@ -162,52 +131,39 @@ namespace quda {
 		  ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      //printfQuda("out.Precision() = QUDA_DOUBLE_PRECISION\n");
-      FieldOrder<double> *outOrder = createOrder<double>(out);
-      FieldOrder<double> *inOrder = createOrder<double>(in);
-      FieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
-      FieldOrder<double> *tmpOrder = createOrder<double>(tmp);
-      ProlongateArg<FieldOrder<double>, FieldOrder<double> > 
-	arg(*tmpOrder, *inOrder, geo_map, spin_map);
-      if (Location(out, in, v) == QUDA_CPU_FIELD_LOCATION) {
-	prolongate(arg);
-	rotateFineColor(*outOrder, *tmpOrder, *vOrder);
-      } else {
-	ProlongateLaunch<ProlongateArg<FieldOrder<double>, FieldOrder<double> > > prolongator(arg);
-	prolongator.apply(0);
-	errorQuda("Need rotation");
-      }
+      typedef FieldOrder<double> Field;
+      Field *outOrder = createOrder<double>(out);
+      Field *inOrder = createOrder<double>(in);
+      Field *vOrder = createOrder<double>(v, Nvec);
+      Field *tmpOrder = createOrder<double>(tmp);
+      ProlongateArg<Field, Field, Field, Field> 
+	arg(*outOrder, *inOrder, *vOrder, *tmpOrder, geo_map, spin_map);
+      ProlongateLaunch<ProlongateArg<Field, Field, Field, Field> > 
+	prolongator(arg, Location(out, in, v));
+      prolongator.apply(0);
       delete outOrder;
       delete inOrder;
       delete vOrder;
       delete tmpOrder;
     } else {
-	//printfQuda("out.Precision() = %d\n", out.Precision());
-      FieldOrder<float> *outOrder = createOrder<float>(out);
-      FieldOrder<float> *inOrder = createOrder<float>(in);
-      FieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
-      FieldOrder<float> *tmpOrder = createOrder<float>(tmp);
-      ProlongateArg<FieldOrder<float>, FieldOrder<float> > 
-	arg(*tmpOrder, *inOrder, geo_map, spin_map);
-      if (Location(out, in, v) == QUDA_CPU_FIELD_LOCATION) {
-	//printfQuda("tmpOrder = %p, inOrder = %p\n", (void *)tmpOrder, (void *)inOrder);
-	//printfQuda("Location(out,in,v) == QUDA_CPU_FIELD_LOCATION\n");
-	prolongate(arg);
-	//printfQuda("Now rotate fine color\n");
-	rotateFineColor(*outOrder, *tmpOrder, *vOrder);
-	//printfQuda("End location\n");
-      } else {
-	//printfQuda("Location(out,in,v) == %d\n",Location(out,in,v));
-	ProlongateLaunch<ProlongateArg<FieldOrder<float>, FieldOrder<float> > > prolongator(arg);
-	prolongator.apply(0);
-	errorQuda("Need rotation");
-      }
+      typedef FieldOrder<float> Field;
+      Field *outOrder = createOrder<float>(out);
+      Field *inOrder = createOrder<float>(in);
+      Field *vOrder = createOrder<float>(v, Nvec);
+      Field *tmpOrder = createOrder<float>(tmp);
+      ProlongateArg<Field, Field, Field, Field> 
+	arg(*outOrder, *inOrder, *vOrder, *tmpOrder, geo_map, spin_map);
+      ProlongateLaunch<ProlongateArg<Field, Field, Field, Field> > 
+	prolongator(arg, Location(out, in, v));
+      prolongator.apply(0);
       delete outOrder;
       delete inOrder;
       delete vOrder;
       delete tmpOrder;
     }
 
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  
+      checkCudaError();
   }
 
 } // end namespace quda

@@ -94,7 +94,7 @@ namespace quda {
       profile.Start(QUDA_PROFILE_COMPUTE);
     }
 
-    double omega = 1.0;
+    double omega = 1.2;
 
     int k = 0;
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

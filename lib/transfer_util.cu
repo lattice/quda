@@ -82,7 +82,7 @@ namespace quda {
 	for (int s=0; s<in.NspinPacked(); s++) {
 	  for (int c=0; c<in.NcolorPacked(); c++) {
 	    int chirality = s / spin_bs; // chirality is the coarse spin
-	    int blockSpin = s % spin_bs; // the remainingg spin dof left in each block
+	    int blockSpin = s % spin_bs; // the remaining spin dof left in each block
 
 	    int index = offset +                                              // geo block
 	      chirality * Nvec * geoBlockSize * spin_bs * in.NcolorPacked() + // chiral block
@@ -99,6 +99,7 @@ namespace quda {
 	}
       }
 
+      //printf("blockOrderV done %d / %d\n", i, in.Volume());
     }
     
     if (count != checkLength) {
@@ -106,9 +107,10 @@ namespace quda {
 		count, checkLength);
     }
 
+    // nned non-quadratic check
     for (int i=0; i<checkLength; i++) {
       for (int j=0; j<i; j++) {
-	if (check[i] == check[j]) errorQuda("Collision detected in block ordering\n");
+	//if (check[i] == check[j]) errorQuda("Collision detected in block ordering\n");
       }
     }
 
@@ -143,6 +145,7 @@ namespace quda {
 	for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] *= scale;
       }
 
+      //printf("blockGramSchmidt done %d / %d\n", b, nBlocks);
     }
 
   }

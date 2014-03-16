@@ -19,6 +19,9 @@ namespace quda {
       this->geo_bs[d] = geo_bs[d];
     }
 
+    if (B[0]->X(0) == geo_bs[0]) 
+      errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);
+
     printfQuda("Transfer: using block size %d", geo_bs[0]);
     for (int d=1; d<ndim; d++) printfQuda(" x %d", geo_bs[d]);
     printfQuda("\n");
@@ -39,10 +42,10 @@ namespace quda {
     }
 
     if (typeid(*B[0]) == typeid(cpuColorSpinorField)) {
-      printfQuda("Transfer: creating cpu V field\n");
+      printfQuda("Transfer: creating cpu V field with basis %d\n", param.gammaBasis);
       V = new cpuColorSpinorField(param);
     } else {
-      printfQuda("Transfer: creating cuda V field\n");
+      printfQuda("Transfer: creating cuda V field with basis %d\n", param.gammaBasis);
       V = new cudaColorSpinorField(param);      
     }
 
@@ -109,8 +112,8 @@ namespace quda {
     for (int i=0; i<tmp->Volume(); i++) {
       // compute the lattice-site index for this offset index
       tmp->LatticeIndex(x, i);
-
-      //printf("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
+      
+      //printfQuda("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
 
       // compute the corresponding coarse-grid index given the block size
       for (int d=0; d<tmp->Ndim(); d++) x[d] /= geo_bs[d];
@@ -120,7 +123,7 @@ namespace quda {
       coarse.OffsetIndex(k, x); // this index is parity ordered
       fine_to_coarse[i] = k;
 
-      //printf("coarse (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
+      //printfQuda("coarse after (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
     }
 
     // now create an inverse-like variant of this
@@ -142,6 +145,9 @@ namespace quda {
 
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
+
+    printf("Prolongator locations: out = %d, in = %d\n", out.Location(), in.Location());
+
     ColorSpinorField *output = &out;
     if (out.Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam param(out);
@@ -151,7 +157,7 @@ namespace quda {
       output = new cpuColorSpinorField(param);
     }
 
-    if ((output->GammaBasis() != V->GammaBasis()) || (in.GammaBasis() != V->GammaBasis()) )
+    if ((output->GammaBasis() != V->GammaBasis()) || (in.GammaBasis() != V->GammaBasis()))
       errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
 
@@ -165,6 +171,9 @@ namespace quda {
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+
+    printf("Restrictor locations: out = %d, in = %d\n", out.Location(), in.Location());
+
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam param(in);
