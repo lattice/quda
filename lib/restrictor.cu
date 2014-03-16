@@ -34,7 +34,8 @@ namespace quda {
   /**
      Applies the grid restriction operator (fine to coarse)
   */
-  __device__ __host__ void restrict(CoarseSpinor &out, const FineSpinor &in, int x, 
+  template <class Coarse, class Fine>
+  __device__ __host__ void restrict(Coarse &out, const Fine &in, int x, 
 				    const int* fine_to_coarse, const int* spin_map) {
     for (int s=0; s<in.Nspin(); s++) {
       for (int c=0; c<in.Ncolor(); c++) {
@@ -89,7 +90,7 @@ namespace quda {
     // obtain fine index from this look up table
     int x_fine = arg.coarse_to_fine[blockIdx.x*blockDim.x + threadIdx.x];
     
-    rotateCoarseColor(arg.tmp, arg.in, arg.V, x);
+    rotateCoarseColor(arg.tmp, arg.in, arg.V, x_fine);
  
     //this is going to be severely sub-optimal until color and spin are templated
     typedef quda::complex<Float> Complex;
@@ -187,7 +188,7 @@ namespace quda {
       Field *vOrder = createOrder<double>(v, Nvec);
       Field *tmpOrder = createOrder<double>(tmp);
       RestrictArg<Field,Field,Field,Field> 
-	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,spin_map);
+	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
       RestrictLaunch<double, RestrictArg<Field, Field, Field, Field> > 
       (arg, Location(out, in, v));
       delete outOrder;
@@ -201,7 +202,7 @@ namespace quda {
       Field *vOrder = createOrder<float>(v, Nvec);
       Field *tmpOrder = createOrder<float>(tmp);
       RestrictArg<Field,Field,Field,Field> 
-	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,spin_map);
+	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
       RestrictLaunch<float, RestrictArg<Field, Field, Field, Field> > 
 	RestrictLaunch(arg, Location(out, in, v));
       delete outOrder;
@@ -210,8 +211,7 @@ namespace quda {
       delete tmpOrder;
     }
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  
-      checkCudaError();
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  checkCudaError();
   }
 
 } // namespace quda

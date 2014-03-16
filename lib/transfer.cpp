@@ -89,9 +89,15 @@ namespace quda {
     FillV(*V, B, Nvec);  //printfQuda("V fill check %e\n", norm2(*V));
   }
 
-  static bool operator<(const int2 &a, const int2 &b) const {
-    return (a.x < b.x) ? true : (a.x==b.x && a.y<b.y) ? true : false;
-  }
+  struct Int2 {
+    int x, y;
+    Int2() : x(0), y(0) { } 
+    Int2(int x, int y) : x(x), y(y) { } 
+    
+    bool operator<(const Int2 &a) const {
+      return (x < a.x) ? true : (x==a.x && y<a.y) ? true : false;
+    }
+  };
 
   // compute the fine-to-coarse site map
   void Transfer::createGeoMap(int *geo_bs) {
@@ -128,10 +134,10 @@ namespace quda {
 
     // now create an inverse-like variant of this
 
-    std::vector<int2> geo_sort(B[0]->Volume());
-    for (int i=0; i<geo_sort.size(); i++) geo_sort[i] = make_int2(fine_to_coarse[i], i);
+    std::vector<Int2> geo_sort(B[0]->Volume());
+    for (unsigned int i=0; i<geo_sort.size(); i++) geo_sort[i] = Int2(fine_to_coarse[i], i);
     std::sort(geo_sort.begin(), geo_sort.end());
-    for (int i=0; i<geo_sort.size(); i++) coarse_to_fine[i] = geo_sort[i].y;
+    for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine[i] = geo_sort[i].y;
   }
 
   // compute the fine spin to coarse spin map
@@ -188,7 +194,7 @@ namespace quda {
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-    Restrict(out, *input, *V, *tmp, Nvec, fine_to_coarse, spin_map);
+    Restrict(out, *input, *V, *tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
 
     if (in.Location() == QUDA_CUDA_FIELD_LOCATION) { delete input; }
   }
