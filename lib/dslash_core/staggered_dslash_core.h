@@ -305,6 +305,11 @@ VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define NFACE 1
 #endif
 
+
+int fat_stride = fat_ga_stride;
+int long_stride = long_ga_stride;
+int fat_link_max = fat_ga_max;
+
 #if ((DD_RECON==9 || DD_RECON==13) && DD_IMPROVED==1)
 #if (DD_PREC==0) // double precision
 double PHASE = 0.;
@@ -322,6 +327,7 @@ int x1,x2,x3,x4;
 int af;
 int x1odd,x2odd;
 int X;
+int full_idx;
 
 if(kernel_type == INTERIOR_KERNEL){
   //data order: X4 X3 X2 X1h
@@ -422,7 +428,7 @@ int sign = 1;
 #endif
     {
       int sp_idx_1st_nbr = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;
-      READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx);
+      READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
       int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -456,8 +462,8 @@ int sign = 1;
 #endif
     {
       int sp_idx_3rd_nbr = ((x1 >= X1m3) ? X -X1m3 : X+3) >> 1;
-      READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx);        
-      READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx);
+      READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx, long_stride);        
+      READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx, long_stride);
       int nbr_idx3 = sp_idx_3rd_nbr;
       int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -511,7 +517,7 @@ int sign = 1;
 	fat_idx = Vh + space_con;
       }
 #endif
-      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
       int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -551,8 +557,8 @@ int sign = 1;
 	long_idx =Vh + x1*X4X3X2h + space_con;
       }    
 #endif
-      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 		
-      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx); 		
+      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 		
+      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 		
       int nbr_idx3 = sp_idx_3rd_nbr;
       int stride3 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -600,7 +606,7 @@ int sign = 1;
 #endif
     {
       int sp_idx_1st_nbr = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;
-      READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx);
+      READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
       int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -634,8 +640,8 @@ int sign = 1;
 #endif
     {
       int sp_idx_3rd_nbr = ((x2 >= X2m3 ) ? X-X2m3*X1 : X+3*X1) >> 1;    
-      READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx);
-      READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx);
+      READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx, long_stride);
+      READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx, long_stride);
       int nbr_idx3 = sp_idx_3rd_nbr;
       int stride3 = sp_stride;        
 #if (DD_PREC == 2) //half precision
@@ -686,7 +692,7 @@ int sign = 1;
 	fat_idx = Vh + space_con;
       }    
 #endif
-      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
       int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -726,8 +732,8 @@ int sign = 1;
 	long_idx = Vh+ x2*X4X3X1h + space_con;
       }    
 #endif
-      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx); 
-      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx); 
+      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 
+      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 
       int nbr_idx3 = sp_idx_3rd_nbr;
       int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -773,7 +779,7 @@ int sign = 1;
 #endif
     {
       int sp_idx_1st_nbr = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
-      READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx);
+      READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
       int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -807,8 +813,8 @@ int sign = 1;
 #endif
     {
       int sp_idx_3rd_nbr = ((x3>= X3m3)? X -X3m3*X2X1: X + 3*X2X1)>> 1;    
-      READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx);
-      READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx);
+      READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx, long_stride);
+      READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx, long_stride);
       int nbr_idx3 = sp_idx_3rd_nbr;
       int stride3 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -861,7 +867,7 @@ int sign = 1;
 	fat_idx = Vh + space_con;
       }    
 #endif
-      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
       int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -901,8 +907,8 @@ int sign = 1;
 	long_idx = Vh + x3*X4X2X1h + space_con;
       }    
 #endif
-      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx);         
-      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx);         
+      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);         
+      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);         
       int nbr_idx3 = sp_idx_3rd_nbr;
       int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -947,7 +953,7 @@ int sign = 1;
 #endif
     {    
       int sp_idx_1st_nbr = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
-      READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx);
+      READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
       int stride1 = sp_stride;
 #if (DD_PREC == 2) //half precision
@@ -982,8 +988,8 @@ int sign = 1;
 #endif
     {
       int sp_idx_3rd_nbr = ((x4>=X4m3)? X -X4m3*X3X2X1 : X + 3*X3X2X1)>> 1;     
-      READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx);    
-      READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx);    
+      READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx, long_stride);    
+      READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx, long_stride);    
       int nbr_idx3 = sp_idx_3rd_nbr;
       int stride3 = sp_stride;    
 #if (DD_PREC == 2) //half precision
@@ -1050,7 +1056,7 @@ int sign = 1;
 	}        	
       }
 #endif
-      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx);
+      READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
       READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
       ADJ_MAT_MUL_V(A, fat, i);
       o00_re -= A0_re;
@@ -1088,8 +1094,8 @@ int sign = 1;
 	}
       }
 #endif	    
-      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx);
-      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx);
+      READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);
+      READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);
       READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);       
 
       RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
