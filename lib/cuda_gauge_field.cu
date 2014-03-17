@@ -399,8 +399,8 @@ namespace quda {
      - input and output precisions must match
    */
   template<typename FloatN, typename Float>
-    static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volumeCB, 
-        int stride, QudaPrecision prec) 
+  static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int Nint, 
+			      int volumeCB, int stride, QudaPrecision prec) 
     {  
       cudaStream_t streams[2];
       for (int i=0; i<2; i++) cudaStreamCreate(&streams[i]);
@@ -408,7 +408,7 @@ namespace quda {
       FloatN *even = gauge;
       FloatN *odd = (FloatN*)((char*)gauge + bytes/2);
 
-      size_t datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
+      size_t datalen = 4*2*volumeCB*Nint*sizeof(Float); // both parities
       void *unpacked = device_malloc(datalen);
       void *unpackedEven = unpacked;
       void *unpackedOdd = (char*)unpacked + datalen/2;
@@ -424,10 +424,10 @@ namespace quda {
       //unpack odd data kernel
       link_format_gpu_to_cpu((void*)unpackedOdd, (void*)odd, volumeCB, stride, prec, streams[1]);
 #ifdef GPU_DIRECT
-      cudaMemcpyAsync(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
+      cudaMemcpyAsync(cpuGauge + 4*volumeCB*Nint, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
       for(int i=0; i<2; i++) cudaStreamSynchronize(streams[i]);
 #else
-      cudaMemcpy(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
+      cudaMemcpy(cpuGauge + 4*volumeCB*Nint, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
 #endif
 
       device_free(unpacked);
@@ -448,10 +448,12 @@ namespace quda {
       if (order != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Only QUDA_FLOAT2_GAUGE_ORDER supported");
       if (cpu.Order() != QUDA_MILC_GAUGE_ORDER) errorQuda("Only QUDA_MILC_GAUGE_ORDER supported");
 
+      // internal degrees of freedom
+      int Nint = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2;
       if (precision == QUDA_DOUBLE_PRECISION){
-        storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, volumeCB, stride, precision);
+        storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, Nint, volumeCB, stride, precision);
       } else if (precision == QUDA_SINGLE_PRECISION){
-        storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, volumeCB, stride, precision);
+        storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, Nint, volumeCB, stride, precision);
       } else {
         errorQuda("Half precision not supported");
       }

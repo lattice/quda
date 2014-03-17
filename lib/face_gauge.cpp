@@ -33,7 +33,9 @@ enum {
   XDOWN = 7
 };
 
-#define gaugeSiteSize 18
+
+//FIXME remove this legacy macro
+#define gaugeSiteSize 18 // real numbers per gauge field
 
 #ifndef GPU_DIRECT
 static void* fwd_nbr_staple_cpu[4];
@@ -973,5 +975,7 @@ void exchange_llfat_cleanup(void)
   }
   checkCudaError();
 }
+
+#undef gaugeSiteSize
 
 #endif
