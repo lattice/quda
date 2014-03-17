@@ -5,15 +5,19 @@ namespace quda {
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
     LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
-    geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 
-    fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
+    geometry(param.geometry), reconstruct(param.reconstruct), 
+    nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
+    order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
     create(param.create), ghostExchange(param.ghostExchange), 
     staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied)
   {
-    if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
-    if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d", nDim);
-    if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0) errorQuda("Anisotropy only supported for Wilson links");
+    if (link_type != QUDA_COARSE_LINKS) {
+      if (nColor != 3) errorQuda("nColor must be 3, not %d for this link type", nColor);
+      if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d for Nc=3 for this link type", nDim);
+    }
+    if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0) 
+      errorQuda("Anisotropy only supported for Wilson links");
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
 
@@ -23,19 +27,18 @@ namespace quda {
     if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
 
     if(geometry == QUDA_SCALAR_GEOMETRY) {
-      real_length = volume*reconstruct;
-      length = 2*stride*reconstruct; // two comes from being full lattice
+      real_length = volume*nInternal;
+      length = 2*stride*nInternal; // two comes from being full lattice
     } else if (geometry == QUDA_VECTOR_GEOMETRY) {
-      real_length = nDim*volume*reconstruct;
-      length = 2*nDim*stride*reconstruct; // two comes from being full lattice
+      real_length = nDim*volume*nInternal;
+      length = 2*nDim*stride*nInternal; // two comes from being full lattice
     } else if(geometry == QUDA_TENSOR_GEOMETRY){
-      real_length = (nDim*(nDim-1)/2)*volume*reconstruct;
-      length = 2*(nDim*(nDim-1)/2)*stride*reconstruct; // two comes from being full lattice
+      real_length = (nDim*(nDim-1)/2)*volume*nInternal;
+      length = 2*(nDim*(nDim-1)/2)*stride*nInternal; // two comes from being full lattice
     }
 
 
-    if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13)
-    {
+    if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
       // Need to adjust the phase alignment as well.  
       int half_phase_bytes = (length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
       int half_gauge_bytes = (length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
@@ -106,6 +109,8 @@ namespace quda {
     if (a.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, a.link_type);
     if (a.nColor != nColor) errorQuda("nColor does not match %d %d", nColor, a.nColor);
     if (a.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, a.nFace);
+    if (a.reconstruct != reconstruct) errorQuda("nFace does not match %d %d", reconstruct, a.reconstruct);
+    if (a.nInternal != nInternal) errorQuda("nInternal does not match %d %d", nInternal, a.nInternal);
     if (a.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, a.fixed);
     if (a.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, a.t_boundary);
     if (a.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, a.anisotropy);
@@ -118,6 +123,9 @@ namespace quda {
     output << "nColor = " << param.nColor << std::endl;
     output << "nFace = " << param.nFace << std::endl;
     output << "reconstruct = " << param.reconstruct << std::endl;
+    int nInternal = (param.reconstruct != QUDA_RECONSTRUCT_NO ? 
+		     param.reconstruct : param.nColor * param.nColor * 2);
+    output << "nInternal = " << nInternal << std::endl;
     output << "order = " << param.order << std::endl;
     output << "fixed = " << param.fixed << std::endl;
     output << "link_type = " << param.link_type << std::endl;

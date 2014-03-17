@@ -26,15 +26,21 @@ namespace quda {
 	const int nDim;
 	const int nColor;
 
+	// used for coarse gauge field access
+	const int nSpinCoarse;
+	const int nColorCoarse;
+
       public:
 	/** 
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-      FieldOrder(GaugeField &U) : U(U), volumeCB(U.VolumeCB()), nDim(U.Ndim()), nColor(U.Ncolor()) { 
-	if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
-	  errorQuda("GaugeField ordering not supported with reconstruction");
-      }
+        FieldOrder(GaugeField &U, int nSpinCoarse=1) : U(U), volumeCB(U.VolumeCB()), 
+	  nDim(U.Ndim()), nColor(U.Ncolor()), 
+	  nSpinCoarse(nSpinCoarse), nColorCoarse(nColor/nSpinCoarse) { 
+	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
+	    errorQuda("GaugeField ordering not supported with reconstruction");
+	}
 	
 	GaugeField& Field() { return U; }
 	
@@ -76,6 +82,43 @@ namespace quda {
 
 	/** Returns the field geometric dimension */
 	__device__ __host__ int Ndim() const { return nDim; }
+
+	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ const quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
+								   int s_col, int c_row, int c_col) const {
+	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+	
+	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
+							     int s_col, int c_row, int c_col) {
+	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+	
+	/** Returns the number of coarse gauge field spins */
+	__device__ __host__ int NspinCoarse() const { return nSpinCoarse; }
+
+	/** Returns the number of coarse gauge field colors */
+	__device__ __host__ int NcolorCoarse() const { return nColorCoarse; }
+
       };
 
     template <typename Float>

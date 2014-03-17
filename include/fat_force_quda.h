@@ -7,9 +7,6 @@
 
 #define freeLinkQuda freeGaugeField
 
-#define momSiteSize   10 // real numbers per momentum
-#define gaugeSiteSize 18 // real numbers per gauge field
-
 namespace quda {
 
   void loadLinkToGPU(cudaGaugeField* cudaGauge, cpuGaugeField* cpuGauge, QudaGaugeParam* param);

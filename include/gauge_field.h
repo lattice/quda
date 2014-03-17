@@ -116,6 +116,7 @@ namespace quda {
     QudaFieldGeometry geometry; // whether the field is a scale, vector or tensor
 
     QudaReconstructType reconstruct;
+    int nInternal; // number of degrees of freedom per link matrix
     QudaGaugeFieldOrder order;
     QudaGaugeFixed fixed;
     QudaLinkType link_type;
@@ -369,8 +370,4 @@ namespace quda {
 
 } // namespace quda
 
-
-//FIXME remove this legacy macro
-#define gaugeSiteSize 18 // real numbers per gauge field
-  
 #endif // _GAUGE_QUDA_H
