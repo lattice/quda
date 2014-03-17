@@ -17,6 +17,7 @@ extern "C" {
     QUDA_GENERAL_LINKS,
     QUDA_THREE_LINKS,
     QUDA_MOMENTUM,
+    QUDA_COARSE_LINKS, // used for coarse-gauge field with multigrid
     QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
     QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,

@@ -21,7 +21,7 @@ namespace quda {
       errorQuda("Field ordering %d presently disabled for this type", order);
 
 #ifdef MULTI_GPU
-    if (link_type != QUDA_ASQTAD_MOM_LINKS &&
+    if (link_type != QUDA_ASQTAD_MOM_LINKS && 
 	ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
       bool pad_check = true;
       for (int i=0; i<nDim; i++)
@@ -46,7 +46,7 @@ namespace quda {
 
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
-        size_t nbytes = nFace * surface[i] * reconstruct * precision;
+        size_t nbytes = nFace * surface[i] * nInternal * precision;
         ghost[i] = nbytes ? device_malloc(nbytes) : NULL;
       }        
     }
@@ -167,15 +167,15 @@ namespace quda {
     void *ghost_[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
-      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*reconstruct*precision) : ghost[d];
-      send[d] = device_malloc(nFace*surface[d]*reconstruct*precision);
+      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
+      send[d] = device_malloc(nFace*surface[d]*nInternal*precision);
     }
 
     // get the links into contiguous buffers
     extractGaugeGhost(*this, send);
 
     // communicate between nodes
-    FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
+    FaceBuffer faceBuf(x, nDim, nInternal, nFace, precision);
     faceBuf.exchangeLink(ghost_, send, QUDA_CUDA_FIELD_LOCATION);
 
     for (int d=0; d<nDim; d++) device_free(send[d]);
@@ -198,7 +198,7 @@ namespace quda {
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d) && !no_comms_fill) continue;
       // store both parities and directions in each
-      bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
+      bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
       send_d[d] = device_malloc(2 * bytes[d]);
       recv_d[d] = device_malloc(2 * bytes[d]);
     }
@@ -209,14 +209,13 @@ namespace quda {
     size_t total_bytes = 0;
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-      total_bytes += 4*bytes[d];
+      total_bytes += 4*bytes[d]; // (2 from send/recv) x (2 from fwd/back)
     }
     resizeBufferPinned(total_bytes);
 
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-
       recv_h[d] = static_cast<char*>(bufferPinned) + offset;
       send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
       offset += 4*bytes[d];
@@ -449,11 +448,10 @@ namespace quda {
       if (cpu.Order() != QUDA_MILC_GAUGE_ORDER) errorQuda("Only QUDA_MILC_GAUGE_ORDER supported");
 
       // internal degrees of freedom
-      int Nint = reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2;
       if (precision == QUDA_DOUBLE_PRECISION){
-        storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, Nint, volumeCB, stride, precision);
+        storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, nInternal, volumeCB, stride, precision);
       } else if (precision == QUDA_SINGLE_PRECISION){
-        storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, Nint, volumeCB, stride, precision);
+        storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, nInternal, volumeCB, stride, precision);
       } else {
         errorQuda("Half precision not supported");
       }
@@ -495,7 +493,10 @@ namespace quda {
 
     if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
         a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
-      errorQuda("Not implemented");
+      errorQuda("Not implemented for this order");
+
+    if (a.LinkType() == QUDA_COARSE_LINKS) 
+      errorQuda("Not implemented for this link type");
 
     int spin = 0;
     switch (a.Geometry()) {
