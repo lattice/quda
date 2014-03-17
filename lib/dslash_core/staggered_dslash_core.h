@@ -7,6 +7,8 @@
 // input spinor
 #if (DD_PREC==0)
 #define spinorFloat double
+#define spinorFloat2 double2
+
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -24,6 +26,9 @@
 #else
 
 #define spinorFloat float
+#define spinorFloat2 float2
+
+
 #define i00_re I0.x
 #define i00_im I0.y
 #define i01_re I1.x
@@ -446,7 +451,7 @@ int sign = 1;
 	}
       } 
 #endif
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       MAT_MUL_V(A, fat, i);    
       o00_re += A0_re;
       o00_im += A0_im;
@@ -481,7 +486,8 @@ int sign = 1;
 	}
       }
 #endif
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 	
       RECONSTRUCT_GAUGE_MATRIX(0, long, ga_idx, sign);
       MAT_MUL_V(B, long, t);        
@@ -534,7 +540,7 @@ int sign = 1;
 	}        
       }
 #endif
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       ADJ_MAT_MUL_V(A, fat, i);       
       o00_re -= A0_re;
       o00_im -= A0_im;
@@ -576,7 +582,8 @@ int sign = 1;
       }
 #endif
 
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);  
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);  
       RECONSTRUCT_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, sign);
       ADJ_MAT_MUL_V(B, long, t);    
       o00_re -= B0_re;
@@ -623,7 +630,7 @@ int sign = 1;
 	}      
       }
 #endif 
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       MAT_MUL_V(A, fat, i);
       o00_re += A0_re;
       o00_im += A0_im;
@@ -658,7 +665,8 @@ int sign = 1;
 	}
       }
 #endif    
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
       RECONSTRUCT_GAUGE_MATRIX(2, long, ga_idx, sign);
       MAT_MUL_V(B, long, t);            
@@ -709,7 +717,7 @@ int sign = 1;
 	}              
       }
 #endif
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       ADJ_MAT_MUL_V(A, fat, i);
       o00_re -= A0_re;
       o00_im -= A0_im;
@@ -750,7 +758,8 @@ int sign = 1;
 	}
       }
 #endif
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
       RECONSTRUCT_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,sign);	    
       ADJ_MAT_MUL_V(B, long, t);    
@@ -796,7 +805,7 @@ int sign = 1;
 	}      
       }
 #endif
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       MAT_MUL_V(A, fat, i);	 
       o00_re += A0_re;
       o00_im += A0_im;
@@ -831,7 +840,8 @@ int sign = 1;
 	}
       }
 #endif
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
       RECONSTRUCT_GAUGE_MATRIX(4, long, ga_idx, sign);    
       MAT_MUL_V(B, long, t);        
@@ -884,7 +894,7 @@ int sign = 1;
 	}        
       }
 #endif
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       ADJ_MAT_MUL_V(A, fat, i);
       o00_re -= A0_re;
       o00_im -= A0_im;
@@ -925,7 +935,8 @@ int sign = 1;
 	}
       }
 #endif
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
       RECONSTRUCT_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,sign);
       ADJ_MAT_MUL_V(B, long, t);    	    
@@ -970,7 +981,7 @@ int sign = 1;
 	}
       }
 #endif
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);    
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);    
       MAT_MUL_V(A, fat, i);
       o00_re += A0_re;
       o00_im += A0_im;
@@ -1007,7 +1018,8 @@ int sign = 1;
       }
 #endif
 	    
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3); 
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3); 
 
       RECONSTRUCT_GAUGE_MATRIX(6, long, ga_idx, sign);
       MAT_MUL_V(B, long, t);    
@@ -1057,7 +1069,7 @@ int sign = 1;
       }
 #endif
       READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
-      READ_1ST_NBR_SPINOR(SPINORTEX, nbr_idx1, stride1);
+      READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       ADJ_MAT_MUL_V(A, fat, i);
       o00_re -= A0_re;
       o00_im -= A0_im;
@@ -1096,7 +1108,9 @@ int sign = 1;
 #endif	    
       READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);
       READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);
-      READ_3RD_NBR_SPINOR(SPINORTEX, nbr_idx3, stride3);       
+
+      spinorFloat2 T0, T1, T2;
+      READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);       
 
       RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
       ADJ_MAT_MUL_V(B, long, t);    
@@ -1166,6 +1180,7 @@ WRITE_SPINOR(out);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat
+#undef spinorFloat2
 #undef SHARED_STRIDE
 
 #undef g00_re
