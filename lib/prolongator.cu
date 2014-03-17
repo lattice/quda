@@ -162,8 +162,7 @@ namespace quda {
       delete tmpOrder;
     }
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  
-      checkCudaError();
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  checkCudaError();
   }
 
 } // end namespace quda

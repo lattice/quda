@@ -39,12 +39,12 @@ namespace quda {
 	length equal to the fine-grid volume, and is sorted into
 	lexicographical fine-grid order, with each value corresponding
 	to a coarse-grid offset. */
-    int *fine_to_coarse_map;
+    int *fine_to_coarse;
 
     /** The mapping onto fine sites from coarse sites. This has length
 	equal to the fine-grid volume, and is sorted into lexicographical
 	block order, with each value corresponding to a fine-grid offset.*/
-    int *coarse_to_fine_map;
+    int *coarse_to_fine;
 
     /** The spin blocking */
     int spin_bs;
