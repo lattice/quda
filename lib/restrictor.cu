@@ -45,7 +45,7 @@ namespace quda {
   }
 
   /**
-    Rotates from the fine-color basis into the coarse-color basis.
+     Rotates from the fine-color basis into the coarse-color basis.
   */
   template <class CoarseColor, class FineColor, class Rotator>
   __device__ __host__ void rotateCoarseColor(CoarseColor &out, const FineColor &in, const Rotator &V, int x) {
@@ -82,7 +82,7 @@ namespace quda {
      of threads equal to the number of fine grid points per aggregate,
      so each thread represents a fine-grid point.  The look up table
      coarse_to_fine is the mapping to the each fine grid point. 
-   */
+  */
   template <typename Float, typename Arg, int block_size>
   __global__ void RestrictKernel(Arg arg) {
     int x_coarse = blockIdx.x;
@@ -190,7 +190,8 @@ namespace quda {
       RestrictArg<Field,Field,Field,Field> 
 	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
       RestrictLaunch<double, RestrictArg<Field, Field, Field, Field> > 
-      (arg, Location(out, in, v));
+	restrictor(arg, Location(out, in, v));
+      restrictor.apply(0);
       delete outOrder;
       delete inOrder;
       delete vOrder;
@@ -204,7 +205,8 @@ namespace quda {
       RestrictArg<Field,Field,Field,Field> 
 	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
       RestrictLaunch<float, RestrictArg<Field, Field, Field, Field> > 
-	RestrictLaunch(arg, Location(out, in, v));
+	restrictor(arg, Location(out, in, v));
+      restrictor.apply(0);
       delete outOrder;
       delete inOrder;
       delete vOrder;
