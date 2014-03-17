@@ -492,7 +492,7 @@ namespace quda {
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x);
 
   inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b) {
-    QudaFieldLocation location;
+    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (a.Location() == b.Location()) location = a.Location();
     else errorQuda("Locations do not match");
     return location;
