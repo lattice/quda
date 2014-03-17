@@ -11,7 +11,7 @@
 #include <misc_helpers.h>
 #include <assert.h>
 
-#define gaugeSiteSize
+#define gaugeSiteSize 18
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define ALIGNMENT 4096 
