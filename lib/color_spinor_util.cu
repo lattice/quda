@@ -22,18 +22,59 @@ namespace quda {
   template <class T>
   void point(T &t, int x, int s, int c) { t(x, s, c, 0) = 1.0; }
 
+  const int n = 0;
+
+  template <class P>
+  void sin(P &p, int d, int n) {
+    for (int t=0; t<p.X(3); t++) {
+      for (int z=0; z<p.X(2); z++) {
+	for (int y=0; y<p.X(1); y++) {
+	  for (int x=0; x<p.X(0); x++) {
+	    double mode;
+	    switch (d) {
+	    case 0:
+	      mode = n * (double)x / p.X(0);
+	      break;
+	    case 1:
+	      mode = n * (double)y / p.X(1);
+	      break;
+	    case 2:
+	      mode = n * (double)z / p.X(2);
+	      break;
+	    case 3:
+	      mode = n * (double)t / p.X(3);
+	      break;
+	    }
+	    double k = sin (M_PI * mode);
+
+	    int offset = ((t*p.X(2)+z)*p.X(1) + y)*p.X(0) + x;
+	    int offset_h = offset / 2;
+	    int parity = offset % 2;
+	    int linear_index = parity * p.Volume()/2 + offset_h;
+
+	    for (int s=0; s<p.Nspin(); s++) 
+	      for (int c=0; c<p.Ncolor(); c++) 
+		p(linear_index, s, c) = k;
+	  }
+	}
+      }
+    }
+  }
+
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       FieldOrder<double> *A = createOrder<double>(a);
       if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
       else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
+      else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(*A, x, s);
       else errorQuda("Unsupported source type %d", sourceType);
       delete A;
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       FieldOrder<float> *A = createOrder<float>(a);
       if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
       else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
+      else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(*A, x, s);
       else errorQuda("Unsupported source type %d", sourceType);
       delete A;
     } else {
