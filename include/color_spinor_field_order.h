@@ -26,6 +26,7 @@ namespace quda {
     protected:
       ColorSpinorField &field; // temporary hack
       quda::complex<Float> *v;
+      int x[QUDA_MAX_DIM];
       const int volume;
       const int nDim;
       const int nColor;
@@ -40,7 +41,8 @@ namespace quda {
     FieldOrder(ColorSpinorField &field, int nVec=1) 
       : field(field), v(static_cast<quda::complex<Float>*>(field.V())), 
 	volume(field.Volume()), nDim(field.Ndim()), nColor(field.Ncolor()), 
-	nSpin(field.Nspin()), nVec(nVec) { ; }
+	nSpin(field.Nspin()), nVec(nVec)
+      { for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
 
       ColorSpinorField& Field() const { return field; }
 
@@ -64,6 +66,9 @@ namespace quda {
        * @param c color index
        */
       __device__ __host__ virtual quda::complex<Float>& operator()(int x, int s, int c) = 0;
+
+      /** Return the length of dimension d */
+      __device__ __host__ int X(int d) const { return x[d]; }
 
       /** Returns the number of field colors */
       __device__ __host__ int Ncolor() const { return nColor; }
