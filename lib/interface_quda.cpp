@@ -1769,12 +1769,12 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   mgParam.level = 1;         // set this level
   mgParam.Nlevel = 2;        // total number of levels
   // set the block size
-  for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = 2;
+  for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = 4;
   mgParam.spinBlockSize = 2;
   mgParam.Nvec = nvec;       // set number of null space components
   mgParam.nu_pre = 4; // set the number of pre-smoothing applications
   mgParam.nu_post = 4; // set the number of pre-smoothing applications  
-  mgParam.smoother = QUDA_GCR_INVERTER;  // set the smoother type
+  mgParam.smoother = QUDA_MR_INVERTER;  // set the smoother type
 
   // create the MG preconditioner
   Solver *K = new MG(mgParam, profileInvert);
