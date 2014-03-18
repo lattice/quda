@@ -31,6 +31,7 @@ namespace quda {
     if (param.level==2) {
       param_presmooth->maxiter = 1000;
       param_presmooth->tol = 1e-10;
+      param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
 				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
@@ -116,7 +117,7 @@ namespace quda {
     printfQuda("MG: Setup of level %d completed\n", param.level);
 
     // now we can run through the verificaion
-    if (param.level == 1) verify();
+    //if (param.level == 1) verify();
 
   }
 
@@ -168,9 +169,7 @@ namespace quda {
       printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *hack2));
     }
 
-    exit(0);
-
-    printfQuda("\nChecking 0 = (1 - D P (P^\\dagger D P) P^\\dagger v_k for %d vectors\n", param.Nvec);
+    /* printfQuda("\nChecking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *(param.B[i]));
@@ -180,16 +179,9 @@ namespace quda {
       param.matResidual(*hack4,*hack3);
       *hack1 = *hack4;
 
-      /*if (i==2) {
-	for (int j=0; j<hack1->Volume(); j++) 
-	  static_cast<cpuColorSpinorField*>(param.B[i])->PrintVector(j);
-	for (int j=0; j<hack1->Volume(); j++) 
-	  static_cast<cpuColorSpinorField*>(hack1)->PrintVector(j);
-	  }*/
-
       printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*hack1));
-      printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *hack1));
-    }
+      printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*(param.B[i]), *hack1) / blas::norm2(*param.B[i])) );
+    }*/
 
     printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c \n");
     static_cast<cpuColorSpinorField*>(x_coarse)->Source(QUDA_RANDOM_SOURCE);
@@ -197,21 +189,66 @@ namespace quda {
     transfer->R(*r_coarse, *hack2);
     printfQuda("Vector norms %e %e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     printfQuda("deviation = %e\n", blas::xmyNorm(*x_coarse, *r_coarse));
+
+    printfQuda("\nChecking sinusoidal waves\n");
+    int dim = 3;
+    //for (int n=1; n<hack2->X(dim); n++) {
+    for (int n=hack2->X(dim)-1; n<hack2->X(dim); n++) {
+      ColorSpinorParam csParam(*hack2);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
+      ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
+
+      static_cast<cpuColorSpinorField*>(tmp)->Source(QUDA_SINUSOIDAL_SOURCE, dim, n);
+      
+      transfer->R(*r_coarse, *tmp);
+      transfer->P(*tmp2, *r_coarse);
+
+      /*for (int k=0; k<r_coarse->Volume(); k++) {
+	static_cast<cpuColorSpinorField*>(hack2)->PrintVector(k);
+	static_cast<cpuColorSpinorField*>(hack1)->PrintVector(k);
+	printf("\n");
+	}*/
+
+      double deviation = sqrt(blas::xmyNorm(*tmp, *tmp2) / blas::norm2(*tmp));
+
+      blas::zero(*x_coarse);
+      transfer->R(*r_coarse, *tmp);
+      (*coarse)(*x_coarse, *r_coarse); setVerbosity(QUDA_VERBOSE);
+      transfer->P(*tmp2, *x_coarse);
+      param.matResidual(*tmp2,*tmp2);
+
+      printfQuda("Dimension %d, mode %d: relative dev = %e, relative residual = %e\n", 
+		 dim, n, deviation, sqrt(blas::xmyNorm(*tmp, *tmp2) / blas::norm2(*tmp)) );
+
+      *hack3 = *tmp;
+      blas::zero(*hack4);
+      operator()(*hack4, *hack3);
+      param.matResidual(*tmp2,*hack4);
+
+      printfQuda("Dimension %d, mode %d: relative dev = %e, relative residual = %e\n", 
+		 dim, n, deviation, sqrt(blas::xmyNorm(*tmp, *tmp2) / blas::norm2(*tmp)) );
+      
+    }
+
+
     exit(0);
 
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
 
-    printfQuda("MG: level %d, x.order = %d b.order = %d\n", param.level, x.FieldOrder(), b.FieldOrder());
-
-    printfQuda("MG: level %d, entering V-cycle with x2=%e, r2=%e\n", 
-	       param.level, blas::norm2(x), blas::norm2(b));
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("MG: level %d, x.order = %d b.order = %d\n", param.level, x.FieldOrder(), b.FieldOrder());
+      
+      printfQuda("MG: level %d, entering V-cycle with x2=%e, r2=%e\n", 
+		 param.level, blas::norm2(x), blas::norm2(b));
+    }
 
     if (param.level < param.Nlevel) {
       
       // do the pre smoothing
-      printfQuda("MG: level %d, pre smoothing\n", param.level);
+      printfQuda("MG: level %d, pre smoothing b2=%e\n", param.level, blas::norm2(b));
       //param.use_init_guess = QUDA_USE_INIT_GUESS_NO;
       //param.maxiter = param.nu_pre;
       
@@ -237,12 +274,14 @@ namespace quda {
       printfQuda("MG: level %d solving coarse operator\n", param.level);
       blas::zero(*x_coarse);
       (*coarse)(*x_coarse, *r_coarse);
-      printfQuda("MG: after coarse solve x_coarse2 %e r_coarse2 = %e\n", blas::norm2(*x_coarse), blas::norm2(*r_coarse)); 
+      //blas::zero(*x_coarse);      
+      printfQuda("MG: after coarse solve x_coarse2 %e r_coarse2 = %e\n", 
+		 blas::norm2(*x_coarse), blas::norm2(*r_coarse)); 
 
       // prolongate back to this grid
       printfQuda("MG: level %d, prolongation\n", param.level);
       transfer->P(*r, *x_coarse); // repurpose residual storage
-      printfQuda("MG: Prolongated coarse solution r2 = %e\n", blas::norm2(*r)); 
+      printfQuda("MG: Prolongated coarse solution y2 = %e\n", blas::norm2(*r)); 
       printfQuda("MG: Old fine solution x2 = %e\n", blas::norm2(x));
       blas::xpy(*r, x); // sum to solution
       printfQuda("MG: New fine solution x2 = %e\n", blas::norm2(x));       
@@ -273,12 +312,16 @@ namespace quda {
 
       //exit(0);
     } else { // do the coarse grid solve
-
-      printfQuda("MG: level %d starting coarsest solve\n", param.level);
+      if (getVerbosity() >= QUDA_VERBOSE) 
+	printfQuda("MG: level %d starting coarsest solve\n", param.level);
       //param.maxiter = 10;
-      (*presmoother)(x, b);
-      printfQuda("MG: level %d finished coarsest solve\n", param.level);
 
+      setVerbosity(QUDA_VERBOSE); 
+      (*presmoother)(x, b);
+      setVerbosity(QUDA_VERBOSE); 
+
+      if (getVerbosity() >= QUDA_VERBOSE) 
+	printfQuda("MG: level %d finished coarsest solve\n", param.level);
     }
 
   }
