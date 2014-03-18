@@ -67,7 +67,14 @@ namespace quda {
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM+1];
     int ghostNormOffset[QUDA_MAX_DIM+1];
+    int X[4];
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+    int sp_stride; // spinor stride
+#ifdef GPU_STAGGERED_DIRAC
+    int gauge_stride;
+    int long_gauge_stride;
+    int fat_link_max;
+#endif 
 
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
@@ -1951,13 +1958,22 @@ namespace quda {
 
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
+  
     dslashParam.parity = parity;
+    dslashParam.sp_stride = in->Stride();
+    dslashParam.gauge_stride = gauge.Stride();
+    dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
+                                                // in the solver for the improved staggered action
+
+
     for(int i=0;i<4;i++){
+      dslashParam.X[i] = in->X()[i];
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
       dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
+    dslashParam.X[0] *= 2; // because color spinor fields are defined on a half lattice
     void *gauge0, *gauge1;
     bindFatGaugeTex(gauge, parity, &gauge0, &gauge1);
 
@@ -2017,14 +2033,21 @@ namespace quda {
 
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
+    dslashParam.sp_stride = in->Stride();
     dslashParam.parity = parity;
-
+    dslashParam.gauge_stride = fatGauge.Stride();
+    dslashParam.long_gauge_stride = longGauge.Stride();
+    dslashParam.fat_link_max = fatGauge.LinkMax();
+  
     for(int i=0;i<4;i++){
+      dslashParam.X[i] = in->X()[i];
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
       dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
+    dslashParam.X[0] *= 2;
+
     void *fatGauge0, *fatGauge1;
     void* longGauge0, *longGauge1;
     bindFatGaugeTex(fatGauge, parity, &fatGauge0, &fatGauge1);

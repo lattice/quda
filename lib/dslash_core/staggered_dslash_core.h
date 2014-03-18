@@ -8,6 +8,9 @@
 #if (DD_PREC==0)
 #define spinorFloat double
 #define spinorFloat2 double2
+/*
+double2 I0, I1, I2;
+*/
 
 #define i00_re I0.x
 #define i00_im I0.y
@@ -27,6 +30,8 @@
 
 #define spinorFloat float
 #define spinorFloat2 float2
+//float2 I0, I1, I2;
+
 
 
 #define i00_re I0.x
@@ -310,10 +315,10 @@ VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define NFACE 1
 #endif
 
-
-int fat_stride = fat_ga_stride;
-int long_stride = long_ga_stride;
-int fat_link_max = fat_ga_max;
+const int *X = param.X;
+const int& fat_stride = param.gauge_stride;
+const int& long_stride = param.long_gauge_stride;
+const int& fat_link_max = param.fat_link_max;
 
 #if ((DD_RECON==9 || DD_RECON==13) && DD_IMPROVED==1)
 #if (DD_PREC==0) // double precision
@@ -326,83 +331,90 @@ float PHASE = 0.f;
 int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if(sid >= param.threads) return;
 
+
+const int X1X0 = X[1]*X[0];
+const int X2X1X0 = X[2]*X1X0;
+const int X3X1X0 = X[3]*X1X0;
+const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
+
 int za,zb; 
 int x1h, x2h;
 int x1,x2,x3,x4;
 int af;
 int x1odd,x2odd;
-int X;
 int full_idx;
 
 if(kernel_type == INTERIOR_KERNEL){
   //data order: X4 X3 X2 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X2;
-  x2 = za - zb*X2;
-  x4 = zb / X3;
-  x3 = zb - x4*X3;
+  za = sid/(X[0]>>1);
+  x1h = sid - za*(X[0]>>1);
+  zb = za / X[1];
+  x2 = za - zb*X[1];
+  x4 = zb / X[2];
+  x3 = zb - x4*X[2];
   x1odd = (x2 + x3 + x4 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
-  X = 2*sid + x1odd;
+  full_idx = 2*sid + x1odd;
  }else if (kernel_type == EXTERIOR_KERNEL_X){
   //data order: X1 X4 X3 X2h
-  za = sid / X2h;
-  x2h = sid - za*X2h;
-  zb = za / X3;
-  x3 = za - zb*X3;
-  x1 = zb / X4;
-  x4 = zb - x1*X4;
-  af = (x1 >= NFACE)?(X1-2*NFACE):0;
+  za = sid /(X[1]>>1);
+  x2h = sid - za*(X[1]>>1);
+  zb = za / X[2];
+  x3 = za - zb*X[2];
+  x1 = zb / X[3];
+  x4 = zb - x1*X[3];
+  af = (x1 >= NFACE)?(X[0]-2*NFACE):0;
   x1 = x1 + af;
   x2odd = (x3 + x4 + x1 + param.parity) & 1;
   x2 = 2*x2h + x2odd;
-  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
-  sid = X>>1;
+  full_idx = x4*X2X1X0+x3*X1X0+x2*X[0]+x1;
+  sid = full_idx>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_Y){
   //data order: X2 X4 X3 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X3;
-  x3 = za - zb*X3;
-  x2 = zb / X4;
-  x4 = zb - x2*X4;
-  af = (x2 >= NFACE)?(X2-2*NFACE):0;
+  za = sid /(X[0]>>1);
+  x1h = sid - za*(X[0]>>1);
+  zb = za / X[2];
+  x3 = za - zb*X[2];
+  x2 = zb / X[3];
+  x4 = zb - x2*X[3];
+  af = (x2 >= NFACE)?(X[1]-2*NFACE):0;
   x2 = x2 + af;
   x1odd = (x3 + x4 + x2 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
-  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
-  sid = X>>1;
+//  full_idx = x4*X3X2X1+x3*X2X1+x2*X[0]+x1;
+  full_idx = x4*X2X1X0+x3*X1X0+x2*X[0]+x1;
+  sid = full_idx>>1;
 
  }else if (kernel_type == EXTERIOR_KERNEL_Z){
   //data order: X3 X4 X2 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X2;
-  x2 = za - zb*X2;
-  x3 = zb / X4;
-  x4 = zb - x3*X4;
-  af = (x3 >= NFACE)?(X3-2*NFACE):0;
+  za = sid /(X[0]>>1);
+  x1h = sid - za*(X[0]>>1);
+  zb = za / X[1];
+  x2 = za - zb*X[1];
+  x3 = zb / X[3];
+  x4 = zb - x3*X[3];
+  af = (x3 >= NFACE)?(X[2]-2*NFACE):0;
   x3 = x3 + af;
   x1odd = (x2 + x4 + x3 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
-  X = x4*X3X2X1+x3*X2X1+x2*X1+x1;
-  sid = X>>1;
+  //full_idx = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  full_idx = x4*X2X1X0+x3*X1X0+x2*X[0]+x1;
+  sid = full_idx>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_T){
   //data order: X4 X3 X2 X1h
-  za = sid / X1h;
-  x1h = sid - za*X1h;
-  zb = za / X2;
-  x2 = za - zb*X2;
-  x4 = zb / X3;
-  x3 = zb - x4*X3;
-  af = (x4 >= NFACE)?(X4-2*NFACE):0;
+  za = sid /(X[0]>>1);
+  x1h = sid - za*(X[0]>>1);
+  zb = za / X[1];
+  x2 = za - zb*X[1];
+  x4 = zb / X[2];
+  x3 = zb - x4*X[2];
+  af = (x4 >= NFACE)?(X[3]-2*NFACE):0;
   int x4_new = x4 + af;
   sid +=Vsh*(x4_new -x4);
   x4=x4_new;
   x1odd = (x2 + x3 + x4 + param.parity) & 1;
   x1 = 2*x1h + x1odd;
-  X = 2*sid + x1odd;
+  full_idx = 2*sid + x1odd;
  }
 
 #if (DD_PREC == 0) // double precision
@@ -429,24 +441,24 @@ int sign = 1;
   int ga_idx = sid;
 
 #ifdef MULTI_GPU
-  if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1m1) )|| (kernel_type == EXTERIOR_KERNEL_X && x1 >= X1m1))
+  if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < (X[0]-1)) )|| (kernel_type == EXTERIOR_KERNEL_X && x1 >= (X[0]-1) ))
 #endif
     {
-      int sp_idx_1st_nbr = ((x1==X1m1) ? X-X1m1 : X+1) >> 1;
+      int sp_idx_1st_nbr = ((x1==(X[0]-1)) ? full_idx-(X[0]-1) : full_idx+1) >> 1;
       READ_FAT_MATRIX(FATLINK0TEX, 0, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif	    
 #ifdef MULTI_GPU
       if ( (kernel_type == EXTERIOR_KERNEL_X)){
 	int space_con = (x4*X3X2+x3*X2+x2)/2;	
-	if (x1 >= X1m1){
-	  nbr_idx1 = param.ghostOffset[0] + 3*NFACE*ghostFace[0] +(x1-X1m1)*ghostFace[0]+ space_con;
+	if (x1 >= (X[0]-1)){
+	  nbr_idx1 = param.ghostOffset[0] + 3*NFACE*ghostFace[0] +(x1-(X[0]-1))*ghostFace[0]+ space_con;
 	  stride1 = NFACE*ghostFace[0];
 #if (DD_PREC == 2) //half precision
-	  norm_idx1 = param.ghostNormOffset[0] + NFACE*ghostFace[0] + (x1-X1m1)*ghostFace[0]+ space_con;
+	  norm_idx1 = param.ghostNormOffset[0] + NFACE*ghostFace[0] + (x1-(X[0]-1))*ghostFace[0]+ space_con;
 #endif		    
 	}
       } 
@@ -463,25 +475,25 @@ int sign = 1;
     
 #if (DD_IMPROVED==1)
 #ifdef MULTI_GPU
-  if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < X1m3) )|| (kernel_type == EXTERIOR_KERNEL_X && x1 >= X1m3))
+  if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 < (X[0]-3)) )|| (kernel_type == EXTERIOR_KERNEL_X && x1 >= (X[0]-3)))
 #endif
     {
-      int sp_idx_3rd_nbr = ((x1 >= X1m3) ? X -X1m3 : X+3) >> 1;
+      int sp_idx_3rd_nbr = ((x1 >= (X[0]-3)) ? full_idx-(X[0]-3) : full_idx+3) >> 1;
       READ_LONG_MATRIX(LONGLINK0TEX, 0, ga_idx, long_stride);        
       READ_LONG_PHASE(LONGPHASE0TEX, 0, ga_idx, long_stride);
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;    
+      int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
       if ( (kernel_type == EXTERIOR_KERNEL_X)){
 	int space_con = (x4*X3X2+x3*X2+x2)/2;		
-	if (x1  >= X1m3){
-	  nbr_idx3 = param.ghostOffset[0] + 3*NFACE*ghostFace[0] +(x1-X1m3)*ghostFace[0]+ space_con;
+	if (x1  >= (X[0]-3)){
+	  nbr_idx3 = param.ghostOffset[0] + 3*NFACE*ghostFace[0] +(x1-(X[0]-3))*ghostFace[0]+ space_con;
 	  stride3 = NFACE*ghostFace[0];
 #if (DD_PREC == 2) //half precision
-	  norm_idx3 = param.ghostNormOffset[0] + NFACE*ghostFace[0] + (x1-X1m3)*ghostFace[0]+ space_con;
+	  norm_idx3 = param.ghostNormOffset[0] + NFACE*ghostFace[0] + (x1-(X[0]-3))*ghostFace[0]+ space_con;
 #endif	
 	}
       }
@@ -516,16 +528,16 @@ int sign = 1;
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 1)) || (kernel_type == EXTERIOR_KERNEL_X && x1 < 1))
 #endif
     {
-      int sp_idx_1st_nbr = ((x1==0) ? X+X1m1 : X-1) >> 1;
+      int sp_idx_1st_nbr = ((x1==0) ? full_idx+(X[0]-1) : full_idx-1) >> 1;
       int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
       if ((x1 -1) < 0){
-	fat_idx = Vh + space_con;
+	fat_idx = half_volume + space_con;
       }
 #endif
       READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif	 
@@ -556,17 +568,17 @@ int sign = 1;
   if ( (kernel_type == INTERIOR_KERNEL && ( (!param.ghostDim[0]) || x1 >= 3)) || (kernel_type == EXTERIOR_KERNEL_X && x1 < 3))
 #endif
     {
-      int sp_idx_3rd_nbr = ((x1<3) ? X + X1m3: X -3)>>1; 
+      int sp_idx_3rd_nbr = ((x1<3) ? full_idx+(X[0]-3): full_idx-3)>>1; 
       int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
       if ((x1 -3) < 0){
-	long_idx =Vh + x1*X4X3X2h + space_con;
+	long_idx =half_volume + x1*X4X3X2h + space_con;
       }    
 #endif
       READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 		
       READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 		
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;
+      int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif	     
@@ -608,24 +620,24 @@ int sign = 1;
   int ga_idx = sid;
 
 #ifdef MULTI_GPU
-  int space_con = (x4*X3X1+x3*X1+x1)/2;
-  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2m1))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= X2m1))
+  int space_con = ((x4*X[2]+x3)*X[0]+x1)/2;
+  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < (X[1]-1)))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= (X[1]-1)))
 #endif
     {
-      int sp_idx_1st_nbr = ((x2==X2m1) ? X-X2X1mX1 : X+X1) >> 1;
+      int sp_idx_1st_nbr = ((x2==(X[1]-1)) ? full_idx-(X1X0-X[0]) : full_idx+X[0]) >> 1;
       READ_FAT_MATRIX(FATLINK0TEX, 2, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif	 
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_Y){	    
-	if (x2 >= X2m1){
-	  nbr_idx1 = param.ghostOffset[1] + 3*NFACE*ghostFace[1] +(x2-X2m1)*ghostFace[1]+ space_con;
+	if (x2 >= (X[1]-1)){
+	  nbr_idx1 = param.ghostOffset[1] + 3*NFACE*ghostFace[1] +(x2-(X[1]-1))*ghostFace[1]+ space_con;
 	  stride1 = NFACE*ghostFace[1];
 #if (DD_PREC == 2) //half precision
-	  norm_idx1 = param.ghostNormOffset[1] + NFACE*ghostFace[1] + (x2-X2m1)*ghostFace[1]+ space_con;
+	  norm_idx1 = param.ghostNormOffset[1] + NFACE*ghostFace[1] + (x2-(X[1]-1))*ghostFace[1]+ space_con;
 #endif		    
 	}      
       }
@@ -643,24 +655,24 @@ int sign = 1;
 #if (DD_IMPROVED==1)
 
 #ifdef MULTI_GPU
-  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < X2m3))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= X2m3))    
+  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 < (X[1]-3)))|| (kernel_type == EXTERIOR_KERNEL_Y && x2 >= (X[1]-3)))    
 #endif
     {
-      int sp_idx_3rd_nbr = ((x2 >= X2m3 ) ? X-X2m3*X1 : X+3*X1) >> 1;    
+      int sp_idx_3rd_nbr = ((x2 >= (X[1]-3) ) ? full_idx-(X[1]-3)*X[0] : full_idx+3*X[0]) >> 1;    
       READ_LONG_MATRIX(LONGLINK0TEX, 2, ga_idx, long_stride);
       READ_LONG_PHASE(LONGPHASE0TEX, 2, ga_idx, long_stride);
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;        
+      int stride3 = param.sp_stride;        
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_Y){
-	if (x2>= X2m3){
-	  nbr_idx3 = param.ghostOffset[1] + 3*NFACE*ghostFace[1] +(x2-X2m3)*ghostFace[1]+ space_con;
+	if (x2>= (X[1]-3)){
+	  nbr_idx3 = param.ghostOffset[1] + 3*NFACE*ghostFace[1] +(x2-(X[1]-3))*ghostFace[1]+ space_con;
 	  stride3 = NFACE*ghostFace[1];
 #if (DD_PREC == 2) //half precision
-	  norm_idx3 = param.ghostNormOffset[1] + NFACE*ghostFace[1] + (x2-X2m3)*ghostFace[1]+ space_con;
+	  norm_idx3 = param.ghostNormOffset[1] + NFACE*ghostFace[1] + (x2-(X[1]-3))*ghostFace[1]+ space_con;
 #endif		    
 	}
       }
@@ -689,20 +701,20 @@ int sign = 1;
 
   int dir=3;
 #ifdef MULTI_GPU
-  int space_con = (x4*X3X1 + x3*X1+ x1) >>1;    
+  int space_con = (x4*X[2]*X[0] + x3*X[0] + x1) >>1;    
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 1)) || (kernel_type == EXTERIOR_KERNEL_Y && x2 < 1))
 #endif
     {
-      int sp_idx_1st_nbr = ((x2==0)    ? X+X2X1mX1 : X-X1) >> 1;
+      int sp_idx_1st_nbr = ((x2==0)    ? full_idx+(X1X0-X[0]) : full_idx-X[0]) >> 1;
       int fat_idx=sp_idx_1st_nbr;
 #ifdef MULTI_GPU
       if ((x2 -1) < 0){
-	fat_idx = Vh + space_con;
+	fat_idx = half_volume + space_con;
       }    
 #endif
       READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif	 
@@ -733,17 +745,17 @@ int sign = 1;
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[1]) || x2 >= 3)) || (kernel_type == EXTERIOR_KERNEL_Y && x2 < 3))
 #endif
     {
-      int sp_idx_3rd_nbr = ((x2 < 3) ? X + X2m3*X1: X -3*X1 )>> 1; 
+      int sp_idx_3rd_nbr = ((x2 < 3) ? full_idx + (X[1]-3)*X[0]: full_idx -3*X[0] )>> 1; 
       int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
       if ((x2-3) < 0){
-	long_idx = Vh+ x2*X4X3X1h + space_con;
+	long_idx = half_volume+ x2*(X[3]*X[2]*X[0] >> 1) + space_con;
       }    
 #endif
       READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride); 
       READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride); 
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;    
+      int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif	 
@@ -784,23 +796,23 @@ int sign = 1;
 
 #ifdef MULTI_GPU
   int space_con = (x4*X2X1+x2*X1+x1)/2;
-  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m1))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= X3m1))
+  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < (X[2]-1)))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= (X[2]-1)))
 #endif
     {
-      int sp_idx_1st_nbr = ((x3==X3m1) ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
+      int sp_idx_1st_nbr = ((x3==(X[2]-1)) ? full_idx-(X[2]-1)*X1X0 : full_idx+X1X0) >> 1;
       READ_FAT_MATRIX(FATLINK0TEX, 4, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif	 
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_Z){	
-	if (x3 >= X3m1){
-	  nbr_idx1 = param.ghostOffset[2] + 3*NFACE*ghostFace[2] +(x3-X3m1)*ghostFace[2]+ space_con;
+	if (x3 >= (X[2]-1)){
+	  nbr_idx1 = param.ghostOffset[2] + 3*NFACE*ghostFace[2] +(x3-(X[2]-1))*ghostFace[2]+ space_con;
 	  stride1 = NFACE*ghostFace[2];	    
 #if (DD_PREC == 2) //half precision
-	  norm_idx1 = param.ghostNormOffset[2] + NFACE*ghostFace[2] + (x3-X3m1)*ghostFace[2]+ space_con;
+	  norm_idx1 = param.ghostNormOffset[2] + NFACE*ghostFace[2] + (x3-(X[2]-1))*ghostFace[2]+ space_con;
 #endif		
 	}      
       }
@@ -818,24 +830,24 @@ int sign = 1;
 #if (DD_IMPROVED==1)
 
 #ifdef MULTI_GPU
-  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < X3m3))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= X3m3))
+  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 < (X[2]-3)))|| (kernel_type == EXTERIOR_KERNEL_Z && x3 >= (X[2]-3)))
 #endif
     {
-      int sp_idx_3rd_nbr = ((x3>= X3m3)? X -X3m3*X2X1: X + 3*X2X1)>> 1;    
+      int sp_idx_3rd_nbr = ((x3>= (X[2]-3))? full_idx -(X[2]-3)*X1X0: full_idx + 3*X1X0)>> 1;    
       READ_LONG_MATRIX(LONGLINK0TEX, 4, ga_idx, long_stride);
       READ_LONG_PHASE(LONGPHASE0TEX, 4, ga_idx, long_stride);
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;
+      int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif	 
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_Z){
-	if (x3 >= X3m3){
-	  nbr_idx3 = param.ghostOffset[2] + 3*NFACE*ghostFace[2] +(x3-X3m3)*ghostFace[2]+ space_con;
+	if (x3 >= (X[2]-3)){
+	  nbr_idx3 = param.ghostOffset[2] + 3*NFACE*ghostFace[2] +(x3-(X[2]-3))*ghostFace[2]+ space_con;
 	  stride3 = NFACE*ghostFace[2];
 #if (DD_PREC == 2) //half precision
-	  norm_idx3 = param.ghostNormOffset[2] + NFACE*ghostFace[2] + (x3-X3m3)*ghostFace[2]+ space_con;
+	  norm_idx3 = param.ghostNormOffset[2] + NFACE*ghostFace[2] + (x3-(X[2]-3))*ghostFace[2]+ space_con;
 #endif
 	}
       }
@@ -870,16 +882,16 @@ int sign = 1;
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 1)) || (kernel_type == EXTERIOR_KERNEL_Z && x3 < 1))
 #endif
     {
-      int sp_idx_1st_nbr = ((x3==0)    ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
+      int sp_idx_1st_nbr = ((x3==0)    ? full_idx+(X[2]-1)*X1X0 : full_idx-X1X0) >> 1;
       int fat_idx = sp_idx_1st_nbr;
 #ifdef MULTI_GPU
       if ((x3 -1) < 0){
-	fat_idx = Vh + space_con;
+	fat_idx = half_volume + space_con;
       }    
 #endif
       READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif	 
@@ -910,17 +922,17 @@ int sign = 1;
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[2]) || x3 >= 3)) || (kernel_type == EXTERIOR_KERNEL_Z && x3 < 3))
 #endif
     {
-      int sp_idx_3rd_nbr = ((x3 <3) ? X + X3m3*X2X1: X - 3*X2X1)>>1;
+      int sp_idx_3rd_nbr = ((x3 <3) ? full_idx + (X[2]-3)*X1X0: full_idx - 3*X1X0)>>1;
       int long_idx = sp_idx_3rd_nbr;
 #ifdef MULTI_GPU
       if ((x3 -3) < 0){
-	long_idx = Vh + x3*X4X2X1h + space_con;
+	long_idx = half_volume + x3*(X3X1X0 >> 1) + space_con;
       }    
 #endif
       READ_LONG_MATRIX(LONGLINK1TEX, dir, long_idx, long_stride);         
       READ_LONG_PHASE(LONGPHASE1TEX, dir, long_idx, long_stride);         
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;    
+      int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif	 
@@ -959,24 +971,24 @@ int sign = 1;
   int ga_idx = sid;
 
 #ifdef MULTI_GPU
-  int space_con = (x3*X2X1+x2*X1+x1)/2;
-  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < X4m1))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= X4m1))
+  int space_con = (x3*X1X0+x2*X[0]+x1)/2;
+  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < (X[3]-1)))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= (X[3]-1)))
 #endif
     {    
-      int sp_idx_1st_nbr = ((x4==X4m1) ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
+      int sp_idx_1st_nbr = ((x4==(X[3]-1)) ? full_idx-(X[3]-1)*X2X1X0 : full_idx+X2X1X0) >> 1;
       READ_FAT_MATRIX(FATLINK0TEX, 6, ga_idx, fat_stride);
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_T){      
-	if (x4 >= X4m1){
-	  nbr_idx1 = param.ghostOffset[3] + 3*NFACE*ghostFace[3] +(x4-X4m1)*ghostFace[3]+ space_con;
+	if (x4 >= (X[3]-1)){
+	  nbr_idx1 = param.ghostOffset[3] + 3*NFACE*ghostFace[3] +(x4-(X[3]-1))*ghostFace[3]+ space_con;
 	  stride1 = NFACE*ghostFace[3];
 #if (DD_PREC == 2) //half precision
-	  norm_idx1 = param.ghostNormOffset[3] + NFACE*ghostFace[3] + (x4-X4m1)*ghostFace[3]+ space_con;
+	  norm_idx1 = param.ghostNormOffset[3] + NFACE*ghostFace[3] + (x4-(X[3]-1))*ghostFace[3]+ space_con;
 #endif
 	}
       }
@@ -995,24 +1007,24 @@ int sign = 1;
 #if (DD_IMPROVED==1)
 
 #ifdef MULTI_GPU
-  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < X4m3))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= X4m3))
+  if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 < (X[3]-3)))|| (kernel_type == EXTERIOR_KERNEL_T && x4 >= (X[3]-3)))
 #endif
     {
-      int sp_idx_3rd_nbr = ((x4>=X4m3)? X -X4m3*X3X2X1 : X + 3*X3X2X1)>> 1;     
+      int sp_idx_3rd_nbr = ((x4>=(X[3]-3))? full_idx -(X[3]-3)*X2X1X0 : full_idx + 3*X2X1X0)>> 1;     
       READ_LONG_MATRIX(LONGLINK0TEX, 6, ga_idx, long_stride);    
       READ_LONG_PHASE(LONGPHASE0TEX, 6, ga_idx, long_stride);    
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;    
+      int stride3 = param.sp_stride;    
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_T){
-	if (x4  >= X4m3){
-	  nbr_idx3 = param.ghostOffset[3] + 3*NFACE*ghostFace[3] +(x4-X4m3)*ghostFace[3]+ space_con;
+	if (x4  >= (X[3]-3)){
+	  nbr_idx3 = param.ghostOffset[3] + 3*NFACE*ghostFace[3] +(x4-(X[3]-3))*ghostFace[3]+ space_con;
 	  stride3 = NFACE*ghostFace[3];
 #if (DD_PREC == 2) //half precision
-	  norm_idx3 = param.ghostNormOffset[3] + NFACE*ghostFace[3] + (x4-X4m3)*ghostFace[3]+ space_con;
+	  norm_idx3 = param.ghostNormOffset[3] + NFACE*ghostFace[3] + (x4-(X[3]-3))*ghostFace[3]+ space_con;
 #endif
 	}
       }
@@ -1036,27 +1048,27 @@ int sign = 1;
 {
   //direction: -T
 #if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = ( ((x4+X4m3)%X4)>= X4m3 ) ? -1 : 1;
+  int sign = ( ((x4+(X[3]-3))%X[3])>= (X[3]-3) ) ? -1 : 1;
 #endif
     
   int dir = 7;
 
 #ifdef MULTI_GPU
-  int space_con = (x3*X2X1+x2*X1+x1)/2;
+  int space_con = (x3*X1X0+x2*X[0]+x1)/2;
   if ((kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 1)) || (kernel_type == EXTERIOR_KERNEL_T && x4 < 1))
 #endif
     {
-      int sp_idx_1st_nbr = ((x4==0)    ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
+      int sp_idx_1st_nbr = ((x4==0)    ? full_idx+(X[3]-1)*X2X1X0 : full_idx-X2X1X0) >> 1;
       int fat_idx = sp_idx_1st_nbr;    
       int nbr_idx1 = sp_idx_1st_nbr;
-      int stride1 = sp_stride;
+      int stride1 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx1 = nbr_idx1;
 #endif
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_T){
 	if ( (x4 - 1) < 0){
-	  fat_idx = Vh + space_con;
+	  fat_idx = half_volume + space_con;
 	}
 		
 	if (x4 - 1 < 0){
@@ -1085,17 +1097,17 @@ int sign = 1;
   if ( (kernel_type == INTERIOR_KERNEL && ((!param.ghostDim[3]) || x4 >= 3)) || (kernel_type == EXTERIOR_KERNEL_T && x4 < 3))
 #endif
     {
-      int sp_idx_3rd_nbr = ((x4<3) ? X + X4m3*X3X2X1: X - 3*X3X2X1) >> 1;
+      int sp_idx_3rd_nbr = ((x4<3) ? full_idx + (X[3]-3)*X2X1X0: full_idx - 3*X2X1X0) >> 1;
       int long_idx = sp_idx_3rd_nbr;
       int nbr_idx3 = sp_idx_3rd_nbr;
-      int stride3 = sp_stride;
+      int stride3 = param.sp_stride;
 #if (DD_PREC == 2) //half precision
       int norm_idx3 = nbr_idx3;
 #endif	    
 #ifdef MULTI_GPU
       if (kernel_type == EXTERIOR_KERNEL_T){
 	if ( (x4 - 3) < 0){
-	  long_idx = Vh + x4*ghostFace[3]+ space_con;
+	  long_idx = half_volume + x4*ghostFace[3]+ space_con;
 	}	
 	if (x4 - 3 < 0){
 	  nbr_idx3 = param.ghostOffset[3] + x4*ghostFace[3]+ space_con;
@@ -1175,7 +1187,7 @@ if (kernel_type != INTERIOR_KERNEL){
 
 
 // write spinor field back to device memory
-WRITE_SPINOR(out);
+WRITE_SPINOR(out, param.sp_stride);
 
 
 // undefine to prevent warning when precision is changed

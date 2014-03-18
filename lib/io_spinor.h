@@ -639,17 +639,17 @@
   }
 
 
-#define WRITE_ST_SPINOR_DOUBLE2(out)				\
-  out[0*sp_stride+sid] = make_double2(o00_re, o00_im);	\
-  out[1*sp_stride+sid] = make_double2(o01_re, o01_im);	\
-  out[2*sp_stride+sid] = make_double2(o02_re, o02_im);
+#define WRITE_ST_SPINOR_DOUBLE2(out, mystride)				\
+  out[0*mystride+sid] = make_double2(o00_re, o00_im);	\
+  out[1*mystride+sid] = make_double2(o01_re, o01_im);	\
+  out[2*mystride+sid] = make_double2(o02_re, o02_im);
 
-#define WRITE_ST_SPINOR_FLOAT2(out)			\
-  out[0*sp_stride+sid] = make_float2(o00_re, o00_im);	\
-  out[1*sp_stride+sid] = make_float2(o01_re, o01_im);	\
-  out[2*sp_stride+sid] = make_float2(o02_re, o02_im);
+#define WRITE_ST_SPINOR_FLOAT2(out, mystride)			\
+  out[0*mystride+sid] = make_float2(o00_re, o00_im);	\
+  out[1*mystride+sid] = make_float2(o01_re, o01_im);	\
+  out[2*mystride+sid] = make_float2(o02_re, o02_im);
 
-#define WRITE_ST_SPINOR_SHORT2(out)					\
+#define WRITE_ST_SPINOR_SHORT2(out, mystride)					\
   float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));			\
   float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im));			\
   float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im));			\
@@ -659,24 +659,24 @@
   float scale = __fdividef(MAX_SHORT, c0);				\
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
-  out[sid+0*sp_stride] = make_short2((short)o00_re, (short)o00_im);	\
-  out[sid+1*sp_stride] = make_short2((short)o01_re, (short)o01_im);	\
-  out[sid+2*sp_stride] = make_short2((short)o02_re, (short)o02_im);
+  out[sid+0*mystride] = make_short2((short)o00_re, (short)o00_im);	\
+  out[sid+1*mystride] = make_short2((short)o01_re, (short)o01_im);	\
+  out[sid+2*mystride] = make_short2((short)o02_re, (short)o02_im);
 
 // Non-cache writes to minimize cache polution
 #if (__COMPUTE_CAPABILITY__ >= 200)
 
-#define WRITE_ST_SPINOR_DOUBLE2_STR(out) \
-  store_streaming_double2(&out[0*sp_stride+sid], o00_re, o00_im);	\
-  store_streaming_double2(&out[1*sp_stride+sid], o01_re, o01_im);	\
-  store_streaming_double2(&out[2*sp_stride+sid], o02_re, o02_im);
+#define WRITE_ST_SPINOR_DOUBLE2_STR(out, mystride) \
+  store_streaming_double2(&out[0*mystride+sid], o00_re, o00_im);	\
+  store_streaming_double2(&out[1*mystride+sid], o01_re, o01_im);	\
+  store_streaming_double2(&out[2*mystride+sid], o02_re, o02_im);
 
-#define WRITE_ST_SPINOR_FLOAT2_STR(out)			       \
-  store_streaming_float2(&out[0*sp_stride+sid], o00_re, o00_im);	\
-  store_streaming_float2(&out[1*sp_stride+sid], o01_re, o01_im);	\
-  store_streaming_float2(&out[2*sp_stride+sid], o02_re, o02_im);
+#define WRITE_ST_SPINOR_FLOAT2_STR(out, mystride)			       \
+  store_streaming_float2(&out[0*mystride+sid], o00_re, o00_im);	\
+  store_streaming_float2(&out[1*mystride+sid], o01_re, o01_im);	\
+  store_streaming_float2(&out[2*mystride+sid], o02_re, o02_im);
 
-#define WRITE_ST_SPINOR_SHORT2_STR(out) \
+#define WRITE_ST_SPINOR_SHORT2_STR(out, mystride)       \
   float c0 = fmaxf(fabsf(o00_re), fabsf(o00_im));	\
   float c1 = fmaxf(fabsf(o01_re), fabsf(o01_im));	\
   float c2 = fmaxf(fabsf(o02_re), fabsf(o02_im));	\
@@ -686,9 +686,9 @@
   float scale = __fdividef(MAX_SHORT, c0);			    \
   o00_re *= scale; o00_im *= scale; o01_re *= scale; o01_im *= scale;	\
   o02_re *= scale; o02_im *= scale;					\
-  store_streaming_short2(&g_out[0*sp_stride+sid], (short)o00_re, (short)o00_im); \
-  store_streaming_short2(&g_out[1*sp_stride+sid], (short)o01_re, (short)o01_im); \
-  store_streaming_short2(&g_out[2*sp_stride+sid], (short)o02_re, (short)o02_im);
+  store_streaming_short2(&g_out[0*mystride+sid], (short)o00_re, (short)o00_im); \
+  store_streaming_short2(&g_out[1*mystride+sid], (short)o01_re, (short)o01_im); \
+  store_streaming_short2(&g_out[2*mystride+sid], (short)o02_re, (short)o02_im);
 #else
 
 #define WRITE_ST_SPINOR_DOUBLE2_STR() WRITE_ST_SPINOR_DOUBLE2()
