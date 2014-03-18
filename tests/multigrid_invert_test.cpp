@@ -346,12 +346,12 @@ int main(int argc, char **argv)
 
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
   {
-    ((float*)spinorIn)[0] = 1.0;
+    for (int i=0; i<3; i++) ((float*)spinorIn)[(niter*3+i)*2+0] = 1.0;
     //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
   }
   else
   {
-    ((double*)spinorIn)[niter*24] = 1.0;
+    for (int i=0; i<3; i++) ((double*)spinorIn)[(niter*3+i)*2+0] = 1.0;
     //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
   }
 
