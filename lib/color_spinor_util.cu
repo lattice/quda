@@ -5,7 +5,9 @@ namespace quda {
 
   using namespace colorspinor;
 
-  // Random number insertion over all field elements
+  /**
+     Random number insertion over all field elements
+  */
   template <class T>
   void random(T &t) {
     for (int x=0; x<t.Volume(); x++) {
@@ -18,12 +20,32 @@ namespace quda {
     }
   }
 
-  // Create a point source at spacetime point x, spin s and colour c
+  /**
+     Create a point source at spacetime point x, spin s and colour c
+  */
   template <class T>
-  void point(T &t, int x, int s, int c) { t(x, s, c, 0) = 1.0; }
+  void point(T &t, int x, int s, int c) { t(x, s, c) = 1.0; }
 
-  const int n = 0;
+  /**
+     Set all space-time real elements at spin s and color c of the
+     field equal to k
+  */
+  template <class T>
+  void constant(T &t, int k, int s, int c) {
+    for (int x=0; x<t.Volume(); x++) {
+      // set all color-spin components to zero
+      for (int s2=0; s2<t.Nspin(); s2++) {
+	for (int c2=0; c2<t.Ncolor(); c2++) {
+	  t(x,s2,c2) = 0.0;
+	}
+      }
+      t(x,s,c) = k; // now set the one we want
+    }
+  }
 
+  /**
+     Insert a sinusoidal wave sin ( n * (x[d] / X[d]) * pi ) in dimension d
+   */
   template <class P>
   void sin(P &p, int d, int n) {
     for (int t=0; t<p.X(3); t++) {
@@ -67,6 +89,7 @@ namespace quda {
       FieldOrder<double> *A = createOrder<double>(a);
       if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
       else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
+      else if (sourceType == QUDA_CONSTANT_SOURCE) constant(*A, x, s, c);
       else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(*A, x, s);
       else errorQuda("Unsupported source type %d", sourceType);
       delete A;
@@ -74,6 +97,7 @@ namespace quda {
       FieldOrder<float> *A = createOrder<float>(a);
       if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
       else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
+      else if (sourceType == QUDA_CONSTANT_SOURCE) constant(*A, x, s, c);
       else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(*A, x, s);
       else errorQuda("Unsupported source type %d", sourceType);
       delete A;
