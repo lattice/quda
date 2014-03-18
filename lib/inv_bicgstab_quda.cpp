@@ -304,6 +304,8 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
+    if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b,r);
+
     profile.Stop(QUDA_PROFILE_EPILOGUE);
 
     profile.Start(QUDA_PROFILE_FREE);
