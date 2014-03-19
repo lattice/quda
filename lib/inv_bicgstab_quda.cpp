@@ -23,7 +23,7 @@ namespace quda {
   }
 
   BiCGstab::~BiCGstab() {
-    profile.Start(QUDA_PROFILE_FREE);
+    //profile.Start(QUDA_PROFILE_FREE);
 
     if(init) {
       delete yp;
@@ -34,7 +34,7 @@ namespace quda {
       delete tp;
     }
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    //profile.Stop(QUDA_PROFILE_FREE);
   }
 
   int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
@@ -303,6 +303,8 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();
+
+    if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b,r);
 
     profile.Stop(QUDA_PROFILE_EPILOGUE);
 

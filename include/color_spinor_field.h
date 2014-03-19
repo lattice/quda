@@ -263,6 +263,9 @@ namespace quda {
     virtual ColorSpinorField& Even() { errorQuda("Not implemented"); return *this; }
     virtual ColorSpinorField& Odd() { errorQuda("Not implemented"); return *this; }
 
+    virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0)
+    { errorQuda("Not implemented"); }
+
     /** 
      * Compute the n-dimensional site index given the 1-d offset index
      * @param y n-dimensional site index

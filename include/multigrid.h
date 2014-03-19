@@ -111,6 +111,9 @@ namespace quda {
     /** Storage for the parameter struct for the post-smoother */
     MGParam *param_postsmooth;
 
+    /** The coarse-grid representation of the null space vectors */
+    std::vector<ColorSpinorField*> *B_coarse;
+
     /** Residual vector */
     ColorSpinorField *r;
 
@@ -142,6 +145,8 @@ namespace quda {
        instance
      */
     virtual ~MG();
+
+    void verify();
 
     /**
        This applies the V-cycle to the residual vector returning the residual vector
@@ -195,11 +200,12 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
 
-      errorQuda("Not implemented");
+      //errorQuda("Not implemented");
+
       t->P(tmp, in);
-      tmp3 = tmp;
-      dirac->M(tmp4, tmp3);
-      tmp2 = tmp4;
+      //tmp3 = tmp;
+      dirac->M(tmp2, tmp);
+      //tmp2 = tmp4;
       t->R(out, tmp2);
     }
 
@@ -211,11 +217,11 @@ namespace quda {
       //printfQuda("Prolongate\n");
       t->P(tmp, in);
       //printfQuda("tmp4 = tmp\n");
-      tmp4 = tmp;
+      //tmp4 = tmp;
       //printfQuda("Find dirac(tmp3,dummy)\n");
-      dirac->M(tmp3, tmp4);
+      dirac->M(tmp2, tmp);
       //printfQuda("tmp2 = tmp3\n");
-      tmp2 = tmp3;
+      //tmp2 = tmp3;
       //printfQuda("Restriction\n");
       t->R(out, tmp2);
       //printfQuda("End DiracCoarse()\n");
@@ -225,11 +231,11 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
     {
-      errorQuda("Not implemented");
+      //errorQuda("Not implemented");
       t->P(tmp, in);
-      tmp3 = tmp;
-      dirac->M(tmp4, tmp3);
-      tmp2 = tmp4;
+      //tmp3 = tmp;
+      dirac->M(tmp2, tmp);
+      //tmp2 = tmp4;
       t->R(out, tmp2);
     }
   };

@@ -41,8 +41,9 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
-
+extern double mass;
 extern char latfile[];
+extern int niter;
 
 extern void usage(char** );
 
@@ -111,11 +112,10 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  //QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
- QudaPrecision cpu_prec = QUDA_SINGLE_PRECISION;
+  QudaPrecision cpu_prec = prec;
   QudaPrecision cuda_prec = prec;
   QudaPrecision cuda_prec_sloppy = prec_sloppy;
-  QudaPrecision cuda_prec_precondition = QUDA_SINGLE_PRECISION;
+  QudaPrecision cuda_prec_precondition = prec_sloppy;
   //QudaPrecision cuda_prec_precondition = QUDA_HALF_PRECISION;
 
 
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
   //gauge_param.anisotropy = 2.38;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
@@ -148,8 +148,6 @@ int main(int argc, char **argv)
   inv_param.dslash_type = dslash_type;
 
   //Free field!
-  double mass = 0.1;
-  //double mass = -0.4125;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -159,7 +157,6 @@ int main(int argc, char **argv)
     //inv_param.twist_flavor = QUDA_TWIST_MINUS;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-    inv_param.mass = 0.02;
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;
@@ -199,7 +196,7 @@ int main(int argc, char **argv)
   inv_param.tol = 1e-7;
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
-  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
+  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
   inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
 #else
   // Pre Fermi architecture only supports L2 relative residual norm
@@ -210,7 +207,7 @@ int main(int argc, char **argv)
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
-  inv_param.maxiter = 25000;
+  inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-2; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters
@@ -349,12 +346,12 @@ int main(int argc, char **argv)
 
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
   {
-    ((float*)spinorIn)[0] = 1.0;
+    for (int i=0; i<3; i++) ((float*)spinorIn)[(niter*3+i)*2+0] = 1.0;
     //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
   }
   else
   {
-    ((double*)spinorIn)[0] = 1.0;
+    for (int i=0; i<3; i++) ((double*)spinorIn)[(niter*3+i)*2+0] = 1.0;
     //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
   }
 

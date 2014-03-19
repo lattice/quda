@@ -1,81 +1,219 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
+#include <tune_quda.h>
+#include <cub/cub.cuh>
 #include <typeinfo>
 
 namespace quda {
 
   using namespace quda::colorspinor;
 
-  // Applies the grid restriction operator (fine to coarse)
-  template <class CoarseSpinor, class FineSpinor>
-  void restrict(CoarseSpinor &out, const FineSpinor &in, const int* geo_map, const int* spin_map) {
+  /** 
+      Kernel argument struct
+  */
+  template <typename Out, typename In, typename Rotator, typename Tmp>
+  struct RestrictArg {
+    Out &out;
+    Tmp &tmp;
+    const In &in;
+    const Rotator &V;
+    const int *fine_to_coarse;  // need to make a device copy of this
+    const int *coarse_to_fine;  // need to make a device copy of this
+    int spin_map[4];
+    RestrictArg(Out &out, const In &in, const Rotator &V, 
+		Tmp &tmp, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) : 
+      out(out), tmp(tmp), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine)  
+    { for (int s=0; s<4; s++) this->spin_map[s] = spin_map[s]; }
 
-    // We need to zero all elements first, since this is a reduction operation
-    for (int x=0; x<in.Volume(); x++) {
-      for (int s=0; s<in.Nspin(); s++) {
-	for (int c=0; c<in.Ncolor(); c++) {
-	  out(geo_map[x], spin_map[s], c) = 0.0;
-	}
+    RestrictArg(const RestrictArg<Out,In,Rotator,Tmp> &arg) : 
+      out(arg.out), in(arg.in), V(arg.V), tmp(arg.tmp), 
+      fine_to_coarse(arg.fine_to_coarse), coarse_to_fine(arg.coarse_to_fine) 
+    { for (int s=0; s<4; s++) this->spin_map[s] = arg.spin_map[s]; }
+  };
+
+  /**
+     Applies the grid restriction operator (fine to coarse)
+  */
+  template <class Coarse, class Fine>
+  __device__ __host__ void restrict(Coarse &out, const Fine &in, int x, 
+				    const int* fine_to_coarse, const int* spin_map) {
+    for (int s=0; s<in.Nspin(); s++) {
+      for (int c=0; c<in.Ncolor(); c++) {
+	out(fine_to_coarse[x], spin_map[s], c) += in(x, s, c);
       }
     }
-
-    for (int x=0; x<in.Volume(); x++) {
-      for (int s=0; s<in.Nspin(); s++) {
-	for (int c=0; c<in.Ncolor(); c++) {
-	  out(geo_map[x], spin_map[s], c) += in(x, s, c);
-	}
-      }
-    }
-
   }
 
-  /*
-    Rotates from the fine-color basis into the coarse-color basis.
+  /**
+     Rotates from the fine-color basis into the coarse-color basis.
   */
   template <class CoarseColor, class FineColor, class Rotator>
-  void rotateCoarseColor(CoarseColor &out, const FineColor &in, const Rotator &V) {
+  __device__ __host__ void rotateCoarseColor(CoarseColor &out, const FineColor &in, const Rotator &V, int x) {
+    for (int s=0; s<out.Nspin(); s++) 
+      for (int i=0; i<out.Ncolor(); i++) out(x, s, i) = 0.0;
+    
+    for (int i=0; i<out.Ncolor(); i++) {
+      for (int s=0; s<out.Nspin(); s++) {
+	for (int j=0; j<in.Ncolor(); j++) {
+	  out(x, s, i) += quda::conj(V(x, s, j, i)) * in(x, s, j);
+	}
+      }
+    }
+  }
 
-    for(int x=0; x<in.Volume(); x++) {
+  template <typename Arg>
+  void Restrict(Arg &arg) {
+    // Zero all elements first, since this is a reduction operation
+    for (int x=0; x<arg.out.Volume(); x++)
+      for (int s=0; s<arg.out.Nspin(); s++) 
+	for (int c=0; c<arg.out.Ncolor(); c++)
+	  arg.out(x, s, c) = 0.0;
 
-      for (int s=0; s<out.Nspin(); s++) for (int i=0; i<out.Ncolor(); i++) out(x, s, i) = 0.0;
+    for (int x=0; x<arg.in.Volume(); x++) {
+      rotateCoarseColor(arg.tmp, arg.in, arg.V, x);
+      restrict(arg.out, arg.tmp, x, arg.fine_to_coarse, arg.spin_map);
+    }
+  }
 
-      for (int i=0; i<out.Ncolor(); i++) {
-	for (int s=0; s<out.Nspin(); s++) {
-	  for (int j=0; j<in.Ncolor(); j++) {
-	    out(x, s, i) += quda::conj(V(x, s, j, i)) * in(x, s, j);
-	  }
+  /**
+     Here, we ensure that each thread block maps exactly to a geometric block
+
+     Each thread block corresponds to one geometric block, with number
+     of threads equal to the number of fine grid points per aggregate,
+     so each thread represents a fine-grid point.  The look up table
+     coarse_to_fine is the mapping to the each fine grid point. 
+  */
+  template <typename Float, typename Arg, int block_size>
+  __global__ void RestrictKernel(Arg arg) {
+    int x_coarse = blockIdx.x;
+
+    // obtain fine index from this look up table
+    int x_fine = arg.coarse_to_fine[blockIdx.x*blockDim.x + threadIdx.x];
+    
+    rotateCoarseColor(arg.tmp, arg.in, arg.V, x_fine);
+ 
+    //this is going to be severely sub-optimal until color and spin are templated
+    typedef quda::complex<Float> Complex;
+    typedef cub::BlockReduce<Complex, block_size> BlockReduce;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+
+    const int length = arg.out.Nspin() * arg.out.Ncolor();
+    Complex *reduced = (Complex*)malloc(length * sizeof(Complex));
+    for (int i=0; i<length; i++) reduced[i] = 0.0;
+
+    for (int s=0; s<arg.out.Nspin(); s++) {
+      for (int c=0; c<arg.out.Ncolor(); c++) {
+	reduced[arg.spin_map[s]*arg.out.Ncolor()+c] += BlockReduce(temp_storage).Sum( arg.tmp(x_fine, s, c) );
+      }
+    }
+
+    if (threadIdx.x==0) {
+      for (int s=0; s<arg.out.Nspin(); s++) {
+	for (int c=0; c<arg.out.Ncolor(); c++) {
+	  arg.out(x_coarse, s, c) = reduced[s*arg.out.Ncolor()+c];
+	}
+      }
+    }
+    free(reduced);
+  }
+
+  template <typename Float, typename Arg>
+  class RestrictLaunch : public Tunable {
+
+  protected:
+    const Arg &arg;
+    QudaFieldLocation location;
+    const int block_size;
+
+    long long flops() const { return 0; }
+    long long bytes() const { return 0; }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return arg.in.Volume(); }
+
+  public:
+    RestrictLaunch(const Arg &arg, const QudaFieldLocation location) 
+      : arg(arg), location(location), block_size(arg.in.Volume()/arg.out.Volume()) { }
+    virtual ~RestrictLaunch() { }
+
+    void apply(const cudaStream_t &stream) {
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+	Restrict(arg);
+      } else {
+	// no tuning here currently as we're assuming CTA size = geo
+	// block size later can think about multiple points per thread
+	// (after we have fully templated the parameters).
+	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+	if (block_size == 16) {
+	  RestrictKernel<Float,Arg,16><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 256) {
+	  RestrictKernel<Float,Arg,256><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else {
+	  errorQuda("Block size not instantiated");
 	}
       }
     }
 
-  }
+    TuneKey tuneKey() const {
+      std::stringstream vol, aux;
+      vol << arg.out.Volume(); 
+      // FIXME should use stride here
+      aux << "out_stride=" << arg.out.Volume() << ",in_stride=" << arg.in.Volume();
+      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+    }
+
+    void initTuneParam(TuneParam &param) const {
+      param.block = dim3(arg.in.Volume()/arg.out.Volume(), 1, 1);
+      param.grid = dim3( (arg.in.Volume()+param.block.x-1) / param.block.x, 1, 1);
+      param.shared_bytes = 0;
+    }
+
+    /** sets default values for when tuning is disabled */
+    void defaultTuneParam(TuneParam &param) const {
+      param.block = dim3(block_size, 1, 1);
+      param.grid = dim3( (arg.in.Volume()+param.block.x-1) / param.block.x, 1, 1);
+      param.shared_bytes = 0;
+    }
+
+  };
 
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      FieldOrder<double> *outOrder = createOrder<double>(out);
-      FieldOrder<double> *inOrder = createOrder<double>(in);
-      FieldOrder<double> *vOrder = createOrder<double>(v, Nvec);
-      FieldOrder<double> *tmpOrder = createOrder<double>(tmp);
-      rotateCoarseColor(*tmpOrder, *inOrder, *vOrder);
-      restrict(*outOrder, *tmpOrder, geo_map, spin_map);
+      typedef FieldOrder<double> Field;
+      Field *outOrder = createOrder<double>(out);
+      Field *inOrder = createOrder<double>(in);
+      Field *vOrder = createOrder<double>(v, Nvec);
+      Field *tmpOrder = createOrder<double>(tmp);
+      RestrictArg<Field,Field,Field,Field> 
+	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
+      RestrictLaunch<double, RestrictArg<Field, Field, Field, Field> > 
+	restrictor(arg, Location(out, in, v));
+      restrictor.apply(0);
       delete outOrder;
       delete inOrder;
       delete vOrder;
       delete tmpOrder;
     } else {
-      FieldOrder<float> *outOrder = createOrder<float>(out);
-      FieldOrder<float> *inOrder = createOrder<float>(in);
-      FieldOrder<float> *vOrder = createOrder<float>(v, Nvec);
-      FieldOrder<float> *tmpOrder = createOrder<float>(tmp);
-      rotateCoarseColor(*tmpOrder, *inOrder, *vOrder);
-      restrict(*outOrder, *tmpOrder, geo_map, spin_map);
+      typedef FieldOrder<float> Field;
+      Field *outOrder = createOrder<float>(out);
+      Field *inOrder = createOrder<float>(in);
+      Field *vOrder = createOrder<float>(v, Nvec);
+      Field *tmpOrder = createOrder<float>(tmp);
+      RestrictArg<Field,Field,Field,Field> 
+	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
+      RestrictLaunch<float, RestrictArg<Field, Field, Field, Field> > 
+	restrictor(arg, Location(out, in, v));
+      restrictor.apply(0);
       delete outOrder;
       delete inOrder;
       delete vOrder;
       delete tmpOrder;
     }
+
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  checkCudaError();
   }
 
 } // namespace quda

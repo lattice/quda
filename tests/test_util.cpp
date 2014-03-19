@@ -1558,6 +1558,7 @@ int nvec  = 1;
 char vecfile[256] = "";
 QudaInverterType inv_type;
 int multishift = 0;
+double mass = 0.1;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1602,6 +1603,7 @@ void usage(char** argv )
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --nvec                                    # Number of vectors to load\n");
+  printf("    --mass                                    # Mass of Dirac operator\n");
   printf("    --load-vec file                           # Load the vectors \"file\" for the multigrid_test (requires QIO\n");
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
@@ -1945,6 +1947,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       printf("ERROR: invalid number of vectors (%d)\n", nvec);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mass") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mass= atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

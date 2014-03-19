@@ -399,7 +399,7 @@ namespace quda {
 
     //printf("\nparity = %d\n", parity);
 
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] *= 2;
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = 2*y[0] + parity;
   }
 
   ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) {
