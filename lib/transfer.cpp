@@ -152,8 +152,6 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
 
-    printf("Prolongator locations: out = %d, in = %d\n", out.Location(), in.Location());
-
     ColorSpinorField *output = &out;
     if (out.Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam param(out);
@@ -177,8 +175,6 @@ namespace quda {
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
-
-    printf("Restrictor locations: out = %d, in = %d\n", out.Location(), in.Location());
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
