@@ -24,13 +24,14 @@ namespace quda {
       class FieldOrder {
 
     protected:
-      ColorSpinorField &field; // temporary hack
       complex<Float> *v;
-      int x[QUDA_MAX_DIM];
+      mutable int x[QUDA_MAX_DIM];
       const int volume;
       const int nDim;
       const int nColor;
       const int nSpin;
+      const QudaGammaBasis gammaBasis;
+      const QudaSiteSubset siteSubset;
       const int nVec;
 
     public:
@@ -39,12 +40,11 @@ namespace quda {
        * @param field The field that we are accessing
        */
     FieldOrder(ColorSpinorField &field, int nVec=1) 
-      : field(field), v(static_cast<complex<Float>*>(field.V())), 
+      : v(static_cast<complex<Float>*>(field.V())), 
 	volume(field.Volume()), nDim(field.Ndim()), nColor(field.Ncolor()), 
-	nSpin(field.Nspin()), nVec(nVec)
+	nSpin(field.Nspin()), gammaBasis(field.GammaBasis()), 
+	siteSubset(field.SiteSubset()), nVec(nVec)
       { for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
-
-      ColorSpinorField& Field() const { return field; }
 
       /**
        * Destructor for the FieldOrder class
@@ -81,6 +81,60 @@ namespace quda {
 
       /** Returns the field geometric dimension */
       __device__ __host__ int Ndim() const { return nDim; }
+
+      /** Returns the field geometric dimension */
+      __device__ __host__ QudaGammaBasis GammaBasis() const { return gammaBasis; }
+
+      /** Returns the field geometric dimension */
+      __device__ __host__ int SiteSubset() const { return siteSubset; }
+
+      /**
+	 Convert from 1-dimensional index to the n-dimensional spatial index.
+	 With full fields, we assume that the field is even-odd ordered.  The
+	 lattice coordinates that are computed here are full-field
+	 coordinates.
+      */
+      __device__ __host__ void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
+	
+	for (int d=0; d<nDim; d++) {
+	  y[d] = i % x[d];
+	  i /= x[d];    
+	}
+	int parity = i; // parity is the slowest running dimension
+	
+	// convert into the full-field lattice coordinate
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  for (int d=1; d<nDim; d++) parity += y[d];
+	  parity = parity & 1;
+	  x[0] *= 2; // restore x[0]
+	}
+	y[0] = 2*y[0] + parity;  // compute the full x coordinate
+      }
+      
+      /**
+	 Convert from n-dimensional spatial index to the 1-dimensional index.
+	 With full fields, we assume that the field is even-odd ordered.  The
+	 input lattice coordinates are always full-field coordinates.
+      */
+      __device__ __host__ void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
+	int parity = 0;
+	
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  for (int d=0; d<nDim; d++) parity += y[d];
+	  parity = parity & 1;
+	  y[0] /= 2;
+	  x[0] /= 2; 
+	}
+	
+	i = parity;
+	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
+	
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  y[0] = 2*y[0] + parity;
+	  x[0] *= 2; // restore x[0]
+	}
+      }
 
       /**
        * Specialized read-only complex-member accessor function (for mg prolongator)

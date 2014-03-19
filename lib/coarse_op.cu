@@ -173,8 +173,8 @@ namespace quda {
   //c = fine color
   //FIXME: N.B. Only works if color-spin field and gauge field are parity ordered in the same way.  Need LatticeIndex function for generic ordering
   template<typename Float>
-  void UV(colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, 
-	  const gauge::FieldOrder<Float> &G, int dir, int ndim, const int *x_size, int Nc, int Nc_c, int Ns) {
+  void computeUV(colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, 
+		 const gauge::FieldOrder<Float> &G, int dir, int ndim, const int *x_size, int Nc, int Nc_c, int Ns) {
 	
     for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
 
@@ -184,7 +184,7 @@ namespace quda {
 
       int coord[QUDA_MAX_DIM];
       int coordV[QUDA_MAX_DIM];
-      V.Field().LatticeIndex(coord, i);
+      V.LatticeIndex(coord, i);
 
       int parity = 0;
       for(int d = 0; d < ndim; d++) {
@@ -195,7 +195,7 @@ namespace quda {
       //Shift the V field w/respect to G
       coordV[dir] = (coord[dir]+1)%x_size[dir];
       int i_V;
-      V.Field().OffsetIndex(i_V, coordV);
+      V.OffsetIndex(i_V, coordV);
 
       for(int s = 0; s < Ns; s++) {  //Fine Spin
 	for(int ic_c = 0; ic_c < Nc_c; ic_c++) {  //Coarse Color
@@ -210,7 +210,7 @@ namespace quda {
   }  //UV
 
   template<typename Float>
-  void VUV(int dir, gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, const Gamma &gamma, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, const int *geo_bs, int spin_bs) {
+  void computeVUV(int dir, gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, const Gamma &gamma, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, const int *geo_bs, int spin_bs) {
 
     for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
 
@@ -220,7 +220,7 @@ namespace quda {
       int coarse_size = 1;
       int coarse_parity = 0;
       int coarse_index = 0;
-      V.Field().LatticeIndex(coord, i);
+      V.LatticeIndex(coord, i);
       for(int d = ndim-1; d >= 0; d--) {
 	coord_coarse[d] = coord[d]/geo_bs[d];
 	coarse_size *= xc_size[d];
@@ -402,7 +402,8 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   template<typename Float>
-void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float> &V, const gauge::FieldOrder<Float> &G, const int *x_size) {
+  void calculateY(gauge::FieldOrder<Float> &Y, colorspinor::FieldOrder<Float> &UV, 
+		  const colorspinor::FieldOrder<Float> &V, const gauge::FieldOrder<Float> &G, const int *x_size) {
 //  void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float> &V, const gauge::FieldOrder<Float> &G,  int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c,const int *geo_bs, int spin_bs) {
 //  void calculateY(quda::complex<Float> *Y[], const colorspinor::FieldOrder<Float> &V, const gauge::FieldOrder<Float> &G, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c,const int *geo_bs, int spin_bs) {
 #if 1
@@ -420,21 +421,15 @@ void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float
     int spin_bs = Ns/Ns_c;
 #endif
 
-    //Create a field UV which holds U*V.  Has the same structure as V.
-    ColorSpinorParam UVparam(V.Field());
-    UVparam.create = QUDA_ZERO_FIELD_CREATE;
-    cpuColorSpinorField uv(UVparam);
-    colorspinor::FieldOrder<Float> *UVorder = colorspinor::createOrder<Float>(uv,Nc_c);
-
     for(int d = 0; d < ndim; d++) {
       //First calculate UV
-      UV<Float>(*UVorder, V, G, d, ndim, x_size, Nc, Nc_c, Ns);
+      computeUV<Float>(UV, V, G, d, ndim, x_size, Nc, Nc_c, Ns);
 
       //Gamma matrix for this direction
-      Gamma gamma(d, UVorder->Field().GammaBasis());
+      Gamma gamma(d, UV.GammaBasis());
 
       //Calculate VUV for this direction, accumulate in the appropriate place
-      VUV<Float>(d, Y, *UVorder, V, gamma, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
+      computeVUV<Float>(d, Y, UV, V, gamma, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
 
       reverseY<Float>(d, Y, ndim, xc_size, Nc_c, Ns_c);
     }
@@ -461,6 +456,7 @@ void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float
     gf_param.anisotropy = gauge.Anisotropy();
     gf_param.gauge = NULL;
     gf_param.create = QUDA_NULL_FIELD_CREATE;
+    gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
 
     cpuGaugeField g(gf_param);
 
@@ -491,19 +487,26 @@ void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float
     int Ns_c = Ns/spin_bs;
 #endif
     const int *x_size = g.X();
+
+    //Create a field UV which holds U*V.  Has the same structure as V.
+    ColorSpinorParam UVparam(T.Vectors());
+    UVparam.create = QUDA_ZERO_FIELD_CREATE;
+    cpuColorSpinorField uv(UVparam);
+
     if (precision == QUDA_DOUBLE_PRECISION) {
       colorspinor::FieldOrder<double> *vOrder = colorspinor::createOrder<double>(T.Vectors(),T.nvec());
+      colorspinor::FieldOrder<double> *uvOrder = colorspinor::createOrder<double>(uv,T.nvec());
       gauge::FieldOrder<double> *gOrder = gauge::createOrder<double>(g);
       gauge::FieldOrder<double> *yOrder = gauge::createOrder<double>(Y, T.Vectors().Nspin()/T.Spin_bs());
 //      calculateY<double>(*yOrder, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
-	calculateY<double>(*yOrder, *vOrder, *gOrder, x_size);
-    }
-    else {
+      calculateY<double>(*yOrder, *uvOrder, *vOrder, *gOrder, x_size);
+    } else {
       colorspinor::FieldOrder<float> * vOrder = colorspinor::createOrder<float>(T.Vectors(), T.nvec());
+      colorspinor::FieldOrder<float> *uvOrder = colorspinor::createOrder<float>(uv,T.nvec());
       gauge::FieldOrder<float> *gOrder = gauge::createOrder<float>(g);
       gauge::FieldOrder<float> *yOrder = gauge::createOrder<float>(Y, T.Vectors().Nspin()/T.Spin_bs());
       //calculateY<float>(*yOrder, *vOrder, *gOrder, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
-      calculateY<float>(*yOrder, *vOrder, *gOrder, x_size);
+      calculateY<float>(*yOrder, *uvOrder, *vOrder, *gOrder, x_size);
     }
   }  
 
@@ -518,14 +521,14 @@ void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float
     int sites = in.Volume();
     int x_size[QUDA_MAX_DIM];
     for(int d = 0; d < ndim; d++) {
-      x_size[d] = in.Field().X()[d];
+      x_size[d] = in.X(d);
     }
 
     for(int i = 0; i < sites; i++) { //Volume
       int coord[QUDA_MAX_DIM];
       int parity = 0;
       int gauge_index = 0;
-      in.Field().LatticeIndex(coord,i);
+      in.LatticeIndex(coord,i);
       for(int dim = ndim-1; dim >= 0; dim--) {
         parity += coord[dim];
         gauge_index *= x_size[dim];
@@ -548,12 +551,12 @@ void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float
         //We need the coordinates of the forward site to index into the "out" field.
         //We need the coordinates of the backward site to index into the "out" field, \
 	//as well as to retrieve the gauge field there for parallel transport.
-	in.Field().LatticeIndex(forward,i);
-        in.Field().LatticeIndex(backward,i);
+	in.LatticeIndex(forward,i);
+        in.LatticeIndex(backward,i);
 	forward[d] = (forward[d] + 1)%x_size[d];
 	backward[d] = (backward[d] - 1 + x_size[d])%x_size[d];
-	out.Field().OffsetIndex(forward_spinor_index, forward);
-	out.Field().OffsetIndex(backward_spinor_index, backward);
+	out.OffsetIndex(forward_spinor_index, forward);
+	out.OffsetIndex(backward_spinor_index, backward);
 
         for(int dim = ndim-1; dim >= 0; dim--) {
           backward_parity += backward[dim];
@@ -595,7 +598,7 @@ void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float
     int sites = out.Volume();
     int x_size[QUDA_MAX_DIM];
     for(int d = 0; d < ndim; d++) {
-      x_size[d] = out.Field().X()[d];
+      x_size[d] = out.X(d);
     }
 
 
@@ -603,7 +606,7 @@ void calculateY(gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float
       int coord[QUDA_MAX_DIM];
       int parity = 0;
       int gauge_index = 0;
-      out.Field().LatticeIndex(coord,i);
+      out.LatticeIndex(coord,i);
       for(int dim = ndim-1; dim >= 0; dim--) {
         parity += coord[dim];
         gauge_index *= x_size[dim];

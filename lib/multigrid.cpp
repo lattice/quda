@@ -101,6 +101,7 @@ namespace quda {
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
 
       // coarse null space vectors (dummy for now)
+      printfQuda("Creating coarse null-space vectors\n");
       B_coarse = new std::vector<ColorSpinorField*>();
       B_coarse->resize(param.Nvec);
       for (int i=0; i<param.Nvec; i++) {
@@ -109,6 +110,7 @@ namespace quda {
       }
 
       // create the next multigrid level
+      printfQuda("Creating next multigrid level\n");
       param_coarse = new MGParam(param, *B_coarse, *matCoarse, *matCoarse);
       param_coarse->level++;
       param_coarse->fine = this;
@@ -297,10 +299,8 @@ namespace quda {
     int ndim = t->Vectors().Ndim();
     int x[QUDA_MAX_DIM];
     //Number of coarse sites.
-    int vol = t->Vectors().Volume();
     const int *geo_bs = t->Geo_bs();
     for(int i = 0; i < ndim; i++) {
-      vol /= geo_bs[i];
       x[i] = t->Vectors().X(i)/geo_bs[i];
     }
 
@@ -311,6 +311,7 @@ namespace quda {
     int Ns_c = t->Vectors().Nspin()/t->Spin_bs();
 
     GaugeFieldParam gParam = new GaugeFieldParam();
+    memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
     gParam.nColor = Nc_c*Ns_c;
     gParam.reconstruct = QUDA_RECONSTRUCT_NO;
     gParam.order = QUDA_QDP_GAUGE_ORDER;
@@ -321,9 +322,10 @@ namespace quda {
     gParam.nDim = ndim;
     gParam.siteDim= 2*ndim+1;
     gParam.geometry = QUDA_COARSE_GEOMETRY;
+    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     cpuGaugeField *Y = new cpuGaugeField(gParam);
     
-    dirac->createCoarseOp(*t,*Y);
+    //dirac->createCoarseOp(*t,*Y);
   }
 
 }
