@@ -205,6 +205,10 @@ extern "C" {
      */
     QudaInverterType inv_type_precondition;
 
+    /**
+      Dirac Dslash used in preconditioner
+    */
+    QudaDslashType dslash_type_precondition;
     /** Verbosity of the inner Krylov solver */
     QudaVerbosity verbosity_precondition;
 
