@@ -283,6 +283,8 @@ extern "C" {
   typedef enum QudaSourceType_s {
     QUDA_POINT_SOURCE,
     QUDA_RANDOM_SOURCE,
+    QUDA_CONSTANT_SOURCE,
+    QUDA_SINUSOIDAL_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   

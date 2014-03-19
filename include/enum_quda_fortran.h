@@ -253,6 +253,8 @@
 #define QudaSourceType integer(4)
 #define QUDA_POINT_SOURCE 0
 #define QUDA_RANDOM_SOURCE 1
+#define QUDA_CONSTANT_SOURCE 2
+#define QUDA_SINUSOIDAL_SOURCE 3
 #define QUDA_INVALID_SOURCE QUDA_INVALID_ENUM
   
 #define QudaTwistFlavorType integer(4)

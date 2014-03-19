@@ -69,6 +69,8 @@ extern QudaDslashType dslash_type;
 
 extern QudaInverterType inv_type;
 
+extern double mass;
+
 static void end();
 
 template<typename Float>
@@ -174,8 +176,6 @@ invert_test(void)
 {
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
-
-  double mass = 0.5;
 
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,

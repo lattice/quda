@@ -118,13 +118,13 @@ namespace quda {
   Timer() : time(0.0), last(0.0), running(false), count(0) { ; } 
 
     void Start() {
-      if (running) errorQuda("Cannot start an already running timer");
+      //if (running) errorQuda("Cannot start an already running timer");
       gettimeofday(&start, NULL);
       running = true;
     }
 
     void Stop() {
-      if (!running) errorQuda("Cannot stop a non-running timer");
+      //if (!running) errorQuda("Cannot stop a non-running timer");
       gettimeofday(&stop, NULL);
 
       long ds = stop.tv_sec - start.tv_sec;

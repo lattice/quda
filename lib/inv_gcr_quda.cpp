@@ -142,8 +142,10 @@ namespace quda {
       K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
       K = new MR(matPrecon, Kparam, profile);
-    else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
-      errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+    else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unknown preconditioner
+      K = NULL;
+    else 
+      errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
 
   }
 
@@ -156,9 +158,7 @@ namespace quda {
 
   GCR::~GCR() {
     profile.Start(QUDA_PROFILE_FREE);
-
     if (K) delete K;
-
     profile.Stop(QUDA_PROFILE_FREE);
   }
 
@@ -290,8 +290,6 @@ namespace quda {
 	    blas::copy(rPre, *rM);
 	  }
 
-	  printfQuda("GCR: pPre.order = %d rPre.order = %d\n", pPre.FieldOrder(), rPre.FieldOrder());
-
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
 	  else blas::copy(pPre, rPre);
 	
@@ -303,7 +301,7 @@ namespace quda {
 
 	} else { // no preconditioner
 	  *p[k] = rSloppy;
-	} 
+	}
       
 	matSloppy(*Ap[k], *p[k], tmp);
 	if (getVerbosity()>= QUDA_DEBUG_VERBOSE)
@@ -395,7 +393,7 @@ namespace quda {
 
     param.gflops += gflops;
     param.iter += total_iter;
-  
+
     // reset the flops counters
     blas::flops = 0;
     mat.flops();

@@ -43,7 +43,7 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern QudaInverterType  inv_type;
 extern int multishift; // whether to test multi-shift or standard solver
-
+extern double mass;
 extern char latfile[];
 
 extern void usage(char** );
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
   gauge_param.anisotropy = 1.0;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
@@ -144,8 +144,6 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  //double mass = -0.4125;
-  double mass = 0.1;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -155,7 +153,6 @@ int main(int argc, char **argv)
     //inv_param.twist_flavor = QUDA_TWIST_MINUS;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
-    inv_param.mass = 0.02;
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;

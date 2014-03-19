@@ -35,8 +35,16 @@ namespace quda {
     /** The geometrical coase grid blocking */
     int *geo_bs;
 
-    /** The mapping onto coarse sites from fine sites */
-    int *geo_map;
+    /** The mapping onto coarse sites from fine sites.  This has
+	length equal to the fine-grid volume, and is sorted into
+	lexicographical fine-grid order, with each value corresponding
+	to a coarse-grid offset. */
+    int *fine_to_coarse;
+
+    /** The mapping onto fine sites from coarse sites. This has length
+	equal to the fine-grid volume, and is sorted into lexicographical
+	block order, with each value corresponding to a fine-grid offset.*/
+    int *coarse_to_fine;
 
     /** The spin blocking */
     int spin_bs;
@@ -102,8 +110,8 @@ namespace quda {
      * @param B Array of null-space vectors
      * @param Nvec Number of null-space vectors
      * @param d The Dirac operator to which these null-space vectors correspond
-     * @param geo_map Geometric mapping from fine grid to coarse grid 
-     * @param spin_map Mapping from fine spin to coarse spin 
+     * @param geo_bs The geometric block sizes to use
+     * @param spin_bs The spin block sizes to use
      */
     Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs);
 
@@ -153,15 +161,15 @@ namespace quda {
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec);
 
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
-			  const int *geo_map, int spin_bs);
+			  const int *fine_to_coarse, int spin_bs);
 
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, 
 		  const ColorSpinorField &v, ColorSpinorField &tmp, 
-		  int Nvec, const int *geo_map, const int *spin_map);
+		  int Nvec, const int *fine_to_coarse, const int *spin_map);
 
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, 
 		const ColorSpinorField &v, ColorSpinorField &tmp,
-		int Nvec, const int *geo_map, const int *spin_map);
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map);
   
 
 } // namespace quda

@@ -4,16 +4,23 @@
 #include <transfer.h>
 #include <multigrid.h>
 
+#include <iostream>
+#include <algorithm>
+#include <vector>
+
 namespace quda {
 
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
-    : B(B), Nvec(Nvec), V(0), tmp(0), geo_bs(0), geo_map(0), spin_bs(spin_bs), spin_map(0)
+    : B(B), Nvec(Nvec), V(0), tmp(0), geo_bs(0), fine_to_coarse(0), coarse_to_fine(0), spin_bs(spin_bs), spin_map(0)
   {
     int ndim = B[0]->Ndim();
     this->geo_bs = new int[ndim];
     for (int d = 0; d < ndim; d++) {
       this->geo_bs[d] = geo_bs[d];
     }
+
+    if (B[0]->X(0) == geo_bs[0]) 
+      errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);
 
     printfQuda("Transfer: using block size %d", geo_bs[0]);
     for (int d=1; d<ndim; d++) printfQuda(" x %d", geo_bs[d]);
@@ -35,10 +42,10 @@ namespace quda {
     }
 
     if (typeid(*B[0]) == typeid(cpuColorSpinorField)) {
-      printfQuda("Transfer: creating cpu V field\n");
+      printfQuda("Transfer: creating cpu V field with basis %d\n", param.gammaBasis);
       V = new cpuColorSpinorField(param);
     } else {
-      printfQuda("Transfer: creating cuda V field\n");
+      printfQuda("Transfer: creating cuda V field with basis %d\n", param.gammaBasis);
       V = new cudaColorSpinorField(param);      
     }
 
@@ -55,8 +62,9 @@ namespace quda {
     else 
       tmp = new cudaColorSpinorField(param);      
 
-    // allocate and compute the fine-to-coarse site map
-    geo_map = new int[B[0]->Volume()];
+    // allocate and compute the fine-to-coarse and coarse-to-fine site maps
+    fine_to_coarse = new int[B[0]->Volume()];
+    coarse_to_fine = new int[B[0]->Volume()];
     createGeoMap(geo_bs);
 
     // allocate the fine-to-coarse spin map
@@ -65,13 +73,14 @@ namespace quda {
 
     // orthogonalize the blocks
     printfQuda("Transfer: block orthogonalizing\n");
-    BlockOrthogonalize(*V, Nvec, geo_bs, geo_map, spin_bs);
+    BlockOrthogonalize(*V, Nvec, geo_bs, fine_to_coarse, spin_bs);
     printfQuda("Transfer: V block orthonormal check %g\n", blas::norm2(*V));
   }
 
   Transfer::~Transfer() {
     if (spin_map) delete [] spin_map;
-    if (geo_map) delete [] geo_map;
+    if (coarse_to_fine) delete [] coarse_to_fine;
+    if (fine_to_coarse) delete [] fine_to_coarse;
     if (V) delete V;
     if (tmp) delete tmp;
   }
@@ -79,6 +88,16 @@ namespace quda {
   void Transfer::fillV() { 
     FillV(*V, B, Nvec);  //printfQuda("V fill check %e\n", norm2(*V));
   }
+
+  struct Int2 {
+    int x, y;
+    Int2() : x(0), y(0) { } 
+    Int2(int x, int y) : x(x), y(y) { } 
+    
+    bool operator<(const Int2 &a) const {
+      return (x < a.x) ? true : (x==a.x && y<a.y) ? true : false;
+    }
+  };
 
   // compute the fine-to-coarse site map
   void Transfer::createGeoMap(int *geo_bs) {
@@ -99,20 +118,26 @@ namespace quda {
     for (int i=0; i<tmp->Volume(); i++) {
       // compute the lattice-site index for this offset index
       tmp->LatticeIndex(x, i);
-
-      //printf("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
+      
+      //printfQuda("fine idx %d = fine (%d,%d,%d,%d), ", i, x[0], x[1], x[2], x[3]);
 
       // compute the corresponding coarse-grid index given the block size
       for (int d=0; d<tmp->Ndim(); d++) x[d] /= geo_bs[d];
 
-      // compute the coarse-offset index and store in the geo_map
+      // compute the coarse-offset index and store in fine_to_coarse
       int k;
       coarse.OffsetIndex(k, x); // this index is parity ordered
-      geo_map[i] = k;
+      fine_to_coarse[i] = k;
 
-      //printf("coarse (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
+      //printfQuda("coarse after (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
     }
 
+    // now create an inverse-like variant of this
+
+    std::vector<Int2> geo_sort(B[0]->Volume());
+    for (unsigned int i=0; i<geo_sort.size(); i++) geo_sort[i] = Int2(fine_to_coarse[i], i);
+    std::sort(geo_sort.begin(), geo_sort.end());
+    for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine[i] = geo_sort[i].y;
   }
 
   // compute the fine spin to coarse spin map
@@ -126,6 +151,7 @@ namespace quda {
 
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
+
     ColorSpinorField *output = &out;
     if (out.Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam param(out);
@@ -135,11 +161,11 @@ namespace quda {
       output = new cpuColorSpinorField(param);
     }
 
-    if ((output->GammaBasis() != V->GammaBasis()) || (in.GammaBasis() != V->GammaBasis()) )
+    if ((output->GammaBasis() != V->GammaBasis()) || (in.GammaBasis() != V->GammaBasis()))
       errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
 
-    Prolongate(*output, in, *V, *tmp, Nvec, geo_map, spin_map);
+    Prolongate(*output, in, *V, *tmp, Nvec, fine_to_coarse, spin_map);
 
     if (out.Location() == QUDA_CUDA_FIELD_LOCATION) { 
       out = *output; // copy result to cuda field
@@ -149,6 +175,7 @@ namespace quda {
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     if (in.Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam param(in);
@@ -163,7 +190,7 @@ namespace quda {
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-    Restrict(out, *input, *V, *tmp, Nvec, geo_map, spin_map);
+    Restrict(out, *input, *V, *tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
 
     if (in.Location() == QUDA_CUDA_FIELD_LOCATION) { delete input; }
   }

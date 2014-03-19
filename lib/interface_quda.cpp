@@ -1466,7 +1466,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
   double nb = blas::norm2(*b);
-  if (nb==0.0) errorQuda("Solution has zero norm");
+  if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = blas::norm2(*h_b);
@@ -1687,7 +1687,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
   double nb = blas::norm2(*b);
-  if (nb==0.0) errorQuda("Solution has zero norm");
+  if (nb==0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nh_b = blas::norm2(*h_b);
@@ -1755,7 +1755,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
   
   printfQuda("Creating vector of null space fields of length %d\n", nvec);
-  cpuParam.create = QUDA_NULL_FIELD_CREATE;
+  cpuParam.create = QUDA_ZERO_FIELD_CREATE;
   std::vector<ColorSpinorField*>B;
   B.resize(nvec);
   for (int i=0; i<nvec; i++) {
@@ -1772,8 +1772,8 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = 4;
   mgParam.spinBlockSize = 2;
   mgParam.Nvec = nvec;       // set number of null space components
-  mgParam.nu_pre = 10; // set the number of pre-smoothing applications
-  mgParam.nu_post = 10; // set the number of pre-smoothing applications  
+  mgParam.nu_pre = 8; // set the number of pre-smoothing applications
+  mgParam.nu_post = 8; // set the number of pre-smoothing applications  
   mgParam.smoother = QUDA_MR_INVERTER;  // set the smoother type
 
   // create the MG preconditioner
@@ -1781,7 +1781,9 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   //(*K)(*out, *in);
 
   SolverParam solverParam(*param);
+  printfQuda("Creating GCR solver with MG preconditioner\n");
   Solver *solve = new GCR(m, *K, mSloppy, mPre, solverParam, profileInvert);
+  //Solver *solve = new GCR(m, mSloppy, mPre, solverParam, profileInvert);
   (*solve)(*out, *in);
   delete solve;
   delete K;
