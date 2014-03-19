@@ -419,7 +419,7 @@ static void setInvertParams(const int dim[4],
     QudaInverterType inverter,
     QudaInvertParam *invertParam)
 {
-  invertParam->use_sloppy_partial_accumulator = (cuda_prec_sloppy == QUDA_HALF_PRECISION) ? 0 : 1;
+  invertParam->use_sloppy_partial_accumulator = 0;
   invertParam->verbosity = verbosity;
   invertParam->mass = mass;
   invertParam->tol = target_residual;
@@ -658,7 +658,7 @@ void qudaMultishiftInvert(int external_precision,
 
   QudaInvertParam invertParam = newQudaInvertParam();
   invertParam.residual_type = (target_fermilab_residual[0] != 0) ? QUDA_HEAVY_QUARK_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
-  invertParam.use_sloppy_partial_accumulator = (device_precision_sloppy == QUDA_HALF_PRECISION) ? 0 : 1;
+  invertParam.use_sloppy_partial_accumulator = 0;
 
 
   const double ignore_mass = 1.0;
@@ -767,7 +767,7 @@ void qudaInvert(int external_precision,
   double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
       mass, target_res, inv_args.max_iter, 1e-1, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
-  invertParam.use_sloppy_partial_accumulator = (device_precision_sloppy == QUDA_HALF_PRECISION) ? 0 : 1;
+  invertParam.use_sloppy_partial_accumulator = 0;
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
