@@ -26,6 +26,7 @@ namespace quda {
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
+    else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = param.siteDim;
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
 

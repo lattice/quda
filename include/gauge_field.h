@@ -20,7 +20,7 @@ namespace quda {
     double anisotropy;
     double tadpole;
     double scale;
-
+    int siteDim;  //Used for Coarse gauge fields when nDim != siteDim;
     void *gauge; // used when we use a reference to an external field
 
     QudaFieldCreate create; // used to determine the type of field created
@@ -60,7 +60,8 @@ namespace quda {
       compute_fat_link_max(false),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
-      staggeredPhaseApplied(false)
+      staggeredPhaseApplied(false),
+      siteDim(4)
         {
 	  // variables declared in LatticeFieldParam
 	  precision = QUDA_INVALID_PRECISION;
@@ -77,7 +78,7 @@ namespace quda {
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
       pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false)
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), siteDim(4)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -93,7 +94,7 @@ namespace quda {
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
       compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
       staggeredPhaseType(param.staggered_phase_type), 
-      staggeredPhaseApplied(param.staggered_phase_applied) 
+      staggeredPhaseApplied(param.staggered_phase_applied), siteDim(param.nDim); 
       {
 	if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
