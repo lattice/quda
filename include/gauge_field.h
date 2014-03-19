@@ -20,7 +20,6 @@ namespace quda {
     double anisotropy;
     double tadpole;
     double scale;
-    int siteDim;  //Used for Coarse gauge fields when nDim != siteDim;
     void *gauge; // used when we use a reference to an external field
 
     QudaFieldCreate create; // used to determine the type of field created
@@ -40,6 +39,8 @@ namespace quda {
 
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
+
+    int siteDim;  //Used for Coarse gauge fields when nDim != siteDim;
 
     // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),

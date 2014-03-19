@@ -68,6 +68,8 @@ namespace quda {
   class DiracM;
   class DiracMdagM;
   class DiracMdag;
+  //Forward declaration of multigrid Transfer class
+  class Transfer;
 
   // Abstract base class
   class Dirac {
@@ -129,10 +131,9 @@ namespace quda {
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 
     void Dagger(QudaDagType dag) { dagger = dag; }
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y) const {errorQuda("Not implemented");}
+    virtual void applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y) const {errorQuda("Not implemented");}
   };
-
-  //Forward declaration of multigrid Transfer class
-  class Transfer;
 
   // Full Wilson
   class DiracWilson : public Dirac {
@@ -160,13 +161,12 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-
-    virtual void createCoarseOp(const Transfer &T, void *Y[], QudaPrecision precision) const;
-    virtual void applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision) const; 
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y) const;
+    virtual void applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y) const; 
   };
 
-  void CoarseOp(const Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge);
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision, double kappa);
+  void CoarseOp(const Transfer &T, GaugeField &Y, const cudaGaugeField &gauge);
+  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, double kappa);
 
   // Even-odd preconditioned Wilson
   class DiracWilsonPC : public DiracWilson {

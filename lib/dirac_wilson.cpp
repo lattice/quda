@@ -113,8 +113,8 @@ namespace quda {
   grid
   */
 
-  void DiracWilson::createCoarseOp(const Transfer &T, void *Y[], QudaPrecision precision) const {
-    CoarseOp(T, Y, precision, gauge);
+  void DiracWilson::createCoarseOp(const Transfer &T, GaugeField &Y) const {
+    CoarseOp(T, Y, gauge);
   }
 
   /* Takes the coarse color matrices Y created by createCoarseOp
@@ -122,8 +122,8 @@ namespace quda {
      spinor field in, putting the result in out.
      The local color matrix is stored in Y[2*ndim]
   */
-  void DiracWilson::applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision) const {
-      ApplyCoarse(out, in, Y, precision, kappa);
+  void DiracWilson::applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y) const {
+      ApplyCoarse(out, in, Y, kappa);
   }
 
 

@@ -262,5 +262,39 @@ namespace quda {
     printfQuda("Done loading vectors\n");
   }
 
+  void DiracCoarse::initializeCoarse() {
+
+    QudaPrecision prec = t->Vectors().Precision();
+    int ndim = t->Vectors().Ndim();
+    int x[QUDA_MAX_DIM];
+    //Number of coarse sites.
+    int vol = t->Vectors().Volume();
+    const int *geo_bs = t->Geo_bs();
+    for(int i = 0; i < ndim; i++) {
+      vol /= geo_bs[i];
+      x[i] = t->Vectors().X(i)/geo_bs[i];
+    }
+
+    //Coarse Color
+    int Nc_c = t->nvec();
+
+    //Coarse Spin
+    int Ns_c = t->Vectors().Nspin()/t->Spin_bs();
+
+    GaugeFieldParam gParam = new GaugeFieldParam();
+    gParam.nColor = Nc_c*Ns_c;
+    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam.order = QUDA_QDP_GAUGE_ORDER;
+    gParam.link_type = QUDA_COARSE_LINKS;
+    gParam.t_boundary = QUDA_PERIODIC_T;
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.precision = prec;
+    gParam.nDim = ndim;
+    gParam.siteDim= 2*ndim+1;
+    gParam.geometry = QUDA_COARSE_GEOMETRY;
+    cpuGaugeField *Y = new cpuGaugeField(gParam);
+    
+    dirac->createCoarseOp(*t,*Y);
+  }
 
 }

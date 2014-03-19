@@ -126,7 +126,7 @@ namespace quda {
 
       quda::complex<Float> **u;
 
-    QDPFieldOrder(GaugeField &U, int nSpinCoarse) : FieldOrder<Float>(U, nSpinCoarse), 
+    QDPFieldOrder(GaugeField &U, int nSpinCoarse = 1) : FieldOrder<Float>(U, nSpinCoarse), 
 	u(static_cast<quda::complex<Float>**>(U.Gauge_p())) { ; } 
       virtual ~QDPFieldOrder() { ; } 
     

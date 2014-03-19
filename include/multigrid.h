@@ -4,6 +4,7 @@
 #include <invert_quda.h>
 #include <transfer.h>
 #include <vector>
+#include <complex_quda.h>
 
 #define QUDA_MAX_MG_LEVEL 2
 
@@ -176,15 +177,24 @@ namespace quda {
     ColorSpinorField &tmp2; // must be a cpuColorSpinorField double/single with arbitrary ordering
     ColorSpinorField &tmp3; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
     ColorSpinorField &tmp4; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
+    cpuGaugeField *Y; //Coarse gauge field
+
+    void initializeCoarse();  //Initialize the coarse gauge field
 
   public:
-  DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4) 
-    : DiracMatrix(d), t(&t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) { }
-  DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4)
-    : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) { }
+    DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4) : DiracMatrix(d), t(&t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) {
+      initializeCoarse();
+    }
+      
+      DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4) : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) {
+	initializeCoarse();
+      }
+	
+	
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
+
       errorQuda("Not implemented");
       t->P(tmp, in);
       tmp3 = tmp;
