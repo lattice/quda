@@ -17,12 +17,12 @@ namespace quda {
     Tmp &tmp;
     const In &in;
     const Rotator &V;
-    const int *fine_to_coarse;  // need to make a device copy of this
-    const int *coarse_to_fine;  // need to make a device copy of this
+    const int *fine_to_coarse;
+    const int *coarse_to_fine;
     int spin_map[4];
     RestrictArg(Out &out, const In &in, const Rotator &V, 
 		Tmp &tmp, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) : 
-      out(out), tmp(tmp), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine)  
+      out(out), tmp(tmp), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine)
     { for (int s=0; s<4; s++) this->spin_map[s] = spin_map[s]; }
 
     RestrictArg(const RestrictArg<Out,In,Rotator,Tmp> &arg) : 
@@ -179,8 +179,8 @@ namespace quda {
   };
 
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
-
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, 
+		const int *coarse_to_fine, const int *spin_map) {
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       typedef FieldOrder<double> Field;
       Field *outOrder = createOrder<double>(out);
@@ -213,7 +213,7 @@ namespace quda {
       delete tmpOrder;
     }
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  checkCudaError();
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
 } // namespace quda

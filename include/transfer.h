@@ -32,19 +32,44 @@ namespace quda {
     /** A temporary field with fine geometry but coarse color */
     ColorSpinorField *tmp;
 
+    /** A temporary field with fine geometry and fine color we use for changing gamma basis */
+    ColorSpinorField *tmp2; // FIXME - this should be in the transfer kernels
+
+    /** A temporary field with coarse geometry and coarse color we use for CPU input / output */
+    ColorSpinorField *tmp3; 
+
     /** The geometrical coase grid blocking */
     int *geo_bs;
 
     /** The mapping onto coarse sites from fine sites.  This has
 	length equal to the fine-grid volume, and is sorted into
 	lexicographical fine-grid order, with each value corresponding
-	to a coarse-grid offset. */
-    int *fine_to_coarse;
+	to a coarse-grid offset. (CPU) */
+    int *fine_to_coarse_h;
 
     /** The mapping onto fine sites from coarse sites. This has length
 	equal to the fine-grid volume, and is sorted into lexicographical
-	block order, with each value corresponding to a fine-grid offset.*/
-    int *coarse_to_fine;
+	block order, with each value corresponding to a fine-grid offset. (CPU) */
+    int *coarse_to_fine_h;
+
+    /** The mapping onto coarse sites from fine sites.  This has
+	length equal to the fine-grid volume, and is sorted into
+	lexicographical fine-grid order, with each value corresponding
+	to a coarse-grid offset. (GPU) */
+    int *fine_to_coarse_d;
+
+    /** The mapping onto fine sites from coarse sites. This has length
+	equal to the fine-grid volume, and is sorted into lexicographical
+	block order, with each value corresponding to a fine-grid offset. (GPU) */
+    int *coarse_to_fine_d;
+
+    /** Points to fine_to_coarse_d or fine_to_coarse_h according to
+	default transfer type */
+    int *fine_to_coarse; 
+
+    /** Points to coarse_to_fine_d or coarse_to_fine_h according to
+	default transfer type */
+    int *coarse_to_fine; 
 
     /** The spin blocking */
     int spin_bs;
@@ -61,7 +86,7 @@ namespace quda {
     /**
      * Copies the null-space vector components into the V-field
      */
-    void fillV();
+    void fillV(ColorSpinorField &V);
 
     /** 
      * Creates the map between fine and coarse grids 
