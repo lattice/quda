@@ -31,6 +31,14 @@ namespace quda {
       report("MR");
       solver = new MR(mat, param, profile);
       break;
+    case QUDA_SD_INVERTER:
+      report("SD");
+      solver = new SD(mat, param, profile);
+      break;
+    case QUDA_PCG_INVERTER:
+      report("PCG");
+      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type");
     }

@@ -85,7 +85,9 @@ extern "C" {
     QUDA_CG_INVERTER,
     QUDA_BICGSTAB_INVERTER,
     QUDA_GCR_INVERTER,
+    QUDA_SD_INVERTER,
     QUDA_MR_INVERTER,
+    QUDA_PCG_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -152,7 +154,7 @@ extern "C" {
 
   typedef enum QudaSolverNormalization_s {
     QUDA_DEFAULT_NORMALIZATION, // leave source and solution untouched
-    QUDA_SOURCE_NORMALIZATION // normalize such that || src || = 1
+    QUDA_SOURCE_NORMALIZATION  // normalize such that || src || = 1
   } QudaSolverNormalization;
 
   typedef enum QudaPreserveSource_s {

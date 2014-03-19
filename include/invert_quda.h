@@ -237,6 +237,25 @@ namespace quda {
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
+
+  class PreconCG : public Solver {
+    private: 
+      const DiracMatrix &mat;
+      const DiracMatrix &matSloppy;
+      const DiracMatrix &matPrecon;
+
+      Solver *K;
+      SolverParam Kparam; // parameters for preconditioner solve
+
+    public:
+      PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
+               SolverParam &param, TimeProfile &profile);
+      virtual ~PreconCG();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
+
   class BiCGstab : public Solver {
 
   private:

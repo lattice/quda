@@ -945,7 +945,13 @@ namespace quda {
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 0; // comms are always off
     }
-
+  
+    // In the preconditioned staggered CG allow a different dlsash type in the preconditioning
+    if(inv_param->inv_type == QUDA_PCG_INVERTER && inv_param->dslash_type == QUDA_ASQTAD_DSLASH
+       && inv_param->dslash_type_precondition == QUDA_STAGGERED_DSLASH) {
+       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
+       diracParam.gauge = gaugeFatPrecondition;
+    }
   }
 
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
