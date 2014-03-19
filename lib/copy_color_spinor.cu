@@ -273,7 +273,7 @@ namespace quda {
   }
 
 
-  template <int Ns, typename dstFloat, typename srcFloat>
+  template <int Ns, int Nc, typename dstFloat, typename srcFloat>
     void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
 				QudaFieldLocation location, dstFloat *Dst, srcFloat *Src, 
 				float *dstNorm, float *srcNorm) {
@@ -295,10 +295,6 @@ namespace quda {
     if (dst.SiteSubset() != src.SiteSubset())
       errorQuda("Subset types do not match %d %d", dst.SiteSubset(), src.SiteSubset());
 
-    if (dst.Ncolor() != 3 || src.Ncolor() != 3) errorQuda("Nc != 3 not yet supported");
-
-    const int Nc = 3;
- 
     // We currently only support parity-ordered fields; even-odd or odd-even
     if (dst.SiteOrder() == QUDA_LEXICOGRAPHIC_SITE_ORDER) {
       errorQuda("Copying to full fields with lexicographical ordering is not currently supported");
@@ -337,6 +333,27 @@ namespace quda {
     } else { // parity field
       genericCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>
 	(dst, src, location, Dst, Src, dstNorm, srcNorm);
+    }
+
+  }
+
+  template <int Ns, typename dstFloat, typename srcFloat>
+  void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
+			      QudaFieldLocation location, dstFloat *Dst, srcFloat *Src, 
+			      float *dstNorm, float *srcNorm) {
+
+    if (dst.Ncolor() != src.Ncolor()) 
+      errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
+
+    switch(src.Ncolor()) {
+    case 3:
+      copyGenericColorSpinor<Ns,3>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
+      break;
+    case 6:
+      copyGenericColorSpinor<Ns,6>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
+      break;
+    default:
+      errorQuda("Ncolors=%d not supported", src.Ncolor());
     }
 
   }
