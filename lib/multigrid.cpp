@@ -8,8 +8,8 @@ namespace quda {
 
   MG::MG(MGParam &param, TimeProfile &profile) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), coarse(0), fine(param.fine), 
-      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), matCoarse(0), 
-      hack1(0), hack2(0), hack3(0), hack4(0) {
+      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), matCoarse(0), 
+      hack1(0), hack2(0), hack3(0), hack4(0), y(0) {
 
     printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
 

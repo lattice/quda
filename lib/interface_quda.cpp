@@ -1786,7 +1786,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   //Solver *solve = new GCR(m, mSloppy, mPre, solverParam, profileInvert);
   (*solve)(*out, *in);
   delete solve;
-  delete K;
+  // delete K; // GCR presently deletes the preconditoner
 
   for (int i=0; i<nvec; i++) delete B[i];
 
