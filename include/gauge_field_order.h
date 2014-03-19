@@ -126,7 +126,7 @@ namespace quda {
 
       quda::complex<Float> **u;
 
-    QDPFieldOrder(GaugeField &U) : FieldOrder<Float>(U), 
+    QDPFieldOrder(GaugeField &U, int nSpinCoarse) : FieldOrder<Float>(U, nSpinCoarse), 
 	u(static_cast<quda::complex<Float>**>(U.Gauge_p())) { ; } 
       virtual ~QDPFieldOrder() { ; } 
     
@@ -161,11 +161,11 @@ namespace quda {
     };
 
     template <typename Float>
-      FieldOrder<Float>* createOrder(const GaugeField &a) {
+      FieldOrder<Float>* createOrder(const GaugeField &a, int nSpinCoarse = 1) {
       FieldOrder<Float>* ptr=0;
 
       if (a.Order() == QUDA_QDP_GAUGE_ORDER) {
-	ptr = new QDPFieldOrder<Float>(const_cast<GaugeField&>(a));
+	ptr = new QDPFieldOrder<Float>(const_cast<GaugeField&>(a), nSpinCoarse);
       } else {
 	errorQuda("Order %d not supported in cpuGaugeField", a.FieldOrder());
       }
