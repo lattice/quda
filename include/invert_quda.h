@@ -291,6 +291,23 @@ namespace quda {
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
+  // Steepest descent solver used as a preconditioner 
+  class SD : public Solver {
+    private:
+      const DiracMatrix &mat;
+      cudaColorSpinorField *Ar;
+      cudaColorSpinorField *r;
+      cudaColorSpinorField *y;
+      bool init;
+    
+    public: 
+      SD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+      virtual ~SD();
+
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
   // multigrid solver
   class alphaSA : public Solver {
 

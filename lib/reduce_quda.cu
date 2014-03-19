@@ -159,6 +159,41 @@ namespace quda {
       (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   }
 
+
+    /* 
+      returns the real component of the dot product of a and b 
+      and the norm of a
+    */
+  __device__ double2 dotNormA_(const double2 &a, const double2 &b)
+  { return make_double2(a.x*b.x + a.y*b.y, a.x*a.x + a.y*a.y); }
+ 
+  __device__ double2 dotNormA_(const float2 &a, const float2 &b)
+  { return make_double2(a.x*b.x + a.y*b.y, a.x*a.x + a.y*a.y); }
+
+ 
+  __device__ double2 dotNormA_(const float4 &a, const float4 & b)
+  { return make_double2(a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w, a.x*a.x + a.y*a.y + a.z*a.z +     a.w*a.w); }
+
+
+
+  template <typename ReduceType, typename Float2, typename FloatN>
+#if (__COMPUTE_CAPABILITY__ >= 200)
+  struct DotNormA : public ReduceFunctor<ReduceType, Float2, FloatN> {
+#else
+  struct DotNormA {
+#endif
+    DotNormA(const Float2 &a, const Float2 &b){}
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,  FloatN &w, FloatN &v){sum += dotNormA_(x,y);}
+    static int streams() { return 2; }
+    static int flops() { return 4; }
+  };
+
+  double2 reDotProductNormACuda(cudaColorSpinorField &x,cudaColorSpinorField &y){
+    return reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,DotNormA,0,0,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+  }
+
+
   /**
      First performs the operation y[i] = a*x[i]
      Return the norm of y
