@@ -110,6 +110,9 @@ namespace quda {
     /** Storage for the parameter struct for the post-smoother */
     MGParam *param_postsmooth;
 
+    /** The coarse-grid representation of the null space vectors */
+    std::vector<ColorSpinorField*> *B_coarse;
+
     /** Residual vector */
     ColorSpinorField *r;
 
