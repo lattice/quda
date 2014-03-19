@@ -94,7 +94,7 @@ namespace quda {
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
       compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
       staggeredPhaseType(param.staggered_phase_type), 
-      staggeredPhaseApplied(param.staggered_phase_applied), siteDim(param.nDim); 
+      staggeredPhaseApplied(param.staggered_phase_applied), siteDim(param.nDim) 
       {
 	if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
