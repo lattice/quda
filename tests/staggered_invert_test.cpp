@@ -133,15 +133,18 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 #endif
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
+
+
+
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
 
   // domain decomposition preconditioner parameters
-  //inv_param->inv_type_precondition = QUDA_MR_INVERTER;
-  //inv_param->tol_precondition = 1e-1;
-  //inv_param->maxiter_precondition = 100;
-  //inv_param->verbosity_precondition = QUDA_SILENT;
-  //inv_param->prec_precondition = prec_sloppy;
+  inv_param->inv_type_precondition = QUDA_SD_INVERTER;
+  inv_param->tol_precondition = 1e-1;
+  inv_param->maxiter_precondition = 100;
+  inv_param->verbosity_precondition = QUDA_SILENT;
+  inv_param->cuda_prec_precondition = prec_sloppy;
 
   inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -321,6 +324,8 @@ invert_test(void)
   int ret = 0;
 
   switch(test_type){
+    case 5: 
+      inv_param.inv_type = QUDA_PCG_INVERTER;
     case 0: //even
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
@@ -344,6 +349,8 @@ invert_test(void)
 
       break;
 
+    case 6:
+      inv_param.inv_type = QUDA_PCG_INVERTER;
     case 1: //odd
 
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
@@ -535,6 +542,8 @@ usage_extra(char** argv )
   printfQuda("                                                1: Odd odd spinor CG inverter\n");
   printfQuda("                                                3: Even even spinor multishift CG inverter\n");
   printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
+  printfQuda("                                                5: Even even spinor preconditioned CG inverter\n");
+  printfQuda("                                                6: Odd odd spinor preconditioned CG inverter\n");
   printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
 
   return ;

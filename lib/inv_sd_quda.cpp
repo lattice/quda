@@ -23,18 +23,20 @@ namespace quda {
   }
 
   SD::~SD(){
-    if(param.inv_type_precondition != QUDA_CG_INVERTER) profile.Start(QUDA_PROFILE_FREE);
+    if(param.inv_type_precondition != QUDA_PCG_INVERTER) profile.Start(QUDA_PROFILE_FREE);
     if(init){
       delete r;
       delete Ar; 
       delete y;
     }
-    if(param.inv_type_precondition != QUDA_CG_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
+    if(param.inv_type_precondition != QUDA_PCG_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
   }
 
 
   void SD::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
+
+
     globalReduce = false;
     if(!init){
       r = new cudaColorSpinorField(b);
@@ -49,18 +51,19 @@ namespace quda {
     double r2 = xmyNormCuda(b,*r);
     double alpha=0.; 
     double beta=0;
-    double2 Ar2;
+    double2 rAr;
 
     int k=0;
     while(k < param.maxiter-1){
 
       mat(*Ar, *r, *y);
-      Ar2 = reDotProductNormACuda(*r, *Ar);
-      alpha = Ar2.y/Ar2.x;
+      rAr = reDotProductNormACuda(*r, *Ar);
+      alpha = rAr.y/rAr.x;
       axpyCuda(alpha, *r, x);
       axpyCuda(-alpha, *Ar, *r);
 
       if(getVerbosity() >= QUDA_VERBOSE){
+        r2 = norm2(*r);
         printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
       }
 
@@ -68,12 +71,17 @@ namespace quda {
     }
 
 
-    Ar2 = reDotProductNormACuda(*r, *Ar);
-    alpha = Ar2.y/Ar2.x;
+    rAr = reDotProductNormACuda(*r, *Ar);
+    alpha = rAr.y/rAr.x;
     axpyCuda(alpha, *r, x);
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
+    if(getVerbosity() >= QUDA_VERBOSE){
       axpyCuda(-alpha, *Ar, *r);
       r2 = norm2(*r);
+      printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
+      ++k;
+    }
+
+    if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
       // Compute the true residual
       mat(*r, x, *y);
       double true_r2 = xmyNormCuda(b,*r);
