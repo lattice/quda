@@ -2560,6 +2560,11 @@ namespace quda {
       gParam.reconstruct = QUDA_RECONSTRUCT_NO;
       gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+#ifdef MULTI_GPU
+      if(method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME) gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+#else
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+#endif
       cudaStapleField  = new cudaGaugeField(gParam);
       cudaStapleField1 = new cudaGaugeField(gParam);
     }
