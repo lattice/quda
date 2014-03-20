@@ -600,7 +600,7 @@
   double2 I1 = spinor[idx + 1*mystride];			\
   double2 I2 = spinor[idx + 2*mystride];
 
-#define READ_KS_NBR_SPINOR_DOUBLE(spinor, idx, mystride)	\
+#define READ_KS_NBR_SPINOR_DOUBLE(T, spinor, idx, mystride)	\
   T##0 = spinor[idx + 0*mystride];			\
   T##1 = spinor[idx + 1*mystride];			\
   T##2 = spinor[idx + 2*mystride];
