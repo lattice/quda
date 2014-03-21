@@ -346,6 +346,9 @@ namespace quda {
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 
     switch(src.Ncolor()) {
+    case 2:
+      copyGenericColorSpinor<Ns,2>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
+      break;
     case 3:
       copyGenericColorSpinor<Ns,3>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
       break;
@@ -368,6 +371,8 @@ namespace quda {
 
     if (dst.Nspin() == 4) {
       copyGenericColorSpinor<4>(dst, src, location, Dst, Src, dstNorm, srcNorm);
+    } else if (dst.Nspin() == 2) {
+      copyGenericColorSpinor<2>(dst, src, location, Dst, Src, dstNorm, srcNorm);
     } else if (dst.Nspin() == 1) {
       copyGenericColorSpinor<1>(dst, src, location, Dst, Src, dstNorm, srcNorm);    
     } else {
