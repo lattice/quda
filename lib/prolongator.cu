@@ -12,10 +12,10 @@ namespace quda {
   */
   template <typename Out, typename In, typename Rotator, typename Tmp>
   struct ProlongateArg {
-    Out &out;
-    Tmp &tmp;
-    const In &in;
-    const Rotator &V;
+    Out out;
+    Tmp tmp;
+    const In in;
+    const Rotator V;
     const int *geo_map;  // need to make a device copy of this
     int spin_map[4];
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
@@ -34,7 +34,8 @@ namespace quda {
      Applies the grid prolongation operator (coarse to fine)
   */
   template <class Fine, class Coarse>
-  __device__ __host__ void prolongate(Fine &out, const Coarse &in, int x, const int *geo_map, const int *spin_map) {
+  __device__ __host__ void prolongate(Fine &out, const Coarse &in, int x, 
+				      const int *geo_map, const int *spin_map) {
     for (int s=0; s<out.Nspin(); s++) {
       for (int c=0; c<in.Ncolor(); c++) {
 	out(x, s, c) = in(geo_map[x], spin_map[s], c);
@@ -69,7 +70,7 @@ namespace quda {
     }
   }
 
-  template <typename Arg>
+  template <typename Float, typename Arg>
   __global__ void ProlongateKernel(Arg arg) {
     int x = blockIdx.x*blockDim.x + threadIdx.x;
     if (x >= arg.out.Volume()) return;
@@ -77,11 +78,11 @@ namespace quda {
     rotateFineColor(arg.out, arg.tmp, arg.V, x);    
   }
   
-  template <typename Arg>
+  template <typename Float, typename Arg>
   class ProlongateLaunch : public Tunable {
 
   protected:
-    const Arg &arg;
+    Arg &arg;
     QudaFieldLocation location;
 
     long long flops() const { return 0; }
@@ -92,7 +93,7 @@ namespace quda {
     unsigned int minThreads() const { return arg.out.Volume(); }
 
   public:
-    ProlongateLaunch(const Arg &arg, const QudaFieldLocation location) 
+    ProlongateLaunch(Arg &arg, const QudaFieldLocation location) 
       : arg(arg), location(location) { }
     virtual ~ProlongateLaunch() { }
 
@@ -101,7 +102,7 @@ namespace quda {
 	Prolongate(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	ProlongateKernel<Arg> 
+	ProlongateKernel<Float,Arg> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }
@@ -127,7 +128,52 @@ namespace quda {
 
   };
 
+  template <typename Float, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		  ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *spin_map) {
+    typedef typename accessor<Float,order>::type F;
+
+    F Out(const_cast<ColorSpinorField&>(out));
+    F In(const_cast<ColorSpinorField&>(in));
+    F V(const_cast<ColorSpinorField&>(v),Nvec);
+    F Tmp(const_cast<ColorSpinorField&>(tmp));
+
+    ProlongateArg<F,F,F,F> arg(Out, In, V, Tmp, fine_to_coarse,spin_map);
+    ProlongateLaunch<double, ProlongateArg<F, F, F, F> > prolongator(arg, Location(out, in, v));
+    prolongator.apply(0);
+
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+  }
+
+  template <typename Float>
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *spin_map) {
+
+    if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+      Prolongate<Float,QUDA_FLOAT2_FIELD_ORDER>
+	(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      Prolongate<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
+	(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } else {
+      errorQuda("Unsupported field type %d", out.FieldOrder());
+    }
+  }
+
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		  ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *spin_map) {
+    if (out.Precision() == QUDA_DOUBLE_PRECISION) {
+      Prolongate<double>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+      Prolongate<float>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } else {
+      errorQuda("Unsupported precision %d", out.Precision());
+    }
+
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+  }
+
+  /*  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -164,5 +210,5 @@ namespace quda {
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  checkCudaError();
   }
-
+  */
 } // end namespace quda

@@ -11,7 +11,7 @@
 namespace quda {
 
   // this determines where the prolongation / restriction will take place
-  static bool gpu_transfer = true;
+  static bool gpu_transfer = false;
 
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
     : B(B), Nvec(Nvec), V(0), tmp(0), tmp2(0), tmp3(0), geo_bs(0), 
@@ -64,7 +64,6 @@ namespace quda {
     param.nColor = Nvec; // tmp has nColor equal to the number null-space vectors
 
     printfQuda("Transfer: creating tmp field\n");
-    std::cout << param;
     tmp = ColorSpinorField::Create(param);
     printf("done\n");
 

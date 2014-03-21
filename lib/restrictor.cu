@@ -13,10 +13,10 @@ namespace quda {
   */
   template <typename Out, typename In, typename Rotator, typename Tmp>
   struct RestrictArg {
-    Out &out;
-    Tmp &tmp;
-    const In &in;
-    const Rotator &V;
+    Out out;
+    Tmp tmp;
+    const In in;
+    const Rotator V;
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     int spin_map[4];
@@ -50,19 +50,20 @@ namespace quda {
   template <class CoarseColor, class FineColor, class Rotator>
   __device__ __host__ void rotateCoarseColor(CoarseColor &out, const FineColor &in, const Rotator &V, int x) {
     for (int s=0; s<out.Nspin(); s++) 
-      for (int i=0; i<out.Ncolor(); i++) out(x, s, i) = 0.0;
+      for (int i=0; i<out.Ncolor(); i++) 
+	out(x, s, i) = 0.0;
     
     for (int i=0; i<out.Ncolor(); i++) {
       for (int s=0; s<out.Nspin(); s++) {
 	for (int j=0; j<in.Ncolor(); j++) {
-	  out(x, s, i) += quda::conj(V(x, s, j, i)) * in(x, s, j);
+	  out(x, s, i) += conj(V(x, s, j, i)) * in(x, s, j);
 	}
       }
     }
   }
 
   template <typename Arg>
-  void Restrict(Arg &arg) {
+  void Restrict(Arg arg) {
     // Zero all elements first, since this is a reduction operation
     for (int x=0; x<arg.out.Volume(); x++)
       for (int s=0; s<arg.out.Nspin(); s++) 
@@ -93,17 +94,17 @@ namespace quda {
     rotateCoarseColor(arg.tmp, arg.in, arg.V, x_fine);
  
     //this is going to be severely sub-optimal until color and spin are templated
-    typedef quda::complex<Float> Complex;
-    typedef cub::BlockReduce<Complex, block_size> BlockReduce;
+    typedef cub::BlockReduce<complex<Float>, block_size> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
     const int length = arg.out.Nspin() * arg.out.Ncolor();
-    Complex *reduced = (Complex*)malloc(length * sizeof(Complex));
+    complex<Float> *reduced = (complex<Float>*)malloc(length * sizeof(complex<Float>));
     for (int i=0; i<length; i++) reduced[i] = 0.0;
 
     for (int s=0; s<arg.out.Nspin(); s++) {
       for (int c=0; c<arg.out.Ncolor(); c++) {
-	reduced[arg.spin_map[s]*arg.out.Ncolor()+c] += BlockReduce(temp_storage).Sum( arg.tmp(x_fine, s, c) );
+	reduced[arg.spin_map[s]*arg.out.Ncolor()+c] += 
+	  BlockReduce(temp_storage).Sum( arg.tmp(x_fine, s, c) );
       }
     }
 
@@ -121,7 +122,7 @@ namespace quda {
   class RestrictLaunch : public Tunable {
 
   protected:
-    const Arg &arg;
+    Arg &arg;
     QudaFieldLocation location;
     const int block_size;
 
@@ -133,7 +134,7 @@ namespace quda {
     unsigned int minThreads() const { return arg.in.Volume(); }
 
   public:
-    RestrictLaunch(const Arg &arg, const QudaFieldLocation location) 
+    RestrictLaunch(Arg &arg, const QudaFieldLocation location) 
       : arg(arg), location(location), block_size(arg.in.Volume()/arg.out.Volume()) { }
     virtual ~RestrictLaunch() { }
 
@@ -145,6 +146,7 @@ namespace quda {
 	// block size later can think about multiple points per thread
 	// (after we have fully templated the parameters).
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+
 	if (block_size == 16) {
 	  RestrictKernel<Float,Arg,16><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 256) {
@@ -163,11 +165,7 @@ namespace quda {
       return TuneKey(vol.str(), typeid(*this).name(), aux.str());
     }
 
-    void initTuneParam(TuneParam &param) const {
-      param.block = dim3(arg.in.Volume()/arg.out.Volume(), 1, 1);
-      param.grid = dim3( (arg.in.Volume()+param.block.x-1) / param.block.x, 1, 1);
-      param.shared_bytes = 0;
-    }
+    void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
@@ -178,42 +176,52 @@ namespace quda {
 
   };
 
+  template <typename Float, QudaFieldOrder order>
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse,
+		const int *coarse_to_fine, const int *spin_map) {
+
+    typedef typename accessor<Float,order>::type F;
+
+    F Out(const_cast<ColorSpinorField&>(out));
+    F In(const_cast<ColorSpinorField&>(in));
+    F V(const_cast<ColorSpinorField&>(v),Nvec);
+    F Tmp(const_cast<ColorSpinorField&>(tmp));
+
+    RestrictArg<F,F,F,F> arg(Out, In, V, Tmp, fine_to_coarse,coarse_to_fine,spin_map);
+    RestrictLaunch<Float, RestrictArg<F, F, F, F> > restrictor(arg, Location(out, in, v));
+    restrictor.apply(0);
+
+    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+  }
+
+  template <typename Float>
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, 
+		const int *coarse_to_fine, const int *spin_map) {
+
+    if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+      Restrict<Float,QUDA_FLOAT2_FIELD_ORDER>
+	(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      Restrict<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
+	(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else {
+      errorQuda("Unsupported field type %d", out.FieldOrder());
+    }
+  }
+
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, 
 		const int *coarse_to_fine, const int *spin_map) {
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      typedef FieldOrder<double> Field;
-      Field *outOrder = createOrder<double>(out);
-      Field *inOrder = createOrder<double>(in);
-      Field *vOrder = createOrder<double>(v, Nvec);
-      Field *tmpOrder = createOrder<double>(tmp);
-      RestrictArg<Field,Field,Field,Field> 
-	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
-      RestrictLaunch<double, RestrictArg<Field, Field, Field, Field> > 
-	restrictor(arg, Location(out, in, v));
-      restrictor.apply(0);
-      delete outOrder;
-      delete inOrder;
-      delete vOrder;
-      delete tmpOrder;
+      Restrict<double>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
+      Restrict<float>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
-      typedef FieldOrder<float> Field;
-      Field *outOrder = createOrder<float>(out);
-      Field *inOrder = createOrder<float>(in);
-      Field *vOrder = createOrder<float>(v, Nvec);
-      Field *tmpOrder = createOrder<float>(tmp);
-      RestrictArg<Field,Field,Field,Field> 
-	arg(*outOrder,*inOrder,*vOrder,*tmpOrder,fine_to_coarse,coarse_to_fine,spin_map);
-      RestrictLaunch<float, RestrictArg<Field, Field, Field, Field> > 
-	restrictor(arg, Location(out, in, v));
-      restrictor.apply(0);
-      delete outOrder;
-      delete inOrder;
-      delete vOrder;
-      delete tmpOrder;
+      errorQuda("Unsupported precision %d", out.Precision());
     }
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
 } // namespace quda
