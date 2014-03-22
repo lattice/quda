@@ -511,6 +511,13 @@ static void setInvertParams(const int dim[4],
   return;
 }
 
+static int getFatLinkPadding(const int dim[4])
+{
+  int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
+  padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
+  padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
+  return padding;
+}
 
 static void setGaugeParams(const int dim[4],
     QudaPrecision cpu_prec,
@@ -536,7 +543,7 @@ static void setGaugeParams(const int dim[4],
   gaugeParam->tadpole_coeff = tadpole;
   gaugeParam->t_boundary = QUDA_PERIODIC_T; // anti-periodic boundary conditions are built into the gauge field
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER; 
-  gaugeParam->ga_pad = dim[0]*dim[1]*dim[2]/2;
+  gaugeParam->ga_pad = getFatLinkPadding(dim);
   gaugeParam->scale = -1.0/(24.0*gaugeParam->tadpole_coeff*gaugeParam->tadpole_coeff);
 
 
@@ -570,16 +577,6 @@ static void setColorSpinorParams(const int dim[4],
   param->create = QUDA_ZERO_FIELD_CREATE;
   return;
 } 
-
-
-static int getFatLinkPadding(const int dim[4])
-{
-  int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
-  return padding;
-}
-
 
 
 static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchange, const int dim[4])
@@ -917,18 +914,7 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
   gaugeParam.cuda_prec_sloppy         = device_precision_sloppy;
   gaugeParam.cuda_prec_precondition   = device_precision_sloppy;
   gaugeParam.gauge_fix                = QUDA_GAUGE_FIXED_NO;
-  gaugeParam.ga_pad          = 0;
-
-#ifdef MULTI_GPU
-  int x_face_size = gaugeParam.X[1]*gaugeParam.X[2]*gaugeParam.X[3]/2;
-  int y_face_size = gaugeParam.X[0]*gaugeParam.X[2]*gaugeParam.X[3]/2;
-  int z_face_size = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[3]/2;
-  int t_face_size = gaugeParam.X[0]*gaugeParam.X[1]*gaugeParam.X[2]/2;
-  int pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gaugeParam.ga_pad = pad_size;    
-#endif // MULTI_GPU
+  gaugeParam.ga_pad                   = getFatLinkPadding(dim);
 }
 
 
