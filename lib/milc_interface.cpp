@@ -70,6 +70,9 @@ void qudaSetLayout(QudaLayout_t input)
 
   for(int dir=0; dir<4; ++dir) localDim[dir] = local_dim[dir];
 
+#ifdef GPU_COMMS
+  setKernelPackT(true);
+#endif
 
 #ifdef MULTI_GPU
   for(int dir=0; dir<4; ++dir)  gridDim[dir] = input.machsize[dir];
