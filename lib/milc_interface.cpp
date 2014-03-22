@@ -8,6 +8,7 @@
 #include <string.h>
 #include <hisq_links_quda.h>
 #include <ks_improved_force.h>
+#include <dslash_quda.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
