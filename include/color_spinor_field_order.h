@@ -167,8 +167,8 @@ namespace quda {
 
     // Note this only support N>=2 and cannot work for Float1 ordered fields
     template <typename Float, int N>
-      class FloatNOrder2 : public FieldOrder<Float> {
-      typedef FieldOrder<Float> F;
+      class FloatNOrder2 /*: public FieldOrder<Float>*/ {
+      //typedef FieldOrder<Float> F;
       const int volumeCB;
       const int stride;
       const size_t cb_offset;
@@ -182,7 +182,7 @@ namespace quda {
     private:
 
     public:
-    FloatNOrder2(const ColorSpinorField &field, int nVec=1) : F(field, nVec), 
+    FloatNOrder2(const ColorSpinorField &field, int nVec=1) : /*FieldOrder<Float>(field, nVec), */
 	volumeCB(field.VolumeCB()), stride(field.Stride()), cb_offset(field.Bytes()>>1),
 	volume(field.Volume()), nColor(field.Ncolor()), nSpin(field.Nspin()), nVec(nVec),
 	v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
@@ -241,33 +241,97 @@ namespace quda {
 
     template <typename Float>
       class SpaceSpinColorOrder : public FieldOrder<Float> {
-      typedef FieldOrder<Float> F;
-
     private:
+	  //typedef FieldOrder<Float> F;
+
+      const int volume;
+      const int nColor;
+      const int nSpin;
+      const int nVec;
+      complex<Float> *v;	  
 
     public:
-    SpaceSpinColorOrder(const ColorSpinorField &field, int nVec=1) : F(field, nVec)
+    SpaceSpinColorOrder(const ColorSpinorField &field, int nVec=1) 
+      : FieldOrder<Float>(field, nVec), volume(field.Volume()), 
+	nColor(field.Ncolor()), nSpin(field.Nspin()), nVec(nVec), 
+	v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
       { ; }
       virtual ~SpaceSpinColorOrder() { ; }
 
       __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
-	unsigned long index = (x*F::nSpin+s)*F::nColor+c;
-	return *(F::v + index);
+	unsigned long index = (x*nSpin+s)*nColor+c;
+	return *(v + index);
       }
 
       __device__ __host__ complex<Float>& operator()(int x, int s, int c) {
-	unsigned long index = (x*F::nSpin+s)*F::nColor+c;
-	return *(F::v + index);
+	unsigned long index = (x*nSpin+s)*nColor+c;
+	return *(v + index);
       }
 
       __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const {
-	return (*this)(x, s, c*F::nVec + n);      
+	return (*this)(x, s, c*nVec + n);      
       }
 
       __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) {
-	return (*this)(x, s, c*F::nVec + n);      
+	return (*this)(x, s, c*nVec + n);      
       }
+
+      /** Returns the field volume */
+      __device__ __host__ int Volume() const { return volume; }
+
+      /** Returns the number of field colors */
+       __device__ __host__ int Ncolor() const { return nColor; }
+
+      /** Returns the number of field spins */
+      __device__ __host__ int Nspin() const { return nSpin; }
     };
+
+template <typename Float>
+      struct SpaceSpinColorOrder2 {
+    private:
+	  //typedef FieldOrder<Float> F;
+
+      const int volume;
+      const int nColor;
+      const int nSpin;
+      const int nVec;
+      complex<Float> *v;	  
+
+    public:
+    SpaceSpinColorOrder2(const ColorSpinorField &field, int nVec=1) 
+      : volume(field.Volume()), nColor(field.Ncolor()), nSpin(field.Nspin()), nVec(nVec), 
+	v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
+      { ; }
+      virtual ~SpaceSpinColorOrder2() { ; }
+
+      __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
+	unsigned long index = (x*nSpin+s)*nColor+c;
+	return *(v + index);
+      }
+
+      __device__ __host__ complex<Float>& operator()(int x, int s, int c) {
+	unsigned long index = (x*nSpin+s)*nColor+c;
+	return *(v + index);
+      }
+
+      __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const {
+	return (*this)(x, s, c*nVec + n);      
+      }
+
+      __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) {
+	return (*this)(x, s, c*nVec + n);      
+      }
+
+      /** Returns the field volume */
+      __device__ __host__ int Volume() const { return volume; }
+
+      /** Returns the number of field colors */
+       __device__ __host__ int Ncolor() const { return nColor; }
+
+      /** Returns the number of field spins */
+      __device__ __host__ int Nspin() const { return nSpin; }
+    };
+
 
     template <typename Float>
       class SpaceColorSpinOrder : public FieldOrder<Float> {
@@ -376,7 +440,7 @@ namespace quda {
       { typedef FloatNOrder2<Float,4> type; };
 
     template<typename Float> struct accessor<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> 
-      { typedef SpaceSpinColorOrder<Float> type; };
+      { typedef SpaceSpinColorOrder2<Float> type; };
 
     template<typename Float> struct accessor<Float,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER> 
       { typedef SpaceColorSpinOrder<Float> type; };
