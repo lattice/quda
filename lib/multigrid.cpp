@@ -2,9 +2,7 @@
 #include <qio_field.h>
 #include <string.h>
 
-namespace quda {
-  
-  // FIXME - do basis check
+namespace quda {  
 
   MG::MG(MGParam &param, TimeProfile &profile) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), coarse(0), fine(param.fine), 
@@ -29,8 +27,9 @@ namespace quda {
     param_presmooth->Nkrylov = 4;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
     if (param.level==2) {
+      param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
-      param_presmooth->tol = 1e-10;
+      param_presmooth->tol = 1e-7;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
@@ -114,7 +113,7 @@ namespace quda {
       param_coarse = new MGParam(param, *B_coarse, *matCoarse, *matCoarse);
       param_coarse->level++;
       param_coarse->fine = this;
-      param_coarse->smoother = QUDA_BICGSTAB_INVERTER;
+      param_coarse->smoother = QUDA_GCR_INVERTER;
       param_coarse->delta = 1e-1;
 
       coarse = new MG(*param_coarse, profile);
@@ -123,7 +122,10 @@ namespace quda {
     printfQuda("MG: Setup of level %d completed\n", param.level);
 
     // now we can run through the verificaion
-    if (param.level == 1) verify();
+    if (param.level == 1) {
+      verify();  //exit(0);
+    }
+
   }
 
   MG::~MG() {
@@ -160,6 +162,9 @@ namespace quda {
 
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *param.B[i]);
+
+      //for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
+
       transfer->P(*hack2, *r_coarse);
       printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*hack2));
       printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *hack2));
@@ -273,7 +278,7 @@ namespace quda {
       printfQuda("Using %d constant nullvectors\n", Nvec);
       //errorQuda("No nullspace file defined");
 
-      for (int i = 0; i < 2; i++) {
+      for (int i = 0; i < (nvec < 2 ? nvec : 2); i++) {
 	blas::zero(*B[i]);
 	ColorSpinorParam csParam(*B[i]);
 	csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -281,6 +286,7 @@ namespace quda {
 	for (int s=i; s<4; s+=2) {
 	  for (int c=0; c<B[i]->Ncolor(); c++) {
 	    tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
+	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, 2);
 	    blas::xpy(*tmp,*B[i]);
 	  }
 	}
