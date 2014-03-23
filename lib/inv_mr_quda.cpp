@@ -36,15 +36,13 @@ namespace quda {
 
   void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");    
-
     globalReduce = false; // use local reductions for DD solver
 
     if (!init) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      Arp = new cudaColorSpinorField(x);
-      tmpp = new cudaColorSpinorField(x, csParam); //temporary for mat-vec
+      Arp = ColorSpinorField::Create(csParam);
+      tmpp = ColorSpinorField::Create(csParam); //temporary for mat-vec
       init = true;
     }
 
@@ -52,14 +50,14 @@ namespace quda {
     if(!allocate_r && ((param.preserve_source == QUDA_PRESERVE_SOURCE_YES) || (param.use_init_guess == QUDA_USE_INIT_GUESS_YES))) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      rp = new cudaColorSpinorField(x, csParam);
+      rp = ColorSpinorField::Create(csParam);
       allocate_r = true;
     }
 
     if (!allocate_y && (param.use_init_guess == QUDA_USE_INIT_GUESS_YES)) {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = new cudaColorSpinorField(x, csParam);
+      yp = ColorSpinorField::Create(csParam);
       allocate_y = true;
     }
     ColorSpinorField &r = 

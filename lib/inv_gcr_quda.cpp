@@ -164,16 +164,16 @@ namespace quda {
 
   void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION) errorQuda("Not supported");    
-
     profile.Start(QUDA_PROFILE_INIT);
 
     int Nkrylov = param.Nkrylov; // size of Krylov space
 
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField r(x, csParam); 
-    cudaColorSpinorField y(x, csParam); // high precision accumulator
+    ColorSpinorField *rp = ColorSpinorField::Create(csParam); ColorSpinorField &r = *rp;
+
+    // high precision accumulator
+    ColorSpinorField *yp = ColorSpinorField::Create(csParam); ColorSpinorField &y = *yp;
 
     // create sloppy fields used for orthogonalization
     csParam.setPrecision(param.precision_sloppy);
@@ -182,17 +182,18 @@ namespace quda {
     p.resize(Nkrylov);
     Ap.resize(Nkrylov);
     for (int i=0; i<Nkrylov; i++) {
-      p[i] = new cudaColorSpinorField(x, csParam);
-      Ap[i] = new cudaColorSpinorField(x, csParam);
+      p[i] = ColorSpinorField::Create(csParam);
+      Ap[i] = ColorSpinorField::Create(csParam);
     }
 
-    cudaColorSpinorField tmp(x, csParam); //temporary for sloppy mat-vec
+    ColorSpinorField *tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
+    ColorSpinorField &tmp = *tmpp;
 
     ColorSpinorField *x_sloppy, *r_sloppy;
     if (param.precision_sloppy != param.precision) {
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy = new cudaColorSpinorField(x, csParam);
-      r_sloppy = new cudaColorSpinorField(x, csParam);
+      x_sloppy = ColorSpinorField::Create(csParam);
+      r_sloppy = ColorSpinorField::Create(csParam);
     } else {
       x_sloppy = &x;
       r_sloppy = &r;
@@ -206,8 +207,8 @@ namespace quda {
     ColorSpinorField *r_pre, *p_pre;
     if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
       csParam.setPrecision(param.precision_precondition);
-      p_pre = new cudaColorSpinorField(x, csParam);
-      r_pre = new cudaColorSpinorField(x, csParam);
+      p_pre = ColorSpinorField::Create(csParam);
+      r_pre = ColorSpinorField::Create(csParam);
       precMatch = false;
     } else {
       p_pre = NULL;
@@ -215,7 +216,13 @@ namespace quda {
     }
     ColorSpinorField &rPre = *r_pre;
 
-    cudaColorSpinorField *rM = param.precondition_cycle > 1 ? new cudaColorSpinorField(rSloppy) : 0;
+    ColorSpinorField *rM = NULL;
+    if (param.precondition_cycle > 1) {
+      ColorSpinorParam rParam(rSloppy);
+      rParam.create = QUDA_NULL_FIELD_CREATE; 
+      rM = ColorSpinorField::Create(rParam);
+      *rM = rSloppy;
+    }
 
     Complex *alpha = new Complex[Nkrylov];
     Complex **beta = new Complex*[Nkrylov];
@@ -421,6 +428,10 @@ namespace quda {
       delete p[i];
       delete Ap[i];
     }
+
+    delete tmpp;
+    delete rp;
+    delete yp;
 
     delete []alpha;
     for (int i=0; i<Nkrylov; i++) delete []beta[i];
