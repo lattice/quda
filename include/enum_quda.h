@@ -86,11 +86,19 @@ extern "C" {
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
+  typedef enum QudaEigType_s {
+    QUDA_LANCZOS, //Normal Lanczos eigen solver
+    QUDA_IMP_RST_LANCZOS, //implicit restarted lanczos solver
+    QUDA_INVALID_TYPE
+  } QudaEigType;
+
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
     QUDA_MATDAG_MAT_SOLUTION,
     QUDA_MATPC_SOLUTION,
+    QUDA_MATPC_DAG_SOLUTION,
     QUDA_MATPCDAG_MATPC_SOLUTION,
+    QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION,
     QUDA_INVALID_SOLUTION = QUDA_INVALID_ENUM
   } QudaSolutionType;
 

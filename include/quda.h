@@ -220,6 +220,32 @@ extern "C" {
   } QudaInvertParam;
 
 
+  // Parameter set for solving the eigenvalue problems.
+  // Eigen problems are tightly related with Ritz algorithm.
+  // And the Lanczos algorithm use the Ritz operator.
+  // For Ritz matrix operation, 
+  // we need to know about the solution type of dirac operator.
+  // For acceleration, we are also using chevisov polynomial method.
+  // And nk, np values are needed Implicit Restart Lanczos method
+  // which is optimized form of Lanczos algorithm
+  typedef struct QudaEigParam_s {
+
+    QudaInvertParam *invert_param;
+    QudaSolutionType  RitzMat_lanczos;
+    QudaSolutionType  RitzMat_Convcheck;
+    QudaEigType eig_type;
+
+    double *MatPoly_param;
+    int NPoly;
+    double Stp_residual;
+    int nk;
+    int np;
+    int f_size;
+    double eigen_shift;
+
+  } QudaEigParam;
+
+    
   /*
    * Interface functions, found in interface_quda.cpp
    */
@@ -345,6 +371,15 @@ extern "C" {
    *   QudaInvertParam invert_param = newQudaInvertParam();
    */
   QudaInvertParam newQudaInvertParam(void);
+  
+  /**
+   * A new QudaEigParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaEigParam eig_param = newQudaEigParam();
+   */
+  QudaEigParam newQudaEigParam(void);
 
   /**
    * Print the members of QudaGaugeParam.
@@ -353,10 +388,16 @@ extern "C" {
   void printQudaGaugeParam(QudaGaugeParam *param);
 
   /**
-   * Print the members of QudaGaugeParam.
-   * @param param The QudaGaugeParam whose elements we are to print.
+   * Print the members of QudaInvertParam.
+   * @param param The QudaInvertParam whose elements we are to print.
    */
   void printQudaInvertParam(QudaInvertParam *param);
+
+  /**
+   * Print the members of QudaEigParam.
+   * @param param The QudaEigParam whose elements we are to print.
+   */
+  void printQudaEigParam(QudaEigParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -401,6 +442,9 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
+  void lanczosQuda(int &k0, int &m, void *hp_Apsi, void *hp_r, void *hp_V, 
+                   void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
+
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**

@@ -130,9 +130,9 @@ namespace quda {
     if (&src != this) {
       // keep current attributes unless unset
       if (!ColorSpinorField::init) { // note this will turn a reference field into a regular field
-	destroy();
-	ColorSpinorField::operator=(src);
-	create(QUDA_COPY_FIELD_CREATE);
+        destroy();
+        ColorSpinorField::operator=(src);
+        create(QUDA_COPY_FIELD_CREATE);
       }
       if (isNative() && src.isNative()) copy(src);
       else errorQuda("Cannot copy using non-native fields");
@@ -190,7 +190,7 @@ namespace quda {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
       if (precision == QUDA_HALF_PRECISION) {
-	norm = device_malloc(norm_bytes);
+        norm = device_malloc(norm_bytes);
       }
       alloc = true;
     }
@@ -200,8 +200,8 @@ namespace quda {
       host_free(buffer_h);
       buffer_h = NULL;
       if (REORDER_LOCATION == QUDA_CUDA_FIELD_LOCATION) {
-	device_free(buffer_d);
-	buffer_d = NULL;
+        device_free(buffer_d);
+        buffer_d = NULL;
       }
       bufferInit = false;
     }
@@ -210,7 +210,7 @@ namespace quda {
       bufferBytes = bytes;
       buffer_h = pinned_malloc(bufferBytes);
       if (REORDER_LOCATION == QUDA_CUDA_FIELD_LOCATION) {
-	buffer_d = device_malloc(bufferBytes);
+        buffer_d = device_malloc(bufferBytes);
       }
       bufferInit = true;
     }

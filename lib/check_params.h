@@ -93,7 +93,41 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 }
 
+// define the appropriate function for EigParam
 
+#if defined INIT_PARAM
+QudaEigParam newQudaEigParam(void) {
+  QudaEigParam ret;
+#elif defined CHECK_PARAM
+static void checkEigParam(QudaEigParam *param) {
+#else
+void printQudaEigParam(QudaEigParam *param) {
+  printfQuda("QUDA Eig Parameters:\n");
+#endif
+
+#if defined INIT_PARAM
+  P(RitzMat_lanczos, QUDA_INVALID_SOLUTION);
+  P(RitzMat_Convcheck, QUDA_INVALID_SOLUTION);
+  P(eig_type, QUDA_INVALID_TYPE);
+  P(NPoly, 0);
+  P(Stp_residual, 0.0);
+  P(nk, 0);
+  P(np, 0);
+  P(f_size, 0);
+  P(eigen_shift, 0.0);
+#else
+  P(NPoly, INVALID_INT);
+  P(Stp_residual, INVALID_DOUBLE);
+  P(nk, INVALID_INT);
+  P(np, INVALID_INT);
+  P(f_size, INVALID_INT);
+  P(eigen_shift, INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
 // define the appropriate function for InvertParam
 
 #if defined INIT_PARAM

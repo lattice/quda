@@ -1,5 +1,6 @@
 #include <quda_internal.h>
 #include <invert_quda.h>
+#include <lanczos_quda.h>
 
 namespace quda {
 
@@ -15,11 +16,11 @@ namespace quda {
     switch (param.eig_type) {
     case QUDA_LANCZOS:
       report("Lanczos solver");
-      eig_solver = new LANCZOS(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile);
+      eig_solver = new Lanczos(ritz_mat, param, profile);
       break;
     case QUDA_IMP_RST_LANCZOS:
       report("BiCGstab");
-      eig_solver = new ImpRstLanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile);
+      eig_solver = new ImpRstLanczos(ritz_mat, param, profile);
       break;
     default:
       errorQuda("Invalid eig solver type");
@@ -59,24 +60,21 @@ namespace quda {
   void Eig_Solver::PrintSummary(const char *name, int k, const double &r2, const double &b2) {
   }
   
-  void GrandScm_test(cudaColorSpinorField &psi, cudaEigVecSet &Eig_Vec, int Nvec, double *alpha) {
-
-    Complex xp;
-
+  void Eig_Solver::GrandSchm_test(cudaColorSpinorField &psi, cudaColorSpinorField **Eig_Vec, int Nvec, double *delta) {
+    Complex xp(0.0,0.0);
     for(int i = 0; i<Nvec; ++i)
     {
-      xp =cDotProduct((Eig_Vec.v())[i], psi);
+      xp =cDotProductCuda(*(Eig_Vec[i]), psi);
 
-      if(!UniqueID() && (fabs(xp.real()) > 1e-13 || fabs(xp.imag()) > 1e-13)
-        printf("[%d][%d] %e %e\n", UniqueID(),i, xp.real(),xp.imag());
+      if (getVerbosity() >= QUDA_VERBOSE) {
+        if(fabs(xp.real()) > 1e-13 || fabs(xp.imag()) > 1e-13)
+          printf("[%d] %e %e\n", i, xp.real(),xp.imag());
+      }
 
       xp *= -1.0;
-      caxpyCuda(xp, (Eig_Vec.v())[i], psi);
+      caxpyCuda(xp, *(Eig_Vec[i]), psi);
 
-
-      if(i==Nvec-1 && alpha)  *alpha = xp.real();   //  Re ( vec[Nvec-1],  psi ) needed for Lanczos' alpha
+      if(i==Nvec-1 && delta)  *delta = xp.real();   //  Re ( vec[Nvec-1],  psi ) needed for Lanczos' delta
     }
-  
   }
-
 } // namespace quda

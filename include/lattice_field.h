@@ -12,6 +12,14 @@ namespace quda {
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
+  
+  class EigValueSet;
+  class cudaEigValueSet;
+  class cpuEigValueSet;
+
+  class EigVecSet;
+  class cpuEigVecSet;
+  class cudaEigVecSet;
 
   class GaugeField;
   class cpuGaugeField;

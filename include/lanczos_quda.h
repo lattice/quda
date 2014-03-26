@@ -20,7 +20,7 @@ namespace quda {
   Eig_Solver(QudaEigParam &eigParam, TimeProfile &profile) : eigParam(eigParam), profile(profile) { ; }
     virtual ~Eig_Solver() { ; }
 
-    virtual void operator()(cudaEigValueSet &alpha, cudaEigValueSet &beta, cudaEigVecSet &Eig_Vec, 
+    virtual void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
                             cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m) = 0;
 
     // solver factory
@@ -42,7 +42,7 @@ namespace quda {
     */
     void PrintSummary(const char *name, int k, const double &r2, const double &b2);
 
-    void GrandSchm_test(cudaColorSpinorField &psi, cudaEigVecSet &Eig_Vec, int Nvec, double *alpha);
+    void GrandSchm_test(cudaColorSpinorField &psi, cudaColorSpinorField **Eig_Vec, int Nvec, double *delta);
   };
 
   class Lanczos : public Eig_Solver {
@@ -54,7 +54,7 @@ namespace quda {
     Lanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile);
     virtual ~Lanczos();
 
-    void operator()(cudaEigValueSet &alpha, cudaEigValueSet &beta, cudaEigVecSet &Eig_Vec, 
+    void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
                     cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m);
   };
 
@@ -67,7 +67,7 @@ namespace quda {
     ImpRstLanczos(RitzMat &ritz_mat, QudaEigParam &eigParam, TimeProfile &profile);
     virtual ~ImpRstLanczos();
 
-    void operator()(cudaEigValueSet &alpha, cudaEigValueSet &beta, cudaEigVecSet &Eig_Vec, 
+    void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
                     cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m);
   };
 

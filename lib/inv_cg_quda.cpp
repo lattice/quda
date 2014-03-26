@@ -41,7 +41,6 @@ namespace quda {
       return;
     }
 
-
     cudaColorSpinorField r(b);
 
     ColorSpinorParam param(x);

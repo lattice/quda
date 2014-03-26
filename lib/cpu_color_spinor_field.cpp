@@ -140,11 +140,11 @@ namespace quda {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       // array of 4-d fields
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-	int Ls = x[nDim-1];
-	v = (void**)safe_malloc(Ls * sizeof(void*));
-	for (int i=0; i<Ls; i++) ((void**)v)[i] = safe_malloc(bytes / Ls);
+        int Ls = x[nDim-1];
+        v = (void**)safe_malloc(Ls * sizeof(void*));
+        for (int i=0; i<Ls; i++) ((void**)v)[i] = safe_malloc(bytes / Ls);
       } else {
-	v = safe_malloc(bytes);
+        v = safe_malloc(bytes);
       }
       init = true;
     }
@@ -216,22 +216,22 @@ namespace quda {
     checkField(*this, src);
     if (fieldOrder == src.fieldOrder) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes);
+        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes); // HJ Kim: I think this is a bug, we should copy the data with amount of "bytes/Ls"
       else 
-	memcpy(v, src.v, bytes);
+        memcpy(v, src.v, bytes);
     } else {
       if (precision == QUDA_DOUBLE_PRECISION) {
-	if (src.precision == QUDA_DOUBLE_PRECISION) {
-	  genericCopy(*order_double, *(src.order_double));
-	} else {
-	  genericCopy(*order_double, *(src.order_single));
-	}
+        if (src.precision == QUDA_DOUBLE_PRECISION) {
+          genericCopy(*order_double, *(src.order_double));
+        } else {
+          genericCopy(*order_double, *(src.order_single));
+        }
       } else {
-	if (src.precision == QUDA_DOUBLE_PRECISION) {
-	  genericCopy(*order_single, *(src.order_double));
-	} else {
-	  genericCopy(*order_single, *(src.order_single));
-	}
+        if (src.precision == QUDA_DOUBLE_PRECISION) {
+          genericCopy(*order_single, *(src.order_double));
+        } else {
+          genericCopy(*order_single, *(src.order_single));
+        }
       }
     }
   }

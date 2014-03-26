@@ -5,21 +5,23 @@ QUDA_OBJS = timer.o malloc.o solver.o inv_bicgstab_quda.o		\
 	inv_cg_quda.o inv_multi_cg_quda.o inv_gcr_quda.o		\
 	inv_mr_quda.o inv_mre.o interface_quda.o util_quda.o		\
 	hw_quda.o blas_cpu.o clover_field.o color_spinor_field.o	\
-	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	\
-	lattice_field.o gauge_field.o cpu_gauge_field.o			\
+	eig_solver.o cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	\
+	lattice_field.o gauge_field.o cpu_gauge_field.o ritz_quda.o			\
 	cuda_gauge_field.o dirac_clover.o dirac_wilson.o		\
 	dirac_staggered.o dirac_domain_wall.o dirac_twisted_mass.o	\
 	tune.o fat_force_quda.o llfat_quda_itf.o clover_quda.o		\
 	dslash_quda.o blas_quda.o copy_quda.o reduce_quda.o face_buffer.o \
-	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
+	face_gauge.o comm_common.o 	eig_lanczos_quda.o \
+	${COMM_OBJS} ${NUMA_AFFINITY_OBJS}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	dirac_quda.h dslash_quda.h enum_quda.h gauge_force_quda.h	\
 	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
 	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
-	gauge_field.h double_single.h texture.h	\
-	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h
+	gauge_field.h double_single.h texture.h	eig_variables.h \
+	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h \
+	lanczos_quda.h ritz_quda.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h 
@@ -103,6 +105,9 @@ reduce_quda.o: reduce_quda.cu $(HDRS) $(REDUCE_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+
+cuda_eig_variables.o: cuda_eig_variables.cu $(HDRS) $(CSF_INLN)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
