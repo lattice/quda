@@ -101,8 +101,8 @@ namespace quda {
     complex<Float> *reduced = (complex<Float>*)malloc(length * sizeof(complex<Float>));
     for (int i=0; i<length; i++) reduced[i] = 0.0;
 
-    for (int s=0; s<arg.out.Nspin(); s++) {
-      for (int c=0; c<arg.out.Ncolor(); c++) {
+    for (int s=0; s<arg.tmp.Nspin(); s++) {
+      for (int c=0; c<arg.tmp.Ncolor(); c++) {
 	reduced[arg.spin_map[s]*arg.out.Ncolor()+c] += 
 	  BlockReduce(temp_storage).Sum( arg.tmp(x_fine, s, c) );
       }
@@ -149,6 +149,8 @@ namespace quda {
 
 	if (block_size == 16) {
 	  RestrictKernel<Float,Arg,16><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 32) {
+	  RestrictKernel<Float,Arg,32><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 256) {
 	  RestrictKernel<Float,Arg,256><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else {

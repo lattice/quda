@@ -621,6 +621,24 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
+      } else if (x.Nspin() == 2){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
+	Spinor<double2,double2,double2,M,writeX> X(x);
+	Spinor<double2,double2,double2,M,writeY> Y(y);
+	Spinor<double2,double2,double2,M,writeZ> Z(z);
+	Spinor<double2,double2,double2,M,writeW> W(w);
+	Spinor<double2,double2,double2,M,writeV> V(v);
+	Reducer<ReduceType, double2, double2> r(a,b);
+	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
+	  Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
+	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
+	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
+	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce.apply(*blas::getStream());
+#else
+	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
       } else if (x.Nspin() == 1){ //staggered
 #ifdef GPU_STAGGERED_DIRAC
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do

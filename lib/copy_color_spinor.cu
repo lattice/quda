@@ -254,10 +254,10 @@ namespace quda {
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-    } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
+    } /*else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-    } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
+      } */else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
       QDPJITDiracOrder<FloatIn, Ns, Nc> inOrder(in, In);
@@ -346,6 +346,9 @@ namespace quda {
       errorQuda("Destination %d and source %d colors not equal", dst.Ncolor(), src.Ncolor());
 
     switch(src.Ncolor()) {
+    case 1:
+      copyGenericColorSpinor<Ns,1>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
+      break;
     case 2:
       copyGenericColorSpinor<Ns,2>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
       break;
@@ -354,6 +357,9 @@ namespace quda {
       break;
     case 6:
       copyGenericColorSpinor<Ns,6>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
+      break;
+    case 9:
+      copyGenericColorSpinor<Ns,9>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
       break;
     default:
       errorQuda("Ncolors=%d not supported", src.Ncolor());
@@ -395,7 +401,7 @@ namespace quda {
       } else {
 	errorQuda("Unsupported Precision %d", src.Precision());
       }
-    } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+      /*} else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
       if (src.Precision() == QUDA_DOUBLE_PRECISION) {
 	CopyGenericColorSpinor(dst, src, location, (float*)Dst, (double*)Src);
       } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
@@ -414,7 +420,7 @@ namespace quda {
 	CopyGenericColorSpinor(dst, src, location, (short*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
       } else {
 	errorQuda("Unsupported Precision %d", src.Precision());
-      }
+	}*/
     } else {
       errorQuda("Unsupported Precision %d", dst.Precision());
     }
