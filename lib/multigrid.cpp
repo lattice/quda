@@ -325,7 +325,7 @@ namespace quda {
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     cpuGaugeField *Y = new cpuGaugeField(gParam);
     
-    //dirac->createCoarseOp(*t,*Y);
+    dirac->createCoarseOp(*t,*Y);
   }
 
 }

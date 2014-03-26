@@ -189,14 +189,14 @@ namespace quda {
       int parity = 0;
       for(int d = 0; d < ndim; d++) {
 	parity += coord[d];
+	coordV[d] = coord[d];
       }
       parity = parity%2;
 
       //Shift the V field w/respect to G
       coordV[dir] = (coord[dir]+1)%x_size[dir];
-      int i_V;
+      int i_V = 0;
       V.OffsetIndex(i_V, coordV);
-
       for(int s = 0; s < Ns; s++) {  //Fine Spin
 	for(int ic_c = 0; ic_c < Nc_c; ic_c++) {  //Coarse Color
 	  for(int ic = 0; ic < Nc; ic++) { //Fine Color rows of gauge field
@@ -275,7 +275,7 @@ namespace quda {
 	  //int total_offdiag_offset = coarse_site_offset + spin_offdiag_offset + coarse_color_offset;
 
            for(int ic = 0; ic < Nc; ic++) { //Sum over fine color
-
+	     //FIXME: Need to multiply by the appropriate gamma component (1 or i) in Off-Diagonal spin.
              //Diagonal Spin
 	     Y(dim_index,coarse_parity,coarse_index/2,s_c_row,s_c_row,ic_c,jc_c) += half*quda::conj(V(i, s, ic, ic_c))*UV(i, s, ic, jc_c); 
 	     //M[total_diag_offset] += half*quda::conj(V(i, s, ic, ic_c))*UV(i, s, ic, jc_c);
