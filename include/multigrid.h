@@ -195,11 +195,16 @@ namespace quda {
 	initializeCoarse();
       }
 	
-	
+    ~DiracCoarse() {
+       delete Y;
+    }	
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
 
+      #if 0
+      ApplyCoarse(out,in,*Y,dirac->kappa); 
+      #else
       //errorQuda("Not implemented");
 
       t->P(tmp, in);
@@ -207,11 +212,15 @@ namespace quda {
       dirac->M(tmp2, tmp);
       //tmp2 = tmp4;
       t->R(out, tmp2);
+      #endif
     }
 
     // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
     {
+      #if 0
+      ApplyCoarse(out,in,*Y,dirac->kappa);
+      #else
       //errorQuda("Not implemented");
       //printfQuda("Starting DiracCoarse()\n");
       //printfQuda("Prolongate\n");
@@ -224,19 +233,24 @@ namespace quda {
       //tmp2 = tmp3;
       //printfQuda("Restriction\n");
       t->R(out, tmp2);
-      //printfQuda("End DiracCoarse()\n");
+      //prientfQuda("End DiracCoarse()\n");
+      #endif
     }
 
     // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
     {
+      #if 0
+      ApplyCoarse(out,in,*Y,dirac->kappa);
+      #else
       //errorQuda("Not implemented");
       t->P(tmp, in);
       //tmp3 = tmp;
       dirac->M(tmp2, tmp);
       //tmp2 = tmp4;
       t->R(out, tmp2);
+      #endif
     }
   };
 

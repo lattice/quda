@@ -323,13 +323,13 @@ namespace quda {
     gParam.order = QUDA_QDP_GAUGE_ORDER;
     gParam.link_type = QUDA_COARSE_LINKS;
     gParam.t_boundary = QUDA_PERIODIC_T;
-    gParam.create = QUDA_NULL_FIELD_CREATE;
+    gParam.create = QUDA_ZERO_FIELD_CREATE;
     gParam.precision = prec;
     gParam.nDim = ndim;
     gParam.siteDim= 2*ndim+1;
     gParam.geometry = QUDA_COARSE_GEOMETRY;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    cpuGaugeField *Y = new cpuGaugeField(gParam);
+    Y = new cpuGaugeField(gParam);
     
     dirac->createCoarseOp(*t,*Y);
   }

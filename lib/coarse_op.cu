@@ -8,6 +8,7 @@
 namespace quda {
 
   //A simple Euclidean gamma matrix class for use with the Wilson projectors.
+  template <typename ValueType>
   class Gamma {
 	private:
 	int ndim;
@@ -26,12 +27,12 @@ namespace quda {
 	//The column with the non-zero element for each row
 	int coupling[4];
 	//The value of the matrix element, for each row
-	std::complex<int> elem[4];
+	quda::complex<ValueType> elem[4];
 
 	public:
 
 	Gamma(int dir, QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS) : ndim(4), dir(dir), basis(basis) {
-	  std::complex<int> I(0,1);
+	  quda::complex<ValueType> I(0,1);
 	  if((dir==0) || (dir==1)) {
 	    coupling[0] = 3;
 	    coupling[1] = 2;
@@ -143,7 +144,7 @@ namespace quda {
 	~Gamma() {}
 
 	//Returns the matrix element.
-	std::complex<int> getelem(int row, int col) const {
+	quda::complex<ValueType> getelem(int row, int col) const {
 	  if(coupling[row] == col) {
 	    return elem[row];
 	  } else {
@@ -153,7 +154,7 @@ namespace quda {
 
 	//Like getelem, but one only needs to specify the row.
 	//The column of the non-zero component is returned via the "col" reference
-	std::complex<int> getrowelem(int row, int &col) const {
+	quda::complex<ValueType> getrowelem(int row, int &col) const {
 	  col = coupling[row];
 	  return elem[row];
 	}
@@ -210,7 +211,7 @@ namespace quda {
   }  //UV
 
   template<typename Float>
-  void computeVUV(int dir, gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, const Gamma &gamma, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, const int *geo_bs, int spin_bs) {
+  void computeVUV(int dir, gauge::FieldOrder<Float> &Y, const colorspinor::FieldOrder<Float> &UV, const colorspinor::FieldOrder<Float> &V, const Gamma<Float> &gamma, int ndim, const int *x_size, const int *xc_size, int Nc, int Nc_c, int Ns, int Ns_c, const int *geo_bs, int spin_bs) {
 
     for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
 
@@ -259,7 +260,7 @@ namespace quda {
 	//Use Gamma to calculate off-diagonal coupling and
 	//column index.  Diagonal coupling is always 1.
 	int s_col;
-	std::complex<int> coupling = gamma.getrowelem(s, s_col);
+	quda::complex<Float> coupling = gamma.getrowelem(s, s_col);
 	int s_c_col = s_col/spin_bs;
 
 	//Precompute spin offsets
@@ -275,12 +276,11 @@ namespace quda {
 	  //int total_offdiag_offset = coarse_site_offset + spin_offdiag_offset + coarse_color_offset;
 
            for(int ic = 0; ic < Nc; ic++) { //Sum over fine color
-	     //FIXME: Need to multiply by the appropriate gamma component (1 or i) in Off-Diagonal spin.
              //Diagonal Spin
 	     Y(dim_index,coarse_parity,coarse_index/2,s_c_row,s_c_row,ic_c,jc_c) += half*quda::conj(V(i, s, ic, ic_c))*UV(i, s, ic, jc_c); 
 	     //M[total_diag_offset] += half*quda::conj(V(i, s, ic, ic_c))*UV(i, s, ic, jc_c);
 	     //Off-diagonal Spin
-	     Y(dim_index,coarse_parity,coarse_index/2,s_c_row,s_c_col,ic_c,jc_c) += half*quda::conj(V(i, s, ic, ic_c))*UV(i,s_col, ic, jc_c);
+	     Y(dim_index,coarse_parity,coarse_index/2,s_c_row,s_c_col,ic_c,jc_c) += half*coupling*quda::conj(V(i, s, ic, ic_c))*UV(i,s_col, ic, jc_c);
 	     //M[total_offdiag_offset] += half*quda::conj(V(i, s, ic, ic_c))*UV(i,s_col, ic, jc_c); 
 	   } //Fine color
 	 } //Coarse Color column
@@ -426,12 +426,21 @@ namespace quda {
       computeUV<Float>(UV, V, G, d, ndim, x_size, Nc, Nc_c, Ns);
 
       //Gamma matrix for this direction
-      Gamma gamma(d, UV.GammaBasis());
+      Gamma<Float> gamma(d, UV.GammaBasis());
 
       //Calculate VUV for this direction, accumulate in the appropriate place
       computeVUV<Float>(d, Y, UV, V, gamma, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
 
       reverseY<Float>(d, Y, ndim, xc_size, Nc_c, Ns_c);
+      #if 0
+      for(int i = 0; i < Y.Volume(); i++) {
+	for(int s = 0; s < Ns_c; s++) {
+          for(int s_col = 0; s_col < Ns_c; s_col++) {
+            for(int c = 0; c < Nc_c; c++) {
+              for(int c_col = 0; c_col < Nc_c; c_col++) {
+                printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y.real(2*d) = %e, Y.real(2*d+1) = %e\n",d,i,s,s_col,c,c_col,Y(2*d,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).real());
+              }}}}}
+      #endif
     }
 
     coarseDiagonal<Float>(Y, ndim, xc_size, Nc_c, Ns_c);
@@ -577,7 +586,7 @@ namespace quda {
 		out(forward_spinor_index, s_row, c_row) += quda::conj(Y(2*d+1,parity, gauge_index/2, s_col, s_row, c_col, c_row))*in(i, s_col, c_col);
 	        //Backward link
 		//out(backward_spinor_index, s_row, c_row) += Y[2*d+1][backward_gauge_site_offset+Nc*Nc*(Ns*s_row+s_col) + Nc*c_row+c_col]*in(i, s_col, c_col);
-		out(backward_spinor_index, s_row, c_row) += Y(2*d, parity, gauge_index/2, s_row, s_col, c_row, c_col)*in(i, s_col, c_col);
+		out(backward_spinor_index, s_row, c_row) += Y(2*d, backward_parity, backward_gauge_index/2, s_row, s_col, c_row, c_col)*in(i, s_col, c_col);
 	      } //Color column
 	    } //Spin column
 	  } //Color row
@@ -621,7 +630,9 @@ namespace quda {
 	  out(i,s,c) += in(i,s,c);
 	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
 	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
+              //printf("pre i = %d, s = %d, c = %d, s_col = %d, c_col = %d, parity = %d, gauge_index = %d, Y = %e, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,parity, gauge_index, Y(2*ndim,parity,gauge_index/2,s,s_col,c,c_col).real(),out(i,s,c).real(),in(i,s_col,c_col).real());
 	      out(i,s,c) -= Y(2*ndim, parity, gauge_index/2, s, s_col, c, c_col)*in(i,s_col,c_col);
+              //printf("post i = %d, s = %d, c = %d, s_col = %d, c_col = %d, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,out(i,s,c).real(),in(i,s_col,c_col).real());
 		//out(i,s,c) -= Y[2*ndim][gauge_site_offset+Nc*Nc*(Ns*s+s_col)+Nc*c+c_col]*in(i,s_col,c_col);
 	    } //Color in
           } //Spin in
@@ -662,11 +673,10 @@ namespace quda {
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, double kappa) {
   //void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision, double kappa) {
 
-    QudaPrecision precision = Y.Precision();
+    QudaPrecision prec = Y.Precision();
     int Ns_c = in.Nspin();
-    int ndim = in.Ndim();	
-
-    if (precision == QUDA_DOUBLE_PRECISION) {
+    int ndim = in.Ndim();
+    if (prec == QUDA_DOUBLE_PRECISION) {
       colorspinor::FieldOrder<double> *inOrder = colorspinor::createOrder<double>(in);
       colorspinor::FieldOrder<double> *outOrder = colorspinor::createOrder<double>(out);
       gauge::FieldOrder<double> *yOrder = gauge::createOrder<double>(Y, Ns_c);

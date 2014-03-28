@@ -309,7 +309,7 @@ namespace quda {
 	} else { // no preconditioner
 	  *p[k] = rSloppy;
 	}
-      
+        //printf("GCR debug Ap2=%e, p2=%e,rPre2=%e\n",blas::norm2(*Ap[k]), blas::norm2(*p[k]), blas::norm2(rPre)); 
 	matSloppy(*Ap[k], *p[k], tmp);
 	if (getVerbosity()>= QUDA_DEBUG_VERBOSE)
 	  printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, rPre2=%e\n", 
