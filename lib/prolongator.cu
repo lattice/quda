@@ -139,10 +139,10 @@ namespace quda {
     F Tmp(const_cast<ColorSpinorField&>(tmp));
 
     ProlongateArg<F,F,F,F> arg(Out, In, V, Tmp, fine_to_coarse,spin_map);
-    ProlongateLaunch<double, ProlongateArg<F, F, F, F> > prolongator(arg, Location(out, in, v));
+    ProlongateLaunch<double, ProlongateArg<F, F, F, F> > prolongator(arg, Location(out, in, v, tmp));
     prolongator.apply(0);
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (Location(out, in, v, tmp) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   template <typename Float>
