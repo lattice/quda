@@ -161,7 +161,11 @@ module quda_fortran
      ! The inner Krylov solver used in the preconditioner.  Set to
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
-     
+    
+
+     ! Dslash used in the inner Krylov solver
+     QudaDslashType :: dslash_type_precondition
+ 
      ! Verbosity of the inner Krylov solver 
      QudaVerbosity :: verbosity_precondition
      
