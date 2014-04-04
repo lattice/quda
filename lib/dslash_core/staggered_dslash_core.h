@@ -344,11 +344,9 @@ const int X3X1X0 = X[3]*X1X0;
 const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
 
 int za,zb; 
-int x0h, x1h;
-//int x1,x2,x3,x4;
+int x0h;
 int y[4];
-int af;
-int x0odd,x1odd;
+int x0odd;
 int full_idx;
 
 if(kernel_type == INTERIOR_KERNEL){
@@ -364,63 +362,23 @@ if(kernel_type == INTERIOR_KERNEL){
   full_idx = 2*sid + x0odd;
  }else if (kernel_type == EXTERIOR_KERNEL_X){
   //data order: X1 X4 X3 X2h
-  za = sid /(X[1]>>1);
-  x1h = sid - za*(X[1]>>1);
-  zb = za / X[2];
-  y[2] = za - zb*X[2];
-  y[0] = zb / X[3];
-  y[3] = zb - y[0]*X[3];
-  af = (y[0] >= NFACE)?(X[0]-2*NFACE):0;
-  y[0] = y[0] + af;
-  x1odd = (y[2] + y[3] + y[0] + param.parity) & 1;
-  y[1] = 2*x1h + x1odd;
+  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 0, X);
   full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
   sid = full_idx>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_Y){
   //data order: X2 X4 X3 X1h
-  za = sid /(X[0]>>1);
-  x0h = sid - za*(X[0]>>1);
-  zb = za / X[2];
-  y[2] = za - zb*X[2];
-  y[1] = zb / X[3];
-  y[3] = zb - y[1]*X[3];
-  af = (y[1] >= NFACE)?(X[1]-2*NFACE):0;
-  y[1] = y[1] + af;
-  x0odd = (y[2] + y[3] + y[1] + param.parity) & 1;
-  y[0] = 2*x0h + x0odd;
-//  full_idx = x4*X3X2X1+x3*X2X1+x2*X[0]+x1;
+  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 1, X);
   full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
   sid = full_idx>>1;
-
  }else if (kernel_type == EXTERIOR_KERNEL_Z){
   //data order: X3 X4 X2 X1h
-  za = sid /(X[0]>>1);
-  x0h = sid - za*(X[0]>>1);
-  zb = za / X[1];
-  y[1] = za - zb*X[1];
-  y[2] = zb / X[3];
-  y[3] = zb - y[2]*X[3];
-  af = (y[2] >= NFACE)?(X[2]-2*NFACE):0;
-  y[2] = y[2] + af;
-  x0odd = (y[1] + y[3] + y[2] + param.parity) & 1;
-  y[0] = 2*x0h + x0odd;
-  //full_idx = x4*X3X2X1+x3*X2X1+x2*X1+x1;
+  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 2, X);
   full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
   sid = full_idx>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_T){
   //data order: X4 X3 X2 X1h
-  za = sid /(X[0]>>1);
-  x0h = sid - za*(X[0]>>1);
-  zb = za / X[1];
-  y[1] = za - zb*X[1];
-  y[3] = zb / X[2];
-  y[2] = zb - y[3]*X[2];
-  af = (y[3] >= NFACE)?(X[3]-2*NFACE):0;
-  int x3_new = y[3] + af;
-  sid +=Vsh*(x3_new -y[3]);
-  y[3]=x3_new;
-  x0odd = (y[1] + y[2] + y[3] + param.parity) & 1;
-  y[0] = 2*x0h + x0odd;
+  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 3, X);
+  sid += Vsh*( ((y[3] >= NFACE) ? (X[3] - 2*NFACE) : 0) );
   full_idx = 2*sid + x0odd;
  }
 

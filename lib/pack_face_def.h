@@ -234,7 +234,54 @@ static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, c
 }
 
 
-
+template<int nLayers> 
+static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const int parity, const int dim, const int X[])
+{
+  int za, x1h, x0h, zb;
+  switch(dim) {
+    case 0:
+      za = idx/(X[1]>>1); 
+      x1h = idx - za*(X[1]>>1);
+      zb = za / X[2];
+      x[2] = za - zb*X[2];
+      x[0] = zb/X[3];
+      x[3] = zb - x[0]*X[3];
+      x[0] += ((x[0] >= nLayers) ? (X[0] - 2*nLayers) : 0);
+      x[1] = 2*x1h + ((x[0] + x[2] + x[3] + parity) & 1);
+      break;
+    case 1:
+      za = idx/(X[0]>>1);
+      x0h = idx - za*(X[0]>>1);
+      zb = za / X[2];
+      x[2] = za - zb*X[2];
+      x[1] = zb/X[3];
+      x[3] = zb - x[1]*X[3];
+      x[1] += ((x[1] >= nLayers) ? (X[1] - 2*nLayers) : 0);
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1); 
+      break;
+    case 2:
+      za = idx/(X[0]>>1);
+      x0h = idx - za*(X[0]>>1);
+      zb = za / X[1];
+      x[1] = za - zb*X[1];
+      x[2] = zb / X[3];
+      x[3] = zb - x[2]*X[3];
+      x[2] += ((x[2] >= nLayers) ? (X[2] - 2*nLayers) : 0);
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
+      break;
+    case 3:
+      za = idx/(X[0]>>1);
+      x0h = idx - za*(X[0]>>1);
+      zb = za / X[1];
+      x[1] = za - zb*X[1];
+      x[3] = zb / X[2];
+      x[2] = zb - x[3]*X[2];
+      x[3] += ((x[3] >= nLayers) ? (X[3] - 2*nLayers) : 0);
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
+      break; 
+  }
+  return;
+}
 
 
 // compute full coordinates from an index into the face (used by the exterior Dslash kernels)
