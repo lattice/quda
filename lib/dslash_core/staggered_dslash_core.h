@@ -362,24 +362,26 @@ if(kernel_type == INTERIOR_KERNEL){
   full_idx = 2*sid + x0odd;
  }else if (kernel_type == EXTERIOR_KERNEL_X){
   //data order: X1 X4 X3 X2h
-  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 0, X);
+  coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, 0, X);
   full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
   sid = full_idx>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_Y){
   //data order: X2 X4 X3 X1h
-  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 1, X);
+  coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, 1, X);
   full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
   sid = full_idx>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_Z){
   //data order: X3 X4 X2 X1h
-  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 2, X);
+  coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, 2, X);
   full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
   sid = full_idx>>1;
  }else if (kernel_type == EXTERIOR_KERNEL_T){
   //data order: X4 X3 X2 X1h
-  coordsFromFaceIndexStaggered<NFACE>(y, sid, param.parity, 3, X);
-  sid += Vsh*( ((y[3] >= NFACE) ? (X[3] - 2*NFACE) : 0) );
-  full_idx = 2*sid + x0odd;
+  coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, 3, X);
+  full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
+  sid = full_idx>>1;
+//  sid += Vsh*( ((y[3] >= NFACE) ? (X[3] - 2*NFACE) : 0) );
+//  full_idx = 2*sid + x0odd;
  }
 
 #if (DD_PREC == 0) // double precision

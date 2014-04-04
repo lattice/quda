@@ -234,7 +234,7 @@ static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, c
 }
 
 
-template<int nLayers> 
+template<int nLayers, int Faces> 
 static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const int parity, const int dim, const int X[])
 {
   int za, x1h, x0h, zb;
@@ -246,7 +246,11 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       x[2] = za - zb*X[2];
       x[0] = zb/X[3];
       x[3] = zb - x[0]*X[3];
-      x[0] += ((x[0] >= nLayers) ? (X[0] - 2*nLayers) : 0);
+      if(Faces == 2){
+        x[0] += ((x[0] >= nLayers) ? (X[0] - 2*nLayers) : 0);
+      }else if(Faces == 1){
+       x[0] += (X[0] - nLayers);
+      }
       x[1] = 2*x1h + ((x[0] + x[2] + x[3] + parity) & 1);
       break;
     case 1:
@@ -256,7 +260,11 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       x[2] = za - zb*X[2];
       x[1] = zb/X[3];
       x[3] = zb - x[1]*X[3];
-      x[1] += ((x[1] >= nLayers) ? (X[1] - 2*nLayers) : 0);
+      if(Faces == 2){
+        x[1] += ((x[1] >= nLayers) ? (X[1] - 2*nLayers) : 0);
+      }else if(Faces == 1){
+        x[1] += (X[1] - nLayers);
+      }
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1); 
       break;
     case 2:
@@ -266,7 +274,11 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       x[1] = za - zb*X[1];
       x[2] = zb / X[3];
       x[3] = zb - x[2]*X[3];
-      x[2] += ((x[2] >= nLayers) ? (X[2] - 2*nLayers) : 0);
+      if(Faces == 2){
+        x[2] += ((x[2] >= nLayers) ? (X[2] - 2*nLayers) : 0);
+      }else if(Faces == 1){
+        x[2] += (X[2] - nLayers);
+      }
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
       break;
     case 3:
@@ -276,7 +288,11 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       x[1] = za - zb*X[1];
       x[3] = zb / X[2];
       x[2] = zb - x[3]*X[2];
-      x[3] += ((x[3] >= nLayers) ? (X[3] - 2*nLayers) : 0);
+      if(Faces == 2){
+        x[3] += ((x[3] >= nLayers) ? (X[3] - 2*nLayers) : 0);
+      }else if(Faces == 1){
+        x[3] += (X[3] - nLayers);
+      }
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
       break; 
   }
