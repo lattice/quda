@@ -235,11 +235,11 @@ static inline __device__ int indexFromFaceIndexExtendedStaggered(int face_idx, c
 
 
 template<int nLayers, int Faces> 
-static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const int parity, const int dim, const int X[])
+static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, const int parity, const enum KernelType dim, const int X[])
 {
   int za, x1h, x0h, zb;
   switch(dim) {
-    case 0:
+    case EXTERIOR_KERNEL_X:
       za = idx/(X[1]>>1); 
       x1h = idx - za*(X[1]>>1);
       zb = za / X[2];
@@ -253,7 +253,7 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       }
       x[1] = 2*x1h + ((x[0] + x[2] + x[3] + parity) & 1);
       break;
-    case 1:
+    case EXTERIOR_KERNEL_Y:
       za = idx/(X[0]>>1);
       x0h = idx - za*(X[0]>>1);
       zb = za / X[2];
@@ -267,7 +267,7 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       }
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1); 
       break;
-    case 2:
+    case EXTERIOR_KERNEL_Z:
       za = idx/(X[0]>>1);
       x0h = idx - za*(X[0]>>1);
       zb = za / X[1];
@@ -281,7 +281,7 @@ static inline __device__ void coordsFromFaceIndexStaggered(int x[], int idx, con
       }
       x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
       break;
-    case 3:
+    case EXTERIOR_KERNEL_T:
       za = idx/(X[0]>>1);
       x0h = idx - za*(X[0]>>1);
       zb = za / X[1];
