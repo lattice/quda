@@ -1279,6 +1279,7 @@ namespace quda {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
+    initDslashCommsPattern();
     // Record the start of the dslash
     PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
 	    profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1320,7 +1321,6 @@ namespace quda {
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
 #ifdef MULTI_GPU
-    initDslashCommsPattern();
 
     int completeSum = 0;
     while (completeSum < commDimTotal) {
@@ -1398,7 +1398,7 @@ namespace quda {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-
+    initDslashCommsPattern();
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
@@ -1445,7 +1445,6 @@ namespace quda {
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
 #ifdef MULTI_GPU
-    initDslashCommsPattern();
 
 #ifdef GPU_COMMS
     bool pack_event = false;
@@ -1549,6 +1548,8 @@ namespace quda {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
+    initDslashCommsPattern();
+
     setKernelPackT(true);
 
     // Record the end of the packing
@@ -1585,7 +1586,6 @@ namespace quda {
       }
     }
 
-    initDslashCommsPattern();
 
     int completeSum = 0;
     commDimTotal /= 2; // pipe is shorter for zero-variant
