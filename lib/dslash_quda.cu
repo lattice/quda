@@ -107,7 +107,7 @@ namespace quda {
   static cudaEvent_t dslashStart;
   static cudaEvent_t dslashEnd;
 
-  static FaceBuffer *face;
+  static FaceBuffer *face[2];
   static cudaColorSpinorField *inSpinor;
 
   // For tuneLaunch() to uniquely identify a suitable set of launch parameters, we need copies of a few of
@@ -194,10 +194,14 @@ namespace quda {
 #endif
 
 
-  void setFace(const FaceBuffer &Face) {
-    face = (FaceBuffer*)&Face; // nasty
+
+
+  void setFace(const FaceBuffer &Face1, const FaceBuffer &Face2) {
+    face[0] = (FaceBuffer*)&(Face1); 
+    face[1] = (FaceBuffer*)&(Face2); // nasty
   }
 
+  static int it = 0;
 
   void createDslashEvents()
   {
@@ -1285,7 +1289,7 @@ namespace quda {
 	{ pack = true; break; }
 
     // Initialize pack from source spinor
-    PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams, twist_a, twist_b), 
+    PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, twist_a, twist_b), 
 	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
@@ -1304,7 +1308,7 @@ namespace quda {
 		profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
 	// Initialize host transfer from source spinor
-	PROFILE(face->gather(*inSpinor, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
+	PROFILE(face[it]->gather(*inSpinor, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
 
 	// Record the end of the gathering
 	PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), 
@@ -1329,21 +1333,20 @@ namespace quda {
 	  if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
 	    //CUresult event_test;
 	    //event_test = cuEventQuery(gatherEnd[2*i+dir]);
-	    //if (CUDA_SUCCESS == event_test) {
 	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
 		    profile, QUDA_PROFILE_EVENT_QUERY);
 
 	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
-	      PROFILE(face->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(face[it]->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
 	    }
 	  }
 	
 	  // Query if comms has finished
 	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
 	      gatherCompleted[2*i+dir]) {
-	    PROFILE(int comms_test = face->commsQuery(2*i+dir), 
+	    PROFILE(int comms_test = face[it]->commsQuery(2*i+dir), 
 		    profile, QUDA_PROFILE_COMMS_QUERY);
 	    if (comms_test) { 
 	      commsCompleted[2*i+dir] = 1;
@@ -1351,7 +1354,7 @@ namespace quda {
 	    
 	      // Scatter into the end zone
 	      // Both directions use the same stream
-	      PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), 
+	      PROFILE(face[it]->scatter(*inSpinor, dagger, 2*i+dir), 
 		      profile, QUDA_PROFILE_SCATTER);
 	    }
 	  }
@@ -1380,6 +1383,7 @@ namespace quda {
       }
     
     }
+    it = (it^1);
 #endif // MULTI_GPU
 
     profile.Stop(QUDA_PROFILE_TOTAL);
@@ -1527,8 +1531,8 @@ namespace quda {
       }
     
     }
+    it = (it^1);
 #endif // MULTI_GPU
-
     profile.Stop(QUDA_PROFILE_TOTAL);
   }
 
@@ -1555,7 +1559,7 @@ namespace quda {
 	    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
     // Initialize pack from source spinor
-    PROFILE(face->pack(*inSpinor, 1-parity, dagger, streams, true, twist_a, twist_b), 
+    PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, true, twist_a, twist_b), 
 	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     // Record the end of the packing
@@ -1577,7 +1581,7 @@ namespace quda {
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
       for (int dir=1; dir>=0; dir--) {
-	PROFILE(face->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);    
+	PROFILE(face[it]->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);    
       }
     }
 
@@ -1595,7 +1599,7 @@ namespace quda {
 	
 	  // Query if comms have finished
 	  if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]]) {
-	    PROFILE(int comms_test = face->commsQuery(2*i+dir), 
+	    PROFILE(int comms_test = face[it]->commsQuery(2*i+dir), 
 		    profile, QUDA_PROFILE_COMMS_QUERY);
 	    if (comms_test) { 
 	      commsCompleted[2*i+dir] = 1;
@@ -1603,7 +1607,7 @@ namespace quda {
 	    
 	      // Scatter into the end zone
 	      // Both directions use the same stream
-	      PROFILE(face->scatter(*inSpinor, dagger, 2*i+dir), 
+	      PROFILE(face[it]->scatter(*inSpinor, dagger, 2*i+dir), 
 		      profile, QUDA_PROFILE_SCATTER);
 	    }
 	  }
@@ -1632,6 +1636,7 @@ namespace quda {
       }
     
     }
+    it = (it^1);
 #endif // MULTI_GPU
 
     profile.Stop(QUDA_PROFILE_TOTAL);

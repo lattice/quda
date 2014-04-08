@@ -135,7 +135,7 @@ namespace quda {
   class DiracWilson : public Dirac {
 
   protected:
-    FaceBuffer face; // multi-gpu communication buffers
+    FaceBuffer face1, face2; // multi-gpu communication buffers
 
   public:
     DiracWilson(const DiracParam &param);
@@ -342,7 +342,7 @@ namespace quda {
   class DiracStaggered : public Dirac {
 
   protected:
-    FaceBuffer face; // multi-gpu communication buffers
+    FaceBuffer face1, face2; // multi-gpu communication buffers
 
   public:
     DiracStaggered(const DiracParam &param);
@@ -393,7 +393,7 @@ namespace quda {
   protected:
     cudaGaugeField &fatGauge;
     cudaGaugeField &longGauge;
-    FaceBuffer face; // multi-gpu communication buffers
+    FaceBuffer face1, face2; // multi-gpu communication buffers
 
   public:
     DiracImprovedStaggered(const DiracParam &param);

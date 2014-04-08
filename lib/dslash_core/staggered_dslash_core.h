@@ -366,38 +366,15 @@ VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
     sid = full_idx>>1;
   }
 
-/*
-   if (kernel_type == EXTERIOR_KERNEL_X){
-//data order: X1 X4 X3 X2h
-coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, kernel_type, X);
-full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
-sid = full_idx>>1;
-}else if (kernel_type == EXTERIOR_KERNEL_Y){
-//data order: X2 X4 X3 X1h
-coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, kernel_type, X);
-full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
-sid = full_idx>>1;
-}else if (kernel_type == EXTERIOR_KERNEL_Z){
-//data order: X3 X4 X2 X1h
-coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, kernel_type, X);
-full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
-sid = full_idx>>1;
-}else if (kernel_type == EXTERIOR_KERNEL_T){
-//data order: X4 X3 X2 X1h
-coordsFromFaceIndexStaggered<NFACE,2>(y, sid, param.parity, kernel_type, X);
-full_idx = y[3]*X2X1X0+y[2]*X1X0+y[1]*X[0]+y[0];
-sid = full_idx>>1;
-}
-*/
 
 #if (DD_PREC == 0) // double precision
-o00_re = o00_im = 0.0;
-o01_re = o01_im = 0.0;
-o02_re = o02_im = 0.0;
+  o00_re = o00_im = 0.0;
+  o01_re = o01_im = 0.0;
+  o02_re = o02_im = 0.0;
 #else 
-o00_re = o00_im = 0.f;
-o01_re = o01_im = 0.f;
-o02_re = o02_im = 0.f;
+  o00_re = o00_im = 0.f;
+  o01_re = o01_im = 0.f;
+  o02_re = o02_im = 0.f;
 #endif
 #if((DD_RECON == 13 || DD_RECON == 9) && DD_IMPROVED==1)
 int sign = 1;

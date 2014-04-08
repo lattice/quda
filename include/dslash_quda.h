@@ -28,7 +28,7 @@ namespace quda {
     */
   bool getTwistPack();
 
-  void setFace(const FaceBuffer &face);
+  void setFace(const FaceBuffer& face1, const FaceBuffer& face2);
 
   bool getDslashLaunch();
 
