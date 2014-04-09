@@ -30,7 +30,7 @@ cpuGaugeField *cpuReference = NULL;
 static QudaGaugeParam gaugeParam;
 
 
-extern bool verify_results = 0;
+extern bool verify_results;
 double accuracy = 1e-5;
 int ODD_BIT = 1;
 extern int device;
@@ -186,11 +186,10 @@ hisq_force_test()
   if(verify_results){
 	  printfQuda("Calling unitarizeForceCPU\n");
     fermion_force::unitarizeForceCPU(gaugeParam, *cpuOprod, *cpuFatLink, cpuResult);
-  }
-  cudaResult->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION);
 
-  if(verify_results){
-	  printfQuda("Comparing CPU and GPU results\n");
+    cudaResult->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION);
+
+    printfQuda("Comparing CPU and GPU results\n");
     for(int dir=0; dir<4; ++dir){
       int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuResult->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
 #ifdef MULTI_GPU

@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <cuda.h>
+
+ #include <cuda.h>
 #include <cuda_runtime.h>
 
 #include "quda.h"
@@ -101,16 +102,16 @@ unitarize_link_test()
  
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
-  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
-  gParam.order     = QUDA_QDP_GAUGE_ORDER;
+  gParam.link_type = QUDA_GENERAL_LINKS;
+  gParam.ghostInit = false;
 
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
-  gParam.link_type   = QUDA_ASQTAD_MOM_LINKS;
-  gParam.order       = QUDA_QDP_GAUGE_ORDER;
+  gParam.order       = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
+  gParam.order = gauge_order;
 
   TimeProfile profile("dummy");
 
@@ -155,7 +156,7 @@ unitarize_link_test()
   
   if(gauge_order == QUDA_QDP_GAUGE_ORDER){
     computeKSLinkQuda(fatlink, NULL, sitelink, act_path_coeff, &qudaGaugeParam,
-			   QUDA_COMPUTE_FAT_STANDARD);
+		      QUDA_COMPUTE_FAT_STANDARD);
   } // gauge order is QDP_GAUGE_ORDER
 
 
@@ -165,20 +166,19 @@ unitarize_link_test()
   }
 
 
-  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge     = fatlink_2d;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge  = fatlink_2d;
   cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
 
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
 
-  delete cpuOutLink;
 
   setUnitarizeLinksConstants(unitarize_eps,
-				   max_allowed_error,
-				   reunit_allow_svd,
-				   reunit_svd_only,
-				   svd_rel_error,
-				   svd_abs_error);
+			     max_allowed_error,
+			     reunit_allow_svd,
+			     reunit_svd_only,
+			     svd_rel_error,
+			     svd_abs_error);
  
   setUnitarizeLinksPadding(0,0);
 
@@ -201,6 +201,9 @@ unitarize_link_test()
  delete cpuOutLink;
  delete cudaFatLink;
  delete cudaULink;
+
+ 
+ free(fatlink);
  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
   cudaFree(num_failures_dev); 
 #ifdef MULTI_GPU
