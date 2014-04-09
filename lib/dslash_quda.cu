@@ -1284,6 +1284,14 @@ namespace quda {
     PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
 	    profile, QUDA_PROFILE_EVENT_RECORD);
 
+    for(int i=3; i>=0; i--){
+      if(!dslashParam.commDim[i]) continue;
+      for(int dir=1; dir>=0; dir--){
+        face[it]->recvStart(2*i+dir);
+      } 
+    }
+
+
     bool pack = false;
     for (int i=3; i>=0; i--) 
       if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
@@ -1321,6 +1329,7 @@ namespace quda {
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
 #ifdef MULTI_GPU
+    printfQuda("Calling dslashCuda\n");
 
     int completeSum = 0;
     while (completeSum < commDimTotal) {
@@ -1339,7 +1348,7 @@ namespace quda {
 	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
-	      PROFILE(face[it]->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(face[it]->sendStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
 	    }
 	  }
 	
@@ -1549,6 +1558,13 @@ namespace quda {
 
 #ifdef MULTI_GPU
     initDslashCommsPattern();
+    for(int i=3; i>=0; i--){
+      if(!dslashParam.commDim[i]) continue;
+      for(int dir=1; dir>=0; dir--){
+        face[it]->recvStart(2*i+dir);
+      }
+    }
+
 
     setKernelPackT(true);
 
@@ -1582,7 +1598,7 @@ namespace quda {
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
       for (int dir=1; dir>=0; dir--) {
-	PROFILE(face[it]->commsStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);    
+	PROFILE(face[it]->sendStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);    
       }
     }
 

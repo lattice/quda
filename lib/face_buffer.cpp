@@ -330,6 +330,36 @@ void FaceBuffer::commsStart(int dir) {
   }
 }
 
+void FaceBuffer::recvStart(int dir){
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
+
+  if(dir&1){
+    comm_start(mh_recv_back[dim]);
+  }else{
+    comm_start(mh_recv_fwd[dim]);
+  }
+  return;
+}
+
+void FaceBuffer::sendStart(int dir){
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
+
+  if (dir%2 == 0) { // sending backwards
+#ifndef GPU_DIRECT
+    memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
+#endif
+    comm_start(mh_send_back[dim]);
+  } else { //sending forwards
+    // Begin forward send
+#ifndef GPU_DIRECT
+    memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
+#endif
+    comm_start(mh_send_fwd[dim]);
+  }
+}
+
 #endif // QUDA_CALLBACK
 
 

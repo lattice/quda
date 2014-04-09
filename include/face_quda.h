@@ -97,6 +97,8 @@ namespace quda {
 
 
 
+    void sendStart(int dir);
+    void recvStart(int dir);
     void commsStart(int dir);
     int  commsQuery(int dir);
     void scatter(quda::cudaColorSpinorField &out, int dagger, int dir);
