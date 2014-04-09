@@ -67,7 +67,11 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    CopyClover(CopyCloverArg<Out,In> &arg) : arg(arg) { ; }
+    CopyClover(CopyCloverArg<Out,In> &arg) : arg(arg) { 
+      sprintf(vol, "%d", arg.in.volumeCB);
+      sprintf(fname, "%s", typeid(*this).name());
+      sprintf(aux, "out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
+    }
     virtual ~CopyClover() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -76,12 +80,7 @@ namespace quda {
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.in.volumeCB; 
-      aux << "out_stride=" << arg.out.stride << ",in_stride=" << arg.in.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;

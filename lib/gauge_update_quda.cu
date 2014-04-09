@@ -97,8 +97,13 @@ namespace quda {
   public:
     UpdateGaugeField(const UpdateGaugeArg<Complex,Gauge,Mom> &arg, 
 		     const int *X, QudaFieldLocation location) 
-      : arg(arg), X(X), location(location) {}
-    virtual ~UpdateGaugeField() {}
+      : arg(arg), X(X), location(location) {
+      sprintf(vol, "%dx%dx%dx%d", X[0], X[1], X[2], X[3]);
+      sprintf(fname, "%s",  typeid(*this).name());
+      sprintf(aux, "threads=%d,prec=%d,stride=%d", 
+	      2*arg.in.volumeCB, sizeof(Complex)/2, arg.in.stride);
+    }
+    virtual ~UpdateGaugeField() { }
     
     void apply(const cudaStream_t &stream){
       if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -125,16 +130,7 @@ namespace quda {
     long long bytes() const { return arg.nDim*2*arg.in.volumeCB*
 	(arg.in.Bytes() + arg.out.Bytes() + arg.momentum.Bytes()); }
     
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << X[0] << "x";
-      vol << X[1] << "x";
-      vol << X[2] << "x";
-      vol << X[3] << "x";
-      aux << "threads=" << 2*arg.in.volumeCB << ",prec=" << sizeof(Complex)/2;
-      aux << "stride=" << arg.in.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
   };
   
   template <typename Float, typename Gauge, typename Mom>

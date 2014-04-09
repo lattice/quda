@@ -34,15 +34,23 @@ namespace quda {
   {
     std::string line;
     std::stringstream ls;
+
     TuneKey key;
     TuneParam param;
+
+    std::string v;
+    std::string n;
+    std::string a;
 
     while (in.good()) {
       getline(in, line);
       if (!line.length()) continue; // skip blank lines (e.g., at end of file)
       ls.clear();
       ls.str(line);
-      ls >> key.volume >> key.name >> key.aux >> param.block.x >> param.block.y >> param.block.z;
+      ls >> v >> n >> a >> param.block.x >> param.block.y >> param.block.z;
+      sprintf(key.volume, "%s", v.c_str());
+      sprintf(key.name, "%s", n.c_str());
+      sprintf(key.aux, "%s", a.c_str());
       ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes;
       ls.ignore(1); // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment
@@ -146,6 +154,7 @@ namespace quda {
 	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version", cache_path.c_str());
 	ls >> token;
 	if (token.compare(quda_hash)) warningQuda("Cache file %s does not match current QUDA build", cache_path.c_str());
+
       
 	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
 	getline(cache_file, line); // eat the blank line
@@ -154,6 +163,7 @@ namespace quda {
 	getline(cache_file, line); // eat the description line
       
 	deserializeTuneCache(cache_file);
+
 	cache_file.close();      
 	initial_cache_size = tunecache.size();
 
@@ -161,6 +171,7 @@ namespace quda {
 	  printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size), cache_path.c_str());
 	}
       
+
       } else {
 	warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).");
       }
@@ -168,6 +179,7 @@ namespace quda {
 #ifdef MULTI_GPU
     }
 #endif
+
 
     broadcastTuneCache();
   }
@@ -235,47 +247,69 @@ namespace quda {
   }
 
   /**
-   * Return the optimal launch parameters for a given kernel, either by retrieving them from tunecache or autotuning
-   * on the spot.
+   * Return the optimal launch parameters for a given kernel, either
+   * by retrieving them from tunecache or autotuning on the spot.
    */
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
+  TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
+    //TimeProfile hello("tune");
+
+    //hello.Start(QUDA_PROFILE_INIT);
+    const TuneKey key = tunable.tuneKey();
+    //hello.Stop(QUDA_PROFILE_INIT);
+    static TuneParam param;
+
+    //printf("tuneLaunch for %s\n", key.name);
+
+    // first check if we have the tuned value and return if we have it
+    //hello.Start(QUDA_PROFILE_PREAMBLE);
+    if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
+      //hello.Stop(QUDA_PROFILE_PREAMBLE);
+
+      //hello.Start(QUDA_PROFILE_COMPUTE);
+      param = tunecache[key];
+      //hello.Stop(QUDA_PROFILE_COMPUTE);
+
+      //hello.Start(QUDA_PROFILE_FREE);
+      tunable.checkLaunchParam(param);
+      //hello.Stop(QUDA_PROFILE_FREE);
+
+      //hello.Print();
+      return param;
+    }
+
+    //printf("tuning %s\n", key.name);
+
     // We must switch off the global sum when tuning in case of process divergence
     bool reduceState = globalReduce;
     globalReduce = false;
 
     static bool tuning = false; // tuning in progress?
     static const Tunable *active_tunable; // for error checking
-    static TuneParam param;
-
-    TuneParam best_param;
-    cudaError_t error;
-    cudaEvent_t start, end;
-    float elapsed_time, best_time;
-    time_t now;
-
-    const TuneKey key = tunable.tuneKey();
 
     if (enabled == QUDA_TUNE_NO) {
       tunable.defaultTuneParam(param);
       tunable.checkLaunchParam(param);
-    } else if (tunecache.count(key)) {
-      param = tunecache[key];
-      tunable.checkLaunchParam(param);
     } else if (!tuning) {
+
+      TuneParam best_param;
+      cudaError_t error;
+      cudaEvent_t start, end;
+      float elapsed_time, best_time;
+      time_t now;
 
       tuning = true;
       active_tunable = &tunable;
       best_time = FLT_MAX;
 
-      if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name.c_str());
+      if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
       tunable.preTune();
 
       cudaEventCreate(&start);
       cudaEventCreate(&end);
 
       if (verbosity >= QUDA_DEBUG_VERBOSE) {
-	printfQuda("Tuning %s with %s at vol=%s\n", key.name.c_str(), key.aux.c_str(), key.volume.c_str());
+	printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
       }
 
       tunable.initTuneParam(param);
@@ -315,11 +349,11 @@ namespace quda {
       }
 
       if (best_time == FLT_MAX) {
-	errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name.c_str(), key.aux.c_str(), key.volume.c_str());
+	errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
       }
       if (verbosity >= QUDA_VERBOSE) {
 	printfQuda("Tuned %s giving %s for %s with %s\n", tunable.paramString(best_param).c_str(),
-		   tunable.perfString(best_time).c_str(), key.name.c_str(), key.aux.c_str());
+		   tunable.perfString(best_time).c_str(), key.name, key.aux);
       }
       time(&now);
       best_param.comment = "# " + tunable.perfString(best_time) + ", tuned ";
@@ -328,7 +362,7 @@ namespace quda {
       cudaEventDestroy(start);
       cudaEventDestroy(end);
 
-      if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name.c_str());
+      if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
       tunable.postTune();
       param = best_param;
       tunecache[key] = best_param;

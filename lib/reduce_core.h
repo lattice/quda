@@ -442,18 +442,15 @@ public:
   arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, length),
     result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0), 
     Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0)
-    { ; }
+    { 
+      sprintf(vol, "%dx%dx%dx%d", blasConstants.x[0], 
+	      blasConstants.x[1], blasConstants.x[2], blasConstants.x[3]);
+      sprintf(fname, "%s", typeid(arg.r).name());
+      sprintf(aux, "stride=%d,prec=%d", blasConstants.stride, arg.X.Precision());
+    }
   virtual ~ReduceCuda() { }
 
-  TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << blasConstants.x[0] << "x";
-    vol << blasConstants.x[1] << "x";
-    vol << blasConstants.x[2] << "x";
-    vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << arg.X.Precision();
-    return TuneKey(vol.str(), typeid(arg.r).name(), aux.str());
-  }  
+  TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }  
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());

@@ -69,22 +69,19 @@ public:
   BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor &f, 
 	   int length) :
   arg(X, Y, Z, W, f, length), X_h(0), Y_h(0), Z_h(0), W_h(0), 
-  Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0)
-    { ; }
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0)
+    { 
+      sprintf(vol, "%dx%dx%dx%d", blasConstants.x[0], 
+	      blasConstants.x[1], blasConstants.x[2], blasConstants.x[3]);
+      sprintf(fname, "%s", typeid(arg.f).name());
+      sprintf(aux, "stride=%d,prec=%d", blasConstants.stride, arg.X.Precision());
+    }
   virtual ~BlasCuda() { }
 
-  TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << blasConstants.x[0] << "x";
-    vol << blasConstants.x[1] << "x";
-    vol << blasConstants.x[2] << "x";
-    vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << arg.X.Precision();
-    return TuneKey(vol.str(), typeid(arg.f).name(), aux.str());
-  }  
+  TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+    TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
     blasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
   }
 

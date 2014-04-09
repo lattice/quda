@@ -59,18 +59,15 @@ namespace quda {
       }
 
     public:
-      CopyCuda(Output &Y, Input &X, int length) : X(X), Y(Y), length(length) { ; }
+      CopyCuda(Output &Y, Input &X, int length) : X(X), Y(Y), length(length) { 
+	sprintf(vol, "%dx%dx%dx%d", blasConstants.x[0], 
+		blasConstants.x[1], blasConstants.x[2], blasConstants.x[3]);
+	sprintf(fname, "copyKernel");
+	sprintf(aux, "stride=%d,out_prec=%d,in_prec=%d", blasConstants.stride, Y.Precision(), X.Precision());
+      }
       virtual ~CopyCuda() { ; }
 
-      TuneKey tuneKey() const {
-	std::stringstream vol, aux;
-	vol << blasConstants.x[0] << "x";
-	vol << blasConstants.x[1] << "x";
-	vol << blasConstants.x[2] << "x";
-	vol << blasConstants.x[3];
-	aux << "stride=" << blasConstants.stride << ",out_prec=" << Y.Precision() << ",in_prec=" << X.Precision();
-	return TuneKey(vol.str(), "copyKernel", aux.str());
-      }  
+      TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
 
       void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());

@@ -500,7 +500,39 @@ namespace quda {
   public:
     DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 	       const cudaColorSpinorField *x) 
-      : out(out), in(in), x(x), saveOut(0), saveOutNorm(0) { }
+      : out(out), in(in), x(x), saveOut(0), saveOutNorm(0) { 
+
+      sprintf(vol, "%dx%dx%dx%d", dslashConstants.x[0], 
+	      dslashConstants.x[1], dslashConstants.x[2], dslashConstants.x[3]);
+      sprintf(fname, "%s", typeid(*this).name());
+
+#ifdef MULTI_GPU // FIXME
+    aux << "type=";
+    char comm[5], ghost[5];
+    switch (dslashParam.kernel_type) {
+    case INTERIOR_KERNEL: aux << "interior"; break;
+    case EXTERIOR_KERNEL_X: aux << "exterior_x"; break;
+    case EXTERIOR_KERNEL_Y: aux << "exterior_y"; break;
+    case EXTERIOR_KERNEL_Z: aux << "exterior_z"; break;
+    case EXTERIOR_KERNEL_T: aux << "exterior_t"; break;
+    }
+    for (int i=0; i<4; i++) {
+      comm[i] = (dslashParam.commDim[i] ? '1' : '0');
+      ghost[i] = (dslashParam.ghostDim[i] ? '1' : '0');
+    }
+    comm[4] = '\0'; ghost[4] = '\0';
+    aux << ",comm=" << comm;
+    if (dslashParam.kernel_type == INTERIOR_KERNEL) {
+      aux << ",ghost=" << ghost;
+    }
+#else
+    sprintf(aux, "type=single-GPU");
+#endif // MULTI_GPU
+
+ 
+
+    }
+
     virtual ~DslashCuda() { }
     virtual TuneKey tuneKey() const;
     std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
@@ -538,40 +570,7 @@ namespace quda {
 
   };
 
-  TuneKey DslashCuda::tuneKey() const
-  {
-    std::stringstream vol, aux;
-  
-    vol << dslashConstants.x[0] << "x";
-    vol << dslashConstants.x[1] << "x";
-    vol << dslashConstants.x[2] << "x";
-    vol << dslashConstants.x[3];
-
-    aux << "type=";
-#ifdef MULTI_GPU
-    char comm[5], ghost[5];
-    switch (dslashParam.kernel_type) {
-    case INTERIOR_KERNEL: aux << "interior"; break;
-    case EXTERIOR_KERNEL_X: aux << "exterior_x"; break;
-    case EXTERIOR_KERNEL_Y: aux << "exterior_y"; break;
-    case EXTERIOR_KERNEL_Z: aux << "exterior_z"; break;
-    case EXTERIOR_KERNEL_T: aux << "exterior_t"; break;
-    }
-    for (int i=0; i<4; i++) {
-      comm[i] = (dslashParam.commDim[i] ? '1' : '0');
-      ghost[i] = (dslashParam.ghostDim[i] ? '1' : '0');
-    }
-    comm[4] = '\0'; ghost[4] = '\0';
-    aux << ",comm=" << comm;
-    if (dslashParam.kernel_type == INTERIOR_KERNEL) {
-      aux << ",ghost=" << ghost;
-    }
-#else
-    aux << "single-GPU";
-#endif // MULTI_GPU
-
-    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-  }
+  TuneKey DslashCuda::tuneKey() const  { return TuneKey(vol, fname, aux); }
 
   /** This derived class is specifically for driving the Dslash kernels
       that use shared memory blocking.  This only applies on Fermi and
@@ -732,10 +731,10 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      std::stringstream recon;
+      /*      std::stringstream recon; FIXME
       recon << reconstruct;
       key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Xpay";
+      if (x) key.aux += ",Xpay";*/
       return key;
     }
 
@@ -795,10 +794,10 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      std::stringstream recon;
+      /*std::stringstream recon; FIXME
       recon << reconstruct;
       key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Xpay";
+      if (x) key.aux += ",Xpay";*/
       return key;
     }
 
@@ -860,9 +859,9 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      std::stringstream recon;
+      /*std::stringstream recon;
       recon << reconstruct;
-      key.aux += ",reconstruct=" + recon.str() + ",Xpay";
+      key.aux += ",reconstruct=" + recon.str() + ",Xpay";*/
       return key;
     }
 
@@ -941,7 +940,7 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      std::stringstream recon, dslash_type;
+      /*std::stringstream recon, dslash_type; FIXME
       recon << reconstruct;
       key.aux += ",reconstruct=" + recon.str();
 
@@ -959,7 +958,7 @@ namespace quda {
         key.aux += ",NdegDslash";
         break;
       }
-      if (x) key.aux += "Xpay";
+      if (x) key.aux += "Xpay";*/
       return key;
     }
 
@@ -1099,12 +1098,12 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      std::stringstream ls, recon;
+      /*std::stringstream ls, recon; FIXME
       ls << dslashConstants.Ls;
       recon << reconstruct;
       key.volume += "x" + ls.str();
       key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Xpay";
+      if (x) key.aux += ",Xpay";*/
       return key;
     }
 
@@ -1168,10 +1167,10 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      std::stringstream recon;
+      /*std::stringstream recon; FIXME
       recon << reconstruct;
       key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Axpy";
+      if (x) key.aux += ",Axpy";*/
       return key;
     }
 
@@ -1881,6 +1880,10 @@ namespace quda {
       : out(out), clover(clover), cloverNorm(cloverNorm), in(in)
     {
       bindSpinorTex<sFloat>(in);
+
+      sprintf(vol, "%dx%dx%dx%d", dslashConstants.x[0], 
+	      dslashConstants.x[1], dslashConstants.x[2], dslashConstants.x[3]);
+      sprintf(fname, "%s", typeid(*this).name());
     }
     virtual ~CloverCuda() { unbindSpinorTex<sFloat>(in); }
     void apply(const cudaStream_t &stream)
@@ -1891,15 +1894,7 @@ namespace quda {
 	((sFloat*)out->V(), (float*)out->Norm(), clover, cloverNorm, 
 	 (sFloat*)in->V(), (float*)in->Norm(), dslashParam);
     }
-    virtual TuneKey tuneKey() const
-    {
-      std::stringstream vol, aux;
-      vol << dslashConstants.x[0] << "x";
-      vol << dslashConstants.x[1] << "x";
-      vol << dslashConstants.x[2] << "x";
-      vol << dslashConstants.x[3];
-      return TuneKey(vol.str(), typeid(*this).name());
-    }
+    virtual TuneKey tuneKey() const { return TuneKey(vol, fname); }
 
     // Need to save the out field if it aliases the in field
     void preTune() {
@@ -2002,20 +1997,17 @@ namespace quda {
       else{//twist doublet
         a = kappa, b = mu, c = epsilon;
       } 
+      
+      sprintf(vol, "%dx%dx%dx%d", dslashConstants.x[0], 
+	      dslashConstants.x[1], dslashConstants.x[2], dslashConstants.x[3]);
+      sprintf(fname, "%s", typeid(*this).name());
+      sprintf(aux, "TwistFlavour=%d", in->TwistFlavor());
     }
     virtual ~TwistGamma5Cuda() {
       unbindSpinorTex<sFloat>(in);    
     }
 
-   TuneKey tuneKey() const {
-     std::stringstream vol, aux;
-     vol << dslashConstants.x[0] << "x";
-     vol << dslashConstants.x[1] << "x";
-     vol << dslashConstants.x[2] << "x";
-     vol << dslashConstants.x[3];    
-     aux << "TwistFlavor" << in->TwistFlavor();
-     return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-   }  
+    TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
 
   void apply(const cudaStream_t &stream) 
   {

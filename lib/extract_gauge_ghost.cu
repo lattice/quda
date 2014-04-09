@@ -129,7 +129,12 @@ namespace quda {
 	faceMax = (arg.order.faceVolumeCB[d] > faceMax ) 
 	  ? arg.order.faceVolumeCB[d] : faceMax;
       size = 2 * faceMax; // factor of comes from parity
+
+      sprintf(vol, "%d", arg.order.volumeCB);
+      sprintf(fname, "%s",  typeid(*this).name());
+      sprintf(aux, "stride=%d", arg.order.stride);
     }
+
     virtual ~ExtractGhost() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -138,12 +143,7 @@ namespace quda {
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.order.volumeCB; 
-      aux << "stride=" << arg.order.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;

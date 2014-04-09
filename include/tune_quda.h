@@ -7,10 +7,58 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include <cstring>
 
 namespace quda {
 
-  class TuneKey {
+class TuneKey {
+
+  public:
+    char volume[32];
+    char name[1024];
+    char aux[1024];
+
+    TuneKey() { }
+    TuneKey(const char v[], const char n[], const char a[]="type=default") {
+      strcpy(volume, v);
+      strcpy(name, n);
+      strcpy(aux, a);
+    } 
+    TuneKey(const TuneKey &key) {
+      strcpy(volume,key.volume);
+      strcpy(name,key.name);
+      strcpy(aux,key.aux);
+    }
+
+    TuneKey& operator=(const TuneKey &key) {
+      if (&key != this) {
+	strcpy(volume,key.volume);
+	strcpy(name,key.name);
+	strcpy(aux,key.aux);
+      }
+      return *this;
+    }
+
+    bool operator<(const TuneKey &other) const {
+      int vc = std::strcmp(volume, other.volume);
+      if (vc < 0) {
+	return true;
+      } else if (vc == 0) {
+	int nc = std::strcmp(name, other.name);
+	if (nc < 0) {
+	  return true;
+	} else if (nc == 0) {
+	  int ac = std::strcmp(aux, other.aux);
+	  return (ac < 0 ? true : false);
+	}
+      }
+      return false;
+    }
+
+  };
+
+
+/*class TuneKey {
 
   public:
     std::string volume;
@@ -38,7 +86,7 @@ namespace quda {
 	((volume == other.volume) && (name == other.name) && (aux < other.aux));
     }
 
-  };
+  };*/
 
 
   class TuneParam {
@@ -156,6 +204,10 @@ namespace quda {
       }
     }
 
+    char vol[32];
+    char aux[1024];
+    char fname[1024];
+
   public:
     Tunable() { }
     virtual ~Tunable() { }
@@ -255,7 +307,7 @@ namespace quda {
 
   void loadTuneCache(QudaVerbosity verbosity);
   void saveTuneCache(QudaVerbosity verbosity);
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
 } // namespace quda
 
