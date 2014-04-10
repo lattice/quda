@@ -611,7 +611,13 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     public:
       UnitarizeForceCuda(const cudaGaugeField& oldForce, const cudaGaugeField& gauge,  
 			 cudaGaugeField& newForce, int* fails) : 
-	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { ; }
+	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { 
+	sprintf(vol, "%dx%dx%dx%d", gauge.X()[0],  gauge.X()[1],  
+		gauge.X()[2],  gauge.X()[3]);
+	sprintf(fname, "%s",  typeid(*this).name());
+	sprintf(aux, "threads=%d,prec=%d,stride=%d", 
+		gauge.Volume(), gauge.Precision(), gauge.Stride());
+      }
       virtual ~UnitarizeForceCuda() { ; }
 
       void apply(const cudaStream_t &stream) {
@@ -635,16 +641,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       
       long long flops() const { return 0; } // FIXME: add flops counter
       
-      TuneKey tuneKey() const {
-	std::stringstream vol, aux;
-	vol << gauge.X()[0] << "x";
-	vol << gauge.X()[1] << "x";
-	vol << gauge.X()[2] << "x";
-	vol << gauge.X()[3] << "x";
-	aux << "threads=" << gauge.Volume() << ",prec=" << gauge.Precision();
-	aux << "stride=" << gauge.Stride();
-	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }  
+      TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
     }; // UnitarizeForceCuda
 
     void unitarizeForceCuda(const QudaGaugeParam &param, cudaGaugeField &cudaOldForce,
