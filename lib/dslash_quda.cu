@@ -1329,7 +1329,6 @@ namespace quda {
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
 #ifdef MULTI_GPU
-    printfQuda("Calling dslashCuda\n");
 
     int completeSum = 0;
     while (completeSum < commDimTotal) {
