@@ -998,6 +998,33 @@ namespace quda {
 
 
 
+  void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger) {
+    int dim = dir/2;
+    if(!commDimPartitioned(dim)) return;
+
+    if (dir%2 == 0) { // sending backwards
+      // Prepost receive
+      comm_start(mh_recv_fwd[nFace-1][dim]);
+    } else { //sending forwards
+      // Prepost receive
+      comm_start(mh_recv_back[nFace-1][dim]);
+    }
+  }
+
+  void cudaColorSpinorField::sendStart(int nFace, int dir, int dagger) {
+    int dim = dir / 2;
+    if(!commDimPartitioned(dim)) return;
+
+    if (dir%2 == 0) { // sending backwards
+      comm_start(mh_send_back[nFace-1][2*dim+dagger]);
+    } else { //sending forwards
+      comm_start(mh_send_fwd[nFace-1][2*dim+dagger]);
+    }
+  }
+
+
+
+
   void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return;

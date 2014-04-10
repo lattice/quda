@@ -380,6 +380,8 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
+    void recvStart(int nFace, int dir, int dagger=0);
+    void sendStart(int nFace, int dir, int dagger=0);
     void commsStart(int nFace, int dir, int dagger=0);
     int commsQuery(int nFace, int dir, int dagger=0); 
     void scatter(int nFace, int dagger, int dir);

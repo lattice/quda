@@ -1287,7 +1287,7 @@ namespace quda {
     for(int i=3; i>=0; i--){
       if(!dslashParam.commDim[i]) continue;
       for(int dir=1; dir>=0; dir--){
-        face[it]->recvStart(2*i+dir);
+	PROFILE(face[it]->recvStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
       } 
     }
 
@@ -1407,13 +1407,19 @@ namespace quda {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-    initDslashCommsPattern();
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
 	      profile, QUDA_PROFILE_EVENT_RECORD);
     }
-
+	
+    initDslashCommsPattern();
+    for(int i=3; i>=0; i--){
+      if(!dslashParam.commDim[i]) continue;
+      for(int dir=1; dir>=0; dir--){
+        PROFILE(inSpinor->recvStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+      }
+    }
     bool pack = false;
     for (int i=3; i>=0; i--) 
       if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
@@ -1468,7 +1474,7 @@ namespace quda {
       }
 
       for (int dir=1; dir>=0; dir--) {	
-	PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	PROFILE(inSpinor->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
 	inSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
       }
     }
@@ -1490,7 +1496,7 @@ namespace quda {
 	    if (cudaSuccess == event_test) {
 	      gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
-	      PROFILE(inSpinor->commsStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	      PROFILE(inSpinor->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
 	    }
 	  }
 #endif
@@ -1561,7 +1567,7 @@ namespace quda {
     for(int i=3; i>=0; i--){
       if(!dslashParam.commDim[i]) continue;
       for(int dir=1; dir>=0; dir--){
-        face[it]->recvStart(2*i+dir);
+	PROFILE(face[it]->recvStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);    
       }
     }
 
