@@ -9,11 +9,11 @@
 #include <typeinfo>
 #include <map>
 #include <unistd.h>
-#include <loki.h>
+
+//#define LAUNCH_TIMER
 
 namespace quda {
 
-  //typedef Loki::AssocVector<TuneKey, TuneParam> map;
   typedef std::map<TuneKey, TuneParam> map;
   
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
@@ -246,39 +246,59 @@ namespace quda {
 #endif
   }
 
+
+  static TimeProfile launchTimer("tuneLaunch");
+
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-    //TimeProfile hello("tune");
 
-    //hello.Start(QUDA_PROFILE_INIT);
+#ifdef LAUNCH_TIMER
+    launchTimer.Start(QUDA_PROFILE_TOTAL);
+    launchTimer.Start(QUDA_PROFILE_INIT);
+#endif
+
     const TuneKey key = tunable.tuneKey();
-    //hello.Stop(QUDA_PROFILE_INIT);
     static TuneParam param;
 
-    //printf("tuneLaunch for %s\n", key.name);
+#ifdef LAUNCH_TIMER
+    launchTimer.Stop(QUDA_PROFILE_INIT);
+    launchTimer.Start(QUDA_PROFILE_PREAMBLE);
+#endif
 
     // first check if we have the tuned value and return if we have it
-    //hello.Start(QUDA_PROFILE_PREAMBLE);
     if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
-      //hello.Stop(QUDA_PROFILE_PREAMBLE);
 
-      //hello.Start(QUDA_PROFILE_COMPUTE);
+#ifdef LAUNCH_TIMER
+      launchTimer.Stop(QUDA_PROFILE_PREAMBLE);
+      launchTimer.Start(QUDA_PROFILE_COMPUTE);
+#endif
+
       param = tunecache[key];
-      //hello.Stop(QUDA_PROFILE_COMPUTE);
 
-      //hello.Start(QUDA_PROFILE_FREE);
+#ifdef LAUNCH_TIMER
+      launchTimer.Stop(QUDA_PROFILE_COMPUTE);
+      launchTimer.Start(QUDA_PROFILE_EPILOGUE);
+#endif
+
       tunable.checkLaunchParam(param);
-      //hello.Stop(QUDA_PROFILE_FREE);
 
-      //hello.Print();
+#ifdef LAUNCH_TIMER
+      launchTimer.Stop(QUDA_PROFILE_EPILOGUE);
+      launchTimer.Stop(QUDA_PROFILE_TOTAL);
+#endif
+
       return param;
     }
 
-    //printf("tuning %s\n", key.name);
+#ifdef LAUNCH_TIMER
+    launchTimer.Stop(QUDA_PROFILE_PREAMBLE);
+    launchTimer.Stop(QUDA_PROFILE_TOTAL);
+#endif
+
 
     // We must switch off the global sum when tuning in case of process divergence
     bool reduceState = globalReduce;
@@ -377,4 +397,9 @@ namespace quda {
     return param;
   }
 
+  void printLaunchTimer() {
+#ifdef LAUNCH_TIMER
+    launchTimer.Print();
+#endif
+  }
 } // namespace quda
