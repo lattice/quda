@@ -24,6 +24,7 @@ BUILD_CLOVER_DIRAC = @BUILD_CLOVER_DIRAC@			# build clover Dirac operators?
 BUILD_DOMAIN_WALL_DIRAC = @BUILD_DOMAIN_WALL_DIRAC@			# build domain wall Dirac operators?
 BUILD_STAGGERED_DIRAC = @BUILD_STAGGERED_DIRAC@			# build staggered Dirac operators?
 BUILD_TWISTED_MASS_DIRAC = @BUILD_TWISTED_MASS_DIRAC@		# build twisted mass Dirac operators?
+BUILD_TWISTED_CLOVER_DIRAC = @BUILD_TWISTED_CLOVER_DIRAC@		# build twisted clover Dirac operators?
 BUILD_NDEG_TWISTED_MASS_DIRAC = @BUILD_NDEG_TWISTED_MASS_DIRAC@	# build non-degenerate twisted mass Dirac operators?
 BUILD_FATLINK = @BUILD_FATLINK@				# build code for computing asqtad fat links?
 BUILD_HISQLINK = @BUILD_HISQLINK@				# build code for computing hisq fat links?
@@ -153,6 +154,11 @@ endif
 ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
   NVCCOPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
   COPT += -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+endif
+
+ifeq ($(strip $(BUILD_TWISTED_CLOVER_DIRAC)), yes)
+  NVCCOPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+  COPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
 endif
 
 ifeq ($(strip $(BUILD_NDEG_TWISTED_MASS_DIRAC)), yes)
