@@ -20,9 +20,9 @@ namespace quda {
 #include <texture.h>
 
     static struct {
-      int x[QUDA_MAX_DIM];
-      int stride;
-    } blasConstants;
+      const char *vol_str;
+      const char *aux_str;      
+    } blasStrings;
 
     template <typename FloatN, int N, typename Output, typename Input>
     __global__ void copyKernel(Output Y, Input X, int length) {
@@ -59,17 +59,14 @@ namespace quda {
       }
 
     public:
-      CopyCuda(Output &Y, Input &X, int length) : X(X), Y(Y), length(length) { 
-	sprintf(vol, "%dx%dx%dx%d", blasConstants.x[0], 
-		blasConstants.x[1], blasConstants.x[2], blasConstants.x[3]);
-	sprintf(fname, "copyKernel");
-	sprintf(aux, "stride=%d,out_prec=%d,in_prec=%d", blasConstants.stride, Y.Precision(), X.Precision());
-      }
+      CopyCuda(Output &Y, Input &X, int length) : X(X), Y(Y), length(length) { }
       virtual ~CopyCuda() { ; }
 
-      TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
+      inline TuneKey tuneKey() const {
+	return TuneKey(blasStrings.vol_str, "copyKernel", blasStrings.aux_str); 
+      }
 
-      void apply(const cudaStream_t &stream) {
+      inline void apply(const cudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
       }
@@ -85,6 +82,7 @@ namespace quda {
 	if (Y.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
 	return bytes*length; 
       }
+      int tuningIter() const { return 10; }
     };
 
     void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
@@ -102,8 +100,13 @@ namespace quda {
 
       checkSpinorLength(dst, src);
 
-      for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = src.X()[d];
-      blasConstants.stride = src.Stride();
+      blasStrings.vol_str = src.VolString();
+      char tmp[256];
+      strcpy(tmp, "dst=");
+      strcat(tmp, dst.AuxString());
+      strcat(tmp, ",src=");
+      strcat(tmp, src.AuxString());
+      blasStrings.aux_str = tmp;
 
       // For a given dst precision, there are two non-trivial possibilities for the
       // src precision.
@@ -150,8 +153,8 @@ namespace quda {
 	  CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
 		   Spinor<float2, float2, double2, 3, 0, 0> >
 	  copy(dst_spinor, src_tex, src.Volume());
-	  copy.apply(*getBlasStream());	
-      }
+  copy.apply(*getBlasStream());	
+}
   } else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	blas_bytes += (unsigned long long)src.Volume()*sizeof(float);
 	if (src.Nspin() == 4){      
