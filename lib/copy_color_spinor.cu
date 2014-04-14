@@ -141,7 +141,6 @@ namespace quda {
     : out(out), in(in), basis(basis), volume(volume) { ; }
     virtual ~PackSpinor() { 
       sprintf(vol, "%d", in.volumeCB);
-      sprintf(fname, "%s", typeid(*this).name());
       sprintf(aux, "out_stride=%d,in_stride=%d", out.stride, in.stride);
     }
   
@@ -152,7 +151,7 @@ namespace quda {
 	(out, in, basis, volume);
     }
 
-    TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;

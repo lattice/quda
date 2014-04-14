@@ -69,7 +69,6 @@ namespace quda {
   public:
     CopyClover(CopyCloverArg<Out,In> &arg) : arg(arg) { 
       sprintf(vol, "%d", arg.in.volumeCB);
-      sprintf(fname, "%s", typeid(*this).name());
       sprintf(aux, "out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
     virtual ~CopyClover() { ; }
@@ -80,7 +79,7 @@ namespace quda {
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;

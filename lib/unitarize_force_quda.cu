@@ -614,7 +614,6 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { 
 	sprintf(vol, "%dx%dx%dx%d", gauge.X()[0],  gauge.X()[1],  
 		gauge.X()[2],  gauge.X()[3]);
-	sprintf(fname, "%s",  typeid(*this).name());
 	sprintf(aux, "threads=%d,prec=%d,stride=%d", 
 		gauge.Volume(), gauge.Precision(), gauge.Stride());
       }
@@ -641,7 +640,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       
       long long flops() const { return 0; } // FIXME: add flops counter
       
-      TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
     }; // UnitarizeForceCuda
 
     void unitarizeForceCuda(const QudaGaugeParam &param, cudaGaugeField &cudaOldForce,
