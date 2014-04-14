@@ -1,0 +1,31 @@
+tunecache	0.6.0	cpu_arch=x86_64,gpu_arch=sm_35	# Last updated Mon Apr 14 13:49:00 2014
+
+volume	name	aux	block.x	block.y	block.z	grid.x	grid.y	grid.z	shared_bytes	comment
+12x24x24x8	N4quda11axpyCGNorm2I7double26float2S2_EE	stride=62208,prec=4	96	1	1	108	1	1	1536	# 30.01 Gflop/s, 60.02 GB/s, tuned Mon Apr 14 13:48:54 2014
+12x24x24x8	N4quda17PackFaceStaggeredI6float2fEE	threads=4608,stride=62208,prec=4	928	1	1	5	1	1	16385	# 0.00 Gflop/s, 19.29 GB/s, tuned Mon Apr 14 13:48:50 2014
+12x24x24x8	N4quda22HeavyQuarkResidualNormI7double36float2S2_EE	stride=62208,prec=4	160	1	1	51	1	1	3840	# 19.18 Gflop/s, 38.36 GB/s, tuned Mon Apr 14 13:48:59 2014
+12x24x24x8	N4quda3DotId6float2S1_EE	stride=62208,prec=4	160	1	1	129	1	1	1280	# 12.92 Gflop/s, 51.70 GB/s, tuned Mon Apr 14 13:48:52 2014
+12x24x24x8	N4quda3xpyI6float2S1_EE	stride=62208,prec=4	512	1	1	255	1	1	0	# 7.63 Gflop/s, 91.60 GB/s, tuned Mon Apr 14 13:48:57 2014
+12x24x24x8	N4quda4axpyI6float2S1_EE	stride=62208,prec=4	512	1	1	242	1	1	0	# 15.40 Gflop/s, 92.39 GB/s, tuned Mon Apr 14 13:48:56 2014
+12x24x24x8	N4quda4xpayI6float2S1_EE	stride=62208,prec=4	192	1	1	256	1	1	0	# 15.47 Gflop/s, 92.82 GB/s, tuned Mon Apr 14 13:48:58 2014
+12x24x24x8	N4quda5Norm2Id6float2S1_EE	stride=62208,prec=4	128	1	1	144	1	1	1024	# 15.56 Gflop/s, 31.12 GB/s, tuned Mon Apr 14 13:48:49 2014
+12x24x24x8	N4quda8axpyZpbxI6float2S1_EE	stride=62208,prec=4	608	1	1	243	1	1	0	# 44.33 Gflop/s, 110.82 GB/s, tuned Mon Apr 14 13:48:55 2014
+12x24x24x8	N4quda8xmyNorm2Id6float2S1_EE	stride=62208,prec=4	96	1	1	156	1	1	768	# 16.52 Gflop/s, 66.08 GB/s, tuned Mon Apr 14 13:48:51 2014
+16x16x16x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=exterior_z,comm=0010,reconstruct=18	32	1	1	512	1	1	768	# 684.76 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:11 2014
+16x16x16x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=exterior_z,comm=0010,reconstruct=18,Axpy	32	1	1	512	1	1	768	# 683.35 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:11 2014
+16x16x16x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=interior,comm=0010,ghost=0010,reconstruct=18	224	1	1	74	1	1	5376	# 105.90 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:10 2014
+16x16x16x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=interior,comm=0010,ghost=0010,reconstruct=18,Axpy	704	1	1	24	1	1	24577	# 105.70 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:11 2014
+24x24x24x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=exterior_z,comm=0010,reconstruct=18	32	1	1	1728	1	1	768	# 1935.12 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:50 2014
+24x24x24x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=exterior_z,comm=0010,reconstruct=18,Axpy	32	1	1	1728	1	1	768	# 1987.65 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:50 2014
+24x24x24x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=interior,comm=0010,ghost=0010,reconstruct=18	128	1	1	432	1	1	3072	# 122.80 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:50 2014
+24x24x24x8	N4quda19StaggeredDslashCudaI6float2S1_6float4fEE	type=interior,comm=0010,ghost=0010,reconstruct=18,Axpy	320	1	1	173	1	1	16385	# 121.05 Gflop/s, 0.00 GB/s, tuned Mon Apr 14 13:48:50 2014
+8x16x16x8	N4quda11axpyCGNorm2I7double26float2S2_EE	stride=18432,prec=4	96	1	1	104	1	1	1536	# 16.01 Gflop/s, 32.02 GB/s, tuned Mon Apr 14 13:48:13 2014
+8x16x16x8	N4quda17PackFaceStaggeredI6float2fEE	threads=2048,stride=18432,prec=4	608	1	1	4	1	1	0	# 0.00 Gflop/s, 8.64 GB/s, tuned Mon Apr 14 13:48:10 2014
+8x16x16x8	N4quda22HeavyQuarkResidualNormI7double36float2S2_EE	stride=18432,prec=4	96	1	1	75	1	1	2304	# 8.44 Gflop/s, 16.88 GB/s, tuned Mon Apr 14 13:48:17 2014
+8x16x16x8	N4quda3DotId6float2S1_EE	stride=18432,prec=4	160	1	1	95	1	1	1280	# 5.95 Gflop/s, 23.81 GB/s, tuned Mon Apr 14 13:48:12 2014
+8x16x16x8	N4quda3xpyI6float2S1_EE	stride=18432,prec=4	288	1	1	125	1	1	0	# 8.98 Gflop/s, 107.72 GB/s, tuned Mon Apr 14 13:48:15 2014
+8x16x16x8	N4quda4axpyI6float2S1_EE	stride=18432,prec=4	256	1	1	147	1	1	0	# 10.43 Gflop/s, 62.55 GB/s, tuned Mon Apr 14 13:48:15 2014
+8x16x16x8	N4quda4xpayI6float2S1_EE	stride=18432,prec=4	320	1	1	117	1	1	0	# 10.29 Gflop/s, 61.71 GB/s, tuned Mon Apr 14 13:48:16 2014
+8x16x16x8	N4quda5Norm2Id6float2S1_EE	stride=18432,prec=4	128	1	1	145	1	1	1024	# 6.26 Gflop/s, 12.52 GB/s, tuned Mon Apr 14 13:48:10 2014
+8x16x16x8	N4quda8axpyZpbxI6float2S1_EE	stride=18432,prec=4	608	1	1	142	1	1	0	# 36.57 Gflop/s, 91.43 GB/s, tuned Mon Apr 14 13:48:14 2014
+8x16x16x8	N4quda8xmyNorm2Id6float2S1_EE	stride=18432,prec=4	160	1	1	80	1	1	1280	# 8.77 Gflop/s, 35.09 GB/s, tuned Mon Apr 14 13:48:11 2014
