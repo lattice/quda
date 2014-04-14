@@ -117,6 +117,10 @@ static TimeProfile profileGaugeUpdate("updateGaugeFieldQuda");
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
+namespace quda {
+  void printLaunchTimer();
+}
+
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
 {
   setVerbosity(verbosity);
@@ -666,7 +670,6 @@ void freeCloverQuda(void)
   cloverPrecise = NULL;
 }
 
-
 void endQuda(void)
 {
   profileEnd.Start(QUDA_PROFILE_TOTAL);
@@ -716,6 +719,8 @@ void endQuda(void)
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
     profileEnd.Print();
+
+    printLaunchTimer();
 
     printfQuda("\n");
     printPeakMemUsage();
