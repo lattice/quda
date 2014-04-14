@@ -175,6 +175,12 @@ namespace quda {
     init = true;
 
     clearGhostPointers();
+    setTuningString();
+  }
+
+  void ColorSpinorField::setTuningString() {
+    sprintf(vol_string, "%dx%dx%dx%d", x[0],  x[1],  x[2],  x[3]);
+    sprintf(aux_string, "vol=%d,stride=%d", volume, stride, precision);
   }
 
   void ColorSpinorField::destroy() {
@@ -249,6 +255,8 @@ namespace quda {
       std::cout << *this << std::endl;
       printfQuda("\n");
     }
+
+    setTuningString();
   }
 
   // Fills the param with the contents of this field

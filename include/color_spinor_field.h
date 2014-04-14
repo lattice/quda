@@ -160,7 +160,7 @@ namespace quda {
     // multi-GPU parameters
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
-    
+
     int ghostFace[QUDA_MAX_DIM];// the size of each face
     int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
     int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
@@ -190,6 +190,10 @@ namespace quda {
     static void checkField(const ColorSpinorField &, const ColorSpinorField &);
     void clearGhostPointers();
 
+    char vol_string[32]; // used as a label in the autotuner
+    char aux_string[128]; // used as a label in the autotuner
+    void setTuningString(); // set the vol_string and aux_string for use in tuning
+
   public:
     //ColorSpinorField();
     ColorSpinorField(const ColorSpinorField &);
@@ -217,6 +221,9 @@ namespace quda {
     size_t NormBytes() const { return norm_bytes; }
     void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
   
+    const char *VolString() const { return vol_string; }
+    const char *AuxString() const { return aux_string; }
+
     void* V() {return v;}
     const void* V() const {return v;}
     void* Norm(){return norm;}
