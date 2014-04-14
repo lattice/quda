@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -88,7 +88,7 @@ __device__ __forceinline__ unsigned int SHR_ADD(
     unsigned int addend)
 {
     unsigned int ret;
-#if __CUDA_ARCH__ >= 200
+#if CUB_PTX_VERSION >= 200
     asm("vshr.u32.u32.u32.clamp.add %0, %1, %2, %3;" :
         "=r"(ret) : "r"(x), "r"(shift), "r"(addend));
 #else
@@ -107,7 +107,7 @@ __device__ __forceinline__ unsigned int SHL_ADD(
     unsigned int addend)
 {
     unsigned int ret;
-#if __CUDA_ARCH__ >= 200
+#if CUB_PTX_VERSION >= 200
     asm("vshl.u32.u32.u32.clamp.add %0, %1, %2, %3;" :
         "=r"(ret) : "r"(x), "r"(shift), "r"(addend));
 #else
@@ -129,7 +129,7 @@ __device__ __forceinline__ unsigned int BFE(
     Int2Type<BYTE_LEN>      byte_len)
 {
     unsigned int bits;
-#if __CUDA_ARCH__ >= 200
+#if CUB_PTX_VERSION >= 200
     asm("bfe.u32 %0, %1, %2, %3;" : "=r"(bits) : "r"((unsigned int) source), "r"(bit_start), "r"(num_bits));
 #else
     const unsigned int MASK = (1 << num_bits) - 1;
@@ -178,7 +178,7 @@ __device__ __forceinline__ void BFI(
     unsigned int bit_start,
     unsigned int num_bits)
 {
-#if __CUDA_ARCH__ >= 200
+#if CUB_PTX_VERSION >= 200
     asm("bfi.b32 %0, %1, %2, %3, %4;" :
         "=r"(ret) : "r"(y), "r"(x), "r"(bit_start), "r"(num_bits));
 #else
@@ -195,7 +195,7 @@ __device__ __forceinline__ void BFI(
  */
 __device__ __forceinline__ unsigned int IADD3(unsigned int x, unsigned int y, unsigned int z)
 {
-#if __CUDA_ARCH__ >= 200
+#if CUB_PTX_VERSION >= 200
     asm("vadd.u32.u32.u32.add %0, %1, %2, %3;" : "=r"(x) : "r"(x), "r"(y), "r"(z));
 #else
     x = x + y + z;
@@ -473,9 +473,9 @@ __device__ __forceinline__ T ShuffleDown(
  */
 template <typename T>
 __device__ __forceinline__ T ShuffleBroadcast(
-    T               input,                  ///< [in] The value to broadcast
-    int             src_lane,               ///< [in] Which warp lane is to do the broadcasting
-    int             logical_warp_threads)   ///< [in] Number of threads per logical warp
+    T               input,                                          ///< [in] The value to broadcast
+    int             src_lane,                                       ///< [in] Which warp lane is to do the broadcasting
+    int             logical_warp_threads)                           ///< [in] Number of threads per logical warp
 {
     typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
 

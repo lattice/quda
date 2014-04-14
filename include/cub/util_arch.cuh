@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -57,7 +57,7 @@ namespace cub {
 
 
 /// Whether or not the source targeted by the active compiler pass is allowed to  invoke device kernels or methods from the CUDA runtime API.
-#if !defined(__CUDA_ARCH__) || defined(CUB_CDP)
+#if (CUB_PTX_VERSION == 0) || defined(CUB_CDP)
 #define CUB_RUNTIME_ENABLED
 #endif
 
@@ -149,25 +149,33 @@ namespace cub {
 #define CUB_SUBSCRIPTION_FACTOR(arch)                   \
     ((arch >= 300) ?                                    \
         (5) :                                           \
-        (3))
+        ((arch >= 200) ?                                \
+            (3) :                                       \
+            (10)))
 
+/// Prefer X-way conflict over padding
+#define CUB_PREFER_CONFLICT_OVER_PADDING(arch)          \
+    ((arch >= 300) ?                                    \
+        (0) :                                           \
+        (4))
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
-#define CUB_PTX_LOG_WARP_THREADS    CUB_LOG_WARP_THREADS(CUB_PTX_VERSION)
-#define CUB_PTX_WARP_THREADS        (1 << CUB_PTX_LOG_WARP_THREADS)
-#define CUB_PTX_LOG_SMEM_BANKS      CUB_LOG_SMEM_BANKS(CUB_PTX_VERSION)
-#define CUB_PTX_SMEM_BANKS          (1 << CUB_PTX_LOG_SMEM_BANKS)
-#define CUB_PTX_SMEM_BANK_BYTES     CUB_SMEM_BANK_BYTES(CUB_PTX_VERSION)
-#define CUB_PTX_SMEM_BYTES          CUB_SMEM_BYTES(CUB_PTX_VERSION)
-#define CUB_PTX_SMEM_ALLOC_UNIT     CUB_SMEM_ALLOC_UNIT(CUB_PTX_VERSION)
-#define CUB_PTX_REGS_BY_BLOCK       CUB_REGS_BY_BLOCK(CUB_PTX_VERSION)
-#define CUB_PTX_REG_ALLOC_UNIT      CUB_REG_ALLOC_UNIT(CUB_PTX_VERSION)
-#define CUB_PTX_WARP_ALLOC_UNIT     CUB_WARP_ALLOC_UNIT(CUB_PTX_VERSION)
-#define CUB_PTX_MAX_SM_THREADS      CUB_MAX_SM_THREADS(CUB_PTX_VERSION)
-#define CUB_PTX_MAX_SM_BLOCKS       CUB_MAX_SM_BLOCKS(CUB_PTX_VERSION)
-#define CUB_PTX_MAX_BLOCK_THREADS   CUB_MAX_BLOCK_THREADS(CUB_PTX_VERSION)
-#define CUB_PTX_MAX_SM_REGISTERS    CUB_MAX_SM_REGISTERS(CUB_PTX_VERSION)
+#define CUB_PTX_LOG_WARP_THREADS                CUB_LOG_WARP_THREADS(CUB_PTX_VERSION)
+#define CUB_PTX_WARP_THREADS                    (1 << CUB_PTX_LOG_WARP_THREADS)
+#define CUB_PTX_LOG_SMEM_BANKS                  CUB_LOG_SMEM_BANKS(CUB_PTX_VERSION)
+#define CUB_PTX_SMEM_BANKS                      (1 << CUB_PTX_LOG_SMEM_BANKS)
+#define CUB_PTX_SMEM_BANK_BYTES                 CUB_SMEM_BANK_BYTES(CUB_PTX_VERSION)
+#define CUB_PTX_SMEM_BYTES                      CUB_SMEM_BYTES(CUB_PTX_VERSION)
+#define CUB_PTX_SMEM_ALLOC_UNIT                 CUB_SMEM_ALLOC_UNIT(CUB_PTX_VERSION)
+#define CUB_PTX_REGS_BY_BLOCK                   CUB_REGS_BY_BLOCK(CUB_PTX_VERSION)
+#define CUB_PTX_REG_ALLOC_UNIT                  CUB_REG_ALLOC_UNIT(CUB_PTX_VERSION)
+#define CUB_PTX_WARP_ALLOC_UNIT                 CUB_WARP_ALLOC_UNIT(CUB_PTX_VERSION)
+#define CUB_PTX_MAX_SM_THREADS                  CUB_MAX_SM_THREADS(CUB_PTX_VERSION)
+#define CUB_PTX_MAX_SM_BLOCKS                   CUB_MAX_SM_BLOCKS(CUB_PTX_VERSION)
+#define CUB_PTX_MAX_BLOCK_THREADS               CUB_MAX_BLOCK_THREADS(CUB_PTX_VERSION)
+#define CUB_PTX_MAX_SM_REGISTERS                CUB_MAX_SM_REGISTERS(CUB_PTX_VERSION)
+#define CUB_PTX_PREFER_CONFLICT_OVER_PADDING    CUB_PREFER_CONFLICT_OVER_PADDING(CUB_PTX_VERSION)
 
 #endif  // Do not document
 

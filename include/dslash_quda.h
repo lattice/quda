@@ -87,11 +87,19 @@ namespace quda {
       const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
       const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile);
 
+  // twisted clover Dslash  
+  void twistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover *clover, const FullClover *cloverInv, 
+			     const   cudaColorSpinorField *in, const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistCloverDslashType type,
+			     const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile);
+
   // solo twist term
   void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger,     
       const double &kappa, const double &mu, const double &epsilon, 
       const QudaTwistGamma5Type);
 
+  // solo twist clover term
+  void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in, const int dagger, const double &kappa, const double &mu,
+			     const double &epsilon, const QudaTwistGamma5Type twist, const FullClover *clov, const FullClover *clovInv, const int parity);
   // face packing routines
   void packFace(void *ghost_buf, cudaColorSpinorField &in, const int nFace, const int dagger, 
       const int parity, const int dim, const int face_num, const cudaStream_t &stream,
@@ -100,6 +108,11 @@ namespace quda {
   void packFaceExtended(void *ghost_buf, cudaColorSpinorField &field, const int nFace, const int R[], const int dagger,
       const int parity, const int dim, const int face_num, const cudaStream_t &stream, const bool unpack=false);
 
+
+  // face packing routines
+  void packFace(void *ghost_buf, cudaColorSpinorField &in, FullClover &clov, FullClover &clovInv,
+		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
+		const cudaStream_t &stream, const double a=0.0);
 
 
 }

@@ -331,6 +331,9 @@ namespace quda {
         const int dagger,cudaStream_t* stream, void *buffer=0);
 
 
+    void packGhost(FullClover &clov, FullClover &clovInv, const int nFace, const QudaParity parity, const int dim,
+		   const QudaDirection dir, const int dagger, cudaStream_t* stream, void *buffer=0, double a=0);
+
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
       @param ghost_spinor Where to send the ghost zone
@@ -373,7 +376,10 @@ namespace quda {
 
 
     void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
-        double a=0, double b=0);
+	      double a=0, double b=0);
+
+    void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
+	      cudaStream_t *stream_p, bool zeroCopyPack, double a=0);
 
     void packExtended(const int nFace, const int R[], const int parity, const int dagger,
         const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);

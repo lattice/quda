@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -39,6 +39,7 @@
 #include "../../thread/thread_store.cuh"
 #include "../../warp/warp_reduce.cuh"
 #include "../../util_arch.cuh"
+#include "../../util_device.cuh"
 #include "../../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -93,31 +94,6 @@ struct RunningBlockPrefixCallbackOp
 };
 
 
-
-/******************************************************************************
- * Scan data types
- ******************************************************************************/
-
-/**
- * Scan data type for two-way partitioning
- */
-template <typename Offset>          ///< Signed integer type for global offsets
-struct DevicePartitionScanTuple
-{
-    Offset   first_count;
-    Offset   second_count;
-
-    __device__ __host__ __forceinline__ DevicePartitionScanTuple operator+(
-        const DevicePartitionScanTuple &other)
-    {
-        DevicePartitionScanTuple retval;
-        retval.first_count = first_count + other.first_count;
-        retval.second_count = second_count + other.second_count;
-        return retval;
-    }
-};
-
-
 /******************************************************************************
  * Bookkeeping types for single-pass device-wide scan with dynamic lookback
  ******************************************************************************/
@@ -130,25 +106,36 @@ enum LookbackTileStatus
     LOOKBACK_TILE_OOB,          // Out-of-bounds (e.g., padding)
     LOOKBACK_TILE_INVALID,      // Not yet processed
     LOOKBACK_TILE_PARTIAL,      // Tile aggregate is available
-    LOOKBACK_TILE_PREFIX,       // Inclusive tile prefix is available
+    LOOKBACK_TILE_INCLUSIVE,       // Inclusive tile prefix is available
 };
 
 
-
-
 /**
- * Data type of tile status descriptor.
- *
- * Specialized for scan status and value types that can be combined into the same
- * machine word that can be read/written coherently in a single access.
+ * Tile status interface.
  */
 template <
     typename    T,
-    bool        SINGLE_WORD = (PowerOfTwo<sizeof(T)>::VALUE && (sizeof(T) <= 8))>
-struct LookbackTileDescriptor
+    bool        SINGLE_WORD = Traits<T>::PRIMITIVE>
+struct TileLookbackStatus;
+
+
+/**
+ * Tile status interface specialized for scan status and value types
+ * that can be combined into one machine word that can be
+ * read/written coherently in a single access.
+ */
+template <typename T>
+struct TileLookbackStatus<T, true>
 {
     // Status word type
-    typedef typename UnitWord<T>::VolatileWord StatusWord;
+    typedef typename If<(sizeof(T) == 8),
+        long long,
+        typename If<(sizeof(T) == 4),
+            int,
+            typename If<(sizeof(T) == 2),
+                short,
+                char>::Type>::Type>::Type StatusWord;
+
 
     // Unit word type
     typedef typename If<(sizeof(T) == 8),
@@ -157,75 +144,127 @@ struct LookbackTileDescriptor
             int2,
             typename If<(sizeof(T) == 2),
                 int,
-                char2>::Type>::Type>::Type TxnWord;
+                uchar2>::Type>::Type>::Type TxnWord;
 
-    StatusWord  status;
-    T           value;
 
-    static __device__ __forceinline__ void SetPrefix(LookbackTileDescriptor *ptr, T prefix)
+    // Device word type
+    struct TileDescriptor
     {
-        LookbackTileDescriptor tile_descriptor;
-        tile_descriptor.status = LOOKBACK_TILE_PREFIX;
-        tile_descriptor.value = prefix;
+        StatusWord  status;
+        T           value;
+    };
 
-        TxnWord alias;
-        *reinterpret_cast<LookbackTileDescriptor*>(&alias) = tile_descriptor;
-        ThreadStore<STORE_CG>(reinterpret_cast<TxnWord*>(ptr), alias);
+
+    // Constants
+    enum
+    {
+        TILE_STATUS_PADDING = CUB_PTX_WARP_THREADS,
+    };
+
+
+    // Device storage
+    TileDescriptor *d_tile_status;
+
+
+    /// Constructor
+    __host__ __device__ __forceinline__
+    TileLookbackStatus()
+    :
+        d_tile_status(NULL)
+    {}
+
+
+    /// Initializer
+    __host__ __device__ __forceinline__
+    cudaError_t Init(
+        int     num_tiles,                          ///< [in] Number of tiles
+        void    *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t  temp_storage_bytes)                 ///< [in] Size in bytes of \t d_temp_storage allocation
+    {
+        d_tile_status = reinterpret_cast<TileDescriptor*>(d_temp_storage);
+        return cudaSuccess;
     }
 
-    static __device__ __forceinline__ void SetPartial(LookbackTileDescriptor *ptr, T partial)
+
+    /**
+     * Compute device memory needed for tile status
+     */
+    __host__ __device__ __forceinline__
+    static cudaError_t AllocationSize(
+        int     num_tiles,                          ///< [in] Number of tiles
+        size_t  &temp_storage_bytes)                ///< [out] Size in bytes of \t d_temp_storage allocation
     {
-        LookbackTileDescriptor tile_descriptor;
+        temp_storage_bytes = (num_tiles + TILE_STATUS_PADDING) * sizeof(TileDescriptor);       // bytes needed for tile status descriptors
+        return cudaSuccess;
+    }
+
+
+    /**
+     * Initialize (from device)
+     */
+    __device__ __forceinline__ void InitializeStatus(int num_tiles)
+    {
+        int tile_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+        if (tile_idx < num_tiles)
+        {
+            // Not-yet-set
+            d_tile_status[TILE_STATUS_PADDING + tile_idx].status = StatusWord(LOOKBACK_TILE_INVALID);
+        }
+
+        if ((blockIdx.x == 0) && (threadIdx.x < TILE_STATUS_PADDING))
+        {
+            // Padding
+            d_tile_status[threadIdx.x].status = StatusWord(LOOKBACK_TILE_OOB);
+        }
+    }
+
+
+    /**
+     * Update the specified tile's inclusive value and corresponding status
+     */
+    __device__ __forceinline__ void SetInclusive(int tile_idx, T tile_inclusive)
+    {
+        TileDescriptor tile_descriptor;
+        tile_descriptor.status = LOOKBACK_TILE_INCLUSIVE;
+        tile_descriptor.value = tile_inclusive;
+
+        TxnWord alias;
+        *reinterpret_cast<TileDescriptor*>(&alias) = tile_descriptor;
+        ThreadStore<STORE_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx), alias);
+    }
+
+
+    /**
+     * Update the specified tile's partial value and corresponding status
+     */
+    __device__ __forceinline__ void SetPartial(int tile_idx, T tile_partial)
+    {
+        TileDescriptor tile_descriptor;
         tile_descriptor.status = LOOKBACK_TILE_PARTIAL;
-        tile_descriptor.value = partial;
+        tile_descriptor.value = tile_partial;
 
         TxnWord alias;
-        *reinterpret_cast<LookbackTileDescriptor*>(&alias) = tile_descriptor;
-        ThreadStore<STORE_CG>(reinterpret_cast<TxnWord*>(ptr), alias);
+        *reinterpret_cast<TileDescriptor*>(&alias) = tile_descriptor;
+        ThreadStore<STORE_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx), alias);
     }
 
-    static __device__ __forceinline__ void WaitForValid(
-        LookbackTileDescriptor    *ptr,
-        int                     &status,
-        T                       &value)
+    /**
+     * Wait for the corresponding tile to become non-invalid
+     */
+    __device__ __forceinline__ void WaitForValid(
+        int             tile_idx,
+        StatusWord      &status,
+        T               &value)
     {
-        LookbackTileDescriptor tile_descriptor;
-        tile_descriptor.status = LOOKBACK_TILE_INVALID;
-
-#if CUB_PTX_VERSION == 100
-
-        // Use shared memory to determine when all threads have valid status
-        __shared__ volatile int done;
-
-        do
-        {
-            if (threadIdx.x == 0) done = 1;
-
-            TxnWord alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(ptr));
-            __threadfence_block();
-
-            tile_descriptor = reinterpret_cast<LookbackTileDescriptor&>(alias);
-            if (tile_descriptor.status == LOOKBACK_TILE_INVALID)
-                done = 0;
-
-        } while (done == 0);
-
-#else
-
         // Use warp-any to determine when all threads have valid status
-        bool invalid = true;
-        do
-        {
-            if (invalid)
-            {
-                TxnWord alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(ptr));
-                __threadfence_block();
+        TxnWord alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
+        TileDescriptor tile_descriptor = reinterpret_cast<TileDescriptor&>(alias);
 
-                tile_descriptor = reinterpret_cast<LookbackTileDescriptor&>(alias);
-                invalid = tile_descriptor.status == LOOKBACK_TILE_INVALID;
-            }
-        } while (__any(invalid));
-#endif
+        while ((tile_descriptor.status == LOOKBACK_TILE_INVALID))
+        {
+            alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
+            tile_descriptor = reinterpret_cast<TileDescriptor&>(alias);
+        }
 
         status = tile_descriptor.status;
         value = tile_descriptor.value;
@@ -235,54 +274,159 @@ struct LookbackTileDescriptor
 
 
 
+/**
+ * Tile status interface specialized for scan status and value types that
+ * cannot be combined into one machine word.
+ */
 template <typename T>
-struct LookbackTileDescriptor<T, false>
+struct TileLookbackStatus<T, false>
 {
-    T       prefix_value;
-    T       partial_value;
-    T       value;
+    // Status word type
+    typedef char StatusWord;
 
-    /// Workaround for the fact that win32 doesn't guarantee 16B alignment 16B values of T
-    union
+    // Constants
+    enum
     {
-        int                     status;
-        Uninitialized<T>        padding;
+        TILE_STATUS_PADDING = CUB_PTX_WARP_THREADS,
     };
 
-    static __device__ __forceinline__ void SetPrefix(LookbackTileDescriptor *ptr, T prefix)
+    // Device storage
+    StatusWord  *d_tile_status;
+    T           *d_tile_partial;
+    T           *d_tile_inclusive;
+
+    /// Constructor
+    __host__ __device__ __forceinline__
+    TileLookbackStatus()
+    :
+        d_tile_status(NULL),
+        d_tile_partial(NULL),
+        d_tile_inclusive(NULL)
+    {}
+
+
+    /// Initializer
+    __host__ __device__ __forceinline__
+    cudaError_t Init(
+        int     num_tiles,                          ///< [in] Number of tiles
+        void    *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t  temp_storage_bytes)                 ///< [in] Size in bytes of \t d_temp_storage allocation
     {
-        ThreadStore<STORE_CG>(&ptr->prefix_value, prefix);
-        __threadfence_block();
-//        __threadfence();        // __threadfence_block seems sufficient on current architectures to prevent reordeing
-        ThreadStore<STORE_CG>(&ptr->status, (int) LOOKBACK_TILE_PREFIX);
-
-    }
-
-    static __device__ __forceinline__ void SetPartial(LookbackTileDescriptor *ptr, T partial)
-    {
-        ThreadStore<STORE_CG>(&ptr->partial_value, partial);
-        __threadfence_block();
-//        __threadfence();        // __threadfence_block seems sufficient on current architectures to prevent reordeing
-        ThreadStore<STORE_CG>(&ptr->status, (int) LOOKBACK_TILE_PARTIAL);
-    }
-
-    static __device__ __forceinline__ void WaitForValid(
-        LookbackTileDescriptor    *ptr,
-        int                         &status,
-        T                           &value)
-    {
-
-        while (true)
+        cudaError_t error = cudaSuccess;
+        do
         {
-            status = ThreadLoad<LOAD_CG>(&ptr->status);
-            if (WarpAll(status != LOOKBACK_TILE_INVALID)) break;
+            void*   allocations[3];
+            size_t  allocation_sizes[3];
 
-            __threadfence_block();
+            allocation_sizes[0] = (num_tiles + TILE_STATUS_PADDING) * sizeof(StatusWord);       // bytes needed for tile status descriptors
+            allocation_sizes[1] = num_tiles * sizeof(Uninitialized<T>);                   // bytes needed for partials
+            allocation_sizes[2] = num_tiles * sizeof(Uninitialized<T>);                   // bytes needed for inclusives
+
+            // Compute allocation pointers into the single storage blob
+            if (CubDebug(error = AliasTemporaries(d_temp_storage, temp_storage_bytes, allocations, allocation_sizes))) break;
+
+            // Alias the offsets
+            d_tile_status       = reinterpret_cast<StatusWord*>(allocations[0]);
+            d_tile_partial      = reinterpret_cast<T*>(allocations[1]);
+            d_tile_inclusive    = reinterpret_cast<T*>(allocations[2]);
+        }
+        while (0);
+
+        return error;
+    }
+
+
+    /**
+     * Compute device memory needed for tile status
+     */
+    __host__ __device__ __forceinline__
+    static cudaError_t AllocationSize(
+        int     num_tiles,                          ///< [in] Number of tiles
+        size_t  &temp_storage_bytes)                ///< [out] Size in bytes of \t d_temp_storage allocation
+    {
+        // Specify storage allocation requirements
+        size_t  allocation_sizes[3];
+        allocation_sizes[0] = (num_tiles + TILE_STATUS_PADDING) * sizeof(StatusWord);         // bytes needed for tile status descriptors
+        allocation_sizes[1] = num_tiles * sizeof(Uninitialized<T>);                     // bytes needed for partials
+        allocation_sizes[2] = num_tiles * sizeof(Uninitialized<T>);                     // bytes needed for inclusives
+
+        // Set the necessary size of the blob
+        void* allocations[3];
+        return CubDebug(AliasTemporaries(NULL, temp_storage_bytes, allocations, allocation_sizes));
+    }
+
+
+    /**
+     * Initialize (from device)
+     */
+    __device__ __forceinline__ void InitializeStatus(int num_tiles)
+    {
+        int tile_idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+        if (tile_idx < num_tiles)
+        {
+            // Not-yet-set
+            d_tile_status[TILE_STATUS_PADDING + tile_idx] = StatusWord(LOOKBACK_TILE_INVALID);
         }
 
-        value = (status == LOOKBACK_TILE_PARTIAL) ?
-            ThreadLoad<LOAD_CG>(&ptr->partial_value) :
-            ThreadLoad<LOAD_CG>(&ptr->prefix_value);
+        if ((blockIdx.x == 0) && (threadIdx.x < TILE_STATUS_PADDING))
+        {
+            // Padding
+            d_tile_status[threadIdx.x] = StatusWord(LOOKBACK_TILE_OOB);
+        }
+    }
+
+
+    /**
+     * Update the specified tile's inclusive value and corresponding status
+     */
+    __device__ __forceinline__ void SetInclusive(int tile_idx, T tile_inclusive)
+    {
+        // Update tile inclusive value
+        ThreadStore<STORE_CG>(d_tile_inclusive + tile_idx, tile_inclusive);
+
+        // Fence
+        __threadfence();
+
+        // Update tile status
+        ThreadStore<STORE_CG>(d_tile_status + TILE_STATUS_PADDING + tile_idx, StatusWord(LOOKBACK_TILE_INCLUSIVE));
+    }
+
+
+    /**
+     * Update the specified tile's partial value and corresponding status
+     */
+    __device__ __forceinline__ void SetPartial(int tile_idx, T tile_partial)
+    {
+        // Update tile partial value
+        ThreadStore<STORE_CG>(d_tile_partial + tile_idx, tile_partial);
+
+        // Fence
+        __threadfence();
+
+        // Update tile status
+        ThreadStore<STORE_CG>(d_tile_status + TILE_STATUS_PADDING + tile_idx, StatusWord(LOOKBACK_TILE_PARTIAL));
+    }
+
+    /**
+     * Wait for the corresponding tile to become non-invalid
+     */
+    __device__ __forceinline__ void WaitForValid(
+        int             tile_idx,
+        StatusWord      &status,
+        T               &value)
+    {
+        status = ThreadLoad<LOAD_CG>(d_tile_status + TILE_STATUS_PADDING + tile_idx);
+        while (status == LOOKBACK_TILE_INVALID)
+        {
+            status = ThreadLoad<LOAD_CG>(d_tile_status + TILE_STATUS_PADDING + tile_idx);
+        }
+
+        T partial = ThreadLoad<LOAD_CG>(d_tile_partial + tile_idx);
+        T inclusive = ThreadLoad<LOAD_CG>(d_tile_inclusive + tile_idx);
+
+        value = (status == StatusWord(LOOKBACK_TILE_PARTIAL)) ?
+            partial :
+            inclusive;
 
     }
 };
@@ -296,23 +440,41 @@ struct LookbackTileDescriptor<T, false>
  */
 template <
     typename T,
-    typename ScanOp>
+    typename ScanOp,
+    typename TileLookbackStatus>
 struct LookbackBlockPrefixCallbackOp
 {
     // Parameterized warp reduce
-    typedef WarpReduce<T>                       WarpReduceT;
+    typedef WarpReduce<T> WarpReduceT;
 
-    // Storage type
-    typedef typename WarpReduceT::TempStorage   _TempStorage;
+    // Temporary storage type
+    typedef typename WarpReduceT::TempStorage _TempStorage;
 
-    // Alias wrapper allowing storage to be unioned
-    typedef Uninitialized<_TempStorage>         TempStorage;
+    // Alias wrapper allowing temporary storage to be unioned
+    struct TempStorage : Uninitialized<_TempStorage> {};
 
-    // Tile status descriptor type
-    typedef LookbackTileDescriptor<T>           LookbackTileDescriptorT;
+    // Type of status word
+    typedef typename TileLookbackStatus::StatusWord StatusWord;
+
+    // Scan operator for switching the scan arguments
+    struct SwizzleScanOp
+    {
+        ScanOp scan_op;
+
+        // Constructor
+        __host__ __device__ __forceinline__
+        SwizzleScanOp(ScanOp scan_op) : scan_op(scan_op) {}
+
+        // Switch the scan arguments
+        __host__ __device__ __forceinline__
+        T operator()(const T &a, const T &b)
+        {
+            return scan_op(b, a);
+        }
+    };
 
     // Fields
-    LookbackTileDescriptorT     *d_tile_status;     ///< Pointer to array of tile status
+    TileLookbackStatus          &tile_status;       ///< Interface to tile status
     _TempStorage                &temp_storage;      ///< Reference to a warp-reduction instance
     ScanOp                      scan_op;            ///< Binary scan operator
     int                         tile_idx;           ///< The current tile index
@@ -322,29 +484,32 @@ struct LookbackBlockPrefixCallbackOp
     // Constructor
     __device__ __forceinline__
     LookbackBlockPrefixCallbackOp(
-        LookbackTileDescriptorT     *d_tile_status,
-        TempStorage                 &temp_storage,
-        ScanOp                      scan_op,
-        int                         tile_idx) :
-            d_tile_status(d_tile_status),
-            temp_storage(temp_storage.Alias()),
-            scan_op(scan_op),
-            tile_idx(tile_idx) {}
+        TileLookbackStatus      &tile_status,
+        TempStorage             &temp_storage,
+        ScanOp                  scan_op,
+        int                     tile_idx)
+    :
+        tile_status(tile_status),
+        temp_storage(temp_storage.Alias()),
+        scan_op(scan_op),
+        tile_idx(tile_idx) {}
 
 
     // Block until all predecessors within the warp-wide window have non-invalid status
     __device__ __forceinline__
     void ProcessWindow(
-        int predecessor_idx,        ///< Preceding tile index to inspect
-        int &predecessor_status,    ///< [out] Preceding tile status
-        T   &window_aggregate)      ///< [out] Relevant partial reduction from this window of preceding tiles
+        int         predecessor_idx,        ///< Preceding tile index to inspect
+        StatusWord  &predecessor_status,    ///< [out] Preceding tile status
+        T           &window_aggregate)      ///< [out] Relevant partial reduction from this window of preceding tiles
     {
         T value;
-        LookbackTileDescriptorT::WaitForValid(d_tile_status + predecessor_idx, predecessor_status, value);
+        tile_status.WaitForValid(predecessor_idx, predecessor_status, value);
 
-        // Perform a segmented reduction to get the prefix for the current window
-        int tail_flag = (predecessor_status == LOOKBACK_TILE_PREFIX);
-        window_aggregate = WarpReduceT(temp_storage).TailSegmentedReduce(value, tail_flag, scan_op);
+        // Perform a segmented reduction to get the prefix for the current window.
+        // Use the swizzled scan operator because we are now scanning *down* towards thread0.
+
+        int tail_flag = (predecessor_status == StatusWord(LOOKBACK_TILE_INCLUSIVE));
+        window_aggregate = WarpReduceT(temp_storage).TailSegmentedReduce(value, tail_flag, SwizzleScanOp(scan_op));
     }
 
 
@@ -355,20 +520,21 @@ struct LookbackBlockPrefixCallbackOp
         // Update our status with our tile-aggregate
         if (threadIdx.x == 0)
         {
-            LookbackTileDescriptorT::SetPartial(d_tile_status + tile_idx, block_aggregate);
+            tile_status.SetPartial(tile_idx, block_aggregate);
         }
 
+        int         predecessor_idx = tile_idx - threadIdx.x - 1;
+        StatusWord  predecessor_status;
+        T           window_aggregate;
+
         // Wait for the warp-wide window of predecessor tiles to become valid
-        int predecessor_idx = tile_idx - threadIdx.x - 1;
-        int predecessor_status;
-        T window_aggregate;
         ProcessWindow(predecessor_idx, predecessor_status, window_aggregate);
 
         // The exclusive tile prefix starts out as the current window aggregate
         exclusive_prefix = window_aggregate;
 
         // Keep sliding the window back until we come across a tile whose inclusive prefix is known
-        while (WarpAll(predecessor_status != LOOKBACK_TILE_PREFIX))
+        while (WarpAll(predecessor_status != StatusWord(LOOKBACK_TILE_INCLUSIVE)))
         {
             predecessor_idx -= CUB_PTX_WARP_THREADS;
 
@@ -381,9 +547,7 @@ struct LookbackBlockPrefixCallbackOp
         if (threadIdx.x == 0)
         {
             inclusive_prefix = scan_op(exclusive_prefix, block_aggregate);
-            LookbackTileDescriptorT::SetPrefix(
-                d_tile_status + tile_idx,
-                inclusive_prefix);
+            tile_status.SetInclusive(tile_idx, inclusive_prefix);
         }
 
         // Return exclusive_prefix

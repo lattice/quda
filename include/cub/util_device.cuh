@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -66,7 +66,7 @@ __global__ void EmptyKernel(void) { }
 template <int ALLOCATIONS>
 __host__ __device__ __forceinline__
 cudaError_t AliasTemporaries(
-    void    *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
+    void    *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
     size_t  &temp_storage_bytes,                ///< [in,out] Size in bytes of \t d_temp_storage allocation
     void*   (&allocations)[ALLOCATIONS],        ///< [in,out] Pointers to device allocations needed
     size_t  (&allocation_sizes)[ALLOCATIONS])   ///< [in] Sizes in bytes of device allocations needed
@@ -75,11 +75,12 @@ cudaError_t AliasTemporaries(
     const int ALIGN_MASK    = ~(ALIGN_BYTES - 1);
 
     // Compute exclusive prefix sum over allocation requests
+    size_t allocation_offsets[ALLOCATIONS];
     size_t bytes_needed = 0;
     for (int i = 0; i < ALLOCATIONS; ++i)
     {
         size_t allocation_bytes = (allocation_sizes[i] + ALIGN_BYTES - 1) & ALIGN_MASK;
-        allocation_sizes[i] = bytes_needed;
+        allocation_offsets[i] = bytes_needed;
         bytes_needed += allocation_bytes;
     }
 
@@ -99,7 +100,7 @@ cudaError_t AliasTemporaries(
     // Alias
     for (int i = 0; i < ALLOCATIONS; ++i)
     {
-        allocations[i] = static_cast<char*>(d_temp_storage) + allocation_sizes[i];
+        allocations[i] = static_cast<char*>(d_temp_storage) + allocation_offsets[i];
     }
 
     return cudaSuccess;
@@ -135,7 +136,7 @@ __host__ __device__ __forceinline__ cudaError_t PtxVersion(int &ptx_version)
     // CUDA API calls not supported from this device
     return cudaErrorInvalidConfiguration;
 
-#elif defined(__CUDA_ARCH__)
+#elif (CUB_PTX_VERSION > 0)
 
     ptx_version = CUB_PTX_VERSION;
     return cudaSuccess;
@@ -194,7 +195,7 @@ __host__ __device__ __forceinline__ cudaError_t SmVersion(int &sm_version, int d
 __host__ __device__ __forceinline__
 static cudaError_t SyncStream(cudaStream_t stream)
 {
-#ifndef __CUDA_ARCH__
+#if (CUB_PTX_VERSION == 0)
     return cudaStreamSynchronize(stream);
 #else
     // Device can't yet sync on a specific stream
