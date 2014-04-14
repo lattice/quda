@@ -1263,13 +1263,7 @@ class PackFace : public Tunable {
   virtual int tuningIter() const { return 100; }
 
   virtual TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << in->X()[0] << "x";
-    vol << in->X()[1] << "x";
-    vol << in->X()[2] << "x";
-    vol << in->X()[3];    
-    aux << "threads=" <<threads() << ",stride=" << in->Stride() << ",prec=" << sizeof(((FloatN*)0)->x);
-    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+    return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString());
   }  
   
   virtual void apply(const cudaStream_t &stream) = 0;
