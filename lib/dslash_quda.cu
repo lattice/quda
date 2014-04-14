@@ -1222,12 +1222,15 @@ namespace quda {
     commDimTotal *= 4; // 2 from pipe length, 2 from direction
   }
 
-  //#define PROFILE(f, profile, idx)		\
-  //profile.Start(idx);				\
-  //f;						\
-  //profile.Stop(idx); 
-
+  //#define DSLASH_PROFILE
+#ifdef DSLASH_PROFILE
+#define PROFILE(f, profile, idx)		\
+  profile.Start(idx);				\
+  f;						\
+  profile.Stop(idx); 
+#else
 #define PROFILE(f, profile, idx) f;
+#endif
 
   void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
