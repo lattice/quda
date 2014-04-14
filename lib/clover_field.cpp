@@ -29,6 +29,9 @@ namespace quda {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
       norm_bytes = ALIGNMENT_ADJUST(norm_bytes);
     }
+//for twisted mass only:
+    twisted = false;//param.twisted;
+    mu2 = 0.0; //param.mu2;
   }
   
   CloverField::~CloverField() {
@@ -93,6 +96,8 @@ namespace quda {
     createTexObject(evenInvTex, evenInvNormTex, evenInv, evenInvNorm);
     createTexObject(oddInvTex, oddInvNormTex, oddInv, oddInvNorm);
 #endif
+    twisted = param.twisted;
+    mu2 = param.mu2;
 
   }
 

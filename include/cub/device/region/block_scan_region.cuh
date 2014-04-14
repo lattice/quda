@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -106,6 +106,9 @@ struct BlockScanRegion
     // Data type of input iterator
     typedef typename std::iterator_traits<InputIterator>::value_type T;
 
+    // Tile status descriptor interface type
+    typedef TileLookbackStatus<T> TileLookbackStatus;
+
     // Input iterator wrapper type
     typedef typename If<IsPointer<InputIterator>::VALUE,
             CacheModifiedInputIterator<BlockScanRegionPolicy::LOAD_MODIFIER, T, Offset>,    // Wrap the native input pointer with CacheModifiedInputIterator
@@ -139,9 +142,6 @@ struct BlockScanRegion
             BlockScanRegionPolicy::STORE_WARP_TIME_SLICING>
         BlockStoreT;
 
-    // Tile status descriptor type
-    typedef LookbackTileDescriptor<T> TileDescriptor;
-
     // Parameterized BlockScan type
     typedef BlockScan<
             T,
@@ -152,7 +152,8 @@ struct BlockScanRegion
     // Callback type for obtaining tile prefix during block scan
     typedef LookbackBlockPrefixCallbackOp<
             T,
-            ScanOp>
+            ScanOp,
+            TileLookbackStatus>
         LookbackPrefixCallbackOp;
 
     // Stateful BlockScan prefix callback type for managing a running total while scanning consecutive tiles
@@ -310,48 +311,50 @@ struct BlockScanRegion
     /**
      * Process a tile of input (dynamic domino scan)
      */
-    template <bool FULL_TILE>
+    template <bool LAST_TILE>
     __device__ __forceinline__ void ConsumeTile(
         Offset                      num_items,          ///< Total number of input items
+        Offset                      num_remaining,      ///< Total number of items remaining to be processed (including this tile)
         int                         tile_idx,           ///< Tile index
         Offset                      block_offset,       ///< Tile offset
-        TileDescriptor              *d_tile_status)     ///< Global list of tile status
+        TileLookbackStatus          &tile_status)       ///< Global list of tile status
     {
         // Load items
         T items[ITEMS_PER_THREAD];
 
-        if (FULL_TILE)
-            BlockLoadT(temp_storage.load).Load(d_in + block_offset, items);
+        if (LAST_TILE)
+            BlockLoadT(temp_storage.load).Load(d_in + block_offset, items, num_remaining);
         else
-            BlockLoadT(temp_storage.load).Load(d_in + block_offset, items, num_items - block_offset);
+            BlockLoadT(temp_storage.load).Load(d_in + block_offset, items);
 
         __syncthreads();
 
         // Perform tile scan
-        T block_aggregate;
         if (tile_idx == 0)
         {
             // Scan first tile
+            T block_aggregate;
             ScanBlock(items, scan_op, identity, block_aggregate);
 
             // Update tile status if there may be successor tiles (i.e., this tile is full)
-            if (FULL_TILE && (threadIdx.x == 0))
-                TileDescriptor::SetPrefix(d_tile_status, block_aggregate);
+            if (!LAST_TILE && (threadIdx.x == 0))
+                tile_status.SetInclusive(0, block_aggregate);
         }
         else
         {
             // Scan non-first tile
-            LookbackPrefixCallbackOp prefix_op(d_tile_status, temp_storage.prefix, scan_op, tile_idx);
+            T block_aggregate;
+            LookbackPrefixCallbackOp prefix_op(tile_status, temp_storage.prefix, scan_op, tile_idx);
             ScanBlock(items, scan_op, identity, block_aggregate, prefix_op);
         }
 
         __syncthreads();
 
         // Store items
-        if (FULL_TILE)
-            BlockStoreT(temp_storage.store).Store(d_out + block_offset, items);
+        if (LAST_TILE)
+            BlockStoreT(temp_storage.store).Store(d_out + block_offset, items, num_remaining);
         else
-            BlockStoreT(temp_storage.store).Store(d_out + block_offset, items, num_items - block_offset);
+            BlockStoreT(temp_storage.store).Store(d_out + block_offset, items);
     }
 
 
@@ -361,34 +364,37 @@ struct BlockScanRegion
     __device__ __forceinline__ void ConsumeRegion(
         int                     num_items,          ///< Total number of input items
         GridQueue<int>          queue,              ///< Queue descriptor for assigning tiles of work to thread blocks
-        TileDescriptor          *d_tile_status)     ///< Global list of tile status
+        TileLookbackStatus      &tile_status)       ///< Global list of tile status
     {
-#if CUB_PTX_VERSION < 200
+#if (CUB_PTX_VERSION <= 130)
+        // Blocks are launched in increasing order, so just assign one tile per block
 
-        // No concurrent kernels allowed and blocks are launched in increasing order, so just assign one tile per block (up to 65K blocks)
-        int     tile_idx        = blockIdx.x;
-        Offset  block_offset    = Offset(TILE_ITEMS) * tile_idx;
+        int     tile_idx        = (blockIdx.y * 32 * 1024) + blockIdx.x;    // Current tile index
+        Offset  block_offset    = Offset(TILE_ITEMS) * tile_idx;            // Global offset for the current tile
+        Offset  num_remaining   = num_items - block_offset;                 // Remaining items (including this tile)
 
         if (block_offset + TILE_ITEMS <= num_items)
-            ConsumeTile<true>(num_items, tile_idx, block_offset, d_tile_status);
+            ConsumeTile<false>(num_items, num_remaining, tile_idx, block_offset, tile_status);
         else if (block_offset < num_items)
-            ConsumeTile<false>(num_items, tile_idx, block_offset, d_tile_status);
+            ConsumeTile<true>(num_items, num_remaining, tile_idx, block_offset, tile_status);
 
 #else
+        // Blocks may not be launched in increasing order, so work-steal tiles
 
-        // Get first tile
+        // Get first tile index
         if (threadIdx.x == 0)
             temp_storage.tile_idx = queue.Drain(1);
 
         __syncthreads();
 
-        int tile_idx = temp_storage.tile_idx;
-        Offset block_offset = Offset(TILE_ITEMS) * tile_idx;
+        int     tile_idx        = temp_storage.tile_idx;
+        Offset  block_offset    = TILE_ITEMS * tile_idx;
+        Offset  num_remaining   = num_items - block_offset;
 
-        while (block_offset + TILE_ITEMS <= num_items)
+        while (num_remaining >= TILE_ITEMS)
         {
             // Consume full tile
-            ConsumeTile<true>(num_items, tile_idx, block_offset, d_tile_status);
+            ConsumeTile<false>(num_items, num_remaining, tile_idx, block_offset, tile_status);
 
             // Get next tile
             if (threadIdx.x == 0)
@@ -396,17 +402,18 @@ struct BlockScanRegion
 
             __syncthreads();
 
-            tile_idx = temp_storage.tile_idx;
-            block_offset = Offset(TILE_ITEMS) * tile_idx;
+            tile_idx        = temp_storage.tile_idx;
+            block_offset    = TILE_ITEMS * tile_idx;
+            num_remaining   = num_items - block_offset;
         }
 
-        // Consume a partially-full tile
-        if (block_offset < num_items)
+        // Consume the last (and potentially partially-full) tile
+        if (num_remaining > 0)
         {
-            ConsumeTile<false>(num_items, tile_idx, block_offset, d_tile_status);
+            ConsumeTile<true>(num_items, num_remaining, tile_idx, block_offset, tile_status);
         }
-#endif
 
+#endif
     }
 
 
@@ -436,14 +443,15 @@ struct BlockScanRegion
         __syncthreads();
 
         // Block scan
-        T block_aggregate;
         if (FIRST_TILE)
         {
+            T block_aggregate;
             ScanBlock(items, scan_op, identity, block_aggregate);
             prefix_op.running_total = block_aggregate;
         }
         else
         {
+            T block_aggregate;
             ScanBlock(items, scan_op, identity, block_aggregate, prefix_op);
         }
 

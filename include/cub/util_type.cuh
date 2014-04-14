@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,6 +37,7 @@
 #include <limits>
 
 #include "util_macro.cuh"
+#include "util_arch.cuh"
 #include "util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -77,10 +78,11 @@ struct If<false, ThenType, ElseType>
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
+
+
 /******************************************************************************
  * Conditional types
  ******************************************************************************/
-
 
 /**
  * \brief Type equality test
@@ -218,7 +220,7 @@ struct UnitWord
         unsigned int,
         typename If<IsMultiple<short>::IS_MULTIPLE,
             unsigned short,
-            unsigned char>::Type>::Type                  ShuffleWord;
+            unsigned char>::Type>::Type         ShuffleWord;
 
     /// Biggest volatile word that T is a whole multiple of and is not larger than the alignment of T
     typedef typename If<IsMultiple<long long>::IS_MULTIPLE,
@@ -244,7 +246,7 @@ template <>
 struct UnitWord <float2>
 {
     typedef int         ShuffleWord;
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ <= 130)
+#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
     typedef float       VolatileWord;
     typedef uint2       DeviceWord;
 #else
@@ -259,7 +261,7 @@ template <>
 struct UnitWord <float4>
 {
     typedef int         ShuffleWord;
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ <= 130)
+#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
     typedef float               VolatileWord;
     typedef uint4               DeviceWord;
 #else
@@ -269,101 +271,208 @@ struct UnitWord <float4>
     typedef float4              TextureWord;
 };
 
+
+// char2 specialization workaround (for SM10-SM13)
+template <>
+struct UnitWord <char2>
+{
+    typedef unsigned short      ShuffleWord;
+#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
+    typedef unsigned short      VolatileWord;
+    typedef short               DeviceWord;
+#else
+    typedef unsigned short      VolatileWord;
+    typedef unsigned short      DeviceWord;
+#endif
+    typedef unsigned short      TextureWord;
+};
+
 #endif // DOXYGEN_SHOULD_SKIP_THIS
+
+
+
+/******************************************************************************
+ * Vector type inference utilities.
+ ******************************************************************************/
+
+/**
+ * \brief Exposes a member typedef \p Type that names the corresponding CUDA vector type if one exists.  Otherwise \p Type refers to the CubVector structure itself, which will wrap the corresponding \p x, \p y, etc. vector fields.
+ */
+template <typename T, int vec_elements> struct CubVector;
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
+enum
+{
+    /// The maximum number of elements in CUDA vector types
+    MAX_VEC_ELEMENTS = 4,
+};
+
+
+/**
+ * Generic vector-1 type
+ */
+template <typename T>
+struct CubVector<T, 1>
+{
+    T x;
+
+    typedef T BaseType;
+    typedef CubVector<T, 1> Type;
+};
+
+/**
+ * Generic vector-2 type
+ */
+template <typename T>
+struct CubVector<T, 2>
+{
+    T x;
+    T y;
+
+    typedef T BaseType;
+    typedef CubVector<T, 2> Type;
+};
+
+/**
+ * Generic vector-3 type
+ */
+template <typename T>
+struct CubVector<T, 3>
+{
+    T x;
+    T y;
+    T z;
+
+    typedef T BaseType;
+    typedef CubVector<T, 3> Type;
+};
+
+/**
+ * Generic vector-4 type
+ */
+template <typename T>
+struct CubVector<T, 4>
+{
+    T x;
+    T y;
+    T z;
+    T w;
+
+    typedef T BaseType;
+    typedef CubVector<T, 4> Type;
+};
+
+
+/**
+ * Macro for expanding partially-specialized built-in vector types
+ */
+#define CUB_DEFINE_VECTOR_TYPE(base_type,short_type)                                                    \
+                                                                                                        \
+    template<> struct CubVector<base_type, 1> : short_type##1                                           \
+    {                                                                                                   \
+      typedef base_type       BaseType;                                                                 \
+      typedef short_type##1   Type;                                                                     \
+      __host__ __device__ __forceinline__ CubVector operator+(const CubVector &other) const {           \
+          CubVector retval;                                                                             \
+          retval.x = x + other.x;                                                                       \
+          return retval;                                                                                \
+      }                                                                                                 \
+      __host__ __device__ __forceinline__ CubVector operator-(const CubVector &other) const {           \
+          CubVector retval;                                                                             \
+          retval.x = x - other.x;                                                                       \
+          return retval;                                                                                \
+      }                                                                                                 \
+    };                                                                                                  \
+                                                                                                        \
+    template<> struct CubVector<base_type, 2> : short_type##2                                           \
+    {                                                                                                   \
+        typedef base_type       BaseType;                                                               \
+        typedef short_type##2   Type;                                                                   \
+        __host__ __device__ __forceinline__ CubVector operator+(const CubVector &other) const {         \
+            CubVector retval;                                                                           \
+            retval.x = x + other.x;                                                                     \
+            retval.y = y + other.y;                                                                     \
+            return retval;                                                                              \
+        }                                                                                               \
+        __host__ __device__ __forceinline__ CubVector operator-(const CubVector &other) const {         \
+            CubVector retval;                                                                           \
+            retval.x = x - other.x;                                                                     \
+            retval.y = y - other.y;                                                                     \
+            return retval;                                                                              \
+        }                                                                                               \
+    };                                                                                                  \
+                                                                                                        \
+    template<> struct CubVector<base_type, 3> : short_type##3                                           \
+    {                                                                                                   \
+        typedef base_type       BaseType;                                                               \
+        typedef short_type##3   Type;                                                                   \
+        __host__ __device__ __forceinline__ CubVector operator+(const CubVector &other) const {         \
+            CubVector retval;                                                                           \
+            retval.x = x + other.x;                                                                     \
+            retval.y = y + other.y;                                                                     \
+            retval.z = z + other.z;                                                                     \
+            return retval;                                                                              \
+        }                                                                                               \
+        __host__ __device__ __forceinline__ CubVector operator-(const CubVector &other) const {         \
+            CubVector retval;                                                                           \
+            retval.x = x - other.x;                                                                     \
+            retval.y = y - other.y;                                                                     \
+            retval.z = z - other.z;                                                                     \
+            return retval;                                                                              \
+        }                                                                                               \
+    };                                                                                                  \
+                                                                                                        \
+    template<> struct CubVector<base_type, 4> : short_type##4                                           \
+    {                                                                                                   \
+        typedef base_type       BaseType;                                                               \
+        typedef short_type##4   Type;                                                                   \
+        __host__ __device__ __forceinline__ CubVector operator+(const CubVector &other) const {         \
+            CubVector retval;                                                                           \
+            retval.x = x + other.x;                                                                     \
+            retval.y = y + other.y;                                                                     \
+            retval.z = z + other.z;                                                                     \
+            retval.w = w + other.w;                                                                     \
+            return retval;                                                                              \
+        }                                                                                               \
+        __host__ __device__ __forceinline__ CubVector operator-(const CubVector &other) const {         \
+            CubVector retval;                                                                           \
+            retval.x = x - other.x;                                                                     \
+            retval.y = y - other.y;                                                                     \
+            retval.z = z - other.z;                                                                     \
+            retval.w = w - other.w;                                                                     \
+            return retval;                                                                              \
+        }                                                                                               \
+    };
+
+
+
+// Expand CUDA vector types for built-in primitives
+CUB_DEFINE_VECTOR_TYPE(char,               char)
+CUB_DEFINE_VECTOR_TYPE(signed char,        char)
+CUB_DEFINE_VECTOR_TYPE(short,              short)
+CUB_DEFINE_VECTOR_TYPE(int,                int)
+CUB_DEFINE_VECTOR_TYPE(long,               long)
+CUB_DEFINE_VECTOR_TYPE(long long,          longlong)
+CUB_DEFINE_VECTOR_TYPE(unsigned char,      uchar)
+CUB_DEFINE_VECTOR_TYPE(unsigned short,     ushort)
+CUB_DEFINE_VECTOR_TYPE(unsigned int,       uint)
+CUB_DEFINE_VECTOR_TYPE(unsigned long,      ulong)
+CUB_DEFINE_VECTOR_TYPE(unsigned long long, ulonglong)
+CUB_DEFINE_VECTOR_TYPE(float,              float)
+CUB_DEFINE_VECTOR_TYPE(double,             double)
+CUB_DEFINE_VECTOR_TYPE(bool,               uchar)
+
+// Undefine macros
+#undef CUB_DEFINE_VECTOR_TYPE
+
+#endif // DOXYGEN_SHOULD_SKIP_THIS
+
 
 
 /******************************************************************************
  * Wrapper types
  ******************************************************************************/
-
-/**
- * \brief An item value paired with a corresponding offset
- */
-template <typename _T, typename _Offset>
-struct ItemOffsetPair
-{
-    typedef _T        T;        ///< Item data type
-    typedef _Offset   Offset;   ///< Integer offset data type
-
-    T       value;      ///< Item value
-    Offset  offset;     ///< Offset
-
-    /// Inequality operator
-    __host__ __device__ __forceinline__ bool operator !=(const ItemOffsetPair &b)
-    {
-        return (value != b.value) || (offset != b.offset);
-    }
-};
-
-
-/**
- * \brief A key identifier paired with a corresponding value
- */
-template <typename _Key, typename _Value>
-struct KeyValuePair
-{
-    typedef _Key        Key;        ///< Key data type
-    typedef _Value      Value;      ///< Value data type
-
-    Value   value;          ///< Value data
-    Key     key;            ///< Key identifier
-
-    /// Inequality operator
-    __host__ __device__ __forceinline__ bool operator !=(const KeyValuePair &b)
-    {
-        return (value != b.value) || (key != b.key);
-    }
-
-};
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
-
-/*
-template <>
-struct KeyValuePair<int, long long>
-{
-    typedef int         Key;
-    typedef long long   Value;
-
-    Value       value;          ///< Value
-    long long   key;            ///< Key identifier
-};
-
-
-template <>
-struct KeyValuePair<int, double>
-{
-    typedef int         Key;
-    typedef double      Value;
-
-    Value       value;          ///< Value
-    long long   key;            ///< Key identifier
-};
-*/
-
-
-
-template <typename T>
-__host__ __device__ __forceinline__ T ZeroInitialize()
-{
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ <= 130)
-
-    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
-    const int MULTIPLE = sizeof(T) / sizeof(ShuffleWord);
-    ShuffleWord words[MULTIPLE];
-    #pragma unroll
-    for (int i = 0; i < MULTIPLE; ++i)
-        words[i] = 0;
-    return *reinterpret_cast<T*>(words);
-
-#else
-
-    return T();
-
-#endif
-}
-
-#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 /**
  * \brief A storage-backing wrapper that allows types with non-trivial constructors to be aliased in unions
@@ -389,7 +498,81 @@ struct Uninitialized
     }
 };
 
+
+/**
+ * \brief An item value paired with a corresponding offset
+ */
+template <typename _T, typename _Offset>
+struct ItemOffsetPair
+{
+    typedef _T        T;                ///< Item data type
+    typedef _Offset   Offset;           ///< Integer offset data type
+
+#if (CUB_PTX_VERSION == 0)
+    union
+    {
+        Offset                              offset;     ///< Offset
+        typename UnitWord<T>::DeviceWord    align0;     ///< Alignment/padding (for Win32 consistency between host/device)
+    };
+#else
+    Offset                                  offset;     ///< Offset
+#endif
+
+    T                                       value;      ///< Item value
+
+    /// Inequality operator
+    __host__ __device__ __forceinline__ bool operator !=(const ItemOffsetPair &b)
+    {
+        return (value != b.value) || (offset != b.offset);
+    }
+};
+
+
+/**
+ * \brief A key identifier paired with a corresponding value
+ */
+template <typename _Key, typename _Value>
+struct KeyValuePair
+{
+    typedef _Key    Key;                ///< Key data type
+    typedef _Value  Value;              ///< Value data type
+
+    Value                   value;      ///< Item value
+    Key                     key;        ///< Item key
+
+    /// Inequality operator
+    __host__ __device__ __forceinline__ bool operator !=(const KeyValuePair &b)
+    {
+        return (value != b.value) || (key != b.key);
+    }
+
+};
+
 #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
+
+/**
+ * Workaround for inability for SM1.x compiler to properly zero-initialize POD structures when it's supposed to
+ */
+template <typename T>
+__host__ __device__ __forceinline__ T ZeroInitialize()
+{
+#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
+
+    typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
+    const int MULTIPLE = sizeof(T) / sizeof(ShuffleWord);
+    ShuffleWord words[MULTIPLE];
+    #pragma unroll
+    for (int i = 0; i < MULTIPLE; ++i)
+        words[i] = 0;
+    return *reinterpret_cast<T*>(words);
+
+#else
+
+    return T();
+
+#endif
+}
 
 
 /**

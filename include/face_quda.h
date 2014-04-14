@@ -81,6 +81,16 @@ namespace quda {
        @param a Twisted mass parameter (default=0)
        @param b Twisted mass parameter (Default=0)
      */
+    void pack(quda::cudaColorSpinorField &in, quda::FullClover &clov, quda::FullClover &clovInv, 
+	      int dim, int dir, int parity, int dagger, cudaStream_t *stream,
+	      bool zeroCopyPack=false, double a=0);
+
+    void pack(quda::cudaColorSpinorField &in, quda::FullClover &clov, quda::FullClover &clovInv, int dir, int parity, int dagger, 
+              cudaStream_t *stream, bool zeroCopyPack=false, double a=0);
+
+    void pack(quda::cudaColorSpinorField &in, quda::FullClover &clov, quda::FullClover &clovInv, int parity, int dagger, 
+	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0);
+
     void pack(quda::cudaColorSpinorField &in, int dim, int dir, int parity, int dagger, 
 	      cudaStream_t *stream, bool zeroCopyPack=false, double a=0, double b=0);
 

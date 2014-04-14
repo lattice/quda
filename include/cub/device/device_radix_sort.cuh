@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -285,13 +285,13 @@ struct DeviceRadixSortDispatch
         typedef BlockScanRegionPolicy <512, 4, BLOCK_LOAD_VECTORIZE, false, LOAD_DEFAULT, BLOCK_STORE_VECTORIZE, false, BLOCK_SCAN_RAKING_MEMOIZE> ScanPolicy;
 
         // DownsweepPolicy
-        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 18 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyKeys;
-        typedef BlockRadixSortDownsweepRegionPolicy <128, CUB_MAX(1, 13 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyPairs;
+        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 18 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_RAKING_MEMOIZE, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyKeys;
+        typedef BlockRadixSortDownsweepRegionPolicy <128, CUB_MAX(1, 13 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_RAKING_MEMOIZE, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyPairs;
         typedef typename If<KEYS_ONLY, DownsweepPolicyKeys, DownsweepPolicyPairs>::Type DownsweepPolicy;
 
         // Alternate DownsweepPolicy for (RADIX_BITS-1)-bit passes
-        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 18 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyKeys;
-        typedef BlockRadixSortDownsweepRegionPolicy <128, CUB_MAX(1, 13 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyPairs;
+        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 18 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_RAKING_MEMOIZE, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyKeys;
+        typedef BlockRadixSortDownsweepRegionPolicy <128, CUB_MAX(1, 13 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_RAKING_MEMOIZE, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyPairs;
         typedef typename If<KEYS_ONLY, AltDownsweepPolicyKeys, AltDownsweepPolicyPairs>::Type AltDownsweepPolicy;
     };
 
@@ -306,8 +306,8 @@ struct DeviceRadixSortDispatch
         };
 
         // UpsweepPolicy
-        typedef BlockRadixSortUpsweepRegionPolicy <128, CUB_MAX(1, 15 / SCALE_FACTOR), LOAD_DEFAULT, RADIX_BITS> UpsweepPolicyKeys;
-        typedef BlockRadixSortUpsweepRegionPolicy <128, CUB_MAX(1, 15 / SCALE_FACTOR), LOAD_DEFAULT, RADIX_BITS> UpsweepPolicyPairs;
+        typedef BlockRadixSortUpsweepRegionPolicy <128, CUB_MAX(1, 19 / SCALE_FACTOR), LOAD_DEFAULT, RADIX_BITS> UpsweepPolicyKeys;
+        typedef BlockRadixSortUpsweepRegionPolicy <128, CUB_MAX(1, 19 / SCALE_FACTOR), LOAD_DEFAULT, RADIX_BITS> UpsweepPolicyPairs;
         typedef typename If<KEYS_ONLY, UpsweepPolicyKeys, UpsweepPolicyPairs>::Type UpsweepPolicy;
 
         // Alternate UpsweepPolicy for (RADIX_BITS-1)-bit passes
@@ -316,16 +316,16 @@ struct DeviceRadixSortDispatch
         typedef typename If<KEYS_ONLY, AltUpsweepPolicyKeys, AltUpsweepPolicyPairs>::Type AltUpsweepPolicy;
 
         // ScanPolicy
-        typedef BlockScanRegionPolicy <256, 4, BLOCK_LOAD_VECTORIZE, false, LOAD_DEFAULT, BLOCK_STORE_VECTORIZE, false, BLOCK_SCAN_RAKING_MEMOIZE> ScanPolicy;
+        typedef BlockScanRegionPolicy <256, 4, BLOCK_LOAD_VECTORIZE, false, LOAD_DEFAULT, BLOCK_STORE_VECTORIZE, false, BLOCK_SCAN_WARP_SCANS> ScanPolicy;
 
         // DownsweepPolicy
-        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 15 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, true, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyKeys;
-        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 15 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, true, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyPairs;
+        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 19 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyKeys;
+        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 19 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS> DownsweepPolicyPairs;
         typedef typename If<KEYS_ONLY, DownsweepPolicyKeys, DownsweepPolicyPairs>::Type DownsweepPolicy;
 
         // Alternate DownsweepPolicy for (RADIX_BITS-1)-bit passes
-        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 15 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, true, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyKeys;
-        typedef BlockRadixSortDownsweepRegionPolicy <64, CUB_MAX(1, 15 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, true, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyPairs;
+        typedef BlockRadixSortDownsweepRegionPolicy <128, CUB_MAX(1, 15 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyKeys;
+        typedef BlockRadixSortDownsweepRegionPolicy <128, CUB_MAX(1, 15 / SCALE_FACTOR), BLOCK_LOAD_WARP_TRANSPOSE, LOAD_DEFAULT, false, false, BLOCK_SCAN_WARP_SCANS, RADIX_SORT_SCATTER_TWO_PHASE, cudaSharedMemBankSizeFourByte, RADIX_BITS - 1> AltDownsweepPolicyPairs;
         typedef typename If<KEYS_ONLY, AltDownsweepPolicyKeys, AltDownsweepPolicyPairs>::Type AltDownsweepPolicy;
     };
 
@@ -449,7 +449,7 @@ struct DeviceRadixSortDispatch
         DownsweepKernelPtr      downsweep_kernel,
         DownsweepKernelPtr      alt_downsweep_kernel)
     {
-    #ifdef __CUDA_ARCH__
+    #if (CUB_PTX_VERSION > 0)
 
         // We're on the device, so initialize the kernel dispatch configurations with the current PTX policy
         cudaError_t error;
@@ -567,8 +567,8 @@ struct DeviceRadixSortDispatch
 
     __host__ __device__ __forceinline__
     static cudaError_t AllocateTemporaries(
-        void                    *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
-        size_t                  &temp_storage_bytes,            ///< [in,out] Size in bytes of \p d_temp_storage allocation
+        void                    *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t                  &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         Offset*                 &d_spine,                       ///< [out] Digit count histograms per thread block
         KernelConfig            &scan_config,                   ///< [in] Dispatch parameters that match the policy that \p scan_kernel was compiled for
         KernelConfig            &downsweep_config)              ///< [in] Dispatch parameters that match the policy that \p downsweep_kernel was compiled for
@@ -643,9 +643,9 @@ struct DeviceRadixSortDispatch
         do
         {
             // Get even-share work distribution descriptor
-            GridEvenShare<Offset> even_share(num_items, downsweep_config.max_grid_size, downsweep_config.tile_size);
+            GridEvenShare<Offset> even_share(num_items, downsweep_config.max_grid_size, CUB_MAX(downsweep_config.tile_size, upsweep_config.tile_size));
 
-#ifndef __CUDA_ARCH__
+#if (CUB_PTX_VERSION == 0)
             // Get current smem bank configuration
             cudaSharedMemConfig original_smem_config;
             if (CubDebug(error = cudaDeviceGetSharedMemConfig(&original_smem_config))) break;
@@ -655,7 +655,7 @@ struct DeviceRadixSortDispatch
             int current_bit = begin_bit;
             while (current_bit < end_bit)
             {
-#ifndef __CUDA_ARCH__
+#if (CUB_PTX_VERSION == 0)
                 // Update smem config if necessary
                 if (current_smem_config != upsweep_config.smem_config)
                 {
@@ -694,7 +694,7 @@ struct DeviceRadixSortDispatch
                 if (debug_synchronous && (CubDebug(error = SyncStream(stream)))) break;
 
 
-#ifndef __CUDA_ARCH__
+#if (CUB_PTX_VERSION == 0)
                 // Update smem config if necessary
                 if (current_smem_config != downsweep_config.smem_config)
                 {
@@ -730,7 +730,7 @@ struct DeviceRadixSortDispatch
                 current_bit += downsweep_config.radix_bits;
             }
 
-#ifndef __CUDA_ARCH__
+#if (CUB_PTX_VERSION == 0)
             // Reset smem config if necessary
             if (current_smem_config != original_smem_config)
             {
@@ -756,8 +756,8 @@ struct DeviceRadixSortDispatch
         typename DownsweepKernelPtr>        ///< Function type of cub::RadixSortUpsweepKernel
     __host__ __device__ __forceinline__
     static cudaError_t Dispatch(
-        void                    *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
-        size_t                  &temp_storage_bytes,            ///< [in,out] Size in bytes of \p d_temp_storage allocation
+        void                    *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t                  &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<Key>       &d_keys,                        ///< [in,out] Double-buffer whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         DoubleBuffer<Value>     &d_values,                      ///< [in,out] Double-buffer whose current buffer contains the unsorted input values and, upon return, is updated to point to the sorted output values
         Offset                  num_items,                      ///< [in] Number of items to reduce
@@ -784,7 +784,7 @@ struct DeviceRadixSortDispatch
         {
             // Get PTX version
             int ptx_version;
-    #ifndef __CUDA_ARCH__
+    #if (CUB_PTX_VERSION == 0)
             if (CubDebug(error = PtxVersion(ptx_version))) break;
     #else
             ptx_version = CUB_PTX_VERSION;
@@ -894,8 +894,8 @@ struct DeviceRadixSortDispatch
 
     __host__ __device__ __forceinline__
     static cudaError_t Dispatch(
-        void                    *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
-        size_t                  &temp_storage_bytes,            ///< [in,out] Size in bytes of \p d_temp_storage allocation
+        void                    *d_temp_storage,                ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t                  &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<Key>       &d_keys,                        ///< [in,out] Double-buffer whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         DoubleBuffer<Value>     &d_values,                      ///< [in,out] Double-buffer whose current buffer contains the unsorted input values and, upon return, is updated to point to the sorted output values
         Offset                  num_items,                      ///< [in] Number of items to reduce
@@ -956,8 +956,11 @@ struct DeviceRadixSortDispatch
  * \cdp_class{DeviceRadixSort}
  *
  * \par Performance
+ * \linear_performance{radix sort} The following chart illustrates DeviceRadixSort::SortKeys
+ * performance across different CUDA architectures for uniform-random \p uint32 keys.
+ * \plots_below
  *
- * \image html lsd_sort_perf.png
+ * \image html lsb_radix_sort_int32_keys.png
  *
  */
 struct DeviceRadixSort
@@ -973,7 +976,15 @@ struct DeviceRadixSort
      * - \devicestorage
      * - \cdp
      *
-     * \par
+     * \par Performance
+     * The following charts illustrate saturated sorting performance across different
+     * CUDA architectures for uniform-random <tt>uint32,uint32</tt> and
+     * <tt>uint64,uint64</tt> pairs, respectively.
+     *
+     * \image html lsb_radix_sort_int32_pairs.png
+     * \image html lsb_radix_sort_int64_pairs.png
+     *
+     * \par Snippet
      * The code snippet below illustrates the sorting of a device vector of \p int keys
      * with associated vector of \p int values.
      * \par
@@ -1016,9 +1027,9 @@ struct DeviceRadixSort
         typename            Value>
     __host__ __device__
     static cudaError_t SortPairs(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Size in bytes of \p d_temp_storage allocation
-        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
+        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         DoubleBuffer<Value> &d_values,                              ///< [in,out] Double-buffer of values whose current buffer contains the unsorted input values and, upon return, is updated to point to the sorted output values
         int                 num_items,                              ///< [in] Number of items to reduce
         int                 begin_bit           = 0,                ///< [in] <b>[optional]</b> The first (least-significant) bit index needed for key comparison
@@ -1053,7 +1064,10 @@ struct DeviceRadixSort
      * - \devicestorage
      * - \cdp
      *
-     * \par
+     * \par Performance
+     * Performance is similar to DeviceRadixSort::SortPairs.
+     *
+     * \par Snippet
      * The code snippet below illustrates the sorting of a device vector of \p int keys
      * with associated vector of \p int values.
      * \par
@@ -1096,9 +1110,9 @@ struct DeviceRadixSort
         typename            Value>
     __host__ __device__
     static cudaError_t SortPairsDescending(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Size in bytes of \p d_temp_storage allocation
-        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
+        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         DoubleBuffer<Value> &d_values,                              ///< [in,out] Double-buffer of values whose current buffer contains the unsorted input values and, upon return, is updated to point to the sorted output values
         int                 num_items,                              ///< [in] Number of items to reduce
         int                 begin_bit           = 0,                ///< [in] <b>[optional]</b> The first (least-significant) bit index needed for key comparison
@@ -1133,7 +1147,14 @@ struct DeviceRadixSort
      * - \devicestorage
      * - \cdp
      *
-     * \par
+     * \par Performance
+     * The following charts illustrate saturated sorting performance across different
+     * CUDA architectures for uniform-random \p uint32 and \p uint64 keys, respectively.
+     *
+     * \image html lsb_radix_sort_int32_keys.png
+     * \image html lsb_radix_sort_int64_keys.png
+     *
+     * \par Snippet
      * The code snippet below illustrates the sorting of a device vector of \p int keys.
      * \par
      * \code
@@ -1168,9 +1189,9 @@ struct DeviceRadixSort
     template <typename Key>
     __host__ __device__
     static cudaError_t SortKeys(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Size in bytes of \p d_temp_storage allocation
-        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
+        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         int                 num_items,                              ///< [in] Number of items to reduce
         int                 begin_bit           = 0,                ///< [in] <b>[optional]</b> The first (least-significant) bit index needed for key comparison
         int                 end_bit             = sizeof(Key) * 8,  ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
@@ -1207,7 +1228,10 @@ struct DeviceRadixSort
      * - \devicestorage
      * - \cdp
      *
-     * \par
+     * \par Performance
+     * Performance is similar to DeviceRadixSort::SortKeys.
+     *
+     * \par Snippet
      * The code snippet below illustrates the sorting of a device vector of \p int keys.
      * \par
      * \code
@@ -1242,9 +1266,9 @@ struct DeviceRadixSort
     template <typename Key>
     __host__ __device__
     static cudaError_t SortKeysDescending(
-        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is returned in \p temp_storage_bytes and no work is done.
-        size_t              &temp_storage_bytes,                    ///< [in,out] Size in bytes of \p d_temp_storage allocation
-        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
+        void                *d_temp_storage,                        ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t              &temp_storage_bytes,                    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+        DoubleBuffer<Key>   &d_keys,                                ///< [in,out] Reference to the double-buffer of keys whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
         int                 num_items,                              ///< [in] Number of items to reduce
         int                 begin_bit           = 0,                ///< [in] <b>[optional]</b> The first (least-significant) bit index needed for key comparison
         int                 end_bit             = sizeof(Key) * 8,  ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison

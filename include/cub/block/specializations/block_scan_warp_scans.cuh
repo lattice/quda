@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -116,11 +116,12 @@ struct BlockScanWarpScans
         #pragma unroll
         for (int WARP = 1; WARP < WARPS; WARP++)
         {
+            T inclusive = scan_op(block_aggregate, partial);
             if (warp_id == WARP)
             {
                 partial = (lane_valid) ?
-                    scan_op(block_aggregate, partial) :     // fold it in our valid partial
-                    block_aggregate;                        // replace our invalid partial with the aggregate
+                    inclusive :
+                    block_aggregate;
             }
 
             block_aggregate = scan_op(block_aggregate, temp_storage.warp_aggregates[WARP]);

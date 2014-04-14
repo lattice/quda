@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -146,7 +146,7 @@ struct BlockRadixSortUpsweepRegion
         {
             DigitCounter    digit_counters[COUNTER_LANES][BLOCK_THREADS][PACKING_RATIO];
             PackedCounter   packed_counters[COUNTER_LANES][BLOCK_THREADS];
-            Offset           digit_partials[RADIX_DIGITS][WARP_THREADS + 1];
+            Offset          digit_partials[RADIX_DIGITS][WARP_THREADS + 1];
         };
     };
 

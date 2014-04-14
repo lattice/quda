@@ -12,6 +12,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	extract_gauge_ghost.o max_gauge.o gauge_update_quda.o		\
 	dirac_clover.o dirac_wilson.o dirac_staggered.o			\
 	dirac_improved_staggered.o dirac_domain_wall.o			\
+	dirac_twisted_clover.o						\
 	dirac_twisted_mass.o tune.o fat_force_quda.o llfat_quda_itf.o	\
 	clover_quda.o dslash_quda.o blas_quda.o copy_quda.o		\
 	reduce_quda.o face_buffer.o face_gauge.o comm_common.o		\

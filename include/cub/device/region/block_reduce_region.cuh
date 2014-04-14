@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -40,7 +40,7 @@
 #include "../../grid/grid_mapping.cuh"
 #include "../../grid/grid_queue.cuh"
 #include "../../grid/grid_even_share.cuh"
-#include "../../util_vector.cuh"
+#include "../../util_type.cuh"
 #include "../../iterator/cache_modified_input_iterator.cuh"
 #include "../../util_namespace.cuh"
 
