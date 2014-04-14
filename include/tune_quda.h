@@ -48,8 +48,7 @@ class TuneKey {
 	if (nc < 0) {
 	  return true;
 	} else if (nc == 0) {
-	  int ac = std::strcmp(aux, other.aux);
-	  return (ac < 0 ? true : false);
+	  return (std::strcmp(aux, other.aux) < 0 ? true : false);
 	}
       }
       return false;
@@ -206,7 +205,6 @@ class TuneKey {
 
     char vol[32];
     char aux[1024];
-    char fname[1024];
 
   public:
     Tunable() { }
