@@ -1411,7 +1411,8 @@ namespace quda {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
 	      profile, QUDA_PROFILE_EVENT_RECORD);
     }
-	
+
+    inSpinor->createComms(dslash.Nface()/2);	
     initDslashCommsPattern();
     for(int i=3; i>=0; i--){
       if(!dslashParam.commDim[i]) continue;

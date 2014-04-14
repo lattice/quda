@@ -289,11 +289,6 @@ namespace quda {
     /** How many faces we are communicating in this communicator */
     int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
-    /** Create the communication handlers and buffers */
-    void createComms(int nFace);
-
-    /** Destroy the communication handlers and buffers */
-    void destroyComms();
 
     public:
     //cudaColorSpinorField();
@@ -307,6 +302,10 @@ namespace quda {
     cudaColorSpinorField& operator=(const cudaColorSpinorField&);
     cudaColorSpinorField& operator=(const cpuColorSpinorField&);
 
+    /** Create the communication handlers and buffers */
+    void createComms(int nFace);
+    /** Destroy the communication handlers and buffers */
+    void destroyComms();
     void allocateGhostBuffer(int nFace);
     static void freeGhostBuffer(void);
 
