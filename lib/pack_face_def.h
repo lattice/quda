@@ -1455,9 +1455,9 @@ static inline __device__ void packCloverTwistedFaceWilsonCore(float4 *out, float
 			#define TM_INV_CLOVERTEXNORM (param.cloverInvNormTex)
 		#else
 			#define TMCLOVERTEX cloverTexHalf
-			#define TMCLOVERTEXNORM cloverTexNorm
+			#define TMCLOVERTEXNORM cloverNormTex
 			#define TM_INV_CLOVERTEX cloverInvTexHalf
-			#define TM_INV_CLOVERTEXNORM cloverInvTexNorm
+			#define TM_INV_CLOVERTEXNORM cloverInvNormTex
 		#endif
 		#define ASSN_CLOVER PACK_CLOVER_HALF_TEX
 	#endif
@@ -1619,14 +1619,14 @@ class PackFace : public Tunable {
       if (clov != NULL && clovInv != NULL) {
         if (param.parity == QUDA_EVEN_PARITY) {
           param.cloverTex = clov->evenTex;
-          param.cloverTexNorm = clov->evenTexNorm;
+          param.cloverNormTex = clov->evenNormTex;
           param.cloverInvTex = clovInv->evenTex;
-          param.cloverInvTexNorm = clovInv->evenTexNorm;
+          param.cloverInvNormTex = clovInv->evenNormTex;
 	} else {
           param.cloverTex = clov->oddTex;
-          param.cloverTexNorm = clov->oddTexNorm;
+          param.cloverNormTex = clov->oddNormTex;
           param.cloverInvTex = clovInv->oddTex;
-          param.cloverInvTexNorm = clovInv->oddTexNorm;
+          param.cloverInvNormTex = clovInv->oddNormTex;
 	}
       }
 #endif

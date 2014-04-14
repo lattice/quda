@@ -174,7 +174,7 @@ void init(int argc, char **argv) {
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = 1.5*inv_parm.kappa;
+    inv_param.clover_coeff = 1.5*inv_param.kappa;
     //if (test_type > 0) {
       hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
       hostCloverInv = hostClover; // fake it
@@ -337,7 +337,7 @@ void end() {
   delete spinorTmp;
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || QUDA_TWISTED_CLOVER_DSLASH) {
+  if((dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)){
     if (hostClover != hostCloverInv && hostClover) free(hostClover);
     free(hostCloverInv);
   }
@@ -431,7 +431,7 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
-  } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  } else if((dslash_type == QUDA_TWISTED_MASS_DSLASH) || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)){ 
     switch (test_type) {
     case 0:
       if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)
