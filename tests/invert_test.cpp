@@ -106,6 +106,7 @@ int main(int argc, char **argv)
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
       dslash_type != QUDA_TWISTED_MASS_DSLASH &&
+      dslash_type != QUDA_TWISTED_CLOVER_DSLASH &&
       dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
@@ -146,11 +147,11 @@ int main(int argc, char **argv)
   double mass = -0.585;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.12;
     inv_param.epsilon = 0.1385;
-    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
-    //inv_param.twist_flavor = QUDA_TWIST_MINUS;
+    //inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
+    inv_param.twist_flavor = QUDA_TWIST_MINUS;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     inv_param.mass = 0.02;
@@ -166,7 +167,7 @@ int main(int argc, char **argv)
 
   inv_param.inv_type = inv_type;
 
-  if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
@@ -178,8 +179,8 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH 
-      || multishift || inv_type == QUDA_CG_INVERTER) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH
+      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || multishift || inv_type == QUDA_CG_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -251,6 +252,7 @@ int main(int argc, char **argv)
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.clover_coeff = 1.5*inv_param.kappa;
   }
 
   inv_param.verbosity = QUDA_VERBOSE;
@@ -360,6 +362,8 @@ int main(int argc, char **argv)
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
+  if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(NULL, NULL, &inv_param);
+
   // perform the inversion
   if (multishift) {
     invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
@@ -373,7 +377,9 @@ int main(int argc, char **argv)
     
   printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n", 
 	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
+  }
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
@@ -385,7 +391,7 @@ int main(int argc, char **argv)
     for(int i=0; i < inv_param.num_offset; i++) {
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       
-      if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
@@ -418,7 +424,7 @@ int main(int argc, char **argv)
     
     if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 
-      if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 	if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)      
 	  tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
 	else
@@ -450,7 +456,7 @@ int main(int argc, char **argv)
 
     } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
-      if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
@@ -480,7 +486,7 @@ int main(int argc, char **argv)
 
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       
-      if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_MINUS && inv_param.twist_flavor != QUDA_TWIST_PLUS)
 	  errorQuda("Twisted mass solution type not supported");
         tm_matpc(spinorTmp, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 
@@ -517,7 +523,7 @@ int main(int argc, char **argv)
   }
 
   freeGaugeQuda();
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) freeCloverQuda();
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
 
   // finalize the QUDA library
   endQuda();
