@@ -34,9 +34,9 @@ namespace quda {
   static cudaStream_t *blasStream;
 
   static struct {
-    int x[QUDA_MAX_DIM];
-    int stride;
-  } blasConstants;
+    const char *vol_str;
+    const char *aux_str;
+  } blasStrings;
 
   void initReduce();
   void endReduce();

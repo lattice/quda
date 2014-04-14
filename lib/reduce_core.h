@@ -441,16 +441,12 @@ public:
 	     SpinorW &W, SpinorV &V, Reducer &r, int length) :
   arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, length),
     result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0), 
-    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0)
-    { 
-      sprintf(vol, "%dx%dx%dx%d", blasConstants.x[0], 
-	      blasConstants.x[1], blasConstants.x[2], blasConstants.x[3]);
-      sprintf(fname, "%s", typeid(arg.r).name());
-      sprintf(aux, "stride=%d,prec=%d", blasConstants.stride, arg.X.Precision());
-    }
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0) { }
   virtual ~ReduceCuda() { }
 
-  TuneKey tuneKey() const { return TuneKey(vol, fname, aux); }  
+  inline TuneKey tuneKey() const { 
+    return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_str);
+  }
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -482,6 +478,7 @@ public:
     size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
     if (arg.X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
     return arg.r.streams()*bytes*arg.length; }
+  int tuningIter() const { return 10; }
 };
 
 
@@ -532,8 +529,8 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
     return value;
   }
 
-  for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
-  blasConstants.stride = x.Stride();
+  blasStrings.vol_str = x.VolString();
+  blasStrings.aux_str = x.AuxString();
 
   int reduce_length = siteUnroll ? x.RealLength() : x.Length();
   doubleN value;
