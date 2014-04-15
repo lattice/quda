@@ -634,7 +634,7 @@ int main(int argc, char **argv)
   
     if (verify_results) {
       ::testing::InitGoogleTest(&argc, argv);
-      return RUN_ALL_TESTS();
+      RUN_ALL_TESTS();
     }
   }    
   end();
