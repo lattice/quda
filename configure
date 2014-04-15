@@ -690,6 +690,7 @@ enable_gauge_force
 enable_staggered_force
 enable_hisq_force
 enable_multi_gpu
+enable_pthreads
 enable_gpu_direct
 enable_gpu_comms
 enable_device_pack
@@ -2168,6 +2169,15 @@ else
    device_pack="no"
 
 fi
+
+# Check whether --enable-pthreads was given.
+if test "${enable_pthreads+set}" = set; then :
+  enableval=$enable_pthreads;  posix_threads=${enableval}
+else
+  posix_threads="no"
+
+fi
+
 
 
 
@@ -3986,6 +3996,13 @@ yes|no);;
   ;;
 esac
 
+case ${posix_threads} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-pthreads " "$LINENO" 5
+  ;;
+esac
+
 case ${gpu_direct} in
 yes|no);;
 *)
@@ -4176,6 +4193,10 @@ BUILD_QMP=${build_qmp}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MPI = ${build_mpi} " >&5
 $as_echo "$as_me: Setting BUILD_MPI = ${build_mpi} " >&6;}
 BUILD_MPI=${build_mpi}
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting POSIX_THREADS = ${posix_threads}  " >&5
+$as_echo "$as_me: Setting POSIX_THREADS = ${posix_threads}  " >&6;}
+POSIX_THREADS=${posix_threads}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECT= ${gpu_direct}" >&5

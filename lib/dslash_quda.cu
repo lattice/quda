@@ -1568,6 +1568,8 @@ namespace quda {
 
         inSpinor->createComms(dslash.Nface()/2);	
 
+#ifdef PTHREADS // create two new threads to issue MPI receives 
+                // and launch the interior dslash kernel
         pthread_t receiveThread, interiorThread;
         ReceiveParam receiveParam;
         receiveParam.profile = &profile;
@@ -1587,16 +1589,14 @@ namespace quda {
           errorQuda("pthread_create failed");
         }
         if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
-
-
-/*
+#else // single CPU thread per MPI process
         for(int i=3; i>=0; i--){
           if(!dslashParam.commDim[i]) continue;
           for(int dir=1; dir>=0; dir--){
             PROFILE(inSpinor->recvStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
           }
         }
-*/
+#endif
         bool pack = false;
         for (int i=3; i>=0; i--) 
           if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
@@ -1639,8 +1639,14 @@ namespace quda {
 
 #endif // MULTI_GPU
 
-#ifdef MULTI_GPU
+#if (!defined MULTI_GPU) || (!defined PTHREADS)
+        PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+#endif
+
+#ifdef MULTI_GPU 
+#ifdef PTHREADS
         if(pthread_join(receiveThread, NULL)) errorQuda("pthread_join failed");
+#endif
 
 #ifdef GPU_COMMS
         bool pack_event = false;
