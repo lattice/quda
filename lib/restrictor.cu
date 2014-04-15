@@ -191,10 +191,10 @@ namespace quda {
     F Tmp(const_cast<ColorSpinorField&>(tmp));
 
     RestrictArg<F,F,F,F> arg(Out, In, V, Tmp, fine_to_coarse,coarse_to_fine,spin_map);
-    RestrictLaunch<Float, RestrictArg<F, F, F, F> > restrictor(arg, Location(out, in, v));
+    RestrictLaunch<Float, RestrictArg<F, F, F, F> > restrictor(arg, Location(out, in, v, tmp));
     restrictor.apply(0);
 
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (Location(out, in, v, tmp) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
   template <typename Float>
