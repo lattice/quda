@@ -1,4 +1,5 @@
 #include <gauge_field.h>
+#include <typeinfo>
 
 namespace quda {
 
@@ -7,7 +8,8 @@ namespace quda {
     geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 
     fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
-    create(param.create), ghostExchange(false)
+    create(param.create), ghostExchange(param.ghostExchange), 
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied)
   {
     if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
     if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d", nDim);
@@ -18,6 +20,7 @@ namespace quda {
     if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
       errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
        
+    if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
 
     if(geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*reconstruct;
@@ -45,7 +48,7 @@ namespace quda {
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
     }else{
       bytes = length*precision;
-      bytes = ALIGNMENT_ADJUST(bytes);
+      bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
   }
@@ -54,8 +57,33 @@ namespace quda {
 
   }
 
-  bool GaugeField::isNative() const {
+  void GaugeField::applyStaggeredPhase() {
+    if (staggeredPhaseApplied) errorQuda("Staggered phases already applied");
+    applyGaugePhase(*this);
+    if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
+      if (typeid(*this)==typeid(cudaGaugeField)) {
+	static_cast<cudaGaugeField&>(*this).exchangeGhost();
+      } else {
+	static_cast<cpuGaugeField&>(*this).exchangeGhost();
+      }
+    }
+    staggeredPhaseApplied = true;
+  }
 
+  void GaugeField::removeStaggeredPhase() {
+    if (!staggeredPhaseApplied) errorQuda("No staggered phases to remove");
+    applyGaugePhase(*this);
+    if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
+      if (typeid(*this)==typeid(cudaGaugeField)) {
+	static_cast<cudaGaugeField&>(*this).exchangeGhost();
+      } else {
+	static_cast<cpuGaugeField&>(*this).exchangeGhost();
+      }
+    }
+    staggeredPhaseApplied = false;
+  }
+
+  bool GaugeField::isNative() const {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION || 
@@ -70,7 +98,6 @@ namespace quda {
 	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
       }
     }
-
     return false;
   }
 
@@ -83,7 +110,7 @@ namespace quda {
     if (a.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, a.t_boundary);
     if (a.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, a.anisotropy);
     if (a.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, a.tadpole);
-    if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale); 
+    //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale); 
   }
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param) {
@@ -99,6 +126,10 @@ namespace quda {
     output << "tadpole = " << param.tadpole << std::endl;
     output << "scale = " << param.scale << std::endl;
     output << "create = " << param.create << std::endl;
+    output << "geometry = " << param.geometry << std::endl;
+    output << "ghostExchange = " << param.ghostExchange << std::endl;
+    output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
+    output << "staggeredPhaseApplied = " << param.staggeredPhaseApplied << std::endl;
 
     return output;  // for multiple << operators.
   }

@@ -1095,11 +1095,14 @@ template<int mu, int nu, int odd_bit, int save_staple>
 __global__ void 
 LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const FloatN* sitelink_odd,
 					FloatM* fatlink_even, FloatM* fatlink_odd,
-					Float coeff0, Float coeff5)
+					Float coeff0, Float coeff5, int threads)
 {
   const FloatN* my_sitelink;
   FloatM* my_fatlink;
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+
+  if(sid >= threads) return;
+
   int mem_idx = sid;
 
 #if (RECONSTRUCT != 18)

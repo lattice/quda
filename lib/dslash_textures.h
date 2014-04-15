@@ -432,13 +432,18 @@ void unbindSpinorTex(const cudaColorSpinorField *in, const cudaColorSpinorField 
 
 // Double precision clover term
 texture<int4, 1> cloverTexDouble;
+texture<int4, 1> cloverInvTexDouble;
 
 // Single precision clover term
 texture<float4, 1, cudaReadModeElementType> cloverTexSingle;
+texture<float4, 1, cudaReadModeElementType> cloverInvTexSingle;
 
 // Half precision clover term
 texture<short4, 1, cudaReadModeNormalizedFloat> cloverTexHalf;
 texture<float, 1, cudaReadModeElementType> cloverTexNorm;
+
+texture<short4, 1, cudaReadModeNormalizedFloat> cloverInvTexHalf;
+texture<float, 1, cudaReadModeElementType> cloverInvTexNorm;
 
 QudaPrecision bindCloverTex(const FullClover clover, const int oddBit, 
 				   void **cloverP, void **cloverNormP)
@@ -483,3 +488,70 @@ void unbindCloverTex(const FullClover clover)
 #endif // not defined USE_TEXTURE_OBJECTS
 }
 
+QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover cloverInv, const int oddBit, void **cloverP, void **cloverNormP, void **cloverInvP, void **cloverInvNormP)
+{
+	if (oddBit)
+	{
+		*cloverP	 = clover.odd;
+		*cloverNormP	 = clover.oddNorm;
+		*cloverInvP	 = cloverInv.odd;
+		*cloverInvNormP	 = cloverInv.oddNorm;
+	}
+	else
+	{
+		*cloverP	 = clover.even;
+		*cloverNormP	 = clover.evenNorm;
+		*cloverInvP	 = cloverInv.even;
+		*cloverInvNormP	 = cloverInv.evenNorm;
+	}
+
+#ifdef USE_TEXTURE_OBJECTS
+	dslashParam.cloverTex   = oddBit ? clover.OddTex() : clover.EvenTex();
+	if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
+	dslashParam.cloverInvTex = oddBit ? cloverInv.OddTex() : cloverInv.EvenTex();
+	if (cloverInv.precision == QUDA_HALF_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
+#else
+	if (clover.precision == QUDA_DOUBLE_PRECISION)    //I assume that the clover and cloverInv fields have the same precision
+	{
+		cudaBindTexture(0, cloverTexDouble, *cloverP, clover.bytes); 
+		cudaBindTexture(0, cloverInvTexDouble, *cloverInvP, cloverInv.bytes); 
+	}
+	else if (clover.precision == QUDA_SINGLE_PRECISION)
+	{
+		cudaBindTexture(0, cloverTexSingle, *cloverP, clover.bytes); 
+		cudaBindTexture(0, cloverInvTexSingle, *cloverInvP, cloverInv.bytes); 
+	}
+	else
+	{
+		cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes); 
+		cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
+		cudaBindTexture(0, cloverInvTexHalf, *cloverInvP, cloverInv.bytes); 
+		cudaBindTexture(0, cloverInvTexNorm, *cloverInvNormP, cloverInv.norm_bytes);
+	}
+#endif // USE_TEXTURE_OBJECTS
+
+	return clover.precision;
+}
+
+void unbindTwistedCloverTex(const FullClover clover)  //We don't really need this function, but for the shake of completeness...
+{
+#if (!defined USE_TEXTURE_OBJECTS)
+	if (clover.precision == QUDA_DOUBLE_PRECISION)  //Again we assume that the precision of the clover and cloverInv are the same
+	{
+		cudaUnbindTexture(cloverTexDouble);
+		cudaUnbindTexture(cloverInvTexDouble);
+	}
+	else if (clover.precision == QUDA_SINGLE_PRECISION)
+	{
+		cudaUnbindTexture(cloverTexSingle);
+		cudaUnbindTexture(cloverInvTexSingle);
+	}
+	else
+	{
+		cudaUnbindTexture(cloverTexHalf);
+		cudaUnbindTexture(cloverTexNorm);
+		cudaUnbindTexture(cloverInvTexHalf);
+		cudaUnbindTexture(cloverInvTexNorm);
+	}
+#endif // not defined USE_TEXTURE_OBJECTS
+}

@@ -15,6 +15,21 @@ namespace quda {
       errorQuda("QDP ordering only supported for reference fields");
     }
 
+    if (order == QUDA_QDP_GAUGE_ORDER || order == QUDA_MILC_GAUGE_ORDER ||
+	order == QUDA_TIFR_GAUGE_ORDER || order == QUDA_BQCD_GAUGE_ORDER ||
+	order == QUDA_CPS_WILSON_GAUGE_ORDER) 
+      errorQuda("Field ordering %d presently disabled for this type", order);
+
+#ifdef MULTI_GPU
+    if (link_type != QUDA_ASQTAD_MOM_LINKS &&
+	ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+      bool pad_check = true;
+      for (int i=0; i<nDim; i++)
+	if (pad < nFace*surfaceCB[i]) pad_check = false;
+      if (!pad_check)
+	errorQuda("cudaGaugeField being constructed with insufficient padding\n");
+    }
+#endif
 
     if(create != QUDA_NULL_FIELD_CREATE &&  
         create != QUDA_ZERO_FIELD_CREATE && 
@@ -32,11 +47,13 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         size_t nbytes = nFace * surface[i] * reconstruct * precision;
-        ghost[i] = device_malloc(nbytes);
+        ghost[i] = nbytes ? device_malloc(nbytes) : NULL;
       }        
     }
 
-    if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost(); 
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+      if (create == QUDA_REFERENCE_FIELD_CREATE) exchangeGhost(); 
+    }
 
     even = gauge;
     odd = (char*)gauge + bytes/2; 
@@ -51,6 +68,7 @@ namespace quda {
       createTexObject(oddPhaseTex, (char*)odd + phase_offset, isPhase);
     }
 #endif
+
   }
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -133,12 +151,18 @@ namespace quda {
         if (ghost[i]) device_free(ghost[i]);
       }
     }
+
   }
 
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
   void cudaGaugeField::exchangeGhost() {
-    if (ghostExchange) return;
+    if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD)
+      errorQuda("Cannot call exchangeGhost with ghostExchange=%d", 
+		ghostExchange);
+
+    if (geometry != QUDA_VECTOR_GEOMETRY) 
+      errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
     void *ghost_[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
@@ -161,8 +185,138 @@ namespace quda {
       copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost_, 1);
       for (int d=0; d<nDim; d++) device_free(ghost_[d]);
     }
+  }
 
-    ghostExchange = true;
+  void cudaGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {
+    
+    void *send[QUDA_MAX_DIM];
+    void *recv[QUDA_MAX_DIM];
+    void *send_d[QUDA_MAX_DIM];
+    void *recv_d[QUDA_MAX_DIM];
+    size_t bytes[QUDA_MAX_DIM];
+
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+      // store both parities and directions in each
+      bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
+      send_d[d] = device_malloc(2 * bytes[d]);
+      recv_d[d] = device_malloc(2 * bytes[d]);
+    }
+
+#ifndef GPU_COMMS
+    void *send_h[QUDA_MAX_DIM];
+    void *recv_h[QUDA_MAX_DIM];
+    size_t total_bytes = 0;
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+      total_bytes += 4*bytes[d];
+    }
+    resizeBufferPinned(total_bytes);
+
+    size_t offset = 0;
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+
+      recv_h[d] = static_cast<char*>(bufferPinned) + offset;
+      send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
+      offset += 4*bytes[d];
+    }
+#endif
+
+    // do the exchange
+    MsgHandle *mh_recv_back[QUDA_MAX_DIM];
+    MsgHandle *mh_recv_fwd[QUDA_MAX_DIM];
+    MsgHandle *mh_send_fwd[QUDA_MAX_DIM];
+    MsgHandle *mh_send_back[QUDA_MAX_DIM];
+
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d)) continue;
+#ifdef GPU_COMMS
+      recv[d] = recv_d[d];
+      send[d] = send_d[d];
+#else
+      recv[d] = recv_h[d];
+      send[d] = send_h[d];
+#endif
+
+      // look into storing these for later
+      mh_recv_back[d] = comm_declare_receive_relative(recv[d], d, -1, bytes[d]);
+      mh_recv_fwd[d]  = comm_declare_receive_relative(static_cast<char*>(recv[d])+bytes[d], 
+						      d, +1, bytes[d]);
+      mh_send_back[d] = comm_declare_send_relative(send[d], d, -1, bytes[d]);
+      mh_send_fwd[d]  = comm_declare_send_relative(static_cast<char*>(send[d])+bytes[d], 
+						   d, +1, bytes[d]);
+    }
+
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+
+      // FIXME why does this break if the order is switched?
+      // prepost the receives
+      if (commDimPartitioned(d)) {
+	comm_start(mh_recv_fwd[d]);
+	comm_start(mh_recv_back[d]);
+      }
+
+      //extract into a contiguous buffer
+      extractExtendedGaugeGhost(*this, d, R, send_d, true);
+
+      if (commDimPartitioned(d)) {
+	
+	// pipeline the forwards and backwards sending
+#ifndef GPU_COMMS
+	cudaMemcpyAsync(send_h[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, streams[0]);
+	cudaMemcpyAsync(static_cast<char*>(send_h[d])+bytes[d], 
+			static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToHost, streams[1]);
+#endif      
+	
+#ifndef GPU_COMMS
+	cudaStreamSynchronize(streams[0]);
+#endif
+	comm_start(mh_send_back[d]);
+	
+#ifndef GPU_COMMS
+	cudaStreamSynchronize(streams[1]);
+#endif
+	comm_start(mh_send_fwd[d]);
+	
+	// forwards recv
+	comm_wait(mh_send_back[d]);
+	comm_wait(mh_recv_fwd[d]);
+#ifndef GPU_COMMS
+	cudaMemcpyAsync(static_cast<char*>(recv_d[d])+bytes[d], 
+			static_cast<char*>(recv_h[d])+bytes[d], bytes[d], cudaMemcpyHostToDevice, streams[0]);
+#endif      
+	
+	// backwards recv
+	comm_wait(mh_send_fwd[d]);
+	comm_wait(mh_recv_back[d]);
+#ifndef GPU_COMMS
+	cudaMemcpyAsync(recv_d[d], recv_h[d], bytes[d], cudaMemcpyHostToDevice, streams[1]);
+#endif      
+      } else { // if just doing a local exchange to fill halo then need to swap faces
+	cudaMemcpy(static_cast<char*>(recv_d[d])+bytes[d], send_d[d], bytes[d], cudaMemcpyDeviceToDevice);
+	cudaMemcpy(recv_d[d], static_cast<char*>(send_d[d])+bytes[d], bytes[d], cudaMemcpyDeviceToDevice);
+      }
+
+      // inject back into the gauge field
+      extractExtendedGaugeGhost(*this, d, R, recv_d, false);
+    }
+
+    for (int d=0; d<nDim; d++) {
+      if (!commDimPartitioned(d) && !no_comms_fill) continue;
+
+      if (commDimPartitioned(d)) {
+	comm_free(mh_send_fwd[d]);
+	comm_free(mh_send_back[d]);
+	comm_free(mh_recv_back[d]);
+	comm_free(mh_recv_fwd[d]);
+      }
+
+      device_free(send_d[d]);
+      device_free(recv_d[d]);
+    }
+
   }
 
   void cudaGaugeField::setGauge(void *gauge_)
@@ -175,14 +329,16 @@ namespace quda {
   }
 
   void cudaGaugeField::copy(const GaugeField &src) {
+    if (this == &src) return;
 
-    if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
     checkField(src);
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
       if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0) 
         errorQuda("fat_link_max has not been computed");
+    } else {
+      fat_link_max = 1.0;
     }
 
     if (typeid(src) == typeid(cudaGaugeField)) {
@@ -194,7 +350,7 @@ namespace quda {
 
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
-          static_cast<const cpuGaugeField&>(src).gauge); 
+		       static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
       cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
@@ -202,13 +358,17 @@ namespace quda {
       errorQuda("Invalid gauge field type");
     }
 
+    // if we have copied from a source without a pad then we need to exchange
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD &&
+	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
+      exchangeGhost(); 
+    }
+
     checkCudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, const QudaFieldLocation &pack_location)
   {
-    if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
-
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
       if (cpu.Order() == QUDA_MILC_GAUGE_ORDER ||
 	  cpu.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
@@ -276,8 +436,6 @@ namespace quda {
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, const QudaFieldLocation &pack_location) const
   {
-    if (geometry != QUDA_VECTOR_GEOMETRY) errorQuda("Only vector geometry is supported");
-
     // FIXME use the generic copying for the below copying
     // do device-side reordering then copy
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
@@ -328,6 +486,8 @@ namespace quda {
     backed_up = false;
   }
 
+  void setGhostSpinor(bool value);
+
   // Return the L2 norm squared of the gauge field
   double norm2(const cudaGaugeField &a) {
 
@@ -344,7 +504,7 @@ namespace quda {
         spin = a.Ndim();
         break;
       case QUDA_TENSOR_GEOMETRY:
-        spin = a.Ndim() * (a.Ndim()-1);
+        spin = a.Ndim() * (a.Ndim()-1) / 2;
         break;
       default:
         errorQuda("Unsupported field geometry %d", a.Geometry());
@@ -356,8 +516,6 @@ namespace quda {
     if (a.Reconstruct() == QUDA_RECONSTRUCT_13 || a.Reconstruct() == QUDA_RECONSTRUCT_9)
       errorQuda("Unsupported field reconstruct %d", a.Reconstruct());
 
-
-
     ColorSpinorParam spinor_param;
     spinor_param.nColor = a.Reconstruct()/2;
     spinor_param.nSpin = a.Ndim();
@@ -367,11 +525,17 @@ namespace quda {
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    spinor_param.fieldOrder = (QudaFieldOrder)a.FieldOrder();
+    spinor_param.fieldOrder = (a.Precision() == QUDA_DOUBLE_PRECISION || spinor_param.nSpin == 1) ? 
+    QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.Gauge_p();
+
+    // quick hack to disable ghost zone creation which otherwise breaks this mapping on multi-gpu
+    setGhostSpinor(false);
     cudaColorSpinorField b(spinor_param);
+    setGhostSpinor(true);
+
     return norm2(b);
   }
 

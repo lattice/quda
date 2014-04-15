@@ -13,6 +13,11 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
+
+//for twisted mass only:
+    bool twisted; // whether to create twisted mass clover
+    double mu2;
+
     CloverFieldOrder order;
     QudaFieldCreate create;
     void setPrecision(QudaPrecision precision) {
@@ -36,9 +41,14 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
+//new!
+    bool twisted; 
+    double mu2;
 
     CloverFieldOrder order;
     QudaFieldCreate create;
+
+    double *trlog;
 
   public:
     CloverField(const CloverFieldParam &param);
@@ -48,10 +58,15 @@ namespace quda {
     void* Norm(bool inverse=false) { return inverse ? invNorm : norm; }
     const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
     const void* Norm(bool inverse=false) const { return inverse ? invNorm : norm; }
+
+    double* TrLog() const { return trlog; }
     
     CloverFieldOrder Order() const { return order; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
+//new!
+    bool Twisted() const {return twisted; }
+    double Mu2() const {return mu2; }
   };
 
   class cudaCloverField : public CloverField {
@@ -100,13 +115,21 @@ namespace quda {
        Copy into this CloverField from the generic CloverField src
        @param src The clover field from which we want to copy
      */
-    void copy(const CloverField &src);
+    void copy(const CloverField &src, bool inverse=true);
 
     /**
        Copy into this CloverField from the cpuCloverField cpu
        @param cpu The cpu clover field from which we want to copy
      */
     void loadCPUField(const cpuCloverField &cpu);
+
+  
+    /**
+      Copy from this CloverField into cpuCloverField cpu
+      @param cpu The cpu clover destination field
+    */
+    void saveCPUField(cpuCloverField &cpu);  
+
 
     friend class DiracClover;
     friend class DiracCloverPC;
@@ -168,12 +191,14 @@ namespace quda {
   };
 
   // driver for computing the clover field from the gauge field
-  void computeCloverCuda(cudaCloverField &clover, const cudaGaugeField &gauge);
+  void computeClover(CloverField &clover, const GaugeField &gauge, double coeff,  QudaFieldLocation location);
 
-  // driver for generic clover field copying
+
+  void computeCloverSigmaTrace(GaugeField &gauge, const CloverField &clover, int dir1, int dir2, QudaFieldLocation location);
+
   /**
-     This function is used for  extracting the gauge ghost zone from a
-     gauge field array.  Defined in copy_gauge.cu
+     This generic function is used for copying the clover field where
+     in the input and output can be in any order and location.
      @param out The output field to which we are copying
      @param in The input field from which we are copying
      @param inverse Whether we are copying the inverse term or not
@@ -185,6 +210,20 @@ namespace quda {
   */
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			 void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
+  
+
+  void cloverDerivative(cudaGaugeField &out, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, double coeff, QudaParity parity, int conjugate);
+
+
+
+  /**
+     This function compute the Cholesky decomposition of each clover
+     matrix and stores the clover inverse field.
+     @param clover The clover field (contains both the field itself and its inverse)
+     @param computeTraceLog Whether to compute the trace logarithm of the clover term
+     @param location The location of the field
+  */
+  void cloverInvert(CloverField &clover, bool computeTraceLog, QudaFieldLocation location);
 
 } // namespace quda
 

@@ -10,7 +10,6 @@ namespace quda {
   double normCpu(const cpuColorSpinorField &b);
   double normCuda(const cudaColorSpinorField &b);
 
-
   /*ColorSpinorField::ColorSpinorField() : init(false) {
 
     }*/
@@ -39,17 +38,46 @@ namespace quda {
     destroy();
   }
 
+  static bool createSpinorGhost = true;
+  void setGhostSpinor(bool value) { createSpinorGhost = value; }
+
   void ColorSpinorField::createGhostZone() {
+
+    if (!createSpinorGhost) {
+      total_length = length;
+      total_norm_length = 2*stride;
+      return;
+    }
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
       printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
 
     int num_faces = 1;
     int num_norm_faces=2;
+
+    // FIXME - this is a hack from hell that needs to be fixed.  When
+    // the TIFR interface is enabled we are forcing naive staggered
+    // support which breaks asqtad/hisq fermions.  The problem occurs
+    // because the ghost zone is allocated before we know which
+    // operator (and hence number of faces are needed).  One solution
+    // may be to separate the ghost zone memory allocation from the
+    // field itself, which has other benefits (1. on multi-gpu
+    // machines with UVA, we can read the ghost zone directly from the
+    // neighbouring field and 2.) we can use a single contiguous
+    // buffer for the ghost zone and its norm which will reduce
+    // latency for half precision and allow us to enable GPU_COMMS
+    // support for half precision).
+#ifdef BUILD_TIFR_INTERFACE
     if (nSpin == 1) { //staggered
+      num_faces=2;
+      num_norm_faces=2;
+    }
+#else
+    if (nSpin == 1) { // improved staggered
       num_faces=6;
       num_norm_faces=6;
     }
+#endif
 
     // calculate size of ghost zone required
     int ghostVolume = 0;
@@ -153,6 +181,7 @@ namespace quda {
       x[d] = X[d];
       volume *= x[d];
     }
+    volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
 
@@ -179,6 +208,7 @@ namespace quda {
 
 //! stuff for deflated solvers (eigenvector sets):
     if(evdim != 0){
+
       eigv_volume = volume;
       eigv_stride = stride;
       eigv_length = length;
@@ -206,6 +236,7 @@ namespace quda {
 
       bytes *= evdim;
       norm_bytes *= evdim;
+
     }else{
 
       eigv_volume = 0;
@@ -220,7 +251,8 @@ namespace quda {
       eigv_ghost_norm_length = 0;
 
       eigv_bytes       = 0;
-      eigv_norm_bytes  = 0; 
+      eigv_norm_bytes  = 0;
+ 
     }
 
     clearGhostPointers();
@@ -249,7 +281,7 @@ namespace quda {
     if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
     if (param.nDim != 0) nDim = param.nDim;
 
-    if (param.eigv_dim     != 0 ){
+    if (param.eigv_dim  != 0 ){
       eigv_dim     = param.eigv_dim;
       eigv_id      = param.eigv_id;
     }
@@ -264,8 +296,9 @@ namespace quda {
       if (param.x[0] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
+    volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
+  if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
 
   
     if (param.pad != 0) pad = param.pad;
@@ -275,7 +308,7 @@ namespace quda {
       length = 2*stride*nColor*nSpin*2;
     } else if (param.siteSubset == QUDA_PARITY_SITE_SUBSET){
       stride = volume + pad;
-      length = stride*nColor*nSpin*2; 
+      length = stride*nColor*nSpin*2;  
     } else {
       //errorQuda("SiteSubset not defined %d", param.siteSubset);
       //do nothing, not an error (can't remember why - need to document this sometime! )
@@ -286,7 +319,7 @@ namespace quda {
     if (param.fieldOrder != QUDA_INVALID_FIELD_ORDER) fieldOrder = param.fieldOrder;
     if (param.gammaBasis != QUDA_INVALID_GAMMA_BASIS) gammaBasis = param.gammaBasis;
 
-    createGhostZone();//Warning: for eigenvectors clear ghost pointers...
+    createGhostZone();
 
     real_length = volume*nColor*nSpin*2;
 
@@ -299,7 +332,6 @@ namespace quda {
     } else {
       norm_bytes = 0;
     }
-
 
 //! for deflated solvers:
     if(eigv_dim > 0)
@@ -352,6 +384,7 @@ namespace quda {
           errorQuda("\nIncorrect eigenvector index.\n");
        }
     }
+
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

@@ -417,11 +417,11 @@ private:
   char *X_h, *Y_h, *Z_h, *W_h, *V_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
 
-  int sharedBytesPerThread() const { return sizeof(ReduceType); }
+  unsigned int sharedBytesPerThread() const { return sizeof(ReduceType); }
 
   // when there is only one warp per block, we need to allocate two warps 
   // worth of shared memory so that we don't index shared memory out of bounds
-  int sharedBytesPerBlock(const TuneParam &param) const { 
+  unsigned int sharedBytesPerBlock(const TuneParam &param) const { 
     int warpSize = 32; // FIXME - use device property query
     return 2*warpSize*sizeof(ReduceType); 
   }

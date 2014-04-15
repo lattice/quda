@@ -32,7 +32,7 @@ namespace quda {
     checkSpinorAlias(in, out);
  
     initSpinorConstants(in, profile);
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, profile);   
 
     long long Ls = in.X(4);
@@ -51,7 +51,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     initSpinorConstants(in, profile);
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, profile);
 
     long long Ls = in.X(4);

@@ -27,8 +27,48 @@ extern "C" {
   Topology *comm_default_topology(void);
   int comm_dim(int dim);
   int comm_coord(int dim);
+
+  /**
+     Create a persistent message handler for a relative send
+     @param buffer Buffer from which message will be sent
+     @param dim Dimension in which message will be sent
+     @param dir Direction in which messaged with be sent (0 - backwards, 1 forwards)
+     @param nbytes Size of message in bytes
+  */
   MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t nbytes);
+
+  /**
+     Create a persistent message handler for a relative receive
+     @param buffer Buffer into which message will be received
+     @param dim Dimension from message will be received
+     @param dir Direction from messaged with be recived (0 - backwards, 1 forwards)
+     @param nbytes Size of message in bytes
+  */
   MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t nbytes);
+
+  /**
+     Create a persistent strided message handler for a relative send
+     @param buffer Buffer from which message will be sent
+     @param dim Dimension in which message will be sent
+     @param dir Direction in which messaged with be sent (0 - backwards, 1 forwards)
+     @param blksize Size of block in bytes
+     @param nblocks Number of blocks
+     @param stride Stride between blocks in bytes
+  */
+  MsgHandle *comm_declare_strided_send_relative(void *buffer, int dim, int dir, 
+						size_t blksize, int nblocks, size_t stride);
+
+  /**
+     Create a persistent strided message handler for a relative receive
+     @param buffer Buffer into which message will be received
+     @param dim Dimension from message will be received
+     @param dir Direction from messaged with be recived (0 - backwards, 1 forwards)
+     @param blksize Size of block in bytes
+     @param nblocks Number of blocks
+     @param stride Stride between blocks in bytes
+  */
+  MsgHandle *comm_declare_strided_receive_relative(void *buffer, int dim, int dir, 
+						   size_t blksize, int nblocks, size_t stride);
   void comm_finalize(void);
   void comm_dim_partitioned_set(int dim);
   int comm_dim_partitioned(int dim);
@@ -40,8 +80,46 @@ extern "C" {
   int comm_rank(void);
   int comm_size(void);
   int comm_gpuid(void);
+
+  /**
+     Create a persistent message handler for a relative send
+     @param buffer Buffer from which message will be sent
+     @param dim Dimension in which message will be sent
+     @param dir Direction in which messaged with be sent (0 - backwards, 1 forwards)
+     @param nbytes Size of message in bytes
+  */
   MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes);
+
+  /**
+     Create a persistent message handler for a relative receive
+     @param buffer Buffer into which message will be received
+     @param dim Dimension from message will be received
+     @param dir Direction from messaged with be recived (0 - backwards, 1 forwards)
+     @param nbytes Size of message in bytes
+  */
   MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[], size_t nbytes);
+
+  /**
+     Create a persistent strided message handler for a displaced send
+     @param buffer Buffer from which message will be sent
+     @param displacement Array of offsets specifying the relative node to which we are sending 
+     @param blksize Size of block in bytes
+     @param nblocks Number of blocks
+     @param stride Stride between blocks in bytes
+  */
+  MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[], 
+						 size_t blksize, int nblocks, size_t stride);
+
+  /**
+     Create a persistent strided message handler for a displaced receive
+     @param buffer Buffer into which message will be received
+     @param displacement Array of offsets specifying the relative node from which we are receiving
+     @param blksize Size of block in bytes
+     @param nblocks Number of blocks
+     @param stride Stride between blocks in bytes
+  */
+  MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
+						    size_t blksize, int nblocks, size_t stride);
   void comm_free(MsgHandle *mh);
   void comm_start(MsgHandle *mh);
   void comm_wait(MsgHandle *mh);

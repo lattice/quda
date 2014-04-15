@@ -5,13 +5,18 @@
 namespace quda {
 
   DiracWilson::DiracWilson(const DiracParam &param) : 
-    Dirac(param), face(param.gauge->X(), 4, 12, 1, param.gauge->Precision()) { }
+    Dirac(param), face1(param.gauge->X(), 4, 12, 1, param.gauge->Precision()),
+                  face2(param.gauge->X(), 4, 12, 1, param.gauge->Precision()) 
+    { }
 
   DiracWilson::DiracWilson(const DiracWilson &dirac) : 
-    Dirac(dirac), face(dirac.face) { }
+    Dirac(dirac), face1(dirac.face1), face2(dirac.face2) 
+    { }
 
   DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : 
-    Dirac(param), face(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) { }//temporal hack (for DW and TM operators) 
+    Dirac(param), face1(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls),
+                  face2(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) 
+  { }//temporal hack (for DW and TM operators) 
 
   DiracWilson::~DiracWilson() { }
 
@@ -19,7 +24,8 @@ namespace quda {
   {
     if (&dirac != this) {
       Dirac::operator=(dirac);
-      face = dirac.face;
+      face1 = dirac.face1;
+      face2 = dirac.face2;
     }
     return *this;
   }
@@ -31,7 +37,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim, profile);
 
@@ -46,7 +52,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim, profile);
 

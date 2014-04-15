@@ -31,11 +31,36 @@ namespace quda {
       report("MR");
       solver = new MR(mat, param, profile);
       break;
+    case QUDA_SD_INVERTER:
+      report("SD");
+      solver = new SD(mat, param, profile);
+      break;
+    case QUDA_PCG_INVERTER:
+      report("PCG");
+      solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type");
     }
     
     return solver;
+  }
+
+  double Solver::stopping(const double &tol, const double &b2, QudaResidualType residual_type) {
+
+    double stop=0.0;
+    if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
+	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {
+      // use the most stringent stopping condition
+      double lowest = (b2 < 1.0) ? b2 : 1.0;
+      stop = lowest*tol*tol;
+    } else if (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) {
+      stop = tol*tol;
+    } else {
+      stop = b2*tol*tol;
+    }
+
+    return stop;
   }
 
   bool Solver::convergence(const double &r2, const double &hq2, const double &r2_tol, 
@@ -47,7 +72,8 @@ namespace quda {
       return false;
 
     // check the L2 relative residual norm if necessary
-    if ( (param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) && (r2 > r2_tol) ) 
+    if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
+	  (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) ) 
       return false;
 
     return true;
@@ -80,15 +106,14 @@ namespace quda {
     }
   }
 
-  // solver factory
-  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDeflate,
-                                         ColorSpinorParam *eigvParam, TimeProfile &profile)
+  // Deflated solver factory
+  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDeflate, TimeProfile &profile)
   {
     DeflatedSolver* solver=0;
 
     if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
       report("Incremental EIGCG");
-      solver = new IncEigCG(mat, matSloppy, matDeflate, eigvParam, param, profile);
+      solver = new IncEigCG(mat, matSloppy, matDeflate, param, profile);
     }else{
       errorQuda("Invalid solver type");
     }
@@ -137,5 +162,6 @@ namespace quda {
 
     }
   }
+
 
 } // namespace quda

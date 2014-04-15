@@ -9,60 +9,67 @@
 #include "magma.h"
 #endif
 
-const char cV = 'V';
-const char cU = 'U';
-const char cR = 'R';
-const char cL = 'L';
-const char cN = 'N';
-const char cC = 'C';
+char cV = 'V';
+char cU = 'U';
+char cR = 'R';
+char cL = 'L';
+char cN = 'N';
+char cC = 'C';
 
 void BlasMagmaArgs::OpenMagma(){ 
  
-    magma_err_t err;
-    err = magma_init(); 
+    magma_err_t err = magma_init(); 
+
     if(err != MAGMA_SUCCESS) printf("\nError: cannot initialize MAGMA library\n");
 
     int major, minor, micro;
+
     magma_version( &major, &minor, &micro);
     printf("\nMAGMA library version: %d.%d\n\n", major,  minor);
 
+    return;
 }
 
 void BlasMagmaArgs::CloseMagma(){  
 
-    magma_err_t err; 
-    err = magma_finalize();
-    if(err != MAGMA_SUCCESS) printf("\nError: cannot close MAGMA library\n");
+    magma_err_t err = magma_finalize();
+
+    if(magma_finalize() != MAGMA_SUCCESS) printf("\nError: cannot close MAGMA library\n");
+
+    return;
 }
 
 BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0), llwork(0), lrwork(0), liwork(0), htsize(0), dtsize(0),  sideLR(0), lwork_max(0), W(0), W2(0), hTau(0), dTau(0), lwork(0), rwork(0), iwork(0),  info(-1)
 {
 
 #ifdef MAGMA_LIB
-    //magma_init();
-    magma_int_t dev_info;
-    dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+
+    magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
     if(dev_info == 0)  exit(-1);
 
     printf("\nMAGMA will use device architecture %d.\n", dev_info);
 
     alloc = false;
     init  = true;
+
 #else
+
     printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
     exit(-1);
-    //init = false;
+
 #endif    
+
     return;
 }
 
 
 BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec) : m(m), nev(nev), ldm(ldm), prec(prec), info(-1)
 {
+
 #ifdef MAGMA_LIB
-    //magma_init();
-    magma_int_t dev_info;
-    dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+
+    magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+
     if(dev_info == 0)  exit(-1);
 
     printf("\nMAGMA will use device architecture %d.\n", dev_info);
@@ -92,18 +99,21 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const in
 
     init  = true;
     alloc = true;
+
 #else
+
     printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
     exit(-1);
-    //init = false;
+
 #endif    
+
     return;
 }
 
 BlasMagmaArgs::~BlasMagmaArgs()
 {
 #ifdef MAGMA_LIB
-   //if(!init) printf("\n\nError: MAGMA was not initialized..\n"), exit(-1);
+
    if(alloc == true)
    {
      magma_free(dTau);
@@ -117,9 +127,11 @@ BlasMagmaArgs::~BlasMagmaArgs()
      magma_free_cpu(iwork);
      alloc = false;
    }
-   //magma_finalize();
+
    init  = false;
+
 #endif
+
    return;
 }
 
@@ -184,15 +196,27 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
   return l;
 }
 
-void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, void *dTevecm, void *dTm)
+#define __min(a, b) (a < b ? a : b)
+
+void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm)
 {
        const int complex_prec = 2*prec;
        int l                  = 2*nev;
 #ifdef MAGMA_LIB 
-       void *Tmp = 0;
-       magma_malloc((void**)&Tmp, vld*l*complex_prec);     
+//
+       //void *Tmp = 0;
+       //magma_malloc((void**)&Tmp, vld*l*complex_prec);     
 
-       cudaMemset(Tmp, 0, vld*l*complex_prec);   
+       //cudaMemset(Tmp, 0, vld*l*complex_prec);   
+//
+       const int rworkSize = 2*vld+l*l;
+      
+       int AvailRows = __min(rworkSize / l, vlen);
+
+       void  *rwork;
+       magma_malloc(&rwork, rworkSize*complex_prec);
+       cudaMemset(rwork, 0, rworkSize*complex_prec);
+
 
        if(prec == 4)
        {
@@ -200,24 +224,91 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, void *dTev
          magma_cunmqr_gpu(cL, cN, m, l, l, (magmaFloatComplex*)dTevecm, ldm, (magmaFloatComplex*)hTau, (magmaFloatComplex*)dTm, ldm, (magmaFloatComplex*)W, sideLR, (magmaFloatComplex*)dTau, nb, &info);
         
          if(info != 0) printf("\nError in RestartV (magma_cunmqr_gpu), exit ...\n"), exit(-1); 
-
-         magmablas_cgemm(cN, cN, vlen, l, m, MAGMA_C_ONE, (magmaFloatComplex*)dV, vld, (magmaFloatComplex*)dTm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)Tmp, vld);
-
        }
        else
        {
          magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
          magma_zunmqr_gpu(cL, cN, m, l, l, (magmaDoubleComplex*)dTevecm, ldm, (magmaDoubleComplex*)hTau, (magmaDoubleComplex*)dTm, ldm, (magmaDoubleComplex*)W, sideLR, (magmaDoubleComplex*)dTau, nb, &info);
 
-         if(info != 0) printf("\nError in RestartV (magma_zunmqr_gpu), exit ...\n"), exit(-1);
-
-         magmablas_zgemm(cN, cN, vlen, l, m, MAGMA_Z_ONE, (magmaDoubleComplex*)dV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)Tmp, vld);
+         if(info != 0) printf("\nError in RestartV (magma_zunmqr_gpu), exit ...\n"), exit(-1); 
        }
 
-       cudaMemcpy(dV, Tmp, vld*l*complex_prec, cudaMemcpyDefault); 
+       if(vprec == 4)
+       {
+         magmaFloatComplex *dtm;
 
-       magma_free(Tmp);
+         if(prec == 8)
+         {
+            magma_malloc((void**)&dtm, ldm*l*prec);
+
+            double *hbuff1;
+            float  *hbuff2;
+
+            magma_malloc_pinned((void**)&hbuff1, ldm*l*complex_prec );
+            magma_malloc_pinned((void**)&hbuff2, ldm*l*prec);
+
+            cudaMemcpy(hbuff1, dTm, ldm*l*complex_prec, cudaMemcpyDefault); 
+            for(int i = 0; i < ldm*l; i++) hbuff2[i] = (float)hbuff1[i];
+
+            cudaMemcpy(dtm, hbuff2, ldm*l*prec, cudaMemcpyDefault); 
+
+            magma_free_pinned(hbuff1);
+            magma_free_pinned(hbuff2);
+         }
+         else 
+         {
+            dtm = (magmaFloatComplex *)dTm;
+         }
+
+         //magmablas_cgemm(cN, cN, vlen, l, m, MAGMA_C_ONE, (magmaFloatComplex*)dV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)Tmp, vld);
+
+         int i = 0;
+         while (i < vlen) 
+         {
+           magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[i]);
+           magmablas_cgemm(cN, cN, AvailRows, l, m, MAGMA_C_ONE, ptrV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)rwork, AvailRows);
+
+           for (int k = 0; k < l; k++) {
+
+             magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[i + vld * k]);
+             cudaMemcpy(ptrV, &((magmaFloatComplex*)rwork)[AvailRows*k], AvailRows*sizeof(magmaFloatComplex), cudaMemcpyDefault);
+           }
+
+           i += AvailRows;
+           AvailRows = __min(AvailRows, (vlen-i));
+         }
+
+         if(prec == 8) magma_free(dtm);
+
+       }
+       else
+       {
+         //magmablas_zgemm(cN, cN, vlen, l, m, MAGMA_Z_ONE, (magmaDoubleComplex*)dV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)Tmp, vld);
+
+         int i = 0;
+         while (i < vlen) 
+         {
+           magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[i]);
+           magmablas_zgemm(cN, cN, AvailRows, l, m, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)rwork, AvailRows);
+
+           for (int k = 0; k < l; k++) {
+
+             magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[i + vld * k]);
+             cudaMemcpy(ptrV, &((magmaDoubleComplex*)rwork)[AvailRows*k], AvailRows*sizeof(magmaDoubleComplex), cudaMemcpyDefault);
+           }
+
+           i += AvailRows;
+           AvailRows = __min(AvailRows, (vlen-i));
+         }
+
+       }
+
+       //cudaMemcpy(dV, Tmp, vld*l*complex_prec, cudaMemcpyDefault); 
+
+       //magma_free(Tmp);
+       magma_free(rwork);
 #endif
+
        return;
 }
 

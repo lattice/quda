@@ -67,19 +67,34 @@ namespace quda {
     for (int i=0; i<N; i++) iter[i] = 0;
 
     for (int x=0; x<u.Volume(); x++) {
+      //int test[u.Nspin()*u.Ncolor()*2];
+      
+      //printf("x = %d (", x);
       for (int s=0; s<u.Nspin(); s++) {
 	for (int c=0; c<u.Ncolor(); c++) {
 	  for (int z=0; z<2; z++) {
+	    int j = (s*u.Ncolor() + c)*2+z;
+	    //test[j] = 0;
+
 	    double diff = fabs(u(x,s,c,z) - v(x,s,c,z));
 
-	    for (int f=0; f<fail_check; f++)
-	      if (diff > pow(10.0,-(f+1)/(double)tol)) fail[f]++;
+	    for (int f=0; f<fail_check; f++) {
+	      if (diff > pow(10.0,-(f+1)/(double)tol)) {
+		fail[f]++;
+	      }
+	    }
 
-	    int j = (s*u.Ncolor() + c)*2+z;
-	    if (diff > 1e-3) iter[j]++;
+	    if (diff > 1e-3) {
+	      iter[j]++;
+	      //printf("%d %d %e %e\n", x, j, u(x,s,c,z), v(x,s,c,z));
+	      //test[j] = 1;
+	    }
+	    //printf("%d ", test[j]);
+
 	  }
 	}
       }
+      //      printf(")\n");
     }
 
     for (int i=0; i<N; i++) printfQuda("%d fails = %d\n", i, iter[i]);

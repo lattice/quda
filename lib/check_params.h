@@ -96,6 +96,18 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(preserve_gauge, INVALID_INT);
 #endif
 
+#if defined INIT_PARAM
+  P(use_resident_gauge, 0);
+  P(use_resident_mom, 0);
+  P(make_resident_gauge, 0);
+  P(make_resident_mom, 0);
+#else
+  P(use_resident_gauge, INVALID_INT);
+  P(use_resident_mom, INVALID_INT);
+  P(make_resident_gauge, INVALID_INT);
+  P(make_resident_mom, INVALID_INT);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif
@@ -126,8 +138,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(mu, INVALID_DOUBLE);
   P(twist_flavor, QUDA_TWIST_INVALID);
 #else
-  // asqtad and domain wall use mass parameterization
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  // staggered, asqtad and domain wall use mass parameterization
+  if (param->dslash_type == QUDA_STAGGERED_DSLASH || 
+      param->dslash_type == QUDA_ASQTAD_DSLASH || 
+      param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     P(mass, INVALID_DOUBLE);
   } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
@@ -156,6 +170,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
+#ifdef INIT_PARAM /**< Default is to use a sloppy accumulator */
+  P(use_sloppy_partial_accumulator, 1);
+#else
+  P(use_sloppy_partial_accumulator, INVALID_INT);
+#endif
 
 #ifndef CHECK_PARAM
   P(pipeline, 0); /** Whether to use a pipelined solver */
@@ -259,6 +278,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
 #if defined INIT_PARAM
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
+    P(compute_clover_trlog, 0);
 #else
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;

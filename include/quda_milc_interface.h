@@ -2,6 +2,7 @@
 #define _QUDA_MILC_INTERFACE_H
 
 #include <enum_quda.h>
+#include <quda.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,9 +92,6 @@ extern "C" {
       int* num_iters);
 
 
-
-
-
   void qudaMultishiftInvert(
       int external_precision,    
       int precision, 
@@ -112,10 +110,10 @@ extern "C" {
       int* num_iters);
 
 
-
   void qudaCloverInvert(int external_precision, 
       int quda_precision,
       double kappa,
+      double clover_coeff,
       QudaInvertArgs_t inv_args,
       double target_residual,
       double target_fermilab_residual,
@@ -129,6 +127,62 @@ extern "C" {
       int* num_iters
       );
 
+  void qudaLoadGaugeField(int external_precision, 
+      int quda_precision,
+      QudaInvertArgs_t inv_args,
+      const void* milc_link) ;
+
+  void qudaFreeGaugeField();
+
+  void qudaLoadCloverField(int external_precision, 
+      int quda_precision,
+      QudaInvertArgs_t inv_args,
+      void* milc_clover, 
+      void* milc_clover_inv,
+      QudaSolutionType solution_type,
+      QudaSolveType solve_type,
+      double clover_coeff,
+      int compute_trlog,
+      double *trlog) ;
+
+  void qudaFreeCloverField();
+
+  void qudaCloverMultishiftInvert(int external_precision, 
+      int quda_precision,
+      int num_offsets,
+      double* const offset,
+      double kappa,
+      double clover_coeff,
+      QudaInvertArgs_t inv_args,
+      const double* target_residual,
+      const void* milc_link,
+      void* milc_clover, 
+      void* milc_clover_inv,
+      void* source,
+      void** solutionArray,
+      double* const final_residual, 
+      int* num_iters
+      );
+
+  void qudaCloverMultishiftMDInvert(int external_precision, 
+      int quda_precision,
+      int num_offsets,
+      double* const offset,
+      double kappa,
+      double clover_coeff,
+      QudaInvertArgs_t inv_args,
+      const double* target_residual,
+      const void* milc_link,
+      void* milc_clover, 
+      void* milc_clover_inv,
+      void* source,
+      void** psiEven,
+      void** psiOdd,
+      void** pEven,
+      void** pOdd,
+      double* const final_residual, 
+      int* num_iters
+      );
 
   void qudaHisqForce(
       int precision,
@@ -160,24 +214,32 @@ extern "C" {
       void* milc_momentum);
 
 
-  void qudaComputeOuterProduct(int precision, 
-      double one_hop_coeff[],
-      double three_hop_coeff[],
+  void qudaComputeOprod(int precision,
       int num_terms,
-      void** quark_fields,
-      void* const one_link_src[4], 
-      void* const three_link_src[4]);
+      double** coeff,
+      void** quark_field,
+      void* oprod[2]);
 
-
-  void qudaTest();
 
   void qudaUpdateU(int precision, 
-                   int dim[4],
-                   double eps,
-                   void* momentum, 
-                   void* link);
+      double eps,
+      void* momentum, 
+      void* link);
+
+  void qudaCloverTrace(void* out, void* clover, int mu, int nu);
 
 
+  void qudaCloverDerivative(void* out, void* gauge, void* oprod, 
+      int mu, int nu, double coeff, int precision, int parity, int conjugate);
+
+
+  void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision);
+
+  void* qudaCreateGaugeField(void* gauge, int geometry, int precision);
+
+  void qudaSaveGaugeField(void* gauge, void* inGauge);
+
+  void qudaDestroyGaugeField(void* gauge);
 
 
 #ifdef __cplusplus

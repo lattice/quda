@@ -34,6 +34,7 @@ extern "C" {
     QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, column-row color
     QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
     QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
+    QUDA_TIFR_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime, column-row order
     QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
   } QudaGaugeFieldOrder;
 
@@ -74,8 +75,10 @@ extern "C" {
     QUDA_WILSON_DSLASH,
     QUDA_CLOVER_WILSON_DSLASH,
     QUDA_DOMAIN_WALL_DSLASH,
+    QUDA_STAGGERED_DSLASH,
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
+    QUDA_TWISTED_CLOVER_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
 
@@ -83,7 +86,9 @@ extern "C" {
     QUDA_CG_INVERTER,
     QUDA_BICGSTAB_INVERTER,
     QUDA_GCR_INVERTER,
+    QUDA_SD_INVERTER,
     QUDA_MR_INVERTER,
+    QUDA_PCG_INVERTER,
     QUDA_EIGCG_INVERTER,
     QUDA_INC_EIGCG_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
@@ -114,8 +119,9 @@ extern "C" {
   } QudaSchwarzType;
 
   typedef enum QudaResidualType_s {
-    QUDA_L2_RELATIVE_RESIDUAL = 1, // the default
-    QUDA_HEAVY_QUARK_RESIDUAL = 2, // Fermilab heavy quark residual
+    QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
+    QUDA_L2_ABSOLUTE_RESIDUAL = 2, // L2 absolute residual
+    QUDA_HEAVY_QUARK_RESIDUAL = 4, // Fermilab heavy quark residual
     QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
 
@@ -151,7 +157,7 @@ extern "C" {
 
   typedef enum QudaSolverNormalization_s {
     QUDA_DEFAULT_NORMALIZATION, // leave source and solution untouched
-    QUDA_SOURCE_NORMALIZATION, // normalize such that || src || = 1
+    QUDA_SOURCE_NORMALIZATION  // normalize such that || src || = 1
   } QudaSolverNormalization;
 
   typedef enum QudaPreserveSource_s {
@@ -221,10 +227,14 @@ extern "C" {
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
+    QUDA_STAGGERED_DIRAC,
+    QUDA_STAGGEREDPC_DIRAC,
     QUDA_ASQTAD_DIRAC,
     QUDA_ASQTADPC_DIRAC,
     QUDA_TWISTED_MASS_DIRAC,
     QUDA_TWISTED_MASSPC_DIRAC,
+    QUDA_TWISTED_CLOVER_DIRAC,
+    QUDA_TWISTED_CLOVERPC_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 
@@ -299,6 +309,13 @@ extern "C" {
     QUDA_DSLASH_INVALID = QUDA_INVALID_ENUM
   } QudaTwistDslashType;
 
+  typedef enum QudaTwistCloverDslashType_s {
+    QUDA_DEG_CLOVER_TWIST_INV_DSLASH,
+    QUDA_DEG_DSLASH_CLOVER_TWIST_INV,
+    QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY,
+    QUDA_TC_DSLASH_INVALID = QUDA_INVALID_ENUM
+  } QudaTwistCloverDslashType;
+
   typedef enum QudaTwistGamma5Type_s {
     QUDA_TWIST_GAMMA5_DIRECT,
     QUDA_TWIST_GAMMA5_INVERSE,
@@ -313,7 +330,8 @@ extern "C" {
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
-    QUDA_FORWARDS = +1
+    QUDA_FORWARDS = +1,
+    QUDA_BOTH_DIRS = 2
   } QudaDirection;
   
   typedef enum QudaComputeFatMethod_s {
@@ -329,11 +347,25 @@ extern "C" {
   } QudaFatLinkFlag;
 
   typedef enum QudaFieldGeometry_s {
-    QUDA_SCALAR_GEOMETRY,
-    QUDA_VECTOR_GEOMETRY,
-    QUDA_TENSOR_GEOMETRY,
+    QUDA_SCALAR_GEOMETRY = 1,
+    QUDA_VECTOR_GEOMETRY = 4,
+    QUDA_TENSOR_GEOMETRY = 6,
     QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
+
+  typedef enum QudaGhostExchange_s {
+    QUDA_GHOST_EXCHANGE_NO,
+    QUDA_GHOST_EXCHANGE_PAD,
+    QUDA_GHOST_EXCHANGE_EXTENDED,
+    QUDA_GHOST_EXCHANGE_INVALID = QUDA_INVALID_ENUM
+  } QudaGhostExchange;
+
+  typedef enum QudaStaggeredPhase_s {
+    QUDA_MILC_STAGGERED_PHASE = 0,
+    QUDA_CPS_STAGGERED_PHASE = 1,
+    QUDA_TIFR_STAGGERED_PHASE = 2,
+    QUDA_INVALID_STAGGERED_PHASE = QUDA_INVALID_ENUM
+  } QudaStaggeredPhase;
 
 #ifdef __cplusplus
 }
