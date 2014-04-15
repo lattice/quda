@@ -260,6 +260,15 @@ namespace quda {
     void destroyTexObject();
 #endif
 
+#ifdef GPU_COMMS  // This is a hack for half precision.
+   // Since the ghost data and ghost norm data are not contiguous, 
+   // separate MPI calls are needed when using GPUDirect RDMA.
+   void *my_fwd_norm_face[QUDA_MAX_DIM];
+   void *my_back_norm_face[QUDA_MAX_DIM];
+   void *from_fwd_norm_face[QUDA_MAX_DIM];
+   void *from_back_norm_face[QUDA_MAX_DIM];
+#endif
+
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;

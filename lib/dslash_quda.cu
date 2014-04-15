@@ -1590,6 +1590,7 @@ namespace quda {
         }
         if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
 #else // single CPU thread per MPI process
+        initDslashCommsPattern();
         for(int i=3; i>=0; i--){
           if(!dslashParam.commDim[i]) continue;
           for(int dir=1; dir>=0; dir--){
