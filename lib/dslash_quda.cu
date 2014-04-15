@@ -1565,7 +1565,8 @@ namespace quda {
           PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
               profile, QUDA_PROFILE_EVENT_RECORD);
         }
-
+		
+	inSpinor->allocateGhostBuffer(dslash.Nface()/2);
         inSpinor->createComms(dslash.Nface()/2);	
 
 #ifdef PTHREADS // create two new threads to issue MPI receives 
@@ -1617,7 +1618,6 @@ namespace quda {
           PROFILE(cudaEventRecord(packEnd[0], streams[Nstream-1]), 
               profile, QUDA_PROFILE_EVENT_RECORD);
         }
-
 #ifndef GPU_COMMS
         for(int i = 3; i >=0; i--){
           if (!dslashParam.commDim[i]) continue;
