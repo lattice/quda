@@ -190,6 +190,12 @@ namespace quda {
       static void checkField(const ColorSpinorField &, const ColorSpinorField &);
       void clearGhostPointers();
 
+      MsgHandle ***mh_recv_norm_fwd;
+      MsgHandle ***mh_recv_norm_back;
+      MsgHandle ***mh_send_norm_fwd;
+      MsgHandle ***mh_send_norm_back;
+
+
     public:
       //ColorSpinorField();
       ColorSpinorField(const ColorSpinorField &);

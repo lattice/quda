@@ -769,8 +769,6 @@ namespace quda {
 #ifdef GPU_COMMS
       bool comms = false;
       for (int i=0; i<nDimComms; i++) if (commDimPartitioned(i)) comms = true;
-      if (comms && precision == QUDA_HALF_PRECISION)
-	errorQuda("GPU-aware communication not yet supported with half precision");
 #endif
 
       if (nFace > maxNface) 
@@ -813,6 +811,13 @@ namespace quda {
 	size_t offset2 = precision*(length + ghostOffset[i]*nColor*nSpin*2);
 	my_back_face[i] = backGhostFaceBuffer[i];
 	from_back_face[i] = static_cast<char*>(v) + offset2;
+	
+	if(precision == QUDA_HALF_PRECISION){
+	  int norm_offset = stride + ghostNormOffset[i];
+	  my_back_norm_face[i]  = static_cast<char*>(backGhostFaceBuffer[i]) + nFace*ghostFace[i]*Ndof*precision;
+	  from_back_norm_face[i] = static_cast<char*>(norm) + norm_offset*sizeof(float); 
+	}
+
 #else
 	my_back_face[i] = static_cast<char*>(my_face) + offset;
 	from_back_face[i] = static_cast<char*>(from_face) + offset;
@@ -823,6 +828,12 @@ namespace quda {
 	offset2 += nFace*ghostFace[i]*Ndof*precision;
 	my_fwd_face[i] = fwdGhostFaceBuffer[i];	
 	from_fwd_face[i] = /*static_cast<char*>(ghost[i]) + nFace*ghostFace[i]*Ndof*precision; //*/static_cast<char*>(v) + offset2;
+
+	if(precision == QUDA_HALF_PRECISION){
+	  int norm_offset = stride + ghostNormOffset[i] + nFace*ghostFace[i];
+	  my_fwd_norm_face[i] = static_cast<char*>(fwdGhostFaceBuffer[i]) + nFace*ghostFace[i]*Ndof*precision;
+	  from_fwd_norm_face[i] = static_cast<char*>(norm) + norm_offset*sizeof(float);
+	}
 #else
 	my_fwd_face[i] = static_cast<char*>(my_face) + offset;
 	from_fwd_face[i] = static_cast<char*>(from_face) + offset;
@@ -836,11 +847,30 @@ namespace quda {
       mh_send_back = new MsgHandle**[maxNface];
       mh_recv_fwd = new MsgHandle**[maxNface];
       mh_recv_back = new MsgHandle**[maxNface];
+#ifdef GPU_COMMS
+      if(precision == QUDA_HALF_PRECISION){
+      	mh_send_norm_fwd  = new MsgHandle**[maxNface];
+      	mh_send_norm_back = new MsgHandle**[maxNface];
+     	mh_recv_norm_fwd  = new MsgHandle**[maxNface];
+      	mh_recv_norm_back = new MsgHandle**[maxNface]; 
+      }
+#endif
       for (int j=0; j<maxNface; j++) {
 	mh_send_fwd[j] = new MsgHandle*[2*nDimComms];
 	mh_send_back[j] = new MsgHandle*[2*nDimComms];
 	mh_recv_fwd[j] = new MsgHandle*[nDimComms];
 	mh_recv_back[j] = new MsgHandle*[nDimComms];
+
+		
+#ifdef GPU_COMMS
+	if(precision == QUDA_HALF_PRECISION){
+	  mh_send_norm_fwd[j] = new MsgHandle*[2*nDimComms];
+	  mh_send_norm_back[j] = new MsgHandle*[2*nDimComms];
+	  mh_recv_norm_fwd[j] = new MsgHandle*[nDimComms];
+	  mh_recv_norm_back[j] = new MsgHandle*[nDimComms];
+	}
+#endif	
+
 
 	for (int i=0; i<nDimComms; i++) {
 	  size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
@@ -852,7 +882,14 @@ namespace quda {
 	    mh_send_back[j][2*i+0] = comm_declare_send_relative(my_back_face[i], i, -1, nbytes_Nface);
 	    mh_send_fwd[j][2*i+1] = mh_send_fwd[j][2*i]; // alias pointers
 	    mh_send_back[j][2*i+1] = mh_send_back[j][2*i]; // alias pointers
+
 #ifdef GPU_COMMS
+	    if(precision == QUDA_HALF_PRECISION){
+	      mh_send_norm_fwd[j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[i], i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
+	      mh_send_norm_back[j][2*i+0] = comm_declare_send_relative(my_back_norm_face[i], i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+	      mh_send_norm_fwd[j][2*i+1] = mh_send_norm_fwd[j][2*i];
+	      mh_send_norm_back[j][2*i+1] = mh_send_norm_back[j][2*i]; 	
+	    }
 	  } else { 
 	    /* 
 	       use a strided communicator, here we can't really use
@@ -911,10 +948,18 @@ namespace quda {
 	      mh_send_back[j][2*i+1] = mh_send_back[j][2*i+0];
 	    }
 	  }
+
+	  if(precision == QUDA_HALF_PRECISION){
+	    mh_recv_norm_fwd[j][i] = comm_declare_receive_relative(from_fwd_norm_face[i], i, +1, surfaceCB[i]*sizeof(float)*(j+1));
+	    mh_recv_norm_back[j][i] = comm_declare_receive_relative(from_back_norm_face[i], i, -1, surfaceCB[i]*sizeof(float)*(j+1));
+	  }
 #endif // GPU_COMMS
 
 	  mh_recv_fwd[j][i] = comm_declare_receive_relative(from_fwd_face[i], i, +1, nbytes_Nface);
 	  mh_recv_back[j][i] = comm_declare_receive_relative(from_back_face[i], i, -1, nbytes_Nface);
+
+	 
+
 
 	} // loop over dimension
       }
@@ -936,6 +981,13 @@ namespace quda {
 	    comm_free(mh_send_back[j][2*i]);
 	    // only in a special case are these not aliasing pointers
 #ifdef GPU_COMMS
+	    if(precision == QUDA_HALF_PRECISION){
+	      comm_free(mh_recv_norm_fwd[j][i]);
+	      comm_free(mh_recv_norm_back[j][i]);
+	      comm_free(mh_send_norm_fwd[j][2*i]);
+	      comm_free(mh_send_norm_back[j][2*i]);
+	    }
+
 	    if (i == 3 && !getKernelPackT() && nSpin == 4) {
 	      comm_free(mh_send_fwd[j][2*i+1]);
 	      comm_free(mh_send_back[j][2*i+1]);
@@ -947,6 +999,14 @@ namespace quda {
 	delete []mh_recv_back[j];
 	delete []mh_send_fwd[j];
 	delete []mh_send_back[j];
+#ifdef GPU_COMMS
+	if(precision == QUDA_HALF_PRECISION){
+	  delete []mh_recv_norm_fwd[j];
+	  delete []mh_recv_norm_back[j];
+	  delete []mh_send_norm_fwd[j];
+	  delete []mh_send_norm_back[j];
+	}
+#endif
       }    
       delete []mh_recv_fwd;
       delete []mh_recv_back;
@@ -959,7 +1019,21 @@ namespace quda {
 	from_fwd_face[i] = NULL;
 	from_back_face[i] = NULL;      
       }
-      
+#ifdef GPU_COMMS
+      if(precision == QUDA_HALF_PRECISION){
+	delete []mh_recv_norm_fwd;
+	delete []mh_recv_norm_back;
+	delete []mh_send_norm_fwd;
+	delete []mh_send_norm_back;
+      }
+	
+      for(int i=0; i<nDimComms; i++){
+	my_fwd_norm_face[i] = NULL;
+	my_back_norm_face[i] = NULL;
+	from_fwd_norm_face[i] = NULL;
+	from_back_norm_face[i] = NULL;
+      }
+#endif      
       initComms = false;
       checkCudaError();
     }
