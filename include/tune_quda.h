@@ -15,8 +15,8 @@ class TuneKey {
 
   public:
     char volume[32];
-    char name[1024];
-    char aux[1024];
+    char name[256];
+    char aux[256];
 
     TuneKey() { }
     TuneKey(const char v[], const char n[], const char a[]="type=default") {
