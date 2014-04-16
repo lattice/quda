@@ -165,7 +165,6 @@ namespace quda {
         }
   };
 
-
   //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
   //Where:
   //mu = dir
@@ -290,7 +289,7 @@ namespace quda {
 }
 
   //Calculate the reverse link, Y_{-\mu}(x+mu).
-  //The reverse link is almost the Hermitian conjugate of the forward link,
+  //The reverse link is almost the same as the forward link,
   //but with negative sign for the spin off-diagonal parts to account
   //for the forward/backward spin proejctors.
   //Note: No shifting in site index, so that site x holds the matrices Y_{\pm mu}(x, x+mu)
@@ -314,7 +313,7 @@ namespace quda {
 	        for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
 	          //Flip s_row, s_col and ic_c, jc_c indices on the rhs because of Hermitian conjugation.
 		  //Y_m[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] = sign*quda::conj(Y_p[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_col+s_row)+Nc_c*jc_c+ic_c]);
-		  Y(2*dir, i%2, i/2, s_row, s_col, ic_c, jc_c) = sign*quda::conj(Y(2*dir+1,i%2,i/2,s_col, s_row, jc_c, ic_c));
+		  Y(2*dir, i%2, i/2, s_row, s_col, ic_c, jc_c) = sign*Y(2*dir+1,i%2,i/2,s_row, s_col, ic_c, jc_c);
 	        } //Color column
 	      } //Color row
 	    } //Spin column
@@ -348,7 +347,7 @@ namespace quda {
                 for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
 	        //Flip s_col, s_row on the rhs because of Hermitian conjugation.  Color part left untransposed.
 	        //Xlocal[k] = X[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_col+s_row)+k];
-		Xlocal[Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] = Y(2*ndim,i%2,i/2,s_row, s_col, ic_c, jc_c);
+		Xlocal[Nc_c*Nc_c*(Ns_c*s_col+s_row)+Nc_c*ic_c+jc_c] = Y(2*ndim,i%2,i/2,s_row, s_col, ic_c, jc_c);
 	        }	
               }
             }
@@ -364,10 +363,9 @@ namespace quda {
 
 	      for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
 	        for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
-	          //Flip  color indices because of Hermitian conjugation.
-	          //Spin indices already flipped while filling Xlocal.
 		  //X[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] += sign*quda::conj(Xlocal[Nc_c*jc_c + ic_c]);
-		  Y(2*ndim,i%2,i/2,s_col,s_row,jc_c,ic_c) += sign*quda::conj(Xlocal[Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c]);
+		  //Transpose color part
+		  Y(2*ndim,i%2,i/2,s_row,s_col,ic_c,jc_c) += sign*quda::conj(Xlocal[Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*jc_c+ic_c]);
 	        } //Color column
 	      } //Color row
 	    } //Spin column
@@ -423,6 +421,7 @@ namespace quda {
 
     for(int d = 0; d < ndim; d++) {
       //First calculate UV
+      setZero(UV);
       computeUV<Float>(UV, V, G, d, ndim, x_size, Nc, Nc_c, Ns);
 
       //Gamma matrix for this direction
@@ -438,7 +437,7 @@ namespace quda {
           for(int s_col = 0; s_col < Ns_c; s_col++) {
             for(int c = 0; c < Nc_c; c++) {
               for(int c_col = 0; c_col < Nc_c; c_col++) {
-                printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y.real(2*d) = %e, Y.real(2*d+1) = %e\n",d,i,s,s_col,c,c_col,Y(2*d,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).real());
+                printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e, Y(2*d+1) = %e %e\n",d,i,s,s_col,c,c_col,Y(2*d,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d,i%2,i/2,s,s_col,c,c_col).imag(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).imag());
               }}}}}
       #endif
     }
@@ -598,7 +597,7 @@ namespace quda {
 
   //out(x) = -X*in(x), where X is the local color-spin matrix on the coarse grid.
   template<typename Float>
-  void coarseClover(colorspinor::FieldOrder<Float> &out, const colorspinor::FieldOrder<Float> &in, const gauge::FieldOrder<Float> &Y) {
+  void coarseClover(colorspinor::FieldOrder<Float> &out, const colorspinor::FieldOrder<Float> &in, const gauge::FieldOrder<Float> &Y, Float kappa) {
   //void coarseClover(colorspinor::FieldOrder<Float> &out, const colorspinor::FieldOrder<Float> &in, const quda::complex<Float> *X) {
 
     int Nc = out.Ncolor();
@@ -631,7 +630,7 @@ namespace quda {
 	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
 	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
               //printf("pre i = %d, s = %d, c = %d, s_col = %d, c_col = %d, parity = %d, gauge_index = %d, Y = %e, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,parity, gauge_index, Y(2*ndim,parity,gauge_index/2,s,s_col,c,c_col).real(),out(i,s,c).real(),in(i,s_col,c_col).real());
-	      out(i,s,c) -= Y(2*ndim, parity, gauge_index/2, s, s_col, c, c_col)*in(i,s_col,c_col);
+	      out(i,s,c) -= 2*kappa*Y(2*ndim, parity, gauge_index/2, s, s_col, c, c_col)*in(i,s_col,c_col);
               //printf("post i = %d, s = %d, c = %d, s_col = %d, c_col = %d, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,out(i,s,c).real(),in(i,s_col,c_col).real());
 		//out(i,s,c) -= Y[2*ndim][gauge_site_offset+Nc*Nc*(Ns*s+s_col)+Nc*c+c_col]*in(i,s_col,c_col);
 	    } //Color in
@@ -672,7 +671,6 @@ namespace quda {
   //absorbed into the Y matrices.
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, double kappa) {
   //void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision, double kappa) {
-
     QudaPrecision prec = Y.Precision();
     int Ns_c = in.Nspin();
     int ndim = in.Ndim();
@@ -682,8 +680,8 @@ namespace quda {
       gauge::FieldOrder<double> *yOrder = gauge::createOrder<double>(Y, Ns_c);
       setZero(*outOrder);
       coarseDslash(*outOrder, *inOrder, *yOrder);
-      F_eq_rF(*outOrder, -2*kappa);
-      coarseClover(*outOrder, *inOrder, *yOrder);
+      F_eq_rF(*outOrder, (-2.0*kappa));
+      coarseClover(*outOrder, *inOrder, *yOrder, kappa);
     }
     else {
       colorspinor::FieldOrder<float> *inOrder = colorspinor::createOrder<float>(in);
@@ -691,8 +689,8 @@ namespace quda {
       gauge::FieldOrder<float> *yOrder = gauge::createOrder<float>(Y, Ns_c);
       setZero(*outOrder);
       coarseDslash(*outOrder, *inOrder, *yOrder);
-      F_eq_rF(*outOrder, (float) (-2*kappa));
-      coarseClover(*outOrder, *inOrder, *yOrder);
+      F_eq_rF(*outOrder, (float) (-2.0*kappa));
+      coarseClover(*outOrder, *inOrder, *yOrder, (float) kappa);
     }  
 
   }//ApplyCoarse

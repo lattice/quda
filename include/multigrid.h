@@ -202,7 +202,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
 
-      #if 0
+      #if 1
       ApplyCoarse(out,in,*Y,dirac->kappa); 
       #else
       //errorQuda("Not implemented");
@@ -218,7 +218,7 @@ namespace quda {
     // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
     {
-      #if 0
+      #if 1
       ApplyCoarse(out,in,*Y,dirac->kappa);
       #else
       //errorQuda("Not implemented");
@@ -241,7 +241,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
     {
-      #if 0
+      #if 1
       ApplyCoarse(out,in,*Y,dirac->kappa);
       #else
       //errorQuda("Not implemented");
