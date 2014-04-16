@@ -1125,6 +1125,17 @@ namespace quda {
       // Prepost receive
       comm_start(mh_recv_back[nFace-1][dim]);
     }
+#ifdef GPU_COMMS
+    if(precision != QUDA_HALF_PRECISION) return;
+
+    if (dir%2 == 0) { // sending backwards
+      // Prepost receive
+      comm_start(mh_recv_norm_fwd[nFace-1][dim]);
+    } else { //sending forwards
+      // Prepost receive
+      comm_start(mh_recv_norm_back[nFace-1][dim]);
+    }
+#endif
   }
 
   void cudaColorSpinorField::sendStart(int nFace, int dir, int dagger) {
@@ -1136,6 +1147,14 @@ namespace quda {
     } else { //sending forwards
       comm_start(mh_send_fwd[nFace-1][2*dim+dagger]);
     }
+#ifdef GPU_COMMS
+    if(precision != QUDA_HALF_PRECISION) return;
+    if (dir%2 == 0) { // sending backwards
+      comm_start(mh_send_norm_back[nFace-1][2*dim+dagger]);
+    } else { //sending forwards
+      comm_start(mh_send_norm_fwd[nFace-1][2*dim+dagger]);
+    }
+#endif
   }
 
 
@@ -1155,12 +1174,30 @@ namespace quda {
       // Begin forward send
       comm_start(mh_send_fwd[nFace-1][2*dim+dagger]);
     }
+#ifdef GPU_COMMS
+
+    if(precision != QUDA_HALF_PRECISION) return;		
+
+    if (dir%2 == 0) { // sending backwards
+      // Prepost receive
+      comm_start(mh_recv_norm_fwd[nFace-1][dim]);
+      comm_start(mh_send_norm_back[nFace-1][2*dim+dagger]);
+    } else { //sending forwards
+      // Prepost receive
+      comm_start(mh_recv_norm_back[nFace-1][dim]);
+      // Begin forward send
+      comm_start(mh_send_norm_fwd[nFace-1][2*dim+dagger]);
+    }
+#endif
   }
 
   int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return 0;
-    
+
+#ifdef GPU_COMMS
+    if(precision != QUDA_HALF_PRECISION){
+#endif
     if(dir%2==0) {
       if (comm_query(mh_recv_fwd[nFace-1][dim]) && 
 	  comm_query(mh_send_back[nFace-1][2*dim+dagger])) return 1;
@@ -1168,7 +1205,21 @@ namespace quda {
       if (comm_query(mh_recv_back[nFace-1][dim]) && 
 	  comm_query(mh_send_fwd[nFace-1][2*dim+dagger])) return 1;
     }
-    
+#ifdef GPU_COMMS
+   }else{ // half precision
+    if(dir%2==0) {
+      if (comm_query(mh_recv_fwd[nFace-1][dim]) && 
+	  comm_query(mh_send_back[nFace-1][2*dim+dagger]) &&
+	  comm_query(mh_recv_norm_fwd[nFace-1][dim]) &&
+	  comm_query(mh_send_norm_back[nFace-1][2*dim+dagger])) return 1;
+    } else {
+      if (comm_query(mh_recv_back[nFace-1][dim]) && 
+	  comm_query(mh_send_fwd[nFace-1][2*dim+dagger]) &&
+	  comm_query(mh_recv_norm_back[nFace-1][dim]) && 
+	  comm_query(mh_send_norm_fwd[nFace-1][2*dim+dagger])) return 1;
+    }
+   } // half precision
+#endif
     return 0;
   }
 
