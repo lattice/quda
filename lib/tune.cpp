@@ -19,6 +19,7 @@ namespace quda {
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
   static std::string resource_path;
   static map tunecache;
+  static map::iterator it;
   static size_t initial_cache_size = 0;
 
 #define STR_(x) #x
@@ -270,28 +271,32 @@ namespace quda {
 #endif
 
     // first check if we have the tuned value and return if we have it
-    if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
+    //if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
+
+    it = tunecache.find(key);
+    if (enabled == QUDA_TUNE_YES && it != tunecache.end()) {
 
 #ifdef LAUNCH_TIMER
       launchTimer.Stop(QUDA_PROFILE_PREAMBLE);
       launchTimer.Start(QUDA_PROFILE_COMPUTE);
 #endif
 
-      param = tunecache[key];
+      //param = tunecache[key];
+      TuneParam param = it->second;
 
 #ifdef LAUNCH_TIMER
       launchTimer.Stop(QUDA_PROFILE_COMPUTE);
       launchTimer.Start(QUDA_PROFILE_EPILOGUE);
 #endif
 
-      tunable.checkLaunchParam(param);
+      tunable.checkLaunchParam(it->second);
 
 #ifdef LAUNCH_TIMER
       launchTimer.Stop(QUDA_PROFILE_EPILOGUE);
       launchTimer.Stop(QUDA_PROFILE_TOTAL);
 #endif
 
-      return param;
+      return it->second;
     }
 
 #ifdef LAUNCH_TIMER
