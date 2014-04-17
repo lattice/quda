@@ -201,6 +201,7 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
     errorQuda("Number of communication grid dimensions must be 4");
   }
 
+  LexMapData map_data;
   if (!func) {
 
 #if QMP_COMMS
@@ -220,7 +221,6 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
       warningQuda("QMP logical topology is undeclared; using default lexicographical ordering");
 #endif
 
-      LexMapData map_data;
       map_data.ndim = nDim;
       for (int i=0; i<nDim; i++) {
         map_data.dims[i] = dims[i];
