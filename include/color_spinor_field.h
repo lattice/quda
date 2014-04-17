@@ -190,11 +190,6 @@ namespace quda {
       static void checkField(const ColorSpinorField &, const ColorSpinorField &);
       void clearGhostPointers();
 
-      MsgHandle ***mh_recv_norm_fwd;
-      MsgHandle ***mh_recv_norm_back;
-      MsgHandle ***mh_send_norm_fwd;
-      MsgHandle ***mh_send_norm_back;
-
 
     public:
       //ColorSpinorField();
@@ -273,6 +268,12 @@ namespace quda {
    void *my_back_norm_face[QUDA_MAX_DIM];
    void *from_fwd_norm_face[QUDA_MAX_DIM];
    void *from_back_norm_face[QUDA_MAX_DIM];
+
+   MsgHandle ***mh_recv_norm_fwd;
+   MsgHandle ***mh_recv_norm_back;
+   MsgHandle ***mh_send_norm_fwd;
+   MsgHandle ***mh_send_norm_back;
+
 #endif
 
     bool reference; // whether the field is a reference or not
