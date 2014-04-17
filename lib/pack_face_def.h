@@ -1455,9 +1455,9 @@ static inline __device__ void packCloverTwistedFaceWilsonCore(float4 *out, float
 			#define TM_INV_CLOVERTEXNORM (param.cloverInvNormTex)
 		#else
 			#define TMCLOVERTEX cloverTexHalf
-			#define TMCLOVERTEXNORM cloverNormTex
+			#define TMCLOVERTEXNORM cloverTexNorm
 			#define TM_INV_CLOVERTEX cloverInvTexHalf
-			#define TM_INV_CLOVERTEXNORM cloverInvNormTex
+			#define TM_INV_CLOVERTEXNORM cloverInvTexNorm
 		#endif
 		#define ASSN_CLOVER PACK_CLOVER_HALF_TEX
 	#endif
