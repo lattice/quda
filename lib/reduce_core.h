@@ -90,6 +90,8 @@ template<> __device__ void add<doublesingle3,doublesingle>(volatile doublesingle
 { s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
 #endif
 
+#include <launch_kernel.cuh>
+
 __device__ unsigned int count = 0;
 __shared__ bool isLastBlockDone;
 
@@ -251,138 +253,7 @@ doubleN reduceLaunch(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spinor
   if (tp.grid.x > REDUCE_MAX_BLOCKS) 
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
-  switch (tp.block.x) {
-  case 32:
-    reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 64:
-    reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 96:
-    reduceKernel<96,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 128:
-    reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 160:
-    reduceKernel<160,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 192:
-    reduceKernel<192,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 224:
-    reduceKernel<224,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 256:
-    reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 288:
-    reduceKernel<288,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 320:
-    reduceKernel<320,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 352:
-    reduceKernel<352,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 384:
-    reduceKernel<384,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 416:
-    reduceKernel<416,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 448:
-    reduceKernel<448,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 480:
-    reduceKernel<480,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 512:
-    reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 544:
-    reduceKernel<544,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 576:
-    reduceKernel<576,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 608:
-    reduceKernel<608,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 640:
-    reduceKernel<640,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 672:
-    reduceKernel<672,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 704:
-    reduceKernel<704,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 736:
-    reduceKernel<736,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 768:
-    reduceKernel<768,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 800:
-    reduceKernel<800,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 832:
-    reduceKernel<832,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 864:
-    reduceKernel<864,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 896:
-    reduceKernel<896,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 928:
-    reduceKernel<928,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 960:
-    reduceKernel<960,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 992:
-    reduceKernel<992,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 1024:
-    reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  default:
-    errorQuda("Reduction not implemented for %d threads", tp.block.x);
-  }
+  LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,ReduceSimpleType,FloatN,M);
 
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
   if(deviceProp.canMapHostMemory) {
