@@ -36,7 +36,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	staggered_oprod.h
 
 # These are only inlined into blas_quda.cu
-BLAS_INLN = blas_core.h 
+BLAS_INLN = blas_core.h blas_mixed_core.h
 
 # These are only inlined into reduce_quda.cu
 REDUCE_INLN = reduce_core.h
