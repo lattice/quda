@@ -343,15 +343,8 @@ namespace quda {
 
   void DiracDomainWallPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
-#ifdef MULTI_GPU
-    bool reset = newTmp(&tmp2, in);
-    M(*tmp2, in);
-    Mdag(out, *tmp2);
-    deleteTmp(&tmp2, reset);
-#else
     M(out, in);
     Mdag(out, out);
-#endif
   }
 
   void DiracDomainWallPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,

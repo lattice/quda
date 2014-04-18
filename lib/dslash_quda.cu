@@ -1566,9 +1566,7 @@ namespace quda {
       }
     }
 #endif
-
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-
 #ifdef MULTI_GPU
     initDslashCommsPattern();
 
@@ -1578,7 +1576,6 @@ namespace quda {
         if (!dslashParam.commDim[i]) continue;
 
         for (int dir=1; dir>=0; dir--) {
-
           // Query if gather has completed
           if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
             PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
@@ -1608,34 +1605,31 @@ namespace quda {
                   profile, QUDA_PROFILE_SCATTER);
             }
           }
-
-          }
-
-          // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-          if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
-            // Record the end of the scattering
-            PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
-                profile, QUDA_PROFILE_EVENT_RECORD);
-
-            dslashParam.kernel_type = static_cast<KernelType>(i);
-            dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-
-            // wait for scattering to finish and then launch dslash
-            PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
-                profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
-
-            // all faces use this stream
-            PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-
-            dslashCompleted[2*i] = 1;
-          }
-
         }
+        // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
+        if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
+          // Record the end of the scattering
+          PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
+              profile, QUDA_PROFILE_EVENT_RECORD);
 
+          dslashParam.kernel_type = static_cast<KernelType>(i);
+          dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
+
+          // wait for scattering to finish and then launch dslash
+          PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
+              profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+
+          // all faces use this stream
+          PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+          dslashCompleted[2*i] = 1;
+        }
       }
+    }
 #endif // MULTI_GPU
 
-      profile.Stop(QUDA_PROFILE_TOTAL);
+
+    profile.Stop(QUDA_PROFILE_TOTAL);
   }
 
   void dslashCudaNC(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 

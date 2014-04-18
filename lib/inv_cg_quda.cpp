@@ -56,14 +56,6 @@ namespace quda {
     cudaColorSpinorField Ap(x, param);
     cudaColorSpinorField tmp(x, param);
 
-    cudaColorSpinorField *tmp2_p = &tmp;
-    // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
-	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(x, param);
-    }
-    cudaColorSpinorField &tmp2 = *tmp2_p;
-
     cudaColorSpinorField *x_sloppy, *r_sloppy;
     if (invParam.cuda_prec_sloppy == x.Precision()) {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -121,7 +113,7 @@ namespace quda {
 
     while ( !convergence(r2, heavy_quark_res, stop, invParam.tol_hq) && 
 	    k < invParam.maxiter) {
-      matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
+      matSloppy(Ap, p, tmp); // tmp as tmp
     
       double sigma;
 
@@ -258,7 +250,6 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_EPILOGUE);
     profile.Start(QUDA_PROFILE_FREE);
 
-    if (&tmp2 != &tmp) delete tmp2_p;
 
     if (invParam.cuda_prec_sloppy != x.Precision()) {
       delete r_sloppy;
