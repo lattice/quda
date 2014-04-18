@@ -237,8 +237,13 @@ namespace quda {
       }
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	copyCuda(tmp,y);
-	heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	if (&x != &xSloppy) {
+	  copyCuda(tmp,y);
+	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	} else {
+	  copyCuda(r, rSloppy);
+	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);	  
+	}
       }
 
       if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
