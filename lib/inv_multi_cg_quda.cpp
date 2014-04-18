@@ -240,6 +240,12 @@ namespace quda {
 	  if (reliable_shift == j_low) break;
 	}
 
+	// explicitly restore the orthogonality of the gradient vector
+	for (int j=0; j<num_offset_now; j++) {
+	  double rp = reDotProductCuda(*r_sloppy, *p[j]) / (r2[0]);
+	  axpyCuda(-rp, *r_sloppy, *p[j]);
+	}
+
 	// update beta and p
 	beta[0] = r2[0] / r2_old; 
 	xpayCuda(*r_sloppy, beta[0], *p[0]);
