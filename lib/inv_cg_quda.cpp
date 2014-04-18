@@ -67,7 +67,6 @@ namespace quda {
 
     cudaColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
       r_sloppy = &r;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -77,7 +76,6 @@ namespace quda {
     cudaColorSpinorField *x_sloppy;
     if (param.precision_sloppy == x.Precision() ||
 	!param.use_sloppy_partial_accumulator) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
       x_sloppy = &x;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -234,6 +232,7 @@ namespace quda {
       k++;
 
       PrintStats("CG", k, r2, b2, heavy_quark_res);
+
     }
 
     copyCuda(x, xSloppy); // nop when these pointers alias
