@@ -105,7 +105,7 @@ void init(int argc, char **argv) {
 
   inv_param.kappa = 0.1;
 
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.01;
     inv_param.epsilon = 0.01; 
 //!    inv_param.twist_flavor = QUDA_TWIST_MINUS;
@@ -138,7 +138,6 @@ void init(int argc, char **argv) {
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   else
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-
   inv_param.dagger = dagger;
 
   inv_param.cpu_prec = cpu_prec;
@@ -191,11 +190,12 @@ void init(int argc, char **argv) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.clover_coeff = 1.5*inv_param.kappa;
     //if (test_type > 0) {
       hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
       hostCloverInv = hostClover; // fake it
@@ -207,7 +207,7 @@ void init(int argc, char **argv) {
 
   }
 
-  //inv_param.verbosity = QUDA_DEBUG_VERBOSE;
+  setVerbosity(QUDA_VERBOSE);
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc(V*gaugeSiteSize*gauge_param.cpu_prec);
@@ -249,8 +249,6 @@ void init(int argc, char **argv) {
   csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-  //csParam.verbose = QUDA_DEBUG_VERBOSE;
-
   spinor = new cpuColorSpinorField(csParam);
   spinorOut = new cpuColorSpinorField(csParam);
   spinorRef = new cpuColorSpinorField(csParam);
@@ -289,7 +287,11 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     printfQuda("Sending clover field to GPU\n");
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
-    //clover = cudaCloverPrecise;
+  }
+
+  if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    printfQuda("Sending clover field to GPU\n");
+    loadCloverQuda(NULL, NULL, &inv_param);
   }
 
   if (!transfer) {
@@ -330,7 +332,6 @@ void init(int argc, char **argv) {
     bool pc = (test_type != 2 && test_type != 4);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    diracParam.verbose = QUDA_VERBOSE;
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
     
@@ -358,7 +359,7 @@ void end() {
   delete spinorTmp;
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if((dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)){
     if (hostClover != hostCloverInv && hostClover) free(hostClover);
     free(hostCloverInv);
   }
@@ -464,7 +465,7 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
-  } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  } else if((dslash_type == QUDA_TWISTED_MASS_DSLASH) || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)){ 
     switch (test_type) {
     case 0:
       if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)
@@ -627,7 +628,7 @@ int main(int argc, char **argv)
 
     if (tune) { // warm-up run
       printfQuda("Tuning...\n");
-      setDslashTuning(QUDA_TUNE_YES, QUDA_VERBOSE);
+      setTuning(QUDA_TUNE_YES);
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...\n", niter);
@@ -639,7 +640,7 @@ int main(int argc, char **argv)
 
     // print timing information
     printfQuda("%fus per kernel call\n", 1e6*secs / niter);
-    
+    //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
     int spinor_floats = test_type ? 2*(7*24+24)+24 : 7*24+24;

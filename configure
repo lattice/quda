@@ -599,7 +599,15 @@ FECXX
 FECC
 BUILD_QIO
 DEVICE_PACK
+BUILD_TIFR_INTERFACE
+BUILD_BQCD_INTERFACE
+BUILD_QDPJIT_INTERFACE
+BUILD_CPS_INTERFACE
+BUILD_MILC_INTERFACE
+BUILD_QDP_INTERFACE
+GPU_COMMS
 GPU_DIRECT
+POSIX_THREADS
 BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
@@ -608,8 +616,9 @@ BUILD_FERMION_FORCE
 BUILD_GAUGE_FORCE
 BUILD_HISQLINK
 BUILD_FATLINK
-BUILD_TWISTED_MASS_DIRAC
+BUILD_TWISTED_CLOVER_DIRAC
 BUILD_NDEG_TWISTED_MASS_DIRAC
+BUILD_TWISTED_MASS_DIRAC
 BUILD_STAGGERED_DIRAC
 BUILD_DOMAIN_WALL_DIRAC
 BUILD_CLOVER_DIRAC
@@ -685,12 +694,19 @@ with_python
 enable_host_debug
 enable_device_debug
 enable_verbose_build
+enable_qdp_interface
+enable_milc_interface
+enable_cps_interface
+enable_qdpjit_interface
+enable_bqcd_interface
+enable_tifr_interface
 enable_wilson_dirac
 enable_clover_dirac
 enable_domain_wall_dirac
 enable_staggered_dirac
 enable_twisted_mass_dirac
 enable_ndeg_twisted_mass_dirac
+enable_twisted_clover_dirac
 enable_staggered_fatlink
 enable_hisq_fatlink
 enable_gauge_force
@@ -698,8 +714,10 @@ enable_staggered_force
 enable_hisq_force
 enable_multi_gpu
 enable_gpu_direct
+enable_gpu_comms
 enable_device_pack
 with_mpi
+enable_pthreads
 with_qmp
 with_qio
 enable_qdp_jit
@@ -1335,6 +1353,13 @@ Optional Features:
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
   --enable-verbose-build  Display kernel register usage
+  --enable-qdp-interface  Build the QDP interface (default: enabled)
+  --enable-milc-interface Build the MILC interface (default: enabled)
+  --enable-cps-interface  Build the CPS interface (default: disabled)
+  --enable-qdpjit-interface
+                          Build the QDPJIT interface (default: disabled)
+  --enable-bqcd-interface Build the BQCD interface (default: disabled)
+  --enable-tifr-interface Build the TIFR interface (default: disabled)
   --enable-wilson-dirac   Build Wilson Dirac operator (default: enabled)
   --enable-clover-dirac   Build Wilson-clover Dirac operator (default:
                           enabled)
@@ -1345,7 +1370,11 @@ Optional Features:
   --enable-twisted-mass-dirac
                           Build twisted mass Dirac operator (default: enabled)
   --enable-ndeg-twisted-mass-dirac
-                          Build non-degenerate twisted mass Dirac operator (default: disabled)
+                          Build non-degenerate twisted mass Dirac operator
+                          (default: disabled)
+  --enable-twisted-clover-dirac
+                          Build twisted mass clover Dirac operator (default:
+                          disabled)
   --enable-staggered-fatlink
                           Build asqtad link-fattening routines (default:
                           disabled)
@@ -1359,8 +1388,13 @@ Optional Features:
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
+  --enable-gpu-comms      Enable direct CUDA-NIC communication (experimental,
+                          default: disabled)
   --enable-device-pack    Enable the packing / unpacking of fields on the
                           device (default: disabled)
+  --enable-pthreads       Enable pthreads in the multi-GPU dslash build
+                          (default: disabled)
+   posix_threads=${enableval}
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
                           (default: disabled)
   --enable-blas-tex       Enable texture reads for blas (default: enabled)
@@ -1975,6 +2009,60 @@ else
 fi
 
 
+# Check whether --enable-qdp-interface was given.
+if test "${enable_qdp_interface+set}" = set; then :
+  enableval=$enable_qdp_interface;  build_qdp_interface=${enableval}
+else
+   build_qdp_interface="yes"
+
+fi
+
+
+# Check whether --enable-milc-interface was given.
+if test "${enable_milc_interface+set}" = set; then :
+  enableval=$enable_milc_interface;  build_milc_interface=${enableval}
+else
+   build_milc_interface="yes"
+
+fi
+
+
+# Check whether --enable-cps-interface was given.
+if test "${enable_cps_interface+set}" = set; then :
+  enableval=$enable_cps_interface;  build_cps_interface=${enableval}
+else
+   build_cps_interface="no"
+
+fi
+
+
+# Check whether --enable-qdpjit-interface was given.
+if test "${enable_qdpjit_interface+set}" = set; then :
+  enableval=$enable_qdpjit_interface;  build_qdpjit_interface=${enableval}
+else
+   build_qdpjit_interface="no"
+
+fi
+
+
+# Check whether --enable-bqcd-interface was given.
+if test "${enable_bqcd_interface+set}" = set; then :
+  enableval=$enable_bqcd_interface;  build_bqcd_interface=${enableval}
+else
+   build_bqcd_interface="no"
+
+fi
+
+
+# Check whether --enable-tifr-interface was given.
+if test "${enable_tifr_interface+set}" = set; then :
+  enableval=$enable_tifr_interface;  build_tifr_interface=${enableval}
+else
+   build_tifr_interface="no"
+
+fi
+
+
 # Check whether --enable-wilson-dirac was given.
 if test "${enable_wilson_dirac+set}" = set; then :
   enableval=$enable_wilson_dirac;  build_wilson_dirac=${enableval}
@@ -2020,12 +2108,20 @@ else
 fi
 
 
-
 # Check whether --enable-ndeg-twisted-mass-dirac was given.
 if test "${enable_ndeg_twisted_mass_dirac+set}" = set; then :
-  enableval=$enable_ndeg_twisted_mass_dirac;  build_ndegtwm_dirac=${enableval}
+  enableval=$enable_ndeg_twisted_mass_dirac;  build_ndeg_twm_dirac=${enableval}
 else
-   build_ndegtwm_dirac="no"
+   build_ndeg_twm_dirac="no"
+
+fi
+
+
+# Check whether --enable-twisted-clover-dirac was given.
+if test "${enable_twisted_clover_dirac+set}" = set; then :
+  enableval=$enable_twisted_clover_dirac;  build_twc_dirac=${enableval}
+else
+   build_twc_dirac="no"
 
 fi
 
@@ -2089,6 +2185,15 @@ if test "${enable_gpu_direct+set}" = set; then :
   enableval=$enable_gpu_direct;  gpu_direct=${enableval}
 else
    gpu_direct="yes"
+
+fi
+
+
+# Check whether --enable-gpu-comms was given.
+if test "${enable_gpu_comms+set}" = set; then :
+  enableval=$enable_gpu_comms;  gpu_comms=${enableval}
+else
+   gpu_comms="no"
 
 fi
 
@@ -3577,6 +3682,13 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 esac
 
 
+# Check whether --enable-pthreads was given.
+if test "${enable_pthreads+set}" = set; then :
+  enableval=$enable_pthreads;  posix_threads="no"
+
+fi
+
+
 
 # Check whether --with-qmp was given.
 if test "${with_qmp+set}" = set; then :
@@ -3706,7 +3818,7 @@ fi
     as_fn_error $? "QDP++ configuration program qdp++-config not found." "$LINENO" 5
   fi
 
-        QDPXX_CXXFLAGS="`${QDPXX_CONFIG} --cxxflags`"
+        QDPXX_CXXFLAGS="`${QDPXX_CONFIG} --cxxflags | sed -e 's/-std=c++0x//g'`"
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: QDP++ compile flags: ${QDPXX_CXXFLAGS}" >&5
 $as_echo "$as_me: QDP++ compile flags: ${QDPXX_CXXFLAGS}" >&6;}
@@ -3790,6 +3902,48 @@ yes|no);;
   ;;
 esac
 
+case ${build_qdp_interface} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-qdp-interface : ${build_qdp_interface} " "$LINENO" 5
+  ;;
+esac
+
+case ${build_milc_interface} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-milc-interface : ${build_milc_interface} " "$LINENO" 5
+  ;;
+esac
+
+case ${build_cps_interface} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-cps-interface : ${build_cps_interface} " "$LINENO" 5
+  ;;
+esac
+
+case ${build_qdpjit_interface} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-qdpjit-interface : ${build_qdpjit_interface} " "$LINENO" 5
+  ;;
+esac
+
+case ${build_bqcd_interface} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-bqcd-interface : ${build_bqcd_interface} " "$LINENO" 5
+  ;;
+esac
+
+case ${build_tifr_interface} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-tifr-interface : ${build_tifr_interface} " "$LINENO" 5
+  ;;
+esac
+
 case ${build_wilson_dirac} in
 yes|no);;
 *)
@@ -3818,17 +3972,24 @@ yes|no);;
   ;;
 esac
 
-case ${build_ndegtwm_dirac} in
+case ${build_twm_dirac} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-twisted-mass-dirac " "$LINENO" 5
+  ;;
+esac
+
+case ${build_ndeg_twm_dirac} in
 yes|no);;
 *)
   as_fn_error $? " invalid value for --enable-ndeg-twisted-mass-dirac " "$LINENO" 5
   ;;
 esac
 
-case ${build_twm_dirac} in
+case ${build_twc_dirac} in
 yes|no);;
 *)
-  as_fn_error $? " invalid value for --enable-twisted-mass-dirac " "$LINENO" 5
+  as_fn_error $? " invalid value for --enable-twisted-clover-dirac " "$LINENO" 5
   ;;
 esac
 
@@ -3878,6 +4039,13 @@ case ${gpu_direct} in
 yes|no);;
 *)
   as_fn_error $? " invalid value for --gpu-direct " "$LINENO" 5
+  ;;
+esac
+
+case ${gpu_comms} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --gpu-comms " "$LINENO" 5
   ;;
 esac
 
@@ -4013,9 +4181,16 @@ BUILD_STAGGERED_DIRAC=${build_staggered_dirac}
 $as_echo "$as_me: Setting BUILD_TWISTED_MASS_DIRAC = ${build_twm_dirac} " >&6;}
 BUILD_TWISTED_MASS_DIRAC=${build_twm_dirac}
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_NDEG_TWISTED_MASS_DIRAC = ${build_ndegtwm_dirac} " >&5
-$as_echo "$as_me: Setting BUILD_NDEG_TWISTED_MASS_DIRAC = ${build_ndegtwm_dirac} " >&6;}
-BUILD_NDEG_TWISTED_MASS_DIRAC=${build_ndegtwm_dirac}
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_NDEG_TWISTED_MASS_DIRAC = ${build_ndeg_twm_dirac} " >&5
+$as_echo "$as_me: Setting BUILD_NDEG_TWISTED_MASS_DIRAC = ${build_ndeg_twm_dirac} " >&6;}
+BUILD_NDEG_TWISTED_MASS_DIRAC=${build_ndeg_twm_dirac}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_TWISTED_CLOVER_DIRAC = ${build_twc_dirac} " >&5
+$as_echo "$as_me: Setting BUILD_TWISTED_CLOVER_DIRAC = ${build_twc_dirac} " >&6;}
+BUILD_TWISTED_CLOVER_DIRAC=${build_twc_dirac}
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_FATLINK = ${build_staggered_fatlink}  " >&5
 $as_echo "$as_me: Setting BUILD_FATLINK = ${build_staggered_fatlink}  " >&6;}
@@ -4057,9 +4232,49 @@ $as_echo "$as_me: Setting BUILD_MPI = ${build_mpi} " >&6;}
 BUILD_MPI=${build_mpi}
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting POSIX_THREADS = ${posix_threads}" >&5
+$as_echo "$as_me: Setting POSIX_THREADS = ${posix_threads}" >&6;}
+POSIX_THREADS=${posix_threads}
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_DIRECT= ${gpu_direct}" >&5
 $as_echo "$as_me: Setting GPU_DIRECT= ${gpu_direct}" >&6;}
 GPU_DIRECT=${gpu_direct}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_COMMS= ${gpu_comms}" >&5
+$as_echo "$as_me: Setting GPU_COMMS= ${gpu_comms}" >&6;}
+GPU_COMMS=${gpu_comms}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}" >&5
+$as_echo "$as_me: Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}" >&6;}
+BUILD_QDP_INTERFACE=${build_qdp_interface}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MILC_INTERFACE= ${build_milc_interface}" >&5
+$as_echo "$as_me: Setting BUILD_MILC_INTERFACE= ${build_milc_interface}" >&6;}
+BUILD_MILC_INTERFACE=${build_milc_interface}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CPS_INTERFACE= ${build_cps_interface}" >&5
+$as_echo "$as_me: Setting BUILD_CPS_INTERFACE= ${build_cps_interface}" >&6;}
+BUILD_CPS_INTERFACE=${build_cps_interface}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QDPJIT_INTERFACE= ${build_qdpjit_interface}" >&5
+$as_echo "$as_me: Setting BUILD_QDPJIT_INTERFACE= ${build_qdpjit_interface}" >&6;}
+BUILD_QDPJIT_INTERFACE=${build_qdpjit_interface}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_BQCD_INTERFACE= ${build_bqcd_interface}" >&5
+$as_echo "$as_me: Setting BUILD_BQCD_INTERFACE= ${build_bqcd_interface}" >&6;}
+BUILD_BQCD_INTERFACE=${build_bqcd_interface}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}" >&5
+$as_echo "$as_me: Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}" >&6;}
+BUILD_TIFR_INTERFACE=${build_tifr_interface}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting DEVICE_PACK= ${device_pack}" >&5

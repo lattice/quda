@@ -46,7 +46,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     FullClover cs(clover);
     asymCloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim, profile);
@@ -148,7 +148,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     FullClover cs(clover, true);
     cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, 0, 0.0, commDim, profile);
@@ -165,7 +165,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     FullClover cs(clover, true);
     cloverDslashCuda(&out, gauge, cs, &in, parity, dagger, &x, k, commDim, profile);

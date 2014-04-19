@@ -75,7 +75,8 @@ void initFields(int prec)
   ColorSpinorParam param;
   param.nColor = 3;
   // set spin according to the type of dslash
-  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH) ? 1 : 4;
+  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || 
+	   dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
   param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
 
@@ -349,7 +350,7 @@ double benchmark(int kernel, const int niter) {
 
 double test(int kernel) {
 
-  double a = 1.5, b = 2.5, c = 3.5;
+  double a = M_PI, b = M_PI*exp(1.0), c = sqrt(M_PI);
   quda::Complex a2(a, b), b2(b, -c), c2(a+b, c*a);
   double error = 0;
 
@@ -689,7 +690,8 @@ int main(int argc, char** argv)
 #endif
 
   // enable the tuning
-  quda::setBlasTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO, QUDA_SILENT);
+  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
+  setVerbosity(QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
 
@@ -724,12 +726,29 @@ int main(int argc, char** argv)
   for (int prec = 0; prec < Nprec; prec++) {
     printfQuda("\nTesting %s precision...\n\n", prec_str[prec]);
     initFields(prec);
-    
+
+    double tol;
+    switch(prec) {
+    case 0: // half precision
+      tol = 1e-3;
+      break;
+    case 1:
+      tol = 1e-5;
+      break;
+    case 2:
+      tol = 1e-12;
+      break;
+    default:
+      errorQuda("Unsupported precision");
+    }
+
     for (int kernel = 0; kernel < Nkernels; kernel++) {
       // only benchmark "high precision" copyCuda() if double is supported
       if ((Nprec < 3) && (kernel == 0)) continue;
+      double tol_kernel = (kernel < 2) ? 1e-4 : tol; // use different tolerance for mixed-precision copy 
       double error = test(kernel);
-      printfQuda("%-35s error = %e, \n", names[kernel], error);
+      const char *result = error < tol_kernel ? "PASS" : "FAIL";
+      printfQuda("%-35s error = %e, %s\n", names[kernel], error, result);
     }
     freeFields();
   }

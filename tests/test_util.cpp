@@ -45,7 +45,6 @@ int mySpinorSiteSize;
 
 extern float fat_link_max;
 
-
 void initComms(int argc, char **argv, const int *commDims)
 {
 #if defined(QMP_COMMS)
@@ -81,7 +80,6 @@ void initRand()
 
   srand(17*rank + 137);
 }
-
 
 void setDims(int *X) {
   V = 1;
@@ -395,7 +393,16 @@ int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision prec
   else return compareFloats((float*)a, (float*)b, len, epsilon);
 }
 
+int fullLatticeIndex(int dim[4], int index, int oddBit){
 
+  int za = index/(dim[0]>>1);
+  int zb = za/dim[1];
+  int x2 = za - zb*dim[1];
+  int x4 = zb/dim[2];
+  int x3 = zb - x4*dim[2];
+  
+  return  2*index + ((x2 + x3 + x4 + oddBit) & 1);
+}
 
 // given a "half index" i into either an even or odd half lattice (corresponding
 // to oddBit = {0, 1}), returns the corresponding full lattice index.
@@ -451,6 +458,23 @@ int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
   x1 = (x1+dx1+Z[0]) % Z[0];
   
   return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+}
+
+
+int neighborIndex(int dim[4], int index, int oddBit, int dx[4]){
+
+  const int fullIndex = fullLatticeIndex(dim, index, oddBit);
+
+  int x[4];
+  x[3] = fullIndex/(dim[2]*dim[1]*dim[0]);
+  x[2] = (fullIndex/(dim[1]*dim[0])) % dim[2];
+  x[1] = (fullIndex/dim[0]) % dim[1];
+  x[0] = fullIndex % dim[0];
+
+  for(int dir=0; dir<4; ++dir)
+    x[dir] = (x[dir]+dx[dir]+dim[dir]) % dim[dir];
+
+  return (((x[3]*dim[2] + x[2])*dim[1] + x[1])*dim[0] + x[0])/2;
 }
 
 int
@@ -511,6 +535,30 @@ neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
     
   return ret;
 }
+
+int
+neighborIndexFullLattice(int dim[4], int index, int dx[4])
+{
+  const int volume = dim[0]*dim[1]*dim[2]*dim[3];
+  const int halfVolume = volume/2;
+  int oddBit = 0;
+  int halfIndex = index;
+
+  if(index >= halfVolume){
+    oddBit = 1;
+    halfIndex = index - halfVolume;
+  }
+
+  int neighborHalfIndex = neighborIndex(dim, halfIndex, oddBit, dx);
+
+  int oddBitChanged = (dx[0]+dx[1]+dx[2]+dx[3])%2;
+  if(oddBitChanged){
+    oddBit = 1 - oddBit;
+  }
+
+  return neighborHalfIndex + oddBit*halfVolume;
+}
+
 
 
 int
@@ -958,8 +1006,9 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 }
 
 void
-construct_fat_long_gauge_field(void **fatlink, void** longlink,  
-			       int type, QudaPrecision precision, QudaGaugeParam* param)
+construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
+			       QudaPrecision precision, QudaGaugeParam* param,
+			       QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -982,6 +1031,47 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink,
       constructGaugeField((float**)longlink, param);
     }
   }
+
+  if(param->reconstruct == QUDA_RECONSTRUCT_9 || 
+     param->reconstruct == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
+    const double cos_pi_3 = 0.5; // Cos(pi/3)
+    const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+        for(int j=0; j<gaugeSiteSize; j+=2){
+          if(precision == QUDA_DOUBLE_PRECISION){
+            const double real = ((double*)longlink[dir])[i*gaugeSiteSize + j];
+            const double imag = ((double*)longlink[dir])[i*gaugeSiteSize + j + 1];
+            ((double*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
+            ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+          }else{
+            const float real = ((float*)longlink[dir])[i*gaugeSiteSize + j];
+            const float imag = ((float*)longlink[dir])[i*gaugeSiteSize + j + 1];
+            ((float*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
+            ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+          }
+        } 
+      }
+    }
+  }
+
+  if (dslash_type == QUDA_STAGGERED_DSLASH) { // set all links to zero to emulate the 1-link operator
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+	for(int j=0; j<gaugeSiteSize; j+=2){
+	  if(precision == QUDA_DOUBLE_PRECISION){
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }else{
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }
+	} 
+      }
+    }
+  }
+
+
 }
 
 
@@ -1047,7 +1137,7 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%e, %e, %e, %e)\n", pow(10.0,-(f+1)), 
+    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0,-(f+1)), 
 	   fail[0][f], fail[1][f], fail[2][f], fail[3][f],
 	   fail[0][f]/(double)(V*18), fail[1][f]/(double)(V*18), fail[2][f]/(double)(V*18), fail[3][f]/(double)(V*18));
   }
@@ -1361,7 +1451,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   for (int i=0; i<momSiteSize; i++) iter[i] = 0;
   
   for (int i=0; i<len; i++) {
-    for (int j=0; j<momSiteSize; j++) {
+    for (int j=0; j<momSiteSize-1; j++) {
       int is = i*momSiteSize+j;
       double diff = fabs(momA[is]-momB[is]);
       for (int f=0; f<fail_check; f++)
@@ -1381,7 +1471,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   for (int i=0; i<momSiteSize; i++) printfQuda("%d fails = %d\n", i, iter[i]);
   
   for (int f=0; f<fail_check; f++) {
-    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*momSiteSize, fail[f] / (double)(len*6));
+    printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*9, fail[f]/(double)(len*9));
   }
   
   return accuracy_level;
@@ -1447,7 +1537,7 @@ int device = -1;
 int device = 0;
 #endif
 
-QudaReconstructType link_recon = QUDA_RECONSTRUCT_12;
+QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
@@ -1463,6 +1553,8 @@ char latfile[256] = "";
 bool tune = true;
 int niter = 10;
 int test_type = 0;
+QudaInverterType inv_type;
+int multishift = 0;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1470,7 +1562,6 @@ int dimPartitioned(int dim)
 {
   return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]);
 }
-
 
 void __attribute__((weak)) usage_extra(char** argv){};
 
@@ -1483,8 +1574,8 @@ void usage(char** argv )
 #endif
   printf("    --prec <double/single/half>               # Precision in GPU\n"); 
   printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
-  printf("    --recon <8/12/18>                         # Link reconstruction type\n"); 
-  printf("    --recon_sloppy <8/12/18>                  # Sloppy link reconstruction type\n"); 
+  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n"); 
+  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n"); 
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
   printf("    --sdim <n>                                # Set space dimention(X/Y/Z) size\n"); 
   printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     
@@ -1499,10 +1590,12 @@ void usage(char** argv )
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                wilson/clover/twisted_mass/asqtad/\n"
-   "                                                domain_wall/domain_wall_4dpc/mobius_Dwf\n");
+	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
+         "                                                  /asqtad/domain_wall/domain_wall_4dpc/mobius_Dwf\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
+  printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
+  printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --help                                    # Print out this message\n"); 
@@ -1723,6 +1816,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--multishift") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      multishift = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      multishift = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid multishift boolean\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--xgridsize") == 0){
     if (i+1 >= argc){ 
       usage(argv);
@@ -1784,6 +1896,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }     
     dslash_type =  get_dslash_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--inv_type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    inv_type =  get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

@@ -22,10 +22,13 @@ module quda_fortran
   ! This corresponds to the QudaGaugeParam struct in quda.h
   type quda_gauge_param
 
+     QudaFieldLocation :: location !The location of the gauge field
+
      integer(4), dimension(4) :: x
 
      real(8) :: anisotropy    !Used for Wilson and Wilson-clover
      real(8) :: tadpole_coeff !Used for staggered only
+     real(8) :: scale         !Used by staggered long links
 
      QudaLinkType :: link_type
      QudaGaugeFieldOrder :: gauge_order
@@ -50,6 +53,16 @@ module quda_fortran
 
      integer(4) :: preserve_gauge ! Used by link fattening
     
+     ! Set the staggered phase type of the links
+     QudaStaggeredPhase :: staggered_phase_type; 
+     ! Whether the staggered phase has already been applied to the links
+     integer(4) :: staggered_phase_applied 
+
+     integer(4) :: use_resident_gauge  ! Use the resident gauge field 
+     integer(4) :: use_resident_mom    ! Use the resident mom field
+     integer(4) :: make_resident_gauge ! Make the gauge field resident
+     integer(4) :: make_resident_mom   ! Make the mom field resident
+
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
@@ -77,7 +90,9 @@ module quda_fortran
      real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance 
+     integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
      
+     integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver 
      
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver 
@@ -97,7 +112,8 @@ module quda_fortran
      QudaMatPCType :: matpc_type
      QudaDagType :: dagger
      QudaMassNormalization :: mass_normalization
-     
+
+     QudaSolverNormalization :: solver_normalization
      QudaPreserveSource :: preserve_source
      
      QudaPrecision :: cpu_prec
@@ -110,6 +126,7 @@ module quda_fortran
      ! Gamma basis of the input and output host fields 
      QudaGammaBasis :: gamma_basis
      
+     QudaFieldLocation :: clover_location            ! The location of the clover field
      QudaPrecision :: clover_cpu_prec
      QudaPrecision :: clover_cuda_prec
      QudaPrecision :: clover_cuda_prec_sloppy
@@ -117,7 +134,11 @@ module quda_fortran
      
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
-     
+    
+     real(8) :: clover_coeff ! Coefficient of the clover term 
+     integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
+     real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately) 
+
      QudaVerbosity :: verbosity    
      
      integer(4) :: sp_pad
@@ -140,7 +161,11 @@ module quda_fortran
      ! The inner Krylov solver used in the preconditioner.  Set to
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
-     
+    
+
+     ! Dslash used in the inner Krylov solver
+     QudaDslashType :: dslash_type_precondition
+ 
      ! Verbosity of the inner Krylov solver 
      QudaVerbosity :: verbosity_precondition
      

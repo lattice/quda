@@ -22,6 +22,14 @@
       errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
   }
 
+#define checkLength(a, b)						\
+  {									\
+    if (a.Length() != b.Length())					\
+      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+    if (a.Stride() != b.Stride())					\
+      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
+  }
+
 namespace quda {
 
 #include <texture.h>
@@ -31,9 +39,6 @@ namespace quda {
 
   void zeroCuda(cudaColorSpinorField &a) { a.zero(); }
 
-  // blasTuning = 1 turns off error checking
-  static QudaTune blasTuning = QUDA_TUNE_NO;
-  static QudaVerbosity verbosity = QUDA_SILENT;
   static cudaStream_t *blasStream;
 
   static struct {
@@ -55,17 +60,10 @@ namespace quda {
     endReduce();
   }
     
-  void setBlasTuning(QudaTune tune, QudaVerbosity verbose)
-  {
-    blasTuning = tune;
-    verbosity = verbose;
-  }
-
-  QudaTune getBlasTuning() { return blasTuning; }
-  QudaVerbosity getBlasVerbosity() { return verbosity; }
   cudaStream_t* getBlasStream() { return blasStream; }
 
 #include <blas_core.h>
+#include <blas_mixed_core.h>
 
   /**
      Functor to perform the operation y = a*x + b*y
@@ -114,8 +112,14 @@ namespace quda {
   };
 
   void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    blasCuda<axpy,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
-			   x, y, x, x);
+    if (x.Precision() != y.Precision()) {
+      // call hacked mixed precision kernel
+      mixed::blasCuda<axpy,0,1,0,0>(make_double2(a,0.0), make_double2(1.0,0.0), make_double2(0.0,0.0),
+				    x, y, x, x);
+    } else {
+      blasCuda<axpy,0,1,0,0>(make_double2(a, 0.0), make_double2(1.0, 0.0), make_double2(0.0, 0.0), 
+			     x, y, x, x);
+    }
   }
 
   /**
@@ -193,13 +197,15 @@ namespace quda {
   struct caxpy {
     const Float2 a;
     caxpy(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-    __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) { caxpy_(a, x, y); }
+    __device__ void operator()(const FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
+    { caxpy_(a, x, y); }
     static int streams() { return 3; } //! total number of input and output streams
     static int flops() { return 4; } //! flops per element
   };
 
   void caxpyCuda(const Complex &a, cudaColorSpinorField &x, cudaColorSpinorField &y) {
-    blasCuda<caxpy,0,1,0,0>(make_double2(real(a),imag(a)), make_double2(0.0, 0.0), 
+    blasCuda<caxpy,0,1,0,0>(make_double2(REAL(a), IMAG(a)), 
+			    make_double2(0.0, 0.0), 
 			    make_double2(0.0, 0.0), x, y, x, x);
   }
 
@@ -238,7 +244,7 @@ namespace quda {
   };
 
   void caxpbyCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, cudaColorSpinorField &y) {
-    blasCuda<caxpby,0,1,0,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<caxpby,0,1,0,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)), 
 			     make_double2(0.0, 0.0), x, y, x, x);
   }
 
@@ -282,7 +288,7 @@ namespace quda {
 
   void cxpaypbzCuda(cudaColorSpinorField &x, const Complex &a, cudaColorSpinorField &y, 
 		    const Complex &b, cudaColorSpinorField &z) {
-    blasCuda<cxpaypbz,0,0,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<cxpaypbz,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b), IMAG(b)), 
 			       make_double2(0.0, 0.0), x, y, z, z);
   }
 
@@ -303,8 +309,15 @@ namespace quda {
 
   void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, 
 		     cudaColorSpinorField& z, const double &c) {
-    blasCuda<axpyBzpcx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0), 
-				x, y, z, x);
+    if (x.Precision() != y.Precision()) {
+      // call hacked mixed precision kernel
+      mixed::blasCuda<axpyBzpcx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+					 make_double2(c,0.0),	x, y, z, x);
+    } else {
+      // swap arguments around 
+      blasCuda<axpyBzpcx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+				  make_double2(c,0.0), x, y, z, x);
+    }
   }
 
   /**
@@ -323,9 +336,15 @@ namespace quda {
 
   void axpyZpbxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y,
 		    cudaColorSpinorField& z, const double &b) {
-    // swap arguments around 
-    blasCuda<axpyZpbx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
-			       x, y, z, x);
+    if (x.Precision() != y.Precision()) {
+      // call hacked mixed precision kernel
+      mixed::blasCuda<axpyZpbx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+									x, y, z, x);
+    } else {
+      // swap arguments around 
+      blasCuda<axpyZpbx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
+				 x, y, z, x);
+    }
   }
 
   /**
@@ -345,7 +364,7 @@ namespace quda {
 
   void caxpbypzYmbwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 			cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w) {
-    blasCuda<caxpbypzYmbw,0,1,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(), b.imag()), 
+    blasCuda<caxpbypzYmbw,0,1,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
 				   make_double2(0.0,0.0), x, y, z, w);
   }
 
@@ -366,7 +385,7 @@ namespace quda {
   void cabxpyAxCuda(const double &a, const Complex &b, 
 		    cudaColorSpinorField &x, cudaColorSpinorField &y) {
     // swap arguments around 
-    blasCuda<cabxpyAx,1,1,0,0>(make_double2(a,0.0), make_double2(b.real(),b.imag()), 
+    blasCuda<cabxpyAx,1,1,0,0>(make_double2(a,0.0), make_double2(REAL(b),IMAG(b)), 
 			       make_double2(0.0,0.0), x, y, x, x);
   }
 
@@ -386,7 +405,7 @@ namespace quda {
 
   void caxpbypzCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 		    cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    blasCuda<caxpbypz,0,0,1,0>(make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
+    blasCuda<caxpbypz,0,0,1,0>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
 			       make_double2(0.0,0.0), x, y, z, z);
   }
 
@@ -409,8 +428,8 @@ namespace quda {
   void caxpbypczpwCuda(const Complex &a, cudaColorSpinorField &x, const Complex &b, 
 		       cudaColorSpinorField &y, const Complex &c, cudaColorSpinorField &z, 
 		       cudaColorSpinorField &w) {
-    blasCuda<caxpbypczpw,0,0,0,1>(make_double2(a.real(),a.imag()), make_double2(b.real(),b.imag()), 
-				  make_double2(c.real(), c.imag()), x, y, z, w);
+    blasCuda<caxpbypczpw,0,0,0,1>(make_double2(REAL(a),IMAG(a)), make_double2(REAL(b),IMAG(b)), 
+				  make_double2(REAL(c),IMAG(c)), x, y, z, w);
   }
 
   /**
@@ -431,7 +450,7 @@ namespace quda {
 
   void caxpyXmazCuda(const Complex &a, cudaColorSpinorField &x, 
 		     cudaColorSpinorField &y, cudaColorSpinorField &z) {
-    blasCuda<caxpyxmaz,1,1,0,0>(make_double2(a.real(), a.imag()), make_double2(0.0, 0.0), 
+    blasCuda<caxpyxmaz,1,1,0,0>(make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), 
 				make_double2(0.0, 0.0), x, y, z, x);
   }
 
@@ -441,21 +460,32 @@ namespace quda {
      First performs the operation y[i] = y[i] - a*x[i] 
      Second performs the operatio z[i] = z[i] + a*w[i]
      Third performs the operation w[i] = y[i] + b*w[i]
+
+     First performs the operatio y[i] = y[i] + a*w[i]
+     Second performs the operation z[i] = z[i] - a*x[i] 
+     Third performs the operation w[i] = z[i] + b*w[i]
   */
   template <typename Float2, typename FloatN>
   struct tripleCGUpdate {
     Float2 a, b;
     tripleCGUpdate(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
     __device__ void operator()(const FloatN &x, FloatN &y, FloatN &z, FloatN &w) 
-    { y -= a.x*x; z += a.x*w; w = y + b.x*w; }
+    //{ y -= a.x*x; z += a.x*w; w = y + b.x*w; }
+    { y += a.x*w; z -= a.x*x; w = z + b.x*w; }
     static int streams() { return 7; } //! total number of input and output streams
     static int flops() { return 6; } //! flops per element
   };
 
   void tripleCGUpdateCuda(const double &a, const double &b, cudaColorSpinorField &x, 
 		      cudaColorSpinorField &y, cudaColorSpinorField &z, cudaColorSpinorField &w) {
-    blasCuda<tripleCGUpdate,0,1,1,1>(make_double2(a, 0.0), make_double2(b, 0.0), 
-				     make_double2(0.0, 0.0), x, y, z, w);
+    if (x.Precision() != y.Precision()) {
+      // call hacked mixed precision kernel
+      mixed::blasCuda<tripleCGUpdate,0,1,1,1>(make_double2(a,0.0), make_double2(b,0.0), 
+					      make_double2(0.0,0.0), x, y, z, w);
+    } else {
+      blasCuda<tripleCGUpdate,0,1,1,1>(make_double2(a, 0.0), make_double2(b, 0.0), 
+				       make_double2(0.0, 0.0), x, y, z, w);
+    }
   }
 
 } // namespace quda

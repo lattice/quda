@@ -11,7 +11,6 @@ namespace quda {
   void initBlas(); 
   void endBlas(void);
 
-  void setBlasTuning(QudaTune tune, QudaVerbosity verbose);
   void setBlasParam(int kernel, int prec, int threads, int blocks);
 
   extern unsigned long long blas_flops;
@@ -32,6 +31,9 @@ namespace quda {
   double normCuda(const cudaColorSpinorField &b);
   double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
+
+  double2 reDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
+
 
   void axpbyCuda(const double &a, cudaColorSpinorField &x, const double &b, cudaColorSpinorField &y);
   void axpyCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);

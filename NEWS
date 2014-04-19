@@ -1,5 +1,68 @@
 
-Version 0.5.0 - 3 December 2012
+Version 0.6.0 - 23rd January 2014
+
+- Support for reconstruct 9/13 for the long link in HISQ fermions.
+  This provides up to a 25% speedup over using no reconstruction.
+  Owing to architecture constraints, reconstruct 9/13 is not supported
+  on "Tesla" architectures, and is only supported on superceding
+  architectures (Fermi, Kepler, etc.).
+
+- Implemented the long link calculation for HISQ and asqtad fermions.
+  This has the net result of speeding up the gauge fattening by
+  about a factor 1.6x.
+
+- Implemented a gauge field update routine that evolves the gauge
+  field by a given step size using a momentum field.  This is exposed
+  as the function updateGaugeFieldQuda(...).
+
+- Added support for qdpjit field ordering.  When used in conjuction
+  with the device interface, this allows Chroma (when compiled using
+  qdpjit) to avoid all CPU <-> GPU transfers.
+
+- Completely rewritten gauge and clover field copying routines using a
+  generic template-driven approach.  Due the large number of possible
+  input / output combinations to keep the compilation time under
+  control, the different interfaces need to be opted in at configure
+  time (MILC and QDP interfaces are enabled by default).
+
+- The QUDA interface (loadGaugeQuda, loadCloverQuda, invertQuda and
+  invertMultishiftQuda) now supports device-side pointers as well as
+  host-size pointers.  The location of a given pointer is set by the
+  QudaFieldLocation members of QudaGaugeParam (location) and
+  QudaInvertParam (input_location, output_location, clover_location).
+
+- Added new interface support for QDPJIT ordered fields (dirac, clover
+  and gauge fields).
+
+- When doing mixed-precision solvers, all low-precision copies of
+  gauge and clover fields are created from the pre-existing GPU copies
+  instead of re-copying from the CPU.  This lowers the PCIe overhead
+  by up to 1.75x.
+
+- Significantly improved performance of both degenerate and
+  non-degenerate twisted-mass CG solver (up to 17% and 32%, respectively).
+
+- ColorSpinorField is now derived from LatticeField, with all
+  LatticeField derivations now using common page-locked and device memory
+  buffers.  This has the effect of reducing the overall packed-locked
+  memory footprint.
+
+- The source vector is now scaled such that it is equal to unity.
+  This prevents underflow from occuring when the source vector is too
+  small.
+
+- Fixed double precision definition of *= vector operator, which caused a
+  truncation to single precision for certain solver types.
+
+- Fixed memory overalloction when doing clover fermions in half precision.
+
+- Memory leak fix to clover fermions.
+
+- Added work around to allow QUDA to compile with GCC 4.7.x.
+
+- Many small fixes and overall code cleanup.
+
+Version 0.5.0 - 20 March 2013
 
 - Added full support for CUDA 5.0, including the Tesla K20 and other
   GK110 ("Kepler 2") GPUs.  QUDA has yet to be fully optimized for
@@ -20,6 +83,19 @@ Version 0.5.0 - 3 December 2012
   multiple GPUs.  This currently requires a specific branch of BQCD
   (https://github.com/lattice/bqcd-r399-quda).
 
+- Added a new interface function, initCommsGridQuda(), for declaring
+  the mapping of MPI ranks (or QMP node IDs) to the logical grid used
+  for communication.  This finally completes the MPI interface, which
+  previously relied on an undocumented function internal to QUDA.
+
+- Added a new interface function, setVerbosityQuda(), to allow for
+  finer-grained control of status reporting.  See the description in
+  include/quda.h for details.
+
+- Merged wilson_dslash_test and domain_wall_dslash_test together into
+  a unified dslash_test, and likewise for invert_test.  The staggered
+  tests are still separate for now.
+
 - Moved all internal symbols behind a namespace, "quda", for better
   insulation from external applications and libraries.
 
@@ -28,40 +104,38 @@ Version 0.5.0 - 3 December 2012
   mixed precision and implements per-shift refinement after the
   multi-shift solver completes to ensure accuracy of the final result.
   The old invertMultiShiftQudaMixed() interface function has been
-  removed.
+  removed.  In addition, the multi-shift solver now supports setting
+  the convergence tolerance on a per-pole basis via the tol_offset[]
+  member of QudaInvertParam.
 
 - Improved the stability and accuracy of mixed-precision CG.  As a
-  result, mixed double/single CG has a virtually identical iteration
+  result, mixed double/single CG yields a virtually identical iteration
   count to pure double CG, and using half precision is now a win.
 
-- Added experimental support for the Fermilab heavy-quark residual as
-  a stopping condition in BiCGstab and CG.  To minimize the impact on
+- Added support for the Fermilab heavy-quark residual as a stopping
+  condition in BiCGstab, CG, and GCR.  To minimize the impact on
   performance, the heavy-quark residual is only measured every 10
-  iterations.  This stopping condition has also been incorporated into
-  the sequential CG refinement stage of the multi-shift solver for
-  staggered fermions (and will be enabled for Wilson fermions in a
-  future release).  Owing to hardware-limitations of the Tesla-class
-  architecture (e.g., GT200), the heavy-quark reisudal is not
-  supported for sm_1x targets.  Attempting to do so will result in a
-  runtime error.
+  iterations (for BiCGstab and CG) or only when the solution is computed
+  (for GCR).  This stopping condition has also been incorporated into the
+  sequential CG refinement stage of the multi-shift solver.  The
+  tolerance for the heavy-quark residual is set via the "tol_hq"
+  member of QudaInvertParam (and "tol_hq_offset" for the
+  multi-shift solver).  The "residual_type" member selects the
+  desired stopping condition(s): L2 relative residual, Fermilab
+  heavy-quark residual, or both.  Note that the heavy-quark residual
+  is not supported on cards with compute capability 1.1, 1.2, or 1.3
+  (i.e., those predating the "Fermi" architecture) due to hardware
+  limitations.
 
 - The value of the true residual(s) are now returned in the true_res
   and (for multi-shift) true_res_offset members of the QudaInvertParam
   struct.  When using heavy quark residual stopping condition, the
   true_res_hq and true_res_hq_offset members are additionally filled
-  with the heavy-quark residual value.
+  with the heavy-quark residual value(s).
 
 - The BiCGstab solver now supports an initial-guess strategy.  This is
   presently only supported when employing a one-pass solve and does
   not yet work for a two-pass solve (e.g., of the normal equations).
-
-- Added a new interface function, setVerbosityQuda(), to allow for
-  finer-grained control of status reporting.  See the description in
-  include/quda.h for usage information.
-
-- Merged wilson_dslash_test and domain_wall_dslash_test together into
-  a unified dslash_test, and likewise for invert_test.  The staggered
-  tests are still separate for now.
 
 - Enabled by default double-precision textures since the Fermi double
   precision instability has been fixed in the driver accompanying the

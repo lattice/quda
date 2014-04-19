@@ -52,6 +52,42 @@ AC_ARG_ENABLE(verbose-build,
    [ quda_verbose_build="no" ]
 )
 
+AC_ARG_ENABLE(qdp-interface,
+  AC_HELP_STRING([--enable-qdp-interface], [ Build the QDP interface (default: enabled)]),
+  [ build_qdp_interface=${enableval} ], 
+  [ build_qdp_interface="yes" ]
+)
+
+AC_ARG_ENABLE(milc-interface,
+  AC_HELP_STRING([--enable-milc-interface], [ Build the MILC interface (default: enabled)]),
+  [ build_milc_interface=${enableval} ], 
+  [ build_milc_interface="yes" ]
+)
+
+AC_ARG_ENABLE(cps-interface,
+  AC_HELP_STRING([--enable-cps-interface], [ Build the CPS interface (default: disabled)]),
+  [ build_cps_interface=${enableval} ], 
+  [ build_cps_interface="no" ]
+)
+
+AC_ARG_ENABLE(qdpjit-interface,
+  AC_HELP_STRING([--enable-qdpjit-interface], [ Build the QDPJIT interface (default: disabled)]),
+  [ build_qdpjit_interface=${enableval} ], 
+  [ build_qdpjit_interface="no" ]
+)
+
+AC_ARG_ENABLE(bqcd-interface,
+  AC_HELP_STRING([--enable-bqcd-interface], [ Build the BQCD interface (default: disabled)]),
+  [ build_bqcd_interface=${enableval} ], 
+  [ build_bqcd_interface="no" ]
+)
+
+AC_ARG_ENABLE(tifr-interface,
+  AC_HELP_STRING([--enable-tifr-interface], [ Build the TIFR interface (default: disabled)]),
+  [ build_tifr_interface=${enableval} ], 
+  [ build_tifr_interface="no" ]
+)
+
 AC_ARG_ENABLE(wilson-dirac,
   AC_HELP_STRING([--enable-wilson-dirac], [ Build Wilson Dirac operator (default: enabled)]),
   [ build_wilson_dirac=${enableval} ], 
@@ -80,6 +116,18 @@ AC_ARG_ENABLE(twisted-mass-dirac,
   AC_HELP_STRING([--enable-twisted-mass-dirac], [ Build twisted mass Dirac operator (default: enabled)]),
   [ build_twm_dirac=${enableval} ], 
   [ build_twm_dirac="yes" ]
+)
+
+AC_ARG_ENABLE(ndeg-twisted-mass-dirac,
+  AC_HELP_STRING([--enable-ndeg-twisted-mass-dirac], [ Build non-degenerate twisted mass Dirac operator (default: disabled)]),
+  [ build_ndeg_twm_dirac=${enableval} ], 
+  [ build_ndeg_twm_dirac="no" ]
+)
+
+AC_ARG_ENABLE(twisted-clover-dirac,
+  AC_HELP_STRING([--enable-twisted-clover-dirac], [ Build twisted mass clover Dirac operator (default: disabled)]),
+  [ build_twc_dirac=${enableval} ], 
+  [ build_twc_dirac="no" ]
 )
 
 AC_ARG_ENABLE(staggered-fatlink,
@@ -128,6 +176,13 @@ AC_ARG_ENABLE(gpu-direct,
   [ gpu_direct="yes" ]
 )
 
+dnl enable direct cuda-nic communication
+AC_ARG_ENABLE(gpu-comms,
+  AC_HELP_STRING([--enable-gpu-comms], [ Enable direct CUDA-NIC communication (experimental, default: disabled)]),
+  [ gpu_comms=${enableval}],
+  [ gpu_comms="no" ]
+)
+
 dnl enable packing and unpacking on the device
 AC_ARG_ENABLE(device-pack,
   AC_HELP_STRING([--enable-device-pack], [ Enable the packing / unpacking of fields on the device (default: disabled)]),
@@ -146,6 +201,12 @@ AS_CASE([$build_mpi],
 	[yes], [AC_PROG_CC($mpi_home/bin/mpicc mpicc) AC_PROG_CXX($mpi_home/bin/mpicxx mpicxx CC)],
 	[no], [AC_PROG_CC(gcc cc) AC_PROG_CXX(g++ CC cxx)])
 
+
+AC_ARG_ENABLE(pthreads,
+  AC_HELP_STRING([--enable-pthreads], [ Enable pthreads in the multi-GPU dslash build (default: disabled)])
+  [ posix_threads=${enableval}],
+  [ posix_threads="no" ]
+)
 
 AC_ARG_WITH(qmp,
  AC_HELP_STRING([--with-qmp=QMPDIR], [ Specify QMP installation directory]),
@@ -185,7 +246,7 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
   dnl AC_MSG_NOTICE([Found QDP++ configuration program ${QDPXX_CONFIG}])
   dnl AC_SUBST(CXX, "`${QDPXX_CONFIG} --cxx`")
   dnl AC_MSG_NOTICE([QDP++ compiler: ${CXX}])
-  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags`")
+  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags | sed -e 's/-std=c++0x//g'`")
   AC_MSG_NOTICE([QDP++ compile flags: ${QDPXX_CXXFLAGS}])
   AC_SUBST(QDPXX_LDFLAGS,  "`${QDPXX_CONFIG} --ldflags`")
   AC_MSG_NOTICE([QDP++ linking flags: ${QDPXX_LDFLAGS}])
@@ -261,6 +322,54 @@ yes|no);;
   ;;
 esac
 
+dnl Build QDP interface
+case ${build_qdp_interface} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-qdp-interface : ${build_qdp_interface} ])
+  ;;
+esac
+
+dnl Build MILC interface
+case ${build_milc_interface} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-milc-interface : ${build_milc_interface} ])
+  ;;
+esac
+
+dnl Build CPS interface
+case ${build_cps_interface} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-cps-interface : ${build_cps_interface} ])
+  ;;
+esac
+
+dnl Build QDPJIT interface
+case ${build_qdpjit_interface} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-qdpjit-interface : ${build_qdpjit_interface} ])
+  ;;
+esac
+
+dnl Build BQCD interface
+case ${build_bqcd_interface} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-bqcd-interface : ${build_bqcd_interface} ])
+  ;;
+esac
+
+dnl Build TIFR interface
+case ${build_tifr_interface} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-tifr-interface : ${build_tifr_interface} ])
+  ;;
+esac
+
 dnl Build Wilson Dirac
 case ${build_wilson_dirac} in
 yes|no);;
@@ -298,6 +407,22 @@ case ${build_twm_dirac} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-twisted-mass-dirac ])
+  ;;
+esac
+
+dnl Build Non-degenerate Twisted Mass Dirac
+case ${build_ndeg_twm_dirac} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-ndeg-twisted-mass-dirac ])
+  ;;
+esac
+
+dnl Build Twisted Mass Clover Dirac
+case ${build_twc_dirac} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-twisted-clover-dirac ])
   ;;
 esac
 
@@ -354,6 +479,14 @@ case ${gpu_direct} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --gpu-direct ])
+  ;;
+esac
+
+dnl Enables direct CUDA-NIC communication
+case ${gpu_comms} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --gpu-comms ])
   ;;
 esac
 
@@ -473,6 +606,12 @@ AC_SUBST( BUILD_STAGGERED_DIRAC, [${build_staggered_dirac}])
 AC_MSG_NOTICE([Setting BUILD_TWISTED_MASS_DIRAC = ${build_twm_dirac} ])
 AC_SUBST( BUILD_TWISTED_MASS_DIRAC, [${build_twm_dirac}])
 
+AC_MSG_NOTICE([Setting BUILD_NDEG_TWISTED_MASS_DIRAC = ${build_ndeg_twm_dirac} ])
+AC_SUBST( BUILD_NDEG_TWISTED_MASS_DIRAC, [${build_ndeg_twm_dirac}])
+
+AC_MSG_NOTICE([Setting BUILD_TWISTED_CLOVER_DIRAC = ${build_twc_dirac} ])
+AC_SUBST( BUILD_TWISTED_CLOVER_DIRAC, [${build_twc_dirac}])
+
 AC_MSG_NOTICE([Setting BUILD_FATLINK = ${build_staggered_fatlink} ] )
 AC_SUBST( BUILD_FATLINK, [${build_staggered_fatlink}])
 
@@ -497,8 +636,32 @@ AC_SUBST( BUILD_QMP, [${build_qmp}])
 AC_MSG_NOTICE([Setting BUILD_MPI = ${build_mpi} ])
 AC_SUBST( BUILD_MPI, [${build_mpi}])
 
+AC_MSG_NOTICE([Setting POSIX_THREADS = ${posix_threads}])
+AC_SUBST( POSIX_THREADS, [${posix_threads}])
+
 AC_MSG_NOTICE([Setting GPU_DIRECT= ${gpu_direct}])
 AC_SUBST( GPU_DIRECT, [${gpu_direct}])
+
+AC_MSG_NOTICE([Setting GPU_COMMS= ${gpu_comms}])
+AC_SUBST( GPU_COMMS, [${gpu_comms}])
+
+AC_MSG_NOTICE([Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}])
+AC_SUBST( BUILD_QDP_INTERFACE, [${build_qdp_interface}])
+
+AC_MSG_NOTICE([Setting BUILD_MILC_INTERFACE= ${build_milc_interface}])
+AC_SUBST( BUILD_MILC_INTERFACE, [${build_milc_interface}])
+
+AC_MSG_NOTICE([Setting BUILD_CPS_INTERFACE= ${build_cps_interface}])
+AC_SUBST( BUILD_CPS_INTERFACE, [${build_cps_interface}])
+
+AC_MSG_NOTICE([Setting BUILD_QDPJIT_INTERFACE= ${build_qdpjit_interface}])
+AC_SUBST( BUILD_QDPJIT_INTERFACE, [${build_qdpjit_interface}])
+
+AC_MSG_NOTICE([Setting BUILD_BQCD_INTERFACE= ${build_bqcd_interface}])
+AC_SUBST( BUILD_BQCD_INTERFACE, [${build_bqcd_interface}])
+
+AC_MSG_NOTICE([Setting BUILD_TIFR_INTERFACE= ${build_tifr_interface}])
+AC_SUBST( BUILD_TIFR_INTERFACE, [${build_tifr_interface}])
 
 AC_MSG_NOTICE([Setting DEVICE_PACK= ${device_pack}])
 AC_SUBST( DEVICE_PACK, [${device_pack}])

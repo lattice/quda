@@ -9,8 +9,6 @@
 #include <test_util.h>
 
 
-extern int verbose;
-
 #define stSpinorSiteSize 6
 template<typename Float>
 void display_spinor_internal(Float* spinor)
@@ -619,8 +617,12 @@ get_recon(char* s)
     
     if (strcmp(s, "8") == 0){
 	ret =  QUDA_RECONSTRUCT_8;
+    }else if (strcmp(s, "9") == 0){
+	ret =  QUDA_RECONSTRUCT_9;
     }else if (strcmp(s, "12") == 0){
 	ret =  QUDA_RECONSTRUCT_12;
+    }else if (strcmp(s, "13") == 0){
+	ret =  QUDA_RECONSTRUCT_13;
     }else if (strcmp(s, "18") == 0){
 	ret =  QUDA_RECONSTRUCT_NO;
     }else{
@@ -723,9 +725,15 @@ get_recon_str(QudaReconstructType recon)
 {
     const char* ret;
     switch(recon){
+    case QUDA_RECONSTRUCT_13:
+        ret="13";
+        break;
     case QUDA_RECONSTRUCT_12:
 	ret= "12";
 	break;
+    case QUDA_RECONSTRUCT_9:
+        ret="9";
+        break;
     case QUDA_RECONSTRUCT_8:
 	ret = "8";
 	break;
@@ -782,6 +790,10 @@ get_dslash_type(char* s)
     ret = QUDA_CLOVER_WILSON_DSLASH;
   }else if (strcmp(s, "twisted_mass") == 0){
     ret = QUDA_TWISTED_MASS_DSLASH;
+  }else if (strcmp(s, "twisted_clover") == 0){
+    ret = QUDA_TWISTED_CLOVER_DSLASH;
+  }else if (strcmp(s, "staggered") == 0){
+    ret =  QUDA_STAGGERED_DSLASH;
   }else if (strcmp(s, "asqtad") == 0){
     ret =  QUDA_ASQTAD_DSLASH;
   }else if (strcmp(s, "domain_wall") == 0){
@@ -813,6 +825,9 @@ get_dslash_type_str(QudaDslashType type)
   case QUDA_TWISTED_MASS_DSLASH:
     ret= "twisted_mass";
     break;
+  case QUDA_STAGGERED_DSLASH:
+    ret = "staggered";
+    break;
   case QUDA_ASQTAD_DSLASH:
     ret = "asqtad";
     break;
@@ -825,6 +840,50 @@ get_dslash_type_str(QudaDslashType type)
   case QUDA_MOBIUS_DWF_DSLASH:
     ret = "mobius_Dwf";
       break;
+  default:
+    ret = "unknown";	
+    break;
+  }
+  
+  
+  return ret;
+    
+}
+
+QudaInverterType
+get_solver_type(char* s)
+{
+  QudaInverterType ret =  QUDA_INVALID_INVERTER;
+  
+  if (strcmp(s, "cg") == 0){
+    ret = QUDA_CG_INVERTER;
+  }else if (strcmp(s, "bicgstab") == 0){
+    ret = QUDA_BICGSTAB_INVERTER;
+  }else if (strcmp(s, "gcr") == 0){
+    ret = QUDA_GCR_INVERTER;
+  }else{
+    fprintf(stderr, "Error: invalid solver type\n");	
+    exit(1);
+  }
+  
+  return ret;
+}
+
+const char* 
+get_solver_type_str(QudaInverterType type)
+{
+  const char* ret;
+  
+  switch( type){	
+  case QUDA_CG_INVERTER:
+    ret=  "cg";
+    break;
+  case QUDA_BICGSTAB_INVERTER:
+    ret= "bicgstab";
+    break;
+  case QUDA_GCR_INVERTER:
+    ret= "gcr";
+    break;
   default:
     ret = "unknown";	
     break;

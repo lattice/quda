@@ -30,9 +30,11 @@ extern "C" {
     QUDA_FLOAT2_GAUGE_ORDER = 2, // no reconstruct and double precision
     QUDA_FLOAT4_GAUGE_ORDER = 4, // 8 and 12 reconstruct half and single
     QUDA_QDP_GAUGE_ORDER, // expect *gauge[mu], even-odd, spacetime, row-column color
+    QUDA_QDPJIT_GAUGE_ORDER, // expect *gauge[mu], even-odd, complex-column-row-spacetime
     QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, column-row color
     QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
     QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
+    QUDA_TIFR_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime, column-row order
     QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
   } QudaGaugeFieldOrder;
 
@@ -53,6 +55,8 @@ extern "C" {
     QUDA_RECONSTRUCT_NO = 18, // store all 18 real numbers explicitly
     QUDA_RECONSTRUCT_12 = 12, // reconstruct from 12 real numbers
     QUDA_RECONSTRUCT_8 = 8,  // reconstruct from 8 real numbers
+    QUDA_RECONSTRUCT_9 = 9,   // used for storing HISQ long-link variables
+    QUDA_RECONSTRUCT_13 = 13, // used for storing HISQ long-link variables
     QUDA_RECONSTRUCT_10 = 10, // 10-number parameterization used for storing the momentum field
     QUDA_RECONSTRUCT_INVALID = QUDA_INVALID_ENUM
   } QudaReconstructType;
@@ -73,8 +77,10 @@ extern "C" {
     QUDA_DOMAIN_WALL_DSLASH,
     QUDA_DOMAIN_WALL_4D_DSLASH,
     QUDA_MOBIUS_DWF_DSLASH,
+    QUDA_STAGGERED_DSLASH,
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
+    QUDA_TWISTED_CLOVER_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
 
@@ -82,7 +88,9 @@ extern "C" {
     QUDA_CG_INVERTER,
     QUDA_BICGSTAB_INVERTER,
     QUDA_GCR_INVERTER,
+    QUDA_SD_INVERTER,
     QUDA_MR_INVERTER,
+    QUDA_PCG_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -119,8 +127,9 @@ extern "C" {
   } QudaSchwarzType;
 
   typedef enum QudaResidualType_s {
-    QUDA_L2_RELATIVE_RESIDUAL = 1, // the default
-    QUDA_HEAVY_QUARK_RESIDUAL = 2, // Fermilab heavy quark residual
+    QUDA_L2_RELATIVE_RESIDUAL = 1, // L2 relative residual (default)
+    QUDA_L2_ABSOLUTE_RESIDUAL = 2, // L2 absolute residual
+    QUDA_HEAVY_QUARK_RESIDUAL = 4, // Fermilab heavy quark residual
     QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
 
@@ -154,6 +163,11 @@ extern "C" {
     QUDA_INVALID_NORMALIZATION = QUDA_INVALID_ENUM
   } QudaMassNormalization;
 
+  typedef enum QudaSolverNormalization_s {
+    QUDA_DEFAULT_NORMALIZATION, // leave source and solution untouched
+    QUDA_SOURCE_NORMALIZATION  // normalize such that || src || = 1
+  } QudaSolverNormalization;
+
   typedef enum QudaPreserveSource_s {
     QUDA_PRESERVE_SOURCE_NO,  // use the source for the residual
     QUDA_PRESERVE_SOURCE_YES, // keep the source intact
@@ -161,18 +175,21 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaDiracFieldOrder_s {
-    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used by QUDA, varies depending on precision and dslash type
+    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used, varies on precision and dslash type
     QUDA_DIRAC_ORDER,            // even-odd, color inside spin
     QUDA_QDP_DIRAC_ORDER,        // even-odd, spin inside color
+    QUDA_QDPJIT_DIRAC_ORDER,     // even-odd, complex-color-spin-spacetime
     QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
     QUDA_LEX_DIRAC_ORDER,        // lexicographical order, color inside spin
     QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
   } QudaDiracFieldOrder;  
 
   typedef enum QudaCloverFieldOrder_s {
-    QUDA_INTERNAL_CLOVER_ORDER,   // internal clover order use by QUDA.
-    QUDA_PACKED_CLOVER_ORDER,     // even-odd, packed
-    QUDA_LEX_PACKED_CLOVER_ORDER, // lexicographical order, packed
+    QUDA_FLOAT_CLOVER_ORDER=1,   // even-odd float ordering 
+    QUDA_FLOAT2_CLOVER_ORDER=2,   // even-odd float2 ordering
+    QUDA_FLOAT4_CLOVER_ORDER=4,   // even-odd float4 ordering
+    QUDA_PACKED_CLOVER_ORDER,     // even-odd, QDP packed
+    QUDA_QDPJIT_CLOVER_ORDER,     // (diagonal / off-diagonal)-chirality-spacetime
     QUDA_BQCD_CLOVER_ORDER,       // even-odd, super-diagonal packed and reordered
     QUDA_INVALID_CLOVER_ORDER = QUDA_INVALID_ENUM
   } QudaCloverFieldOrder;
@@ -220,10 +237,14 @@ extern "C" {
     QUDA_DOMAIN_WALLPC_DIRAC,
     QUDA_DOMAIN_WALL_4DPC_DIRAC,// 4D preconditioned domain wall dirac operator
     QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
+    QUDA_STAGGERED_DIRAC,
+    QUDA_STAGGEREDPC_DIRAC,
     QUDA_ASQTAD_DIRAC,
     QUDA_ASQTADPC_DIRAC,
     QUDA_TWISTED_MASS_DIRAC,
     QUDA_TWISTED_MASSPC_DIRAC,
+    QUDA_TWISTED_CLOVER_DIRAC,
+    QUDA_TWISTED_CLOVERPC_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 
@@ -256,6 +277,7 @@ extern "C" {
     QUDA_FLOAT4_FIELD_ORDER = 4, // (spin-color-complex)/4-space-(spin-color-complex)%4
     QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, // CPS/QDP++ ordering
     QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
+    QUDA_QDPJIT_FIELD_ORDER, // QDP field ordering (complex-color-spin-spacetime)
     QUDA_QOP_DOMAIN_WALL_FIELD_ORDER, // QOP domain-wall ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;
@@ -304,6 +326,13 @@ extern "C" {
     QUDA_DSLASH_INVALID = QUDA_INVALID_ENUM
   } QudaTwistDslashType;
 
+  typedef enum QudaTwistCloverDslashType_s {
+    QUDA_DEG_CLOVER_TWIST_INV_DSLASH,
+    QUDA_DEG_DSLASH_CLOVER_TWIST_INV,
+    QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY,
+    QUDA_TC_DSLASH_INVALID = QUDA_INVALID_ENUM
+  } QudaTwistCloverDslashType;
+
   typedef enum QudaTwistGamma5Type_s {
     QUDA_TWIST_GAMMA5_DIRECT,
     QUDA_TWIST_GAMMA5_INVERSE,
@@ -318,7 +347,8 @@ extern "C" {
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
-    QUDA_FORWARDS = +1
+    QUDA_FORWARDS = +1,
+    QUDA_BOTH_DIRS = 2
   } QudaDirection;
   
   typedef enum QudaComputeFatMethod_s {
@@ -334,11 +364,25 @@ extern "C" {
   } QudaFatLinkFlag;
 
   typedef enum QudaFieldGeometry_s {
-    QUDA_SCALAR_GEOMETRY,
-    QUDA_VECTOR_GEOMETRY,
-    QUDA_TENSOR_GEOMETRY,
+    QUDA_SCALAR_GEOMETRY = 1,
+    QUDA_VECTOR_GEOMETRY = 4,
+    QUDA_TENSOR_GEOMETRY = 6,
     QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
+
+  typedef enum QudaGhostExchange_s {
+    QUDA_GHOST_EXCHANGE_NO,
+    QUDA_GHOST_EXCHANGE_PAD,
+    QUDA_GHOST_EXCHANGE_EXTENDED,
+    QUDA_GHOST_EXCHANGE_INVALID = QUDA_INVALID_ENUM
+  } QudaGhostExchange;
+
+  typedef enum QudaStaggeredPhase_s {
+    QUDA_MILC_STAGGERED_PHASE = 0,
+    QUDA_CPS_STAGGERED_PHASE = 1,
+    QUDA_TIFR_STAGGERED_PHASE = 2,
+    QUDA_INVALID_STAGGERED_PHASE = QUDA_INVALID_ENUM
+  } QudaStaggeredPhase;
 
 #ifdef __cplusplus
 }

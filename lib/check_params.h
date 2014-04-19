@@ -41,17 +41,25 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   printfQuda("QUDA Gauge Parameters:\n");
 #endif
 
+#if defined INIT_PARAM
+  P(location, QUDA_CPU_FIELD_LOCATION);
+#else
+  P(location, QUDA_INVALID_FIELD_LOCATION);
+#endif
+
   for (int i=0; i<4; i++) P(X[i], INVALID_INT);
 
 #if defined INIT_PARAM
   P(anisotropy, INVALID_DOUBLE);
   P(tadpole_coeff, INVALID_DOUBLE);
+  P(scale, INVALID_DOUBLE);
 #else
   if (param->type == QUDA_WILSON_LINKS) {
     P(anisotropy, INVALID_DOUBLE);
   } else if (param->type == QUDA_ASQTAD_FAT_LINKS ||
 	     param->type == QUDA_ASQTAD_LONG_LINKS) {
     P(tadpole_coeff, INVALID_DOUBLE);
+    //P(scale, INVALID_DOUBLE);
   }
 #endif
 
@@ -86,6 +94,18 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(preserve_gauge, 0);
 #else
   P(preserve_gauge, INVALID_INT);
+#endif
+
+#if defined INIT_PARAM
+  P(use_resident_gauge, 0);
+  P(use_resident_mom, 0);
+  P(make_resident_gauge, 0);
+  P(make_resident_mom, 0);
+#else
+  P(use_resident_gauge, INVALID_INT);
+  P(use_resident_mom, INVALID_INT);
+  P(make_resident_gauge, INVALID_INT);
+  P(make_resident_mom, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM
@@ -153,7 +173,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(twist_flavor, QUDA_TWIST_INVALID);
 #else
   // asqtad and domain wall use mass parameterization
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH || 
+  if (param->dslash_type == QUDA_STAGGERED_DSLASH || 
+      param->dslash_type == QUDA_ASQTAD_DSLASH || 
       param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
@@ -175,14 +196,26 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(tol, INVALID_DOUBLE);
 
+#ifdef INIT_PARAM
+  P(residual_type, QUDA_L2_RELATIVE_RESIDUAL);
+#else
+  P(residual_type, QUDA_INVALID_RESIDUAL);
+#endif
+
   if (param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
     P(tol_hq, INVALID_DOUBLE);
   }
 
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
+#ifdef INIT_PARAM /**< Default is to use a sloppy accumulator */
+  P(use_sloppy_partial_accumulator, 1);
+#else
+  P(use_sloppy_partial_accumulator, INVALID_INT);
+#endif
 
 #ifndef CHECK_PARAM
+  P(pipeline, 0); /** Whether to use a pipelined solver */
   P(num_offset, 0); /**< Number of offsets in the multi-shift solver */
 #endif
 
@@ -203,6 +236,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(matpc_type, QUDA_MATPC_INVALID);
   P(dagger, QUDA_DAG_INVALID);
   P(mass_normalization, QUDA_INVALID_NORMALIZATION);
+#ifndef CHECK_PARAM
+  P(solver_normalization, QUDA_DEFAULT_NORMALIZATION);
+#endif
   P(preserve_source, QUDA_PRESERVE_SOURCE_INVALID);
   P(cpu_prec, QUDA_INVALID_PRECISION);
   P(cuda_prec, QUDA_INVALID_PRECISION);
@@ -212,9 +248,11 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(input_location, QUDA_CPU_FIELD_LOCATION);
   P(output_location, QUDA_CPU_FIELD_LOCATION);
+  P(clover_location, QUDA_CPU_FIELD_LOCATION);
 #else
   P(input_location, QUDA_INVALID_FIELD_LOCATION);
   P(output_location, QUDA_INVALID_FIELD_LOCATION);
+  P(clover_location, QUDA_INVALID_FIELD_LOCATION);
 #endif
 
 #if defined INIT_PARAM
@@ -278,6 +316,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(clover_cuda_prec_sloppy, QUDA_INVALID_PRECISION);
 #if defined INIT_PARAM
     P(clover_cuda_prec_precondition, QUDA_INVALID_PRECISION);
+    P(compute_clover_trlog, 0);
 #else
   if (param->clover_cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->clover_cuda_prec_precondition = param->clover_cuda_prec_sloppy;
@@ -312,12 +351,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   //p(ghostDim[1],0);
   //p(ghostDim[2],0);
   //p(ghostDim[3],0);
-#endif
-
-#ifdef INIT_PARAM
-  P(residual_type, QUDA_L2_RELATIVE_RESIDUAL);
-#else
-  P(residual_type, QUDA_INVALID_RESIDUAL);
 #endif
 
 #ifdef INIT_PARAM

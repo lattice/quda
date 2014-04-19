@@ -4,6 +4,8 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <convert.h>
+#include <register_traits.h>
+#include <float_vector.h>
 
 //namespace quda {
 
@@ -11,6 +13,8 @@
 
 template<typename OutputType, typename InputType>
 class Texture {
+
+  typedef typename quda::mapper<InputType>::type RegType;
 
 private: 
 #ifndef DIRECT_ACCESS_BLAS
@@ -36,7 +40,11 @@ public:
   
 #ifndef DIRECT_ACCESS_BLAS
   __device__ inline OutputType fetch(unsigned int idx) 
-  { return tex1Dfetch<OutputType>(spinor, idx); }
+  { 
+    OutputType rtn;
+    copyFloatN(rtn, tex1Dfetch<RegType>(spinor, idx));
+    return rtn;
+  }
 #else
   __device__ inline OutputType fetch(unsigned int idx) 
   { OutputType out; copyFloatN(out, spinor[idx]); return out; } 
@@ -46,6 +54,9 @@ public:
 };
 
 #ifndef DIRECT_ACCESS_BLAS
+__device__ inline double fetch_double(int2 v)
+{ return __hiloint2double(v.y, v.x); }
+
 __device__ inline double2 fetch_double2(int4 v)
 { return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
 
@@ -61,12 +72,21 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 // legacy Texture references
 
 #if (__COMPUTE_CAPABILITY__ >= 130)
+
+  __inline__ __device__ double fetch_double(texture<int2, 1> t, int i)
+  {
+    int2 v = tex1Dfetch(t,i);
+    return __hiloint2double(v.y, v.x);
+  }
+
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
     int4 v = tex1Dfetch(t,i);
     return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
   }
 #else
+  __inline__ __device__ double fetch_double(texture<int2, 1> t, int i){ return 0.0; }
+
   __inline__ __device__ double2 fetch_double2(texture<int4, 1> t, int i)
   {
     // do nothing
@@ -78,6 +98,7 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
   template<typename OutputType, typename InputType, int tex_id>
     class Texture {
+
   private: 
 #ifdef DIRECT_ACCESS_BLAS
   const InputType *spinor; // used when textures are disabled
@@ -407,7 +428,9 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       return precision;
     }
 
-    int Stride() { return stride; }
+    int Stride() const { return stride; }
+
+    void setStride(int stride_) { stride = stride_; }
   };
 
 //} // namespace quda

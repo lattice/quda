@@ -13,8 +13,6 @@
 
 namespace quda {
 
-  QudaTune getBlasTuning();
-  QudaVerbosity getBlasVerbosity();
   cudaStream_t* getBlasStream();
     
   namespace copy {
@@ -47,8 +45,8 @@ namespace quda {
       Output &Y;
       const int length;
 
-      int sharedBytesPerThread() const { return 0; }
-      int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       virtual bool advanceSharedBytes(TuneParam &param) const
       {
@@ -75,7 +73,7 @@ namespace quda {
       }  
 
       void apply(const cudaStream_t &stream) {
-	TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
       }
 
@@ -112,6 +110,9 @@ namespace quda {
 
       // For a given dst precision, there are two non-trivial possibilities for the
       // src precision.
+
+      // FIXME: use traits to encapsulate register type for shorts -
+      // will reduce template type parameters from 3 to 2
 
       blas_bytes += (unsigned long long)src.RealLength()*(src.Precision() + dst.Precision());
       

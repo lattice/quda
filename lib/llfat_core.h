@@ -2,7 +2,6 @@
 #define Vsh_y ghostFace[1]
 #define Vsh_z ghostFace[2]
 #define Vsh_t ghostFace[3]
-
 #define xcomm kparam.ghostDim[0]
 #define ycomm kparam.ghostDim[1]
 #define zcomm kparam.ghostDim[2]
@@ -27,7 +26,7 @@
 #else //RECONSTRUCT == 12
 #define DECLARE_VAR_SIGN short sign=1
 #define DECLARE_NEW_X short new_x1=x1; short new_x2=x2; \
-  /*short new_x3=x3; */short new_x4=x4; 
+  short new_x3=x3; short new_x4=x4; 
 #define DECLARE_X_ARRAY int x[4] = {x1,x2,x3, x4};
 
 #endif
@@ -91,6 +90,27 @@
 #define c22_re C4.x
 #define c22_im C4.y
 
+#define f00_re F0.x
+#define f00_im F0.y
+#define f01_re F0.z
+#define f01_im F0.w
+#define f02_re F1.x
+#define f02_im F1.y
+#define f10_re F1.z
+#define f10_im F1.w
+#define f11_re F2.x
+#define f11_im F2.y
+#define f12_re F2.z
+#define f12_im F2.w
+#define f20_re F3.x
+#define f20_im F3.y
+#define f21_re F3.z
+#define f21_im F3.w
+#define f22_re F4.x
+#define f22_im F4.y
+
+#define WRITE_LONG_MATRIX WRITE_GAUGE_MATRIX_FLOAT4
+
 #else
 #define a00_re A0.x
 #define a00_im A0.y
@@ -104,7 +124,6 @@
 #define a11_im A4.y
 #define a12_re A5.x
 #define a12_im A5.y
-
 #define a20_re A6.x
 #define a20_im A6.y
 #define a21_re A7.x
@@ -150,7 +169,29 @@
 #define c22_re C8.x
 #define c22_im C8.y
 
+#define f00_re F0.x
+#define f00_im F0.y
+#define f01_re F1.x
+#define f01_im F1.y
+#define f02_re F2.x
+#define f02_im F2.y
+#define f10_re F3.x
+#define f10_im F3.y
+#define f11_re F4.x
+#define f11_im F4.y
+#define f12_re F5.x
+#define f12_im F5.y
+#define f20_re F6.x
+#define f20_im F6.y
+#define f21_re F7.x
+#define f21_im F7.y
+#define f22_re F8.x
+#define f22_im F8.y
+
+#define WRITE_LONG_MATRIX WRITE_GAUGE_MATRIX_FLOAT2
+
 #endif
+
 
 #define bb00_re BB0.x
 #define bb00_im BB0.y
@@ -303,19 +344,20 @@
 #undef UPDATE_COOR_LOWER_STAPLE_EX
 #undef COMPUTE_RECONSTRUCT_SIGN
 #if (RECONSTRUCT  != 18)
-#define UPDATE_COOR_PLUS(mydir, idx) do {				\
-    new_x1 = x1; new_x2 = x2; new_x4 = x4;				\
+#define UPDATE_COOR_PLUS(mydir, n, idx) do {				\
+    new_x1 = x1; new_x2 = x2; new_x3=x3; new_x4 = x4;			\
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_x1 = x1+1;							\
+      new_x1 = x1+n;							\
       break;                                                            \
     case 1:                                                             \
-      new_x2 = x2+1;							\
+      new_x2 = x2+n;							\
       break;                                                            \
     case 2:                                                             \
+      new_x3 = x3+n;                                                     \
       break;                                                            \
     case 3:								\
-      new_x4 = x4+1;							\
+      new_x4 = x4+n;							\
       break;                                                            \
     }                                                                   \
   }while(0)
@@ -470,7 +512,7 @@
 
 #else
 
-#define UPDATE_COOR_PLUS(mydir, idx)
+#define UPDATE_COOR_PLUS(mydir, n, idx)
 #define UPDATE_COOR_MINUS(mydir, idx)
 #define UPDATE_COOR_LOWER_STAPLE(mydir1, mydir2)
 #define UPDATE_COOR_LOWER_STAPLE_DIAG(nu, mu, dir1, dir2)
@@ -480,22 +522,22 @@
 
 #ifdef MULTI_GPU
 
-#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {                     \
+#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, n, idx) do {                  \
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_mem_idx = (x1==X1m1)? ((Vh+Vsh_x+ spacecon_x)*xcomm+(idx - X1m1)/2*(1-xcomm)):((idx+1)>>1); \
+      new_mem_idx = (x1>=(X1-n))? ((Vh+Vsh_x+ spacecon_x)*xcomm+(idx-(X1-n))/2*(1-xcomm)):((idx+n)>>1); \
       break;                                                            \
     case 1:                                                             \
-      new_mem_idx = (x2==X2m1)? ((Vh+2*(Vsh_x)+Vsh_y+ spacecon_y)*ycomm+(idx-X2X1mX1)/2*(1-ycomm)):((idx+X1)>>1); \
+      new_mem_idx = (x2>=(X2-n))? ((Vh+2*(Vsh_x)+Vsh_y+ spacecon_y)*ycomm+(idx-(X2-n)*X1)/2*(1-ycomm)):((idx+n*X1)>>1); \
       break;                                                            \
     case 2:                                                             \
-      new_mem_idx = (x3==X3m1)? ((Vh+2*(Vsh_x+Vsh_y)+Vsh_z+ spacecon_z))*zcomm+(idx-X3X2X1mX2X1)/2*(1-zcomm):((idx+X2X1)>>1); \
+      new_mem_idx = (x3>=(X3-n))? ((Vh+2*(Vsh_x+Vsh_y)+Vsh_z+ spacecon_z))*zcomm+(idx-(X3-n)*X2X1)/2*(1-zcomm):((idx+n*X2X1)>>1); \
       break;                                                            \
     case 3:								\
-      new_mem_idx = ( (x4==X4m1)? ((Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+spacecon_t))*tcomm+(idx-X4X3X2X1mX3X2X1)/2*(1-tcomm): (idx+X3X2X1)>>1); \
+      new_mem_idx = ( (x4>=(X4-n))? ((Vh+2*(Vsh_x+Vsh_y+Vsh_z)+Vsh_t+spacecon_t))*tcomm+(idx-(X4-n)*X3X2X1)/2*(1-tcomm): (idx+n*X3X2X1)>>1); \
       break;                                                            \
     }                                                                   \
-    UPDATE_COOR_PLUS(mydir, idx);					\
+    UPDATE_COOR_PLUS(mydir, n, idx);					\
   }while(0)
 
 
@@ -608,22 +650,22 @@
 
 #else
 
-#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, idx) do {		\
+#define LLFAT_COMPUTE_NEW_IDX_PLUS(mydir, n, idx) do {		\
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_mem_idx = ( (x1==X1m1)?idx-X1m1:idx+1)>>1;                    \
+      new_mem_idx = ( (x1>=(X1-n))?idx-(X1-n):idx+n)>>1;                    \
       break;                                                            \
     case 1:                                                             \
-      new_mem_idx = ( (x2==X2m1)?idx-X2X1mX1:idx+X1)>>1;                \
+      new_mem_idx = ( (x2>=(X2-n))?idx-(X2-n)*X1:idx+n*X1)>>1;                \
       break;                                                            \
     case 2:                                                             \
-      new_mem_idx = ( (x3==X3m1)?idx-X3X2X1mX2X1:idx+X2X1)>>1;          \
+      new_mem_idx = ( (x3>=(X3-n))?idx-(X3-n)*X2X1:idx+n*X2X1)>>1;          \
       break;                                                            \
     case 3:                                                             \
-      new_mem_idx = ( (x4==X4m1)?idx-X4X3X2X1mX3X2X1: idx+X3X2X1)>>1;	\
+      new_mem_idx = ( (x4>=(X4-n))?idx-(X4-n)*X3X2X1 : idx+n*X3X2X1)>>1;	\
       break;                                                            \
     }                                                                   \
-    UPDATE_COOR_PLUS(mydir, idx);					\
+    UPDATE_COOR_PLUS(mydir, n, idx);					\
   }while(0)
 
 
@@ -681,22 +723,22 @@
 #endif
 
 
-#define LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mydir, idx) do {                  \
+#define LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mydir, n, idx) do {               \
     switch(mydir){                                                      \
     case 0:                                                             \
-      new_mem_idx = (idx+1)>>1;                                         \
+      new_mem_idx = (idx+n)>>1;                                         \
       break;                                                            \
     case 1:                                                             \
-      new_mem_idx = (idx+E1)>>1;                                        \
+      new_mem_idx = (idx+n*E1)>>1;                                      \
       break;                                                            \
     case 2:                                                             \
-      new_mem_idx = (idx+E2E1)>>1;                                      \
+      new_mem_idx = (idx+n*E2E1)>>1;                                    \
       break;                                                            \
     case 3:                                                             \
-      new_mem_idx = (idx+E3E2E1)>>1;                                    \
+      new_mem_idx = (idx+n*E3E2E1)>>1;                                  \
       break;                                                            \
     }                                                                   \
-    UPDATE_COOR_PLUS(mydir, idx);                                       \
+    UPDATE_COOR_PLUS(mydir, n, idx);                                    \
   }while(0)
 
 #define LLFAT_COMPUTE_NEW_IDX_MINUS_EX(mydir, idx) do {                 \
@@ -760,7 +802,7 @@ template<int mu, int nu, int odd_bit>
 							   FloatM* fatlink_even, FloatM* fatlink_odd,	
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
-  __shared__ FloatM sd_data[NUM_FLOATS*64];
+  __shared__ FloatM sd_data[NUM_FLOATS*BLOCK_DIM];
   
   //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;
   FloatM TEMPA5, TEMPA6, TEMPA7, TEMPA8;
@@ -821,7 +863,7 @@ template<int mu, int nu, int odd_bit>
 
 
     /* load matrix B*/  
-    LLFAT_COMPUTE_NEW_IDX_PLUS(nu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS(nu, 1, X);    
     LOAD_ODD_SITE_MATRIX(mu, new_mem_idx, B);
     COMPUTE_RECONSTRUCT_SIGN(sign, mu, new_x1, new_x2, new_x3, new_x4);    
     RECONSTRUCT_SITE_LINK(sign, b);
@@ -831,7 +873,7 @@ template<int mu, int nu, int odd_bit>
     
     /* load matrix C*/
         
-    LLFAT_COMPUTE_NEW_IDX_PLUS(mu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS(mu, 1, X);    
     LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, new_x3, new_x4);    
     RECONSTRUCT_SITE_LINK(sign, c);
@@ -904,7 +946,7 @@ template<int mu, int nu, int odd_bit, int save_staple>
 							   const FloatM* mulink_even, const FloatM* mulink_odd, 
 							   Float mycoeff, llfat_kernel_param_t kparam)
 {
-  __shared__ FloatM sd_data[NUM_FLOATS*64];
+  __shared__ FloatM sd_data[NUM_FLOATS*BLOCK_DIM];
   //FloatM TEMPA0, TEMPA1, TEMPA2, TEMPA3, TEMPA4, TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
   FloatM  TEMPA5, TEMPA6, TEMPA7, TEMPA8;  
   FloatM TEMPB0, TEMPB1, TEMPB2, TEMPB3, TEMPB4, TEMPB5, TEMPB6, TEMPB7, TEMPB8;
@@ -962,13 +1004,13 @@ template<int mu, int nu, int odd_bit, int save_staple>
     RECONSTRUCT_SITE_LINK(sign, a);
     
     /* load matrix BB*/
-    LLFAT_COMPUTE_NEW_IDX_PLUS(nu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS(nu, 1, X);    
     LOAD_ODD_MULINK_MATRIX(0, new_mem_idx, BB);
     
     MULT_SU3_NN(a, bb, tempa);    
     
     /* load matrix C*/
-    LLFAT_COMPUTE_NEW_IDX_PLUS(mu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS(mu, 1, X);    
     LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, new_x1, new_x2, new_x3, new_x4);
     RECONSTRUCT_SITE_LINK(sign, c);
@@ -1053,11 +1095,14 @@ template<int mu, int nu, int odd_bit, int save_staple>
 __global__ void 
 LLFAT_KERNEL(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const FloatN* sitelink_odd,
 					FloatM* fatlink_even, FloatM* fatlink_odd,
-					Float coeff0, Float coeff5)
+					Float coeff0, Float coeff5, int threads)
 {
   const FloatN* my_sitelink;
   FloatM* my_fatlink;
   int sid = blockIdx.x*blockDim.x + threadIdx.x;
+
+  if(sid >= threads) return;
+
   int mem_idx = sid;
 
 #if (RECONSTRUCT != 18)
@@ -1163,7 +1208,7 @@ template<int mu, int nu, int odd_bit>
 
     
     /* load matrix B*/  
-    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(nu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(nu, 1, X);    
     LOAD_ODD_SITE_MATRIX(mu, new_mem_idx, B);
     COMPUTE_RECONSTRUCT_SIGN(sign, mu, (new_x1-2), (new_x2-2), (new_x3-2), (new_x4-2));    
     RECONSTRUCT_SITE_LINK(sign, b);
@@ -1173,7 +1218,7 @@ template<int mu, int nu, int odd_bit>
     
     /* load matrix C*/
         
-    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mu, 1, X);    
     LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, (new_x1-2), (new_x2-2), (new_x3-2), (new_x4-2));    
     RECONSTRUCT_SITE_LINK(sign, c);
@@ -1292,12 +1337,12 @@ template<int mu, int nu, int odd_bit, int save_staple>
     RECONSTRUCT_SITE_LINK(sign, a);
     
     /* load matrix BB*/
-    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(nu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(nu, 1, X);    
     LOAD_ODD_MULINK_MATRIX(0, new_mem_idx, BB);
     MULT_SU3_NN(a, bb, tempa);    
     
     /* load matrix C*/
-    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mu, X);    
+    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(mu, 1, X);    
     LOAD_ODD_SITE_MATRIX(nu, new_mem_idx, C);
     COMPUTE_RECONSTRUCT_SIGN(sign, nu, (new_x1-2), (new_x2-2), (new_x3-2), (new_x4-2));
     RECONSTRUCT_SITE_LINK(sign, c);
@@ -1406,7 +1451,7 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const Fl
     LOAD_SITE_MATRIX(my_sitelink, dir, mem_idx, A);
     COMPUTE_RECONSTRUCT_SIGN(sign, dir, (x1-2), (x2-2), (x3-2), (x4-2));
     RECONSTRUCT_SITE_LINK(sign, a);
-
+  
     LOAD_FAT_MATRIX(my_fatlink, dir, idx);
     
     SCALAR_MULT_SU3_MATRIX((coeff0 - 6.0*coeff5), a, fat); 
@@ -1416,6 +1461,86 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const Fl
 #endif
     
   return;
+}
+
+
+template<int odd_bit>
+__global__ void LLFAT_KERNEL(computeLongLinkParity,RECONSTRUCT)
+    (FloatN* const outField,
+    const FloatN* const sitelink_even, const FloatN* const sitelink_odd,
+    Float coeff,
+    const llfat_kernel_param_t kparam)
+{
+  int idx = blockIdx.x*blockDim.x + threadIdx.x;
+  int mem_idx = idx;
+  if(mem_idx >= kparam.threads) return;
+
+  int z1 = mem_idx/D1h;
+  short x1h = mem_idx - z1*D1h;
+  int z2 = z1/D2;
+  short x2 = z1 - z2*D2;
+  short x4 = z2/D3;
+  short x3 = z2 - x4*D3;
+
+  short x1odd = (x2 + x3 + x4 + odd_bit) & 1;
+  short x1 = 2*x1h + x1odd;
+
+#ifdef MULTI_GPU
+  x1 += 2;  
+  x2 += 2;  
+  x3 += 2;  
+  x4 += 2;
+  int X = x4*E3E2E1 + x3*E2E1 + x2*E1 + x1;
+#else 
+  int X = x4*X3X2X1 + x3*X2X1 + x2*X1 + x1;
+#endif
+  mem_idx = X/2;
+
+  int new_mem_idx;
+  DECLARE_VAR_SIGN;
+  DECLARE_NEW_X;
+  
+  FloatN F0, F1, F2, F3, F4, F5, F6, F7, F8;
+
+  for(int dir=0; dir<4; ++dir){
+    LOAD_EVEN_SITE_MATRIX(dir, mem_idx, A);
+#ifdef MULTI_GPU
+    COMPUTE_RECONSTRUCT_SIGN(sign, dir, x1-2, x2-2, x3-2, x4-2);
+#else
+    COMPUTE_RECONSTRUCT_SIGN(sign, dir, x1, x2, x3, x4);
+#endif
+    RECONSTRUCT_SITE_LINK(sign, a);
+
+#ifdef MULTI_GPU
+    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(dir, 1, X);
+    LOAD_ODD_SITE_MATRIX(dir, new_mem_idx, B);
+    COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1-2, new_x2-2, new_x3-2, new_x4-2);
+#else
+    LLFAT_COMPUTE_NEW_IDX_PLUS(dir, 1, X);
+    LOAD_ODD_SITE_MATRIX(dir, new_mem_idx, B);
+    COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1, new_x2, new_x3, new_x4);
+#endif
+    RECONSTRUCT_SITE_LINK(sign, b);
+
+#ifdef MULTI_GPU
+    LLFAT_COMPUTE_NEW_IDX_PLUS_EX(dir, 2, X);
+    LOAD_EVEN_SITE_MATRIX(dir, new_mem_idx, C);
+    COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1-2, new_x2-2, new_x3-2, new_x4-2);
+#else
+    LLFAT_COMPUTE_NEW_IDX_PLUS(dir, 2, X);
+    LOAD_EVEN_SITE_MATRIX(dir, new_mem_idx, C);
+    COMPUTE_RECONSTRUCT_SIGN(sign, dir, new_x1, new_x2, new_x3, new_x4);
+#endif
+    RECONSTRUCT_SITE_LINK(sign, c);
+
+    SCALAR_MULT_SU3_MATRIX(coeff, a, f); 
+    MULT_SU3_NN(f,b,a);
+    MULT_SU3_NN(a,c,f);
+
+  
+    WRITE_LONG_MATRIX(outField, F, dir, idx, fl.fat_ga_stride);
+  }
+  return; 
 }
 
 #undef D1
@@ -1504,6 +1629,28 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const Fl
 #undef c22_re 
 #undef c22_im 
 
+#undef f00_re 
+#undef f00_im 
+#undef f01_re 
+#undef f01_im 
+#undef f02_re 
+#undef f02_im 
+#undef f10_re 
+#undef f10_im 
+#undef f11_re 
+#undef f11_im 
+#undef f12_re 
+#undef f12_im 
+#undef f20_re 
+#undef f20_im 
+#undef f21_re 
+#undef f21_im 
+#undef f22_re 
+#undef f22_im 
+
+#undef aT00_re 
+#undef aT00_im 
+#undef aT01_re 
 #undef aT00_re 
 #undef aT00_im 
 #undef aT01_re 
@@ -1618,3 +1765,6 @@ LLFAT_KERNEL_EX(llfatOneLink, RECONSTRUCT)(const FloatN* sitelink_even, const Fl
 #undef fat21_im 
 #undef fat22_re 
 #undef fat22_im 
+
+#undef WRITE_LONG_MATRIX
+

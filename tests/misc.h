@@ -7,20 +7,22 @@
 extern "C" {
 #endif
     
-    void display_spinor(void* spinor, int len, int precision);
-    void display_link(void* link, int len, int precision);
-    int link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* gaugeParam);
-    int site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gaugeParam);
-
-    QudaReconstructType get_recon(char* s);
-    QudaPrecision   get_prec(char* s);
-    const char* get_prec_str(QudaPrecision prec);
-    const char* get_gauge_order_str(QudaGaugeFieldOrder order);
-    const char* get_recon_str(QudaReconstructType recon);
-    const char* get_test_type(int t);
-    const char* get_unitarization_str(bool svd_only);
-    QudaDslashType get_dslash_type(char* s);
-    const char* get_dslash_type_str(QudaDslashType type);
+  void display_spinor(void* spinor, int len, int precision);
+  void display_link(void* link, int len, int precision);
+  int link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* gaugeParam);
+  int site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gaugeParam);
+  
+  QudaReconstructType get_recon(char* s);
+  QudaPrecision   get_prec(char* s);
+  const char* get_prec_str(QudaPrecision prec);
+  const char* get_gauge_order_str(QudaGaugeFieldOrder order);
+  const char* get_recon_str(QudaReconstructType recon);
+  const char* get_test_type(int t);
+  const char* get_unitarization_str(bool svd_only);
+  QudaDslashType get_dslash_type(char* s);
+  const char* get_dslash_type_str(QudaDslashType type);
+  QudaInverterType get_solver_type(char* s);
+  const char* get_solver_type_str(QudaInverterType type);
   const char* get_quda_ver_str();
 #ifdef __cplusplus
 }

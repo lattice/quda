@@ -147,6 +147,7 @@ namespace quda {
 			 cudaStream_t stream)
   {
     dim3 blockDim(BLOCKSIZE);
+
     if(cpu_order ==  QUDA_QDP_GAUGE_ORDER){
 #ifdef MULTI_GPU  
       size_t threads=Vh+ghostV;
@@ -185,7 +186,7 @@ namespace quda {
       default:
 	errorQuda("ERROR: half precision not support in %s\n", __FUNCTION__);
       }
-    }else if (cpu_order == QUDA_MILC_GAUGE_ORDER){    
+    } else if (cpu_order == QUDA_MILC_GAUGE_ORDER){    
 #ifdef MULTI_GPU  
       int threads=4*(Vh+ghostV);
 #else

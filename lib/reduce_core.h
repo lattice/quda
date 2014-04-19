@@ -90,8 +90,27 @@ template<> __device__ void add<doublesingle3,doublesingle>(volatile doublesingle
 { s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
 #endif
 
+#include <launch_kernel.cuh>
+
 __device__ unsigned int count = 0;
 __shared__ bool isLastBlockDone;
+
+template <typename ReduceType, typename SpinorX, typename SpinorY, 
+  typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
+struct ReduceArg {
+  SpinorX X;
+  SpinorY Y;
+  SpinorZ Z;
+  SpinorW W;
+  SpinorV V;
+  Reducer r;
+  ReduceType *partial;
+  ReduceType *complete;
+  const int length;
+  ReduceArg(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
+	    ReduceType *partial, ReduceType *complete, int length) 
+  : X(X), Y(Y), Z(Z), W(W), V(V), r(r), partial(partial), complete(complete), length(length) { ; }
+};
 
 /**
    Generic reduction kernel with up to four loads and three saves.
@@ -99,38 +118,37 @@ __shared__ bool isLastBlockDone;
 template <int block_size, typename ReduceType, typename ReduceSimpleType, 
   typename FloatN, int M, typename SpinorX, typename SpinorY, 
   typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
-__global__ void reduceKernel(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
-			     ReduceType *partial, ReduceType *complete, int length) {
+  __global__ void reduceKernel(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) {
   unsigned int tid = threadIdx.x;
   unsigned int i = blockIdx.x*(blockDim.x) + threadIdx.x;
   unsigned int gridSize = gridDim.x*blockDim.x;
 
   ReduceType sum;
   zero(sum); 
-  while (i < length) {
+  while (i < arg.length) {
     FloatN x[M], y[M], z[M], w[M], v[M];
-    X.load(x, i);
-    Y.load(y, i);
-    Z.load(z, i);
-    W.load(w, i);
-    V.load(v, i);
+    arg.X.load(x, i);
+    arg.Y.load(y, i);
+    arg.Z.load(z, i);
+    arg.W.load(w, i);
+    arg.V.load(v, i);
 
 #if (__COMPUTE_CAPABILITY__ >= 200)
-    r.pre();
+    arg.r.pre();
 #endif
 
 #pragma unroll
-    for (int j=0; j<M; j++) r(sum, x[j], y[j], z[j], w[j], v[j]);
+    for (int j=0; j<M; j++) arg.r(sum, x[j], y[j], z[j], w[j], v[j]);
 
 #if (__COMPUTE_CAPABILITY__ >= 200)
-    r.post(sum);
+    arg.r.post(sum);
 #endif
 
-    X.save(x, i);
-    Y.save(y, i);
-    Z.save(z, i);
-    W.save(w, i);
-    V.save(v, i);
+    arg.X.save(x, i);
+    arg.Y.save(y, i);
+    arg.Z.save(z, i);
+    arg.W.save(w, i);
+    arg.V.save(v, i);
 
     i += gridSize;
   }
@@ -165,7 +183,7 @@ __global__ void reduceKernel(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV
   if (tid == 0) {    
     ReduceType tmp;
     copyfromshared(tmp, s, 0, block_size);
-    partial[blockIdx.x] = tmp;
+    arg.partial[blockIdx.x] = tmp;
     
     __threadfence(); // flush result
     
@@ -185,7 +203,7 @@ __global__ void reduceKernel(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV
     ReduceType sum;
     zero(sum); 
     while (i < gridDim.x) {
-      sum += partial[i];
+      sum += arg.partial[i];
       i += block_size;
     }
     
@@ -218,7 +236,7 @@ __global__ void reduceKernel(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV
     if (threadIdx.x == 0) {
       ReduceType tmp;
       copyfromshared(tmp, s, 0, block_size);
-      complete[0] = tmp;
+      arg.complete[0] = tmp;
       count = 0;
     }
   }
@@ -230,113 +248,12 @@ __global__ void reduceKernel(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
   int M, typename SpinorX, typename SpinorY, typename SpinorZ,  
   typename SpinorW, typename SpinorV, typename Reducer>
-doubleN reduceLaunch(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, 
-		     int len, const TuneParam &tp, const cudaStream_t &stream) {
-  ReduceType *part = (ReduceType*)d_reduce;
-  ReduceType *full = (ReduceType*)hd_reduce;
-
+doubleN reduceLaunch(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> &arg, 
+		     const TuneParam &tp, const cudaStream_t &stream) {
   if (tp.grid.x > REDUCE_MAX_BLOCKS) 
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
-  if (tp.block.x == 32) {
-    reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 64) {
-    reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 96) {
-    reduceKernel<96,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 128) {
-    reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 160) {
-    reduceKernel<160,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 192) {
-    reduceKernel<192,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 224) {
-    reduceKernel<224,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 256) {
-    reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 288) {
-    reduceKernel<288,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 320) {
-    reduceKernel<320,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 352) {
-    reduceKernel<352,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 384) {
-    reduceKernel<384,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 416) {
-    reduceKernel<416,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 448) {
-    reduceKernel<448,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 480) {
-    reduceKernel<480,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 512) {
-    reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 544) {
-    reduceKernel<544,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 576) {
-    reduceKernel<576,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 608) {
-    reduceKernel<608,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 640) {
-    reduceKernel<640,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 672) {
-    reduceKernel<672,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 704) {
-    reduceKernel<704,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 736) {
-    reduceKernel<736,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 768) {
-    reduceKernel<768,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 800) {
-    reduceKernel<800,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 832) {
-    reduceKernel<832,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 864) {
-    reduceKernel<864,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 896) {
-    reduceKernel<896,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 928) {
-    reduceKernel<928,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 960) {
-    reduceKernel<960,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 992) {
-    reduceKernel<992,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else if (tp.block.x == 1024) {
-    reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(X, Y, Z, W, V, r, part, full, len);
-  } else {
-    errorQuda("Reduction not implemented for %d threads", tp.block.x);
-  }
+  LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,ReduceSimpleType,FloatN,M);
 
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
   if(deviceProp.canMapHostMemory) {
@@ -363,13 +280,7 @@ template <typename doubleN, typename ReduceType, typename ReduceSimpleType, type
 class ReduceCuda : public Tunable {
 
 private:
-  SpinorX &X;
-  SpinorY &Y;
-  SpinorZ &Z;
-  SpinorW &W;
-  SpinorV &V;
-  Reducer &r;
-  const int length;
+  mutable ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg;
   doubleN &result;
 
   // host pointers used for backing up fields when tuning
@@ -377,11 +288,11 @@ private:
   char *X_h, *Y_h, *Z_h, *W_h, *V_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
 
-  int sharedBytesPerThread() const { return sizeof(ReduceType); }
+  unsigned int sharedBytesPerThread() const { return sizeof(ReduceType); }
 
   // when there is only one warp per block, we need to allocate two warps 
   // worth of shared memory so that we don't index shared memory out of bounds
-  int sharedBytesPerBlock(const TuneParam &param) const { 
+  unsigned int sharedBytesPerBlock(const TuneParam &param) const { 
     int warpSize = 32; // FIXME - use device property query
     return 2*warpSize*sizeof(ReduceType); 
   }
@@ -399,9 +310,9 @@ private:
 public:
   ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, 
 	     SpinorW &W, SpinorV &V, Reducer &r, int length) :
-    result(result), X(X), Y(Y), Z(Z), W(W), V(V), r(r), 
-      X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0),
-      Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0), length(length)
+  arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, length),
+    result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0), 
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0)
     { ; }
   virtual ~ReduceCuda() { }
 
@@ -411,41 +322,40 @@ public:
     vol << blasConstants.x[1] << "x";
     vol << blasConstants.x[2] << "x";
     vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << X.Precision();
-    return TuneKey(vol.str(), typeid(r).name(), aux.str());
+    aux << "stride=" << blasConstants.stride << ",prec=" << arg.X.Precision();
+    return TuneKey(vol.str(), typeid(arg.r).name(), aux.str());
   }  
 
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, getBlasTuning(), getBlasVerbosity());
-    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>
-      (X, Y, Z, W, V, r, length, tp, stream);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+    result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>(arg, tp, stream);
   }
 
   void preTune() { 
-    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*X.Stride();
-    size_t norm_bytes = (X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
-    X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
-    Y.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
-    W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
-    V.save(&V_h, &Vnorm_h, bytes, norm_bytes);
+    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
+    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
+    arg.X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
+    arg.Y.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    arg.Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
+    arg.W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.V.save(&V_h, &Vnorm_h, bytes, norm_bytes);
   }
 
   void postTune() {
-    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*X.Stride();
-    size_t norm_bytes = (X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*length : 0;
-    X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
-    Y.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
-    W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
-    V.load(&V_h, &Vnorm_h, bytes, norm_bytes);
+    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
+    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
+    arg.X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
+    arg.Y.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
+    arg.Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
+    arg.W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.V.load(&V_h, &Vnorm_h, bytes, norm_bytes);
   }
 
-  long long flops() const { return r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*length*M; }
+  long long flops() const { return arg.r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
   long long bytes() const { 
-    size_t bytes = X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
-    if (X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
-    return r.streams()*bytes*length; }
+    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
+    if (arg.X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
+    return arg.r.streams()*bytes*arg.length; }
 };
 
 
@@ -489,11 +399,21 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   checkSpinor(x, w);
   checkSpinor(x, v);
 
+  if (!x.isNative()) {
+    warningQuda("Reductions on non-native fields is not supported\n");
+    doubleN value;
+    zero(value);
+    return value;
+  }
+
   for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
   blasConstants.stride = x.Stride();
 
   int reduce_length = siteUnroll ? x.RealLength() : x.Length();
   doubleN value;
+
+  // FIXME: use traits to encapsulate register type for shorts -
+  // will reduce template type parameters from 3 to 2
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
@@ -527,6 +447,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
       Spinor<float4,float4,float4,M,writeX,0> X(x);
       Spinor<float4,float4,float4,M,writeY,1> Y(y);
@@ -540,7 +461,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float4,float4,float4,M,writeV,4>, Reducer<ReduceType, float2, float4> >
 	reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M));
       reduce.apply(*getBlasStream());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else if (x.Nspin() == 1) {
+#ifdef GPU_STAGGERED_DIRAC
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
       Spinor<float2,float2,float2,M,writeX,0> X(x);
       Spinor<float2,float2,float2,M,writeY,1> Y(y);
@@ -554,9 +479,13 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
 	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
       reduce.apply(*getBlasStream());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else {
     if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       Spinor<float4,float4,short4,6,writeX,0> X(x);
       Spinor<float4,float4,short4,6,writeY,1> Y(y);
       Spinor<float4,float4,short4,6,writeZ,2> Z(z);
@@ -569,7 +498,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
 	reduce(value, X, Y, Z, W, V, r, y.Volume());
       reduce.apply(*getBlasStream());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else if (x.Nspin() == 1) {//staggered
+#ifdef GPU_STAGGERED_DIRAC
       Spinor<float2,float2,short2,3,writeX,0> X(x);
       Spinor<float2,float2,short2,3,writeY,1> Y(y);
       Spinor<float2,float2,short2,3,writeZ,2> Z(z);
@@ -582,6 +515,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
 	reduce(value, X, Y, Z, W, V, r, y.Volume());
       reduce.apply(*getBlasStream());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
   }
