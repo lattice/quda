@@ -1522,7 +1522,6 @@ namespace quda {
 
       void *issueMPIReceive(void* receiveParam)
       {
-        initDslashCommsPattern();
         ReceiveParam* param = static_cast<ReceiveParam*>(receiveParam);
         for(int i=3; i>=0; i--){
           if(!dslashParam.commDim[i]) continue;
@@ -1568,6 +1567,7 @@ namespace quda {
 		
 	inSpinor->allocateGhostBuffer(dslash.Nface()/2);
         inSpinor->createComms(dslash.Nface()/2);	
+        initDslashCommsPattern();
 
 #ifdef PTHREADS // create two new threads to issue MPI receives 
                 // and launch the interior dslash kernel
@@ -1589,9 +1589,7 @@ namespace quda {
         if(pthread_create(&interiorThread, NULL, launchInteriorKernel, &interiorParam)){
           errorQuda("pthread_create failed");
         }
-        if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
 #else // single CPU thread per MPI process
-        initDslashCommsPattern();
         for(int i=3; i>=0; i--){
           if(!dslashParam.commDim[i]) continue;
           for(int dir=1; dir>=0; dir--){
@@ -1647,6 +1645,7 @@ namespace quda {
 #ifdef MULTI_GPU 
 #ifdef PTHREADS
         if(pthread_join(receiveThread, NULL)) errorQuda("pthread_join failed");
+        if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
 #endif
 
 #ifdef GPU_COMMS
