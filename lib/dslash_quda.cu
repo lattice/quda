@@ -101,6 +101,9 @@ namespace quda {
   // these are set in initDslashConst
   int Vspatial;
 
+#ifdef PTHREADS
+  static cudaEvent_t interiorDslashEnd;
+#endif
   static cudaEvent_t packEnd[Nstream];
   static cudaEvent_t gatherStart[Nstream];
   static cudaEvent_t gatherEnd[Nstream];
@@ -220,6 +223,9 @@ namespace quda {
     }
     cudaEventCreateWithFlags(&dslashStart, cudaEventDisableTiming);
     cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
+#ifdef PTHREADS
+    cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
+#endif
 
     checkCudaError();
   }
@@ -237,6 +243,9 @@ namespace quda {
 
     cudaEventDestroy(dslashStart);
     cudaEventDestroy(dslashEnd);
+#ifdef PTHREADS
+    cudaEventDestroy(interiorDslashEnd);
+#endif
 
     checkCudaError();
   }
@@ -1544,7 +1553,8 @@ namespace quda {
       {
         InteriorParam* param = static_cast<InteriorParam*>(interiorParam);
         cudaSetDevice(param->current_device); // set device in the new thread
-        PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
+        PROFILE(param->dslash->apply(streams[Nstream-2]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
+        PROFILE(cudaEventRecord(interiorDslashEnd, streams[Nstream-2]), (*(param->profile)), QUDA_PROFILE_EVENT_RECORD);
         return NULL;
       }
 
@@ -1723,6 +1733,17 @@ namespace quda {
               dslashParam.kernel_type = static_cast<KernelType>(i);
               dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
 
+#ifdef PTHREADS // Wait for the interior Dslash to complete in stream[Nstream-2] 
+                // before launching exterior kernels in stream[Nstream-1]
+#ifdef GPU_COMMS 
+              if(completeSum==2){ // Only call cudaStreamWaitEvent once
+#else 
+              if(completeSum==4){ // Only call cudaStreamWaitEvent once
+#endif
+                PROFILE(cudaStreamWaitEvent(streams[Nstream-1], interiorDslashEnd, 0), 
+                    profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+             }
+#endif // PTHREADS
               // all faces use this stream
               PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
