@@ -73,7 +73,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
     int gauge_stride;
     int long_gauge_stride;
-    int fat_link_max;
+    float fat_link_max;
 #endif 
 
 #ifdef USE_TEXTURE_OBJECTS

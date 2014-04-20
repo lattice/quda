@@ -321,7 +321,7 @@ VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
   const int& long_stride = param.long_gauge_stride;
 #endif
 #if (DD_PREC == 2) // half precision
-  const int& fat_link_max = param.fat_link_max;
+  const float& fat_link_max = param.fat_link_max;
 #endif
 
 #if ((DD_RECON==9 || DD_RECON==13) && DD_IMPROVED==1)
