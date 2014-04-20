@@ -96,8 +96,6 @@ namespace quda {
       if (param.tol_offset[j] < param.delta) reliable = true;
 
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
-    cudaColorSpinorField *r_sloppy;
-    cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset];
     cudaColorSpinorField **y = reliable ? new cudaColorSpinorField*[num_offset] : NULL;
   
     ColorSpinorParam csParam(b);
@@ -108,17 +106,22 @@ namespace quda {
 
     csParam.setPrecision(param.precision_sloppy);
   
+    cudaColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x[0]->Precision()) {
-      for (int i=0; i<num_offset; i++){
-	x_sloppy[i] = x[i];
-	zeroCuda(*x_sloppy[i]);
-      }
       r_sloppy = r;
     } else {
-      for (int i=0; i<num_offset; i++)
-	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
       csParam.create = QUDA_COPY_FIELD_CREATE;
       r_sloppy = new cudaColorSpinorField(*r, csParam);
+    }
+  
+    cudaColorSpinorField **x_sloppy = new cudaColorSpinorField*[num_offset];
+    if (param.precision_sloppy == x[0]->Precision() ||
+	!param.use_sloppy_partial_accumulator) {
+      for (int i=0; i<num_offset; i++) x_sloppy[i] = x[i];
+    } else {
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      for (int i=0; i<num_offset; i++)
+	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
     }
   
     cudaColorSpinorField **p = new cudaColorSpinorField*[num_offset];  
@@ -237,6 +240,12 @@ namespace quda {
 	  if (reliable_shift == j_low) break;
 	}
 
+	// explicitly restore the orthogonality of the gradient vector
+	for (int j=0; j<num_offset_now; j++) {
+	  double rp = reDotProductCuda(*r_sloppy, *p[j]) / (r2[0]);
+	  axpyCuda(-rp, *r_sloppy, *p[j]);
+	}
+
 	// update beta and p
 	beta[0] = r2[0] / r2_old; 
 	xpayCuda(*r_sloppy, beta[0], *p[0]);
@@ -321,6 +330,11 @@ namespace quda {
 
     if (&tmp2 != &tmp1) delete tmp2_p;
 
+    if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;
+    for (int i=0; i<num_offset; i++) 
+       if (x_sloppy[i]->Precision() != x[i]->Precision()) delete x_sloppy[i];
+    delete []x_sloppy;
+  
     delete r;
     for (int i=0; i<num_offset; i++) delete p[i];
     delete []p;
@@ -331,12 +345,6 @@ namespace quda {
     }
 
     delete Ap;
-  
-    if (param.precision_sloppy != x[0]->Precision()) {
-      for (int i=0; i<num_offset; i++) delete x_sloppy[i];
-      delete r_sloppy;
-    }
-    delete []x_sloppy;
   
     delete []zeta_old;
     delete []zeta;

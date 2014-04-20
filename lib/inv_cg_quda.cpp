@@ -67,7 +67,6 @@ namespace quda {
 
     cudaColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
       r_sloppy = &r;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -77,7 +76,6 @@ namespace quda {
     cudaColorSpinorField *x_sloppy;
     if (param.precision_sloppy == x.Precision() ||
 	!param.use_sloppy_partial_accumulator) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
       x_sloppy = &x;
     } else {
       csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -185,8 +183,13 @@ namespace quda {
 	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	  copyCuda(tmp,y);
-	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	  if (&x != &xSloppy) {
+	    copyCuda(tmp,y);
+	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	  } else {
+	    copyCuda(r, rSloppy);
+	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);	  
+	  }
 	}
 
 	steps_since_reliable++;
@@ -234,6 +237,7 @@ namespace quda {
       k++;
 
       PrintStats("CG", k, r2, b2, heavy_quark_res);
+
     }
 
     copyCuda(x, xSloppy); // nop when these pointers alias

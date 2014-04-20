@@ -25,6 +25,14 @@
       errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
   }
 
+#define checkLength(a, b)						\
+  {									\
+    if (a.Length() != b.Length())					\
+      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+    if (a.Stride() != b.Stride())					\
+      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
+  }
+
 static struct {
   int x[QUDA_MAX_DIM];
   int stride;
@@ -89,6 +97,7 @@ namespace quda {
 
 #include <texture.h>
 #include <reduce_core.h>
+#include <reduce_mixed_core.h>
     
   } // namespace reduce
 
@@ -497,8 +506,14 @@ namespace quda {
 					     const Complex &b, cudaColorSpinorField &y,
 					     cudaColorSpinorField &z, cudaColorSpinorField &w,
 					     cudaColorSpinorField &u) {
-    return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1,0,0,false>
+    if (x.Precision() != z.Precision()) {
+      return reduce::mixed::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1,0,0,false>
       (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
+
+    } else {
+      return reduce::reduceCuda<double3,QudaSumFloat3,QudaSumFloat,caxpbypzYmbwcDotProductUYNormY,0,1,1,0,0,false>
+      (make_double2(REAL(a), IMAG(a)), make_double2(REAL(b), IMAG(b)), x, y, z, w, u);
+    }
   }
 
 

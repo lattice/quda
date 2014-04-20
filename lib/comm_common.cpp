@@ -110,9 +110,7 @@ Topology *comm_create_topology(int ndim, const int *dims, QudaCommsMap rank_from
   topo->coords = (int (*)[QUDA_MAX_DIM]) safe_malloc(nodes*sizeof(int[QUDA_MAX_DIM]));
 
   int x[QUDA_MAX_DIM];
-  for (int i = 0; i < ndim; i++) {
-    x[i] = 0;
-  }
+  for (int i = 0; i < QUDA_MAX_DIM; i++) x[i] = 0;
 
   do {
     int rank = rank_from_coords(x, map_data);
@@ -182,9 +180,11 @@ int comm_rank_displaced(const Topology *topo, const int displacement[])
 {
   int coords[QUDA_MAX_DIM];
 
-  for (int i = 0; i < topo->ndim; i++) {
-    coords[i] = mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]);
+  for (int i = 0; i < QUDA_MAX_DIM; i++) {
+    coords[i] = (i < topo->ndim) ? 
+      mod(comm_coords(topo)[i] + displacement[i], comm_dims(topo)[i]) : 0;
   }
+
   return comm_rank_from_coords(topo, coords);
 }
 
