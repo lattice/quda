@@ -78,6 +78,10 @@ void init()
 
   initQuda(device);
 
+#ifdef GPU_COMMS
+  setKernelPackT(true);
+#endif
+
   setVerbosity(QUDA_VERBOSE);
 
   gaugeParam = newQudaGaugeParam();

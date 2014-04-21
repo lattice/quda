@@ -827,7 +827,7 @@ namespace quda {
 #ifdef GPU_COMMS
 	offset2 += nFace*ghostFace[i]*Ndof*precision;
 	my_fwd_face[i] = fwdGhostFaceBuffer[i];	
-	from_fwd_face[i] = /*static_cast<char*>(ghost[i]) + nFace*ghostFace[i]*Ndof*precision; //*/static_cast<char*>(v) + offset2;
+	from_fwd_face[i] = /*static_cast<char*>(ghost[i]) + nFace*ghostFace[i]*Ndof*precision;*/static_cast<char*>(v) + offset2;
 
 	if(precision == QUDA_HALF_PRECISION){
 	  int norm_offset = stride + ghostNormOffset[i] + nFace*ghostFace[i];
@@ -873,10 +873,12 @@ namespace quda {
 
 
 	for (int i=0; i<nDimComms; i++) {
-	  size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 	  if (!commDimPartitioned(i)) continue;
 #ifdef GPU_COMMS
+	  size_t nbytes_Nface = surfaceCB[i]*Ndof*precision * (j+1);
 	  if (i != 3 || getKernelPackT()) {
+#else 
+	  size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 #endif
 	    mh_send_fwd[j][2*i+0] = comm_declare_send_relative(my_fwd_face[i], i, +1, nbytes_Nface);
 	    mh_send_back[j][2*i+0] = comm_declare_send_relative(my_back_face[i], i, -1, nbytes_Nface);
@@ -890,6 +892,8 @@ namespace quda {
 	      mh_send_norm_fwd[j][2*i+1] = mh_send_norm_fwd[j][2*i];
 	      mh_send_norm_back[j][2*i+1] = mh_send_norm_back[j][2*i]; 	
 	    }
+
+
 	  } else { 
 	    /* 
 	       use a strided communicator, here we can't really use
