@@ -1519,6 +1519,8 @@ namespace quda {
         profile.Stop(QUDA_PROFILE_TOTAL);
       }
 
+
+#ifdef PTHREADS
 #include <pthread.h>
 
       struct ReceiveParam 
@@ -1557,7 +1559,7 @@ namespace quda {
         PROFILE(cudaEventRecord(interiorDslashEnd, streams[Nstream-2]), (*(param->profile)), QUDA_PROFILE_EVENT_RECORD);
         return NULL;
       }
-
+#endif
 
       void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
           const int volume, const int *faceVolumeCB, TimeProfile &profile) {
