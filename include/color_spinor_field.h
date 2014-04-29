@@ -382,7 +382,11 @@ namespace quda {
 
     void streamInit(cudaStream_t *stream_p);
 
+    void pack(int nFace, int parity, int dagger, int stream_idx, bool zeroCopyPack, 
+              double a=0, double b=0);
 
+    void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
+	      int stream_idx, bool zeroCopyPack, double a=0);
 
     void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
 	      double a=0, double b=0);

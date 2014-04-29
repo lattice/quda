@@ -988,6 +988,23 @@ namespace quda {
     }
   }
 
+
+  void cudaColorSpinorField::pack(FullClover &clov, FullClover &clovInv, int nFace, int parity,
+				  int dagger, int stream_idx, bool zeroCopyPack, double a) {
+    allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
+    createComms(nFace); // must call this first
+
+    const int dim=-1; // pack all partitioned dimensions
+ 
+    if (zeroCopyPack) {
+      void *my_face_d;
+      cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
+      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d, a);
+    } else {
+      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[stream_idx-1], 0, a);
+    }
+  }
+
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
 				  bool zeroCopyPack, double a, double b) {
     allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
@@ -1003,6 +1020,23 @@ namespace quda {
       packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d, a, b);
     } else {
       packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[Nstream-1], 0, a, b);
+    }
+  }
+
+
+  void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx, 
+				  bool zeroCopyPack, double a, double b) {
+    allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
+    createComms(nFace); // must call this first
+
+    const int dim=-1; // pack all partitioned dimensions
+ 
+    if (zeroCopyPack) {
+      void *my_face_d;
+      cudaHostGetDevicePointer(&my_face_d, my_face, 0); // set the matching device pointer
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d, a, b);
+    } else {
+      packGhost(nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[stream_idx], 0, a, b);
     }
   }
 
