@@ -1943,74 +1943,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 }
 
 #if defined MULTI_GPU && defined DSLASH_XPAY
-if (kernel_type == INTERIOR_KERNEL)
-#endif
-{
-
-#ifdef DSLASH_XPAY
- READ_ACCUM(ACCUMTEX, sp_stride)
- VOLATILE spinorFloat coeff;
-
-#ifdef MDWF_mode
- coeff = 2.0*(mdwf_b5[xs]*(m5+4.0) + 1.0)/a;
-#else
- coeff = 1.0/a;
-#endif
-
-#ifdef SPINOR_DOUBLE
- o00_re = o00_re + coeff*accum0.x;
- o00_im = o00_im + coeff*accum0.y;
- o01_re = o01_re + coeff*accum1.x;
- o01_im = o01_im + coeff*accum1.y;
- o02_re = o02_re + coeff*accum2.x;
- o02_im = o02_im + coeff*accum2.y;
- o10_re = o10_re + coeff*accum3.x;
- o10_im = o10_im + coeff*accum3.y;
- o11_re = o11_re + coeff*accum4.x;
- o11_im = o11_im + coeff*accum4.y;
- o12_re = o12_re + coeff*accum5.x;
- o12_im = o12_im + coeff*accum5.y;
- o20_re = o20_re + coeff*accum6.x;
- o20_im = o20_im + coeff*accum6.y;
- o21_re = o21_re + coeff*accum7.x;
- o21_im = o21_im + coeff*accum7.y;
- o22_re = o22_re + coeff*accum8.x;
- o22_im = o22_im + coeff*accum8.y;
- o30_re = o30_re + coeff*accum9.x;
- o30_im = o30_im + coeff*accum9.y;
- o31_re = o31_re + coeff*accum10.x;
- o31_im = o31_im + coeff*accum10.y;
- o32_re = o32_re + coeff*accum11.x;
- o32_im = o32_im + coeff*accum11.y;
-#else                    
- o00_re = o00_re + coeff*accum0.x;
- o00_im = o00_im + coeff*accum0.y;
- o01_re = o01_re + coeff*accum0.z;
- o01_im = o01_im + coeff*accum0.w;
- o02_re = o02_re + coeff*accum1.x;
- o02_im = o02_im + coeff*accum1.y;
- o10_re = o10_re + coeff*accum1.z;
- o10_im = o10_im + coeff*accum1.w;
- o11_re = o11_re + coeff*accum2.x;
- o11_im = o11_im + coeff*accum2.y;
- o12_re = o12_re + coeff*accum2.z;
- o12_im = o12_im + coeff*accum2.w;
- o20_re = o20_re + coeff*accum3.x;
- o20_im = o20_im + coeff*accum3.y;
- o21_re = o21_re + coeff*accum3.z;
- o21_im = o21_im + coeff*accum3.w;
- o22_re = o22_re + coeff*accum4.x;
- o22_im = o22_im + coeff*accum4.y;
- o30_re = o30_re + coeff*accum4.z;
- o30_im = o30_im + coeff*accum4.w;
- o31_re = o31_re + coeff*accum5.x;
- o31_im = o31_im + coeff*accum5.y;
- o32_re = o32_re + coeff*accum5.z;
- o32_im = o32_im + coeff*accum5.w;
-#endif // SPINOR_DOUBLE
-#endif // DSLASH_XPAY
-}
-#if defined MULTI_GPU && defined DSLASH_XPAY
 
 int incomplete = 0; // Have all 8 contributions been computed for this site?
 
@@ -2028,65 +1960,67 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
 if (!incomplete)
 #endif // MULTI_GPU
 {
+
 #ifdef DSLASH_XPAY
+ READ_ACCUM(ACCUMTEX, sp_stride)
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
- coeff = 0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0);
+ coeff = (spinorFloat)(0.5*a/(mdwf_b5[xs]*(m5+4.0) + 1.0));
 #else
  coeff = a;
 #endif
 
 #ifdef SPINOR_DOUBLE
- o00_re = coeff*o00_re;
- o00_im = coeff*o00_im;
- o01_re = coeff*o01_re;
- o01_im = coeff*o01_im;
- o02_re = coeff*o02_re;
- o02_im = coeff*o02_im;
- o10_re = coeff*o10_re;
- o10_im = coeff*o10_im;
- o11_re = coeff*o11_re;
- o11_im = coeff*o11_im;
- o12_re = coeff*o12_re;
- o12_im = coeff*o12_im;
- o20_re = coeff*o20_re;
- o20_im = coeff*o20_im;
- o21_re = coeff*o21_re;
- o21_im = coeff*o21_im;
- o22_re = coeff*o22_re;
- o22_im = coeff*o22_im;
- o30_re = coeff*o30_re;
- o30_im = coeff*o30_im;
- o31_re = coeff*o31_re;
- o31_im = coeff*o31_im;
- o32_re = coeff*o32_re;
- o32_im = coeff*o32_im;
+ o00_re = coeff*o00_re + accum0.x;
+ o00_im = coeff*o00_im + accum0.y;
+ o01_re = coeff*o01_re + accum1.x;
+ o01_im = coeff*o01_im + accum1.y;
+ o02_re = coeff*o02_re + accum2.x;
+ o02_im = coeff*o02_im + accum2.y;
+ o10_re = coeff*o10_re + accum3.x;
+ o10_im = coeff*o10_im + accum3.y;
+ o11_re = coeff*o11_re + accum4.x;
+ o11_im = coeff*o11_im + accum4.y;
+ o12_re = coeff*o12_re + accum5.x;
+ o12_im = coeff*o12_im + accum5.y;
+ o20_re = coeff*o20_re + accum6.x;
+ o20_im = coeff*o20_im + accum6.y;
+ o21_re = coeff*o21_re + accum7.x;
+ o21_im = coeff*o21_im + accum7.y;
+ o22_re = coeff*o22_re + accum8.x;
+ o22_im = coeff*o22_im + accum8.y;
+ o30_re = coeff*o30_re + accum9.x;
+ o30_im = coeff*o30_im + accum9.y;
+ o31_re = coeff*o31_re + accum10.x;
+ o31_im = coeff*o31_im + accum10.y;
+ o32_re = coeff*o32_re + accum11.x;
+ o32_im = coeff*o32_im + accum11.y;
 #else
- o00_re = coeff*o00_re;
- o00_im = coeff*o00_im;
- o01_re = coeff*o01_re;
- o01_im = coeff*o01_im;
- o02_re = coeff*o02_re;
- o02_im = coeff*o02_im;
- o10_re = coeff*o10_re;
- o10_im = coeff*o10_im;
- o11_re = coeff*o11_re;
- o11_im = coeff*o11_im;
- o12_re = coeff*o12_re;
- o12_im = coeff*o12_im;
- o20_re = coeff*o20_re;
- o20_im = coeff*o20_im;
- o21_re = coeff*o21_re;
- o21_im = coeff*o21_im;
- o22_re = coeff*o22_re;
- o22_im = coeff*o22_im;
- o30_re = coeff*o30_re;
- o30_im = coeff*o30_im;
- o31_re = coeff*o31_re;
- o31_im = coeff*o31_im;
- o32_re = coeff*o32_re;
- o32_im = coeff*o32_im;
+ o00_re = coeff*o00_re + accum0.x;
+ o00_im = coeff*o00_im + accum0.y;
+ o01_re = coeff*o01_re + accum0.z;
+ o01_im = coeff*o01_im + accum0.w;
+ o02_re = coeff*o02_re + accum1.x;
+ o02_im = coeff*o02_im + accum1.y;
+ o10_re = coeff*o10_re + accum1.z;
+ o10_im = coeff*o10_im + accum1.w;
+ o11_re = coeff*o11_re + accum2.x;
+ o11_im = coeff*o11_im + accum2.y;
+ o12_re = coeff*o12_re + accum2.z;
+ o12_im = coeff*o12_im + accum2.w;
+ o20_re = coeff*o20_re + accum3.x;
+ o20_im = coeff*o20_im + accum3.y;
+ o21_re = coeff*o21_re + accum3.z;
+ o21_im = coeff*o21_im + accum3.w;
+ o22_re = coeff*o22_re + accum4.x;
+ o22_im = coeff*o22_im + accum4.y;
+ o30_re = coeff*o30_re + accum4.z;
+ o30_im = coeff*o30_im + accum4.w;
+ o31_re = coeff*o31_re + accum5.x;
+ o31_im = coeff*o31_im + accum5.y;
+ o32_re = coeff*o32_re + accum5.z;
+ o32_im = coeff*o32_im + accum5.w;
 #endif // SPINOR_DOUBLE
 #endif // DSLASH_XPAY
 }

@@ -125,12 +125,6 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
   return mh;
 }
 
-
-int comm_gpuid(void)
-{
-  return gpuid;
-}
-
 /**
  * Declare a message handle for strided receiving from a node
  * displaced in (x,y,z,t) according to "displacement"

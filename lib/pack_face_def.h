@@ -2630,7 +2630,7 @@ class PackFaceDW4D : public PackFace<FloatN, Float> {
   virtual ~PackFaceDW4D() { }
   
   void apply(const cudaStream_t &stream) {
-    TuneParam tp = tuneLaunch(*this, dslashTuning, verbosity);
+    TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     
 #ifdef GPU_DOMAIN_WALL_DIRAC
     PackParam<FloatN> param = this->prepareParam();
