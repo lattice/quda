@@ -965,6 +965,11 @@ namespace quda {
     }
   }
 
+  void cudaColorSpinorField::streamInit(cudaStream_t *stream_p){
+    stream = stream_p;
+  }
+
+
   void cudaColorSpinorField::pack(FullClover &clov, FullClover &clovInv, int nFace, int parity,
 				  int dagger, cudaStream_t *stream_p, bool zeroCopyPack, double a) {
     allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  

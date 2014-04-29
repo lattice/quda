@@ -380,6 +380,7 @@ namespace quda {
         const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream);
 
 
+    void streamInit(cudaStream_t *stream_p);
 
 
 
