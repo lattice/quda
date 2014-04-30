@@ -1619,14 +1619,14 @@ class PackFace : public Tunable {
       if (clov != NULL && clovInv != NULL) {
         if (param.parity == QUDA_EVEN_PARITY) {
           param.cloverTex = clov->evenTex;
-          param.cloverTexNorm = clov->evenTexNorm;
+          param.cloverNormTex = clov->evenNormTex;
           param.cloverInvTex = clovInv->evenTex;
-          param.cloverInvTexNorm = clovInv->evenTexNorm;
+          param.cloverInvNormTex = clovInv->evenNormTex;
 	} else {
           param.cloverTex = clov->oddTex;
-          param.cloverTexNorm = clov->oddTexNorm;
+          param.cloverNormTex = clov->oddNormTex;
           param.cloverInvTex = clovInv->oddTex;
-          param.cloverInvTexNorm = clovInv->oddTexNorm;
+          param.cloverInvNormTex = clovInv->oddNormTex;
 	}
       }
 #endif

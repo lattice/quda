@@ -43,6 +43,8 @@
 #include <util_quda.h>
 #include <malloc_quda.h>
 
+#include <vector>
+
 // Use bindless texture on Kepler
 #if (__COMPUTE_CAPABILITY__ >= 300) && (CUDA_VERSION >= 5000)
 #define USE_TEXTURE_OBJECTS
@@ -209,7 +211,11 @@ namespace quda {
   };
 
 #ifdef MULTI_GPU
+#ifdef PTHREADS
+  const int Nstream = 10;
+#else
   const int Nstream = 9;
+#endif
 #else
   const int Nstream = 1;
 #endif

@@ -309,8 +309,15 @@ namespace quda {
 
   void axpyBzpcxCuda(const double &a, cudaColorSpinorField& x, cudaColorSpinorField& y, const double &b, 
 		     cudaColorSpinorField& z, const double &c) {
-    blasCuda<axpyBzpcx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0), 
-				x, y, z, x);
+    if (x.Precision() != y.Precision()) {
+      // call hacked mixed precision kernel
+      mixed::blasCuda<axpyBzpcx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+					 make_double2(c,0.0),	x, y, z, x);
+    } else {
+      // swap arguments around 
+      blasCuda<axpyBzpcx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+				  make_double2(c,0.0), x, y, z, x);
+    }
   }
 
   /**

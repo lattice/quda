@@ -45,7 +45,7 @@ namespace quda {
               inv_param.dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4), 
         twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER), 
         fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
-          create(QUDA_REFERENCE_FIELD_CREATE), v(V), eigv_dim(0), eigv_id(-1) { 
+        create(QUDA_REFERENCE_FIELD_CREATE), v(V), eigv_dim(0), eigv_id(-1) {
 
             if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
             for (int d=0; d<nDim; d++) x[d] = X[d];
@@ -162,7 +162,6 @@ namespace quda {
 
       void *v; // the field elements
       void *norm; // the normalization field
-
       //! used for deflated solvers:
       int eigv_dim;
       int eigv_id;
@@ -189,13 +188,13 @@ namespace quda {
 
       /*Warning: we need copies of the above params for eigenvectors*/
       //multi_GPU parameters:
-
+ 
       //ghost pointers are always for single eigenvector..
       int eigv_total_length;
       int eigv_total_norm_length;
       int eigv_ghost_length;
       int eigv_ghost_norm_length;
-
+ 
       size_t eigv_bytes;      // size in bytes of spinor field
       size_t eigv_norm_bytes; // makes no sense but let's keep it...
 
@@ -259,7 +258,7 @@ namespace quda {
       int EigvLength() const { return eigv_length; }
       int EigvRealLength() const { return eigv_real_length; } 
       int EigvTotalLength() const { return eigv_total_length; }
-
+ 
       size_t EigvBytes() const { return eigv_bytes; }
       size_t EigvNormBytes() const { return eigv_norm_bytes; }
       int EigvGhostLength() const { return eigv_ghost_length; }
@@ -302,6 +301,15 @@ namespace quda {
     void destroyTexObject();
 #endif
 
+#ifdef GPU_COMMS  // This is a hack for half precision.
+   // Since the ghost data and ghost norm data are not contiguous, 
+   // separate MPI calls are needed when using GPUDirect RDMA.
+   void *my_fwd_norm_face[QUDA_MAX_DIM];
+   void *my_back_norm_face[QUDA_MAX_DIM];
+   void *from_fwd_norm_face[QUDA_MAX_DIM];
+   void *from_back_norm_face[QUDA_MAX_DIM];
+#endif
+
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
@@ -331,11 +339,6 @@ namespace quda {
     /** How many faces we are communicating in this communicator */
     int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
-    /** Create the communication handlers and buffers */
-    void createComms(int nFace);
-
-    /** Destroy the communication handlers and buffers */
-    void destroyComms();
 
     public:
     //cudaColorSpinorField();
@@ -349,6 +352,10 @@ namespace quda {
     cudaColorSpinorField& operator=(const cudaColorSpinorField&);
     cudaColorSpinorField& operator=(const cpuColorSpinorField&);
 
+    /** Create the communication handlers and buffers */
+    void createComms(int nFace);
+    /** Destroy the communication handlers and buffers */
+    void destroyComms();
     void allocateGhostBuffer(int nFace);
     static void freeGhostBuffer(void);
 
@@ -414,8 +421,13 @@ namespace quda {
         const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream);
 
 
+    void streamInit(cudaStream_t *stream_p);
 
+    void pack(int nFace, int parity, int dagger, int stream_idx, bool zeroCopyPack, 
+              double a=0, double b=0);
 
+    void pack(FullClover &clov, FullClover &clovInv, int nFace, int parity, int dagger,
+	      int stream_idx, bool zeroCopyPack, double a=0);
 
     void pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, bool zeroCopyPack,
 	      double a=0, double b=0);

@@ -110,18 +110,26 @@ namespace quda {
 
     // set field aliasing according to whether we are doing mixed precision or not
     if (param.precision_sloppy == x.Precision()) {
-      x_sloppy = &x;
       r_sloppy = &r;
       r_0 = &b;
+    } else {
+      ColorSpinorParam csParam(x);
+      csParam.setPrecision(param.precision_sloppy);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      r_sloppy = new cudaColorSpinorField(r, csParam);
+      r_0 = new cudaColorSpinorField(b, csParam);
+    }
+
+    // set field aliasing according to whether we are doing mixed precision or not
+    if (param.precision_sloppy == x.Precision() ||
+	!param.use_sloppy_partial_accumulator) {
+      x_sloppy = &x;
       zeroCuda(*x_sloppy);
     } else {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
       x_sloppy = new cudaColorSpinorField(x, csParam);
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(r, csParam);
-      r_0 = new cudaColorSpinorField(b, csParam);
     }
 
     // Syntatic sugar
@@ -229,8 +237,13 @@ namespace quda {
       }
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	copyCuda(tmp,y);
-	heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	if (&x != &xSloppy) {
+	  copyCuda(tmp,y);
+	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	} else {
+	  copyCuda(r, rSloppy);
+	  heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);	  
+	}
       }
 
       if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
@@ -311,8 +324,10 @@ namespace quda {
     if (param.precision_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
-      delete x_sloppy;
     }
+
+    if (&x != &xSloppy) delete x_sloppy;
+
     profile.Stop(QUDA_PROFILE_FREE);
     
     return;

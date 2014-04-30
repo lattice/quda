@@ -499,8 +499,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
 
 #if DD_DAG
-//#include "tmc_dslash_dagger_fermi_core.h"
-#include "tmc2_dslash_dagger_fermi_core.h"
+#include "tmc_dslash_dagger_fermi_core.h"
 #else
 #include "tmc_dslash_fermi_core.h"
 #endif

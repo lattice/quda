@@ -225,6 +225,7 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
     errorQuda("Number of communication grid dimensions must be 4");
   }
 
+  LexMapData map_data;
   if (!func) {
 
 #if QMP_COMMS
@@ -244,7 +245,6 @@ void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata
       warningQuda("QMP logical topology is undeclared; using default lexicographical ordering");
 #endif
 
-      LexMapData map_data;
       map_data.ndim = nDim;
       for (int i=0; i<nDim; i++) {
         map_data.dims[i] = dims[i];
@@ -374,7 +374,6 @@ void initQudaMemory()
   int greatestPriority;
   int leastPriority;
   cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
-
   for (int i=0; i<Nstream-1; i++) {
     cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
   }
@@ -2641,7 +2640,6 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   profileMulti.Stop(QUDA_PROFILE_TOTAL);
 }
 
-
 void invertIncDeflatedQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u/*=0*/, bool last_rhs/*=false*/)
 {
   if(!InitMagma) openMagma();
@@ -2762,6 +2760,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void 
   setTuning(param->tune);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
+//here...
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
     double nout = norm2(*out);
@@ -2769,7 +2768,8 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void 
     printfQuda("Prepared solution = %g\n", nout);   
   }
 
-  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
+//  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
+    massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -2795,7 +2795,6 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void 
   if(param->inv_type == QUDA_INC_EIGCG_INVERTER || param->inv_type == QUDA_EIGCG_INVERTER)
   {  
     DiracMdagM m(dirac), mSloppy(diracSloppy), mDeflate(diracDeflate);
-
     SolverParam solverParam(*param);
 
     DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mDeflate, profileInvert);  
@@ -2857,8 +2856,6 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void 
 
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
-
-
 
 #ifdef GPU_FATLINK 
 /*   @method  
