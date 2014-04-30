@@ -39,8 +39,8 @@ BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU c
 POSIX_THREADS = no                # set to 'yes' to build pthread code
 
 # GPUdirect options
-GPU_DIRECT = @GPU_DIRECT@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
-GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to shared pinned buffers
+GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
+GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
 
 # Interface options
 BUILD_QDP_INTERFACE = @BUILD_QDP_INTERFACE@                     # build qdp interface
