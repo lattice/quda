@@ -101,6 +101,9 @@ namespace quda {
   // these are set in initDslashConst
   int Vspatial;
 
+#ifdef PTHREADS
+  static cudaEvent_t interiorDslashEnd;
+#endif
   static cudaEvent_t packEnd[Nstream];
   static cudaEvent_t gatherStart[Nstream];
   static cudaEvent_t gatherEnd[Nstream];
@@ -220,6 +223,9 @@ namespace quda {
     }
     cudaEventCreateWithFlags(&dslashStart, cudaEventDisableTiming);
     cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
+#ifdef PTHREADS
+    cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
+#endif
 
     checkCudaError();
   }
@@ -237,6 +243,9 @@ namespace quda {
 
     cudaEventDestroy(dslashStart);
     cudaEventDestroy(dslashEnd);
+#ifdef PTHREADS
+    cudaEventDestroy(interiorDslashEnd);
+#endif
 
     checkCudaError();
   }
@@ -1510,6 +1519,8 @@ namespace quda {
         profile.Stop(QUDA_PROFILE_TOTAL);
       }
 
+
+#ifdef PTHREADS
 #include <pthread.h>
 
       struct ReceiveParam 
@@ -1522,7 +1533,6 @@ namespace quda {
 
       void *issueMPIReceive(void* receiveParam)
       {
-        initDslashCommsPattern();
         ReceiveParam* param = static_cast<ReceiveParam*>(receiveParam);
         for(int i=3; i>=0; i--){
           if(!dslashParam.commDim[i]) continue;
@@ -1548,7 +1558,7 @@ namespace quda {
         PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
         return NULL;
       }
-
+#endif
 
       void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
           const int volume, const int *faceVolumeCB, TimeProfile &profile) {
@@ -1568,9 +1578,12 @@ namespace quda {
 		
 	inSpinor->allocateGhostBuffer(dslash.Nface()/2);
         inSpinor->createComms(dslash.Nface()/2);	
-
+        initDslashCommsPattern();
+        inSpinor->streamInit(streams);
 #ifdef PTHREADS // create two new threads to issue MPI receives 
                 // and launch the interior dslash kernel
+
+        const int packIndex = Nstream-2;
         pthread_t receiveThread, interiorThread;
         ReceiveParam receiveParam;
         receiveParam.profile = &profile;
@@ -1589,9 +1602,9 @@ namespace quda {
         if(pthread_create(&interiorThread, NULL, launchInteriorKernel, &interiorParam)){
           errorQuda("pthread_create failed");
         }
-        if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
 #else // single CPU thread per MPI process
-        initDslashCommsPattern();
+        const int packIndex = Nstream-1;
+        
         for(int i=3; i>=0; i--){
           if(!dslashParam.commDim[i]) continue;
           for(int dir=1; dir>=0; dir--){
@@ -1606,16 +1619,16 @@ namespace quda {
 
         // Initialize pack from source spinor
         if (inCloverInv == NULL) {
-          PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, streams, twist_a, twist_b),
+          PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a, twist_b),
               profile, QUDA_PROFILE_PACK_KERNEL);
         } else {
-          PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, streams, twist_a),
+          PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
               profile, QUDA_PROFILE_PACK_KERNEL);
         }
 
         if (pack) {
           // Record the end of the packing
-          PROFILE(cudaEventRecord(packEnd[0], streams[Nstream-1]), 
+          PROFILE(cudaEventRecord(packEnd[0], streams[packIndex]), 
               profile, QUDA_PROFILE_EVENT_RECORD);
         }
 #ifndef GPU_COMMS
@@ -1645,10 +1658,10 @@ namespace quda {
 #endif
 
 #ifdef MULTI_GPU 
+
 #ifdef PTHREADS
         if(pthread_join(receiveThread, NULL)) errorQuda("pthread_join failed");
 #endif
-
 #ifdef GPU_COMMS
         bool pack_event = false;
         for (int i=3; i>=0; i--) {
@@ -1723,7 +1736,6 @@ namespace quda {
 
               dslashParam.kernel_type = static_cast<KernelType>(i);
               dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
-
               // all faces use this stream
               PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
@@ -1735,6 +1747,11 @@ namespace quda {
         }
         it = (it^1);
 #endif // MULTI_GPU
+
+#ifdef PTHREADS
+        if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
+#endif
+
         profile.Stop(QUDA_PROFILE_TOTAL);
       }
 

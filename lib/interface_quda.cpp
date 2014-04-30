@@ -350,7 +350,6 @@ void initQudaMemory()
   int greatestPriority;
   int leastPriority;
   cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
-
   for (int i=0; i<Nstream-1; i++) {
     cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
   }
