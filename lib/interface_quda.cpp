@@ -350,20 +350,10 @@ void initQudaMemory()
   int greatestPriority;
   int leastPriority;
   cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
-#ifndef PTHREADS
   for (int i=0; i<Nstream-1; i++) {
     cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
   }
   cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
-#else // launch the interior Dslash kernel in stream[Nstream-2]. 
-      // This has lower priority than the packing stream (Nstream-1),
-      // so launching the interior dslash first doesn't delay comms.
-  for (int i=0; i<Nstream-2; i++) {
-    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
-  }
-  cudaStreamCreateWithPriority(&streams[Nstream-2], cudaStreamDefault, leastPriority);
-  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, greatestPriority);
-#endif
 #else
   for (int i=0; i<Nstream; i++) {
     cudaStreamCreate(&streams[i]);
