@@ -358,18 +358,20 @@ namespace quda {
 
 	      Float sign = 1.0;	
 	      if(s_row != s_col) {
-		sign = -1.0;
+	       sign = -1.0;
 	      }
 
 	      for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
 	        for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
 		  //X[coarse_site_offset+Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*ic_c+jc_c] += sign*quda::conj(Xlocal[Nc_c*jc_c + ic_c]);
 		  //Transpose color part
-		  Y(2*ndim,i%2,i/2,s_row,s_col,ic_c,jc_c) += sign*quda::conj(Xlocal[Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*jc_c+ic_c]);
+		  Y(2*ndim,i%2,i/2,s_row,s_col,ic_c,jc_c) =  sign*Y(2*ndim,i%2,i/2,s_row,s_col,ic_c,jc_c)+quda::conj(Xlocal[Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*jc_c+ic_c]);
 	        } //Color column
 	      } //Color row
 	    } //Spin column
-	  } //Spin row  
+	  } //Spin row
+
+
 	} //Volume
 	delete [] Xlocal;
 }
@@ -443,6 +445,16 @@ namespace quda {
     }
 
     coarseDiagonal<Float>(Y, ndim, xc_size, Nc_c, Ns_c);
+      #if 0
+      for(int i = 0; i < Y.Volume(); i++) {
+        for(int s = 0; s < Ns_c; s++) {
+          for(int s_col = 0; s_col < Ns_c; s_col++) {
+            for(int c = 0; c < Nc_c; c++) {
+              for(int c_col = 0; c_col < Nc_c; c_col++) {
+                printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e\n",ndim,i,s,s_col,c,c_col,Y(2*ndim,i%2,i/2,s,s_col,c,c_col).real(),Y(2*ndim,i%2,i/2,s,s_col,c,c_col).imag());
+              }}}}}
+      #endif
+
     //addMass<Float>(Y[2*ndim], ndim, xc_size, Nc_c, Ns_c, mass);
 
   }
@@ -557,7 +569,7 @@ namespace quda {
         int backward_parity = 0;
 
         //We need the coordinates of the forward site to index into the "out" field.
-        //We need the coordinates of the backward site to index into the "out" field, \
+        //We need the coordinates of the backward site to index into the "out" field, 
 	//as well as to retrieve the gauge field there for parallel transport.
 	in.LatticeIndex(forward,i);
         in.LatticeIndex(backward,i);
@@ -572,10 +584,8 @@ namespace quda {
           backward_gauge_index += backward[dim];
         }
 	backward_parity = backward_parity%2;
-        int backward_gauge_site_offset = backward_parity*sites/2 + backward_gauge_index/2;
-        backward_gauge_site_offset *= Nc*Nc*Ns*Ns;
-
-
+        //int backward_gauge_site_offset = backward_parity*sites/2 + backward_gauge_index/2;
+        //backward_gauge_site_offset *= Nc*Nc*Ns*Ns;
         for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
 	  for(int c_row = 0; c_row < Nc; c_row++) { //Color row
             for(int s_col = 0; s_col < Ns; s_col++) { //Spin column

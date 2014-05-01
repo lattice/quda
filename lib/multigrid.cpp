@@ -207,7 +207,7 @@ namespace quda {
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
     //for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
-    printfQuda("deviation = %e\n", blas::xmyNorm(*x_coarse, *r_coarse));
+    printfQuda("deviation = %e\n\n", blas::xmyNorm(*x_coarse, *r_coarse));
       //}
     //}
     delete tmp_coarse;
@@ -304,6 +304,7 @@ namespace quda {
 
       for (int i = 0; i < (nvec < 2 ? nvec : 2); i++) {
 	blas::zero(*B[i]);
+	#if 1
 	ColorSpinorParam csParam(*B[i]);
 	csParam.create = QUDA_ZERO_FIELD_CREATE;
 	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
@@ -315,6 +316,10 @@ namespace quda {
 	  }
 	}
 	delete tmp;
+	#else
+	printfQuda("Using random source for nullvector = %d\n",i);
+	B[i]->Source(QUDA_RANDOM_SOURCE);
+	#endif
       }
 
       for (int i=2; i<nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
