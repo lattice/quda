@@ -119,6 +119,7 @@ namespace quda {
       */
       __device__ __host__ void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
 	int parity = 0;
+	int savey0 = y[0];
 	
 	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 	  for (int d=0; d<nDim; d++) parity += y[d];
@@ -131,7 +132,8 @@ namespace quda {
 	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
 	
 	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	  y[0] = 2*y[0] + parity;
+	  //y[0] = 2*y[0] + parity;
+	  y[0] = savey0;
 	  x[0] *= 2; // restore x[0]
 	}
       }

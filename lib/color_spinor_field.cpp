@@ -383,6 +383,7 @@ namespace quda {
     int parity = 0;
     int z[QUDA_MAX_DIM];
     memcpy(z, x, QUDA_MAX_DIM*sizeof(int));
+    int savey0 = y[0];
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       for (int d=0; d<nDim; d++) parity += y[d];
@@ -399,7 +400,7 @@ namespace quda {
 
     //printf("\nparity = %d\n", parity);
 
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = 2*y[0] + parity;
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) y[0] = savey0;
   }
 
   ColorSpinorField* ColorSpinorField::Create(const ColorSpinorParam &param) {
