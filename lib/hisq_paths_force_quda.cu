@@ -1506,7 +1506,6 @@ namespace quda {
         private:
           const cudaGaugeField &link;
           const cudaGaugeField &oprod;
-          const int sig;
           cudaGaugeField &mom;
           int X[4];
           hisq_kernel_param_t kparam;
@@ -1520,8 +1519,8 @@ namespace quda {
 
         public:
           CompleteForce(const cudaGaugeField &link, const cudaGaugeField &oprod, 
-              int sig, cudaGaugeField &mom, const QudaGaugeParam &param) :
-            link(link), oprod(oprod), sig(sig), mom(mom)
+             cudaGaugeField &mom, const QudaGaugeParam &param) :
+            link(link), oprod(oprod), mom(mom)
         {  
 
           for(int dir=0; dir<4; ++dir){
@@ -1541,14 +1540,13 @@ namespace quda {
             vol << X[2] << "x";
             vol << X[3];    
             int threads = X[0]*X[1]*X[2]*X[3]/2;
-            aux << "threads=" << threads << ",prec=" << link.Precision() << ",sig=" << sig;
+            aux << "threads=" << threads << ",prec=" << link.Precision();
             return TuneKey(vol.str(), typeid(*this).name(), aux.str());
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB)  <<<tp.grid, tp.block>>>		\
           ((typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
            (typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
-           sig,								\
            (typeA*)mom.Even_p(), (typeA*)mom.Odd_p(),			\
            kparam);		
 
@@ -1847,20 +1845,17 @@ namespace quda {
     {
       bind_tex_link(link, oprod);
 
-
-      for(int sig=0; sig<4; sig++){
-        if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
-          CompleteForce<double2,double2> completeForce(link, oprod, sig, *force, param);
-          completeForce.apply(0);
-          checkCudaError();
-        }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
-          CompleteForce<float2,float2> completeForce(link, oprod, sig, *force, param);
-          completeForce.apply(0);
-          checkCudaError();
-        }else{
+      if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
+        CompleteForce<double2,double2> completeForce(link, oprod, *force, param);
+        completeForce.apply(0);
+        checkCudaError();
+      }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
+        CompleteForce<float2,float2> completeForce(link, oprod, *force, param);
+        completeForce.apply(0);
+        checkCudaError();
+      }else{
           errorQuda("Unsupported precision");
-        }
-      } // loop over directions
+      }
 
       unbind_tex_link(link, oprod);
       return;

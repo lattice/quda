@@ -28,7 +28,7 @@ printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21
  *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pmu_at_B, Qmu_at_A
  *
  * Three call variations:
- *   1. when Qprev == NULL:   Qprod_at_D does not exit and is not read in
+ *   1. when Qprev == NULL:   Qprod_at_D does not exist and is not read in
  *   2. full read/write
  *   3. when Pmu/Qmu == NULL,   Pmu_at_B and Qmu_at_A are not written out
  *
@@ -222,7 +222,9 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   return;
 }
 
-
+// Flop count, in two-number pair (matrix_multi, matrix_add)
+//  if (sig is positive)  (4, 1)
+//  else                  (2, 0)
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change> 
   __global__ void
 HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
@@ -394,6 +396,10 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
  *
  *********************************************************************************/
 
+// Flop count, in two-number pair (matrix_mult, matrix_add)
+// 		(2,2)
+
+
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
   __global__ void
 HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
@@ -497,11 +503,12 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     if(oddBit){ mycoeff = -mycoeff; }
     addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
   } 
-//#endif
   return;
 }
 
 
+// Flop count, in two-number pair (matrix_mult, matrix_add)
+// 		(0,1)
 
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
@@ -750,7 +757,8 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
 
 
-
+// Flops count, in two-number pair (matrix_mult, matrix_add)
+// 				   (24, 12)
 
 template<class RealA, class RealB,  int oddBit>
   __global__ void 
@@ -833,11 +841,11 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
 }
 
 
+// Flops count: 1 matrix multiplication
 template<class RealA, class RealB, int oddBit>
   __global__ void 
 HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const RealB* const linkOdd, 
     const RealA* const oprodEven, const RealA* const oprodOdd,
-    int sig,
     RealA* const forceEven, RealA* const forceOdd,
     hisq_kernel_param_t kparam)
 {
@@ -859,17 +867,18 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
   new_sid = linkIndex(x,dx,E);
 #endif
 
+  for(int sig=0; sig<4; ++sig){
+  
+    Matrix<RealA,3> Uw, Ow, Ox;
 
-  Matrix<RealA,3> Uw, Ow, Ox;
+    loadLink<18>(linkEven, linkOdd, sig, new_sid, Uw.data, oddBit, kparam.thin_link_stride);  
 
+    loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, Ox.data, oddBit, kparam.color_matrix_stride);
+    typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
+    Ow = Uw*Ox;
 
-  loadLink<18>(linkEven, linkOdd, sig, new_sid, Uw.data, oddBit, kparam.thin_link_stride);  
-
-  loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, Ox.data, oddBit, kparam.color_matrix_stride);
-  typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
-  Ow = Uw*Ox;
-
-  storeMatrixToMomentumField(Ow.data, sig, sid, coeff, forceEven, forceOdd, oddBit, kparam.momentum_stride); 
+    storeMatrixToMomentumField(Ow.data, sig, sid, coeff, forceEven, forceOdd, oddBit, kparam.momentum_stride); 
+  }
   return;
 }
 
