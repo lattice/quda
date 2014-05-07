@@ -841,7 +841,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
 }
 
 
-// Flops count: 1 matrix multiplication
+// Flops count: 4 matrix multiplicatios
 template<class RealA, class RealB, int oddBit>
   __global__ void 
 HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const RealB* const linkOdd, 
