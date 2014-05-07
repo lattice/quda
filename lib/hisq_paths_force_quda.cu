@@ -553,7 +553,7 @@ namespace quda {
     template<class RealA, int oddBit>
       __global__ void 
       do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOdd,
-          int sig, typename RealTypeId<RealA>::Type coeff,
+          typename RealTypeId<RealA>::Type coeff,
           RealA* const outputEven, RealA* const outputOdd, hisq_kernel_param_t kparam)
       {
         int sid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -568,11 +568,11 @@ namespace quda {
 #else
         int new_sid = sid;
 #endif
-        RealA COLOR_MAT_W[ArrayLength<RealA>::result];
-        if(GOES_FORWARDS(sig)){
+	for(int sig=0; sig<4; ++sig){
+          RealA COLOR_MAT_W[ArrayLength<RealA>::result];
           loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, COLOR_MAT_W, oddBit, kparam.color_matrix_stride);
           addMatrixToField(COLOR_MAT_W, sig, new_sid, coeff, outputEven, outputOdd, oddBit, kparam.color_matrix_stride);
-        }
+	}
         return;
       }
 
@@ -1338,7 +1338,6 @@ namespace quda {
 
         private:
           const cudaGaugeField &oprod;
-          const int sig;
           const typename RealTypeId<RealA>::Type &coeff; 
           cudaGaugeField &ForceMatrix;
           int X[4];
@@ -1352,10 +1351,10 @@ namespace quda {
           unsigned int minThreads() const { return X[0]*X[1]*X[2]*X[3]/2; }
 
         public:
-          OneLinkTerm(const cudaGaugeField &oprod, int sig, 
+          OneLinkTerm(const cudaGaugeField &oprod,  
               const typename RealTypeId<RealA>::Type &coeff, 
               cudaGaugeField &ForceMatrix, const QudaGaugeParam& param) :
-            oprod(oprod), sig(sig), coeff(coeff), ForceMatrix(ForceMatrix)
+            oprod(oprod), coeff(coeff), ForceMatrix(ForceMatrix)
         { 
           for(int dir=0; dir<4; ++dir) X[dir] = param.X[dir];
 
@@ -1376,7 +1375,7 @@ namespace quda {
             vol << X[3];    
             int threads = X[0]*X[1]*X[2]*X[3]/2;
             aux << "threads=" << threads << ",prec=" << oprod.Precision();
-            aux << ",sig=" << sig << ",coeff=" << coeff;
+            aux << ",coeff=" << coeff;
             return TuneKey(vol.str(), typeid(*this).name(), aux.str());
           }  
 
@@ -1386,21 +1385,19 @@ namespace quda {
 
 
 
-            if(GOES_FORWARDS(sig)){
-              do_one_link_term_kernel<RealA,0><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
-                  static_cast<const RealA*>(oprod.Odd_p()), 
-                  sig, coeff,
-                  static_cast<RealA*>(ForceMatrix.Even_p()), 
-                  static_cast<RealA*>(ForceMatrix.Odd_p()),
-                  kparam);
-              do_one_link_term_kernel<RealA,1><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
-                  static_cast<const RealA*>(oprod.Odd_p()), 
-                  sig, coeff,
-                  static_cast<RealA*>(ForceMatrix.Even_p()), 
-                  static_cast<RealA*>(ForceMatrix.Odd_p()),
-                  kparam);
+            do_one_link_term_kernel<RealA,0><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
+                static_cast<const RealA*>(oprod.Odd_p()), 
+                coeff,
+                static_cast<RealA*>(ForceMatrix.Even_p()), 
+                static_cast<RealA*>(ForceMatrix.Odd_p()),
+                kparam);
+            do_one_link_term_kernel<RealA,1><<<tp.grid,tp.block>>>(static_cast<const RealA*>(oprod.Even_p()), 
+                static_cast<const RealA*>(oprod.Odd_p()), 
+                coeff,
+                static_cast<RealA*>(ForceMatrix.Even_p()), 
+                static_cast<RealA*>(ForceMatrix.Odd_p()),
+                kparam);
 
-            }
           }
 
           void preTune() {
@@ -1661,13 +1658,9 @@ namespace quda {
 
 
 
-        for(int sig=0; sig<8; ++sig){
-          if(GOES_FORWARDS(sig)){
-            OneLinkTerm<RealA, RealB> oneLink(oprod, sig, OneLink, newOprod, param);
-            oneLink.apply(0);
-            checkCudaError();
-          } // GOES_FORWARDS(sig)
-        }
+       	OneLinkTerm<RealA, RealB> oneLink(oprod, OneLink, newOprod, param);
+        oneLink.apply(0);
+        checkCudaError();
 
 
         int ghostDim[4]={
