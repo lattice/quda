@@ -189,22 +189,23 @@ namespace quda {
       }
 
 
-      long long flops() const { return 0; } // Fix this
+      long long flops() const { return 792*arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3]; } 
       long long bytes() const { return 0; } // Fix this
     };
 
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
-    void completeKSForce(Oprod oprod, Gauge gauge, Mom mom, int dim[4], QudaFieldLocation location)
+    void completeKSForce(Oprod oprod, Gauge gauge, Mom mom, int dim[4], QudaFieldLocation location, long long *flops)
     {
       KSForceArg<Oprod,Gauge,Mom> arg(oprod, gauge, mom, dim);
       KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,location);
       completeForce.apply(0);
+      if(flops) *flops = completeForce.flops();	
       cudaDeviceSynchronize();
     }
 
 
   template<typename Float>
-    void completeKSForce(GaugeField& mom, const GaugeField& oprod, const GaugeField& gauge, QudaFieldLocation location)
+    void completeKSForce(GaugeField& mom, const GaugeField& oprod, const GaugeField& gauge, QudaFieldLocation location, long long *flops)
     {
 
       if(location != QUDA_CUDA_FIELD_LOCATION){
@@ -217,23 +218,23 @@ namespace quda {
               FloatNOrder<Float, 18, 2, 18>(gauge),
               FloatNOrder<Float, 10, 2, 10>(mom),
               const_cast<int*>(mom.X()),
-              location);
+              location, flops);
         }
       }
       return;
     }
 
 
-  void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location)
+  void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location, long long *flops)
   {
     if(mom.Precision() == QUDA_HALF_PRECISION){
       errorQuda("Half precision not supported");
     }
 
     if(mom.Precision() == QUDA_SINGLE_PRECISION){
-      completeKSForce<float>(mom, oprod, gauge, location);
+      completeKSForce<float>(mom, oprod, gauge, location, flops);
     }else if(mom.Precision() == QUDA_DOUBLE_PRECISION){
-      completeKSForce<double>(mom, oprod, gauge, location);
+      completeKSForce<double>(mom, oprod, gauge, location, flops);
     }else{
       errorQuda("Precision %d not supported", mom.Precision());
     }

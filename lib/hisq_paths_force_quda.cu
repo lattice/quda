@@ -549,7 +549,7 @@ namespace quda {
 
 
 
-
+    // Flops: four matrix additions per lattice site = 72 Flops per lattice site
     template<class RealA, int oddBit>
       __global__ void 
       do_one_link_term_kernel(const RealA* const oprodEven, const RealA* const oprodOdd,
@@ -910,6 +910,8 @@ namespace quda {
             int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
+	    printfQuda("kparam.X = %d, %d, %d, %d\n",
+			kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]);
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
               CALL_MIDDLE_LINK_KERNEL(1,1);
@@ -936,7 +938,10 @@ namespace quda {
             newOprod.restore();
           }
 
-          long long flops() const { return 0; }
+          long long flops() const { 
+	    if(GOES_FORWARDS(sig)) return 810*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
+            return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*396; 
+	  }
       };
 
     template<class RealA, class RealB>
@@ -1329,7 +1334,11 @@ namespace quda {
             param.grid = dim3((kparam.threads+param.block.x-1)/param.block.x, 1, 1);
           }
 
-          long long flops() const { return 0; }
+          long long flops() const { 
+	    if(GOES_FORWARDS(sig)) return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*1242;
+	
+	    return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*828;
+	  }
       };
 
 
@@ -1408,7 +1417,9 @@ namespace quda {
             ForceMatrix.restore();
           }
 
-          long long flops() const { return 0; }
+          long long flops() const { 
+	    return 72*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
+	  }
       };
 
 
@@ -1491,7 +1502,7 @@ namespace quda {
             output.restore();
           }
 
-          long long flops() const { return 0; }
+          long long flops() const { return 4968*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]; }
       };
 
 
@@ -1583,7 +1594,9 @@ namespace quda {
             mom.restore();
           }
 
-          long long flops() const { return 0; }
+          long long flops() const { 
+	    return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*792;
+	  }
       };
 
 
@@ -1764,6 +1777,7 @@ namespace quda {
                     || rho == nu || rho == OPP_DIR(nu)){
                   continue;
                 }
+
                 //7-link: middle link and side link
                 if(FiveSt != 0)coeff = SevenSt/FiveSt; else coeff = 0;
                 AllLink<RealA,RealB> allLink(link, Pnumu, Qnumu, sig, rho, SevenSt, coeff,
@@ -1818,7 +1832,6 @@ namespace quda {
           }//mu
         }//sig
 
-
         return; 
       } // do_hisq_staples_force_cuda
 
@@ -1834,21 +1847,25 @@ namespace quda {
     void hisqCompleteForceCuda(const QudaGaugeParam &param,
         const cudaGaugeField &oprod,
         const cudaGaugeField &link,
-        cudaGaugeField* force)
+        cudaGaugeField* force, 
+	long long* flops)
     {
       bind_tex_link(link, oprod);
 
       if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
         CompleteForce<double2,double2> completeForce(link, oprod, *force, param);
         completeForce.apply(0);
+	if(flops) *flops = completeForce.flops();
         checkCudaError();
       }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
         CompleteForce<float2,float2> completeForce(link, oprod, *force, param);
         completeForce.apply(0);
+	if(flops) *flops = completeForce.flops();
         checkCudaError();
       }else{
           errorQuda("Unsupported precision");
       }
+
 
       unbind_tex_link(link, oprod);
       return;
@@ -1859,7 +1876,8 @@ namespace quda {
         const QudaGaugeParam &param,
         const cudaGaugeField &oldOprod,
         const cudaGaugeField &link,
-        cudaGaugeField  *newOprod)
+        cudaGaugeField  *newOprod,
+	long long* flops)
     {
       bind_tex_link(link, *newOprod);
       const int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
@@ -1874,10 +1892,12 @@ namespace quda {
       if(param.cuda_prec == QUDA_DOUBLE_PRECISION){
         LongLinkTerm<double2,double2> longLink(link, oldOprod, coeff, *newOprod, kparam);
         longLink.apply(0);
+	if(flops) (*flops) = longLink.flops();
         checkCudaError();
       }else if(param.cuda_prec == QUDA_SINGLE_PRECISION){
         LongLinkTerm<float2,float2> longLink(link, oldOprod, static_cast<float>(coeff), *newOprod, kparam);
         longLink.apply(0);
+	if(flops) (*flops) = longLink.flops();
         checkCudaError();
       }else{
         errorQuda("Unsupported precision");
@@ -1895,7 +1915,8 @@ namespace quda {
           const QudaGaugeParam &param,
           const cudaGaugeField &oprod, 
           const cudaGaugeField &link, 
-          cudaGaugeField* newOprod)
+          cudaGaugeField* newOprod,
+	  long long* flops)
       {
 
 #ifdef MULTI_GPU
@@ -1981,6 +2002,15 @@ namespace quda {
         cudaEventSynchronize(end);
         float runtime;
         cudaEventElapsedTime(&runtime, start, end);
+	
+	if(flops){
+	  int volume = param.X[0]*param.X[1]*param.X[2]*param.X[3];
+	  // Middle Link, side link, short side link, AllLink, OneLink
+	  *flops = (134784 + 24192 + 103680 + 864 + 397440 + 72);
+	  			
+	  if(path_coeff_array[5] != 0.) *flops += 28944; // Lepage contribution
+	  *flops *= volume;
+	}
 
         unbind_tex_link(link, *newOprod);
 

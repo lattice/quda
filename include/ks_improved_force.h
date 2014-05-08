@@ -12,20 +12,23 @@ namespace quda {
                               const QudaGaugeParam& param,
                               const cudaGaugeField& oprod, 
                               const cudaGaugeField& link, 
-                              cudaGaugeField *newOprod);
+                              cudaGaugeField *newOprod,
+			      long long* flops = NULL);
 
 
    void hisqLongLinkForceCuda(double coeff,
                              const QudaGaugeParam& param,
                              const cudaGaugeField &oprod,
                              const cudaGaugeField &link,
-                             cudaGaugeField *newOprod);
+                             cudaGaugeField *newOprod, 
+			     long long* flops = NULL);
 
 
    void hisqCompleteForceCuda(const QudaGaugeParam &param,
 				 const cudaGaugeField &oprod,
                                  const cudaGaugeField &link,
-                                 cudaGaugeField *force);
+                                 cudaGaugeField *force, 
+				 long long* flops = NULL);
 
 
 
