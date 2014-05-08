@@ -587,6 +587,7 @@ extern "C" {
    * @param param             The field parameters.
    */
   void computeAsqtadForceQuda(void* const momentum,
+	long long* flops,
         const double act_path_coeff[6],
         const void* const one_link_src[4],
         const void* const naik_src[4],
@@ -609,6 +610,7 @@ extern "C" {
    */
 
   void computeHISQForceQuda(void* momentum,
+    long long* flops,
     const double level2_coeff[6],
     const double fat7_coeff[6],
     const void* const staple_src[4],

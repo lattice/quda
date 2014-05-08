@@ -3677,6 +3677,7 @@ void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
 
 
 void computeAsqtadForceQuda(void* const milc_momentum,
+    long long *flops,
     const double act_path_coeff[6],
     const void* const one_link_src[4],
     const void* const naik_src[4],
@@ -3685,6 +3686,7 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 {
 
 #ifdef GPU_HISQ_FORCE
+  long long partialFlops;
   using namespace quda::fermion_force;
   profileAsqtadForce.Start(QUDA_PROFILE_TOTAL);
   profileAsqtadForce.Start(QUDA_PROFILE_INIT);
@@ -3785,9 +3787,11 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   profileAsqtadForce.Start(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
   cudaMemset((void**)(cudaOutForce_ex->Gauge_p()), 0, cudaOutForce_ex->Bytes());
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex);
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex, &partialFlops);
+  *flops += partialFlops;
 #else
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
+  *flops += partialFlops;
 #endif
   profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
 
@@ -3801,11 +3805,15 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 
   profileAsqtadForce.Start(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex);
-  completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex, &partialFlops);
+  *flops += partialFlops;
+  completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION, &partialFlops);
+  *flops += partialFlops;
 #else
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
-  hisqCompleteForceCuda(*gParam, *cudaOutForce, *cudaGauge, cudaMom);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
+  *flops += partialFlops;
+  hisqCompleteForceCuda(*gParam, *cudaOutForce, *cudaGauge, cudaMom, &partialFlops);
+  *flops += partialFlops;
 #endif
   profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
 
@@ -3882,6 +3890,7 @@ computeHISQForceCompleteQuda(void* const milc_momentum,
 
   void
 computeHISQForceQuda(void* const milc_momentum,
+    long long *flops,
     const double level2_coeff[6],
     const double fat7_coeff[6],
     const void* const staple_src[4],
@@ -3893,6 +3902,9 @@ computeHISQForceQuda(void* const milc_momentum,
     const QudaGaugeParam* gParam)
 {
 #ifdef GPU_HISQ_FORCE
+
+  long long partialFlops;
+	
   using namespace quda::fermion_force;
   profileHISQForce.Start(QUDA_PROFILE_TOTAL);
   profileHISQForce.Start(QUDA_PROFILE_INIT); 
@@ -4022,7 +4034,8 @@ computeHISQForceQuda(void* const milc_momentum,
 #endif
 
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr);
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
@@ -4038,7 +4051,8 @@ computeHISQForceQuda(void* const milc_momentum,
 
   // Compute Naik three-link term
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *inForcePtr, *gaugePtr, outForcePtr);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *inForcePtr, *gaugePtr, outForcePtr, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
   profileHISQForce.Start(QUDA_PROFILE_COMMS);
@@ -4092,8 +4106,10 @@ computeHISQForceQuda(void* const milc_momentum,
 #endif
   // Compute Fat7-staple term 
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForceCuda(fat7_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr);
-  hisqCompleteForceCuda(*gParam, *outForcePtr, *gaugePtr, cudaMom);
+  hisqStaplesForceCuda(fat7_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr, &partialFlops);
+  *flops += partialFlops;
+  hisqCompleteForceCuda(*gParam, *outForcePtr, *gaugePtr, cudaMom, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
 
   profileHISQForce.Start(QUDA_PROFILE_D2H);
