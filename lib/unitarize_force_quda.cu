@@ -453,7 +453,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       DerivativeCoefficients<typename RealTypeId<Cmplx>::Type> deriv_coeffs;
 
-      reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed);
+      reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed); // approx 529 flops (assumes no SVD)
 
       // Pure hack here
       b[0] = deriv_coeffs.getB00();
@@ -488,16 +488,17 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       // now done with vv_dagger, I think
       Matrix<Cmplx,3> qsqv_dagger = q*qv_dagger;
       Matrix<Cmplx,3> pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
-      accumBothDerivatives(&local_result, v, pv_dagger, outer_prod);
+      accumBothDerivatives(&local_result, v, pv_dagger, outer_prod); // 41 flops
 
       Matrix<Cmplx,3> rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
       Matrix<Cmplx,3> vq = v*q;
-      accumBothDerivatives(&local_result, vq, rv_dagger, outer_prod);
+      accumBothDerivatives(&local_result, vq, rv_dagger, outer_prod); // 41 flops
 
       Matrix<Cmplx,3> sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
       Matrix<Cmplx,3> vqsq = vq*q;
-      accumBothDerivatives(&local_result, vqsq, sv_dagger, outer_prod);
+      accumBothDerivatives(&local_result, vqsq, sv_dagger, outer_prod); // 41 flops
       return;
+      // 4528 flops - 17 matrix multiplies (198 flops each) + reciprocal root (approx 529 flops) + accumBothDerivatives (41 each) + miscellaneous
     } // get unit force term
 
 
@@ -539,7 +540,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	getUnitarizeForceSite<double2>(v, oprod, &result, unitarization_failed); 
 
 	writeLinkVariableToArray(result, dir, mem_idx, HALF_VOLUME, force); 
-      }
+      } // 4*4528 flops per site
       return;
     } // getUnitarizeForceField
 
@@ -631,7 +632,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       void preTune() { ; }
       void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
       
-      long long flops() const { return 0; } // FIXME: add flops counter
+      long long flops() const { return 4*4528*gauge.Volume(); } // FIXME: add flops counter
       
       TuneKey tuneKey() const {
 	std::stringstream vol, aux;
@@ -646,12 +647,11 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     }; // UnitarizeForceCuda
 
     void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
-                            cudaGaugeField &cudaGauge, cudaGaugeField *cudaNewForce, int* unitarization_failed) {
+                            cudaGaugeField &cudaGauge, cudaGaugeField *cudaNewForce, int* unitarization_failed, long long *flops) {
 
-      checkCudaError();
       UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
-      checkCudaError();
       unitarizeForce.apply(0);
+      if(*flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }
     

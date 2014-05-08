@@ -40,7 +40,8 @@ namespace quda {
   void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
                           cudaGaugeField &cudaGauge,
                           cudaGaugeField *cudaNewForce,
-			  int* unitarization_failed);
+			  int* unitarization_failed, 
+			  long long* flops = NULL);
 
   void unitarizeForceCPU( cpuGaugeField &cpuOldForce,
                           cpuGaugeField &cpuGauge,

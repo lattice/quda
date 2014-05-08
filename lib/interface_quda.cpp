@@ -4082,7 +4082,8 @@ computeHISQForceQuda(void* const milc_momentum,
 
 
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, numFailuresDev);
+  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, numFailuresDev, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
   profileHISQForce.Start(QUDA_PROFILE_D2H);
   cudaMemcpy(&numFailures, numFailuresDev, sizeof(int), cudaMemcpyDeviceToHost);
