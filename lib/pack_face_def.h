@@ -1065,6 +1065,23 @@ static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, c
   }
 #endif // (__COMPUTE_CAPABILITY__ >= 130)
 }
+
+  template <int dim, int dagger, int face_num>
+static inline __device__ void unpackFaceWilsonCore(double2 *out, float *outNorm, const double2 *in, 
+    const float *inNorm, const int &idx, 
+    const int &face_idx, const int &face_volume, 
+    PackParam<double2> &param)
+{
+#if (__COMPUTE_CAPABILITY__ >= 130)
+  if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+  } else {
+#include "wilson_pack_face_core.h"
+  }
+#endif // (__COMPUTE_CAPABILITY__ >= 130)
+}
+
+#undef READ_SPINOR
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
@@ -1092,6 +1109,19 @@ static inline __device__ void packFaceWilsonCore(double2 *out, float *outNorm, c
 #define WRITE_HALF_SPINOR WRITE_HALF_SPINOR_FLOAT4
   template <int dim, int dagger, int face_num>
 static inline __device__ void packFaceWilsonCore(float4 *out, float *outNorm, const float4 *in, const float *inNorm,
+    const int &idx, const int &face_idx, 
+    const int &face_volume, 
+    const PackParam<float4> &param)
+{
+  if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+  } else {
+#include "wilson_pack_face_core.h"
+  }
+}
+
+  template <int dim, int dagger, int face_num>
+static inline __device__ void unpackFaceWilsonCore(float4 *out, float *outNorm, const float4 *in, const float *inNorm,
     const int &idx, const int &face_idx, 
     const int &face_volume, 
     const PackParam<float4> &param)
@@ -1138,6 +1168,18 @@ static inline __device__ void packFaceWilsonCore(short4 *out, float *outNorm, co
 #include "wilson_pack_face_core.h"
   }
 }
+
+  template <int dim, int dagger, int face_num>
+static inline __device__ void unpackFaceWilsonCore(short4 *out, float *outNorm, const short4 *in, const float *inNorm,
+    const int &idx, const int &face_idx, 
+    const int &face_volume, 
+    const PackParam<short4> &param)
+{
+  if (dagger) {
+#include "wilson_pack_face_dagger_core.h"
+  } else {
+#include "wilson_pack_face_core.h"
+  }
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
@@ -1269,6 +1311,76 @@ __global__ void packFaceExtendedWilsonKernel(PackParam<FloatN> param)
   }
 
 }
+
+
+  template <int dagger, typename FloatN, int nFace>
+__global__ void unpackFaceExtendedWilsonKernel(PackParam<FloatN> param)
+{
+  int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+  if (face_idx >= param.threads) return;
+
+  // determine which dimension we are packing
+  const int dim = dimFromFaceIndex(face_idx, param);
+
+  // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
+  // if param.face_num==2 pack both the start and the end, otherwise pack the region of the lattice 
+  // specified by param.face_num
+  const int face_num = (param.face_num==2) ? ((face_idx >= nFace*ghostFace[dim]) ? 1 : 0) : param.face_num;
+  if(param.face_num==2) face_idx -= face_num*nFace*ghostFace[dim];
+
+
+  // compute where the output is located
+  // compute an index into the local volume from the index into the face
+  // read spinor, spin-project, and write half spinor to face
+  if (dim == 0) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[0], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[0], param);
+    }
+  } else if (dim == 1) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[1], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[1], param);
+    }
+  } else if (dim == 2) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[2], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[2], param);
+    }
+  } else {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[3], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X,param.R);
+      unpackFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[3], param);
+    }
+  }
+
+}
+
+#endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
+
+
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_TWISTED_MASS_DIRAC)
+
 
 #endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
 
