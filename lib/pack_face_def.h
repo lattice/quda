@@ -1206,6 +1206,77 @@ __global__ void packFaceWilsonKernel(PackParam<FloatN> param)
 
 }
 
+
+  template <int dagger, typename FloatN, int nFace>
+__global__ void packFaceExtendedWilsonKernel(PackParam<FloatN> param)
+{
+  int face_idx = blockIdx.x*blockDim.x + threadIdx.x;
+  if (face_idx >= param.threads) return;
+
+  // determine which dimension we are packing
+  const int dim = dimFromFaceIndex(face_idx, param);
+
+  // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
+  // if param.face_num==2 pack both the start and the end, otherwise pack the region of the lattice 
+  // specified by param.face_num
+  const int face_num = (param.face_num==2) ? ((face_idx >= nFace*ghostFace[dim]) ? 1 : 0) : param.face_num;
+  if(param.face_num==2) face_idx -= face_num*nFace*ghostFace[dim];
+
+
+  // compute where the output is located
+  // compute an index into the local volume from the index into the face
+  // read spinor, spin-project, and write half spinor to face
+  if (dim == 0) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<0,nFace,0>(face_idx,ghostFace[0],param.parity,param.X,param.R);
+      packFaceWilsonCore<0,dagger,0>(param.out[0], param.outNorm[0], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[0], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<0,nFace,1>(face_idx,ghostFace[0],param.parity,param.X,param.R);
+      packFaceWilsonCore<0,dagger,1>(param.out[1], param.outNorm[1], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[0], param);
+    }
+  } else if (dim == 1) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<1,nFace,0>(face_idx,ghostFace[1],param.parity,param.X,param.R);
+      packFaceWilsonCore<1, dagger,0>(param.out[2], param.outNorm[2], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[1], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<1,nFace,1>(face_idx,ghostFace[1],param.parity,param.X,param.R);
+      packFaceWilsonCore<1, dagger,1>(param.out[3], param.outNorm[3], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[1], param);
+    }
+  } else if (dim == 2) {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<2,nFace,0>(face_idx,ghostFace[2],param.parity,param.X,param.R);
+      packFaceWilsonCore<2, dagger,0>(param.out[4], param.outNorm[4], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[2], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<2,nFace,1>(face_idx,ghostFace[2],param.parity,param.X,param.R);
+      packFaceWilsonCore<2, dagger,1>(param.out[5], param.outNorm[5], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[2], param);
+    }
+  } else {
+    if (face_num == 0) {
+      const int idx = indexFromFaceIndexExtended<3,nFace,0>(face_idx,ghostFace[3],param.parity,param.X,param.R);
+      packFaceWilsonCore<3, dagger,0>(param.out[6], param.outNorm[6], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[3], param);
+    } else {
+      const int idx = indexFromFaceIndexExtended<3,nFace,1>(face_idx,ghostFace[3],param.parity,param.X,param.R);
+      packFaceWilsonCore<3, dagger,1>(param.out[7], param.outNorm[7], param.in, 
+          param.inNorm,idx, face_idx, ghostFace[3], param);
+    }
+  }
+
+}
+
+#endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
+
+
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_TWISTED_MASS_DIRAC)
+
+// double precision
+
 #endif // GPU_WILSON_DIRAC || GPU_DOMAIN_WALL_DIRAC
 
 
@@ -2090,7 +2161,7 @@ __global__ void packFaceExtendedStaggeredKernel(PackExtendedParam<FloatN> param)
   const int dim = dimFromFaceIndex(face_idx, param);
 
   // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-  // if param.face_num==2 pack both the start and the end, otherwist pack the region of the 
+  // if param.face_num==2 pack both the start and the end, otherwise pack the region of the 
   // lattice specified by param.face_num
   const int face_num = (param.face_num==2) ? ((face_idx >= nFace*ghostFace[dim]) ? 1 : 0) : param.face_num;
   if(param.face_num==2) face_idx -= face_num*nFace*ghostFace[dim];
