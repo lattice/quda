@@ -83,6 +83,88 @@ static inline __device__ int indexFromFaceIndex(int face_idx, const int &face_vo
   return idx >> 1;
 }
 
+
+  template <int dim, int nLayers, int face_num>
+static inline __device__ int indexFromFaceIndexExtended(int face_idx, const int &face_volume, const int &parity, const int X[], const int R[])
+{
+
+  int face_X = X[0], face_Y = X[1], face_Z = X[2]; // face_T = X[3]
+  switch (dim) {
+    case 0:
+      face_X = nLayers;
+      break;
+    case 1:
+      face_Y = nLayers;
+      break;
+    case 2:
+      face_Z = nLayers;
+      break;
+    case 3:
+      // face_T = nLayers;
+      break;
+  }
+  int face_XYZ = face_X * face_Y * face_Z;
+  int face_XY = face_X * face_Y;
+
+  // intrinsic parity of the face depends on offset of first element
+
+  int face_parity = (parity + face_num *(X[dim] - nLayers)) & 1;
+  // reconstruct full face index from index into the checkerboard
+
+  face_idx *= 2;
+
+  if (!(face_X & 1)) { // face_X even
+    //   int t = face_idx / face_XYZ;
+    //   int z = (face_idx / face_XY) % face_Z;
+    //   int y = (face_idx / face_X) % face_Y;
+    //   face_idx += (face_parity + t + z + y) & 1;
+    // equivalent to the above, but with fewer divisions/mods:
+    int aux1 = face_idx / face_X;
+    int aux2 = aux1 / face_Y;
+    int y = aux1 - aux2 * face_Y;
+    int t = aux2 / face_Z;
+    int z = aux2 - t * face_Z;
+    face_idx += (face_parity + t + z + y) & 1;
+  } else if (!(face_Y & 1)) { // face_Y even
+    int t = face_idx / face_XYZ;
+    int z = (face_idx / face_XY) % face_Z;
+    face_idx += (face_parity + t + z) & 1;
+  } else if (!(face_Z & 1)) { // face_Z even
+    int t = face_idx / face_XYZ;
+    face_idx += (face_parity + t) & 1;
+  } else {
+    face_idx += face_parity;
+  }
+
+  // compute index into the full local volume
+
+  int idx = face_idx;
+  int aux;
+
+  int gap = X[dim] - nLayers;
+  switch (dim) {
+    case 0:
+      aux = face_idx / face_X;
+      idx += (aux + face_num)*gap + (1 - 2*face_num)*R[0];
+      break;
+    case 1:
+      aux = face_idx / face_XY;
+      idx += ((aux + face_num)*gap + (1 - 2*face_num)*R[1])*face_X;
+      break;
+    case 2:
+      aux = face_idx / face_XYZ;
+      idx += ((aux + face_num)*gap + (1 - 2*face_num)*R[2])* face_XY;
+      break;
+    case 3:
+      idx += (face_num*gap + (1 - 2*face_num)*R[3])*face_XYZ;
+      break;
+  }
+
+  // return index into the checkerboard
+
+  return idx >> 1;
+}
+
 // compute an index into the local volume from an index into the face (used by the face packing routines)
 // G.Shi: the spinor order in ghost region is different between wilson and staggered, thus different index
 //	  computing routine.
