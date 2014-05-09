@@ -2247,18 +2247,50 @@ class PackFaceStaggered : public PackFace<FloatN, Float> {
         PackExtendedParam<FloatN> extendedParam(param);
         if(!unpack){
           for(int d=0; d<QUDA_MAX_DIM; ++d) extendedParam.R[d] = R[d];
-          if(PackFace<FloatN,Float>::nFace==1){
-            packFaceExtendedStaggeredKernel<FloatN,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
-          }else{
-            packFaceExtendedStaggeredKernel<FloatN,3><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
-          }
-        }else{
-          if(PackFace<FloatN,Float>::nFace==1){
-            unpackFaceExtendedStaggeredKernel<FloatN,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
-          }else{
-            unpackFaceExtendedStaggeredKernel<FloatN,3><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
-          }
-        }
+	  switch(PackFace<FloatN,Float>::nFace){
+     	    case 1:
+	      packFaceExtendedStaggeredKernel<FloatN,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+
+	    case 2:
+	      packFaceExtendedStaggeredKernel<FloatN,2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+	
+	    case 3:
+	      packFaceExtendedStaggeredKernel<FloatN,3><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+
+	    case 4:
+	      packFaceExtendedStaggeredKernel<FloatN,4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+
+	    default: 
+              errorQuda("Unsupported boundary width");
+	      break;
+	  }
+        }else{ // extended field unpack
+	  switch(PackFace<FloatN,Float>::nFace){
+	    case 1:
+              unpackFaceExtendedStaggeredKernel<FloatN,1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+
+	    case 2:
+              unpackFaceExtendedStaggeredKernel<FloatN,2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+
+	    case 3:
+              unpackFaceExtendedStaggeredKernel<FloatN,3><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+
+	    case 4:
+              unpackFaceExtendedStaggeredKernel<FloatN,4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(extendedParam);
+	      break;
+
+	    default:
+	      errorQuda("Unsupported boundary width");
+	      break;
+	  }
+	}
       }
 #else
       errorQuda("Staggered face packing kernel is not built");
