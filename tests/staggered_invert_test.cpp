@@ -142,9 +142,9 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // domain decomposition preconditioner parameters
   inv_param->inv_type_precondition = QUDA_SD_INVERTER;
   inv_param->tol_precondition = 1e-1;
-  inv_param->maxiter_precondition = 100;
+  inv_param->maxiter_precondition = 30;
   inv_param->verbosity_precondition = QUDA_SILENT;
-  inv_param->cuda_prec_precondition = prec_sloppy;
+  inv_param->cuda_prec_precondition = QUDA_HALF_PRECISION;
 
   inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -295,6 +295,7 @@ invert_test(void)
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = fat_pad;
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
   loadGaugeQuda(fatlink, &gaugeParam);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -307,6 +308,7 @@ invert_test(void)
 #else
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
   loadGaugeQuda(fatlink, &gaugeParam);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
