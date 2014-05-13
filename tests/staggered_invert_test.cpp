@@ -142,7 +142,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // domain decomposition preconditioner parameters
   inv_param->inv_type_precondition = QUDA_SD_INVERTER;
   inv_param->tol_precondition = 1e-1;
-  inv_param->maxiter_precondition = 30;
+  inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
   inv_param->cuda_prec_precondition = QUDA_HALF_PRECISION;
 
@@ -327,7 +327,9 @@ invert_test(void)
 
   switch(test_type){
     case 5: 
-      inv_param.inv_type = QUDA_PCG_INVERTER;
+//      inv_param.inv_type = QUDA_PCG_INVERTER;
+      inv_param.inv_type = QUDA_GCR_INVERTER;
+      inv_param.gcrNkrylov = 50;
     case 0: //even
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
