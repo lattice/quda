@@ -327,6 +327,26 @@ namespace quda {
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
+
+  // Extended Steepest Descent solver used for overlapping DD preconditioning
+  class XSD : public Solver {
+    private:
+      const DiracMatrix &mat;
+      cudaColorSpinorField *Ar;
+      cudaColorSpinorField *r;
+      cudaColorSpinorField *y;
+      cudaGaugeField *gauge;
+      bool init;
+      unsigned int overlap;
+
+    public:
+      XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile, unsigned int overlap = 0);
+      virtual ~XSD();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
+
   // multigrid solver
   class alphaSA : public Solver {
 
