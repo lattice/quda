@@ -851,6 +851,8 @@ get_solver_type(char* s)
     ret = QUDA_BICGSTAB_INVERTER;
   }else if (strcmp(s, "gcr") == 0){
     ret = QUDA_GCR_INVERTER;
+  }else if (strcmp(s, "pcg") == 0){
+    ret = QUDA_PCG_INVERTER;
   }else{
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);
