@@ -325,12 +325,16 @@ invert_test(void)
   double src2=0;
   int ret = 0;
 
+
+
   switch(test_type){
-    case 5: 
-//      inv_param.inv_type = QUDA_PCG_INVERTER;
-      inv_param.inv_type = QUDA_GCR_INVERTER;
-      inv_param.gcrNkrylov = 50;
     case 0: //even
+      if(inv_type == QUDA_GCR_INVERTER){
+      	inv_param.inv_type = QUDA_GCR_INVERTER;
+      	inv_param.gcrNkrylov = 50;
+      }else if(inv_type == QUDA_PCG_INVERTER){
+	inv_param.inv_type = QUDA_PCG_INVERTER;
+      }
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
       invertQuda(out->V(), in->V(), &inv_param);
@@ -353,9 +357,13 @@ invert_test(void)
 
       break;
 
-    case 6:
-      inv_param.inv_type = QUDA_PCG_INVERTER;
     case 1: //odd
+      if(inv_type == QUDA_GCR_INVERTER){
+      	inv_param.inv_type = QUDA_GCR_INVERTER;
+      	inv_param.gcrNkrylov = 50;
+      }else if(inv_type == QUDA_PCG_INVERTER){
+	inv_param.inv_type = QUDA_PCG_INVERTER;
+      }
 
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
       invertQuda(out->V(), in->V(), &inv_param);	
@@ -546,8 +554,6 @@ usage_extra(char** argv )
   printfQuda("                                                1: Odd odd spinor CG inverter\n");
   printfQuda("                                                3: Even even spinor multishift CG inverter\n");
   printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
-  printfQuda("                                                5: Even even spinor preconditioned CG inverter\n");
-  printfQuda("                                                6: Odd odd spinor preconditioned CG inverter\n");
   printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
 
   return ;
@@ -593,6 +599,10 @@ int main(int argc, char** argv)
   }
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
     link_recon_sloppy = link_recon;
+  }
+
+  if(inv_type != QUDA_CG_INVERTER){
+    if(test_type != 0 && test_type != 1) errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
 
 
