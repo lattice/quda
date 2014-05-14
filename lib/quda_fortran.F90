@@ -58,6 +58,8 @@ module quda_fortran
      ! Whether the staggered phase has already been applied to the links
      integer(4) :: staggered_phase_applied 
 
+     integer(4) :: overlap ! width of domain overlap
+
      integer(4) :: use_resident_gauge  ! Use the resident gauge field 
      integer(4) :: use_resident_mom    ! Use the resident mom field
      integer(4) :: make_resident_gauge ! Make the gauge field resident
@@ -94,7 +96,8 @@ module quda_fortran
      
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver 
-     
+    
+     integer(4) :: overlap ! width of domain overlaps 
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver 
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset 
      

@@ -90,6 +90,8 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
 
+  P(overlap, 0);
+
 #if defined INIT_PARAM
   P(preserve_gauge, 0);
 #else
@@ -179,6 +181,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #ifndef CHECK_PARAM
   P(pipeline, 0); /** Whether to use a pipelined solver */
   P(num_offset, 0); /**< Number of offsets in the multi-shift solver */
+  P(overlap, 0); /**< width of domain overlaps */
 #endif
 
   if (param->num_offset > 0) {

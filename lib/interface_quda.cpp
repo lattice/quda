@@ -74,12 +74,16 @@ using namespace quda;
 cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
+cudaGaugeField *gaugeExtended = NULL;
 
 // It's important that these alias the above so that constants are set correctly in Dirac::Dirac()
 cudaGaugeField *&gaugeFatPrecise = gaugePrecise;
 cudaGaugeField *&gaugeFatSloppy = gaugeSloppy;
 cudaGaugeField *&gaugeFatPrecondition = gaugePrecondition;
+cudaGaugeField *&gaugeFatExtended = gaugeExtended;
 
+
+cudaGaugeField *gaugeLongExtended = NULL; 
 cudaGaugeField *gaugeLongPrecise = NULL;
 cudaGaugeField *gaugeLongSloppy = NULL;
 cudaGaugeField *gaugeLongPrecondition = NULL;
@@ -479,6 +483,24 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     precondition = sloppy;
   }
 
+  // create an extended preconditioning field
+  cudaGaugeField* extended = NULL;
+  if(param->overlap){
+    int R[4]; // domain-overlap widths in different directions 
+    for(int i=0; i<4; ++i){ 
+      R[i] = param->overlap*commDimPartitioned(i);
+      gauge_param.x[i] += 2*R[i];
+    }
+    // the extended field does not require any ghost padding
+    gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    extended = new cudaGaugeField(gauge_param);
+
+    // copy the unextended preconditioning field into the interior of the extended field
+    copyExtendedGauge(*extended, *precondition, QUDA_CUDA_FIELD_LOCATION);
+    // now perform communication and fill the overlap regions
+    extended->exchangeExtendedGhost(R);
+  }
+
   profileGauge.Stop(QUDA_PROFILE_COMPUTE); 
 
   switch (param->type) {
@@ -489,6 +511,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeSloppy = sloppy;
       //if (gaugePrecondition) errorQuda("Precondition gauge field already allocated");
       gaugePrecondition = precondition;
+	
+      if(param->overlap) gaugeExtended = extended;
       break;
     case QUDA_ASQTAD_FAT_LINKS:
       if (gaugeFatPrecise) errorQuda("Precise gauge fat field already allocated");
@@ -497,6 +521,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeFatSloppy = sloppy;
       if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
       gaugeFatPrecondition = precondition;
+
+      if(param->overlap){
+        if(gaugeFatExtended) errorQuda("Extended gauge fat field already allocated");
+	gaugeFatExtended = extended;
+      }
       break;
     case QUDA_ASQTAD_LONG_LINKS:
       if (gaugeLongPrecise) errorQuda("Precise gauge long field already allocated");
@@ -505,10 +534,15 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeLongSloppy = sloppy;
       if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
       gaugeLongPrecondition = precondition;
+      if(param->overlap){
+        if(gaugeLongExtended) errorQuda("Extended gauge long field already allocated");
+   	gaugeLongExtended = extended;
+      }	
       break;
     default:
       errorQuda("Invalid gauge type");   
   }
+
 
   profileGauge.Start(QUDA_PROFILE_FREE);  
   delete in;
@@ -832,27 +866,34 @@ void freeGaugeQuda(void)
   if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
   if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
   if (gaugePrecise) delete gaugePrecise;
+  if (gaugeExtended) delete gaugeExtended;
 
   gaugePrecondition = NULL;
   gaugeSloppy = NULL;
   gaugePrecise = NULL;
+  gaugeExtended = NULL;
 
   if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
   if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
   if (gaugeLongPrecise) delete gaugeLongPrecise;
+  if (gaugeLongExtended) delete gaugeLongExtended;
 
   gaugeLongPrecondition = NULL;
   gaugeLongSloppy = NULL;
   gaugeLongPrecise = NULL;
+  gaugeLongExtended = NULL;
 
   if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
   if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
   if (gaugeFatPrecise) delete gaugeFatPrecise;
+  
 
   gaugeFatPrecondition = NULL;
   gaugeFatSloppy = NULL;
   gaugeFatPrecise = NULL;
+  gaugeFatExtended = NULL;
 
+  // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
   if (extendedGaugeResident) {
     delete extendedGaugeResident;
     extendedGaugeResident = NULL;
@@ -1085,6 +1126,17 @@ namespace quda {
        diracParam.gauge = gaugeFatPrecondition;
     }
   }
+
+
+ void setDiracOverlappingPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+ {
+   setDiracParam(diracParam, inv_param, pc);
+ 
+   // Create extended gauge field
+
+   setDiracPreParam(diracParam, inv_param, pc);
+ }
+
 
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
   {
@@ -1450,15 +1502,24 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
     if (gaugePrecise == NULL) errorQuda("Precise gauge field doesn't exist");
     if (gaugeSloppy == NULL) errorQuda("Sloppy gauge field doesn't exist");
     if (gaugePrecondition == NULL) errorQuda("Precondition gauge field doesn't exist");
+    if(param->overlap){
+      if(gaugeExtended == NULL) errorQuda("Extended gauge field doesn't exist");
+    }
     cudaGauge = gaugePrecise;
   } else {
     if (gaugeFatPrecise == NULL) errorQuda("Precise gauge fat field doesn't exist");
     if (gaugeFatSloppy == NULL) errorQuda("Sloppy gauge fat field doesn't exist");
     if (gaugeFatPrecondition == NULL) errorQuda("Precondition gauge fat field doesn't exist");
+    if(param->overlap){
+      if(gaugeFatExtended == NULL) errorQuda("Extended gauge fat field doesn't exist");
+    }
 
     if (gaugeLongPrecise == NULL) errorQuda("Precise gauge long field doesn't exist");
     if (gaugeLongSloppy == NULL) errorQuda("Sloppy gauge long field doesn't exist");
     if (gaugeLongPrecondition == NULL) errorQuda("Precondition gauge long field doesn't exist");
+    if(param->overlap){
+      if(gaugeLongExtended == NULL) errorQuda("Extended gauge long field doesn't exist");
+    }
     cudaGauge = gaugeFatPrecise;
   }
   return cudaGauge;

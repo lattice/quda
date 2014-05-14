@@ -35,6 +35,10 @@ namespace quda {
       report("SD");
       solver = new SD(mat, param, profile);
       break;
+    case QUDA_XSD_INVERTER:
+      report("XSD");
+      solver = new XSD(mat, param, profile);
+      break;
     case QUDA_PCG_INVERTER:
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
