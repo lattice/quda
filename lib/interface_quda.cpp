@@ -1109,9 +1109,15 @@ namespace quda {
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    diracParam.gauge = gaugePrecondition;
-    diracParam.fatGauge = gaugeFatPrecondition;
-    diracParam.longGauge = gaugeLongPrecondition;    
+    if(inv_param->overlap){
+      diracParam.gauge = gaugeExtended;
+      diracParam.fatGauge = gaugeFatExtended;
+      diracParam.longGauge = gaugeLongExtended;	
+    }else{
+      diracParam.gauge = gaugePrecondition;
+      diracParam.fatGauge = gaugeFatPrecondition;
+      diracParam.longGauge = gaugeLongPrecondition;    
+    }
     diracParam.clover = cloverPrecondition;
     diracParam.cloverInv = cloverInvPrecondition;
 
@@ -1126,16 +1132,6 @@ namespace quda {
        diracParam.gauge = gaugeFatPrecondition;
     }
   }
-
-
- void setDiracOverlappingPreParam(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
- {
-   setDiracParam(diracParam, inv_param, pc);
- 
-   // Create extended gauge field
-
-   setDiracPreParam(diracParam, inv_param, pc);
- }
 
 
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)

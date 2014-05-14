@@ -76,7 +76,8 @@ namespace quda {
     /**< Preserve the source or not in the linear solver (deprecated?) */    
     QudaPreserveSource preserve_source;       
 
-
+    /**< Domain overlap to use in the preconditioning */
+    int overlap_precondition;
 
     // Multi-shift solver parameters
 
@@ -141,7 +142,8 @@ namespace quda {
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
       precision_precondition(param.cuda_prec_precondition), 
-      preserve_source(param.preserve_source), num_offset(param.num_offset), 
+      preserve_source(param.preserve_source), overlap_precondition(param.overlap), 
+      num_offset(param.num_offset), 
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops)
@@ -332,15 +334,14 @@ namespace quda {
   class XSD : public Solver {
     private:
       const DiracMatrix &mat;
-      cudaColorSpinorField *Ar;
-      cudaColorSpinorField *r;
-      cudaColorSpinorField *y;
-      cudaGaugeField *gauge;
+      cudaColorSpinorField *xx;
+      cudaColorSpinorField *bx;
+      SD *sd; // extended sd is implemented using standard sd
       bool init;
-      unsigned int overlap;
+      int R[4];
 
     public:
-      XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile, unsigned int overlap = 0);
+      XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
       virtual ~XSD();
 
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);

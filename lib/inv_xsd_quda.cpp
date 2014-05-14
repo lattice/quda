@@ -16,79 +16,45 @@
 
 namespace quda {
 
-  XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile, unsigned int overlap) :
-    Solver(param,profile), mat(mat), init(false), overlap(overlap)
+#ifdef MULTI_GPU
+  XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+    Solver(param,profile), mat(mat)
   {
-
+    sd = new SD(mat,param,profile);
+    for(int i=0; i<4; ++i) R[i] = param.overlap_precondition*commDimPartitioned(i);
   }
 
   XSD::~XSD(){
-    if(param.inv_type_precondition != QUDA_PCG_INVERTER && param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Start(QUDA_PROFILE_FREE);
+    if(param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Start(QUDA_PROFILE_FREE);
     if(init){
-      delete r;
-      delete Ar; 
-      delete y;
+      delete xx;
+      delete bx;
     }
-    if(param.inv_type_precondition != QUDA_PCG_INVERTER && param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
+    delete sd;
+    if(param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
   }
 
 
   void XSD::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
-
-
-    globalReduce = false;
     if(!init){
-      r = new cudaColorSpinorField(b);
-      Ar = new cudaColorSpinorField(b);
-      y = new cudaColorSpinorField(b);
-      init = true;
+     ColorSpinorParam csParam(b);
+     for(int i=0; i<4; ++i) csParam.x[i] += 2*R[i];
+     xx = new cudaColorSpinorField(csParam);
+     bx = new cudaColorSpinorField(csParam);	 	
+     init = true;
     }
 
-    double b2 = norm2(b);
+    int parity = mat.getMatPCType();
+    copyExtendedColorSpinor(*bx, b, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
+    exchangeExtendedGhost(bx, R, parity, streams);
 
-    zeroCuda(*r), zeroCuda(x);
-    double r2 = xmyNormCuda(b,*r);
-    double alpha=0.; 
-    double beta=0;
-    double2 rAr;
+    sd->operator()(*xx,*bx); // actuall run SD
 
-    int k=0;
-    while(k < param.maxiter-1){
-
-      mat(*Ar, *r, *y);
-      rAr = reDotProductNormACuda(*r, *Ar);
-      alpha = rAr.y/rAr.x;
-      axpyCuda(alpha, *r, x);
-      axpyCuda(-alpha, *Ar, *r);
-
-      if(getVerbosity() >= QUDA_VERBOSE){
-        r2 = norm2(*r);
-        printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
-      }
-
-      ++k;
-    }
-
-
-    rAr = reDotProductNormACuda(*r, *Ar);
-    alpha = rAr.y/rAr.x;
-    axpyCuda(alpha, *r, x);
-    if(getVerbosity() >= QUDA_VERBOSE){
-      axpyCuda(-alpha, *Ar, *r);
-      r2 = norm2(*r);
-      printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));
-      ++k;
-    }
-
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE){
-      // Compute the true residual
-      mat(*r, x, *y);
-      double true_r2 = xmyNormCuda(b,*r);
-      printfQuda("Steepest Descent: %d iterations, accumulated |r| = %e, true |r| = %e,  |r|/|b| = %e\n", k, sqrt(r2), sqrt(true_r2), sqrt(true_r2/b2));
-    } // >= QUDA_DEBUG_VERBOSITY
-    globalReduce = true;
+    // copy the interior region of the solution back
+    copyExtendedColorSpinor(x, *xx, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
     return;
   }
 
+#endif // MULTI_GPU
 } // namespace quda
