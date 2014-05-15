@@ -90,9 +90,9 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(gaugeGiB, INVALID_DOUBLE);
 #endif
 
-  P(overlap, 0);
 
 #if defined INIT_PARAM
+  P(overlap, 0);
   P(preserve_gauge, 0);
 #else
   P(preserve_gauge, INVALID_INT);
