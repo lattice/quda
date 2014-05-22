@@ -96,8 +96,9 @@ namespace quda {
       y = new cudaColorSpinorField(csParam);
 
       // note last two fields are cpu fields!
-      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack4);
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
+      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack4);
+      std::cout << "MG: level " << param.level << " coarse operator of type " << typeid(matCoarse).name() << "created" << std::endl;
 
       // coarse null space vectors (dummy for now)
       printfQuda("Creating coarse null-space vectors\n");
@@ -169,7 +170,7 @@ namespace quda {
       printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*hack2));
       printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *hack2));
     }
-
+#if 0
     printfQuda("\nChecking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", 
 	       param.Nvec);
 
@@ -181,6 +182,7 @@ namespace quda {
       printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*hack1));
       printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*(param.B[i]), *hack1) / blas::norm2(*param.B[i])) );
     }
+#endif
 
     printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c \n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
@@ -192,7 +194,7 @@ namespace quda {
     printfQuda("\nComparing native coarse operator to emulated operator\n");
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
     //for(int s=0; s<tmp_coarse->Nspin(); s++) {
-      //for(int c=0; c<tmp_coarse->Ncolor(); c++) {
+    //  for(int c=0; c<tmp_coarse->Ncolor(); c++) {
     blas::zero(*tmp_coarse);
     //tmp_coarse->Source(QUDA_POINT_SOURCE, 0, s, c);
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
@@ -208,7 +210,7 @@ namespace quda {
     //for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     printfQuda("deviation = %e\n\n", blas::xmyNorm(*x_coarse, *r_coarse));
-      //}
+    //  }
     //}
     delete tmp_coarse;
     
@@ -359,8 +361,22 @@ namespace quda {
     gParam.geometry = QUDA_COARSE_GEOMETRY;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     Y = new cpuGaugeField(gParam);
+
+   GaugeFieldParam gParam2 = new GaugeFieldParam();
+    memcpy(gParam2.x, x, QUDA_MAX_DIM*sizeof(int));
+    gParam2.nColor = Nc_c*Ns_c;
+    gParam2.reconstruct = QUDA_RECONSTRUCT_NO;
+    gParam2.order = QUDA_QDP_GAUGE_ORDER;
+    gParam2.link_type = QUDA_COARSE_LINKS;
+    gParam2.t_boundary = QUDA_PERIODIC_T;
+    gParam2.create = QUDA_ZERO_FIELD_CREATE;
+    gParam2.precision = prec;
+    gParam2.nDim = ndim;
+    gParam2.geometry = QUDA_SCALAR_GEOMETRY;
+    gParam2.siteSubset = QUDA_FULL_SITE_SUBSET;
+    X = new cpuGaugeField(gParam2);
     
-    dirac->createCoarseOp(*t,*Y);
+    dirac->createCoarseOp(*t,*Y,*X);
   }
 
 }

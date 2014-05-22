@@ -165,6 +165,20 @@ namespace quda {
         }
   };
 
+  //Returns the non parity-blocked integer index for a lattice site.  Also calculates the parity index of a site.
+  int gauge_offset_index(const int *x, const int *x_size, int ndim, int& parity) {
+    parity = 0;
+    int gauge_index = 0;
+    for(int d = ndim-1; d >= 0; d--) {
+      parity += x[d];
+      gauge_index *= x_size[d];
+      gauge_index += x[d];
+    }
+    parity = parity%2;
+    return gauge_index;
+  }
+
+
   //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
   //Where:
   //mu = dir
@@ -185,13 +199,9 @@ namespace quda {
       int coord[QUDA_MAX_DIM];
       int coordV[QUDA_MAX_DIM];
       V.LatticeIndex(coord, i);
-
+      V.LatticeIndex(coordV, i);
       int parity = 0;
-      for(int d = 0; d < ndim; d++) {
-	parity += coord[d];
-	coordV[d] = coord[d];
-      }
-      parity = parity%2;
+      int gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
 
       //Shift the V field w/respect to G
       coordV[dir] = (coord[dir]+1)%x_size[dir];
@@ -201,7 +211,7 @@ namespace quda {
 	for(int ic_c = 0; ic_c < Nc_c; ic_c++) {  //Coarse Color
 	  for(int ic = 0; ic < Nc; ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < Nc; jc++) {  //Fine Color columns of gauge field
-	      UV(i, s, ic, ic_c) += G(dir, parity, i/2, ic, jc) * V(i_V, s, jc, ic_c);
+	      UV(i, s, ic, ic_c) += G(dir, parity, gauge_index/2, ic, jc) * V(i_V, s, jc, ic_c);
 	    }  //Fine color columns
 	  }  //Fine color rows
 	}  //Coarse color
@@ -224,11 +234,8 @@ namespace quda {
       for(int d = ndim-1; d >= 0; d--) {
 	coord_coarse[d] = coord[d]/geo_bs[d];
 	coarse_size *= xc_size[d];
-	coarse_parity += coord_coarse[d];
-	coarse_index *= xc_size[d];
-	coarse_index += coord_coarse[d];
       }
-      coarse_parity = coarse_parity%2;
+      coarse_index = gauge_offset_index(coord_coarse, xc_size, ndim, coarse_parity);
 
       //int coarse_site_offset = coarse_parity*coarse_size/2 + coarse_index/2;
       //coarse_site_offset *= Nc_c*Nc_c*Ns_c*Ns_c;
@@ -237,6 +244,7 @@ namespace quda {
       //if this color matrix connects adjacent blocks.
      //gauge::FieldOrder<Float> *M;
      int dim_index = 2*dir+1;
+     //int dim_index = dir;
      //If adjacent site is in same block, M = X
      if(((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) {
 	//M = &X;
@@ -293,6 +301,7 @@ namespace quda {
   //but with negative sign for the spin off-diagonal parts to account
   //for the forward/backward spin proejctors.
   //Note: No shifting in site index, so that site x holds the matrices Y_{\pm mu}(x, x+mu)
+  //M.C.: No longer used, as only forward link is stored.
   template<typename Float>
   void reverseY(int dir,  gauge::FieldOrder<Float> &Y, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
   //void reverseY(int dir, const quda::complex<Float> *Y_p, quda::complex<Float> *Y_m, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
@@ -432,7 +441,9 @@ namespace quda {
       //Calculate VUV for this direction, accumulate in the appropriate place
       computeVUV<Float>(d, Y, UV, V, gamma, ndim, x_size, xc_size, Nc, Nc_c, Ns, Ns_c, geo_bs, spin_bs);
 
-      reverseY<Float>(d, Y, ndim, xc_size, Nc_c, Ns_c);
+      //MC - "forward" and "backward" coarse gauge fields need not be calculated and stored separately.  Only difference
+      //is factor of -1 in off-diagonal spin, which can be applied directly by the Dslash operator.
+      //reverseY<Float>(d, Y, ndim, xc_size, Nc_c, Ns_c);
       #if 0
       for(int i = 0; i < Y.Volume(); i++) {
 	for(int s = 0; s < Ns_c; s++) {
@@ -461,7 +472,7 @@ namespace quda {
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y has been allocated.
-  void CoarseOp(const Transfer &T, GaugeField &Y, const cudaGaugeField &gauge) {
+  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge) {
 //  void CoarseOp(const Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge) {
 
     QudaPrecision precision = Y.Precision();
@@ -549,15 +560,7 @@ namespace quda {
       int parity = 0;
       int gauge_index = 0;
       in.LatticeIndex(coord,i);
-      for(int dim = ndim-1; dim >= 0; dim--) {
-        parity += coord[dim];
-        gauge_index *= x_size[dim];
-        gauge_index += coord[dim];
-      }
-      parity = parity%2;
-      //int gauge_site_offset = parity*sites/2 + gauge_index/2;
-      //gauge_site_offset *= Nc*Nc*Ns*Ns;
-
+      gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
 
       for(int d = 0; d < ndim; d++) { //Ndim
 
@@ -589,13 +592,19 @@ namespace quda {
         for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
 	  for(int c_row = 0; c_row < Nc; c_row++) { //Color row
             for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
+
+	      Float sign = 1.0;
+	      if (s_row != s_col) {
+		sign = -1.0;
+	      }
+
               for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 	        //Forward link  
 	        //out(forward_spinor_index, s_row, c_row) += quda::conj(Y[2*d][gauge_site_offset+Nc*Nc*(Ns*s_col+s_row) + Nc*c_col+c_row])*in(i, s_col, c_col);
 		out(forward_spinor_index, s_row, c_row) += quda::conj(Y(2*d+1,parity, gauge_index/2, s_col, s_row, c_col, c_row))*in(i, s_col, c_col);
 	        //Backward link
 		//out(backward_spinor_index, s_row, c_row) += Y[2*d+1][backward_gauge_site_offset+Nc*Nc*(Ns*s_row+s_col) + Nc*c_row+c_col]*in(i, s_col, c_col);
-		out(backward_spinor_index, s_row, c_row) += Y(2*d, backward_parity, backward_gauge_index/2, s_row, s_col, c_row, c_col)*in(i, s_col, c_col);
+		out(backward_spinor_index, s_row, c_row) += sign*Y(2*d+1, backward_parity, backward_gauge_index/2, s_row, s_col, c_row, c_col)*in(i, s_col, c_col);
 	      } //Color column
 	    } //Spin column
 	  } //Color row
@@ -625,14 +634,7 @@ namespace quda {
       int parity = 0;
       int gauge_index = 0;
       out.LatticeIndex(coord,i);
-      for(int dim = ndim-1; dim >= 0; dim--) {
-        parity += coord[dim];
-        gauge_index *= x_size[dim];
-        gauge_index += coord[dim];
-      }
-      parity = parity%2;
-      //int gauge_site_offset = parity*sites/2 + gauge_index/2;
-      //gauge_site_offset *= Nc*Nc*Ns*Ns;
+      gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
 
       for(int s = 0; s < Ns; s++) { //Spin out
         for(int c = 0; c < Nc; c++) { //Color out
@@ -679,7 +681,7 @@ namespace quda {
   //Uses the kappa normalization for the Wilson operator.
   //Note factor of 2*kappa compensates for the factor of 1/2 already
   //absorbed into the Y matrices.
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, double kappa) {
+  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, double kappa) {
   //void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision, double kappa) {
     QudaPrecision prec = Y.Precision();
     int Ns_c = in.Nspin();

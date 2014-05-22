@@ -164,8 +164,8 @@ namespace quda {
       operator()(static_cast<ColorSpinorField&>(out), static_cast<ColorSpinorField&>(in));
     }
   };
-  void CoarseOp(const Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge);
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, void *Y[], QudaPrecision precision, double kappa);
+  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
+  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, QudaPrecision precision, double kappa);
 
   class DiracCoarse : public DiracMatrix {
 
@@ -183,6 +183,7 @@ namespace quda {
     ColorSpinorField &tmp3; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
     ColorSpinorField &tmp4; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
     cpuGaugeField *Y; //Coarse gauge field
+    cpuGaugeField *X; //Coarse clover term
 
     void initializeCoarse();  //Initialize the coarse gauge field
 
@@ -197,13 +198,14 @@ namespace quda {
 	
     ~DiracCoarse() {
        delete Y;
+       delete X;
     }	
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
 
       #if 1
-      ApplyCoarse(out,in,*Y,dirac->kappa); 
+      ApplyCoarse(out,in,*Y,*X,dirac->kappa); 
       #else
       //errorQuda("Not implemented");
 
@@ -219,7 +221,7 @@ namespace quda {
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
     {
       #if 1
-      ApplyCoarse(out,in,*Y,dirac->kappa);
+      ApplyCoarse(out,in,*Y,*X,dirac->kappa);
       #else
       //errorQuda("Not implemented");
       //printfQuda("Starting DiracCoarse()\n");
@@ -242,7 +244,7 @@ namespace quda {
 		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
     {
       #if 1
-      ApplyCoarse(out,in,*Y,dirac->kappa);
+      ApplyCoarse(out,in,*Y,*X,dirac->kappa);
       #else
       //errorQuda("Not implemented");
       t->P(tmp, in);
