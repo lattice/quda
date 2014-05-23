@@ -408,6 +408,17 @@ namespace quda {
         } //Volume
 }
 
+  //Zero out a field, using the accessor.
+  template<typename Float>
+  void setZero(colorspinor::FieldOrder<Float> &f) {
+    for(int i = 0; i < f.Volume(); i++) {
+      for(int s = 0; s < f.Nspin(); s++) {
+	for(int c = 0; c < f.Ncolor(); c++) {
+	  f(i,s,c) = (Float) 0.0;
+        }
+      }
+    }
+   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
   template<typename Float>
@@ -651,18 +662,6 @@ namespace quda {
      } //Spin out
    } //Volume
 }
-
-  //Zero out a field, using the accessor.
-  template<typename Float>
-  void setZero(colorspinor::FieldOrder<Float> &f) {
-    for(int i = 0; i < f.Volume(); i++) {
-      for(int s = 0; s < f.Nspin(); s++) {
-	for(int c = 0; c < f.Ncolor(); c++) {
-	  f(i,s,c) = (Float) 0.0;
-        }
-      }
-    }
-   }
 
   //Multiply a field by a real constant
   template<typename Float>
