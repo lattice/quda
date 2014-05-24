@@ -179,7 +179,8 @@ namespace quda {
   }
 
   void ColorSpinorField::setTuningString() {
-    sprintf(vol_string, "%dx%dx%dx%d", x[0],  x[1],  x[2],  x[3]);
+    for (int d=0; d<nDim-1; d++) sprintf(vol_string, "%dx", x[d]);
+    sprintf(vol_string, "%d", x[nDim-1]);
     sprintf(aux_string, "vol=%d,stride=%d,precision=%d", volume, stride, precision);
     if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
       sprintf(aux_string, ",TwistFlavour=%d", twistFlavor);
