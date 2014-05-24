@@ -491,47 +491,71 @@ namespace quda {
     cudaColorSpinorField *out;
     const cudaColorSpinorField *in;
     const cudaColorSpinorField *x;
+    const QudaReconstructType reconstruct;
     char *saveOut, *saveOutNorm;
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
+    char aux[6][256];
+
+    void fillAux(KernelType kernel_type, const char *kernel_str) {
+      strcpy(aux[kernel_type],kernel_str);
+#ifdef MULTI_GPU
+      char comm[5];
+      comm[0] = (dslashParam.commDim[0] ? '1' : '0');
+      comm[1] = (dslashParam.commDim[1] ? '1' : '0');
+      comm[2] = (dslashParam.commDim[2] ? '1' : '0');
+      comm[3] = (dslashParam.commDim[3] ? '1' : '0');
+      comm[4] = '\0'; 
+      strcat(aux[kernel_type],",comm=");
+      strcat(aux[kernel_type],comm);
+      if (kernel_type == INTERIOR_KERNEL) {
+	char ghost[5];
+	ghost[0] = (dslashParam.ghostDim[0] ? '1' : '0');
+	ghost[1] = (dslashParam.ghostDim[1] ? '1' : '0');
+	ghost[2] = (dslashParam.ghostDim[2] ? '1' : '0');
+	ghost[3] = (dslashParam.ghostDim[3] ? '1' : '0');
+	ghost[4] = '\0';
+	strcat(aux[kernel_type],",ghost=");
+	strcat(aux[kernel_type],ghost);
+      }
+#endif
+
+      if (reconstruct == QUDA_RECONSTRUCT_NO) 
+	strcat(aux[kernel_type],",reconstruct=18");
+      else if (reconstruct == QUDA_RECONSTRUCT_13) 
+	strcat(aux[kernel_type],",reconstruct=13");
+      else if (reconstruct == QUDA_RECONSTRUCT_12) 
+	strcat(aux[kernel_type],",reconstruct=12");
+      else if (reconstruct == QUDA_RECONSTRUCT_9) 
+	strcat(aux[kernel_type],",reconstruct=9");
+      else if (reconstruct == QUDA_RECONSTRUCT_8) 
+	strcat(aux[kernel_type],",reconstruct=8");
+
+      if (x) strcat(aux[kernel_type],",Xpay");
+    }
 
   public:
     DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-	       const cudaColorSpinorField *x) 
-      : out(out), in(in), x(x), saveOut(0), saveOutNorm(0) { 
+	       const cudaColorSpinorField *x, const QudaReconstructType reconstruct) 
+      : out(out), in(in), x(x), reconstruct(reconstruct), saveOut(0), saveOutNorm(0) { 
 
-#ifdef MULTI_GPU // FIXME
-      strcpy(aux,"type=");
-      char comm[5], ghost[5];
-      switch (dslashParam.kernel_type) {
-      case INTERIOR_KERNEL: strcat(aux,"interior"); break;
-      case EXTERIOR_KERNEL_X: strcat(aux,"exterior_x"); break;
-      case EXTERIOR_KERNEL_Y: strcat(aux,"exterior_y"); break;
-      case EXTERIOR_KERNEL_Z: strcat(aux,"exterior_z"); break;
-      case EXTERIOR_KERNEL_T: strcat(aux,"exterior_t"); break;
-      }
-      for (int i=0; i<4; i++) {
-	comm[i] = (dslashParam.commDim[i] ? '1' : '0');
-	ghost[i] = (dslashParam.ghostDim[i] ? '1' : '0');
-      }
-      comm[4] = '\0'; ghost[4] = '\0';
-      strcat(aux,",comm=");
-      strcat(aux,comm);
-      if (dslashParam.kernel_type == INTERIOR_KERNEL) {
-	strcat(aux,",ghost=");
-	strcat(aux,ghost);
-      }
+#ifdef MULTI_GPU 
+      fillAux(INTERIOR_KERNEL, "type=interior");
+      fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
+      fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y");
+      fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z");
+      fillAux(EXTERIOR_KERNEL_T, "type=exterior_t");
 #else
-      strcpy(aux, "type=single-GPU");
+      fillAux(INTERIOR_KERNEL, "type=single-GPU");
 #endif // MULTI_GPU
 
     }
 
     virtual ~DslashCuda() { }
     virtual TuneKey tuneKey() const  
-    { return TuneKey(in->VolString(), typeid(*this).name(), aux); }
+    { return TuneKey(in->VolString(), typeid(*this).name(), aux[dslashParam.kernel_type]); }
 
     std::string paramString(const TuneParam &param) const // Don't bother printing the grid dim.
     {
@@ -650,7 +674,8 @@ namespace quda {
 
   public:
     SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		     const cudaColorSpinorField *x) : DslashCuda(out, in, x) { ; }
+		     const cudaColorSpinorField *x, const QudaReconstruct reconstruct) 
+      : DslashCuda(out, in, x, reconstruct) { ; }
     virtual ~SharedDslashCuda() { ; }
     std::string paramString(const TuneParam &param) const // override and print out grid as well
     {
@@ -681,7 +706,8 @@ namespace quda {
   class SharedDslashCuda : public DslashCuda {
   public:
     SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		     const cudaColorSpinorField *x) : DslashCuda(out, in, x) { }
+		     const cudaColorSpinorField *x, QudaReconstructType reconstruct) 
+      : DslashCuda(out, in, x, reconstruct) { }
     virtual ~SharedDslashCuda() { }
   };
 #endif
@@ -692,7 +718,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const QudaReconstructType reconstruct;
     const int dagger;
     const double a;
 
@@ -716,23 +741,13 @@ namespace quda {
     WilsonDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
 		     const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 		     const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x), gauge0(gauge0), gauge1(gauge1), 
-	reconstruct(reconstruct), dagger(dagger), a(a)
+      : SharedDslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), 
+	dagger(dagger), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
     }
 
     virtual ~WilsonDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
-
-    TuneKey tuneKey() const
-    {
-      TuneKey key = DslashCuda::tuneKey();
-      /*      std::stringstream recon; FIXME
-      recon << reconstruct;
-      key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Xpay";*/
-      return key;
-    }
 
     void apply(const cudaStream_t &stream)
     {
@@ -754,7 +769,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const QudaReconstructType reconstruct;
     const cFloat *clover;
     const float *cloverNorm;
     const int dagger;
@@ -780,22 +794,12 @@ namespace quda {
 		     const QudaReconstructType reconstruct, const cFloat *clover, 
 		     const float *cloverNorm, const cudaColorSpinorField *in, 
 		     const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x), gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cloverNorm(cloverNorm), reconstruct(reconstruct), dagger(dagger), a(a)
+      : SharedDslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), clover(clover),
+	cloverNorm(cloverNorm), dagger(dagger), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
     }
     virtual ~CloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
-
-    TuneKey tuneKey() const
-    {
-      TuneKey key = DslashCuda::tuneKey();
-      /*std::stringstream recon; FIXME
-      recon << reconstruct;
-      key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Xpay";*/
-      return key;
-    }
 
     void apply(const cudaStream_t &stream)
     {
@@ -817,7 +821,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const QudaReconstructType reconstruct;
     const cFloat *clover;
     const float *cloverNorm;
     const int dagger;
@@ -844,22 +847,13 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cFloat *clover, 
 			 const float *cloverNorm, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x), gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cloverNorm(cloverNorm), reconstruct(reconstruct), dagger(dagger), a(a)
+      : SharedDslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), clover(clover),
+	cloverNorm(cloverNorm), dagger(dagger), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
       if (!x) errorQuda("Asymmetric clover dslash only defined for Xpay");
     }
     virtual ~AsymCloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
-
-    TuneKey tuneKey() const
-    {
-      TuneKey key = DslashCuda::tuneKey();
-      /*std::stringstream recon;
-      recon << reconstruct;
-      key.aux += ",reconstruct=" + recon.str() + ",Xpay";*/
-      return key;
-    }
 
     void apply(const cudaStream_t &stream)
     {
@@ -896,7 +890,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const QudaReconstructType reconstruct;
     const QudaTwistDslashType dslashType;
     const int dagger;
     double a, b, c, d;
@@ -922,8 +915,8 @@ namespace quda {
 		      const QudaReconstructType reconstruct, const cudaColorSpinorField *in,  const cudaColorSpinorField *x, 
                       const QudaTwistDslashType dslashType, const double kappa, const double mu, 
 		      const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x),gauge0(gauge0), gauge1(gauge1), 
-	reconstruct(reconstruct), dslashType(dslashType), dagger(dagger)
+      : SharedDslashCuda(out, in, x, reconstruct),gauge0(gauge0), gauge1(gauge1), 
+	dslashType(dslashType), dagger(dagger)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
       a = kappa;
@@ -936,25 +929,20 @@ namespace quda {
     TuneKey tuneKey() const
     {
       TuneKey key = DslashCuda::tuneKey();
-      /*std::stringstream recon, dslash_type; FIXME
-      recon << reconstruct;
-      key.aux += ",reconstruct=" + recon.str();
-
       switch(dslashType){
-        case QUDA_DEG_TWIST_INV_DSLASH:
-        key.aux += ",TwistInvDslash";
+      case QUDA_DEG_TWIST_INV_DSLASH:
+	strcat(key.aux,",TwistInvDslash");
+	break;
+      case QUDA_DEG_DSLASH_TWIST_INV:
+        strcat(key.aux,",");
         break;
-        case QUDA_DEG_DSLASH_TWIST_INV:
-        key.aux += ",";
+      case QUDA_DEG_DSLASH_TWIST_XPAY:
+        strcat(key.aux,",DslashTwist");
         break;
-        case QUDA_DEG_DSLASH_TWIST_XPAY:
-        key.aux += ",DslashTwist";
-        break;
-        case QUDA_NONDEG_DSLASH:
-        key.aux += ",NdegDslash";
+      case QUDA_NONDEG_DSLASH:
+        strcat(key.aux,",NdegDslash");
         break;
       }
-      if (x) key.aux += "Xpay";*/
       return key;
     }
 
@@ -999,7 +987,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const QudaReconstructType reconstruct;
     const int dagger;
     const double mferm;
     const double a;
@@ -1063,8 +1050,8 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double mferm, 
 			 const double a, const int dagger)
-      : DslashCuda(out, in, x), gauge0(gauge0), gauge1(gauge1), mferm(mferm), 
-	reconstruct(reconstruct), dagger(dagger), a(a)
+      : DslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), mferm(mferm), 
+	dagger(dagger), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
@@ -1089,18 +1076,6 @@ namespace quda {
       bool ok = true;
       if (!checkGrid(param)) ok = advanceBlockDim(param);
       if (!ok) errorQuda("Lattice volume is too large for even the largest blockDim");
-    }
-
-    TuneKey tuneKey() const
-    {
-      TuneKey key = DslashCuda::tuneKey();
-      /*std::stringstream ls, recon; FIXME
-      ls << dslashConstants.Ls;
-      recon << reconstruct;
-      key.volume += "x" + ls.str();
-      key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Xpay";*/
-      return key;
     }
 
     void apply(const cudaStream_t &stream)
@@ -1134,7 +1109,6 @@ namespace quda {
     const longGFloat *long0, *long1;
    // const typename RealType<longGFloat>::type *phase0, *phase1;
     const phaseFloat *phase0, *phase1;
-    const QudaReconstructType reconstruct;
     const int dagger;
     const double a;
 
@@ -1152,23 +1126,13 @@ namespace quda {
                         const phaseFloat *phase1, 
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x), fat0(fat0), fat1(fat1), long0(long0), long1(long1), phase0(phase0), phase1(phase1), 
-	reconstruct(reconstruct), dagger(dagger), a(a)
+      : DslashCuda(out, in, x, reconstruct), fat0(fat0), fat1(fat1), long0(long0), 
+	long1(long1), phase0(phase0), phase1(phase1), dagger(dagger), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
 
     virtual ~StaggeredDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
-
-    TuneKey tuneKey() const
-    {
-      TuneKey key = DslashCuda::tuneKey();
-      /*std::stringstream recon; FIXME
-      recon << reconstruct;
-      key.aux += ",reconstruct=" + recon.str();
-      if (x) key.aux += ",Axpy";*/
-      return key;
-    }
 
     void apply(const cudaStream_t &stream)
     {
@@ -1222,7 +1186,7 @@ namespace quda {
     commDimTotal *= 4; // 2 from pipe length, 2 from direction
   }
 
-  //#define DSLASH_PROFILE
+  //  #define DSLASH_PROFILE
 #ifdef DSLASH_PROFILE
 #define PROFILE(f, profile, idx)		\
   profile.Start(idx);				\
