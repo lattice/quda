@@ -357,8 +357,9 @@ namespace quda {
     gParam.create = QUDA_ZERO_FIELD_CREATE;
     gParam.precision = prec;
     gParam.nDim = ndim;
-    gParam.siteDim= 2*ndim+1;
-    gParam.geometry = QUDA_COARSE_GEOMETRY;
+    //gParam.siteDim= 2*ndim+1;
+    //gParam.geometry = QUDA_COARSE_GEOMETRY;
+    gParam.geometry = QUDA_VECTOR_GEOMETRY;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     Y = new cpuGaugeField(gParam);
 
