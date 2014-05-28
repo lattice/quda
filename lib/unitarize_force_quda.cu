@@ -619,7 +619,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { 
 	sprintf(vol, "%dx%dx%dx%d", gauge.X()[0],  gauge.X()[1],  
 		gauge.X()[2],  gauge.X()[3]);
-	sprintf(aux, "threads=%d,prec=%d,stride=%d", 
+	sprintf(aux, "threads=%d,prec=%lu,stride=%d", 
 		gauge.Volume(), gauge.Precision(), gauge.Stride());
       }
       virtual ~UnitarizeForceCuda() { ; }

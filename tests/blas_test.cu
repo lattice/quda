@@ -642,7 +642,7 @@ int Nprec = 2;
 
 const char *prec_str[] = {"half", "single", "double"};
 
-char *names[] = {
+const char *names[] = {
   "copyHS",
   "copyLS",
   "axpby",
@@ -728,7 +728,7 @@ int main(int argc, char** argv)
   // lastly check for correctness
   if (verify_results) {
     ::testing::InitGoogleTest(&argc, argv);
-    RUN_ALL_TESTS();
+    if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
   }
 
   endQuda();

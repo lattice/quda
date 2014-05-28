@@ -327,7 +327,7 @@ namespace quda {
 
       TuneKey tuneKey() const {
 	sprintf(vol_string,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	sprintf(aux_string,"threads=%d,stride=%d,prec=%d",arg.threads,arg.clover.stride,sizeof(Float));
+	sprintf(aux_string,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
 	return TuneKey(vol_string, typeid(*this).name(), aux_string);
       }
 
@@ -501,7 +501,7 @@ namespace quda {
 
       TuneKey tuneKey() const {
 	sprintf(vol_string,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	sprintf(aux_string,"threads=%d,stride=%d,prec=%d",arg.threads,arg.clover.stride,sizeof(Float));
+	sprintf(aux_string,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
 	return TuneKey(vol_string, typeid(*this).name(), aux_string);
       }
 

@@ -251,7 +251,7 @@ namespace quda {
 
     TuneKey tuneKey() const {
       sprintf(vol_string,"%d",arg.clover.volumeCB);
-      sprintf(aux_string,"stride=%d,prec=%d",arg.clover.stride,sizeof(Float));
+      sprintf(aux_string,"stride=%d,prec=%lu",arg.clover.stride,sizeof(Float));
       return TuneKey(vol_string, typeid(*this).name(), aux_string);
     }
 

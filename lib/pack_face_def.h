@@ -1180,6 +1180,7 @@ static inline __device__ void unpackFaceWilsonCore(short4 *out, float *outNorm, 
   } else {
 #include "wilson_pack_face_core.h"
   }
+}
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN

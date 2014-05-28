@@ -317,7 +317,7 @@ namespace quda {
         CloverDerivative(const CloverDerivArg<Complex> &arg)
           : arg(arg) {
 	  sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	  sprintf(aux,"threads=%d,prec=%d,stride=%d,geometery=%d",
+	  sprintf(aux,"threads=%d,prec=%lu,stride=%d,geometery=%d",
 		  arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
 	}
         virtual ~CloverDerivative() {}

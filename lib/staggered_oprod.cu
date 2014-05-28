@@ -408,7 +408,7 @@ namespace quda {
             QudaFieldLocation location)
           : arg(arg), location(location) {
 	  sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	  sprintf(aux,"threads=%d,prec=%d,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
+	  sprintf(aux,"threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
 	} 
 
        virtual ~StaggeredOprodField() {}
