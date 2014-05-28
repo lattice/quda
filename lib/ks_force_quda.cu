@@ -159,7 +159,10 @@ namespace quda {
 
       public:
       KSForceComplete(KSForceArg<Oprod,Gauge,Mom> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {}
+        : arg(arg), location(location) {
+	sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+	sprintf(aux,"prec=%d,stride=%d",sizeof(Float),arg.mom.stride);
+      }
 
       virtual ~KSForceComplete() {}
 
@@ -174,12 +177,7 @@ namespace quda {
         }
       }
 
-      TuneKey tuneKey() const {
-        std::stringstream vol, aux;
-        vol << arg.threads;
-        aux << "stride=" << arg.mom.stride;
-        return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
       std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
         std::stringstream ps;
@@ -378,7 +376,10 @@ class KSLongLinkForce : Tunable {
 
   public:
   KSLongLinkForce(KSLongLinkArg<Result,Oprod,Gauge> &arg, QudaFieldLocation location)
-    : arg(arg), location(location) {}
+    : arg(arg), location(location) {
+    sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+    sprintf(aux,"prec=%d,stride=%d",sizeof(Float),arg.res.stride);
+  }
 
   virtual ~KSLongLinkForce() {}
 
@@ -393,12 +394,7 @@ class KSLongLinkForce : Tunable {
     }
   }
 
-  TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << arg.threads;
-    aux << "stride=" << arg.res.stride;
-    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-  }
+  TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
   std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
     std::stringstream ps;

@@ -203,6 +203,15 @@ namespace quda {
     init = true;
 
     clearGhostPointers();
+    setTuningString();
+  }
+
+  void ColorSpinorField::setTuningString() {
+    for (int d=0; d<nDim-1; d++) sprintf(vol_string, "%dx", x[d]);
+    sprintf(vol_string, "%d", x[nDim-1]);
+    sprintf(aux_string, "vol=%d,stride=%d,precision=%d", volume, stride, precision);
+    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
+      sprintf(aux_string, ",TwistFlavour=%d", twistFlavor);
   }
 
   void ColorSpinorField::destroy() {
@@ -277,6 +286,8 @@ namespace quda {
       std::cout << *this << std::endl;
       printfQuda("\n");
     }
+
+    setTuningString();
   }
 
   // Fills the param with the contents of this field

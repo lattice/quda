@@ -34,9 +34,9 @@
   }
 
 static struct {
-  int x[QUDA_MAX_DIM];
-  int stride;
-} blasConstants;
+  const char *vol_str;
+  const char *aux_str;
+} blasStrings;
 
 // These are used for reduction kernels
 static QudaSumFloat *d_reduce=0;

@@ -19,7 +19,7 @@
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
 extern void usage(char** argv);
-static int verify_results = 1;
+extern bool verify_results;
 
 extern int device;
 extern int xdim, ydim, zdim, tdim;
@@ -33,7 +33,7 @@ static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static size_t gSize;
 
-  static int
+  static void
 llfat_test(int test)
 {
 
@@ -323,39 +323,39 @@ llfat_test(int test)
     }
   }
 
-  printfQuda("Checking fat links...\n");
-  int res=1;
-  for(int dir=0; dir<4; dir++){
-    res &= compare_floats(fat_reflink[dir], myfatlink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
-  }
-  int accuracy_level;
-
-  accuracy_level = strong_check_link(myfatlink, "GPU results: ",
-      fat_reflink, "CPU reference results:",
-      V, qudaGaugeParam.cpu_prec);
-
-  printfQuda("Fat-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
+  if (verify_results) {
+    printfQuda("Checking fat links...\n");
+    int res=1;
+    for(int dir=0; dir<4; dir++){
+      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+    }
+    
+    strong_check_link(myfatlink, "GPU results: ",
+		      fat_reflink, "CPU reference results:",
+		      V, qudaGaugeParam.cpu_prec);
+    
+    printfQuda("Fat-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
 #ifdef MULTI_GPU
-  if(test){
+    if(test){
 #endif
-  printfQuda("Checking long links...\n");
-  res = 1;
-  for(int dir=0; dir<4; ++dir){
-    res &= compare_floats(long_reflink[dir], mylonglink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
-  }
-
-  accuracy_level = strong_check_link(mylonglink, "GPU results: ",
-      long_reflink, "CPU reference results:",
-      V, qudaGaugeParam.cpu_prec);
-
-  printfQuda("Long-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
-  
+      printfQuda("Checking long links...\n");
+      res = 1;
+      for(int dir=0; dir<4; ++dir){
+	res &= compare_floats(long_reflink[dir], mylonglink[dir], V*gaugeSiteSize, 1e-3, qudaGaugeParam.cpu_prec);
+      }
+      
+      strong_check_link(mylonglink, "GPU results: ",
+			long_reflink, "CPU reference results:",
+			V, qudaGaugeParam.cpu_prec);
+      
+      printfQuda("Long-link test %s\n\n",(1 == res) ? "PASSED" : "FAILED");
+      
 #ifdef MULTI_GPU
-  }else{ // !test
-    printfQuda("Extended volume is required for multi-GPU long-link construction\n");
-  }
+    }else{ // !test
+      printfQuda("Extended volume is required for multi-GPU long-link construction\n");
+    }
 #endif
-
+  }
 
   int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
   int flops= 61632;
@@ -371,12 +371,6 @@ llfat_test(int test)
 
   for(int i=0;i < 4;i++){
     free(myfatlink[i]);
-  }
-
-  if (res == 0){//failed
-    printfQuda("\n");
-    printfQuda("Warning: your test failed. \n");
-    printfQuda(" Did you check the GPU health by running cuda memtest?\n");
   }
 
 #ifdef MULTI_GPU
@@ -409,9 +403,6 @@ llfat_test(int test)
   exchange_llfat_cleanup();
 #endif
   endQuda();
-
-  return accuracy_level;
-
 }
 
   static void
@@ -446,7 +437,6 @@ usage_extra(char** argv )
   printfQuda("    --test <0/1>                             # Test method\n");
   printfQuda("                                                0: standard method\n");
   printfQuda("                                                1: extended volume method\n");
-  printfQuda("    --verify                                 # Verify the GPU results using CPU results\n");
   printfQuda("    --gauge-order <qdp/milc>		   # ordering of the input gauge-field\n");
   return ;
 }
@@ -489,12 +479,6 @@ main(int argc, char **argv)
       continue;
     }
 
-
-    if( strcmp(argv[i], "--verify") == 0){
-      verify_results=1;
-      continue;
-    }
-
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -507,23 +491,9 @@ main(int argc, char **argv)
 #endif
 
   initComms(argc, argv, gridsize_from_cmdline);
-
   display_test_info(test);
-
-  int accuracy_level = llfat_test(test);
-
-  printfQuda("accuracy_level=%d\n", accuracy_level);
-
+  llfat_test(test);
   finalizeComms();
-
-  int ret;
-  if(accuracy_level >=3 ){
-    ret = 0;
-  }else{
-    ret = 1; //we delclare the test failed
-  }
-
-  return ret;
 }
 
 

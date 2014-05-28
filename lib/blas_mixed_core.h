@@ -75,15 +75,9 @@ public:
     { ; }
   virtual ~BlasCuda() { }
 
-  TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << blasConstants.x[0] << "x";
-    vol << blasConstants.x[1] << "x";
-    vol << blasConstants.x[2] << "x";
-    vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << arg.X.Precision();
-    return TuneKey(vol.str(), typeid(arg.f).name(), aux.str());
-  }  
+  inline TuneKey tuneKey() const { 
+    return TuneKey(blasStrings.vol_str, typeid(arg.f).name(), blasStrings.aux_str);
+  }
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -135,9 +129,6 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     warningQuda("Blas on non-native fields is not supported\n");
     return;
   }
-
-  for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
-  blasConstants.stride = x.Stride();
 
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>

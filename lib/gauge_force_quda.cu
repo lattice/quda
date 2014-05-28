@@ -255,7 +255,7 @@ namespace quda {
       aux << "threads=" << link.Volume() << ",prec=" << link.Precision();
       aux << "stride=" << link.Stride() << ",recon=" << link.Reconstruct();
       aux << "dir=" << dir << "num_paths=" << num_paths;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
     }  
   
   };

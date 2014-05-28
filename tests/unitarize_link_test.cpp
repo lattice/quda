@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <cuda.h>
+
+ #include <cuda.h>
 #include <cuda_runtime.h>
 
 #include "quda.h"
@@ -102,16 +103,17 @@ unitarize_link_test()
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
   gParam.order     = QUDA_QDP_GAUGE_ORDER;
-  gParam.pad         = 0;
-  gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.link_type   = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  gParam.pad         = 0;
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.order       = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
-  
-  gParam.order = QUDA_QDP_GAUGE_ORDER;
+
+  gParam.order = gauge_order;
 
   TimeProfile profile("dummy");
 
@@ -179,11 +181,10 @@ unitarize_link_test()
   act_path_coeff[5] = -0.123113;
 
 
-
   printfQuda("Calling computeKSLinkQuda\n");
-  fflush(stdout);
-    computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
-        QUDA_COMPUTE_FAT_STANDARD);
+
+  computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
+		    QUDA_COMPUTE_FAT_STANDARD);
   printfQuda("Call to computeKSLinkQuda complete\n");
 
 
@@ -193,8 +194,8 @@ unitarize_link_test()
   }
 
 
-  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge     = fatlink_2d;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge  = fatlink_2d;
   cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
 
   printfQuda("About to call cudaFatLink->loadCPUField\n");
@@ -209,11 +210,11 @@ unitarize_link_test()
 
 
   setUnitarizeLinksConstants(unitarize_eps,
-      max_allowed_error,
-      reunit_allow_svd,
-      reunit_svd_only,
-      svd_rel_error,
-      svd_abs_error);
+			     max_allowed_error,
+			     reunit_allow_svd,
+			     reunit_svd_only,
+			     svd_rel_error,
+			     svd_abs_error);
 
   setUnitarizeLinksPadding(0,0);
 
@@ -242,6 +243,9 @@ unitarize_link_test()
   delete cudaFatLink;
   delete cudaULink;
   for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
+
+  free(fatlink);
+
   cudaFree(num_failures_dev); 
 
   free(inlink);

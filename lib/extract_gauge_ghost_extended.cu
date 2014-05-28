@@ -206,6 +206,9 @@ namespace quda {
       int dB = arg.B1[arg.dim]-arg.B0[arg.dim];
       int dC = arg.C1[arg.dim]-arg.C0[arg.dim];
       size = arg.R[arg.dim]*dA*dB*dC*arg.order.geometry;
+      sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+      sprintf(aux,"prec=%d,stride=%d,extract=%d,dimension=%d",
+	      sizeof(Float),arg.order.stride, extract,arg.dim);
     }
     virtual ~ExtractGhostEx() { ; }
   
@@ -233,16 +236,7 @@ namespace quda {
       }
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];    
-      aux << "stride=" << arg.order.stride << ",extract=" <<
-	extract << ",dimension=" << arg.dim;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;

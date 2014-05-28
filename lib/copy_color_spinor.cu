@@ -135,10 +135,14 @@ namespace quda {
       return advance;
     }
 
+
   public:
   PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, int volume) 
     : out(out), in(in), basis(basis), volume(volume) { ; }
-    virtual ~PackSpinor() { ; }
+    virtual ~PackSpinor() { 
+      sprintf(vol, "%d", in.volumeCB);
+      sprintf(aux, "out_stride=%d,in_stride=%d", out.stride, in.stride);
+    }
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -147,12 +151,7 @@ namespace quda {
 	(out, in, basis, volume);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << in.volumeCB; 
-      aux << "out_stride=" << out.stride << ",in_stride=" << in.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;

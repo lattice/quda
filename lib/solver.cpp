@@ -36,8 +36,12 @@ namespace quda {
       solver = new SD(mat, param, profile);
       break;
     case QUDA_XSD_INVERTER:
+#ifdef MULTI_GPU
       report("XSD");
       solver = new XSD(mat, param, profile);
+#else
+      errorQuda("Extended Steepest Descent is multi-gpu only");
+#endif
       break;
     case QUDA_PCG_INVERTER:
       report("PCG");

@@ -713,7 +713,7 @@ namespace quda {
             vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
 
@@ -853,7 +853,7 @@ namespace quda {
             vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
@@ -990,7 +990,7 @@ namespace quda {
             vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
@@ -1112,7 +1112,7 @@ namespace quda {
             vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
@@ -1239,7 +1239,7 @@ namespace quda {
             vol << kparam.D[3];    
             aux << "threads=" << kparam.threads << ",prec=" << link.Precision();
             aux << ",recon=" << link.Reconstruct() << ",sig=" << sig << ",mu=" << mu;
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
@@ -1385,7 +1385,7 @@ namespace quda {
             int threads = X[0]*X[1]*X[2]*X[3]/2;
             aux << "threads=" << threads << ",prec=" << oprod.Precision();
             aux << ",coeff=" << coeff;
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
           void apply(const cudaStream_t &stream) {
@@ -1459,7 +1459,7 @@ namespace quda {
             vol << X[3];    
             int threads = X[0]*X[1]*X[2]*X[3]/2;
             aux << "threads=" << threads << ",prec=" << link.Precision();
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid,tp.block>>>		\
@@ -1549,7 +1549,7 @@ namespace quda {
             vol << X[3];    
             int threads = X[0]*X[1]*X[2]*X[3]/2;
             aux << "threads=" << threads << ",prec=" << link.Precision();
-            return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+            return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB)  <<<tp.grid, tp.block>>>		\

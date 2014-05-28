@@ -159,6 +159,10 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
+namespace quda {
+  void printLaunchTimer();
+}
+
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
 {
   setVerbosity(verbosity);
@@ -1004,6 +1008,8 @@ void endQuda(void)
     profileAsqtadForce.Print();
     profileHISQForce.Print();
     profileEnd.Print();
+
+    printLaunchTimer();
 
     printfQuda("\n");
     printPeakMemUsage();

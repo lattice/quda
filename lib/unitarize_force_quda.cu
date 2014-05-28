@@ -6,11 +6,17 @@
 #include <gauge_field.h>
 #include <tune_quda.h>
 
+#include <tune_quda.h>
 #include <quda_matrix.h>
 
 #ifdef GPU_HISQ_FORCE
 
 namespace quda{
+namespace {
+  #include <svd_quda.h>
+}
+
+//#ifdef GPU_HISQ_FORCE
 
 namespace { // anonymous
 #include <svd_quda.h>
@@ -610,7 +616,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     public:
       UnitarizeForceCuda(const cudaGaugeField& oldForce, const cudaGaugeField& gauge,  
 			 cudaGaugeField& newForce, int* fails) : 
-	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { ; }
+	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { 
+	sprintf(vol, "%dx%dx%dx%d", gauge.X()[0],  gauge.X()[1],  
+		gauge.X()[2],  gauge.X()[3]);
+	sprintf(aux, "threads=%d,prec=%d,stride=%d", 
+		gauge.Volume(), gauge.Precision(), gauge.Stride());
+      }
       virtual ~UnitarizeForceCuda() { ; }
 
       void apply(const cudaStream_t &stream) {
@@ -634,16 +645,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       
       long long flops() const { return 4*4528*gauge.Volume(); } // FIXME: add flops counter
       
-      TuneKey tuneKey() const {
-	std::stringstream vol, aux;
-	vol << gauge.X()[0] << "x";
-	vol << gauge.X()[1] << "x";
-	vol << gauge.X()[2] << "x";
-	vol << gauge.X()[3] << "x";
-	aux << "threads=" << gauge.Volume() << ",prec=" << gauge.Precision();
-	aux << "stride=" << gauge.Stride();
-	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }  
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
     }; // UnitarizeForceCuda
 
     void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
@@ -657,6 +659,8 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     
     
   } // namespace fermion_force
+
+//#endif
 } // namespace quda
 
 #endif

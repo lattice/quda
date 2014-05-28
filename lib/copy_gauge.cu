@@ -134,7 +134,10 @@ namespace quda {
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
       }
       size = isGhost ? faceMax : arg.volume/2;
+      sprintf(vol, "%d", arg.volume/2);
+      sprintf(aux, "out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
+
     virtual ~CopyGauge() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -148,13 +151,7 @@ namespace quda {
       }
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.in.volumeCB; 
-      aux << "out_stride=" << arg.out.stride << ",in_stride=" << arg.in.stride;
-      aux << "geometry=" << arg.geometry;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;

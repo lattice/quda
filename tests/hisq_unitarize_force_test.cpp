@@ -30,7 +30,7 @@ cpuGaugeField *cpuReference = NULL;
 static QudaGaugeParam gaugeParam;
 
 
-int verify_results = 1;
+extern bool verify_results;
 double accuracy = 1e-5;
 int ODD_BIT = 1;
 extern int device;
@@ -182,22 +182,20 @@ hisq_force_test()
 
 
   if(verify_results){
-	  printfQuda("Calling unitarizeForceCPU\n");
+    printfQuda("Calling unitarizeForceCPU\n");
     fermion_force::unitarizeForceCPU(*cpuOprod, *cpuFatLink, cpuResult);
   }
+
   cudaResult->saveCPUField(*cpuReference, QUDA_CPU_FIELD_LOCATION);
-
-  if(verify_results){
-	  printfQuda("Comparing CPU and GPU results\n");
-    for(int dir=0; dir<4; ++dir){
-      int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuResult->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
+  
+  printfQuda("Comparing CPU and GPU results\n");
+  for(int dir=0; dir<4; ++dir){
+    int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuResult->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
 #ifdef MULTI_GPU
-      comm_allreduce_int(&res);
-      res /= comm_size();
+    comm_allreduce_int(&res);
+    res /= comm_size();
 #endif
-      printfQuda("Dir:%d  Test %s\n",dir,(1 == res) ? "PASSED" : "FAILED");
-    }
-
+    printfQuda("Dir:%d  Test %s\n",dir,(1 == res) ? "PASSED" : "FAILED");
   }
 
   hisq_force_end();
@@ -218,14 +216,6 @@ display_test_info()
     
 }
 
-void
-usage_extra(char** argv )
-{
-  printf("Extra options: \n");
-  printf("    --no_verify                                  # Do not verify the GPU results using CPU results\n");
-  return ;
-}
-
 int 
 main(int argc, char **argv) 
 {
@@ -235,12 +225,6 @@ main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     }  
-
-    if( strcmp(argv[i], "--no_verify") == 0){
-      verify_results=0;
-      continue;	    
-    }	
-
 
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);

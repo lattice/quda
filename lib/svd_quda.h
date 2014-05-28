@@ -1,7 +1,6 @@
 #ifndef _SVD_QUDA_H_
 #define _SVD_QUDA_H_
 
-
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11
 #define LOG2 0.69314718055994530942
