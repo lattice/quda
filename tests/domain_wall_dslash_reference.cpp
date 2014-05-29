@@ -733,8 +733,6 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
 
 //END NEW
 
-
-
 void dw_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm) {
 
   void *inEven = in;

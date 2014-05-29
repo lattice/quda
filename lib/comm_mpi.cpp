@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
-
 #include <quda_internal.h>
 #include <comm_quda.h>
 
@@ -23,7 +22,6 @@ struct MsgHandle_s {
   MPI_Request request;
   MPI_Datatype datatype;
 };
-
 
 static int rank = -1;
 static int size = -1;
@@ -55,7 +53,6 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   comm_set_default_topology(topo);
 
   // determine which GPU this MPI rank will use
-
   char *hostname = comm_hostname();
   char *hostname_recv_buf = (char *)safe_malloc(128*size);
   
@@ -215,7 +212,6 @@ void comm_allreduce_max(double* data)
   MPI_CHECK( MPI_Allreduce(data, &recvbuf, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD) );
   *data = recvbuf;
 } 
-
 
 void comm_allreduce_array(double* data, size_t size)
 {

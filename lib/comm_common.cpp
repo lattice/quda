@@ -246,7 +246,6 @@ MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t 
   return comm_declare_receive_displaced(buffer, disp, nbytes);
 }
 
-
 /**
  * Strided send to the "dir" direction in the "dim" dimension
  */
@@ -271,7 +270,6 @@ MsgHandle *comm_declare_strided_receive_relative(void *buffer, int dim, int dir,
 
   return comm_declare_strided_receive_displaced(buffer, disp, blksize, nblocks, stride);
 }
-
 
 void comm_finalize(void)
 {

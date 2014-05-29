@@ -24,6 +24,8 @@ namespace quda {
       QudaGammaBasis gammaBasis;
       QudaFieldCreate create; // 
 
+      QudaDWFPCType PCtype; // used to select preconditioning method in DWF
+    
       void *v; // pointer to field
       void *norm;
 
@@ -32,7 +34,8 @@ namespace quda {
       ColorSpinorParam()
         : LatticeFieldParam(), nColor(0), nSpin(0), twistFlavor(QUDA_TWIST_INVALID), 
         siteOrder(QUDA_INVALID_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
-        gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE) { ; }
+        gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE),
+	PCtype(QUDA_PC_INVALID) { ; }
 
       // used to create cpu params
       ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
@@ -41,7 +44,7 @@ namespace quda {
               inv_param.dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4), 
         twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER), 
         fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
-          create(QUDA_REFERENCE_FIELD_CREATE), v(V) { 
+          create(QUDA_REFERENCE_FIELD_CREATE),  PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||(inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ), v(V) { 
 
             if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
             for (int d=0; d<nDim; d++) x[d] = X[d];
@@ -53,7 +56,9 @@ namespace quda {
               siteSubset = QUDA_PARITY_SITE_SUBSET;
             }
 
-            if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+            if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+		inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+		inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
               nDim++;
               x[4] = inv_param.Ls;
             }
@@ -89,7 +94,7 @@ namespace quda {
         nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor), 
         siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
         gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-        create(QUDA_COPY_FIELD_CREATE), v(0)
+        create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0)
         {
           siteSubset = cpuParam.siteSubset;
           fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
@@ -130,8 +135,9 @@ namespace quda {
 
     private:
       void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
-          QudaPrecision precision, int pad, QudaSiteSubset subset, 
-          QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis);
+		  QudaPrecision precision, int pad, QudaSiteSubset subset, 
+		  QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
+		  QudaDWFPCType PCtype);
       void destroy();  
 
     protected:
@@ -150,6 +156,8 @@ namespace quda {
       int stride;
 
       QudaTwistFlavorType twistFlavor;
+
+      QudaDWFPCType PCtype; // used to select preconditioning method in DWF
 
       int real_length; // physical length only
       int length; // length including pads, but not ghost zone - used for BLAS
@@ -228,6 +236,8 @@ namespace quda {
       const void* V() const {return v;}
       void* Norm(){return norm;}
       const void* Norm() const {return norm;}
+
+      QudaDWFPCType DWFPCtype() const { return PCtype; }
 
       virtual QudaFieldLocation Location() const = 0;
       QudaSiteSubset SiteSubset() const { return siteSubset; }

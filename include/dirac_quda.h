@@ -22,7 +22,9 @@ namespace quda {
     double kappa;
     double mass;
     double m5; // used by domain wall only
-    int Ls;    //!NEW: used by domain wall only and twisted mass  
+    int Ls;    //!NEW: used by domain wall and twisted mass
+    double *b_5;    //!NEW: used by mobius domain wall only  
+    double *c_5;    //!NEW: used by mobius domain wall only
     MatPCType matpcType;
     DagType dagger;
     cudaGaugeField *gauge;
@@ -59,6 +61,7 @@ namespace quda {
       printfQuda("mu = %g\n", mu);
       printfQuda("epsilon = %g\n", epsilon);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
+      for (int i=0; i<Ls; i++) printfQuda("b_5[%d] = %e\t c_5[%d] = %e\n", i,b_5[i],i,c_5[i]);
     }
   };
 
@@ -283,6 +286,70 @@ namespace quda {
 		 const QudaSolutionType) const;
     void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
 		     const QudaSolutionType) const;
+  };
+
+// 4d Even-odd preconditioned domain wall
+  class DiracDomainWall4DPC : public DiracDomainWallPC {
+
+  private:
+
+  public:
+    DiracDomainWall4DPC(const DiracParam &param);
+    DiracDomainWall4DPC(const DiracDomainWall4DPC &dirac);
+    virtual ~DiracDomainWall4DPC();
+    DiracDomainWall4DPC& operator=(const DiracDomainWall4DPC &dirac);
+    void Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		const QudaParity parity) const;
+    void Dslash5(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5inv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity, const double &k) const;
+    void Dslash4Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+
+    void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+
+    void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
+		 cudaColorSpinorField &x, cudaColorSpinorField &b, 
+		 const QudaSolutionType) const;
+    void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+		     const QudaSolutionType) const;
+  };
+
+
+// 4d Even-odd preconditioned Mobius domain wall
+  class DiracMobiusDomainWallPC : public DiracDomainWallPC {
+    
+  protected:
+    //Mobius coefficients
+    double *b_5;
+    double *c_5;
+
+  private:
+
+  public:
+    DiracMobiusDomainWallPC(const DiracParam &param);
+    DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac);
+    virtual ~DiracMobiusDomainWallPC();
+    DiracMobiusDomainWallPC& operator=(const DiracMobiusDomainWallPC &dirac);
+    void Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		const QudaParity parity) const;
+    void Dslash4pre(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		const QudaParity parity) const;
+    void Dslash5(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const;
+    void Dslash5inv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity, const double &k) const;
+    void Dslash4Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+    void Dslash5Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const;
+
+    void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol, cudaColorSpinorField &x, 
+		 cudaColorSpinorField &b, const QudaSolutionType) const;
+    void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b, const QudaSolutionType) const;
   };
 
   // Full twisted mass

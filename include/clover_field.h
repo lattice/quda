@@ -130,7 +130,6 @@ namespace quda {
     */
     void saveCPUField(cpuCloverField &cpu);  
 
-
     friend class DiracClover;
     friend class DiracCloverPC;
     friend struct FullClover;

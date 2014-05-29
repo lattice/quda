@@ -1,6 +1,7 @@
 include ../make.inc
 
 QUDA = libquda.a
+
 QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
 	inv_gcr_quda.o inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o	\
@@ -21,7 +22,8 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
 	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
-	milc_interface.o extended_color_spinor_utilities.o
+	milc_interface.o extended_color_spinor_utilities.o		\
+	eig_lanczos_quda.o ritz_quda.o eig_solver.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -29,9 +31,11 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	gauge_update_quda.h invert_quda.h llfat_quda.h quda.h		\
 	quda_internal.h util_quda.h face_quda.h tune_quda.h		\
 	comm_quda.h lattice_field.h gauge_field.h double_single.h	\
-	texture.h numa_affinity.h misc_helpers.h fermion_force_quda.h	\
-	malloc_quda.h gauge_field_order.h clover_field_order.h		\
-	color_spinor_field_order.h staggered_oprod.h
+	texture.h eig_variables.h numa_affinity.h misc_helpers.h	\
+	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
+	clover_field_order.h color_spinor_field_order.h			\
+	staggered_oprod.h lanczos_quda.h ritz_quda.h
+
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
@@ -100,6 +104,7 @@ gen:
 	$(PYTHON) generate/dw_dslash_cuda_gen.py
 	$(PYTHON) generate/ndeg_tm_dslash_cuda_gen.py
 	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
+	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
 
 clean:
 	-rm -f *.o $(QUDA)
@@ -114,6 +119,9 @@ reduce_quda.o: reduce_quda.cu $(HDRS) $(REDUCE_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+
+cuda_eig_variables.o: cuda_eig_variables.cu $(HDRS) $(CSF_INLN)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)

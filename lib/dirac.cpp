@@ -150,6 +150,12 @@ namespace quda {
     } else if (param.type == QUDA_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWallPC operator\n");
       return new DiracDomainWallPC(param);
+    } else if (param.type == QUDA_DOMAIN_WALL_4DPC_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracDomainWall4DPC operator\n");
+      return new DiracDomainWall4DPC(param);
+    } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracMobiusDomainWallPC operator\n");
+      return new DiracMobiusDomainWallPC(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracStaggered operator\n");
       return new DiracStaggered(param);

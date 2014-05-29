@@ -85,7 +85,6 @@ void initRand()
   srand(17*rank + 137);
 }
 
-
 void setDims(int *X) {
   V = 1;
   for (int d=0; d< 4; d++) {
@@ -1569,7 +1568,6 @@ int dimPartitioned(int dim)
   return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]);
 }
 
-
 void __attribute__((weak)) usage_extra(char** argv){};
 
 void usage(char** argv )
@@ -1597,7 +1595,8 @@ void usage(char** argv )
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered/asqtad/domain_wall\n");
+	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
+         "                                                  /asqtad/domain_wall/domain_wall_4dpc/mobius_Dwf\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");

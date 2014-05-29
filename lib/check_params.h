@@ -115,7 +115,41 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 #endif
 }
 
+// define the appropriate function for EigParam
 
+#if defined INIT_PARAM
+QudaEigParam newQudaEigParam(void) {
+  QudaEigParam ret;
+#elif defined CHECK_PARAM
+static void checkEigParam(QudaEigParam *param) {
+#else
+void printQudaEigParam(QudaEigParam *param) {
+  printfQuda("QUDA Eig Parameters:\n");
+#endif
+
+#if defined INIT_PARAM
+  P(RitzMat_lanczos, QUDA_INVALID_SOLUTION);
+  P(RitzMat_Convcheck, QUDA_INVALID_SOLUTION);
+  P(eig_type, QUDA_INVALID_TYPE);
+  P(NPoly, 0);
+  P(Stp_residual, 0.0);
+  P(nk, 0);
+  P(np, 0);
+  P(f_size, 0);
+  P(eigen_shift, 0.0);
+#else
+  P(NPoly, INVALID_INT);
+  P(Stp_residual, INVALID_DOUBLE);
+  P(nk, INVALID_INT);
+  P(np, INVALID_INT);
+  P(f_size, INVALID_INT);
+  P(eigen_shift, INVALID_DOUBLE);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
 // define the appropriate function for InvertParam
 
 #if defined INIT_PARAM
@@ -140,15 +174,19 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(mu, INVALID_DOUBLE);
   P(twist_flavor, QUDA_TWIST_INVALID);
 #else
-  // staggered, asqtad and domain wall use mass parameterization
+  // asqtad and domain wall use mass parameterization
   if (param->dslash_type == QUDA_STAGGERED_DSLASH || 
       param->dslash_type == QUDA_ASQTAD_DSLASH || 
-      param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+      param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     P(mass, INVALID_DOUBLE);
   } else { // Wilson and clover use kappa parameterization
     P(kappa, INVALID_DOUBLE);
   }
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
     P(m5, INVALID_DOUBLE);
     P(Ls, INVALID_INT);
   }

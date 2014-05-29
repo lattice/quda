@@ -74,6 +74,7 @@ __constant__ int gauge_fixed;
 
 // domain wall constants
 __constant__ int Ls;
+__constant__ double m5;
 
 // single precision constants
 __constant__ float anisotropy_f;
@@ -429,6 +430,33 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
   checkCudaError();
 
   profile.Stop(QUDA_PROFILE_CONSTANT);
+}
+
+//For initializing the coefficients used in MDWF
+__constant__ double *mdwf_b5;
+__constant__ double *mdwf_c5;
+double *Tmp_b5;
+double *Tmp_c5;
+void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h)
+{
+  Tmp_b5 = (double*)device_malloc(sizeof(double)*dim_s);
+  Tmp_c5 = (double*)device_malloc(sizeof(double)*dim_s);
+
+  cudaMemcpy(Tmp_b5, b_5, sizeof(double)*dim_s, cudaMemcpyHostToDevice);
+  cudaMemcpy(Tmp_c5, c_5, sizeof(double)*dim_s, cudaMemcpyHostToDevice);
+
+  cudaMemcpyToSymbol(mdwf_b5, &Tmp_b5, sizeof(Tmp_b5));
+  cudaMemcpyToSymbol(mdwf_c5, &Tmp_c5, sizeof(Tmp_c5));
+ 
+  cudaMemcpyToSymbol(m5, &m5h, sizeof(double));
+
+  checkCudaError();
+}
+
+void deleteMDWFConstants()
+{
+  device_free(Tmp_b5);
+  device_free(Tmp_c5);
 }
 
 //!ndeg tm: 

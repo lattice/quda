@@ -17,13 +17,13 @@ namespace quda {
   ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
     field.fill(*this);
   }
-
+  
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) 
     : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0) 
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, 
 	   param.precision, param.pad, param.siteSubset, param.siteOrder, 
-	   param.fieldOrder, param.gammaBasis);
+	   param.fieldOrder, param.gammaBasis, param.PCtype);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) 
@@ -31,7 +31,7 @@ namespace quda {
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, 
 	   field.precision, field.pad, field.siteSubset, field.siteOrder, 
-	   field.fieldOrder, field.gammaBasis);
+	   field.fieldOrder, field.gammaBasis, field.PCtype);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -157,7 +157,7 @@ namespace quda {
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
-				QudaGammaBasis gammaBasis) {
+				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -170,6 +170,8 @@ namespace quda {
     nColor = Nc;
     nSpin = Ns;
     twistFlavor = Twistflavor;
+
+    PCtype = DWFPC;
 
     precision = Prec;
     volume = 1;
@@ -222,7 +224,7 @@ namespace quda {
     if (&src != this) {
       create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
 	     src.precision, src.pad, src.siteSubset, 
-	     src.siteOrder, src.fieldOrder, src.gammaBasis);    
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);    
     }
     return *this;
   }
@@ -233,6 +235,8 @@ namespace quda {
     if (param.nColor != 0) nColor = param.nColor;
     if (param.nSpin != 0) nSpin = param.nSpin;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
+    
+    if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
 
     if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
     if (param.nDim != 0) nDim = param.nDim;
@@ -244,8 +248,7 @@ namespace quda {
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-  if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
-
+    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
   
     if (param.pad != 0) pad = param.pad;
 
@@ -303,6 +306,7 @@ namespace quda {
     param.siteOrder = siteOrder;
     param.fieldOrder = fieldOrder;
     param.gammaBasis = gammaBasis;
+    param.PCtype = PCtype;
     param.create = QUDA_INVALID_FIELD_CREATE;
   }
 
@@ -394,6 +398,7 @@ namespace quda {
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
+    out << "PC type = " << a.PCtype << std::endl;
     return out;
   }
 
