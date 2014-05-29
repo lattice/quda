@@ -176,7 +176,7 @@ namespace quda {
 #endif // DIRECT_ACCESS inclusions
 
   // Enable shared memory dslash for Fermi architecture
-#define SHARED_WILSON_DSLASH
+  //#define SHARED_WILSON_DSLASH
   //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
 #include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
