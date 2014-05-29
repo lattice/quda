@@ -50,6 +50,10 @@ void initComms(int argc, char **argv, const int *commDims)
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+
+  // FIXME? - tests crash without this
+  QMP_declare_logical_topology(commDims, 4);
+
 #elif defined(MPI_COMMS)
   MPI_Init(&argc, &argv);
 #endif
