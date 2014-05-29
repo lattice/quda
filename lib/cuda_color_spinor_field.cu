@@ -970,8 +970,9 @@ namespace quda {
       
       initComms = true;
       nFaceComms = nFace;
+
+      checkCudaError();
     }
-    checkCudaError();
   }
     
   void cudaColorSpinorField::destroyComms() {
