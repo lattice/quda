@@ -48,8 +48,6 @@ namespace quda {
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
       K = new MR(matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
-      printf("Creating SD\n");
-      fflush(stdout);
       K = new SD(matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
@@ -67,12 +65,6 @@ namespace quda {
 
   void PreconCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
-
-    if(K){
-      printf("Preconditioner has been set\n");
-    }else{
-      printf("Oh no! Preconditioner not set\n");
-    }
 
     profile.Start(QUDA_PROFILE_INIT);
     // Check to see that we're not trying to invert on a zero-field source

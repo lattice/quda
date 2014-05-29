@@ -315,7 +315,11 @@ namespace quda {
 
       public:
         CloverDerivative(const CloverDerivArg<Complex> &arg)
-          : arg(arg) {}
+          : arg(arg) {
+	  sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+	  sprintf(aux,"threads=%d,prec=%d,stride=%d,geometery=%d",
+		  arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
+	}
         virtual ~CloverDerivative() {}
 
         void apply(const cudaStream_t &stream){
@@ -336,16 +340,7 @@ namespace quda {
 
         long long bytes() const { return 0; }
 
-        TuneKey tuneKey() const {
-          std::stringstream vol, aux;
-          vol << arg.X[0] << "x";
-          vol << arg.X[1] << "x";
-          vol << arg.X[2] << "x";
-          vol << arg.X[3] << "x";
-          aux << "threads=" << arg.volumeCB << ",prec=" << sizeof(Complex)/2;
-          aux << "stride=" << arg.forceOffset;
-          return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-        }
+        TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
     };
 
 

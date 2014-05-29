@@ -20,6 +20,7 @@
 #include <face_quda.h>
 
 #include <assert.h>
+#include <gtest.h>
 
 using namespace quda;
 
@@ -28,6 +29,8 @@ using namespace quda;
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
 
 extern void usage(char** argv );
+
+extern QudaDslashType dslash_type;
 
 extern int test_type;
 
@@ -65,6 +68,7 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 
 extern int device;
+extern bool verify_results;
 
 int X[4];
 
@@ -74,6 +78,10 @@ void init()
 {    
 
   initQuda(device);
+
+#ifdef GPU_COMMS
+  setKernelPackT(true);
+#endif
 
   setVerbosity(QUDA_VERBOSE);
 
@@ -164,7 +172,7 @@ void init()
   if (fatlink == NULL || longlink == NULL){
     errorQuda("ERROR: malloc failed for fatlink/longlink");
   }
-  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
+  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam, dslash_type);
 
   if(link_recon == QUDA_RECONSTRUCT_9 || link_recon == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
     const double cos_pi_3 = 0.5; // Cos(pi/3)
@@ -403,7 +411,14 @@ void staggeredDslashRef()
 
 }
 
-static int dslashTest() 
+TEST(dslash, verify) {
+  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
+
+static int dslashTest(int argc, char **argv) 
 {
   int accuracy_level = 0;
 
@@ -441,19 +456,19 @@ static int dslashTest()
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
     printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*1e+9));
 
+    double norm2_cpu = norm2(*spinorRef);
+    double norm2_cpu_cuda= norm2(*spinorOut);
     if (!transfer) {
-      double spinor_ref_norm2 = norm2(*spinorRef);
-      double cuda_spinor_out_norm2 =  norm2(*cudaSpinorOut);
-      double spinor_out_norm2 =  norm2(*spinorOut);
-      printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n",  spinor_ref_norm2, cuda_spinor_out_norm2,
-          spinor_out_norm2);
+      double norm2_cuda= norm2(*cudaSpinorOut);
+      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
-      double spinor_ref_norm2 = norm2(*spinorRef);
-      double spinor_out_norm2 =  norm2(*spinorOut);
-      printfQuda("Result: CPU=%f , CPU-CUDA=%f", spinor_ref_norm2, spinor_out_norm2);
+      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
-
-    accuracy_level = cpuColorSpinorField::Compare(*spinorRef, *spinorOut);	
+  
+    if (verify_results) {
+      ::testing::InitGoogleTest(&argc, argv);
+      if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+    }
   }
   end();
 
@@ -510,7 +525,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   int ret =1;
-  int accuracy_level = dslashTest();
+  int accuracy_level = dslashTest(argc, argv);
 
   printfQuda("accuracy_level =%d\n", accuracy_level);
 

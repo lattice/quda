@@ -76,7 +76,8 @@ namespace quda {
     /**< Preserve the source or not in the linear solver (deprecated?) */    
     QudaPreserveSource preserve_source;       
 
-
+    /**< Domain overlap to use in the preconditioning */
+    int overlap_precondition;
 
     // Multi-shift solver parameters
 
@@ -351,6 +352,24 @@ namespace quda {
 
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
+
+  // Extended Steepest Descent solver used for overlapping DD preconditioning
+  class XSD : public Solver {
+    private:
+      const DiracMatrix &mat;
+      cudaColorSpinorField *xx;
+      cudaColorSpinorField *bx;
+      SD *sd; // extended sd is implemented using standard sd
+      bool init;
+      int R[4];
+
+    public:
+      XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+      virtual ~XSD();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
 
   // multigrid solver
   class alphaSA : public Solver {

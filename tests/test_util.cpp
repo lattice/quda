@@ -45,7 +45,6 @@ int mySpinorSiteSize;
 
 extern float fat_link_max;
 
-
 void initComms(int argc, char **argv, const int *commDims)
 {
 #if defined(QMP_COMMS)
@@ -1008,8 +1007,9 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
 }
 
 void
-construct_fat_long_gauge_field(void **fatlink, void** longlink,  
-			       int type, QudaPrecision precision, QudaGaugeParam* param)
+construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
+			       QudaPrecision precision, QudaGaugeParam* param,
+			       QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1032,6 +1032,47 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink,
       constructGaugeField((float**)longlink, param);
     }
   }
+
+  if(param->reconstruct == QUDA_RECONSTRUCT_9 || 
+     param->reconstruct == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
+    const double cos_pi_3 = 0.5; // Cos(pi/3)
+    const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+        for(int j=0; j<gaugeSiteSize; j+=2){
+          if(precision == QUDA_DOUBLE_PRECISION){
+            const double real = ((double*)longlink[dir])[i*gaugeSiteSize + j];
+            const double imag = ((double*)longlink[dir])[i*gaugeSiteSize + j + 1];
+            ((double*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
+            ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+          }else{
+            const float real = ((float*)longlink[dir])[i*gaugeSiteSize + j];
+            const float imag = ((float*)longlink[dir])[i*gaugeSiteSize + j + 1];
+            ((float*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
+            ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
+          }
+        } 
+      }
+    }
+  }
+
+  if (dslash_type == QUDA_STAGGERED_DSLASH) { // set all links to zero to emulate the 1-link operator
+    for(int dir=0; dir<4; ++dir){
+      for(int i=0; i<V; ++i){
+	for(int j=0; j<gaugeSiteSize; j+=2){
+	  if(precision == QUDA_DOUBLE_PRECISION){
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }else{
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
+	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
+	  }
+	} 
+      }
+    }
+  }
+
+
 }
 
 
@@ -1411,7 +1452,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   for (int i=0; i<momSiteSize; i++) iter[i] = 0;
   
   for (int i=0; i<len; i++) {
-    for (int j=0; j<momSiteSize; j++) {
+    for (int j=0; j<momSiteSize-1; j++) {
       int is = i*momSiteSize+j;
       double diff = fabs(momA[is]-momB[is]);
       for (int f=0; f<fail_check; f++)
@@ -1513,6 +1554,9 @@ char latfile[256] = "";
 bool tune = true;
 int niter = 10;
 int test_type = 0;
+QudaInverterType inv_type;
+int multishift = 0;
+bool verify_results = true;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1533,15 +1577,15 @@ void usage(char** argv )
 #endif
   printf("    --prec <double/single/half>               # Precision in GPU\n"); 
   printf("    --prec_sloppy <double/single/half>        # Sloppy precision in GPU\n"); 
-  printf("    --recon <8/9/12/13/18>                         # Link reconstruction type\n"); 
-  printf("    --recon_sloppy <8/9/12/13/18>                  # Sloppy link reconstruction type\n"); 
+  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n"); 
+  printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n"); 
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
   printf("    --sdim <n>                                # Set space dimention(X/Y/Z) size\n"); 
   printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
-  printf("    --Lsdim <n>                                # Set Ls dimension size(default 16)\n");  
+  printf("    --Lsdim <n>                               # Set Ls dimension size(default 16)\n");  
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1549,11 +1593,14 @@ void usage(char** argv )
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted_mass/asqtad/domain_wall\n");
+	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered/asqtad/domain_wall\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
+  printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
+  printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
+  printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -1582,6 +1629,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     usage(argv);
   }
 
+  if( strcmp(argv[i], "--verify") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      verify_results = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      verify_results = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid verify type\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--device") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -1772,6 +1838,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--multishift") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      multishift = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      multishift = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid multishift boolean\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--xgridsize") == 0){
     if (i+1 >= argc){ 
       usage(argv);
@@ -1833,6 +1918,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }     
     dslash_type =  get_dslash_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--inv_type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    inv_type =  get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

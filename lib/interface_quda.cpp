@@ -98,12 +98,16 @@ void closeMagma(){
 cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
+cudaGaugeField *gaugeExtended = NULL;
 
 // It's important that these alias the above so that constants are set correctly in Dirac::Dirac()
 cudaGaugeField *&gaugeFatPrecise = gaugePrecise;
 cudaGaugeField *&gaugeFatSloppy = gaugeSloppy;
 cudaGaugeField *&gaugeFatPrecondition = gaugePrecondition;
+cudaGaugeField *&gaugeFatExtended = gaugeExtended;
 
+
+cudaGaugeField *gaugeLongExtended = NULL; 
 cudaGaugeField *gaugeLongPrecise = NULL;
 cudaGaugeField *gaugeLongSloppy = NULL;
 cudaGaugeField *gaugeLongPrecondition = NULL;
@@ -178,6 +182,10 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
+
+namespace quda {
+  void printLaunchTimer();
+}
 
 void setVerbosityQuda(QudaVerbosity verbosity, const char prefix[], FILE *outfile)
 {
@@ -503,6 +511,24 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     precondition = sloppy;
   }
 
+  // create an extended preconditioning field
+  cudaGaugeField* extended = NULL;
+  if(param->overlap){
+    int R[4]; // domain-overlap widths in different directions 
+    for(int i=0; i<4; ++i){ 
+      R[i] = param->overlap*commDimPartitioned(i);
+      gauge_param.x[i] += 2*R[i];
+    }
+    // the extended field does not require any ghost padding
+    gauge_param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    extended = new cudaGaugeField(gauge_param);
+
+    // copy the unextended preconditioning field into the interior of the extended field
+    copyExtendedGauge(*extended, *precondition, QUDA_CUDA_FIELD_LOCATION);
+    // now perform communication and fill the overlap regions
+    extended->exchangeExtendedGhost(R);
+  }
+
   profileGauge.Stop(QUDA_PROFILE_COMPUTE); 
 
   switch (param->type) {
@@ -513,6 +539,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeSloppy = sloppy;
       //if (gaugePrecondition) errorQuda("Precondition gauge field already allocated");
       gaugePrecondition = precondition;
+	
+      if(param->overlap) gaugeExtended = extended;
       break;
     case QUDA_ASQTAD_FAT_LINKS:
       if (gaugeFatPrecise) errorQuda("Precise gauge fat field already allocated");
@@ -521,6 +549,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeFatSloppy = sloppy;
       if (gaugeFatPrecondition) errorQuda("Precondition gauge fat field already allocated");
       gaugeFatPrecondition = precondition;
+
+      if(param->overlap){
+        if(gaugeFatExtended) errorQuda("Extended gauge fat field already allocated");
+	gaugeFatExtended = extended;
+      }
       break;
     case QUDA_ASQTAD_LONG_LINKS:
       if (gaugeLongPrecise) errorQuda("Precise gauge long field already allocated");
@@ -529,10 +562,15 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gaugeLongSloppy = sloppy;
       if (gaugeLongPrecondition) errorQuda("Precondition gauge long field already allocated");
       gaugeLongPrecondition = precondition;
+      if(param->overlap){
+        if(gaugeLongExtended) errorQuda("Extended gauge long field already allocated");
+   	gaugeLongExtended = extended;
+      }	
       break;
     default:
       errorQuda("Invalid gauge type");   
   }
+
 
   profileGauge.Start(QUDA_PROFILE_FREE);  
   delete in;
@@ -856,27 +894,34 @@ void freeGaugeQuda(void)
   if (gaugeSloppy != gaugePrecondition && gaugePrecondition) delete gaugePrecondition;
   if (gaugePrecise != gaugeSloppy && gaugeSloppy) delete gaugeSloppy;
   if (gaugePrecise) delete gaugePrecise;
+  if (gaugeExtended) delete gaugeExtended;
 
   gaugePrecondition = NULL;
   gaugeSloppy = NULL;
   gaugePrecise = NULL;
+  gaugeExtended = NULL;
 
   if (gaugeLongSloppy != gaugeLongPrecondition && gaugeLongPrecondition) delete gaugeLongPrecondition;
   if (gaugeLongPrecise != gaugeLongSloppy && gaugeLongSloppy) delete gaugeLongSloppy;
   if (gaugeLongPrecise) delete gaugeLongPrecise;
+  if (gaugeLongExtended) delete gaugeLongExtended;
 
   gaugeLongPrecondition = NULL;
   gaugeLongSloppy = NULL;
   gaugeLongPrecise = NULL;
+  gaugeLongExtended = NULL;
 
   if (gaugeFatSloppy != gaugeFatPrecondition && gaugeFatPrecondition) delete gaugeFatPrecondition;
   if (gaugeFatPrecise != gaugeFatSloppy && gaugeFatSloppy) delete gaugeFatSloppy;
   if (gaugeFatPrecise) delete gaugeFatPrecise;
+  
 
   gaugeFatPrecondition = NULL;
   gaugeFatSloppy = NULL;
   gaugeFatPrecise = NULL;
+  gaugeFatExtended = NULL;
 
+  // Need to merge extendedGaugeResident and gaugeFatPrecise/gaugePrecise
   if (extendedGaugeResident) {
     delete extendedGaugeResident;
     extendedGaugeResident = NULL;
@@ -988,6 +1033,8 @@ void endQuda(void)
     profileHISQForce.Print();
     profileEnd.Print();
 
+    printLaunchTimer();
+
     printfQuda("\n");
     printPeakMemUsage();
     printfQuda("\n");
@@ -1092,9 +1139,15 @@ namespace quda {
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    diracParam.gauge = gaugePrecondition;
-    diracParam.fatGauge = gaugeFatPrecondition;
-    diracParam.longGauge = gaugeLongPrecondition;    
+    if(inv_param->overlap){
+      diracParam.gauge = gaugeExtended;
+      diracParam.fatGauge = gaugeFatExtended;
+      diracParam.longGauge = gaugeLongExtended;	
+    }else{
+      diracParam.gauge = gaugePrecondition;
+      diracParam.fatGauge = gaugeFatPrecondition;
+      diracParam.longGauge = gaugeLongPrecondition;    
+    }
     diracParam.clover = cloverPrecondition;
     diracParam.cloverInv = cloverInvPrecondition;
 
@@ -1109,6 +1162,7 @@ namespace quda {
        diracParam.gauge = gaugeFatPrecondition;
     }
   }
+
 
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
   {
@@ -1474,15 +1528,24 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
     if (gaugePrecise == NULL) errorQuda("Precise gauge field doesn't exist");
     if (gaugeSloppy == NULL) errorQuda("Sloppy gauge field doesn't exist");
     if (gaugePrecondition == NULL) errorQuda("Precondition gauge field doesn't exist");
+    if(param->overlap){
+      if(gaugeExtended == NULL) errorQuda("Extended gauge field doesn't exist");
+    }
     cudaGauge = gaugePrecise;
   } else {
     if (gaugeFatPrecise == NULL) errorQuda("Precise gauge fat field doesn't exist");
     if (gaugeFatSloppy == NULL) errorQuda("Sloppy gauge fat field doesn't exist");
     if (gaugeFatPrecondition == NULL) errorQuda("Precondition gauge fat field doesn't exist");
+    if(param->overlap){
+      if(gaugeFatExtended == NULL) errorQuda("Extended gauge fat field doesn't exist");
+    }
 
     if (gaugeLongPrecise == NULL) errorQuda("Precise gauge long field doesn't exist");
     if (gaugeLongSloppy == NULL) errorQuda("Sloppy gauge long field doesn't exist");
     if (gaugeLongPrecondition == NULL) errorQuda("Precondition gauge long field doesn't exist");
+    if(param->overlap){
+      if(gaugeLongExtended == NULL) errorQuda("Extended gauge long field doesn't exist");
+    }
     cudaGauge = gaugeFatPrecise;
   }
   return cudaGauge;
@@ -2640,6 +2703,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   profileMulti.Stop(QUDA_PROFILE_TOTAL);
 }
 
+
 void invertIncDeflatedQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u/*=0*/, bool last_rhs/*=false*/)
 {
   if(!InitMagma) openMagma();
@@ -2856,6 +2920,7 @@ void invertIncDeflatedQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void 
 
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
+
 
 #ifdef GPU_FATLINK 
 /*   @method  
@@ -3917,6 +3982,7 @@ void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
 
 
 void computeAsqtadForceQuda(void* const milc_momentum,
+    long long *flops,
     const double act_path_coeff[6],
     const void* const one_link_src[4],
     const void* const naik_src[4],
@@ -3925,6 +3991,7 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 {
 
 #ifdef GPU_HISQ_FORCE
+  long long partialFlops;
   using namespace quda::fermion_force;
   profileAsqtadForce.Start(QUDA_PROFILE_TOTAL);
   profileAsqtadForce.Start(QUDA_PROFILE_INIT);
@@ -4025,9 +4092,11 @@ void computeAsqtadForceQuda(void* const milc_momentum,
   profileAsqtadForce.Start(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
   cudaMemset((void**)(cudaOutForce_ex->Gauge_p()), 0, cudaOutForce_ex->Bytes());
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex);
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex, &partialFlops);
+  *flops += partialFlops;
 #else
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
+  *flops += partialFlops;
 #endif
   profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
 
@@ -4041,11 +4110,15 @@ void computeAsqtadForceQuda(void* const milc_momentum,
 
   profileAsqtadForce.Start(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex);
-  completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce_ex, *cudaGauge_ex, cudaOutForce_ex, &partialFlops);
+  *flops += partialFlops;
+  completeKSForce(*cudaMom, *cudaOutForce_ex, *cudaGauge_ex, QUDA_CUDA_FIELD_LOCATION, &partialFlops);
+  *flops += partialFlops;
 #else
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce);
-  hisqCompleteForceCuda(*gParam, *cudaOutForce, *cudaGauge, cudaMom);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *cudaInForce, *cudaGauge, cudaOutForce, &partialFlops);
+  *flops += partialFlops;
+  hisqCompleteForceCuda(*gParam, *cudaOutForce, *cudaGauge, cudaMom, &partialFlops);
+  *flops += partialFlops;
 #endif
   profileAsqtadForce.Stop(QUDA_PROFILE_COMPUTE);
 
@@ -4122,6 +4195,7 @@ computeHISQForceCompleteQuda(void* const milc_momentum,
 
   void
 computeHISQForceQuda(void* const milc_momentum,
+    long long *flops,
     const double level2_coeff[6],
     const double fat7_coeff[6],
     const void* const staple_src[4],
@@ -4133,6 +4207,9 @@ computeHISQForceQuda(void* const milc_momentum,
     const QudaGaugeParam* gParam)
 {
 #ifdef GPU_HISQ_FORCE
+
+  long long partialFlops;
+	
   using namespace quda::fermion_force;
   profileHISQForce.Start(QUDA_PROFILE_TOTAL);
   profileHISQForce.Start(QUDA_PROFILE_INIT); 
@@ -4262,7 +4339,8 @@ computeHISQForceQuda(void* const milc_momentum,
 #endif
 
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForceCuda(act_path_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr);
+  hisqStaplesForceCuda(act_path_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
 
   // Load naik outer product
@@ -4278,7 +4356,8 @@ computeHISQForceQuda(void* const milc_momentum,
 
   // Compute Naik three-link term
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *inForcePtr, *gaugePtr, outForcePtr);
+  hisqLongLinkForceCuda(act_path_coeff[1], *gParam, *inForcePtr, *gaugePtr, outForcePtr, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
   profileHISQForce.Start(QUDA_PROFILE_COMMS);
@@ -4308,7 +4387,8 @@ computeHISQForceQuda(void* const milc_momentum,
 
 
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, numFailuresDev);
+  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, numFailuresDev, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
   profileHISQForce.Start(QUDA_PROFILE_D2H);
   cudaMemcpy(&numFailures, numFailuresDev, sizeof(int), cudaMemcpyDeviceToHost);
@@ -4332,8 +4412,10 @@ computeHISQForceQuda(void* const milc_momentum,
 #endif
   // Compute Fat7-staple term 
   profileHISQForce.Start(QUDA_PROFILE_COMPUTE);
-  hisqStaplesForceCuda(fat7_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr);
-  hisqCompleteForceCuda(*gParam, *outForcePtr, *gaugePtr, cudaMom);
+  hisqStaplesForceCuda(fat7_coeff, *gParam, *inForcePtr, *gaugePtr, outForcePtr, &partialFlops);
+  *flops += partialFlops;
+  hisqCompleteForceCuda(*gParam, *outForcePtr, *gaugePtr, cudaMom, &partialFlops);
+  *flops += partialFlops;
   profileHISQForce.Stop(QUDA_PROFILE_COMPUTE);
 
   profileHISQForce.Start(QUDA_PROFILE_D2H);

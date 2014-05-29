@@ -15,7 +15,7 @@
 
 #define QUDA_VERSION_MAJOR     0
 #define QUDA_VERSION_MINOR     6
-#define QUDA_VERSION_SUBMINOR  0
+#define QUDA_VERSION_SUBMINOR  1
 
 /**
  * @def   QUDA_VERSION
@@ -89,6 +89,8 @@ extern "C" {
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
 
+    int overlap; /**< Width of overlapping domains */
+
     int use_resident_gauge;  /**< Use the resident gauge field */
     int use_resident_mom;    /**< Use the resident mom field */
     int make_resident_gauge; /**< Make the gauge field resident */
@@ -130,6 +132,8 @@ extern "C" {
     int pipeline; /**< Whether to use a pipelined solver with less global sums */
 
     int num_offset; /**< Number of offsets in the multi-shift solver */
+
+    int overlap; /**< Width of domain overlaps */
 
     /** Offsets for multi-shift solver */
     double offset[QUDA_MAX_MULTI_SHIFT];
@@ -609,6 +613,7 @@ extern "C" {
    * @param param             The field parameters.
    */
   void computeAsqtadForceQuda(void* const momentum,
+	long long* flops,
         const double act_path_coeff[6],
         const void* const one_link_src[4],
         const void* const naik_src[4],
@@ -631,6 +636,7 @@ extern "C" {
    */
 
   void computeHISQForceQuda(void* momentum,
+    long long* flops,
     const double level2_coeff[6],
     const double fat7_coeff[6],
     const void* const staple_src[4],

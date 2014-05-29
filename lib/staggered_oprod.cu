@@ -406,9 +406,12 @@ namespace quda {
       public:
         StaggeredOprodField(const StaggeredOprodArg<Complex,Output,Input> &arg,
             QudaFieldLocation location)
-          : arg(arg), location(location) {} 
+          : arg(arg), location(location) {
+	  sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+	  sprintf(aux,"threads=%d,prec=%d,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
+	} 
 
-        virtual ~StaggeredOprodField() {}
+       virtual ~StaggeredOprodField() {}
 
         void set(const StaggeredOprodArg<Complex,Output,Input> &arg, QudaFieldLocation location){
           // This is a hack. Need to change this!
@@ -456,21 +459,11 @@ namespace quda {
         }
 
         long long bytes() const { 
-          return 0; // fix this
+	  return 0; // fix this
         }
 
-        TuneKey tuneKey() const {
-          std::stringstream vol, aux;
-          vol << arg.X[0] << "x";
-          vol << arg.X[1] << "x";
-          vol << arg.X[2] << "x";
-          vol << arg.X[3] << "x";
-
-          aux << "threads=" << arg.length << ",prec=" << sizeof(Complex)/2;
-          aux << "stride=" << arg.inA.Stride();
-          return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-        }
-    }; // StaggeredOprodField
+        TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux);}
+  }; // StaggeredOprodField
 
   template<typename Complex, typename Output, typename Input>
     void computeStaggeredOprodCuda(Output outA, Output outB, cudaGaugeField& outFieldA, cudaGaugeField& outFieldB, Input& inA, Input& inB, cudaColorSpinorField& src, 

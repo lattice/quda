@@ -6,11 +6,17 @@
 #include <gauge_field.h>
 #include <tune_quda.h>
 
+#include <tune_quda.h>
 #include <quda_matrix.h>
 
 #ifdef GPU_HISQ_FORCE
 
 namespace quda{
+namespace {
+  #include <svd_quda.h>
+}
+
+//#ifdef GPU_HISQ_FORCE
 
 namespace { // anonymous
 #include <svd_quda.h>
@@ -453,7 +459,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       DerivativeCoefficients<typename RealTypeId<Cmplx>::Type> deriv_coeffs;
 
-      reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed);
+      reciprocalRoot<Cmplx>(&rsqrt_q, &deriv_coeffs, f, q, unitarization_failed); // approx 529 flops (assumes no SVD)
 
       // Pure hack here
       b[0] = deriv_coeffs.getB00();
@@ -488,16 +494,17 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       // now done with vv_dagger, I think
       Matrix<Cmplx,3> qsqv_dagger = q*qv_dagger;
       Matrix<Cmplx,3> pv_dagger   = b[0]*v_dagger + b[1]*qv_dagger + b[2]*qsqv_dagger;
-      accumBothDerivatives(&local_result, v, pv_dagger, outer_prod);
+      accumBothDerivatives(&local_result, v, pv_dagger, outer_prod); // 41 flops
 
       Matrix<Cmplx,3> rv_dagger = b[1]*v_dagger + b[3]*qv_dagger + b[4]*qsqv_dagger;
       Matrix<Cmplx,3> vq = v*q;
-      accumBothDerivatives(&local_result, vq, rv_dagger, outer_prod);
+      accumBothDerivatives(&local_result, vq, rv_dagger, outer_prod); // 41 flops
 
       Matrix<Cmplx,3> sv_dagger = b[2]*v_dagger + b[4]*qv_dagger + b[5]*qsqv_dagger;
       Matrix<Cmplx,3> vqsq = vq*q;
-      accumBothDerivatives(&local_result, vqsq, sv_dagger, outer_prod);
+      accumBothDerivatives(&local_result, vqsq, sv_dagger, outer_prod); // 41 flops
       return;
+      // 4528 flops - 17 matrix multiplies (198 flops each) + reciprocal root (approx 529 flops) + accumBothDerivatives (41 each) + miscellaneous
     } // get unit force term
 
 
@@ -539,7 +546,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 	getUnitarizeForceSite<double2>(v, oprod, &result, unitarization_failed); 
 
 	writeLinkVariableToArray(result, dir, mem_idx, HALF_VOLUME, force); 
-      }
+      } // 4*4528 flops per site
       return;
     } // getUnitarizeForceField
 
@@ -609,7 +616,12 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     public:
       UnitarizeForceCuda(const cudaGaugeField& oldForce, const cudaGaugeField& gauge,  
 			 cudaGaugeField& newForce, int* fails) : 
-	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { ; }
+	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { 
+	sprintf(vol, "%dx%dx%dx%d", gauge.X()[0],  gauge.X()[1],  
+		gauge.X()[2],  gauge.X()[3]);
+	sprintf(aux, "threads=%d,prec=%d,stride=%d", 
+		gauge.Volume(), gauge.Precision(), gauge.Stride());
+      }
       virtual ~UnitarizeForceCuda() { ; }
 
       void apply(const cudaStream_t &stream) {
@@ -631,32 +643,24 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       void preTune() { ; }
       void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
       
-      long long flops() const { return 0; } // FIXME: add flops counter
+      long long flops() const { return 4*4528*gauge.Volume(); } // FIXME: add flops counter
       
-      TuneKey tuneKey() const {
-	std::stringstream vol, aux;
-	vol << gauge.X()[0] << "x";
-	vol << gauge.X()[1] << "x";
-	vol << gauge.X()[2] << "x";
-	vol << gauge.X()[3] << "x";
-	aux << "threads=" << gauge.Volume() << ",prec=" << gauge.Precision();
-	aux << "stride=" << gauge.Stride();
-	return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }  
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
     }; // UnitarizeForceCuda
 
     void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
-                            cudaGaugeField &cudaGauge, cudaGaugeField *cudaNewForce, int* unitarization_failed) {
+                            cudaGaugeField &cudaGauge, cudaGaugeField *cudaNewForce, int* unitarization_failed, long long *flops) {
 
-      checkCudaError();
       UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
-      checkCudaError();
       unitarizeForce.apply(0);
+      if(*flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }
     
     
   } // namespace fermion_force
+
+//#endif
 } // namespace quda
 
 #endif

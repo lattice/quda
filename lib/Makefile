@@ -3,37 +3,36 @@ include ../make.inc
 QUDA = libquda.a
 QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
-	inv_gcr_quda.o inv_mr_quda.o inv_sd_quda.o inv_pcg_quda.o	\
-	inv_mre.o interface_quda.o					\
-	util_quda.o color_spinor_field.o color_spinor_util.o		\
+	inv_eigcg_quda.o						\
+	inv_gcr_quda.o inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o	\
+	inv_pcg_quda.o inv_mre.o interface_quda.o util_quda.o		\
+	color_spinor_field.o color_spinor_util.o			\
 	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	\
 	hw_quda.o blas_cpu.o clover_field.o lattice_field.o		\
 	gauge_field.o cpu_gauge_field.o cuda_gauge_field.o		\
 	extract_gauge_ghost.o max_gauge.o gauge_update_quda.o		\
 	dirac_clover.o dirac_wilson.o dirac_staggered.o			\
 	dirac_improved_staggered.o dirac_domain_wall.o			\
-	dirac_twisted_clover.o						\
-	dirac_twisted_mass.o tune.o fat_force_quda.o llfat_quda_itf.o	\
-	clover_quda.o dslash_quda.o blas_quda.o copy_quda.o		\
-	reduce_quda.o face_buffer.o face_gauge.o comm_common.o		\
-	${COMM_OBJS} ${NUMA_AFFINITY_OBJS} clover_deriv_quda.o		\
-	clover_invert.o copy_gauge_extended.o				\
+	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
+	fat_force_quda.o llfat_quda_itf.o clover_quda.o dslash_quda.o	\
+	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
+	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
+	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
 	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
-	milc_interface.o extended_color_spinor_utilities.o 
+	milc_interface.o extended_color_spinor_utilities.o blas_magma.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	dirac_quda.h dslash_quda.h enum_quda.h gauge_force_quda.h	\
-	gauge_update_quda.h						\
-	invert_quda.h llfat_quda.h quda.h quda_internal.h util_quda.h	\
-	face_quda.h tune_quda.h comm_quda.h lattice_field.h		\
-	gauge_field.h double_single.h texture.h	\
-	numa_affinity.h misc_helpers.h fermion_force_quda.h malloc_quda.h\
-	gauge_field_order.h clover_field_order.h color_spinor_field_order.h \
-	staggered_oprod.h
+	gauge_update_quda.h invert_quda.h llfat_quda.h quda.h		\
+	quda_internal.h util_quda.h face_quda.h tune_quda.h		\
+	comm_quda.h lattice_field.h gauge_field.h double_single.h	\
+	texture.h numa_affinity.h misc_helpers.h fermion_force_quda.h	\
+	malloc_quda.h gauge_field_order.h clover_field_order.h		\
+	color_spinor_field_order.h staggered_oprod.h blas_magma.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
@@ -49,11 +48,9 @@ DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h		\
 	io_spinor.h staggered_dslash_def.h wilson_dslash_def.h		\
 	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h		\
 	pack_face_def.h hisq_force_macros.h llfat_quda.cu		\
-	fermion_force_quda.cu			\
-	gauge_force_quda.cu 						\
-	gauge_force_core.h			                        \
-	llfat_core.h svd_quda.h read_clover.h				\
-	read_gauge.h misc_helpers.cu
+	fermion_force_quda.cu gauge_force_quda.cu gauge_force_core.h	\
+	llfat_core.h svd_quda.h read_clover.h read_gauge.h		\
+	misc_helpers.cu
 
 
 # files containing complex macros and other code fragments to be inlined,
@@ -125,6 +122,9 @@ dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 
 milc_interface.o: milc_interface.cpp $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+
+blas_magma.o: blas_magma.cpp
+	$(CXX) $(MAGMA_INCLUDE) $(CCXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@

@@ -402,7 +402,7 @@ namespace quda {
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
   
       //construct the Lanczos matrix:
-      if(k > 0){
+      if(l > 0){
         eigcg_args->LoadLanczosDiag(l-1, alpha, alpha0, beta0);
       }
 
@@ -432,16 +432,18 @@ namespace quda {
          eigvRestart++;
          l = _2nev;
       } else{ //no-RR branch:
-         if(k > 0){
+         if(l > 0){
             eigcg_args->LoadLanczosOffDiag(l-1, alpha, beta);
          }
       }
-      l += 1;
+
       //construct Lanczos basis:
-      copyCuda(Vm->Eigenvec(l-1), *r_sloppy);//convert arrays
+      copyCuda(Vm->Eigenvec(l), *r_sloppy);//convert arrays
       //rescale the vector
       scale = 1.0 / sqrt(r2);
-      axCuda(scale, Vm->Eigenvec(l-1));
+      axCuda(scale, Vm->Eigenvec(l));
+      //update search space index
+      l += 1;
 
       //end of RR-procedure
       alpha0 = alpha;

@@ -83,6 +83,7 @@ namespace quda {
     CopyGaugeExArg<OutOrder,InOrder> arg;
     QudaFieldLocation location;
 
+
   private:
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
@@ -92,7 +93,10 @@ namespace quda {
 
   public:
     CopyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, QudaFieldLocation location) 
-      : arg(arg), location(location) { ; }
+      : arg(arg), location(location) { 
+      sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+      sprintf(aux,"out_stride=%d,in_stride=%d,geometery=%d",arg.out.stride,arg.in.stride,arg.geometry);
+    }
     virtual ~CopyGaugeEx() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -107,14 +111,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];    
-      aux << "out_stride=" << arg.out.stride << ",in_stride=" << arg.in.stride;
-      aux << "geometry=" << arg.geometry;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey(vol, typeid(*this).name(), aux);
     }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.

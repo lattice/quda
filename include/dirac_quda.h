@@ -129,6 +129,8 @@ namespace quda {
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 
+
+    MatPCType getMatPCType() const { return matpcType; }
     void Dagger(QudaDagType dag) { dagger = dag; }
   };
 
@@ -516,6 +518,9 @@ namespace quda {
 			    cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const = 0;
 
     unsigned long long flops() const { return dirac->Flops(); }
+
+
+    MatPCType getMatPCType() const { return dirac->getMatPCType(); }
 
     std::string Type() const { return typeid(*dirac).name(); }
   };

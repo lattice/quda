@@ -215,11 +215,13 @@ void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coe
     void* const milc_momentum)
 {
 
+
   QudaGaugeParam gParam = newMILCGaugeParam(localDim,
       (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
-  computeHISQForceQuda(milc_momentum, level2_coeff, fat7_coeff,
+  long long flops;
+  computeHISQForceQuda(milc_momentum, &flops, level2_coeff, fat7_coeff,
       staple_src, one_link_src, naik_src,
       w_link, v_link, u_link, &gParam);
 
@@ -236,7 +238,8 @@ void qudaAsqtadForce(int prec, const double act_path_coeff[6],
       (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
-  computeAsqtadForceQuda(milc_momentum, act_path_coeff, one_link_src, naik_src, link, &gParam);
+  long long flops;
+  computeAsqtadForceQuda(milc_momentum, &flops, act_path_coeff, one_link_src, naik_src, link, &gParam);
 
   return;
 }

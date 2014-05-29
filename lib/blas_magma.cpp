@@ -9,13 +9,6 @@
 #include "magma.h"
 #endif
 
-char cV = 'V';
-char cU = 'U';
-char cR = 'R';
-char cL = 'L';
-char cN = 'N';
-char cC = 'C';
-
 void BlasMagmaArgs::OpenMagma(){ 
  
     magma_err_t err = magma_init(); 
@@ -141,12 +134,12 @@ void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size)
 #ifdef MAGMA_LIB
      if(prec == 4)
      {
-        magma_cheevd_gpu(cV, cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)W2, ldm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
+        magma_cheevd_gpu('V', 'U', prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)W2, ldm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
         if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
      }
      else
      {
-        magma_zheevd_gpu(cV, cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)W2, ldm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
+        magma_zheevd_gpu('V', 'U', prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)W2, ldm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
         if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
      } 
 #endif
@@ -167,11 +160,11 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 
         //compute dTevecm0=QHTmQ
         //get TQ product:
-        magma_cunmqr_gpu(cR,cN, m, m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info); 
+        magma_cunmqr_gpu('R','N', m, m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info); 
         if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n"), exit(-1);
              	
         //get QHT product:
-        magma_cunmqr_gpu(cL,cC, m, l, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
+        magma_cunmqr_gpu('L','C', m, l, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
         if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n"), exit(-1);  
      }
      else
@@ -183,11 +176,11 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 
         //compute dTevecm0=QHTmQ
         //get TQ product:
-        magma_zunmqr_gpu(cR,cN, m, m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info); 
+        magma_zunmqr_gpu('R','N', m, m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info); 
         if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
              	
         //get QHT product:
-        magma_zunmqr_gpu(cL,cC, m, l, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
+        magma_zunmqr_gpu('L','C', m, l, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
         if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);  
 
      }
@@ -195,8 +188,6 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 
   return l;
 }
-
-#define __min(a, b) (a < b ? a : b)
 
 void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm)
 {
@@ -209,26 +200,26 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 
        //cudaMemset(Tmp, 0, vld*l*complex_prec);   
 //
-       const int rworkSize = 2*vld+l*l;
+       const int bufferSize = 2*vld+l*l;
       
-       int AvailRows = __min(rworkSize / l, vlen);
+       int bufferBlock = bufferSize / l;
 
-       void  *rwork;
-       magma_malloc(&rwork, rworkSize*complex_prec);
-       cudaMemset(rwork, 0, rworkSize*complex_prec);
+       void  *buffer;
+       magma_malloc(&buffer, bufferSize*complex_prec);
+       cudaMemset(buffer, 0, bufferSize*complex_prec);
 
 
        if(prec == 4)
        {
          magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
-         magma_cunmqr_gpu(cL, cN, m, l, l, (magmaFloatComplex*)dTevecm, ldm, (magmaFloatComplex*)hTau, (magmaFloatComplex*)dTm, ldm, (magmaFloatComplex*)W, sideLR, (magmaFloatComplex*)dTau, nb, &info);
+         magma_cunmqr_gpu('L', 'N', m, l, l, (magmaFloatComplex*)dTevecm, ldm, (magmaFloatComplex*)hTau, (magmaFloatComplex*)dTm, ldm, (magmaFloatComplex*)W, sideLR, (magmaFloatComplex*)dTau, nb, &info);
         
          if(info != 0) printf("\nError in RestartV (magma_cunmqr_gpu), exit ...\n"), exit(-1); 
        }
        else
        {
          magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
-         magma_zunmqr_gpu(cL, cN, m, l, l, (magmaDoubleComplex*)dTevecm, ldm, (magmaDoubleComplex*)hTau, (magmaDoubleComplex*)dTm, ldm, (magmaDoubleComplex*)W, sideLR, (magmaDoubleComplex*)dTau, nb, &info);
+         magma_zunmqr_gpu('L', 'N', m, l, l, (magmaDoubleComplex*)dTevecm, ldm, (magmaDoubleComplex*)hTau, (magmaDoubleComplex*)dTm, ldm, (magmaDoubleComplex*)W, sideLR, (magmaDoubleComplex*)dTau, nb, &info);
 
          if(info != 0) printf("\nError in RestartV (magma_zunmqr_gpu), exit ...\n"), exit(-1); 
        }
@@ -260,22 +251,17 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
             dtm = (magmaFloatComplex *)dTm;
          }
 
-         //magmablas_cgemm(cN, cN, vlen, l, m, MAGMA_C_ONE, (magmaFloatComplex*)dV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)Tmp, vld);
+         //magmablas_cgemm('N', 'N', vlen, l, m, MAGMA_C_ONE, (magmaFloatComplex*)dV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)Tmp, vld);
 
-         int i = 0;
-         while (i < vlen) 
+         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
          {
-           magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[i]);
-           magmablas_cgemm(cN, cN, AvailRows, l, m, MAGMA_C_ONE, ptrV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)rwork, AvailRows);
+           magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[blockOffset]);
 
-           for (int k = 0; k < l; k++) {
+           magmablas_cgemm('N', 'N', bufferBlock, l, m, MAGMA_C_ONE, ptrV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)buffer, bufferBlock);
 
-             magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[i + vld * k]);
-             cudaMemcpy(ptrV, &((magmaFloatComplex*)rwork)[AvailRows*k], AvailRows*sizeof(magmaFloatComplex), cudaMemcpyDefault);
-           }
+           cudaMemcpy2D(ptrV, vld, buffer, bufferBlock,  bufferBlock*sizeof(magmaFloatComplex), l, cudaMemcpyDefault);
 
-           i += AvailRows;
-           AvailRows = __min(AvailRows, (vlen-i));
+           if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
          }
 
          if(prec == 8) magma_free(dtm);
@@ -283,30 +269,24 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
        }
        else
        {
-         //magmablas_zgemm(cN, cN, vlen, l, m, MAGMA_Z_ONE, (magmaDoubleComplex*)dV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)Tmp, vld);
+         //magmablas_zgemm('N', 'N', vlen, l, m, MAGMA_Z_ONE, (magmaDoubleComplex*)dV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)Tmp, vld);
 
-         int i = 0;
-         while (i < vlen) 
+         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
          {
-           magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[i]);
-           magmablas_zgemm(cN, cN, AvailRows, l, m, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)rwork, AvailRows);
+           magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
 
-           for (int k = 0; k < l; k++) {
+           magmablas_zgemm('N', 'N', bufferBlock, l, m, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
 
-             magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[i + vld * k]);
-             cudaMemcpy(ptrV, &((magmaDoubleComplex*)rwork)[AvailRows*k], AvailRows*sizeof(magmaDoubleComplex), cudaMemcpyDefault);
-           }
+           cudaMemcpy2D(ptrV, vld, buffer, bufferBlock,  bufferBlock*sizeof(magmaDoubleComplex), l, cudaMemcpyDefault);
 
-           i += AvailRows;
-           AvailRows = __min(AvailRows, (vlen-i));
-         }
-
+           if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);         
+	 }
        }
 
        //cudaMemcpy(dV, Tmp, vld*l*complex_prec, cudaMemcpyDefault); 
 
        //magma_free(Tmp);
-       magma_free(rwork);
+       magma_free(buffer);
 #endif
 
        return;
@@ -382,14 +362,14 @@ void BlasMagmaArgs::SpinorMatVec
            magmaFloatComplex *spmat = (magmaFloatComplex*)spinorSetIn; 
            magmaFloatComplex *spout = (magmaFloatComplex*)spinorOut; 
 
-           magmablas_cgemv(cN, slen, vlen, MAGMA_C_ONE, spmat, sld, (magmaFloatComplex*)vec, 1, MAGMA_C_ZERO, spout, 1);//in colour-major format
+           magmablas_cgemv('N', slen, vlen, MAGMA_C_ONE, spmat, sld, (magmaFloatComplex*)vec, 1, MAGMA_C_ZERO, spout, 1);//in colour-major format
        }
        else
        {
            magmaDoubleComplex *spmat = (magmaDoubleComplex*)spinorSetIn; 
            magmaDoubleComplex *spout = (magmaDoubleComplex*)spinorOut; 
 
-           magmablas_zgemv(cN, slen, vlen, MAGMA_Z_ONE, spmat, sld, (magmaDoubleComplex*)vec, 1, MAGMA_Z_ZERO, spout, 1);//in colour-major format
+           magmablas_zgemv('N', slen, vlen, MAGMA_Z_ONE, spmat, sld, (magmaDoubleComplex*)vec, 1, MAGMA_Z_ZERO, spout, 1);//in colour-major format
        }
 #endif
        return;

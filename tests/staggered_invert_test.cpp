@@ -64,6 +64,11 @@ extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
 
+// Dirac operator type
+extern QudaDslashType dslash_type;
+
+extern QudaInverterType inv_type;
+
 static void end();
 
 template<typename Float>
@@ -111,10 +116,12 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->mass = mass;
 
   // outer solver parameters
-  inv_param->inv_type = QUDA_CG_INVERTER;
+  inv_param->inv_type = inv_type;
   inv_param->tol = tol;
   inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1;
+  inv_param->use_sloppy_partial_accumulator = false;
+  inv_param->pipeline = false;
 
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -124,16 +131,20 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // Pre Fermi architecture only supports L2 relative residual norm
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 #endif
+  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
+
+
+
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
   //inv_param->gcrNkrylov = 10;
 
   // domain decomposition preconditioner parameters
-  //inv_param->inv_type_precondition = QUDA_MR_INVERTER;
-  //inv_param->tol_precondition = 1e-1;
-  //inv_param->maxiter_precondition = 100;
-  //inv_param->verbosity_precondition = QUDA_SILENT;
-  //inv_param->prec_precondition = prec_sloppy;
+  inv_param->inv_type_precondition = QUDA_SD_INVERTER;
+  inv_param->tol_precondition = 1e-1;
+  inv_param->maxiter_precondition = 10;
+  inv_param->verbosity_precondition = QUDA_SILENT;
+  inv_param->cuda_prec_precondition = QUDA_HALF_PRECISION;
 
   inv_param->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   inv_param->solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -147,7 +158,11 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
-  inv_param->dslash_type = QUDA_ASQTAD_DSLASH;
+
+  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
+    dslash_type = QUDA_STAGGERED_DSLASH;
+  inv_param->dslash_type = dslash_type;
+
   inv_param->tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
   inv_param->sp_pad = X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
@@ -163,7 +178,7 @@ invert_test(void)
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double mass = 0.005;
+  double mass = 0.5;
 
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,
@@ -188,7 +203,8 @@ invert_test(void)
   fatlink = malloc(4*V*gaugeSiteSize*gSize);
   longlink = malloc(4*V*gaugeSiteSize*gSize);
 
-  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
+  construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, 
+				 &gaugeParam, dslash_type);
 
   const double cos_pi_3 = 0.5; // Cos(pi/3)
   const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
@@ -262,7 +278,9 @@ invert_test(void)
   int fat_pad = tmp_value;
   int link_pad =  3*tmp_value;
 
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  // FIXME: currently assume staggered is SU(3)
+  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+    QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
   cpuFat = new cpuGaugeField(cpuFatParam);
@@ -273,25 +291,32 @@ invert_test(void)
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
+  gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
+    QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = fat_pad;
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
   loadGaugeQuda(fatlink, &gaugeParam);
 
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.ga_pad = link_pad;
-  gaugeParam.reconstruct= link_recon;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda(longlink, &gaugeParam);
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+    gaugeParam.ga_pad = link_pad;
+    gaugeParam.reconstruct= link_recon;
+    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    loadGaugeQuda(longlink, &gaugeParam);
+  }
 #else
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
   loadGaugeQuda(fatlink, &gaugeParam);
 
-  gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-  gaugeParam.reconstruct = link_recon;
-  gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-  loadGaugeQuda(longlink, &gaugeParam);
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+    gaugeParam.reconstruct = link_recon;
+    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+    loadGaugeQuda(longlink, &gaugeParam);
+  }
 #endif
 
   double time0 = -((double)clock()); // Start the timer
@@ -300,8 +325,16 @@ invert_test(void)
   double src2=0;
   int ret = 0;
 
+
+
   switch(test_type){
     case 0: //even
+      if(inv_type == QUDA_GCR_INVERTER){
+      	inv_param.inv_type = QUDA_GCR_INVERTER;
+      	inv_param.gcrNkrylov = 50;
+      }else if(inv_type == QUDA_PCG_INVERTER){
+	inv_param.inv_type = QUDA_PCG_INVERTER;
+      }
       inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
 
       invertQuda(out->V(), in->V(), &inv_param);
@@ -325,6 +358,12 @@ invert_test(void)
       break;
 
     case 1: //odd
+      if(inv_type == QUDA_GCR_INVERTER){
+      	inv_param.inv_type = QUDA_GCR_INVERTER;
+      	inv_param.gcrNkrylov = 50;
+      }else if(inv_type == QUDA_PCG_INVERTER){
+	inv_param.inv_type = QUDA_PCG_INVERTER;
+      }
 
       inv_param.matpc_type = QUDA_MATPC_ODD_ODD;
       invertQuda(out->V(), in->V(), &inv_param);	
@@ -562,6 +601,10 @@ int main(int argc, char** argv)
     link_recon_sloppy = link_recon;
   }
 
+  if(inv_type != QUDA_CG_INVERTER){
+    if(test_type != 0 && test_type != 1) errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
+  }
+
 
   // initialize QMP or MPI
 #if defined(QMP_COMMS)
@@ -577,9 +620,6 @@ int main(int argc, char** argv)
   display_test_info();
 
   int ret = invert_test();
-
-  display_test_info();
-
 
   // finalize the communications layer
 #if defined(QMP_COMMS)

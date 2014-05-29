@@ -242,7 +242,10 @@ namespace quda {
 
       public: 
       CopySpinorEx(CopySpinorExArg<OutOrder,InOrder,Basis> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {}
+        : arg(arg), location(location) {
+	sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+	sprintf(aux,"out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
+      }
       virtual ~CopySpinorEx() {}
 
       void apply(const cudaStream_t &stream){
@@ -256,16 +259,7 @@ namespace quda {
         }
       } 
 
-      TuneKey tuneKey() const {
-        std::stringstream vol,aux;
-        vol << arg.X[0] << "x";
-        vol << arg.X[1] << "x";
-        vol << arg.X[2] << "x";
-        vol << arg.X[3];
-        aux << "out_stride=" << arg.out.stride << ",in_stride=" << arg.in.stride;
-        return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }
-
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
       std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim
         std::stringstream ps;

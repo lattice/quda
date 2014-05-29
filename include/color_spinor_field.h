@@ -218,6 +218,10 @@ namespace quda {
       static void checkField(const ColorSpinorField &, const ColorSpinorField &);
       void clearGhostPointers();
 
+      char vol_string[32]; // used as a label in the autotuner
+      char aux_string[128]; // used as a label in the autotuner
+      void setTuningString(); // set the vol_string and aux_string for use in tuning
+
     public:
       //ColorSpinorField();
       ColorSpinorField(const ColorSpinorField &);
@@ -244,6 +248,9 @@ namespace quda {
       size_t Bytes() const { return bytes; }
       size_t NormBytes() const { return norm_bytes; }
       void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
+
+      const char *VolString() const { return vol_string; }
+      const char *AuxString() const { return aux_string; }
 
       void* V() {return v;}
       const void* V() const {return v;}
@@ -308,6 +315,11 @@ namespace quda {
    void *my_back_norm_face[QUDA_MAX_DIM];
    void *from_fwd_norm_face[QUDA_MAX_DIM];
    void *from_back_norm_face[QUDA_MAX_DIM];
+
+   MsgHandle ***mh_recv_norm_fwd;
+   MsgHandle ***mh_recv_norm_back;
+   MsgHandle ***mh_send_norm_fwd;
+   MsgHandle ***mh_send_norm_back;
 #endif
 
     bool reference; // whether the field is a reference or not

@@ -208,7 +208,10 @@ namespace quda {
 
       public: 
       CloverSigmaTrace(CloverTraceArg<Clover1,Clover2,Gauge> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {;}
+        : arg(arg), location(location) {
+	sprintf(vol, "%d", arg.clover1.volumeCB);
+	sprintf(aux, "stride=%d", arg.clover1.stride);
+      }
       virtual ~CloverSigmaTrace() {;}
 
       void apply(const cudaStream_t &stream){
@@ -221,12 +224,7 @@ namespace quda {
         }
       }
 
-      TuneKey tuneKey() const {
-        std::stringstream vol, aux;
-        vol << arg.clover1.volumeCB;
-        aux << "stride=" << arg.clover1.stride;
-        return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }
+      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
       std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
         std::stringstream ps;

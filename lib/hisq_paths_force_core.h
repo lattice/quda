@@ -28,7 +28,7 @@ printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21
  *    4 COLOR MATRIX:  newOprod_at_A, P3_at_A, Pmu_at_B, Qmu_at_A
  *
  * Three call variations:
- *   1. when Qprev == NULL:   Qprod_at_D does not exit and is not read in
+ *   1. when Qprev == NULL:   Qprod_at_D does not exist and is not read in
  *   2. full read/write
  *   3. when Pmu/Qmu == NULL,   Pmu_at_B and Qmu_at_A are not written out
  *
@@ -58,6 +58,25 @@ printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21
  *               else                  (2, 0) 
  *
  ****************************************************************************/
+// call 1: if (sig is positive) 612 Flops per site
+// 	   else 		396 Flops per site
+// 	   
+// call 2: if (sig is positive) 810 Flops per site
+// 	   else 		594 Flops per site
+//
+// call 3: if (sig is positive) 810 Flops per site
+// 	   else			396 Flops per site
+//
+// call 1: 24 times with +ve sig and 24 times with -ve sig
+// 	   24192 Flops per site for the full 48 calls
+//
+// call 2: 96 times with +ve sig and 96 times with -ve sig
+// 	   134784 Flops per site in total
+//
+// call 3 (Lepage)
+// 	: 24 times with +ve sig and 24 times with -ve sig
+//	28944 Flops per site in total
+//
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change> 
   __global__ void
                  HISQ_KERNEL_NAME(do_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
@@ -222,7 +241,11 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   return;
 }
 
-
+// Flop count, in two-number pair (matrix_multi, matrix_add)
+//  if (sig is positive)  (4, 1)
+//  else                  (2, 0)
+//  if(sig is positive) 810 flops per lattice site
+//  else 396 flops per lattice site
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change> 
   __global__ void
 HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
@@ -394,6 +417,19 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
  *
  *********************************************************************************/
 
+// Flop count, in two-number pair (matrix_mult, matrix_add)
+// 		(2,2)
+// call 1: 432 Flops per site
+// call 2 (short)
+// 	: 18 Flops per site
+//
+// call 1: 240 calls 
+// call 2: 48 calls
+//
+// Aggregate Flops:
+// call 1: 103680
+// call 2: 864 
+
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
   __global__ void
 HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
@@ -497,11 +533,12 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     if(oddBit){ mycoeff = -mycoeff; }
     addMatrixToNewOprod(Ow.data, OPP_DIR(mu), new_sid, mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
   } 
-//#endif
   return;
 }
 
 
+// Flop count, in two-number pair (matrix_mult, matrix_add)
+// 		(0,1)
 
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
@@ -600,6 +637,14 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
  *
  ************************************************************************************************/
 
+// 198 flops per matrix multiply
+// 18 flops per matrix addition
+// if(sig is positive) 1242 Flops per lattice site
+// else 828 Flops per lattice site
+//
+// Aggregate Flops per site
+// 1242*192 + 828*192
+// = 397440 Flops per site
 
 template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
   __global__ void
@@ -750,8 +795,9 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
 
 
-
-
+// Flops count, in two-number pair (matrix_mult, matrix_add)
+// 				   (24, 12)
+// 4968 Flops per site in total
 template<class RealA, class RealB,  int oddBit>
   __global__ void 
 HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* const linkOdd,
@@ -833,11 +879,11 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
 }
 
 
+// Flops count: 4 matrix multiplications per lattice site = 792 Flops per site
 template<class RealA, class RealB, int oddBit>
   __global__ void 
 HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const RealB* const linkOdd, 
     const RealA* const oprodEven, const RealA* const oprodOdd,
-    int sig,
     RealA* const forceEven, RealA* const forceOdd,
     hisq_kernel_param_t kparam)
 {
@@ -859,17 +905,18 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
   new_sid = linkIndex(x,dx,E);
 #endif
 
+  for(int sig=0; sig<4; ++sig){
+  
+    Matrix<RealA,3> Uw, Ow, Ox;
 
-  Matrix<RealA,3> Uw, Ow, Ox;
+    loadLink<18>(linkEven, linkOdd, sig, new_sid, Uw.data, oddBit, kparam.thin_link_stride);  
 
+    loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, Ox.data, oddBit, kparam.color_matrix_stride);
+    typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
+    Ow = Uw*Ox;
 
-  loadLink<18>(linkEven, linkOdd, sig, new_sid, Uw.data, oddBit, kparam.thin_link_stride);  
-
-  loadMatrixFromField(oprodEven, oprodOdd, sig, new_sid, Ox.data, oddBit, kparam.color_matrix_stride);
-  typename RealTypeId<RealA>::Type coeff = (oddBit==1) ? -1 : 1;
-  Ow = Uw*Ox;
-
-  storeMatrixToMomentumField(Ow.data, sig, sid, coeff, forceEven, forceOdd, oddBit, kparam.momentum_stride); 
+    storeMatrixToMomentumField(Ow.data, sig, sid, coeff, forceEven, forceOdd, oddBit, kparam.momentum_stride); 
+  }
   return;
 }
 

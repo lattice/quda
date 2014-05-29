@@ -17,6 +17,9 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
+// google test frame work
+#include <gtest.h>
+
 #include <gauge_qio.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -60,6 +63,7 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern QudaDagType dagger;
 
+extern bool verify_results;
 extern int niter;
 extern char latfile[];
 
@@ -103,11 +107,11 @@ void init(int argc, char **argv) {
 
   inv_param.kappa = 0.1;
 
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.01;
     inv_param.epsilon = 0.01; 
-//!    inv_param.twist_flavor = QUDA_TWIST_MINUS;
-    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
+    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+//!    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
     inv_param.mass = 0.01;
     inv_param.m5 = -1.5;
@@ -169,11 +173,12 @@ void init(int argc, char **argv) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+    inv_param.clover_coeff = 1.5*inv_param.kappa;
     //if (test_type > 0) {
       hostClover = malloc(V*cloverSiteSize*inv_param.clover_cpu_prec);
       hostCloverInv = hostClover; // fake it
@@ -264,7 +269,11 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
     printfQuda("Sending clover field to GPU\n");
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
-    //clover = cudaCloverPrecise;
+  }
+
+  if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    printfQuda("Sending clover field to GPU\n");
+    loadCloverQuda(NULL, NULL, &inv_param);
   }
 
   if (!transfer) {
@@ -332,7 +341,7 @@ void end() {
   delete spinorTmp;
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if((dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)){
     if (hostClover != hostCloverInv && hostClover) free(hostClover);
     free(hostCloverInv);
   }
@@ -426,7 +435,7 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
-  } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  } else if((dslash_type == QUDA_TWISTED_MASS_DSLASH) || (dslash_type == QUDA_TWISTED_CLOVER_DSLASH)){ 
     switch (test_type) {
     case 0:
       if(inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS)
@@ -558,6 +567,12 @@ void display_test_info()
 
 extern void usage(char**);
 
+TEST(dslash, verify) {
+  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double tol = (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? 1e-12 :
+		(inv_param.cuda_prec == QUDA_SINGLE_PRECISION ? 1e-3 : 1e-1));
+  ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
 
 int main(int argc, char **argv)
 {
@@ -599,7 +614,7 @@ int main(int argc, char **argv)
 
     // print timing information
     printfQuda("%fus per kernel call\n", 1e6*secs / niter);
-    
+    //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
     int spinor_floats = test_type ? 2*(7*24+24)+24 : 7*24+24;
@@ -613,18 +628,19 @@ int main(int argc, char **argv)
     printfQuda("GB/s = %f\n\n", 
 	       (double)Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
     
+    double norm2_cpu = norm2(*spinorRef);
+    double norm2_cpu_cuda= norm2(*spinorOut);
     if (!transfer) {
-      double norm2_cpu = norm2(*spinorRef);
       double norm2_cuda= norm2(*cudaSpinorOut);
-      double norm2_cpu_cuda= norm2(*spinorOut);
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
-      double norm2_cpu = norm2(*spinorRef);
-      double norm2_cpu_cuda= norm2(*spinorOut);
       printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
-    
-    cpuColorSpinorField::Compare(*spinorRef, *spinorOut);
+  
+    if (verify_results) {
+      ::testing::InitGoogleTest(&argc, argv);
+      if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+    }
   }    
   end();
 
