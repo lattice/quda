@@ -36,7 +36,7 @@ BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
-POSIX_THREADS = no                # set to 'yes' to build pthread code
+POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread code
 
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers

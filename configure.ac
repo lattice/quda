@@ -1,4 +1,4 @@
-AC_INIT([quda],[0.5],[quda-developers@googlegroups.com])
+AC_INIT([quda],[0.7],[quda-developers@googlegroups.com])
 
 
 dnl Specify CUDA Location
@@ -203,7 +203,7 @@ AS_CASE([$build_mpi],
 
 
 AC_ARG_ENABLE(pthreads,
-  AC_HELP_STRING([--enable-pthreads], [ Enable pthreads in the multi-GPU dslash build (default: disabled)])
+  AC_HELP_STRING([--enable-pthreads], [ Enable pthreads in the multi-GPU dslash build (default: disabled)]),
   [ posix_threads=${enableval}],
   [ posix_threads="no" ]
 )
