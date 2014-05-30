@@ -191,7 +191,6 @@ namespace quda {
     initCGparam.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
   }
 
-
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
     DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCG(0), initCGparam(param), eigcg_alloc(false)
   {
@@ -213,7 +212,8 @@ namespace quda {
     {
        fillInitCGSolveParam(initCGparam);
        //
-       initCG = new CG(mat, matSloppy, initCGparam, profile);
+       if(param.tol_restart < param.tol)//restart was not requested, do normal initCG
+          initCG = new CG(mat, matSloppy, initCGparam, profile);
        //  
        use_eigcg = false;
        //
@@ -233,6 +233,9 @@ namespace quda {
 
   void IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
+
+    if (param.precision_sloppy == x.Precision()) errorQuda("\nMixedprecision is not supported for the eigCG.\n");
+
     profile.Start(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
@@ -510,12 +513,6 @@ namespace quda {
 
 //Free eigcg resources:
     delete eigcg_args;
-
-//    for(int i = 0; i < 4; i++)
-//    {
-//       double check_norm = norm2(Vm->Eigenvec(i));
-//       printfQuda("\nNORM in eigcg : %22.15E\n", check_norm);
-//    }
 
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
@@ -1001,7 +998,44 @@ namespace quda {
         DeflateSpinor(*out, *in, defl_param);
 
         //launch initCG:
-        (*initCG)(*out, *in);
+        if(initCG)
+          (*initCG)(*out, *in);
+        else //think about this!
+        {
+          ColorSpinorParam cudaParam(*out);
+          cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+
+          cudaParam.eigv_dim  = 0;
+          cudaParam.eigv_id   = -1;
+
+          cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam); 
+          cudaColorSpinorField tmp (*W, cudaParam);
+
+          double tol_swap = initCGparam.tol;
+
+          initCGparam.tol = initCGparam.tol_restart;
+
+          initCG = new CG(mat, matSloppy, initCGparam, profile);
+
+          (*initCG)(*out, *in);           
+
+          delete initCG;
+
+          initCGparam.tol = tol_swap;
+
+          matDefl(*W, *out, tmp);
+
+          xpayCuda(*in, -1, *W); 
+
+          DeflateSpinor(*out, *W, defl_param);
+
+          initCG = new CG(mat, matSloppy, initCGparam, profile);
+
+          (*initCG)(*out, *in);           
+        
+          delete initCG;
+          
+        } 
 
         //copy solver statistics:
         param.iter   = initCGparam.iter;

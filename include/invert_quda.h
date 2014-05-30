@@ -47,7 +47,10 @@ namespace quda {
     int pipeline;
 
     /**< Solver tolerance in the L2 residual norm */
-    double tol;             
+    double tol;
+
+    /**< Solver tolerance in the L2 residual norm */
+    double tol_restart;             
 
     /**< Solver tolerance in the heavy quark residual norm */
     double tol_hq;          
@@ -146,7 +149,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), 
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
-      pipeline(param.pipeline), tol(param.tol), tol_hq(param.tol_hq), 
+      pipeline(param.pipeline), tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
