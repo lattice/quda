@@ -90,7 +90,6 @@ extern "C" {
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
 
     int overlap; /**< Width of overlapping domains */
-  
 
     int use_resident_gauge;  /**< Use the resident gauge field */
     int use_resident_mom;    /**< Use the resident mom field */
@@ -125,7 +124,8 @@ extern "C" {
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
 
-    double tol;   /**< Solver tolerance in the L2 residual norm */
+    double tol;    /**< Solver tolerance in the L2 residual norm */
+    double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
     double tol_hq; /**< Solver tolerance in the heavy quark residual norm */
     double true_res; /**< Actual L2 residual norm achieved in solver */
     double true_res_hq; /**< Actual heavy quark residual norm achieved in solver */
@@ -245,6 +245,17 @@ extern "C" {
      */
     QudaResidualType residual_type;
 
+    /**Parameters for deflated solvers*/
+    QudaPrecision cuda_prec_ritz; /**< The precision of the Ritz vectors */
+
+    int nev;
+
+    int max_search_dim;//for magma library this parameter must be multiple 16?
+
+    int rhs_idx;
+
+    int deflation_grid;//total deflation space is nev*deflation_grid
+
   } QudaInvertParam;
 
 
@@ -274,6 +285,7 @@ extern "C" {
   } QudaEigParam;
 
     
+
   /*
    * Interface functions, found in interface_quda.cpp
    */
@@ -399,7 +411,7 @@ extern "C" {
    *   QudaInvertParam invert_param = newQudaInvertParam();
    */
   QudaInvertParam newQudaInvertParam(void);
-  
+
   /**
    * A new QudaEigParam should always be initialized immediately
    * after it's defined (and prior to explicitly setting its members)
@@ -416,8 +428,8 @@ extern "C" {
   void printQudaGaugeParam(QudaGaugeParam *param);
 
   /**
-   * Print the members of QudaInvertParam.
-   * @param param The QudaInvertParam whose elements we are to print.
+   * Print the members of QudaGaugeParam.
+   * @param param The QudaGaugeParam whose elements we are to print.
    */
   void printQudaInvertParam(QudaInvertParam *param);
 
@@ -473,6 +485,15 @@ extern "C" {
   void lanczosQuda(int &k0, int &m, void *hp_Apsi, void *hp_r, void *hp_V, 
                    void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
 
+  /**
+   * Perform the solve, according to the parameters set in param.  It
+   * is assumed that the gauge field has already been loaded via
+   * loadGaugeQuda().
+   * @param h_x    Solution spinor field
+   * @param h_b    Source spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
+   */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
@@ -498,6 +519,17 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param);
+
+  /**
+   * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).
+   * @param _h_x    Outnput: array of solution spinor fields (typically O(10))
+   * @param _h_b    Input: array of source spinor fields (typically O(10))
+   * @param _h_u    Input/Output: array of Ritz spinor fields (typically O(100))
+   * @param _h_h    Input/Output: complex projection mutirx (typically O(100))
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
+   */
+  void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u = 0, bool last_rhs=false);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
@@ -685,6 +717,15 @@ extern "C" {
                       const void* const v_link,
                       const void* const u_link,
                       const QudaGaugeParam* param);
+
+  /**
+  * Open/Close MAGMA library
+  *
+  **/
+  void openMagma();
+
+  void closeMagma();
+
 
 #ifdef __cplusplus
 }

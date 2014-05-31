@@ -22,20 +22,24 @@ namespace quda {
 
       QudaFieldOrder fieldOrder; // Float, Float2, Float4 etc.
       QudaGammaBasis gammaBasis;
-      QudaFieldCreate create; // 
+      QudaFieldCreate create; //
 
-      QudaDWFPCType PCtype; // used to select preconditioning method in DWF
-    
+      QudaDWFPCType PCtype; // used to select preconditioning method in DWF 
+
       void *v; // pointer to field
       void *norm;
+
+      //! for eigcg:
+      int eigv_dim;    //number of eigenvectors
+      int eigv_id;     //eigenvector index
 
       ColorSpinorParam(const ColorSpinorField &a);
 
       ColorSpinorParam()
         : LatticeFieldParam(), nColor(0), nSpin(0), twistFlavor(QUDA_TWIST_INVALID), 
         siteOrder(QUDA_INVALID_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
-        gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE),
-	PCtype(QUDA_PC_INVALID) { ; }
+        gammaBasis(QUDA_INVALID_GAMMA_BASIS), create(QUDA_INVALID_FIELD_CREATE), 
+	PCtype(QUDA_PC_INVALID), eigv_dim(0), eigv_id(-1) { ; }
 
       // used to create cpu params
       ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution)
@@ -44,7 +48,8 @@ namespace quda {
               inv_param.dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4), 
         twistFlavor(inv_param.twist_flavor), siteOrder(QUDA_INVALID_SITE_ORDER), 
         fieldOrder(QUDA_INVALID_FIELD_ORDER), gammaBasis(inv_param.gamma_basis), 
-          create(QUDA_REFERENCE_FIELD_CREATE),  PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||(inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ), v(V) { 
+        create(QUDA_REFERENCE_FIELD_CREATE), PCtype(((inv_param.dslash_type==QUDA_DOMAIN_WALL_4D_DSLASH)||(inv_param.dslash_type==QUDA_MOBIUS_DWF_DSLASH))?QUDA_4D_PC:QUDA_5D_PC ), 
+	v(V), eigv_dim(0), eigv_id(-1) {
 
             if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
             for (int d=0; d<nDim; d++) x[d] = X[d];
@@ -56,9 +61,9 @@ namespace quda {
               siteSubset = QUDA_PARITY_SITE_SUBSET;
             }
 
-            if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-		inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
-		inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+	   if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+	       inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+	       inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
               nDim++;
               x[4] = inv_param.Ls;
             }
@@ -94,7 +99,7 @@ namespace quda {
         nColor(cpuParam.nColor), nSpin(cpuParam.nSpin), twistFlavor(cpuParam.twistFlavor), 
         siteOrder(QUDA_EVEN_ODD_SITE_ORDER), fieldOrder(QUDA_INVALID_FIELD_ORDER), 
         gammaBasis(nSpin == 4? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS), 
-        create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0)
+        create(QUDA_COPY_FIELD_CREATE), PCtype(cpuParam.PCtype), v(0), eigv_dim(cpuParam.eigv_dim), eigv_id(-1)
         {
           siteSubset = cpuParam.siteSubset;
           fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
@@ -122,6 +127,8 @@ namespace quda {
         printfQuda("create = %d\n", create);
         printfQuda("v = %lx\n", (unsigned long)v);
         printfQuda("norm = %lx\n", (unsigned long)norm);
+        //! for eigcg
+        if(eigv_dim != 0) printfQuda("nEv = %d\n", eigv_dim);
       }
 
       virtual ~ColorSpinorParam() {
@@ -135,9 +142,9 @@ namespace quda {
 
     private:
       void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
-		  QudaPrecision precision, int pad, QudaSiteSubset subset, 
-		  QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-		  QudaDWFPCType PCtype);
+          QudaPrecision precision, int pad, QudaSiteSubset subset, 
+          QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaDWFPCType PCtype, 
+          int nev = 0, int evid = -1);
       void destroy();  
 
     protected:
@@ -164,6 +171,13 @@ namespace quda {
 
       void *v; // the field elements
       void *norm; // the normalization field
+      //! used for eigcg:
+      int eigv_dim;
+      int eigv_id;
+      int eigv_volume;       // volume of a single eigenvector 
+      int eigv_stride;       // stride of a single eigenvector
+      int eigv_real_length;  // physical length of a single eigenvector
+      int eigv_length;       // length including pads (but not ghost zones)
 
       // multi-GPU parameters
       void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
@@ -181,6 +195,18 @@ namespace quda {
       size_t bytes; // size in bytes of spinor field
       size_t norm_bytes; // size in bytes of norm field
 
+      /*Warning: we need copies of the above params for eigenvectors*/
+      //multi_GPU parameters:
+ 
+      //ghost pointers are always for single eigenvector..
+      int eigv_total_length;
+      int eigv_total_norm_length;
+      int eigv_ghost_length;
+      int eigv_ghost_norm_length;
+ 
+      size_t eigv_bytes;      // size in bytes of spinor field
+      size_t eigv_norm_bytes; // makes no sense but let's keep it...
+
       QudaSiteSubset siteSubset;
       QudaSiteOrder siteOrder;
       QudaFieldOrder fieldOrder;
@@ -189,6 +215,9 @@ namespace quda {
       // in the case of full fields, these are references to the even / odd sublattices
       ColorSpinorField *even;
       ColorSpinorField *odd;
+
+      //! for eigcg:
+      std::vector<ColorSpinorField*> eigenvectors;
 
       void createGhostZone();
 
@@ -236,6 +265,19 @@ namespace quda {
       const void* V() const {return v;}
       void* Norm(){return norm;}
       const void* Norm() const {return norm;}
+
+      //! for eigcg only:
+      int EigvDim() const { return eigv_dim; }
+      int EigvId() const { return eigv_id; }
+      int EigvVolume() const { return eigv_volume; }
+      int EigvStride() const { return eigv_stride; }
+      int EigvLength() const { return eigv_length; }
+      int EigvRealLength() const { return eigv_real_length; } 
+      int EigvTotalLength() const { return eigv_total_length; }
+ 
+      size_t EigvBytes() const { return eigv_bytes; }
+      size_t EigvNormBytes() const { return eigv_norm_bytes; }
+      int EigvGhostLength() const { return eigv_ghost_length; }
 
       QudaDWFPCType DWFPCtype() const { return PCtype; }
 
@@ -289,7 +331,6 @@ namespace quda {
    MsgHandle ***mh_recv_norm_back;
    MsgHandle ***mh_send_norm_fwd;
    MsgHandle ***mh_send_norm_back;
-
 #endif
 
     bool reference; // whether the field is a reference or not
@@ -440,6 +481,9 @@ namespace quda {
     cudaColorSpinorField& Even() const;
     cudaColorSpinorField& Odd() const;
 
+    cudaColorSpinorField& Eigenvec(const int idx) const;
+    void CopyEigenvecSubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
+
     void zero();
 
     QudaFieldLocation Location() const;
@@ -452,6 +496,8 @@ namespace quda {
     bool isNative() const;
 
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
+
+    void getTexObjectInfo() const;
   };
 
   // Forward declaration of accessor functors

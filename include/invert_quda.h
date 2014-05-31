@@ -47,7 +47,10 @@ namespace quda {
     int pipeline;
 
     /**< Solver tolerance in the L2 residual norm */
-    double tol;             
+    double tol;
+
+    /**< Solver tolerance in the L2 residual norm */
+    double tol_restart;             
 
     /**< Solver tolerance in the heavy quark residual norm */
     double tol_hq;          
@@ -127,6 +130,15 @@ namespace quda {
 
     /**< The Gflops rate of the solver */
     double gflops;
+
+    // Incremental EigCG solver parameters
+    /**< The precision of the Ritz vectors */
+    QudaPrecision precision_ritz;//also search space precision
+
+    int nev;//number of eigenvectors produced by EigCG
+    int m;//Dimension of the search space
+    int deflation_grid;
+    int rhs_idx;
     
     /**
        Constructor that matches the initial values to that of the
@@ -137,21 +149,29 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), 
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
-      pipeline(param.pipeline), tol(param.tol), tol_hq(param.tol_hq), 
+      pipeline(param.pipeline), tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
       precision_precondition(param.cuda_prec_precondition), 
-      preserve_source(param.preserve_source), overlap_precondition(param.overlap), 
-      num_offset(param.num_offset), 
+      preserve_source(param.preserve_source), num_offset(param.num_offset), 
       Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
-      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops)
+      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0) 
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
 	tol_offset[i] = param.tol_offset[i];
 	tol_hq_offset[i] = param.tol_hq_offset[i];
+      }
+
+      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
+        m = (m / 16) * 16 + 16;
+        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
+      }
+      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_EIGCG_INVERTER)){
+        rhs_idx = param.rhs_idx;
       }
     }
     ~SolverParam() { }
@@ -175,6 +195,13 @@ namespace quda {
 	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
 	}
       }
+      //for incremental eigCG:
+      param.rhs_idx = rhs_idx;
+    }
+
+    void updateRhsIndex(QudaInvertParam &param) {
+      //for incremental eigCG:
+      rhs_idx = param.rhs_idx;
     }
 
   };
@@ -329,7 +356,6 @@ namespace quda {
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
-
   // Extended Steepest Descent solver used for overlapping DD preconditioning
   class XSD : public Solver {
     private:
@@ -416,6 +442,226 @@ namespace quda {
     */  
     void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p,
 		    cudaColorSpinorField **q, int N);
+  };
+
+  struct DeflationParam {
+    //host   projection matrix:
+    Complex *proj_matrix; //VH A V
+
+//currently this is just host buffer, in the future it'd be more consistent/convenient to create cpuColorSpinorField. 
+    QudaPrecision           ritz_prec;      //keep it right now.    
+    void                    *cpuRitzVectors;       //host buffer for Ritz vectors
+
+    cudaColorSpinorField    *cudaRitzVectors;      //device buffer for Ritz vectors
+
+    int  cpu_ritz_dim; //number of Ritz vectors allocated on the host
+    int  cuda_ritz_dim; //number of Ritz vectors allocated on the device
+
+    int ld;                 //projection matrix leading dimension
+    int tot_dim;            //projection matrix full (maximum) dimension (nev*deflation_grid)
+    int cur_dim;            //current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) 
+    int added_nevs;
+    
+    size_t ritz_bytes;
+
+    bool cuda_ritz_alloc;
+    bool cpu_ritz_alloc;
+
+    DeflationParam(SolverParam &param, const int eigv_volume) : proj_matrix(0),  cpuRitzVectors(0),  cudaRitzVectors(0), cpu_ritz_dim(0), cuda_ritz_dim(0), cur_dim(0), added_nevs(0), cuda_ritz_alloc(false), cpu_ritz_alloc(false){
+
+       const int spinorSiteSize = 24;
+
+       if(param.nev == 0 || param.deflation_grid == 0) errorQuda("\nIncorrect deflation space parameters...\n");
+       
+       tot_dim      = param.deflation_grid*param.nev;
+
+       ld           = ((tot_dim+15) / 16) * tot_dim;
+
+       //allocate deflation resources:
+       proj_matrix  = new Complex[ld*tot_dim];
+       
+       ritz_prec = param.precision_ritz;
+
+       ritz_bytes      = eigv_volume*spinorSiteSize*ritz_prec;
+
+       cpu_ritz_dim    = tot_dim; 
+
+       cpuRitzVectors  = malloc(cpu_ritz_dim * ritz_bytes);//mm_malloc(cpu_ritz_dim * ritz_bytes, 32);
+
+printfQuda("\nAllocating %u bytes\n", cpu_ritz_dim * ritz_bytes);
+
+       cpu_ritz_alloc  = true;
+    }
+
+    ~DeflationParam(){
+
+       if(proj_matrix)        delete[] proj_matrix;
+
+       if(cuda_ritz_alloc)    delete cudaRitzVectors;
+
+       if(cpu_ritz_alloc)     free(cpuRitzVectors);
+
+    }
+
+    //reset current dimension:
+    void ResetDeflationCurrentDim(const int addedvecs){
+
+      if(addedvecs == 0) return; //nothing to do
+
+      if((cur_dim+addedvecs) > tot_dim) errorQuda("\nCannot reset projection matrix dimension.\n");
+
+      added_nevs = addedvecs;
+      cur_dim   += added_nevs;
+
+      return;
+    }   
+
+    void AllocateRitzCuda(ColorSpinorParam &eigv_param)
+    {
+      if(eigv_param.siteSubset == QUDA_FULL_SITE_SUBSET) errorQuda("\nError: Ritz vectors must be parity spinors.\n");
+      
+      if(cuda_ritz_alloc == false)
+      {
+        eigv_param.setPrecision(ritz_prec);
+
+        eigv_param.eigv_dim  = cuda_ritz_dim;
+        eigv_param.eigv_id   = -1;
+
+        eigv_param.create  = QUDA_ZERO_FIELD_CREATE; 
+      
+        cudaRitzVectors = new cudaColorSpinorField(eigv_param);
+
+        cuda_ritz_alloc = true;
+      }
+      else
+      {
+        errorQuda("\nError: CUDA Ritz vectors were already allocated.\n");//or just warning?
+      }
+
+      return;
+    }
+
+    //print information about the deflation space:
+    void PrintInfo(){
+
+       printfQuda("\nProjection matrix information:\n");
+       printfQuda("Leading dimension %d\n", ld);
+       printfQuda("Total dimension %d\n", tot_dim);
+       printfQuda("Current dimension %d\n", cur_dim);
+       printfQuda("Host pointer: %p\n", proj_matrix);
+
+       printfQuda("\nRitz vector set information:\n");
+       printfQuda("Number of CUDA-allocated Ritz vectors %d\n", cuda_ritz_dim);
+       printfQuda("Number of CPU-allocated Ritz vectors %d\n", cpu_ritz_dim);
+    }
+
+    void CleanHostRitzVectors()  
+    {
+       if( cpu_ritz_alloc ){
+         free(cpuRitzVectors);
+         cpu_ritz_alloc = false;
+       }
+    }
+    void CleanDeviceRitzVectors()
+    {
+       if( cuda_ritz_alloc ){
+         delete cudaRitzVectors;
+         cuda_ritz_alloc = false;
+       }
+    }
+
+  };
+
+  class DeflatedSolver {
+
+  protected:
+    SolverParam &param;
+    TimeProfile &profile;
+
+  public:
+    DeflatedSolver(SolverParam &param, TimeProfile &profile) : 
+    param(param), profile(profile) { ; }
+    virtual ~DeflatedSolver() { ; }
+
+    virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
+
+    virtual void SaveRitzVecs(cudaColorSpinorField *out, const int nevs, bool cleanResources = false) = 0;
+
+    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+
+    virtual void CleanResources() = 0;
+
+    // solver factory
+    static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDeflate, TimeProfile &profile);
+
+    bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
+		     const double &hq_tol);
+ 
+    /**
+       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
+     */
+    void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
+
+    /** 
+	Prints out the summary of the solver convergence (requires a
+	versbosity of QUDA_SUMMARIZE).  Assumes
+	SolverParam.true_res and SolverParam.true_res_hq has
+	been set
+    */
+    void PrintSummary(const char *name, int k, const double &r2, const double &b2);
+
+  };
+
+  class IncEigCG : public DeflatedSolver {
+
+  private:
+    const DiracMatrix &mat;
+    const DiracMatrix &matSloppy;
+    const DiracMatrix &matDefl;
+
+    QudaPrecision search_space_prec;
+    cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
+
+    Solver      *initCG;//initCG solver for deflated inversions
+    SolverParam initCGparam; // parameters for initCG solve
+
+    bool eigcg_alloc;
+    bool use_eigcg;
+
+  public:
+
+    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
+
+    virtual ~IncEigCG();
+
+    //EigCG solver
+    void EigCG(cudaColorSpinorField &out, cudaColorSpinorField &in);
+
+    //Incremental eigCG solver (for eigcg and initcg calls)
+    void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
+
+    //Compute  u dH^{-1} u^{dagger}b: 
+    void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param);
+    //
+    void RelocateRitzVectors(cudaColorSpinorField &eigcgSpinor, DeflationParam *param);//move host Ritz vectors to the device...
+
+    //Deflation space management
+    void CreateDeflationSpace(cudaColorSpinorField &eigcgSpinor, DeflationParam *&param);
+    //extend projection matrix:
+    //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
+    //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
+    //extend H-matrix with the components
+    void ExpandDeflationSpace(DeflationParam *param, const int new_nevs);
+    //
+    void DeleteDeflationSpace(DeflationParam *&param);
+
+    //External methods to manage/use deflation space resources:
+    void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) {  };//not implemented.
+    //
+    void SaveRitzVecs(cudaColorSpinorField *out, const int nevs, bool cleanResources = false);
+    //
+    void CleanResources(); 
+
   };
 
 } // namespace quda

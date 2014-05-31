@@ -75,6 +75,30 @@ int numa_affinity_enabled = 1;
 
 using namespace quda;
 
+//for MAGMA lib:
+#include <blas_magma.h>
+
+static bool InitMagma = false;
+
+void openMagma(){  
+
+   if(!InitMagma){
+      BlasMagmaArgs::OpenMagma();
+      InitMagma = true;
+   }
+   else printfQuda("\nMAGMA library was already initialized..\n");
+
+   return;
+}
+
+void closeMagma(){  
+
+   if(InitMagma) BlasMagmaArgs::CloseMagma();
+   else printfQuda("\nMAGMA library was not initialized..\n");
+
+   return;
+}
+
 cudaGaugeField *gaugePrecise = NULL;
 cudaGaugeField *gaugeSloppy = NULL;
 cudaGaugeField *gaugePrecondition = NULL;
@@ -2845,6 +2869,223 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   saveTuneCache(getVerbosity());
 
   profileMulti.Stop(QUDA_PROFILE_TOTAL);
+}
+
+void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u/*=0*/, bool last_rhs/*=false*/)
+{
+  if(!InitMagma) openMagma();
+
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+
+  profileInvert.Start(QUDA_PROFILE_TOTAL);
+
+  if (!initialized) errorQuda("QUDA not initialized");
+
+  pushVerbosity(param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
+
+  // check the gauge fields have been created
+  cudaGaugeField *cudaGauge = checkGauge(param);
+
+  checkInvertParam(param);
+
+  // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
+  // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
+  // for now, though, so here we factorize everything for convenience.
+
+  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || 
+    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || 
+    (param->solution_type ==  QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
+    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+
+  param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
+  if (!pc_solve) param->spinorGiB *= 2;
+  param->spinorGiB *= (param->cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
+  if (param->preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+    param->spinorGiB *= ((param->inv_type == QUDA_EIGCG_INVERTER || param->inv_type == QUDA_INC_EIGCG_INVERTER) ? 5 : 7)/(double)(1<<30);
+  } else {
+    param->spinorGiB *= ((param->inv_type == QUDA_EIGCG_INVERTER || param->inv_type == QUDA_INC_EIGCG_INVERTER) ? 8 : 9)/(double)(1<<30);
+  }
+
+  param->secs = 0;
+  param->gflops = 0;
+  param->iter = 0;
+
+  DiracParam diracParam;
+  DiracParam diracSloppyParam;
+  //DiracParam diracDeflateParam;
+
+  setDiracParam(diracParam, param, pc_solve);
+  setDiracSloppyParam(diracSloppyParam, param, pc_solve);
+
+  Dirac *d        = Dirac::create(diracParam); // create the Dirac operator   
+  Dirac *dSloppy  = Dirac::create(diracSloppyParam);
+  //Dirac *dDeflate = Dirac::create(diracPreParam);
+
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = param->rhs_idx < param->deflation_grid ? *d : *dSloppy; //hack!!!
+  //Dirac &diracSloppy  = *dSloppy; //hack!!!
+  Dirac &diracDeflate = *d;//full precision 
+
+  profileInvert.Start(QUDA_PROFILE_H2D);
+
+  cudaColorSpinorField *b = NULL;
+  cudaColorSpinorField *x = NULL;
+  cudaColorSpinorField *in = NULL;
+  cudaColorSpinorField *out = NULL;
+
+  const int *X = cudaGauge->X();
+
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam(_h_b, *param, X, pc_solution);
+  ColorSpinorField *h_b = (param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  cpuParam.v = _h_x;
+  ColorSpinorField *h_x = (param->output_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  // download source
+  ColorSpinorParam cudaParam(cpuParam, *param);
+  cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  b = new cudaColorSpinorField(*h_b, cudaParam); 
+
+  if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
+    // initial guess only supported for single-pass solvers
+    if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
+        (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+      errorQuda("Initial guess not supported for two-pass solver");
+    }
+
+    x = new cudaColorSpinorField(*h_x, cudaParam); // solution  
+  } else { // zero initial guess
+    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+    x = new cudaColorSpinorField(cudaParam); // solution
+  }
+
+  profileInvert.Stop(QUDA_PROFILE_H2D);
+
+  double nb = norm2(*b);
+  if (nb==0.0) errorQuda("Source has zero norm");
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nh_b = norm2(*h_b);
+    double nh_x = norm2(*h_x);
+    double nx = norm2(*x);
+    printfQuda("Source: CPU = %g, CUDA copy = %g\n", nh_b, nb);
+    printfQuda("Solution: CPU = %g, CUDA copy = %g\n", nh_x, nx);
+  }
+
+  // rescale the source and solution vectors to help prevent the onset of underflow
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    axCuda(1.0/sqrt(nb), *b);
+    axCuda(1.0/sqrt(nb), *x);
+  }
+
+  setTuning(param->tune);
+
+  dirac.prepare(in, out, *x, *b, param->solution_type);
+//here...
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nin = norm2(*in);
+    double nout = norm2(*out);
+    printfQuda("Prepared source = %g\n", nin);   
+    printfQuda("Prepared solution = %g\n", nout);   
+  }
+
+//  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
+    massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *in);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double nin = norm2(*in);
+    printfQuda("Prepared source post mass rescale = %g\n", nin);   
+  }
+
+  if (param->max_search_dim == 0 || param->nev == 0 || (param->max_search_dim < param->nev)) 
+     errorQuda("\nIncorrect eigenvector space setup...\n");
+
+  if (pc_solution && !pc_solve) {
+    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
+  }
+
+  if (!mat_solution && !pc_solution && pc_solve) {
+    errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
+  }
+
+  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
+    cudaColorSpinorField tmp(*in);
+    dirac.Mdag(*in, tmp);
+  } 
+
+  if(param->inv_type == QUDA_INC_EIGCG_INVERTER || param->inv_type == QUDA_EIGCG_INVERTER)
+  {  
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mDeflate(diracDeflate);
+    SolverParam solverParam(*param);
+
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mDeflate, profileInvert);  
+    
+    (*solve)(out, in);//run solver
+
+    solverParam.updateInvertParam(*param);//will update rhs_idx as well...
+    
+    if(last_rhs)
+    {
+      printfQuda("\nDelete incremental EigCG solver resources...\n");
+      //clean resources:
+      solve->CleanResources();
+      // 
+      printfQuda("\n...done.\n");
+    }
+
+    delete solve;
+  }
+  else
+  {
+    errorQuda("\nUnknown deflated solver...\n");
+  }
+
+  if (getVerbosity() >= QUDA_VERBOSE){
+    double nx = norm2(*x);
+    printfQuda("Solution = %g\n",nx);
+  }
+  dirac.reconstruct(*x, *b, param->solution_type);
+
+  if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    // rescale the solution
+    axCuda(sqrt(nb), *x);
+  }
+
+  profileInvert.Start(QUDA_PROFILE_D2H);
+  *h_x = *x;
+  profileInvert.Stop(QUDA_PROFILE_D2H);
+
+  if (getVerbosity() >= QUDA_VERBOSE){
+    double nx = norm2(*x);
+    double nh_x = norm2(*h_x);
+    printfQuda("Reconstructed: CUDA solution = %g, CPU copy = %g\n", nx, nh_x);
+  }
+
+  delete h_b;
+  delete h_x;
+  delete b;
+  delete x;
+
+  delete d;
+  delete dSloppy;
+//  delete dDeflate;
+
+  popVerbosity();
+
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
+
+  profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
 
 
