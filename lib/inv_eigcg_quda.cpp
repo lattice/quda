@@ -758,7 +758,7 @@ namespace quda {
 
     cudaMemGetInfo(&free_bytes, &total_bytes);
 
-    printfQuda("\nFree GPU memory: %u bytes (of total %u bytes)\n", free_bytes, total_bytes);
+    printfQuda("\nFree GPU memory: %lu bytes (of total %lu bytes)\n", free_bytes, total_bytes);
 
     //ok, must take into account initCG resources, just estimate...
     size_t init_cg_bytes  = dpar->ritz_bytes*10;
