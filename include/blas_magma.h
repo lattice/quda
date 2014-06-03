@@ -63,7 +63,7 @@
       //
       int  MagmaORTH_2nev(void *dTvecm, void *dTm);
       //
-      void RestartV(void *dV, const int vld, const int vlen, void *dTevecm, void *dTm);
+      void RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm);
 
       //Collection of methods used for the initial guess vector deflation:
 
