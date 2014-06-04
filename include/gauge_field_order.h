@@ -25,6 +25,7 @@ namespace quda {
 	const int volumeCB;
 	const int nDim;
 	const int nColor;
+	const int geometry;
 
 	// used for coarse gauge field access
 	const int nSpinCoarse;
@@ -36,7 +37,7 @@ namespace quda {
 	 * @param field The field that we are accessing
 	 */
         FieldOrder(GaugeField &U, int nSpinCoarse=1) : U(U), volumeCB(U.VolumeCB()), 
-	  nDim(U.Ndim()), nColor(U.Ncolor()), 
+	  nDim(U.Ndim()), nColor(U.Ncolor()), geometry(U.Geometry()),
 	  nSpinCoarse(nSpinCoarse), nColorCoarse(nColor/nSpinCoarse) { 
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	    errorQuda("GaugeField ordering not supported with reconstruction");
@@ -82,6 +83,9 @@ namespace quda {
 
 	/** Returns the field geometric dimension */
 	__device__ __host__ int Ndim() const { return nDim; }
+
+	/** Returns the field geometry */
+	__device__ __host__ int Geometry() const { return geometry; }
 
 	/**
 	 * Specialized read-only complex-member accessor function (for coarse gauge field)

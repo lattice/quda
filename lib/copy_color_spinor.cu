@@ -401,7 +401,7 @@ namespace quda {
       } else {
 	errorQuda("Unsupported Precision %d", src.Precision());
       }
-      /*} else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
+    } else if (dst.Precision() == QUDA_SINGLE_PRECISION) {
       if (src.Precision() == QUDA_DOUBLE_PRECISION) {
 	CopyGenericColorSpinor(dst, src, location, (float*)Dst, (double*)Src);
       } else if (src.Precision() == QUDA_SINGLE_PRECISION) {
@@ -420,7 +420,7 @@ namespace quda {
 	CopyGenericColorSpinor(dst, src, location, (short*)Dst, (short*)Src, (float*)dstNorm, (float*)srcNorm);
       } else {
 	errorQuda("Unsupported Precision %d", src.Precision());
-	}*/
+      }
     } else {
       errorQuda("Unsupported Precision %d", dst.Precision());
     }
