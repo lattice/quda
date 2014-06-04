@@ -126,12 +126,40 @@ namespace quda {
       };
 
     template <typename Float>
-      struct QDPFieldOrder : FieldOrder<Float> {
+      struct QDPFieldOrder {//: FieldOrder<Float> {
 
-      quda::complex<Float> **u;
+      protected:
+	/** An internal reference to the actual field we are accessing */
+	GaugeField &U;
+	const int volumeCB;
+	const int nDim;
+	const int nColor;
+	const int geometry;
 
-    QDPFieldOrder(GaugeField &U, int nSpinCoarse = 1) : FieldOrder<Float>(U, nSpinCoarse), 
-	u(static_cast<quda::complex<Float>**>(U.Gauge_p())) { ; } 
+	// used for coarse gauge field access
+	const int nSpinCoarse;
+	const int nColorCoarse;
+
+	quda::complex<Float> **u;
+
+      public:
+	/** 
+	 * Constructor for the FieldOrder class
+	 * @param field The field that we are accessing
+	 */
+      QDPFieldOrder(GaugeField &U, int nSpinCoarse=1) : U(U), volumeCB(U.VolumeCB()), 
+	  nDim(U.Ndim()), nColor(U.Ncolor()), geometry(U.Geometry()),
+	  nSpinCoarse(nSpinCoarse), nColorCoarse(nColor/nSpinCoarse),
+	  u(static_cast<quda::complex<Float>**>(U.Gauge_p()))
+	{
+	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
+	    errorQuda("GaugeField ordering not supported with reconstruction");
+	}
+	
+	GaugeField& Field() { return U; }
+	
+	//QDPFieldOrder(GaugeField &U, int nSpinCoarse = 1) : FieldOrder<Float>(U, nSpinCoarse), 
+	//u(static_cast<quda::complex<Float>**>(U.Gauge_p())) { ; } 
       virtual ~QDPFieldOrder() { ; } 
     
       /**
@@ -144,8 +172,7 @@ namespace quda {
        */
       __device__ __host__ const quda::complex<Float>& operator()
 	(int d, int parity, int x, int row, int col) const {
-	return u[d][ ((parity * FieldOrder<Float>::volumeCB + x)*FieldOrder<Float>::nColor +
-		      row)*FieldOrder<Float>::nColor + col];
+	return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col];
       }
     
       /**
@@ -158,13 +185,63 @@ namespace quda {
        */
       __device__ __host__ quda::complex<Float>& operator()
 	(int d, int parity, int x, int row, int col) {
-	return u[d][ ((parity * FieldOrder<Float>::volumeCB + x)*FieldOrder<Float>::nColor +
-		      row)*FieldOrder<Float>::nColor + col];
+	return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col];
       }
     
+	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ const quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
+								   int s_col, int c_row, int c_col) const {
+	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+	
+	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
+							     int s_col, int c_row, int c_col) {
+	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+	
+	/** Returns the number of field colors */
+	__device__ __host__ int Ncolor() const { return nColor; }
+
+	/** Returns the field volume */
+	__device__ __host__ int Volume() const { return 2*volumeCB; }
+
+	/** Returns the field volume */
+	__device__ __host__ int VolumeCB() const { return volumeCB; }
+
+	/** Returns the field geometric dimension */
+	__device__ __host__ int Ndim() const { return nDim; }
+
+	/** Returns the field geometry */
+	__device__ __host__ int Geometry() const { return geometry; }
+
+	/** Returns the number of coarse gauge field spins */
+	__device__ __host__ int NspinCoarse() const { return nSpinCoarse; }
+
+	/** Returns the number of coarse gauge field colors */
+	__device__ __host__ int NcolorCoarse() const { return nColorCoarse; }
+
     };
 
-    template <typename Float>
+    /*template <typename Float>
       FieldOrder<Float>* createOrder(const GaugeField &a, int nSpinCoarse = 1) {
       FieldOrder<Float>* ptr=0;
 
@@ -175,7 +252,15 @@ namespace quda {
       }
 
       return ptr;
-    }
+      }*/
+
+    /**
+       This traits-driven object creation replaces the factory approach above.
+    */
+    template<typename Float,QudaGaugeFieldOrder> struct accessor { };
+
+    template<typename Float> struct accessor<Float,QUDA_QDP_GAUGE_ORDER>
+      { typedef QDPFieldOrder<Float> type; };
 
     // a += b*c
     template <typename Float>
