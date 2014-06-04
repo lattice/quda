@@ -241,23 +241,25 @@ namespace quda {
       __device__ __host__ int Nspin() const { return nSpin; }
     };
 
-    template <typename Float>
-      class SpaceSpinColorOrder : public FieldOrder<Float> {
+template <typename Float>
+      struct SpaceSpinColorOrder {
     private:
-	  //typedef FieldOrder<Float> F;
-
-      const int volume;
-      const int nColor;
-      const int nSpin;
-      const int nVec;
-      complex<Float> *v;	  
+ 	const int nDim;
+	const int volume;
+	const int nColor;
+	const int nSpin;
+	const QudaGammaBasis gammaBasis;
+	const QudaSiteSubset siteSubset;
+	const int nVec;
+	complex<Float> *v;	  
+	mutable int x[QUDA_MAX_DIM];
 
     public:
-    SpaceSpinColorOrder(const ColorSpinorField &field, int nVec=1) 
-      : FieldOrder<Float>(field, nVec), volume(field.Volume()), 
-	nColor(field.Ncolor()), nSpin(field.Nspin()), nVec(nVec), 
-	v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
-      { ; }
+      SpaceSpinColorOrder(const ColorSpinorField &field, int nVec=1) 
+      : nDim(field.Ndim()), volume(field.Volume()), nColor(field.Ncolor()), 
+	  nSpin(field.Nspin()), gammaBasis(field.GammaBasis()), siteSubset(field.SiteSubset()), nVec(nVec), 
+	  v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
+	{ for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
       virtual ~SpaceSpinColorOrder() { ; }
 
       __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
@@ -278,60 +280,86 @@ namespace quda {
 	return (*this)(x, s, c*nVec + n);      
       }
 
+      /** Returns the field geometric dimension */
+      __device__ __host__ int Ndim() const { return nDim; }
+
       /** Returns the field volume */
       __device__ __host__ int Volume() const { return volume; }
+
+      /** Return the length of dimension d */
+      __device__ __host__ int X(int d) const { return x[d]; }
 
       /** Returns the number of field colors */
        __device__ __host__ int Ncolor() const { return nColor; }
 
       /** Returns the number of field spins */
       __device__ __host__ int Nspin() const { return nSpin; }
-    };
 
-template <typename Float>
-      struct SpaceSpinColorOrder2 {
-    private:
-	  //typedef FieldOrder<Float> F;
+      /** Returns the number of packed vectors (for mg prolongator) */
+      __device__ __host__ int NvecPacked() const { return nVec; }
 
-      const int volume;
-      const int nColor;
-      const int nSpin;
-      const int nVec;
-      complex<Float> *v;	  
+      /** Returns the number of packed colors (for mg prolongator) */
+      __device__ __host__ int NcolorPacked() const { return nColor / nVec; }
 
-    public:
-    SpaceSpinColorOrder2(const ColorSpinorField &field, int nVec=1) 
-      : volume(field.Volume()), nColor(field.Ncolor()), nSpin(field.Nspin()), nVec(nVec), 
-	v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
-      { ; }
-      virtual ~SpaceSpinColorOrder2() { ; }
+      /** Returns the number of packed spins (for mg prolongator) */
+      __device__ __host__ int NspinPacked() const { return nSpin; } 
 
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
-	unsigned long index = (x*nSpin+s)*nColor+c;
-	return *(v + index);
+      /**
+	 Convert from 1-dimensional index to the n-dimensional spatial index.
+	 With full fields, we assume that the field is even-odd ordered.  The
+	 lattice coordinates that are computed here are full-field
+	 coordinates.
+      */
+      __device__ __host__ void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
+	
+	for (int d=0; d<nDim; d++) {
+	  y[d] = i % x[d];
+	  i /= x[d];    
+	}
+	int parity = i; // parity is the slowest running dimension
+	
+	// convert into the full-field lattice coordinate
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  for (int d=1; d<nDim; d++) parity += y[d];
+	  parity = parity & 1;
+	  x[0] *= 2; // restore x[0]
+	}
+	y[0] = 2*y[0] + parity;  // compute the full x coordinate
+      }
+      
+      /**
+	 Convert from n-dimensional spatial index to the 1-dimensional index.
+	 With full fields, we assume that the field is even-odd ordered.  The
+	 input lattice coordinates are always full-field coordinates.
+      */
+      __device__ __host__ void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
+	int parity = 0;
+	int savey0 = y[0];
+	
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  for (int d=0; d<nDim; d++) parity += y[d];
+	  parity = parity & 1;
+	  y[0] /= 2;
+	  x[0] /= 2; 
+	}
+	
+	i = parity;
+	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
+	
+	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+	  //y[0] = 2*y[0] + parity;
+	  y[0] = savey0;
+	  x[0] *= 2; // restore x[0]
+	}
       }
 
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c) {
-	unsigned long index = (x*nSpin+s)*nColor+c;
-	return *(v + index);
-      }
+      /** Returns the field geometric dimension */
+      __device__ __host__ QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const {
-	return (*this)(x, s, c*nVec + n);      
-      }
+      /** Returns the field geometric dimension */
+      __device__ __host__ int SiteSubset() const { return siteSubset; }
 
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) {
-	return (*this)(x, s, c*nVec + n);      
-      }
-
-      /** Returns the field volume */
-      __device__ __host__ int Volume() const { return volume; }
-
-      /** Returns the number of field colors */
-       __device__ __host__ int Ncolor() const { return nColor; }
-
-      /** Returns the number of field spins */
-      __device__ __host__ int Nspin() const { return nSpin; }
     };
 
 
@@ -409,7 +437,7 @@ template <typename Float>
     };
 
     // FIXME remove this factory and propagate the use of traits instead
-    template <typename Float>
+ template <typename Float>
       FieldOrder<Float>* createOrder(const ColorSpinorField &a, int nVec=1) {
       FieldOrder<Float>* ptr=0;
 
@@ -428,7 +456,7 @@ template <typename Float>
       }
 
       return ptr;
-    }
+      }
 
     /**
        This traits-driven object creation replaces the factory approach above.
@@ -442,7 +470,7 @@ template <typename Float>
       { typedef FloatNOrder2<Float,4> type; };
 
     template<typename Float> struct accessor<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> 
-      { typedef SpaceSpinColorOrder2<Float> type; };
+      { typedef SpaceSpinColorOrder<Float> type; };
 
     template<typename Float> struct accessor<Float,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER> 
       { typedef SpaceColorSpinOrder<Float> type; };

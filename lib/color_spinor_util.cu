@@ -83,24 +83,34 @@ namespace quda {
     }
   }
 
+  template <typename Float, QudaFieldOrder order>
+  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
+    typedef typename accessor<Float,order>::type F;
+    F A(a);
+    if (sourceType == QUDA_RANDOM_SOURCE) random(A);
+    else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
+    else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
+    else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s);
+    else errorQuda("Unsupported source type %d", sourceType);
+  }
+
+  // print out the vector at volume point x
+  template <typename Float>
+  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
+    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      genericSource<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a,sourceType, x, s, c);
+    } else {
+      errorQuda("Unsupported field order %d\n", a.FieldOrder());
+    }
+
+  }
+
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      FieldOrder<double> *A = createOrder<double>(a);
-      if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
-      else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
-      else if (sourceType == QUDA_CONSTANT_SOURCE) constant(*A, x, s, c);
-      else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(*A, x, s);
-      else errorQuda("Unsupported source type %d", sourceType);
-      delete A;
+      genericSource<double>(a,sourceType, x, s, c);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      FieldOrder<float> *A = createOrder<float>(a);
-      if (sourceType == QUDA_RANDOM_SOURCE) random(*A);
-      else if (sourceType == QUDA_POINT_SOURCE) point(*A, x, s, c);
-      else if (sourceType == QUDA_CONSTANT_SOURCE) constant(*A, x, s, c);
-      else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(*A, x, s);
-      else errorQuda("Unsupported source type %d", sourceType);
-      delete A;
+      genericSource<float>(a,sourceType, x, s, c);      
     } else {
       errorQuda("Precision not supported");
     }
@@ -168,32 +178,53 @@ namespace quda {
     return accuracy_level;
   }
 
+  template <typename oFloat, typename iFloat, QudaFieldOrder order>
+  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+    int ret = 0;
+    typedef typename accessor<oFloat,order>::type FA;
+    typedef typename accessor<iFloat,order>::type FB;
+    FA A(a);
+    FB B(b);
+    ret = compareSpinor(A, B, tol);
+    return ret;
+  }
+
+
+  template <typename oFloat, typename iFloat>
+  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+    int ret = 0;
+    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
+	a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      genericCompare<oFloat,iFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, b, tol);
+    } else {
+      errorQuda("Unsupported field order %d\n", a.FieldOrder());
+    }
+    return ret;
+  }
+
+
+  template <typename oFloat>
+  int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
+    int ret = 0;
+    if (b.Precision() == QUDA_DOUBLE_PRECISION) {
+      ret = genericCompare<oFloat,double>(a, b, tol);
+    } else if (b.Precision() == QUDA_SINGLE_PRECISION) {
+      ret = genericCompare<oFloat,float>(a, b, tol);
+    } else {
+      errorQuda("Precision not supported");
+    }
+    return ret;
+  }
+
+
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
     int ret = 0;
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      FieldOrder<double> *A = createOrder<double>(a);
-      if (b.Precision() == QUDA_DOUBLE_PRECISION) {
-	FieldOrder<double> *B = createOrder<double>(b);
-	ret = compareSpinor(*A, *B, tol);
-	delete B;
-      } else {
-	FieldOrder<float> *B = createOrder<float>(b);
-	ret = compareSpinor(*A, *B, tol);
-	delete B;
-      }
-      delete A;
+      ret = genericCompare<double>(a, b, tol);
+    } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
+      ret = genericCompare<float>(a, b, tol);
     } else {
-      FieldOrder<float> *A = createOrder<float>(a);
-      if (b.Precision() == QUDA_DOUBLE_PRECISION) {
-	FieldOrder<double> *B = createOrder<double>(b);
-	ret = compareSpinor(*A, *B, tol);
-	delete B;
-      } else {
-	FieldOrder<float> *B = createOrder<float>(b);
-	ret = compareSpinor(*A, *B, tol);
-	delete B;
-      }
-      delete A;
+      errorQuda("Precision not supported");
     }
     return ret;
   }
@@ -214,17 +245,31 @@ namespace quda {
   }
 
   // print out the vector at volume point x
+  template <typename Float, QudaFieldOrder order>
+  void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
+    typedef typename accessor<Float,order>::type F;
+    F A(a);
+    print_vector(A, x);
+  }
+
+  // print out the vector at volume point x
+  template <typename Float>
+  void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
+    if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      genericPrintVector<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a,x);
+    } else {
+      errorQuda("Unsupported field order %d\n", a.FieldOrder());
+    }
+
+  }
+
+  // print out the vector at volume point x
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
   
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      FieldOrder<double> *A = createOrder<double>(a);
-      print_vector(*A, x);
-      delete A;
+      genericPrintVector<double>(a,x);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      FieldOrder<float> *A = createOrder<float>(a);
-      print_vector(*A, x);
-
-      delete A;
+      genericPrintVector<float>(a,x);
     } else {
       errorQuda("Precision %d not implemented", a.Precision()); 
     }

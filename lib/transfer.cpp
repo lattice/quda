@@ -216,6 +216,9 @@ namespace quda {
       errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
 
+    /*printfQuda("prolongating %e %e %e %e\n", 
+	       blas::norm2(*output), blas::norm2(*input), 
+	       blas::norm2(*V), blas::norm2(*tmp));*/
     Prolongate(*output, *input, *V, *tmp, Nvec, fine_to_coarse, spin_map);
 
     out = *output; // copy result to out field (aliasing handled automatically)
@@ -241,6 +244,9 @@ namespace quda {
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
+    /*printfQuda("restricting %e %e %e %e\n", 
+	       blas::norm2(*output), blas::norm2(*input), 
+	       blas::norm2(*V), blas::norm2(*tmp));*/
     Restrict(*output, *input, *V, *tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
 
     out = *output; // copy result to out field (aliasing handled automatically)

@@ -159,6 +159,30 @@ void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
   }
 }
 
+template<typename, int N> struct vector { };
+template<> struct vector<double, 2> { typedef double2 type; };
+template<> struct vector<float, 2> { typedef float2 type; };
+
+template <typename Float, QudaFieldOrder order, 
+  int writeX, int writeY, int writeZ, int writeW, typename Functor>
+  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
+		   ColorSpinorField &w, Functor f) {
+  typedef typename colorspinor::accessor<Float,order>::type F;
+  typedef typename vector<Float,2>::type Float2;
+  F X(x), Y(y), Z(z), W(w);
+  genericBlas<Float2,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
+}
+
+template <typename Float, int writeX, int writeY, int writeZ, int writeW, typename Functor>
+  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+  if (x.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+    genericBlas<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,Functor>
+      (x, y, z, w, f);
+  } else {
+    errorQuda("Not implemeneted");
+  }
+}
+
 /**
    Driver for generic blas routine with four loads and two store.
  */
@@ -276,28 +300,12 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   } else { // fields on the cpu
     using namespace quda::colorspinor;
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      FieldOrder<double> *X = createOrder<double>(x);
-      FieldOrder<double> *Y = createOrder<double>(y);
-      FieldOrder<double> *Z = createOrder<double>(z);
-      FieldOrder<double> *W = createOrder<double>(w);
       Functor<double2, double2> f(a, b, c);
-      genericBlas<double2, writeX, writeY, writeZ, writeW>(*X, *Y, *Z, *W, f);
-      delete X;
-      delete Y;
-      delete Z;
-      delete W;
+      genericBlas<double, writeX, writeY, writeZ, writeW>(x, y, z, w, f);
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      FieldOrder<float> *X = createOrder<float>(x);
-      FieldOrder<float> *Y = createOrder<float>(y);
-      FieldOrder<float> *Z = createOrder<float>(z);
-      FieldOrder<float> *W = createOrder<float>(w);
       Functor<float2, float2> 
 	f(make_float2(a.x,a.y), make_float2(b.x,b.y), make_float2(c.x,c.y) );
-      genericBlas<float2, writeX, writeY, writeZ, writeW>(*X, *Y, *Z, *W, f);
-      delete X;
-      delete Y;
-      delete Z;
-      delete W;
+      genericBlas<float, writeX, writeY, writeZ, writeW>(x, y, z, w, f);
     } else {
       errorQuda("Not implemented");
     }

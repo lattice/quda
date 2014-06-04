@@ -19,7 +19,38 @@ namespace quda {
     }
   }
 
+  template <typename Float, QudaFieldOrder order>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+    typedef typename accessor<Float,order>::type F;
+    F vOrder(const_cast<ColorSpinorField&>(V), Nvec);
+    for (int v=0; v<Nvec; v++) {
+      F bOrder(const_cast<ColorSpinorField&>(*B[v]));
+      fill(vOrder, bOrder, v, Nvec);
+    }
+  }
+
+  template <typename Float>
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+    if (V.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
+      FillV<Float,QUDA_FLOAT2_FIELD_ORDER>(V,B,Nvec);
+    } else if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      FillV<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(V,B,Nvec);
+    } else {
+      errorQuda("Unsupported field type %d", V.FieldOrder());
+    }
+  }
+
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+    if (V.Precision() == QUDA_DOUBLE_PRECISION) {
+      FillV<double>(V,B,Nvec);
+    } else if (V.Precision() == QUDA_SINGLE_PRECISION) {
+      FillV<float>(V,B,Nvec);
+    } else {
+      errorQuda("Unsupported precision %d", V.Precision());
+    }
+  }
+
+  /*  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
       FieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
       for (int v=0; v<Nvec; v++) {
@@ -37,7 +68,7 @@ namespace quda {
       }
       delete vOrder;
     }    
-  }
+    }*/
 
   // Creates a block-ordered version of a ColorSpinorField
   // N.B.: Only works for the V field, as we need to block spin.
@@ -150,12 +181,57 @@ namespace quda {
 
   }
 
+  template<typename Float, QudaFieldOrder order>
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
+			  const int *geo_bs, const int *geo_map, int spin_bs) {
+
+    std::complex<Float> *Vblock = new std::complex<Float>[V.Volume()*V.Nspin()*V.Ncolor()];
+
+    typedef typename accessor<Float,order>::type F;
+    F vOrder(const_cast<ColorSpinorField&>(V),Nvec);
+
+    int geo_blocksize = 1;
+    for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
+
+    int blocksize = geo_blocksize * vOrder.NcolorPacked() * spin_bs; 
+    int chiralBlocks = vOrder.NspinPacked() / spin_bs;
+    int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
+    
+    printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, Nvec);
+    
+    blockOrderV<true>(Vblock, vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
+    blockGramSchmidt(Vblock, numblocks, Nvec, blocksize);  
+    blockOrderV<false>(Vblock, vOrder, Nvec, geo_map, geo_bs, spin_bs, V);    
+
+    delete []Vblock;
+  }
+
+  template<typename Float>
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
+			  const int *geo_bs, const int *geo_map, int spin_bs) {
+  if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+      BlockOrthogonalize<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else {
+      errorQuda("Unsupported field order %d\n", V.FieldOrder());
+    }
+  }
+
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
+			  const int *geo_bs, const int *geo_map, int spin_bs) {
+    if (V.Precision() == QUDA_DOUBLE_PRECISION) {
+      BlockOrthogonalize<double>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else if (V.Precision() == QUDA_SINGLE_PRECISION) {
+      BlockOrthogonalize<float>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else {
+      errorQuda("Unsupported precision %d\n", V.Precision());
+    }
+  }
+
+  /*
   //Orthogonalize null vectors
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
   
-    int geo_blocksize = 1;
-    for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
 
     if (V.Precision() == QUDA_DOUBLE_PRECISION) {
       std::complex<double> *Vblock = new std::complex<double>[V.Volume()*V.Nspin()*V.Ncolor()];
@@ -189,5 +265,6 @@ namespace quda {
       delete []Vblock;
     }
   }
+  */
 
 } // namespace quda

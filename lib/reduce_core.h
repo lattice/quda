@@ -484,6 +484,14 @@ public:
     return arg.r.streams()*bytes*arg.length; }
 };
 
+double2 make_Float2(double x, double y) {
+  return make_double2( x, y );
+}
+
+float2 make_Float2(float x, float y) {
+  return make_float2( x, y );
+}
+
 double2 make_Float2(const std::complex<double> &a) {
   return make_double2( real(a), imag(a) );
 }
@@ -538,6 +546,36 @@ ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV
 
   return sum;
 }
+
+template<typename, int N> struct vector { };
+template<> struct vector<double, 2> { typedef double2 type; };
+template<> struct vector<float, 2> { typedef float2 type; };
+
+template <typename ReduceType, typename Float, QudaFieldOrder order, 
+  int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
+  ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
+			   ColorSpinorField &w, ColorSpinorField &v, R r) {
+  typedef typename colorspinor::accessor<Float,order>::type F;
+  typedef typename vector<Float,2>::type Float2;
+  F X(x), Y(y), Z(z), W(w), V(v);
+  return genericReduce<ReduceType,Float2,writeX,writeY,writeZ,writeW,writeV>(X, Y, Z, W, V, r);
+}
+
+template <typename ReduceType, typename Float,
+  int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
+  ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
+			   ColorSpinorField &w, ColorSpinorField &v, R r) {
+  ReduceType value;
+  if (x.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+    value = genericReduce<ReduceType,Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
+      (x, y, z, w, v, r);
+  } else {
+    errorQuda("Not implemeneted");
+  }
+  return value;
+}
+
+
 
 /*
   Wilson
@@ -735,38 +773,14 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
     }
   } else { // fields are on the CPU
-    using namespace quda::colorspinor;
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      FieldOrder<double> *X = createOrder<double>(x);
-      FieldOrder<double> *Y = createOrder<double>(y);
-      FieldOrder<double> *Z = createOrder<double>(z);
-      FieldOrder<double> *W = createOrder<double>(w);
-      FieldOrder<double> *V = createOrder<double>(v);
-      Reducer<ReduceType,double2, double2> r(a, b);
-      value = genericReduce<ReduceType,double2,writeX,writeY,writeZ,writeW,writeV>
-	(*X, *Y, *Z, *W, *V, r);
-      delete X;
-      delete Y;
-      delete Z;
-      delete W;
-      delete V;
+      Reducer<ReduceType, double2, double2> r(a, b);
+      value = genericReduce<ReduceType,double,writeX,writeY,writeZ,writeW,writeV,Reducer<ReduceType, double2, double2> >(x,y,z,w,v,r);
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      FieldOrder<float> *X = createOrder<float>(x);
-      FieldOrder<float> *Y = createOrder<float>(y);
-      FieldOrder<float> *Z = createOrder<float>(z);
-      FieldOrder<float> *W = createOrder<float>(w);
-      FieldOrder<float> *V = createOrder<float>(v);
-      Reducer<ReduceType,float2, float2> 
-	r(make_float2(a.x,a.y), make_float2(b.x,b.y));
-      value = genericReduce<ReduceType,float2,writeX,writeY,writeZ,writeW,writeV>
-	(*X, *Y, *Z, *W, *V, r);
-      delete X;
-      delete Y;
-      delete Z;
-      delete W;
-      delete V;
+      Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
+      value = genericReduce<ReduceType,float,writeX,writeY,writeZ,writeW,writeV,Reducer<ReduceType, float2, float2> >(x,y,z,w,v,r);
     } else {
-      errorQuda("Not implemented");
+      errorQuda("Precision %d not implemented", x.Precision());
     }
   }
 
