@@ -488,7 +488,7 @@ namespace quda {
 
        cpuRitzVectors  = malloc(cpu_ritz_dim * ritz_bytes);//mm_malloc(cpu_ritz_dim * ritz_bytes, 32);
 
-printfQuda("\nAllocating %u bytes\n", cpu_ritz_dim * ritz_bytes);
+printfQuda("\nAllocating %lu bytes\n", cpu_ritz_dim * ritz_bytes);
 
        cpu_ritz_alloc  = true;
     }
