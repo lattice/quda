@@ -301,8 +301,8 @@ namespace quda {
   //for the forward/backward spin proejctors.
   //Note: No shifting in site index, so that site x holds the matrices Y_{\pm mu}(x, x+mu)
   //M.C.: No longer used, as only forward link is stored.
-  template<typename Float>
-  void reverseY(int dir,  gauge::FieldOrder<Float> &Y, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
+  template<typename Float, typename Gauge>
+  void reverseY(int dir,  Gauge &Y, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
   //void reverseY(int dir, const quda::complex<Float> *Y_p, quda::complex<Float> *Y_m, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
 	int csize = 1;
 	for(int d = 0; d < ndim; d++) {
@@ -385,8 +385,8 @@ namespace quda {
 }
 
   //Currently unusued.  Combining mass and coarse clover term moved to the application of the operator.
-  template<typename Float>
-  void addMass(gauge::FieldOrder<Float> &Y, int ndim, const int *xc_size, int Nc_c, int Ns_c, double mass)  {
+  template<typename Float, typename Gauge>
+  void addMass(Gauge &Y, int ndim, const int *xc_size, int Nc_c, int Ns_c, double mass)  {
 //  void addMass(quda::complex<Float> *X, int ndim, const int *xc_size, int Nc_c, int Ns_c, double mass)  {
 
 	int csize = 1;

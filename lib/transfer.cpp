@@ -199,6 +199,8 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
 
+    printfQuda("Applying prolongator\n");
+
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
 
@@ -226,6 +228,8 @@ namespace quda {
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+
+    printfQuda("Applying restrictor\n");
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;

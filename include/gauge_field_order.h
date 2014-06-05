@@ -16,7 +16,12 @@ namespace quda {
   
   namespace gauge {
     
-    template <typename Float>
+    /**
+       This is a template driven generic gauge field accessor.  To
+       deploy for a specifc field ordering, the two operator()
+       accessors have to be specialized for that ordering.
+     */
+    template <typename Float, QudaGaugeFieldOrder order>
       struct FieldOrder {
 
       protected:
@@ -26,52 +31,91 @@ namespace quda {
 	const int nDim;
 	const int nColor;
 	const int geometry;
-
-	// used for coarse gauge field access
 	const int nSpinCoarse;
 	const int nColorCoarse;
+
+	complex<Float> **u;
 
       public:
 	/** 
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-        FieldOrder(GaugeField &U, int nSpinCoarse=1) : U(U), volumeCB(U.VolumeCB()), 
+      FieldOrder(GaugeField &U, int nSpinCoarse=1) : U(U), volumeCB(U.VolumeCB()), 
 	  nDim(U.Ndim()), nColor(U.Ncolor()), geometry(U.Geometry()),
-	  nSpinCoarse(nSpinCoarse), nColorCoarse(nColor/nSpinCoarse) { 
+	  nSpinCoarse(nSpinCoarse), nColorCoarse(nColor/nSpinCoarse),
+	  u(static_cast<complex<Float>**>(U.Gauge_p()))
+	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	    errorQuda("GaugeField ordering not supported with reconstruction");
 	}
 	
 	GaugeField& Field() { return U; }
 	
-	/**
-	 * Destructor for the FieldOrder class
-	 */
-	virtual ~FieldOrder() { ; }
-
+	virtual ~FieldOrder() { ; } 
+    
 	/**
 	 * Read-only complex-member accessor function
 	 * @param d dimension index
 	 * @param parity Parity index
 	 * @param x 1-d site index
-	 * @param s spin index
-	 * @param c color index
+	 * @param row row index
+	 * @param c column index
 	 */
-	__device__ __host__ virtual const quda::complex<Float>& 
-	operator()(int d, int parity, int x, int row, int col) const = 0;
+	__device__ __host__ const complex<Float>& operator()
+	  (int d, int parity, int x, int row, int col) const {
+#ifndef __CUDA_ARCH__
+	  errorQuda("Not implemented");
+#endif
+	  return complex<Float>(0.0,0.0);
+	}
 
 	/**
 	 * Writable complex-member accessor function
 	 * @param d dimension index
 	 * @param parity Parity index
 	 * @param x 1-d site index
-	 * @param s spin index
-	 * @param c color index
+	 * @param row row index
+	 * @param c column index
 	 */
-	__device__ __host__ virtual quda::complex<Float>& 
-	operator()(int d, int parity, int x, int row, int col) = 0;
+	__device__ __host__ complex<Float>& operator()
+	  (int d, int parity, int x, int row, int col) {
+#ifndef __CUDA_ARCH__
+	  errorQuda("Not implemented");
+#endif
+	  return complex<Float>(0.0,0.0);
+	}
 
+    	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ const complex<Float>& operator()(int d, int parity, int x, int s_row, 
+							     int s_col, int c_row, int c_col) const {
+	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+	
+	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ complex<Float>& operator()(int d, int parity, int x, int s_row, 
+							     int s_col, int c_row, int c_col) {
+	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+	
 	/** Returns the number of field colors */
 	__device__ __host__ int Ncolor() const { return nColor; }
 
@@ -87,36 +131,6 @@ namespace quda {
 	/** Returns the field geometry */
 	__device__ __host__ int Geometry() const { return geometry; }
 
-	/**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ const quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
-								   int s_col, int c_row, int c_col) const {
-	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-	}
-	
-	/**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
-							     int s_col, int c_row, int c_col) {
-	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-	}
-	
 	/** Returns the number of coarse gauge field spins */
 	__device__ __host__ int NspinCoarse() const { return nSpinCoarse; }
 
@@ -125,134 +139,25 @@ namespace quda {
 
       };
 
-    template <typename Float>
-      struct QDPFieldOrder {//: FieldOrder<Float> {
-
-      protected:
-	/** An internal reference to the actual field we are accessing */
-	GaugeField &U;
-	const int volumeCB;
-	const int nDim;
-	const int nColor;
-	const int geometry;
-
-	// used for coarse gauge field access
-	const int nSpinCoarse;
-	const int nColorCoarse;
-
-	quda::complex<Float> **u;
-
-      public:
-	/** 
-	 * Constructor for the FieldOrder class
-	 * @param field The field that we are accessing
-	 */
-      QDPFieldOrder(GaugeField &U, int nSpinCoarse=1) : U(U), volumeCB(U.VolumeCB()), 
-	  nDim(U.Ndim()), nColor(U.Ncolor()), geometry(U.Geometry()),
-	  nSpinCoarse(nSpinCoarse), nColorCoarse(nColor/nSpinCoarse),
-	  u(static_cast<quda::complex<Float>**>(U.Gauge_p()))
-	{
-	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
-	    errorQuda("GaugeField ordering not supported with reconstruction");
-	}
-	
-	GaugeField& Field() { return U; }
-	
-	//QDPFieldOrder(GaugeField &U, int nSpinCoarse = 1) : FieldOrder<Float>(U, nSpinCoarse), 
-	//u(static_cast<quda::complex<Float>**>(U.Gauge_p())) { ; } 
-      virtual ~QDPFieldOrder() { ; } 
+    template<> __device__ __host__ inline const complex<double>& FieldOrder<double,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) const {
+      return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col];
+    }
     
-      /**
-       * Read-only complex-member accessor function
-       * @param d dimension index
-       * @param parity Parity index
-       * @param x 1-d site index
-       * @param s spin index
-       * @param c color index
-       */
-      __device__ __host__ const quda::complex<Float>& operator()
-	(int d, int parity, int x, int row, int col) const {
+    template<> __device__ __host__ inline const complex<float>& FieldOrder<float,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) const {
+      return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col];
+    }
+
+    template<> __device__ __host__ inline complex<double>& FieldOrder<double,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) {
 	return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col];
       }
     
-      /**
-       * Writable complex-member accessor function
-       * @param d dimension index
-       * @param parity Parity index
-       * @param x 1-d site index
-       * @param s spin index
-       * @param c color index
-       */
-      __device__ __host__ quda::complex<Float>& operator()
-	(int d, int parity, int x, int row, int col) {
+    template<> __device__ __host__ inline complex<float>& FieldOrder<float,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) {
 	return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col];
       }
-    
-	/**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ const quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
-								   int s_col, int c_row, int c_col) const {
-	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-	}
-	
-	/**
-	 * Specialized read-only complex-member accessor function (for coarse gauge field)
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param s_row row spin index
-	 * @param c_row row color index
-	 * @param s_col col spin index
-	 * @param c_col col color index
-	 */
-	__device__ __host__ quda::complex<Float>& operator()(int d, int parity, int x, int s_row, 
-							     int s_col, int c_row, int c_col) {
-	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
-	}
-	
-	/** Returns the number of field colors */
-	__device__ __host__ int Ncolor() const { return nColor; }
-
-	/** Returns the field volume */
-	__device__ __host__ int Volume() const { return 2*volumeCB; }
-
-	/** Returns the field volume */
-	__device__ __host__ int VolumeCB() const { return volumeCB; }
-
-	/** Returns the field geometric dimension */
-	__device__ __host__ int Ndim() const { return nDim; }
-
-	/** Returns the field geometry */
-	__device__ __host__ int Geometry() const { return geometry; }
-
-	/** Returns the number of coarse gauge field spins */
-	__device__ __host__ int NspinCoarse() const { return nSpinCoarse; }
-
-	/** Returns the number of coarse gauge field colors */
-	__device__ __host__ int NcolorCoarse() const { return nColorCoarse; }
-
-    };
-
-    /*template <typename Float>
-      FieldOrder<Float>* createOrder(const GaugeField &a, int nSpinCoarse = 1) {
-      FieldOrder<Float>* ptr=0;
-
-      if (a.Order() == QUDA_QDP_GAUGE_ORDER) {
-	ptr = new QDPFieldOrder<Float>(const_cast<GaugeField&>(a), nSpinCoarse);
-      } else {
-	errorQuda("Order %d not supported in cpuGaugeField", a.FieldOrder());
-      }
-
-      return ptr;
-      }*/
 
     /**
        This traits-driven object creation replaces the factory approach above.
@@ -260,7 +165,7 @@ namespace quda {
     template<typename Float,QudaGaugeFieldOrder> struct accessor { };
 
     template<typename Float> struct accessor<Float,QUDA_QDP_GAUGE_ORDER>
-      { typedef QDPFieldOrder<Float> type; };
+      { typedef FieldOrder<Float,QUDA_QDP_GAUGE_ORDER> type; };
 
     // a += b*c
     template <typename Float>
