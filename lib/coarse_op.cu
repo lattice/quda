@@ -311,41 +311,43 @@ namespace quda {
   //plus/minus signs for off-diagonal spin components
   //Also add the diagonal mass term from the original fine wilson operator:
   template<typename Float, typename Gauge>
-  void coarseDiagonal(Gauge &X, int ndim, const int *xc_size, int Nc_c, int Ns_c)  {
+  void coarseDiagonal(Gauge &X, int ndim, const int *xc_size) {
     int csize = 1;
     for(int d = 0; d < ndim; d++) {
       csize *= xc_size[d];
     }
 
-    int local = Nc_c*Nc_c*Ns_c*Ns_c;
+    const int nColor = X.NcolorCoarse();
+    const int nSpin = X.NspinCoarse();
+    const int local = nSpin*nSpin*nColor*nColor;
     complex<Float> *Xlocal = new complex<Float>[local];
 	
     for(int i = 0; i < csize; i++) { //Volume
-      for(int s_row = 0; s_row < Ns_c; s_row++) { //Spin row
-	for(int s_col = 0; s_col < Ns_c; s_col++) { //Spin column
+      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+	for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
 	     
 	  //Copy the Hermitian conjugate term to temp location 
-	  for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
-	    for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
+	  for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+	    for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
 	      //Flip s_col, s_row on the rhs because of Hermitian conjugation.  Color part left untransposed.
-	      Xlocal[Nc_c*Nc_c*(Ns_c*s_col+s_row)+Nc_c*ic_c+jc_c] = X(0,i%2,i/2,s_row, s_col, ic_c, jc_c);
+	      Xlocal[nColor*nColor*(nSpin*s_col+s_row)+nColor*ic_c+jc_c] = X(0,i%2,i/2,s_row, s_col, ic_c, jc_c);
 	    }	
 	  }
 	}
       }
 
-      for(int s_row = 0; s_row < Ns_c; s_row++) { //Spin row
-	for(int s_col = 0; s_col < Ns_c; s_col++) { //Spin column
+      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+	for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
 
 	  Float sign = 1.0;	
 	  if(s_row != s_col) {
 	    sign = -1.0;
 	  }
 
-	  for(int ic_c = 0; ic_c < Nc_c; ic_c++) { //Color row
-	    for(int jc_c = 0; jc_c < Nc_c; jc_c++) { //Color column
+	  for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+	    for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
 	      //Transpose color part
-	      X(0,i%2,i/2,s_row,s_col,ic_c,jc_c) =  sign*X(0,i%2,i/2,s_row,s_col,ic_c,jc_c)+conj(Xlocal[Nc_c*Nc_c*(Ns_c*s_row+s_col)+Nc_c*jc_c+ic_c]);
+	      X(0,i%2,i/2,s_row,s_col,ic_c,jc_c) =  sign*X(0,i%2,i/2,s_row,s_col,ic_c,jc_c)+conj(Xlocal[nColor*nColor*(nSpin*s_row+s_col)+nColor*jc_c+ic_c]);
 	    } //Color column
 	  } //Color row
 	} //Spin column
@@ -398,15 +400,8 @@ namespace quda {
     for(int d = 0; d < ndim; d++) {
       geo_bs[d] = x_size[d]/xc_size[d];
     }
-    //Fine and coarse colors and spins
-    int Nc = G.Ncolor();
-    int Ns = V.Nspin();
-    int Nc_c = Y.NcolorCoarse();
-    int Ns_c = Y.NspinCoarse();
-    int spin_bs = Ns/Ns_c;
+    int spin_bs = V.Nspin()/Y.NspinCoarse();
 #endif
-
-    assert(Nc_c == V.NvecPacked());
 
     for(int d = 0; d < ndim; d++) {
       //First calculate UV
@@ -440,26 +435,26 @@ namespace quda {
 
       //MC - "forward" and "backward" coarse gauge fields need not be calculated and stored separately.  Only difference
       //is factor of -1 in off-diagonal spin, which can be applied directly by the Dslash operator.
-      //reverseY<Float>(d, Y, ndim, xc_size, Nc_c, Ns_c);
+      //reverseY<Float>(d, Y, ndim, xc_size,Y.NcolorCoarse(), Y.NspinCoarse());
 #if 0
       for(int i = 0; i < Y.Volume(); i++) {
-	for(int s = 0; s < Ns_c; s++) {
-          for(int s_col = 0; s_col < Ns_c; s_col++) {
-            for(int c = 0; c < Nc_c; c++) {
-              for(int c_col = 0; c_col < Nc_c; c_col++) {
+	for(int s = 0; s < Y.NspinCoarse(); s++) {
+          for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
+            for(int c = 0; c < Y.NcolorCoarse(); c++) {
+              for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
                 printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e, Y(2*d+1) = %e %e\n",d,i,s,s_col,c,c_col,Y(2*d,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d,i%2,i/2,s,s_col,c,c_col).imag(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).imag());
               }}}}}
 #endif
     }
 
     printfQuda("Computing coarse diagonal\n");
-    coarseDiagonal<Float>(X, ndim, xc_size, Nc_c, Ns_c);
+    coarseDiagonal<Float>(X, ndim, xc_size);
 #if 0
     for(int i = 0; i < Y.Volume(); i++) {
-      for(int s = 0; s < Ns_c; s++) {
-	for(int s_col = 0; s_col < Ns_c; s_col++) {
-	  for(int c = 0; c < Nc_c; c++) {
-	    for(int c_col = 0; c_col < Nc_c; c_col++) {
+      for(int s = 0; s < Y.NspinCoarse(); s++) {
+	for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
+	  for(int c = 0; c < Y.NcolorCoarse(); c++) {
+	    for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
 	      printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e\n",ndim,i,s,s_col,c,c_col,Y(2*ndim,i%2,i/2,s,s_col,c,c_col).real(),Y(2*ndim,i%2,i/2,s,s_col,c,c_col).imag());
 	    }}}}}
 #endif
