@@ -422,6 +422,22 @@ namespace quda {
       //Calculate VUV for this direction, accumulate in the appropriate place
       computeVUV<Float>(d, Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
 
+      Float norm2 = 0;
+      for (int x=0; x<UV.Volume(); x++) 
+	for (int s=0; s<UV.Nspin(); s++) 
+	  for (int c=0; c<UV.Ncolor(); c++) 
+	    norm2 += norm(UV(x,s,c));
+
+      printf("UV2[%d] = %e\n", d, norm2);
+
+      norm2 = 0;
+      for (int x=0; x<Y.Volume(); x++)
+	for (int s=0; s<Y.Ncolor(); s++) 
+	  for (int c=0; c<Y.Ncolor(); c++) 
+	    norm2 += norm(Y(d,0,x,s,c));
+
+      printf("Y2[%d] = %e\n", d, norm2);
+
       //MC - "forward" and "backward" coarse gauge fields need not be calculated and stored separately.  Only difference
       //is factor of -1 in off-diagonal spin, which can be applied directly by the Dslash operator.
       //reverseY<Float>(d, Y, ndim, xc_size, Nc_c, Ns_c);
