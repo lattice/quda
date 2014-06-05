@@ -31,6 +31,7 @@ namespace quda {
       param_presmooth->maxiter = 1000;
       param_presmooth->tol = 1e-7;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
+      param_presmooth->delta = 1e-7;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
 				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
