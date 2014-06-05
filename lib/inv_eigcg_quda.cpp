@@ -213,8 +213,23 @@ namespace quda {
        fillInitCGSolveParam(initCGparam);
        //
        if(param.tol_restart < param.tol)//restart was not requested, do normal initCG
-          initCG = new CG(mat, matSloppy, initCGparam, profile);
+       {
+          initCGrestart = 0;
+          initCG        = new CG(mat, matSloppy, initCGparam, profile);
        //  
+       }
+       else
+       {
+////
+          initCGparam.tol = param.tol_restart;
+
+          initCGrestart = new CG(mat, matSloppy, initCGparam, profile);
+
+          initCGparam.tol = param.tol;
+
+          initCG = new CG(mat, matSloppy, initCGparam, profile);
+       }
+
        use_eigcg = false;
        //
        printfQuda("\nIncEigCG will deploy initCG solver.\n");
@@ -225,9 +240,9 @@ namespace quda {
 
   IncEigCG::~IncEigCG() {
 
-    if(eigcg_alloc) delete Vm;
-    if(initCG)      delete initCG;
-
+    if(eigcg_alloc)   delete Vm;
+    if(initCG)        delete initCG;
+    if(initCGrestart) delete initCGrestart;
     return;
   }
 
@@ -1011,17 +1026,7 @@ namespace quda {
           cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam); 
           cudaColorSpinorField tmp (*W, cudaParam);
 
-          double tol_swap = initCGparam.tol;
-
-          initCGparam.tol = initCGparam.tol_restart;
-
-          initCG = new CG(mat, matSloppy, initCGparam, profile);
-
-          (*initCG)(*out, *in);           
-
-          delete initCG;
-
-          initCGparam.tol = tol_swap;
+          (*initCGrestart)(*out, *in);           
 
           matDefl(*W, *out, tmp);
 
@@ -1029,12 +1034,8 @@ namespace quda {
 
           DeflateSpinor(*out, *W, defl_param);
 
-          initCG = new CG(mat, matSloppy, initCGparam, profile);
-
-          (*initCG)(*out, *in);           
-        
-          delete initCG;
-          
+          (*initCG)(*out, *in);
+          delete W;                     
         } 
 
         //copy solver statistics:

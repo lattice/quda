@@ -488,7 +488,7 @@ namespace quda {
 
        cpuRitzVectors  = malloc(cpu_ritz_dim * ritz_bytes);//mm_malloc(cpu_ritz_dim * ritz_bytes, 32);
 
-       printfQuda("\nAllocating %lu bytes\n", cpu_ritz_dim * ritz_bytes);
+printfQuda("\nAllocating %u bytes\n", cpu_ritz_dim * ritz_bytes);
 
        cpu_ritz_alloc  = true;
     }
@@ -623,6 +623,7 @@ namespace quda {
     cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
     Solver      *initCG;//initCG solver for deflated inversions
+    Solver      *initCGrestart;
     SolverParam initCGparam; // parameters for initCG solve
 
     bool eigcg_alloc;
