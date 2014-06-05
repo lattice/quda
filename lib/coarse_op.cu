@@ -617,10 +617,7 @@ namespace quda {
 	  for(int c_row = 0; c_row < Nc; c_row++) { //Color row
             for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
 
-	      Float sign = 1.0;
-	      if (s_row != s_col) {
-		sign = -1.0;
-	      }
+	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
 
               for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 	        //Forward link  
