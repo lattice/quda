@@ -13,6 +13,8 @@ namespace CloverOrder {
 
 namespace quda {
 
+#ifdef GPU_CLOVER_DIRAC
+
   template<typename Clover1, typename Clover2, typename Gauge>
     struct CloverTraceArg {
       Clover1 clover1;
@@ -300,11 +302,12 @@ namespace quda {
       } // clover order
     }
 
-
+#endif
 
   void computeCloverSigmaTrace(GaugeField& gauge, const CloverField& clover, int dir1, int dir2, 
       QudaFieldLocation location){
 
+#ifdef GPU_CLOVER_DIRAC
     if(clover.Precision() == QUDA_HALF_PRECISION){
       errorQuda("Half precision not supported\n");
     }  
@@ -316,7 +319,9 @@ namespace quda {
     }else{
       errorQuda("Precision %d not supported", clover.Precision());
     }
-
+#else
+    errorQuda("Clover has not been built");
+#endif
 
   }     
 

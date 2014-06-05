@@ -9,6 +9,8 @@
 
 namespace quda {
 
+#ifdef GPU_CLOVER_DIRAC
+
   template<class Cmplx>
     struct CloverDerivArg
     {
@@ -62,8 +64,6 @@ namespace quda {
     for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     return (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0])/2;
   }
-
-
 
 
   template<typename Cmplx, bool isConjugate>
@@ -364,12 +364,14 @@ namespace quda {
       }
     }    
 
+#endif
 
   void cloverDerivative(cudaGaugeField &out,   
       cudaGaugeField& gauge,
       cudaGaugeField& oprod,
       int mu, int nu, double coeff, QudaParity parity, int conjugate)
   {
+#ifdef GPU_CLOVER_DIRAC
     assert(oprod.Geometry() == QUDA_SCALAR_GEOMETRY);
     assert(out.Geometry() == QUDA_SCALAR_GEOMETRY);
 
@@ -383,6 +385,9 @@ namespace quda {
       errorQuda("Precision %d not supported", out.Precision());
     }
     return;
+#else
+    errorQuda("Clover has not been built");
+#endif
   }              
 
 

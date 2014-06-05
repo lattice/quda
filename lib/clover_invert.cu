@@ -7,6 +7,10 @@
 
 namespace quda {
 
+  using namespace clover;
+
+#ifdef GPU_CLOVER_DIRAC
+
   template <typename Clover>
   struct CloverInvertArg {
     const Clover clover;
@@ -291,8 +295,12 @@ namespace quda {
 
   }
 
+#endif
+
   // this is the function that is actually called, from here on down we instantiate all required templates
   void cloverInvert(CloverField &clover, bool computeTraceLog, QudaFieldLocation location) {
+
+#ifdef GPU_CLOVER_DIRAC
     if (clover.Precision() == QUDA_HALF_PRECISION && clover.Order() > 4) 
       errorQuda("Half precision not supported for order %d", clover.Order());
 
@@ -303,6 +311,9 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", clover.Precision());
     }
+#else
+    errorQuda("Clover has not been built");
+#endif
   }
 
 } // namespace quda
