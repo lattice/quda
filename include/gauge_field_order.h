@@ -159,22 +159,22 @@ namespace quda {
 
     template<> __device__ __host__ inline const complex<double>& FieldOrder<double,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
       (int d, int parity, int x, int row, int col) const {
-      return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+      return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
     }
     
     template<> __device__ __host__ inline const complex<float>& FieldOrder<float,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
       (int d, int parity, int x, int row, int col) const {
-      return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+      return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
     }
 
     template<> __device__ __host__ inline complex<double>& FieldOrder<double,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
       (int d, int parity, int x, int row, int col) {
-	return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+	return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
       }
     
     template<> __device__ __host__ inline complex<float>& FieldOrder<float,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
       (int d, int parity, int x, int row, int col) {
-	return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+	return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
       }
 
     /**
