@@ -246,6 +246,7 @@ namespace quda {
     } else {
       blas::copy(r, b);
       r2 = b2;
+      blas::zero(x); // defensive measure in case solution isn't already zero
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -341,7 +342,7 @@ namespace quda {
    
       // update since Nkrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every Nkrylov steps
-      if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || r2/r2_old < param.delta) { 
+      if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) { 
 
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
