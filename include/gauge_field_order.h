@@ -157,6 +157,26 @@ namespace quda {
 	return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
       }
 
+    template<> __device__ __host__ inline const complex<double>& FieldOrder<double,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) const {
+      return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+    }
+    
+    template<> __device__ __host__ inline const complex<float>& FieldOrder<float,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) const {
+      return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+    }
+
+    template<> __device__ __host__ inline complex<double>& FieldOrder<double,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) {
+	return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+      }
+    
+    template<> __device__ __host__ inline complex<float>& FieldOrder<float,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
+      (int d, int parity, int x, int row, int col) {
+	return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
+      }
+
     /**
        This traits-driven object creation replaces the factory approach above.
     */
