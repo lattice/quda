@@ -163,14 +163,31 @@ template<typename, int N> struct vector { };
 template<> struct vector<double, 2> { typedef double2 type; };
 template<> struct vector<float, 2> { typedef float2 type; };
 
-template <typename Float, QudaFieldOrder order, 
+template <typename Float, int nSpin, int nColor, QudaFieldOrder order, 
   int writeX, int writeY, int writeZ, int writeW, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
 		   ColorSpinorField &w, Functor f) {
-  typedef typename colorspinor::accessor<Float,order>::type F;
+  colorspinor::FieldOrder<Float,nSpin,nColor,1,order> X(x), Y(y), Z(z), W(w);
   typedef typename vector<Float,2>::type Float2;
-  F X(x), Y(y), Z(z), W(w);
   genericBlas<Float2,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
+}
+
+template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
+  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+  if (x.Ncolor() == 3) {
+    genericBlas<Float,nSpin,3,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else {
+    errorQuda("nColor = %d not implemeneted",x.Ncolor());
+  }
+}
+
+template <typename Float, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
+  void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
+  if (x.Nspin() == 4) {
+    genericBlas<Float,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else {
+    errorQuda("nSpin = %d not implemeneted",x.Nspin());
+  }
 }
 
 template <typename Float, int writeX, int writeY, int writeZ, int writeW, typename Functor>

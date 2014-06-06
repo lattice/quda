@@ -177,14 +177,6 @@ namespace quda {
 	return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
       }
 
-    /**
-       This traits-driven object creation replaces the factory approach above.
-    */
-    template<typename Float,int nColor,int nSpinCoarse,QudaGaugeFieldOrder> struct accessor { };
-
-    template<typename Float,int nColor,int nSpinCoarse> struct accessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER>
-      { typedef FieldOrder<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> type; };
-
     // a += b*c
     template <typename Float>
       __device__ __host__ inline void accumulateComplexProduct(Float *a, const Float *b, const Float *c, Float sign) {

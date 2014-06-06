@@ -20,30 +20,32 @@ namespace quda {
 
   namespace colorspinor {
 
-    template <typename Float>
+    template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
       class FieldOrder {
 
     protected:
       complex<Float> *v;
       mutable int x[QUDA_MAX_DIM];
       const int volume;
+      const int volumeCB;
+      const int stride;
       const int nDim;
-      const int nColor;
-      const int nSpin;
       const QudaGammaBasis gammaBasis;
       const QudaSiteSubset siteSubset;
-      const int nVec;
+      const size_t cb_offset;
+
+      complex<Float> dummy;
 
     public:
       /** 
        * Constructor for the FieldOrder class
        * @param field The field that we are accessing
        */
-    FieldOrder(const ColorSpinorField &field, int nVec=1) 
+    FieldOrder(const ColorSpinorField &field) 
       : v(static_cast<complex<Float>*>(const_cast<void*>(field.V()))), 
-	volume(field.Volume()), nDim(field.Ndim()), nColor(field.Ncolor()), 
-	nSpin(field.Nspin()), gammaBasis(field.GammaBasis()), 
-	siteSubset(field.SiteSubset()), nVec(nVec)
+	volume(field.Volume()), volumeCB(field.VolumeCB()), stride(field.Stride()),
+	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
+	siteSubset(field.SiteSubset()), cb_offset(field.Bytes()>>1), dummy(0.0,0.0)
       { for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
 
       /**
@@ -57,7 +59,12 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      virtual __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const = 0;
+      __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
+#ifndef __CUDA_ARCH__
+	errorQuda("Not implemented");
+#endif
+	return complex<Float>(0.0,0.0);
+      }
 
       /**
        * Writable complex-member accessor function
@@ -65,28 +72,12 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      virtual __device__ __host__ complex<Float>& operator()(int x, int s, int c) = 0;
-
-      /** Return the length of dimension d */
-      __device__ __host__ int X(int d) const { return x[d]; }
-
-      /** Returns the number of field colors */
-       __device__ __host__ int Ncolor() const { return nColor; }
-
-      /** Returns the number of field spins */
-      __device__ __host__ int Nspin() const { return nSpin; }
-
-      /** Returns the field volume */
-      __device__ __host__ int Volume() const { return volume; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ int Ndim() const { return nDim; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ QudaGammaBasis GammaBasis() const { return gammaBasis; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ int SiteSubset() const { return siteSubset; }
+      __device__ __host__ inline complex<Float>& operator()(int x, int s, int c) {
+#ifndef __CUDA_ARCH__
+	errorQuda("Not implemented");
+#endif
+	return dummy;
+      }
 
       /**
 	 Convert from 1-dimensional index to the n-dimensional spatial index.
@@ -94,7 +85,7 @@ namespace quda {
 	 lattice coordinates that are computed here are full-field
 	 coordinates.
       */
-      __device__ __host__ void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
+      __device__ __host__ inline void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
 	if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
 	
 	for (int d=0; d<nDim; d++) {
@@ -117,7 +108,7 @@ namespace quda {
 	 With full fields, we assume that the field is even-odd ordered.  The
 	 input lattice coordinates are always full-field coordinates.
       */
-      __device__ __host__ void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
+      __device__ __host__ inline void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
 	int parity = 0;
 	int savey0 = y[0];
 	
@@ -145,7 +136,9 @@ namespace quda {
        * @param c color index
        * @param n vector number
        */
-      virtual __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const = 0;
+      __device__ __host__ inline const complex<Float>& operator()(int x, int s, int c, int n) const {
+	return (*this)(x, s, c*nVec + n);      
+      }
 
       /**
        * Specialized writable complex-member accessor function (for mg prolongator)
@@ -154,289 +147,84 @@ namespace quda {
        * @param c color index
        * @param n vector number
        */
-      virtual __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) = 0;
-
-      /** Returns the number of packed vectors (for mg prolongator) */
-      __device__ __host__ int NvecPacked() const { return nVec; }
-
-      /** Returns the number of packed colors (for mg prolongator) */
-      __device__ __host__ int NcolorPacked() const { return nColor / nVec; }
-
-      /** Returns the number of packed spins (for mg prolongator) */
-      __device__ __host__ int NspinPacked() const { return nSpin; }    
-
-    };
-
-    // Note this only support N>=2 and cannot work for Float1 ordered fields
-    template <typename Float, int N>
-      class FloatNOrder2 /*: public FieldOrder<Float>*/ {
-      //typedef FieldOrder<Float> F;
-      const int volumeCB;
-      const int stride;
-      const size_t cb_offset;
-
-      const int volume;
-      const int nColor;
-      const int nSpin;
-      const int nVec;
-      complex<Float> *v;
-
-    private:
-
-    public:
-    FloatNOrder2(const ColorSpinorField &field, int nVec=1) : /*FieldOrder<Float>(field, nVec), */
-	volumeCB(field.VolumeCB()), stride(field.Stride()), cb_offset(field.Bytes()>>1),
-	volume(field.Volume()), nColor(field.Ncolor()), nSpin(field.Nspin()), nVec(nVec),
-	v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
-      { ; }
-      virtual ~FloatNOrder2() { ; }
-
-      /**
-	 @param x parity or full-site index (with checkboard ordering).  Need
-	 to be careful to support non-zero padding and parity alignment.
-	 @param s spin index
-	 @param c color index
-	 @return element at site (x,s,c)
-       */
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
-	int x_cb = (x >= volumeCB) ? x-volumeCB : x;
-	int parity = (x >= volumeCB) ? 1 : 0;
-	int j = ((s*nColor+c)*2) / N; // factor of two for complexity
-	int i = ((s*nColor+c)*2) % N;
-	size_t index = ((j*stride+x_cb)*N+i) / 2; // back to a complex offset
-	return *(reinterpret_cast<complex<Float>*>(reinterpret_cast<char*>(v + index) + parity*cb_offset));
-      }
-
-      /**
-	 @param x parity or full-site index (with checkboard ordering).  Need
-	 to be careful to support non-zero padding and parity alignment.
-	 @param s spin index
-	 @param c color index
-	 @return element at site (x,s,c)
-       */
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c) {
-	int x_cb = (x >= volumeCB) ? x-volumeCB : x;
-	int parity = (x >= volumeCB) ? 1 : 0;
-	int j = ((s*nColor+c)*2) / N; // factor of two for complexity
-	int i = ((s*nColor+c)*2) % N;
-	size_t index = ((j*stride+x_cb)*N+i) / 2; // back to a complex offset
-	return *(reinterpret_cast<complex<Float>*>(reinterpret_cast<char*>(v + index) + parity*cb_offset));
-      }
-
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const {
+      __device__ __host__ inline complex<Float>& operator()(int x, int s, int c, int n) {
 	return (*this)(x, s, c*nVec + n);      
       }
 
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) {
-	return (*this)(x, s, c*nVec + n);      
-      }
-
-      /** Returns the field volume */
-      __device__ __host__ int Volume() const { return volume; }
-
-      /** Returns the number of field colors */
-       __device__ __host__ int Ncolor() const { return nColor; }
-
-      /** Returns the number of field spins */
-      __device__ __host__ int Nspin() const { return nSpin; }
-    };
-
-template <typename Float>
-      struct SpaceSpinColorOrder {
-    private:
- 	const int nDim;
-	const int volume;
-	const int nColor;
-	const int nSpin;
-	const QudaGammaBasis gammaBasis;
-	const QudaSiteSubset siteSubset;
-	const int nVec;
-	complex<Float> *v;	  
-	mutable int x[QUDA_MAX_DIM];
-
-    public:
-      SpaceSpinColorOrder(const ColorSpinorField &field, int nVec=1) 
-      : nDim(field.Ndim()), volume(field.Volume()), nColor(field.Ncolor()), 
-	  nSpin(field.Nspin()), gammaBasis(field.GammaBasis()), siteSubset(field.SiteSubset()), nVec(nVec), 
-	  v(static_cast<complex<Float>*>(const_cast<void*>(field.V())))
-	{ for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
-      virtual ~SpaceSpinColorOrder() { ; }
-
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
-	unsigned long index = (x*nSpin+s)*nColor+c;
-	return *(v + index);
-      }
-
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c) {
-	unsigned long index = (x*nSpin+s)*nColor+c;
-	return *(v + index);
-      }
-
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const {
-	return (*this)(x, s, c*nVec + n);      
-      }
-
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) {
-	return (*this)(x, s, c*nVec + n);      
-      }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ int Ndim() const { return nDim; }
-
-      /** Returns the field volume */
-      __device__ __host__ int Volume() const { return volume; }
 
       /** Return the length of dimension d */
-      __device__ __host__ int X(int d) const { return x[d]; }
+      __device__ __host__ inline int X(int d) const { return x[d]; }
 
       /** Returns the number of field colors */
-       __device__ __host__ int Ncolor() const { return nColor; }
+       __device__ __host__ inline int Ncolor() const { return nColor; }
 
       /** Returns the number of field spins */
-      __device__ __host__ int Nspin() const { return nSpin; }
+      __device__ __host__ inline int Nspin() const { return nSpin; }
+
+      /** Returns the field volume */
+      __device__ __host__ inline int Volume() const { return volume; }
+
+      /** Returns the field geometric dimension */
+      __device__ __host__ inline int Ndim() const { return nDim; }
+
+      /** Returns the field geometric dimension */
+      __device__ __host__ inline QudaGammaBasis GammaBasis() const { return gammaBasis; }
+
+      /** Returns the field geometric dimension */
+      __device__ __host__ inline int SiteSubset() const { return siteSubset; }
 
       /** Returns the number of packed vectors (for mg prolongator) */
-      __device__ __host__ int NvecPacked() const { return nVec; }
+      __device__ __host__ inline int NvecPacked() const { return nVec; }
 
       /** Returns the number of packed colors (for mg prolongator) */
-      __device__ __host__ int NcolorPacked() const { return nColor / nVec; }
+      __device__ __host__ inline int NcolorPacked() const { return nColor / nVec; }
 
       /** Returns the number of packed spins (for mg prolongator) */
-      __device__ __host__ int NspinPacked() const { return nSpin; } 
-
-      /**
-	 Convert from 1-dimensional index to the n-dimensional spatial index.
-	 With full fields, we assume that the field is even-odd ordered.  The
-	 lattice coordinates that are computed here are full-field
-	 coordinates.
-      */
-      __device__ __host__ void LatticeIndex(int y[QUDA_MAX_DIM], int i) const {
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) x[0] /= 2;
-	
-	for (int d=0; d<nDim; d++) {
-	  y[d] = i % x[d];
-	  i /= x[d];    
-	}
-	int parity = i; // parity is the slowest running dimension
-	
-	// convert into the full-field lattice coordinate
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	  for (int d=1; d<nDim; d++) parity += y[d];
-	  parity = parity & 1;
-	  x[0] *= 2; // restore x[0]
-	}
-	y[0] = 2*y[0] + parity;  // compute the full x coordinate
-      }
-      
-      /**
-	 Convert from n-dimensional spatial index to the 1-dimensional index.
-	 With full fields, we assume that the field is even-odd ordered.  The
-	 input lattice coordinates are always full-field coordinates.
-      */
-      __device__ __host__ void OffsetIndex(int &i, int y[QUDA_MAX_DIM]) const {
-	int parity = 0;
-	int savey0 = y[0];
-	
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	  for (int d=0; d<nDim; d++) parity += y[d];
-	  parity = parity & 1;
-	  y[0] /= 2;
-	  x[0] /= 2; 
-	}
-	
-	i = parity;
-	for (int d=nDim-1; d>=0; d--) i = x[d]*i + y[d];
-	
-	if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	  //y[0] = 2*y[0] + parity;
-	  y[0] = savey0;
-	  x[0] *= 2; // restore x[0]
-	}
-      }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ QudaGammaBasis GammaBasis() const { return gammaBasis; }
-
-      /** Returns the field geometric dimension */
-      __device__ __host__ int SiteSubset() const { return siteSubset; }
+      __device__ __host__ inline int NspinPacked() const { return nSpin; }    
 
     };
 
+    template<> __device__ __host__ inline const complex<double>& 
+      FieldOrder<double,4,3,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>::operator()(int x, int s, int c) const {
+      return v[(x*4+s)*3+c];
+    }
+    
+    template<> __device__ __host__ inline complex<double>&
+      FieldOrder<double,4,3,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>::operator()(int x, int s, int c) {
+      return v[(x*4+s)*3+c];
+    }
 
-    template <typename Float>
-      class SpaceColorSpinOrder : public FieldOrder<Float> {
-      typedef FieldOrder<Float> F;
+    template<> __device__ __host__ inline const complex<float>&
+      FieldOrder<float,4,3,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>::operator()(int x, int s, int c) const {
+      return v[(x*4+s)*3+c];
+    }
+    
+    template<> __device__ __host__ inline complex<float>&
+      FieldOrder<float,4,3,1,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>::operator()(int x, int s, int c) {
+      return v[(x*4+s)*3+c];
+    }
 
-    private:
+    template<typename Float, int nSpin, int nColor, int N>
+      inline const complex<Float>& operatorFloatN(int x, int s, int c, int volumeCB, int stride, int cb_offset, const complex<Float> *v) {
+      int x_cb = (x >= volumeCB) ? x-volumeCB : x;
+      int parity = (x >= volumeCB) ? 1 : 0;
+      int j = ((s*nColor+c)*2) / N; // factor of two for complexity
+      int i = ((s*nColor+c)*2) % N;      
+      int index = ((j*stride+x_cb)*N+i) / 2; // back to a complex offset
+      return *(reinterpret_cast<complex<double>*>(reinterpret_cast<char*>(const_cast<complex<Float>*>(v) + index) + parity*cb_offset));
+    }
 
-    public:
-    SpaceColorSpinOrder(const ColorSpinorField &field, int nVec=1) : F(field, nVec)
-      { ; }
-      virtual ~SpaceColorSpinOrder() { ; }
+    template<> __device__ __host__ inline const complex<double>& 
+      FieldOrder<double,4,3,1,QUDA_FLOAT2_FIELD_ORDER>::operator()(int x, int s, int c) const {
+      return operatorFloatN<double,4,3,QUDA_FLOAT2_FIELD_ORDER>(x,s,c,volumeCB,stride,cb_offset,v);
+    }
 
-       __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
-	unsigned long index = (x*F::nColor+c)*F::nSpin+s;
-	return *(F::v + index);
-      }
-
-       __device__ __host__ complex<Float>& operator()(int x, int s, int c) {
-	unsigned long index = (x*F::nColor+c)*F::nSpin+s;
-	return *(F::v + index);
-      }
-
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const {
-	return (*this)(x, s, c*F::nVec + n);      
-      }
-
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) {
-	return (*this)(x, s, c*F::nVec + n);      
-      }
-    };
-
-    template <typename Float>
-      class QOPDomainWallOrder : public FieldOrder<Float> {
-      typedef FieldOrder<Float> F;
-
-    private:
-      complex<Float> **v;
-      int volume_4d;
-      int Ls;
-
-    public:
-    QOPDomainWallOrder(const ColorSpinorField &field, int nVec=1) 
-      : F(field, nVec), v(static_cast<complex<Float>**>(const_cast<void*>(field.V()))), 
-	volume_4d(1), Ls(0)
-	{ 
-	  if (field.Ndim() != 5) errorQuda("Error, wrong number of dimensions for this FieldOrder");
-	  for (int i=0; i<4; i++) volume_4d *= field.X()[i];
-	  Ls = field.X()[4];
-	}
-      virtual ~QOPDomainWallOrder() { ; }
-
-       __device__ __host__ const complex<Float>& operator()(int x, int s, int c) const {
-	int ls = x / Ls;
-	int x_4d = x - ls*volume_4d;
-	unsigned long index_4d = (x_4d*F::nColor+c)*F::nSpin+s;
-	return v[ls][index_4d];
-      }
-      
-       __device__ __host__ complex<Float>& operator()(int x, int s, int c) {
-	int ls = x / Ls;
-	int x_4d = x - ls*volume_4d;
-	unsigned long index_4d = (x_4d*F::nColor+c)*F::nSpin+s;
-	return v[ls][index_4d];
-      }
-
-      __device__ __host__ const complex<Float>& operator()(int x, int s, int c, int n) const {
-	return (*this)(x, s, c*F::nVec + n);      
-      }
-
-      __device__ __host__ complex<Float>& operator()(int x, int s, int c, int n) {
-	return (*this)(x, s, c*F::nVec + n);      
-      }
-    };
-
-    // FIXME remove this factory and propagate the use of traits instead
+    template<> __device__ __host__ inline complex<double>& 
+      FieldOrder<double,4,3,1,QUDA_FLOAT2_FIELD_ORDER>::operator()(int x, int s, int c)  { 
+      return const_cast<complex<double>&>(operatorFloatN<double,4,3,QUDA_FLOAT2_FIELD_ORDER>(x,s,c,volumeCB,stride,cb_offset,v));
+    }
+    
+    /*// FIXME remove this factory and propagate the use of traits instead
  template <typename Float>
       FieldOrder<Float>* createOrder(const ColorSpinorField &a, int nVec=1) {
       FieldOrder<Float>* ptr=0;
@@ -457,11 +245,11 @@ template <typename Float>
 
       return ptr;
       }
-
+    */
     /**
        This traits-driven object creation replaces the factory approach above.
      */
-    template<typename Float,QudaFieldOrder> struct accessor { };
+    /*template<typename Float,QudaFieldOrder> struct accessor { };
 
     template<typename Float> struct accessor<Float,QUDA_FLOAT2_FIELD_ORDER> 
       { typedef FloatNOrder2<Float,2> type; };
@@ -476,7 +264,7 @@ template <typename Float>
       { typedef SpaceColorSpinOrder<Float> type; };
 
     template<typename Float> struct accessor<Float,QUDA_QOP_DOMAIN_WALL_FIELD_ORDER> 
-      { typedef QOPDomainWallOrder<Float> type; };
+    { typedef QOPDomainWallOrder<Float> type; };*/
 
     template <typename Float, int Ns, int Nc, int N>
       struct FloatNOrder {

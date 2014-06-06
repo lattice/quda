@@ -551,14 +551,38 @@ template<typename, int N> struct vector { };
 template<> struct vector<double, 2> { typedef double2 type; };
 template<> struct vector<float, 2> { typedef float2 type; };
 
-template <typename ReduceType, typename Float, QudaFieldOrder order, 
+template <typename ReduceType, typename Float, int nSpin, int nColor, QudaFieldOrder order, 
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
 			   ColorSpinorField &w, ColorSpinorField &v, R r) {
-  typedef typename colorspinor::accessor<Float,order>::type F;
+  colorspinor::FieldOrder<Float,nSpin,nColor,1,order> X(x), Y(y), Z(z), W(w), V(v);
   typedef typename vector<Float,2>::type Float2;
-  F X(x), Y(y), Z(z), W(w), V(v);
   return genericReduce<ReduceType,Float2,writeX,writeY,writeZ,writeW,writeV>(X, Y, Z, W, V, r);
+}
+
+template <typename ReduceType, typename Float, int nSpin, QudaFieldOrder order, 
+  int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
+  ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
+			   ColorSpinorField &w, ColorSpinorField &v, R r) {
+  ReduceType value;
+  if (x.Ncolor() == 3) {
+    value = genericReduce<ReduceType,Float,nSpin,3,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else {
+    errorQuda("nColor = %d not implemeneted",x.Ncolor());
+  }
+  return value;
+}
+
+template <typename ReduceType, typename Float, QudaFieldOrder order, 
+  int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
+  ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r) {
+  ReduceType value;
+  if (x.Nspin() == 4) {
+    value = genericReduce<ReduceType,Float,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else {
+    errorQuda("nSpin = %d not implemeneted",x.Nspin());
+  }
+  return value;
 }
 
 template <typename ReduceType, typename Float,

@@ -85,8 +85,8 @@ namespace quda {
 
   template <typename Float, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
-    typedef typename accessor<Float,order>::type F;
-    F A(a);
+    if (a.Ncolor() != 3 || a.Nspin() != 4) errorQuda("Not supported");
+    FieldOrder<Float,4,3,1,order> A(a);
     if (sourceType == QUDA_RANDOM_SOURCE) random(A);
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
@@ -181,10 +181,9 @@ namespace quda {
   template <typename oFloat, typename iFloat, QudaFieldOrder order>
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
     int ret = 0;
-    typedef typename accessor<oFloat,order>::type FA;
-    typedef typename accessor<iFloat,order>::type FB;
-    FA A(a);
-    FB B(b);
+    if (a.Ncolor() != 3 || a.Nspin() != 4) errorQuda("Not supported");
+    FieldOrder<oFloat,4,3,1,order> A(a);
+    FieldOrder<iFloat,4,3,1,order> B(b);
     ret = compareSpinor(A, B, tol);
     return ret;
   }
@@ -247,8 +246,8 @@ namespace quda {
   // print out the vector at volume point x
   template <typename Float, QudaFieldOrder order>
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
-    typedef typename accessor<Float,order>::type F;
-    F A(a);
+    if (a.Ncolor() != 3 || a.Nspin() != 4) errorQuda("Not supported");
+    FieldOrder<Float,4,3,1,order> A(a);
     print_vector(A, x);
   }
 

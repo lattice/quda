@@ -178,24 +178,64 @@ namespace quda {
 
   };
 
-  template <typename Float, QudaFieldOrder order>
+  template <typename Float, int fineSpin, int fineColor, int nVec, QudaFieldOrder order>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse,
-		const int *coarse_to_fine, const int *spin_map) {
+		ColorSpinorField &tmp, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
 
-    typedef typename accessor<Float,order>::type F;
+    typedef FieldOrder<Float,fineSpin,fineColor,1,order> fineSpinor;
+    typedef FieldOrder<Float,2,nVec,1,order> coarseSpinor;
+    typedef FieldOrder<Float,fineSpin,fineColor,nVec,order> packedSpinor;
+    typedef FieldOrder<Float,fineSpin,nVec,1,order> tmpSpinor;
+    typedef RestrictArg<coarseSpinor,fineSpinor,packedSpinor,tmpSpinor> Arg;
 
-    F Out(const_cast<ColorSpinorField&>(out));
-    F In(const_cast<ColorSpinorField&>(in));
-    F V(const_cast<ColorSpinorField&>(v),Nvec);
-    F Tmp(const_cast<ColorSpinorField&>(tmp));
+    coarseSpinor Out(const_cast<ColorSpinorField&>(out));
+    fineSpinor   In(const_cast<ColorSpinorField&>(in));
+    packedSpinor V(const_cast<ColorSpinorField&>(v));
+    tmpSpinor Tmp(const_cast<ColorSpinorField&>(tmp));
 
-    RestrictArg<F,F,F,F> arg(Out, In, V, Tmp, fine_to_coarse,coarse_to_fine,spin_map);
-    RestrictLaunch<Float, RestrictArg<F, F, F, F> > restrictor(arg, Location(out, in, v, tmp));
+    Arg arg(Out, In, V, Tmp, fine_to_coarse,coarse_to_fine,spin_map);
+    RestrictLaunch<Float, Arg> restrictor(arg, Location(out, in, v, tmp));
     restrictor.apply(0);
 
     if (Location(out, in, v, tmp) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
+
+  template <typename Float, int fineSpin, int fineColor, QudaFieldOrder order>
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int nVec, const int *fine_to_coarse, 
+		const int *coarse_to_fine, const int *spin_map) {
+
+    if (nVec == 24) {
+      Restrict<Float,fineSpin,fineColor,24,order>(out, in, v, tmp, fine_to_coarse, coarse_to_fine, spin_map);
+    } else {
+      errorQuda("Unsupported nVec %d", nVec);
+    }
+  }
+
+  template <typename Float, int fineSpin, QudaFieldOrder order>
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, 
+		const int *coarse_to_fine, const int *spin_map) {
+
+    if (in.Ncolor() == 3) {
+      Restrict<Float,fineSpin,3,order>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else {
+      errorQuda("Unsupported nColor %d", in.Ncolor());
+    }
+  }
+
+  template <typename Float, QudaFieldOrder order>
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, 
+		const int *coarse_to_fine, const int *spin_map) {
+
+    if (in.Nspin() == 4) {
+      Restrict<Float,4,order>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else {
+      errorQuda("Unsupported nSpin %d", in.Nspin());
+    }
+  }
+
 
   template <typename Float>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,

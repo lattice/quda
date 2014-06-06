@@ -2,14 +2,15 @@
 #include <color_spinor_field_order.h>
 #include <typeinfo>
 #include <vector>
+#include <assert.h>
 
 namespace quda {
 
   using namespace quda::colorspinor;
 
   // copy the null-space vectors into the V-field
-  template <class V, class B>
-  void fill(V &out, const B &in, int v, int Nvec) {
+  template <int nVec, class V, class B>
+  void fill(V &out, const B &in, int v) {
     for (int x=0; x<out.Volume(); x++) {
       for (int s=0; s<in.Nspin(); s++) {
 	for (int c=0; c<in.Ncolor(); c++) {
@@ -19,13 +20,39 @@ namespace quda {
     }
   }
 
+  template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
+    FieldOrder<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
+    for (int v=0; v<nVec; v++) {
+      FieldOrder<Float,nSpin,nColor,1,order> bOrder(const_cast<ColorSpinorField&>(*B[v]));
+      fill<nVec>(vOrder, bOrder, v);
+    }
+  }
+
+  template <typename Float, int nSpin, int nColor, QudaFieldOrder order>
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+    if (Nvec == 24) {
+      FillV<Float,nSpin,nColor,24,order>(V,B);
+    } else {
+      errorQuda("Unsupported Nvec %d", Nvec);
+    }
+  }
+
+  template <typename Float, int nSpin, QudaFieldOrder order>
+  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
+    if (V.Ncolor() == 3) {
+      FillV<Float,nSpin,3,order>(V,B,Nvec);
+    } else {
+      errorQuda("Unsupported nColor %d", V.Ncolor());
+    }
+  }
+
   template <typename Float, QudaFieldOrder order>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
-    typedef typename accessor<Float,order>::type F;
-    F vOrder(const_cast<ColorSpinorField&>(V), Nvec);
-    for (int v=0; v<Nvec; v++) {
-      F bOrder(const_cast<ColorSpinorField&>(*B[v]));
-      fill(vOrder, bOrder, v, Nvec);
+    if (V.Nspin() == 4) {
+      FillV<Float,4,order>(V,B,Nvec);
+    } else {
+      errorQuda("Unsupported nSpin %d", V.Nspin());
     }
   }
 
@@ -50,30 +77,10 @@ namespace quda {
     }
   }
 
-  /*  void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
-    if (V.Precision() == QUDA_DOUBLE_PRECISION) {
-      FieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
-      for (int v=0; v<Nvec; v++) {
-	FieldOrder<double> *bOrder = createOrder<double>(*B[v]);
-	fill(*vOrder, *bOrder, v, Nvec);
-	delete bOrder;
-      }
-      delete vOrder;
-    } else {
-      FieldOrder<float> *vOrder = createOrder<float>(V, Nvec);
-      for (int v=0; v<Nvec; v++) {
-	FieldOrder<float> *bOrder = createOrder<float>(*B[v]);
-	fill(*vOrder, *bOrder, v, Nvec);
-	delete bOrder;
-      }
-      delete vOrder;
-    }    
-    }*/
-
   // Creates a block-ordered version of a ColorSpinorField
   // N.B.: Only works for the V field, as we need to block spin.
-  template <bool toBlock, class Complex, class FieldOrder>
-  void blockOrderV(Complex *out, FieldOrder &in, int Nvec, 
+  template <bool toBlock, int nVec, class Complex, class FieldOrder>
+  void blockOrderV(Complex *out, FieldOrder &in,
 		   const int *geo_map, const int *geo_bs, int spin_bs,
 		   const cpuColorSpinorField &V) {
 
@@ -107,7 +114,7 @@ namespace quda {
       }
 
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      int offset = geo_map[i]*nSpin_coarse*Nvec*geoBlockSize*in.NcolorPacked()*spin_bs;
+      int offset = geo_map[i]*nSpin_coarse*nVec*geoBlockSize*in.NcolorPacked()*spin_bs;
 
       for (int v=0; v<in.NvecPacked(); v++) {
 	for (int s=0; s<in.NspinPacked(); s++) {
@@ -116,7 +123,7 @@ namespace quda {
 	    int blockSpin = s % spin_bs; // the remaining spin dof left in each block
 
 	    int index = offset +                                              // geo block
-	      chirality * Nvec * geoBlockSize * spin_bs * in.NcolorPacked() + // chiral block
+	      chirality * nVec * geoBlockSize * spin_bs * in.NcolorPacked() + // chiral block
 	                     v * geoBlockSize * spin_bs * in.NcolorPacked() + // vector
 	                          blockOffset * spin_bs * in.NcolorPacked() + // local geometry
 	                                        blockSpin*in.NcolorPacked() + // block spin
@@ -151,29 +158,29 @@ namespace quda {
   // Orthogonalise the nc vectors v[] of length n
   // this assumes the ordering v[(b * Nvec + v) * blocksize + i]
 
-  template <class Complex>
-  void blockGramSchmidt(Complex *v, int nBlocks, int Nc, int blockSize) {
+  template <class Complex, int N>
+  void blockGramSchmidt(Complex *v, int nBlocks, int blockSize) {
     
     for (int b=0; b<nBlocks; b++) {
-      for (int jc=0; jc<Nc; jc++) {
+      for (int jc=0; jc<N; jc++) {
       
 	for (int ic=0; ic<jc; ic++) {
 	  // Calculate dot product.
 	  Complex dot = 0.0;
 	  for (int i=0; i<blockSize; i++) 
-	    dot += conj(v[(b*Nc+ic)*blockSize+i]) * v[(b*Nc+jc)*blockSize+i];
+	    dot += conj(v[(b*N+ic)*blockSize+i]) * v[(b*N+jc)*blockSize+i];
 	  
 	  // Subtract the blocks to orthogonalise
 	  for (int i=0; i<blockSize; i++) 
-	    v[(b*Nc+jc)*blockSize+i] -= dot * v[(b*Nc+ic)*blockSize+i];
+	    v[(b*N+jc)*blockSize+i] -= dot * v[(b*N+ic)*blockSize+i];
 	}
 	
 	// Normalize the block
 	// nrm2 is pure real, but need to use Complex because of template.
 	Complex nrm2 = 0.0;
-	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*Nc+jc)*blockSize+i]);
-	double scale = real(nrm2) > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
-	for (int i=0; i<blockSize; i++) v[(b*Nc+jc)*blockSize+i] *= scale;
+	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*N+jc)*blockSize+i]);
+	double scale = nrm2.real() > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
+	for (int i=0; i<blockSize; i++) v[(b*N+jc)*blockSize+i] *= scale;
       }
 
       //printf("blockGramSchmidt done %d / %d\n", b, nBlocks);
@@ -181,14 +188,11 @@ namespace quda {
 
   }
 
-  template<typename Float, QudaFieldOrder order>
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
-			  const int *geo_bs, const int *geo_map, int spin_bs) {
+  template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
+  void BlockOrthogonalize(ColorSpinorField &V, const int *geo_bs, const int *geo_map, int spin_bs) {
+    complex<Float> *Vblock = new complex<Float>[V.Volume()*V.Nspin()*V.Ncolor()];
 
-    std::complex<Float> *Vblock = new std::complex<Float>[V.Volume()*V.Nspin()*V.Ncolor()];
-
-    typedef typename accessor<Float,order>::type F;
-    F vOrder(const_cast<ColorSpinorField&>(V),Nvec);
+    FieldOrder<Float,4,3,24,order> vOrder(const_cast<ColorSpinorField&>(V));
 
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
@@ -197,13 +201,43 @@ namespace quda {
     int chiralBlocks = vOrder.NspinPacked() / spin_bs;
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
     
-    printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, Nvec);
+    printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
     
-    blockOrderV<true>(Vblock, vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
-    blockGramSchmidt(Vblock, numblocks, Nvec, blocksize);  
-    blockOrderV<false>(Vblock, vOrder, Nvec, geo_map, geo_bs, spin_bs, V);    
+    blockOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
+    blockGramSchmidt<complex<Float>,nVec>(Vblock, numblocks, blocksize);  
+    blockOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
 
     delete []Vblock;
+  }
+
+
+  template<typename Float, int nSpin, int nColor, QudaFieldOrder order>
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs) {
+    if (Nvec == 24) {
+      BlockOrthogonalize<Float,nSpin,nColor,24,order>(V, geo_bs, geo_map, spin_bs);
+    } else {
+      errorQuda("Unsupported nVec %d\n", Nvec);
+    }
+  }
+
+  template<typename Float, int nSpin, QudaFieldOrder order>
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
+			  const int *geo_bs, const int *geo_map, int spin_bs) {
+    if (V.Ncolor()/Nvec == 3) {
+      BlockOrthogonalize<Float,nSpin,3,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else {
+      errorQuda("Unsupported nColor %d\n", V.Ncolor());
+    }
+  }
+
+  template<typename Float, QudaFieldOrder order>
+  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
+			  const int *geo_bs, const int *geo_map, int spin_bs) {
+    if (V.Nspin() == 4) {
+      BlockOrthogonalize<Float,4,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    } else {
+      errorQuda("Unsupported nSpin %d\n", V.Nspin());
+    }
   }
 
   template<typename Float>
@@ -226,45 +260,5 @@ namespace quda {
       errorQuda("Unsupported precision %d\n", V.Precision());
     }
   }
-
-  /*
-  //Orthogonalize null vectors
-  void BlockOrthogonalize(ColorSpinorField &V, int Nvec, 
-			  const int *geo_bs, const int *geo_map, int spin_bs) {
-  
-
-    if (V.Precision() == QUDA_DOUBLE_PRECISION) {
-      std::complex<double> *Vblock = new std::complex<double>[V.Volume()*V.Nspin()*V.Ncolor()];
-      FieldOrder<double> *vOrder = createOrder<double>(V, Nvec);
-
-      int blocksize = geo_blocksize * vOrder->NcolorPacked() * spin_bs; 
-      int chiralBlocks = vOrder->NspinPacked() / spin_bs;
-      int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
-
-      printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, Nvec);
-
-      blockOrderV<true>(Vblock, *vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
-      blockGramSchmidt(Vblock, numblocks, Nvec, blocksize);  
-      blockOrderV<false>(Vblock, *vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
-
-      delete vOrder;
-      delete []Vblock;
-    } else {
-      std::complex<float> *Vblock = new std::complex<float>[V.Volume()*V.Nspin()*V.Ncolor()];
-      FieldOrder<float> *vOrder = createOrder<float>(V, Nvec);
-
-      int blocksize = geo_blocksize * vOrder->NcolorPacked() * spin_bs; 
-      int chiralBlocks = vOrder->NspinPacked() / spin_bs;
-      int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
-
-      blockOrderV<true>(Vblock, *vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
-      blockGramSchmidt(Vblock, numblocks, Nvec, blocksize);  
-      blockOrderV<false>(Vblock, *vOrder, Nvec, geo_map, geo_bs, spin_bs, V);
-
-      delete vOrder;
-      delete []Vblock;
-    }
-  }
-  */
 
 } // namespace quda

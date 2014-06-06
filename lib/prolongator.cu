@@ -128,21 +128,59 @@ namespace quda {
 
   };
 
-  template <typename Float, QudaFieldOrder order>
+  template <typename Float, int fineSpin, int fineColor, int nVec, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *spin_map) {
-    typedef typename accessor<Float,order>::type F;
+		  ColorSpinorField &tmp, const int *fine_to_coarse, const int *spin_map) {
+    typedef FieldOrder<Float,fineSpin,fineColor,1,order> fineSpinor;
+    typedef FieldOrder<Float,2,nVec,1,order> coarseSpinor;
+    typedef FieldOrder<Float,fineSpin,fineColor,nVec,order> packedSpinor;
+    typedef FieldOrder<Float,fineSpin,fineColor,1,order> tmpSpinor;
+    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,tmpSpinor> Arg;
 
-    F Out(const_cast<ColorSpinorField&>(out));
-    F In(const_cast<ColorSpinorField&>(in));
-    F V(const_cast<ColorSpinorField&>(v),Nvec);
-    F Tmp(const_cast<ColorSpinorField&>(tmp));
+    fineSpinor   Out(const_cast<ColorSpinorField&>(out));
+    coarseSpinor In(const_cast<ColorSpinorField&>(in));
+    packedSpinor V(const_cast<ColorSpinorField&>(v));
+    tmpSpinor Tmp(const_cast<ColorSpinorField&>(tmp));
 
-    ProlongateArg<F,F,F,F> arg(Out, In, V, Tmp, fine_to_coarse,spin_map);
-    ProlongateLaunch<double, ProlongateArg<F, F, F, F> > prolongator(arg, Location(out, in, v, tmp));
+    Arg arg(Out, In, V, Tmp, fine_to_coarse,spin_map);
+    ProlongateLaunch<double, Arg> prolongator(arg, Location(out, in, v, tmp));
     prolongator.apply(0);
 
     if (Location(out, in, v, tmp) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+  }
+
+
+  template <typename Float, int fineSpin, int fineColor, QudaFieldOrder order>
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int nVec, const int *fine_to_coarse, const int *spin_map) {
+
+    if (nVec == 24) {
+      Prolongate<Float,fineSpin,fineColor,24,order>(out, in, v, tmp, fine_to_coarse, spin_map);
+    } else {
+      errorQuda("Unsupported nVec %d", nVec);
+    }
+  }
+
+  template <typename Float, int fineSpin, QudaFieldOrder order>
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *spin_map) {
+
+    if (out.Ncolor() == 3) {
+      Prolongate<Float,fineSpin,3,order>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } else {
+      errorQuda("Unsupported nColor %d", out.Ncolor());
+    }
+  }
+
+  template <typename Float, QudaFieldOrder order>
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+		ColorSpinorField &tmp, int Nvec, const int *fine_to_coarse, const int *spin_map) {
+
+    if (out.Nspin() == 4) {
+      Prolongate<Float,4,order>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } else {
+      errorQuda("Unsupported nSpin %d", out.Nspin());
+    }
   }
 
   template <typename Float>
@@ -173,42 +211,4 @@ namespace quda {
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
-  /*  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  ColorSpinorField &tmp, int Nvec, const int *geo_map, const int *spin_map) {
-
-    if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      typedef FieldOrder<double> Field;
-      Field *outOrder = createOrder<double>(out);
-      Field *inOrder = createOrder<double>(in);
-      Field *vOrder = createOrder<double>(v, Nvec);
-      Field *tmpOrder = createOrder<double>(tmp);
-      ProlongateArg<Field, Field, Field, Field> 
-	arg(*outOrder, *inOrder, *vOrder, *tmpOrder, geo_map, spin_map);
-      ProlongateLaunch<ProlongateArg<Field, Field, Field, Field> > 
-	prolongator(arg, Location(out, in, v));
-      prolongator.apply(0);
-      delete outOrder;
-      delete inOrder;
-      delete vOrder;
-      delete tmpOrder;
-    } else {
-      typedef FieldOrder<float> Field;
-      Field *outOrder = createOrder<float>(out);
-      Field *inOrder = createOrder<float>(in);
-      Field *vOrder = createOrder<float>(v, Nvec);
-      Field *tmpOrder = createOrder<float>(tmp);
-      ProlongateArg<Field, Field, Field, Field> 
-	arg(*outOrder, *inOrder, *vOrder, *tmpOrder, geo_map, spin_map);
-      ProlongateLaunch<ProlongateArg<Field, Field, Field, Field> > 
-	prolongator(arg, Location(out, in, v));
-      prolongator.apply(0);
-      delete outOrder;
-      delete inOrder;
-      delete vOrder;
-      delete tmpOrder;
-    }
-
-    if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION)  checkCudaError();
-  }
-  */
 } // end namespace quda
