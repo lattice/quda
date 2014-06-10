@@ -1821,15 +1821,20 @@ namespace quda {
 
       void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
           const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+
         profile.Start(QUDA_PROFILE_TOTAL);
 
         dslashParam.parity = parity;
         dslashParam.kernel_type = INTERIOR_KERNEL;
         dslashParam.threads = volume;
 
+
 #ifdef MULTI_GPU
         // Record the start of the dslash if doing communication in T and not kernel packing
-        if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) {
+#ifndef PTHREADS
+        if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
+#endif
+        {
           PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
               profile, QUDA_PROFILE_EVENT_RECORD);
         }
@@ -1842,6 +1847,7 @@ namespace quda {
                 // and launch the interior dslash kernel
 
         const int packIndex = Nstream-2;
+        //const int packIndex = Nstream-1;
         pthread_t receiveThread, interiorThread;
         ReceiveParam receiveParam;
         receiveParam.profile = &profile;
@@ -1857,6 +1863,7 @@ namespace quda {
         interiorParam.profile  = &profile; 
 
         cudaGetDevice(&(interiorParam.current_device)); // get the current device number
+//        PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
         if(pthread_create(&interiorThread, NULL, launchInteriorKernel, &interiorParam)){
           errorQuda("pthread_create failed");
         }
@@ -1875,6 +1882,14 @@ namespace quda {
           if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
           { pack = true; break; }
 
+   //     if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
+#ifdef PTHREADS
+        if (pack){
+          PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart, 0), 
+            profile, QUDA_PROFILE_STREAM_WAIT_EVENT); 
+        }
+#endif
+
         // Initialize pack from source spinor
         if (inCloverInv == NULL) {
           PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a, twist_b),
@@ -1883,6 +1898,7 @@ namespace quda {
           PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
               profile, QUDA_PROFILE_PACK_KERNEL);
         }
+
 
         if (pack) {
           // Record the end of the packing
@@ -1919,6 +1935,7 @@ namespace quda {
 
 #ifdef PTHREADS
         if(pthread_join(receiveThread, NULL)) errorQuda("pthread_join failed");
+  //      if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
 #endif
 #ifdef GPU_COMMS
         bool pack_event = false;
@@ -1938,7 +1955,7 @@ namespace quda {
           }
         }
 #endif
-
+        bool interiorLaunched = false;
         int completeSum = 0;
         while (completeSum < commDimTotal) {
           for (int i=3; i>=0; i--) {
@@ -1986,6 +2003,11 @@ namespace quda {
 #ifndef GPU_COMMS
               PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
                   profile, QUDA_PROFILE_EVENT_RECORD);
+              
+              if(!interiorLaunched){
+                if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
+                interiorLaunched = true;
+              }
 
               // wait for scattering to finish and then launch dslash
               PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
@@ -2005,11 +2027,6 @@ namespace quda {
         }
         it = (it^1);
 #endif // MULTI_GPU
-
-#ifdef PTHREADS
-        if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
-#endif
-
         profile.Stop(QUDA_PROFILE_TOTAL);
       }
 

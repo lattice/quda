@@ -23,6 +23,10 @@
 #include <qmp.h>
 #endif
 
+#ifdef PTHREADS
+#include <pthread.h>
+#endif
+
 #define MAX_SHORT 32767.0f
 
 // The "Quda" prefix is added to avoid collisions with other libraries.
@@ -79,7 +83,11 @@ extern "C" {
 
   extern cudaDeviceProp deviceProp;  
   extern cudaStream_t *streams;
-  
+ 
+#ifdef PTHREADS
+  extern pthread_mutex_t pthread_mutex;
+#endif
+ 
 #ifdef __cplusplus
 }
 #endif

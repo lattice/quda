@@ -9,6 +9,9 @@
 #include <typeinfo>
 #include <map>
 #include <unistd.h>
+#ifdef PTHREADS
+#include <pthread.h>
+#endif
 
 //#define LAUNCH_TIMER
 
@@ -21,6 +24,7 @@ namespace quda {
   static map tunecache;
   static map::iterator it;
   static size_t initial_cache_size = 0;
+
 
 #define STR_(x) #x
 #define STR(x) STR_(x)
@@ -250,12 +254,18 @@ namespace quda {
 
   static TimeProfile launchTimer("tuneLaunch");
 
+//  static int tally = 0;
+
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
+#ifdef PTHREADS // tuning should be performed serially
+//  pthread_mutex_lock(&pthread_mutex);
+//  tally++;
+#endif
 
 #ifdef LAUNCH_TIMER
     launchTimer.Start(QUDA_PROFILE_TOTAL);
@@ -296,6 +306,11 @@ namespace quda {
       launchTimer.Stop(QUDA_PROFILE_TOTAL);
 #endif
 
+#ifdef PTHREADS
+      //pthread_mutex_unlock(&pthread_mutex);
+      //tally--;
+      //printfQuda("pthread_mutex_unlock a complete %d\n",tally);
+#endif
       return it->second;
     }
 
@@ -344,6 +359,7 @@ namespace quda {
 	tunable.checkLaunchParam(param);
 	cudaEventRecord(start, 0);
 	for (int i=0; i<tunable.tuningIter(); i++) {
+          printfQuda("About to call tunable.apply\n");
 	  tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	}
 	cudaEventRecord(end, 0);
@@ -399,6 +415,11 @@ namespace quda {
     // restore the original reduction state
     globalReduce = reduceState;
 
+#ifdef PTHREADS
+//    pthread_mutex_unlock(&pthread_mutex);
+//    tally--;
+//    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
+#endif
     return param;
   }
 
