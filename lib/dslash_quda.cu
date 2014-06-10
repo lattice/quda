@@ -2003,11 +2003,12 @@ namespace quda {
 #ifndef GPU_COMMS
               PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
                   profile, QUDA_PROFILE_EVENT_RECORD);
-              
+#ifdef PTHREADS  
               if(!interiorLaunched){
                 if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
                 interiorLaunched = true;
               }
+#endif
 
               // wait for scattering to finish and then launch dslash
               PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
