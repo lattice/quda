@@ -38,6 +38,9 @@ BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU c
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread code
 
+#BLAS library
+BUILD_MAGMA = 'no' #@BUILD_MAGMA@ 	# build magma interface
+
 # GPUdirect options
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
 GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
@@ -64,6 +67,11 @@ FEF90 = @FEF90@			# front-end F90
 MPI_HOME=@MPI_HOME@
 QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
+
+MAGMA_HOME=#@MAGMA_HOME@
+ATLAS_HOME=#@ATLAS_HOME@
+LAPACK_HOME=#@LAPACK_HOME@
+
 
 NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
 
@@ -128,6 +136,16 @@ ifeq ($(strip $(BUILD_QIO)), yes)
   LIB += -L$(QIO_HOME)/lib -lqio -llime
   QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
 endif
+
+ifeq ($(strip $(BUILD_MAGMA)), yes)
+  MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
+  MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
+  COPT += -DMAGMA_LIB
+else
+  MAGMA_INCLUDE = 
+  MAGMA_FLAGS   = 
+endif
+
 
 ifeq ($(strip $(POSIX_THREADS)), yes)
   NVCCOPT += -DPTHREADS

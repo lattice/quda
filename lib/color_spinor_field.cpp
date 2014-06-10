@@ -17,21 +17,21 @@ namespace quda {
   ColorSpinorParam::ColorSpinorParam(const ColorSpinorField &field) {
     field.fill(*this);
   }
-  
+
   ColorSpinorField::ColorSpinorField(const ColorSpinorParam &param) 
-    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0) 
+    : LatticeField(param), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0)
   {
     create(param.nDim, param.x, param.nColor, param.nSpin, param.twistFlavor, 
 	   param.precision, param.pad, param.siteSubset, param.siteOrder, 
-	   param.fieldOrder, param.gammaBasis, param.PCtype);
+	   param.fieldOrder, param.gammaBasis, param.PCtype, param.eigv_dim);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field) 
-    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0)
+    : LatticeField(field), init(false), v(0), norm(0), even(0), odd(0), eigenvectors(0)
   {
     create(field.nDim, field.x, field.nColor, field.nSpin, field.twistFlavor, 
 	   field.precision, field.pad, field.siteSubset, field.siteOrder, 
-	   field.fieldOrder, field.gammaBasis, field.PCtype);
+	   field.fieldOrder, field.gammaBasis, field.PCtype, field.eigv_dim, field.eigv_id);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -157,7 +157,7 @@ namespace quda {
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 				QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, 
 				QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, 
-				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC) {
+				QudaGammaBasis gammaBasis, QudaDWFPCType DWFPC, int evdim /*= 0*/, int evid /* = -1*/) {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
     this->fieldOrder = fieldOrder;
@@ -172,6 +172,10 @@ namespace quda {
     twistFlavor = Twistflavor;
 
     PCtype = DWFPC;
+
+//! for eigCG:
+    eigv_dim    = evdim;
+    eigv_id     = (evdim == 0) ? -1: evid;
 
     precision = Prec;
     volume = 1;
@@ -204,6 +208,55 @@ namespace quda {
 
     init = true;
 
+//! stuff for deflated solvers (eigenvector sets):
+    if(evdim != 0){
+
+      eigv_volume = volume;
+      eigv_stride = stride;
+      eigv_length = length;
+      eigv_real_length = real_length;
+//multi-gpu:
+      eigv_total_length      = total_length;
+      eigv_total_norm_length = total_norm_length;
+
+      eigv_ghost_length      = ghost_length;
+      eigv_ghost_norm_length = ghost_norm_length; 
+
+      eigv_bytes       = bytes;
+      eigv_norm_bytes  = norm_bytes; 
+      
+      volume *= evdim;
+      stride *= evdim;
+      length *= evdim;
+      real_length *= evdim;
+      
+      total_length *= evdim;
+      total_norm_length *= evdim;
+//won't be used.
+      ghost_length *= evdim;
+      ghost_norm_length *= evdim;  
+
+      bytes *= evdim;
+      norm_bytes *= evdim;
+
+    }else{
+
+      eigv_volume = 0;
+      eigv_stride = 0;
+      eigv_length = 0;
+      eigv_real_length = 0;
+
+      eigv_total_length      = 0;
+      eigv_total_norm_length = 0;
+
+      eigv_ghost_length      = 0;
+      eigv_ghost_norm_length = 0;
+
+      eigv_bytes       = 0;
+      eigv_norm_bytes  = 0;
+ 
+    }
+
     clearGhostPointers();
     setTuningString();
   }
@@ -224,7 +277,7 @@ namespace quda {
     if (&src != this) {
       create(src.nDim, src.x, src.nColor, src.nSpin, src.twistFlavor, 
 	     src.precision, src.pad, src.siteSubset, 
-	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype);    
+	     src.siteOrder, src.fieldOrder, src.gammaBasis, src.PCtype, src.eigv_dim, src.eigv_id);    
     }
     return *this;
   }
@@ -235,11 +288,21 @@ namespace quda {
     if (param.nColor != 0) nColor = param.nColor;
     if (param.nSpin != 0) nSpin = param.nSpin;
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
-    
+
     if (param.PCtype != QUDA_PC_INVALID) PCtype = param.PCtype;
 
     if (param.precision != QUDA_INVALID_PRECISION)  precision = param.precision;
     if (param.nDim != 0) nDim = param.nDim;
+
+    if (param.eigv_dim  != 0 ){
+      eigv_dim     = param.eigv_dim;
+      eigv_id      = param.eigv_id;
+    }
+    else
+    {
+      eigv_dim     = 0;
+      eigv_id      = -1;
+    }
 
     volume = 1;
     for (int d=0; d<nDim; d++) {
@@ -248,7 +311,8 @@ namespace quda {
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
+  if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
+
   
     if (param.pad != 0) pad = param.pad;
 
@@ -282,6 +346,58 @@ namespace quda {
       norm_bytes = 0;
     }
 
+//! for deflated solvers:
+    if(eigv_dim > 0)
+    {
+       if(eigv_id == -1)
+       {
+          eigv_volume            = volume;
+          eigv_stride            = stride;
+          eigv_length            = length;
+          eigv_real_length       = real_length;
+
+          eigv_total_length      = total_length;
+          eigv_total_norm_length = total_norm_length;
+
+          eigv_ghost_length      = ghost_length;
+          eigv_ghost_norm_length = ghost_norm_length;
+
+          eigv_bytes             = bytes;
+          eigv_norm_bytes        = norm_bytes;
+
+          volume            *= eigv_dim;
+          stride            *= eigv_dim;
+          length            *= eigv_dim;
+          real_length       *= eigv_dim;
+
+          total_length      *= eigv_dim;
+          total_norm_length *= eigv_dim;
+          ghost_length      *= eigv_dim;
+          ghost_norm_length *= eigv_dim;
+       }
+       else if(eigv_id > -1)
+       {
+ // just to be safe...
+          eigv_volume            = 0;
+          eigv_stride            = 0;
+          eigv_length            = 0;
+          eigv_real_length       = 0;
+
+          eigv_total_length      = 0;
+          eigv_total_norm_length = 0;
+
+          eigv_ghost_length      = 0;
+          eigv_ghost_norm_length = 0;  
+
+          eigv_bytes             = 0;
+          eigv_norm_bytes        = 0; 
+       }
+       else
+       {
+          errorQuda("\nIncorrect eigenvector index.\n");
+       }
+    }
+
     if (!init) errorQuda("Shouldn't be resetting a non-inited field\n");
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -300,6 +416,8 @@ namespace quda {
     param.twistFlavor = twistFlavor;
     param.precision = precision;
     param.nDim = nDim;
+    param.eigv_dim = eigv_dim;
+    param.eigv_id = eigv_id;
     memcpy(param.x, x, QUDA_MAX_DIM*sizeof(int));
     param.pad = pad;
     param.siteSubset = siteSubset;
@@ -398,6 +516,11 @@ namespace quda {
     out << "siteOrder = " << a.siteOrder << std::endl;
     out << "fieldOrder = " << a.fieldOrder << std::endl;
     out << "gammaBasis = " << a.gammaBasis << std::endl;
+    out << "eigDim = " << a.eigv_dim << std::endl;
+    out << "eigID = " << a.eigv_id << std::endl;
+    out << "eigVolume = " << a.eigv_volume << std::endl;
+    out << "eigStride = " << a.eigv_stride << std::endl;
+    out << "eigLength = " << a.eigv_length << std::endl;
     out << "PC type = " << a.PCtype << std::endl;
     return out;
   }

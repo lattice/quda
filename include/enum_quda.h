@@ -92,6 +92,8 @@ extern "C" {
     QUDA_XSD_INVERTER,
     QUDA_MR_INVERTER,
     QUDA_PCG_INVERTER,
+    QUDA_EIGCG_INVERTER,
+    QUDA_INC_EIGCG_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -308,8 +310,8 @@ extern "C" {
     QUDA_5D_PC,
     QUDA_4D_PC,
     QUDA_PC_INVALID
-  } QudaDWFPCType;  
-  
+  } QudaDWFPCType; 
+
   typedef enum QudaTwistFlavorType_s {
     QUDA_TWIST_MINUS = -1,
     QUDA_TWIST_PLUS = +1,
