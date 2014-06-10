@@ -118,7 +118,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // outer solver parameters
   inv_param->inv_type = inv_type;
   inv_param->tol = tol;
-  inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
+  inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
   inv_param->maxiter = 500000;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;

@@ -1,4 +1,4 @@
-#include "blas_magma.h"
+#include <blas_magma.h>
 #include <string.h>
 
 #ifndef MAX
@@ -10,7 +10,7 @@
 #endif
 
 void BlasMagmaArgs::OpenMagma(){ 
- 
+#ifdef MAGMA_LIB
     magma_err_t err = magma_init(); 
 
     if(err != MAGMA_SUCCESS) printf("\nError: cannot initialize MAGMA library\n");
@@ -21,15 +21,17 @@ void BlasMagmaArgs::OpenMagma(){
     printf("\nMAGMA library version: %d.%d\n\n", major,  minor);
 
     return;
+#endif
 }
 
 void BlasMagmaArgs::CloseMagma(){  
-
+#ifdef MAGMA_LIB
     magma_err_t err = magma_finalize();
 
     if(magma_finalize() != MAGMA_SUCCESS) printf("\nError: cannot close MAGMA library\n");
 
     return;
+#endif
 }
 
 BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0), llwork(0), lrwork(0), liwork(0), htsize(0), dtsize(0),  sideLR(0), lwork_max(0), W(0), W2(0), hTau(0), dTau(0), lwork(0), rwork(0), iwork(0),  info(-1)
