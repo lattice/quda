@@ -400,8 +400,9 @@ void initQudaMemory()
 
   checkCudaError();
   createDslashEvents();
+#ifdef GPU_STAGGERED_OPROD
   createStaggeredOprodEvents();  
-
+#endif
   initBlas();
 
   loadTuneCache(getVerbosity());
@@ -1007,7 +1008,9 @@ void endQuda(void)
   }
   destroyDslashEvents();
 
+#ifdef GPU_STAGGERED_OPROD
   destroyStaggeredOprodEvents();
+#endif
 
   saveTuneCache(getVerbosity());
 
