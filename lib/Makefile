@@ -85,7 +85,8 @@ CORE = $(QUDA_CORE:%=dslash_core/%)
 # routines in tune.cpp to check basic compatibility of an existing
 # tunecache.  In the future, we might consider including actual hashes
 # of certain source files.
-HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH))\"
+CUDA_VERSION = $(shell awk '/\#define CUDA_VERSION/{print $$3}' $(CUDA_INSTALL_PATH)/include/cuda.h)
+HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH)),cuda_version=$(strip $(CUDA_VERSION))\"
 
 # limit maximum number of registers in BLAS routines to increase occupancy
 ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30))
