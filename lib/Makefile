@@ -131,8 +131,8 @@ dslash_quda.o: dslash_quda.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 milc_interface.o: milc_interface.cpp $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-blas_magma.o: blas_magma.cpp
-	$(CXX) $(MAGMA_INCLUDE) $(CCXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
+blas_magma.o: blas_magma.cpp $(HDRS)
+	$(CXX) $(MAGMA_INCLUDE) $(CXXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@
