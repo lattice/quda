@@ -141,6 +141,12 @@ ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -DMAGMA_LIB
+  
+  LIB += -L$(MAGMA_HOME)/lib -lmagma 
+  LIB += -L$(LAPACK_HOME) -llapack -lf77blas -lgfortran 
+  LIB += -L$(ATLAS_HOME)/lib -lcblas -latlas
+  LIB += -L$(CUDA_INSTALL_PATH)/lib64 -lcublas
+
 else
   MAGMA_INCLUDE = 
   MAGMA_FLAGS   = 
