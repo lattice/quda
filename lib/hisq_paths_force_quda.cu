@@ -910,9 +910,6 @@ namespace quda {
             int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
-	    printfQuda("kparam.X = %d, %d, %d, %d\n",
-			kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]);
-
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
               CALL_MIDDLE_LINK_KERNEL(1,1);
             }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){

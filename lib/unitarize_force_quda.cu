@@ -653,7 +653,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
       unitarizeForce.apply(0);
-      if(*flops) *flops = unitarizeForce.flops(); 
+      if(flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }
     
