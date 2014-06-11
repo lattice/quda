@@ -10,7 +10,7 @@
 #endif
 
 void BlasMagmaArgs::OpenMagma(){ 
- 
+
 #ifdef MAGMA_LIB
     magma_err_t err = magma_init(); 
 
