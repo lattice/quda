@@ -232,6 +232,13 @@ AC_ARG_WITH(qdp,
   [ qdp_home="" ]
 )
 
+
+AC_ARG_WITH(magma,
+  AC_HELP_STRING([--with-magma=MAGMADIR], [ Specify MAGMA installation directory]),
+  [ magma_home=${withval}; build_magma="yes"],
+  [ magma_home="" ; build_magma="no" ]
+)
+
 if test "X${build_qdpjit}X" = "XyesX" ; then
   if test "X${qdp_home}X" = "XX" ; then
     AC_PATH_PROG(QDPXX_CONFIG, [qdp++-config], [])
@@ -478,7 +485,7 @@ dnl Enables CUDA/NIC buffer interop
 case ${gpu_direct} in
 yes|no);;
 *) 
-  AC_MSG_ERROR([ invalid value for --gpu-direct ])
+  AC_MSG_ERROR([ invalid value for --enable-gpu-direct ])
   ;;
 esac
 
@@ -486,7 +493,7 @@ dnl Enables direct CUDA-NIC communication
 case ${gpu_comms} in
 yes|no);;
 *) 
-  AC_MSG_ERROR([ invalid value for --gpu-comms ])
+  AC_MSG_ERROR([ invalid value for --enable-gpu-comms ])
   ;;
 esac
 
@@ -701,6 +708,12 @@ AC_SUBST( USE_QDPJIT, [${build_qdpjit}])
 
 AC_MSG_NOTICE([Setting QDP_INSTALL_PATH = ${qdp_home} ])
 AC_SUBST( QDP_INSTALL_PATH, [${qdp_home} ])
+
+AC_MSG_NOTICE([Setting BUILD_MAGMA = ${build_magma}])
+AC_SUBST( BUILD_MAGMA, [${build_magma}])
+
+AC_MSG_NOTICE([Setting MAGMA_HOME = ${magma_home}])
+AC_SUBST( MAGMA_HOME, [${magma_home}])
 
 AC_CONFIG_FILES(make.inc)
 AC_OUTPUT

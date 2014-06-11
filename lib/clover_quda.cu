@@ -14,6 +14,8 @@ namespace CloverOrder {
 
 namespace quda {
 
+#ifdef GPU_CLOVER_DIRAC
+
   template<typename Float, typename Clover, typename Gauge>
     struct CloverArg {
       int threads; // number of active threads required
@@ -588,9 +590,11 @@ namespace quda {
       if(Fmunu) delete Fmunu;
     }
 
+#endif
 
   void computeClover(CloverField &clover, const GaugeField& gauge, double cloverCoeff, QudaFieldLocation location){
 
+#ifdef GPU_CLOVER_DIRAC
     if(clover.Precision() == QUDA_HALF_PRECISION){
       errorQuda("Half precision not supported\n");
     }
@@ -603,6 +607,10 @@ namespace quda {
       errorQuda("Precision %d not supported", clover.Precision());
     }
     return;
+#else
+    errorQuda("Clover has not been built");
+#endif
+
   }
 
 } // namespace quda

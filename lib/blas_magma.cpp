@@ -6,10 +6,11 @@
 #endif
 
 #ifdef MAGMA_LIB
-#include "magma.h"
+#include <magma.h>
 #endif
 
 void BlasMagmaArgs::OpenMagma(){ 
+
 #ifdef MAGMA_LIB
     magma_err_t err = magma_init(); 
 
@@ -19,26 +20,33 @@ void BlasMagmaArgs::OpenMagma(){
 
     magma_version( &major, &minor, &micro);
     printf("\nMAGMA library version: %d.%d\n\n", major,  minor);
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
 
     return;
-#endif
 }
 
 void BlasMagmaArgs::CloseMagma(){  
+
 #ifdef MAGMA_LIB
     magma_err_t err = magma_finalize();
-
     if(magma_finalize() != MAGMA_SUCCESS) printf("\nError: cannot close MAGMA library\n");
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
 
     return;
-#endif
 }
 
-BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0), llwork(0), lrwork(0), liwork(0), htsize(0), dtsize(0),  sideLR(0), lwork_max(0), W(0), W2(0), hTau(0), dTau(0), lwork(0), rwork(0), iwork(0),  info(-1)
+ BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0), info(-1), llwork(0), 
+  lrwork(0), liwork(0), sideLR(0), htsize(0), dtsize(0), lwork_max(0), W(0), W2(0), 
+  hTau(0), dTau(0), lwork(0), rwork(0), iwork(0)
 {
 
 #ifdef MAGMA_LIB
-
     magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
     if(dev_info == 0)  exit(-1);
 
@@ -46,19 +54,17 @@ BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0),
 
     alloc = false;
     init  = true;
-
 #else
-
     printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
     exit(-1);
-
 #endif    
 
     return;
 }
 
 
-BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec) : m(m), nev(nev), ldm(ldm), prec(prec), info(-1)
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec) 
+  : m(m), nev(nev),  prec(prec), ldm(ldm), info(-1)
 {
 
 #ifdef MAGMA_LIB
@@ -96,10 +102,8 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const in
     alloc = true;
 
 #else
-
     printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
     exit(-1);
-
 #endif    
 
     return;
@@ -193,9 +197,9 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 
 void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm)
 {
+#ifdef MAGMA_LIB 
        const int complex_prec = 2*prec;
        int l                  = 2*nev;
-#ifdef MAGMA_LIB 
 //
        //void *Tmp = 0;
        //magma_malloc((void**)&Tmp, vld*l*complex_prec);     
@@ -297,8 +301,8 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 
 void BlasMagmaArgs::SolveProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH)
 {
-       const int complex_prec = 2*prec;
 #ifdef MAGMA_LIB
+       const int complex_prec = 2*prec;
        void *tmp; 
        magma_int_t *ipiv;
        magma_int_t err;
@@ -327,8 +331,8 @@ void BlasMagmaArgs::SolveProjMatrix(void* rhs, const int ldn, const int n, void*
 
 void BlasMagmaArgs::SolveGPUProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH)
 {
-       const int complex_prec = 2*prec;
 #ifdef MAGMA_LIB
+       const int complex_prec = 2*prec;
        void *tmp; 
        magma_int_t *ipiv;
        magma_int_t err;
