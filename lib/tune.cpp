@@ -158,7 +158,7 @@ namespace quda {
 	ls >> token;
 	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version", cache_path.c_str());
 	ls >> token;
-	if (token.compare(quda_hash)) warningQuda("Cache file %s does not match current QUDA build", cache_path.c_str());
+	if (token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build", cache_path.c_str());
 
       
 	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
