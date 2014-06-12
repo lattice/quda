@@ -9,6 +9,9 @@
 
 namespace quda {
 
+
+#ifdef GPU_STAGGERED_OPROD
+
   namespace { // anonymous
 #include <texture.h>
   }
@@ -625,6 +628,7 @@ namespace quda {
 #endif
     } // computeStaggeredOprodCuda
 
+#endif // GPU_STAGGERED_OPROD
 
   // At the moment, I pass an instance of FaceBuffer in. 
   // Soon, faceBuffer will be subsumed into cudaColorSpinorField.
@@ -632,6 +636,8 @@ namespace quda {
       FaceBuffer& faceBuffer,
       const unsigned int parity, const double coeff[2])
   {
+
+#ifdef GPU_STAGGERED_OPROD
 
     if(outA.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", outA.Order());    
@@ -669,6 +675,9 @@ namespace quda {
     }else{
       errorQuda("Unsupported precision: %d\n", in.Precision());
     }
+#else // GPU_STAGGERED_OPROD not defined
+   errorQuda("Staggered Outer Product has not been built!"); 
+#endif
     return;
   } // computeStaggeredOprod
 
