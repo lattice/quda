@@ -732,7 +732,7 @@ namespace quda {
       errorQuda("Unsupported number of coarse spins %d\n",in.Nspin());
 
     if (in.Ncolor() == 2) { 
-      ApplyCoarse<Float,csOrder,gOrder,24,2>(out, in, Y, X, kappa);
+      ApplyCoarse<Float,csOrder,gOrder,2,2>(out, in, Y, X, kappa);
     } else if (in.Ncolor() == 24) { 
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, in, Y, X, kappa);
     } else {
