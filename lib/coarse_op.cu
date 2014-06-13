@@ -384,7 +384,9 @@ namespace quda {
     for(int i = 0; i < f.Volume(); i++) {
       for(int s = 0; s < f.Nspin(); s++) {
 	for(int c = 0; c < f.Ncolor(); c++) {
-	  f(i,s,c) = (Float) 0.0;
+	  for(int v = 0; v < f.Nvec(); v++) {
+	    f(i,s,c,v) = (Float) 0.0;
+	  }
         }
       }
     }
