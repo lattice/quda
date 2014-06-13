@@ -86,7 +86,7 @@ namespace quda {
   // print out the vector at volume point x
   template <typename Float, int nSpin, int nColor, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
-    FieldOrder<Float,4,3,1,order> A(a);
+    FieldOrder<Float,nSpin,nColor,1,order> A(a);
     if (sourceType == QUDA_RANDOM_SOURCE) random(A);
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
