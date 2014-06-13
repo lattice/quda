@@ -174,7 +174,9 @@ template <typename Float, int nSpin, int nColor, QudaFieldOrder order,
 
 template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
-  if (x.Ncolor() == 3) {
+  if (x.Ncolor() == 2) {
+    genericBlas<Float,nSpin,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 3) {
     genericBlas<Float,nSpin,3,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
@@ -183,7 +185,9 @@ template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int write
 
 template <typename Float, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
-  if (x.Nspin() == 4) {
+  if (x.Nspin() == 2) {
+    genericBlas<Float,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);    
+  } else if (x.Nspin() == 4) {
     genericBlas<Float,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
     errorQuda("nSpin = %d not implemeneted",x.Nspin());
