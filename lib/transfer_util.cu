@@ -31,7 +31,9 @@ namespace quda {
 
   template <typename Float, int nSpin, int nColor, QudaFieldOrder order>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
-    if (Nvec == 24) {
+    if (Nvec == 2) {
+      FillV<Float,nSpin,nColor,2,order>(V,B);
+    } else if (Nvec == 24) {
       FillV<Float,nSpin,nColor,24,order>(V,B);
     } else {
       errorQuda("Unsupported Nvec %d", Nvec);
@@ -40,10 +42,11 @@ namespace quda {
 
   template <typename Float, int nSpin, QudaFieldOrder order>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
-    if (V.Ncolor() == 3) {
+    if (B[0]->Ncolor()*Nvec != V.Ncolor()) errorQuda("Something wrong here");
+    if (B[0]->Ncolor() == 3) {
       FillV<Float,nSpin,3,order>(V,B,Nvec);
     } else {
-      errorQuda("Unsupported nColor %d", V.Ncolor());
+      errorQuda("Unsupported nColor %d", B[0]->Ncolor());
     }
   }
 
@@ -84,17 +87,17 @@ namespace quda {
 		   const int *geo_map, const int *geo_bs, int spin_bs,
 		   const cpuColorSpinorField &V) {
 
-    int nSpin_coarse = in.NspinPacked() / spin_bs; // this is number of chiral blocks
+    int nSpin_coarse = in.Nspin() / spin_bs; // this is number of chiral blocks
 
     //Compute the size of each block
     int geoBlockSize = 1;
     for (int d=0; d<in.Ndim(); d++) geoBlockSize *= geo_bs[d];
-    int blockSize = geoBlockSize * in.NcolorPacked() * spin_bs; // blockSize includes internal dof
+    int blockSize = geoBlockSize * in.Ncolor() * spin_bs; // blockSize includes internal dof
 
     int x[QUDA_MAX_DIM]; // global coordinates
     int y[QUDA_MAX_DIM]; // local coordinates within a block (full site ordering)
 
-    int checkLength = in.Volume() * in.Ncolor() * in.Nspin();
+    int checkLength = in.Volume() * in.Ncolor() * in.Nspin() * in.Nvec();
     int *check = new int[checkLength];
     int count = 0;
 
@@ -114,19 +117,19 @@ namespace quda {
       }
 
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      int offset = geo_map[i]*nSpin_coarse*nVec*geoBlockSize*in.NcolorPacked()*spin_bs;
+      int offset = geo_map[i]*nSpin_coarse*nVec*geoBlockSize*in.Ncolor()*spin_bs;
 
-      for (int v=0; v<in.NvecPacked(); v++) {
-	for (int s=0; s<in.NspinPacked(); s++) {
-	  for (int c=0; c<in.NcolorPacked(); c++) {
+      for (int v=0; v<in.Nvec(); v++) {
+	for (int s=0; s<in.Nspin(); s++) {
+	  for (int c=0; c<in.Ncolor(); c++) {
 	    int chirality = s / spin_bs; // chirality is the coarse spin
 	    int blockSpin = s % spin_bs; // the remaining spin dof left in each block
 
 	    int index = offset +                                              // geo block
-	      chirality * nVec * geoBlockSize * spin_bs * in.NcolorPacked() + // chiral block
-	                     v * geoBlockSize * spin_bs * in.NcolorPacked() + // vector
-	                          blockOffset * spin_bs * in.NcolorPacked() + // local geometry
-	                                        blockSpin*in.NcolorPacked() + // block spin
+	      chirality * nVec * geoBlockSize * spin_bs * in.Ncolor() + // chiral block
+	                     v * geoBlockSize * spin_bs * in.Ncolor() + // vector
+	                          blockOffset * spin_bs * in.Ncolor() + // local geometry
+	                                        blockSpin*in.Ncolor() + // block spin
 	                                                                 c;   // color
 
 	    if (toBlock) out[index] = in(i, s, c, v); // going to block order
@@ -141,8 +144,8 @@ namespace quda {
     }
     
     if (count != checkLength) {
-      errorQuda("Number of elements packed %d does not match expected value %d", 
-		count, checkLength);
+      errorQuda("Number of elements packed %d does not match expected value %d nvec=%d nspin=%d ncolor=%d", 
+		count, checkLength, in.Nvec(), in.Nspin(), in.Ncolor());
     }
 
     // nned non-quadratic check
@@ -192,13 +195,13 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, const int *geo_bs, const int *geo_map, int spin_bs) {
     complex<Float> *Vblock = new complex<Float>[V.Volume()*V.Nspin()*V.Ncolor()];
 
-    FieldOrder<Float,4,3,24,order> vOrder(const_cast<ColorSpinorField&>(V));
+    FieldOrder<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
 
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
 
-    int blocksize = geo_blocksize * vOrder.NcolorPacked() * spin_bs; 
-    int chiralBlocks = vOrder.NspinPacked() / spin_bs;
+    int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
+    int chiralBlocks = vOrder.Nspin() / spin_bs;
     int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
     
     printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
@@ -213,7 +216,9 @@ namespace quda {
 
   template<typename Float, int nSpin, int nColor, QudaFieldOrder order>
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs) {
-    if (Nvec == 24) {
+    if (Nvec == 2) {
+      BlockOrthogonalize<Float,nSpin,nColor,2,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 24) {
       BlockOrthogonalize<Float,nSpin,nColor,24,order>(V, geo_bs, geo_map, spin_bs);
     } else {
       errorQuda("Unsupported nVec %d\n", Nvec);
@@ -226,7 +231,7 @@ namespace quda {
     if (V.Ncolor()/Nvec == 3) {
       BlockOrthogonalize<Float,nSpin,3,order>(V, Nvec, geo_bs, geo_map, spin_bs);
     } else {
-      errorQuda("Unsupported nColor %d\n", V.Ncolor());
+      errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
     }
   }
 

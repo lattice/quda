@@ -565,8 +565,12 @@ template <typename ReduceType, typename Float, int nSpin, QudaFieldOrder order,
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
 			   ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
-  if (x.Ncolor() == 3) {
+  if (x.Ncolor() == 2) {
+    value = genericReduce<ReduceType,Float,nSpin,2,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Ncolor() == 3) {
     value = genericReduce<ReduceType,Float,nSpin,3,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Ncolor() == 6) {
+    value = genericReduce<ReduceType,Float,nSpin,6,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else {
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
   }
@@ -577,7 +581,9 @@ template <typename ReduceType, typename Float, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
-  if (x.Nspin() == 4) {
+  if (x.Nspin() == 2) {
+    value = genericReduce<ReduceType,Float,2,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Nspin() == 4) {
     value = genericReduce<ReduceType,Float,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else {
     errorQuda("nSpin = %d not implemeneted",x.Nspin());

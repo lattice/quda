@@ -193,7 +193,7 @@ namespace quda {
       int i_V = 0;
       V.OffsetIndex(i_V, coordV);
       for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
-	for(int ic_c = 0; ic_c < V.NvecPacked(); ic_c++) {  //Coarse Color
+	for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
 	  for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
 	    for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
 	      UV(i, s, ic, ic_c) += G(dir, parity, gauge_index/2, ic, jc) * V(i_V, s, jc, ic_c);
@@ -421,7 +421,8 @@ namespace quda {
       for (int x=0; x<UV.Volume(); x++) 
 	for (int s=0; s<UV.Nspin(); s++) 
 	  for (int c=0; c<UV.Ncolor(); c++) 
-	    norm2 += norm(UV(x,s,c));
+	    for (int v=0; v<UV.Nvec(); v++)
+	      norm2 += norm(UV(x,s,c,v));
 
       printf("UV2[%d] = %e\n", d, norm2);
 
@@ -449,6 +450,15 @@ namespace quda {
 
     printfQuda("Computing coarse diagonal\n");
     coarseDiagonal<Float>(X, ndim, xc_size);
+
+    Float norm2 = 0;
+    for (int x=0; x<X.Volume(); x++)
+      for (int s=0; s<X.Ncolor(); s++) 
+	for (int c=0; c<X.Ncolor(); c++) 
+	  norm2 += norm(X(0,0,x,s,c));
+
+    printf("X2 = %e\n", norm2);
+
 #if 0
     for(int i = 0; i < Y.Volume(); i++) {
       for(int s = 0; s < Y.NspinCoarse(); s++) {
@@ -462,11 +472,12 @@ namespace quda {
     //addMass<Float>(Y[2*ndim], ndim, xc_size, Nc_c, Ns_c, mass);
   }
 
-  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int fineColor, int fineSpin, int coarseDof, int coarseSpin>
+  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, 
+	    int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    typedef typename colorspinor::FieldOrder<Float,fineSpin,fineColor,coarseDof/coarseSpin,csOrder> F;
+    typedef typename colorspinor::FieldOrder<Float,fineSpin,fineColor,coarseColor,csOrder> F;
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
-    typedef typename gauge::FieldOrder<Float,coarseDof,coarseSpin,gOrder> gCoarse;
+    typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
     F vAccessor(const_cast<ColorSpinorField&>(T.Vectors()));
     F uvAccessor(const_cast<ColorSpinorField&>(uv));
@@ -480,14 +491,17 @@ namespace quda {
   // template on the number of coarse degrees of freedom
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int fineColor, int fineSpin>
   void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    if (Y.Ncolor() == 48) { // Ncolor = nColorCoarse * nSpinCoarse
-      if (T.Vectors().Nspin()/T.Spin_bs() == 2) { // coarse spin
-	calculateY<Float,csOrder,gOrder,fineColor,fineSpin,48,2>(Y, X, uv, T, g);
-      } else {
-	errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
-      }
+    if (T.Vectors().Nspin()/T.Spin_bs() != 2) 
+      errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
+    const int coarseSpin = 2;
+    const int coarseColor = Y.Ncolor() / coarseSpin;
+
+    if (coarseColor == 2) { 
+      calculateY<Float,csOrder,gOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, T, g);
+    } else if (coarseColor == 24) {
+      calculateY<Float,csOrder,gOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g);
     } else {
-      errorQuda("Unsupported number of coarse dof%d\n", Y.Ncolor());
+      errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
   }
 
@@ -693,13 +707,13 @@ namespace quda {
   }
 
 
-  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseDof, int coarseSpin>
+  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseColor, int coarseSpin>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, double kappa) {
     int Ns_c = in.Nspin();
     int ndim = in.Ndim();
     
-    typedef typename colorspinor::FieldOrder<Float,coarseSpin,coarseDof/coarseSpin,1,csOrder> F;
-    typedef typename gauge::FieldOrder<Float,coarseDof,coarseSpin,gOrder> G;
+    typedef typename colorspinor::FieldOrder<Float,coarseSpin,coarseColor,1,csOrder> F;
+    typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
 
     F outAccessor(const_cast<ColorSpinorField&>(out));
     F inAccessor(const_cast<ColorSpinorField&>(in));
@@ -711,15 +725,16 @@ namespace quda {
     coarseClover(outAccessor, inAccessor, xAccessor, (Float)kappa);
   }
 
-  // template on the number of coarse degrees of freedom
+  // template on the number of coarse colors
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, double kappa) {
-    if (Y.Ncolor() == 48) { // Ncolor = nColorCoarse * nSpinCoarse
-      if (in.Nspin() == 2) { // coarse spin
-	ApplyCoarse<Float,csOrder,gOrder,48,2>(out, in, Y, X, kappa);
-      } else {
-	errorQuda("Unsupported number of coarse spins %d\n", in.Nspin());
-      }
+    if (in.Nspin() != 2)
+      errorQuda("Unsupported number of coarse spins %d\n",in.Nspin());
+
+    if (in.Ncolor() == 2) { 
+      ApplyCoarse<Float,csOrder,gOrder,24,2>(out, in, Y, X, kappa);
+    } else if (in.Ncolor() == 24) { 
+      ApplyCoarse<Float,csOrder,gOrder,24,2>(out, in, Y, X, kappa);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

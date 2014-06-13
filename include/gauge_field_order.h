@@ -16,6 +16,31 @@ namespace quda {
   
   namespace gauge {
     
+
+    template<typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order> struct Accessor { 
+      mutable complex<Float> dummy;
+      Accessor(const GaugeField &) { }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
+#ifndef __CUDA_ARCH__
+	errorQuda("Not implemented");
+#endif
+	return dummy;
+      }
+    };
+
+    template<typename Float, int nColor, int nSpinCoarse> 
+      struct Accessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> { 
+      complex <Float> *u[QUDA_MAX_DIM];
+      int volumeCB;
+    Accessor(const GaugeField &U) : volumeCB(U.VolumeCB() ) { 
+	for (int d=0; d<U.Ndim(); d++) 
+	  u[d] = static_cast<complex<Float>**>(const_cast<void*>(U.Gauge_p()))[d]; 
+      }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const 
+      { return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col]; }
+    };
+
+
     /**
        This is a template driven generic gauge field accessor.  To
        deploy for a specifc field ordering, the two operator()
@@ -33,7 +58,8 @@ namespace quda {
 	const int nColorCoarse;
 
 	complex<Float> **u;
-	complex<Float> dummy;
+	
+	const Accessor<Float,nColor,nSpinCoarse,order> accessor;
 
       public:
 	/** 
@@ -42,7 +68,7 @@ namespace quda {
 	 */
       FieldOrder(GaugeField &U) : U(U), volumeCB(U.VolumeCB()), 
 	  nDim(U.Ndim()), geometry(U.Geometry()), nColorCoarse(nColor/nSpinCoarse),
-	  u(static_cast<complex<Float>**>(U.Gauge_p())), dummy(0.0,0.0)
+	  u(static_cast<complex<Float>**>(U.Gauge_p())), accessor(U)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	    errorQuda("GaugeField ordering not supported with reconstruction");
@@ -60,13 +86,8 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ const complex<Float>& operator()
-	  (int d, int parity, int x, int row, int col) const {
-#ifndef __CUDA_ARCH__
-	  errorQuda("Not implemented");
-#endif
-	  return complex<Float>(0.0,0.0);
-	}
+	__device__ __host__ const complex<Float>& operator()(int d, int parity, int x, int row, int col) const 
+	{ return accessor(d,parity,x,row,col); }
 
 	/**
 	 * Writable complex-member accessor function
@@ -76,13 +97,8 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ complex<Float>& operator()
-	  (int d, int parity, int x, int row, int col) {
-#ifndef __CUDA_ARCH__
-	  errorQuda("Not implemented");
-#endif
-	  return dummy;
-	}
+	__device__ __host__ complex<Float>& operator() (int d, int parity, int x, int row, int col) 
+	{ return accessor(d,parity,x,row,col); }
 
     	/**
 	 * Specialized read-only complex-member accessor function (for coarse gauge field)
@@ -137,45 +153,6 @@ namespace quda {
 
       };
 
-    template<> __device__ __host__ inline const complex<double>& FieldOrder<double,3,1,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) const {
-      return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
-    }
-    
-    template<> __device__ __host__ inline const complex<float>& FieldOrder<float,3,1,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) const {
-      return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
-    }
-
-    template<> __device__ __host__ inline complex<double>& FieldOrder<double,3,1,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) {
-	return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
-      }
-    
-    template<> __device__ __host__ inline complex<float>& FieldOrder<float,3,1,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) {
-	return u[d][ ((parity * volumeCB + x)*3 + row)*3 + col];
-      }
-
-    template<> __device__ __host__ inline const complex<double>& FieldOrder<double,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) const {
-      return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
-    }
-    
-    template<> __device__ __host__ inline const complex<float>& FieldOrder<float,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) const {
-      return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
-    }
-
-    template<> __device__ __host__ inline complex<double>& FieldOrder<double,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) {
-	return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
-      }
-    
-    template<> __device__ __host__ inline complex<float>& FieldOrder<float,48,2,QUDA_QDP_GAUGE_ORDER>::operator()
-      (int d, int parity, int x, int row, int col) {
-	return u[d][ ((parity * volumeCB + x)*48 + row)*48 + col];
-      }
 
     // a += b*c
     template <typename Float>

@@ -134,7 +134,7 @@ namespace quda {
     typedef FieldOrder<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrder<Float,2,nVec,1,order> coarseSpinor;
     typedef FieldOrder<Float,fineSpin,fineColor,nVec,order> packedSpinor;
-    typedef FieldOrder<Float,fineSpin,fineColor,1,order> tmpSpinor;
+    typedef FieldOrder<Float,fineSpin,nVec,1,order> tmpSpinor;
     typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,tmpSpinor> Arg;
 
     fineSpinor   Out(const_cast<ColorSpinorField&>(out));
@@ -154,7 +154,9 @@ namespace quda {
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		ColorSpinorField &tmp, int nVec, const int *fine_to_coarse, const int *spin_map) {
 
-    if (nVec == 24) {
+    if (nVec == 2) {
+      Prolongate<Float,fineSpin,fineColor,2,order>(out, in, v, tmp, fine_to_coarse, spin_map);
+    } else if (nVec == 24) {
       Prolongate<Float,fineSpin,fineColor,24,order>(out, in, v, tmp, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nVec %d", nVec);

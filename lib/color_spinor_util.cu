@@ -83,9 +83,9 @@ namespace quda {
     }
   }
 
-  template <typename Float, QudaFieldOrder order>
+  // print out the vector at volume point x
+  template <typename Float, int nSpin, int nColor, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
-    if (a.Ncolor() != 3 || a.Nspin() != 4) errorQuda("Not supported");
     FieldOrder<Float,4,3,1,order> A(a);
     if (sourceType == QUDA_RANDOM_SOURCE) random(A);
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
@@ -94,7 +94,28 @@ namespace quda {
     else errorQuda("Unsupported source type %d", sourceType);
   }
 
-  // print out the vector at volume point x
+  template <typename Float, int nSpin, QudaFieldOrder order>
+  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
+    if (a.Ncolor() == 2) {
+      genericSource<Float,nSpin,2,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 3) {
+      genericSource<Float,nSpin,3,order>(a,sourceType, x, s, c);
+    } else {
+      errorQuda("Unsupported nColor=%d\n", a.Ncolor());
+    }
+  }
+
+  template <typename Float, QudaFieldOrder order>
+  void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
+    if (a.Nspin() == 2) {
+      genericSource<Float,2,order>(a,sourceType, x, s, c);
+    } else if (a.Nspin() == 4) {
+      genericSource<Float,4,order>(a,sourceType, x, s, c);
+    } else {
+      errorQuda("Unsupported nSpin=%d\n", a.Nspin());
+    }
+  }
+
   template <typename Float>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
     if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {

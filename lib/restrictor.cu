@@ -205,7 +205,9 @@ namespace quda {
 		ColorSpinorField &tmp, int nVec, const int *fine_to_coarse, 
 		const int *coarse_to_fine, const int *spin_map) {
 
-    if (nVec == 24) {
+    if (nVec == 2) {
+      Restrict<Float,fineSpin,fineColor,2,order>(out, in, v, tmp, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (nVec == 24) {
       Restrict<Float,fineSpin,fineColor,24,order>(out, in, v, tmp, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
       errorQuda("Unsupported nVec %d", nVec);
