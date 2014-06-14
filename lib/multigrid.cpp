@@ -7,7 +7,7 @@ namespace quda {
   MG::MG(MGParam &param, TimeProfile &profile) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), coarse(0), fine(param.fine), 
       param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), matCoarse(0), 
-      hack1(0), hack2(0), hack3(0), hack4(0), y(0) {
+      hack1(0), hack2(0), y(0) {
 
     printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
 
@@ -90,15 +90,13 @@ namespace quda {
       csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
       csParam.setPrecision(csParam.precision);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      hack3 = new cudaColorSpinorField(csParam);  // FIXME allocate cudaSpinorFields
-      hack4 = new cudaColorSpinorField(csParam);   // FIXME allocate cudaSpinorFields
 
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       y = new cudaColorSpinorField(csParam);
 
       // note last two fields are cpu fields!
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
-      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2, *hack3, *hack4);
+      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2);
       std::cout << "MG: level " << param.level << " coarse operator of type " << typeid(matCoarse).name() << "created" << std::endl;
 
       // coarse null space vectors (dummy for now)
@@ -151,8 +149,6 @@ namespace quda {
 
     if (hack1) delete hack1;
     if (hack2) delete hack2;
-    if (hack3) delete hack3;
-    if (hack4) delete hack4;
     if (y) delete y;
   }
 

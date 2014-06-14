@@ -171,88 +171,62 @@ namespace quda {
 
     // restrictor / prolongator defined here
     const Transfer *t;
-    /*
-      The types of these vectors is very important.  If the wrong
-      types are passed, then this will bork.  This is a hack for
-      functionality to work around to the fact that Transfer is only
-      implemented to work on CPU, whereas the Dirac operator will only
-      act on GPU fields.
-     */
-    ColorSpinorField &tmp;  // must be a cpuColorSpinorField double/single with arbitrary ordering
-    ColorSpinorField &tmp2; // must be a cpuColorSpinorField double/single with arbitrary ordering
-    ColorSpinorField &tmp3; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
-    ColorSpinorField &tmp4; // must be a cudaColorSpinorField with QUDA internal ordering and UKQCD Dirac basis
+    ColorSpinorField &tmp;  // fine colorspinor field
+    ColorSpinorField &tmp2; // fine colorspinor field
     cpuGaugeField *Y; //Coarse gauge field
     cpuGaugeField *X; //Coarse clover term
 
     void initializeCoarse();  //Initialize the coarse gauge field
 
   public:
-    DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4) : DiracMatrix(d), t(&t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) {
+  DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2) : DiracMatrix(d), t(&t), tmp(tmp), tmp2(tmp2) {
       initializeCoarse();
     }
       
-      DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2, ColorSpinorField &tmp3, ColorSpinorField &tmp4) : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2), tmp3(tmp3), tmp4(tmp4) {
-	initializeCoarse();
-      }
+  DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2) : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2) {
+      initializeCoarse();
+    }
 	
     ~DiracCoarse() {
-       delete Y;
-       delete X;
+      if (Y) delete Y;
+      if (X) delete X;
     }	
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
 
-      #if 1
+#if 1
       ApplyCoarse(out,in,*Y,*X,dirac->kappa); 
-      #else
-      //errorQuda("Not implemented");
-
+#else
       t->P(tmp, in);
-      //tmp3 = tmp;
       dirac->M(tmp2, tmp);
-      //tmp2 = tmp4;
       t->R(out, tmp2);
-      #endif
+#endif
     }
 
     // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
     {
-      #if 1
+#if 1
       ApplyCoarse(out,in,*Y,*X,dirac->kappa);
-      #else
-      //errorQuda("Not implemented");
-      //printfQuda("Starting DiracCoarse()\n");
-      //printfQuda("Prolongate\n");
+#else
       t->P(tmp, in);
-      //printfQuda("tmp4 = tmp\n");
-      //tmp4 = tmp;
-      //printfQuda("Find dirac(tmp3,dummy)\n");
       dirac->M(tmp2, tmp);
-      //printfQuda("tmp2 = tmp3\n");
-      //tmp2 = tmp3;
-      //printfQuda("Restriction\n");
       t->R(out, tmp2);
-      //prientfQuda("End DiracCoarse()\n");
-      #endif
+#endif
     }
 
     // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
     {
-      #if 1
+#if 1
       ApplyCoarse(out,in,*Y,*X,dirac->kappa);
-      #else
-      //errorQuda("Not implemented");
+#else
       t->P(tmp, in);
-      //tmp3 = tmp;
       dirac->M(tmp2, tmp);
-      //tmp2 = tmp4;
       t->R(out, tmp2);
-      #endif
+#endif
     }
   };
 
