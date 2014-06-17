@@ -51,7 +51,7 @@ namespace quda {
       initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), 
-			  gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
+			  *gauge, &static_cast<const cudaColorSpinorField&>(in), parity, 
 			  dagger, 0, 0, commDim, profile);
     } else {
       errorQuda("Not supported");
@@ -69,7 +69,7 @@ namespace quda {
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
-      staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge,
+      staggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
     } else {

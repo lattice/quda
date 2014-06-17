@@ -50,7 +50,7 @@ namespace quda {
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       
       FullClover cs(clover);
-      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, cs, 
+      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
     } else {
@@ -69,7 +69,7 @@ namespace quda {
       initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       
       FullClover cs(clover);     // regular clover term
-      cloverCuda(&static_cast<cudaColorSpinorField&>(out), gauge, cs, 
+      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		 &static_cast<const cudaColorSpinorField&>(in), parity);
     } else {
       errorQuda("Not implemented");
@@ -145,7 +145,7 @@ namespace quda {
       initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       // needs to be cloverinv
       FullClover cs(clover, true);
-      cloverCuda(&static_cast<cudaColorSpinorField&>(out), gauge, cs, 
+      cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		 &static_cast<const cudaColorSpinorField&>(in), parity);
     } else {
       errorQuda("Not supported");
@@ -168,7 +168,7 @@ namespace quda {
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       
       FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, cs, 
+      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
     } else {
       errorQuda("Not supported");
@@ -190,7 +190,7 @@ namespace quda {
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
       
       FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, cs, 
+      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
     } else {

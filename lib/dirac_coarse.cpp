@@ -3,33 +3,31 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const Dirac &d, const Transfer &t) : DiracMatrix(d), t(&t), Y(0), X(0) 
+  DiracCoarse::DiracCoarse(const DiracParam &param) 
+    : Dirac(param), transfer(param.transfer), dirac(param.dirac), Y(0), X(0) 
   { initializeCoarse(); }
       
-  DiracCoarse::DiracCoarse(const Dirac *d, const Transfer *t) : DiracMatrix(d), t(t), Y(0), X(0) 
-  { initializeCoarse(); }
-  
   DiracCoarse::~DiracCoarse() {
     if (Y) delete Y;
     if (X) delete X;
   }	
 
-  void DiracCoarse::operator()(ColorSpinorField &out, const ColorSpinorField &in) const 
-  { ApplyCoarse(out,in,*Y,*X,dirac->kappa); }
+  void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const 
+  { ApplyCoarse(out,in,*Y,*X,kappa); }
 
   void DiracCoarse::initializeCoarse() {
-    QudaPrecision prec = t->Vectors().Precision();
-    int ndim = t->Vectors().Ndim();
+    QudaPrecision prec = transfer->Vectors().Precision();
+    int ndim = transfer->Vectors().Ndim();
     int x[QUDA_MAX_DIM];
     //Number of coarse sites.
-    const int *geo_bs = t->Geo_bs();
-    for (int i = 0; i < ndim; i++) x[i] = t->Vectors().X(i)/geo_bs[i];
+    const int *geo_bs = transfer->Geo_bs();
+    for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
 
     //Coarse Color
-    int Nc_c = t->nvec();
+    int Nc_c = transfer->nvec();
 
     //Coarse Spin
-    int Ns_c = t->Vectors().Nspin()/t->Spin_bs();
+    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs();
 
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
@@ -49,7 +47,7 @@ namespace quda {
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X = new cpuGaugeField(gParam);
     
-    dirac->createCoarseOp(*t,*Y,*X);
+    dirac->createCoarseOp(*transfer,*Y,*X);
   }
 
 }

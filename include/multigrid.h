@@ -124,7 +124,10 @@ namespace quda {
     ColorSpinorField *x_coarse;
 
     /** The coarse grid operator */
-    DiracCoarse *matCoarse;
+    DiracCoarse *diracCoarse;
+
+    /** Wrapper for the coarse grid operator */
+    DiracMatrix *matCoarse;
 
   public:
     /** 
@@ -164,28 +167,48 @@ namespace quda {
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, 
 		   const GaugeField &X, QudaPrecision precision, double kappa);
 
-  class DiracCoarse : public DiracMatrix {
+  class DiracCoarse : public Dirac {
+
+    const Transfer *transfer;
+    const Dirac *dirac;
 
     // restrictor / prolongator defined here
-    const Transfer *t;
     cpuGaugeField *Y; //Coarse gauge field
     cpuGaugeField *X; //Coarse clover term
 
     void initializeCoarse();  //Initialize the coarse gauge field
 
   public:
-    DiracCoarse(const Dirac &d, const Transfer &t);
-    DiracCoarse(const Dirac *d, const Transfer *t);
+    DiracCoarse(const DiracParam &param);
     virtual ~DiracCoarse();
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+		const QudaParity parity) const {
+      errorQuda("Not implemented");
+    }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
-    { (*this)(out,in); }
+    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			    const QudaParity parity, const ColorSpinorField &x,
+		    const double &k) const {
+      errorQuda("Not implemented");
+    }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
-    { (*this)(out,in); }
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const {
+      errorQuda("Not implemented");
+    }
+
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b, 
+		 const QudaSolutionType) const {
+      errorQuda("Not implemented");
+    }
+
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+		     const QudaSolutionType) const {
+      errorQuda("Not implemented");
+    }
 
   };
 

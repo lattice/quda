@@ -6,7 +6,8 @@ namespace quda {
 
   MG::MG(MGParam &param, TimeProfile &profile) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), coarse(0), fine(param.fine), 
-      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), matCoarse(0) {
+      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), 
+      diracCoarse(0), matCoarse(0) {
 
     printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
 
@@ -89,7 +90,14 @@ namespace quda {
 
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
 
-      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer);
+      DiracParam diracParam;
+      diracParam.transfer = transfer;
+      diracParam.dirac = const_cast<Dirac*>(param.matResidual.Expose());
+      diracParam.kappa = param.matResidual.Expose()->Kappa();
+      diracCoarse = new DiracCoarse(diracParam);
+      matCoarse = new DiracM(*diracCoarse);
+
+
       std::cout << "MG: level " << param.level << " coarse operator of type " << typeid(matCoarse).name() << "created" << std::endl;
 
       // coarse null space vectors (dummy for now)
@@ -128,6 +136,7 @@ namespace quda {
       if (coarse) delete coarse;
       if (transfer) delete transfer;
       if (matCoarse) delete matCoarse;
+      if (diracCoarse) delete diracCoarse;
     }
     if (presmoother) delete presmoother;
     if (postsmoother) delete postsmoother;
