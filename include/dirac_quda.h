@@ -13,6 +13,9 @@
 
 namespace quda {
 
+  class Transfer;
+  class Dirac;
+
   // Params for Dirac operator
   class DiracParam {
 
@@ -36,6 +39,10 @@ namespace quda {
     ColorSpinorField *tmp2; // used by Wilson-like kernels only
 
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
+
+    // for multigrid only
+    Transfer *transfer; 
+    Dirac *dirac;
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
@@ -78,10 +85,9 @@ namespace quda {
     friend class DiracM;
     friend class DiracMdagM;
     friend class DiracMdag;
-    friend class DiracCoarse;
 
   protected:
-    cudaGaugeField &gauge;
+    cudaGaugeField *gauge;
     double kappa;
     double mass;
     MatPCType matpcType;
@@ -127,6 +133,8 @@ namespace quda {
     void setMass(double mass){ this->mass = mass;}
     // Dirac operator factory
     static Dirac* create(const DiracParam &param);
+
+    double Kappa() const { return kappa; }
 
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 
@@ -466,7 +474,7 @@ namespace quda {
   public:
   DiracMatrix(const Dirac &d) : dirac(&d) { }
   DiracMatrix(const Dirac *d) : dirac(d) { }
-    virtual ~DiracMatrix() = 0;
+    virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in,
@@ -480,11 +488,6 @@ namespace quda {
 
     const Dirac* Expose() { return dirac; }
   };
-
-  inline DiracMatrix::~DiracMatrix()
-  {
-
-  }
 
   class DiracM : public DiracMatrix {
 

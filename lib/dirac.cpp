@@ -10,13 +10,13 @@ namespace quda {
   // they all have the same volume, etc. (used to initialize the various CUDA constants).
 
   Dirac::Dirac(const DiracParam &param) 
-    : gauge(*(param.gauge)), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
+    : gauge(param.gauge), kappa(param.kappa), mass(param.mass), matpcType(param.matpcType), 
       dagger(param.dagger), flops(0), tmp1(param.tmp1), tmp2(param.tmp2), tune(QUDA_TUNE_NO),
       profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
-    initLatticeConstants(gauge, profile);
-    initGaugeConstants(gauge, profile);
+    if (param.gauge) initLatticeConstants(*gauge, profile);
+    if (param.gauge) initGaugeConstants(*gauge, profile);
     initDslashConstants(profile);
   }
 
@@ -26,8 +26,8 @@ namespace quda {
       profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
-    initLatticeConstants(gauge, profile);
-    initGaugeConstants(gauge, profile);
+    if (gauge) initLatticeConstants(*gauge, profile);
+    if (gauge) initGaugeConstants(*gauge, profile);
     initDslashConstants(profile);
   }
 
@@ -110,15 +110,15 @@ namespace quda {
     if (!static_cast<const cudaColorSpinorField&>(out).isNative()) errorQuda("Output field is not in native order");
 
     if (out.Ndim() != 5) {
-      if ((out.Volume() != gauge.Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	  (out.Volume() != gauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.VolumeCB());
+      if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	  (out.Volume() != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
       }
     } else {
       // Domain wall fermions, compare 4d volumes not 5d
-      if ((out.Volume()/out.X(4) != gauge.Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	  (out.Volume()/out.X(4) != gauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge.VolumeCB());
+      if ((out.Volume()/out.X(4) != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	  (out.Volume()/out.X(4) != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
       }
     }
   }

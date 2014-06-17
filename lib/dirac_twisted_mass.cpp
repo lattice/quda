@@ -75,7 +75,7 @@ namespace quda {
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
       initConstants(in);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda      
-      twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, 
+      twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			    &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			    0, type, a, b, c, d, commDim, profile);
     } else {
@@ -91,7 +91,7 @@ namespace quda {
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
       initConstants(in);
       setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda      
-      twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), gauge, 
+      twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
 			    &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			    &static_cast<const cudaColorSpinorField&>(x), type, 
 			    a, b, c, d, commDim, profile);
