@@ -126,12 +126,6 @@ namespace quda {
     /** The coarse grid operator */
     DiracCoarse *matCoarse;
 
-    // hack vectors
-    ColorSpinorField *hack1, *hack2, *hack3, *hack4;
-
-    //Auxiliary field to preserve solution vector
-    ColorSpinorField *y;
-
   public:
     /** 
       Constructor for MG class
@@ -174,16 +168,14 @@ namespace quda {
 
     // restrictor / prolongator defined here
     const Transfer *t;
-    ColorSpinorField &tmp;  // fine colorspinor field
-    ColorSpinorField &tmp2; // fine colorspinor field
     cpuGaugeField *Y; //Coarse gauge field
     cpuGaugeField *X; //Coarse clover term
 
     void initializeCoarse();  //Initialize the coarse gauge field
 
   public:
-    DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2);
-    DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2);
+    DiracCoarse(const Dirac &d, const Transfer &t);
+    DiracCoarse(const Dirac *d, const Transfer *t);
     virtual ~DiracCoarse();
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const;

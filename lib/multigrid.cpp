@@ -6,8 +6,7 @@ namespace quda {
 
   MG::MG(MGParam &param, TimeProfile &profile) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), coarse(0), fine(param.fine), 
-      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), matCoarse(0), 
-      hack1(0), hack2(0), y(0) {
+      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), matCoarse(0) {
 
     printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
 
@@ -80,23 +79,17 @@ namespace quda {
       x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
 
       // create coarse grid operator
-      // these need to be cpu fields
-      ColorSpinorParam csParam(*(param.B[0]));
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      hack1 = new cpuColorSpinorField(csParam);
-      hack2 = new cpuColorSpinorField(csParam);
 
       // these need to be gpu fields with native ordering basis
+      ColorSpinorParam csParam(*(param.B[0]));
       csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
       csParam.setPrecision(csParam.precision);
       csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      y = new cudaColorSpinorField(csParam);
 
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
 
-      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2);
+      DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer);
       std::cout << "MG: level " << param.level << " coarse operator of type " << typeid(matCoarse).name() << "created" << std::endl;
 
       // coarse null space vectors (dummy for now)
@@ -134,6 +127,7 @@ namespace quda {
       if (B_coarse) for (int i=0; i<param.Nvec; i++) delete (*B_coarse)[i];
       if (coarse) delete coarse;
       if (transfer) delete transfer;
+      if (matCoarse) delete matCoarse;
     }
     if (presmoother) delete presmoother;
     if (postsmoother) delete postsmoother;
@@ -145,28 +139,26 @@ namespace quda {
     if (param_coarse) delete param_coarse;
     if (param_presmooth) delete param_presmooth;
     if (param_postsmooth) delete param_postsmooth;
-
-    if (matCoarse) delete matCoarse;
-
-    if (hack1) delete hack1;
-    if (hack2) delete hack2;
-    if (y) delete y;
   }
 
   /**
      Verification that the constructed multigrid operator is valid
    */
   void MG::verify() {
+    // temporary fields used for verification
+    ColorSpinorParam csParam(*(param.B[0]));
+    csParam.create = QUDA_NULL_FIELD_CREATE;
+    cpuColorSpinorField *tmp1 = new cpuColorSpinorField(csParam);
+    cpuColorSpinorField *tmp2 = new cpuColorSpinorField(csParam);
+
     printfQuda("\nChecking 0 = (1 - P^\\dagger P) v_k for %d vectors\n", param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *param.B[i]);
 
-      //for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
-
-      transfer->P(*hack2, *r_coarse);
-      printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*hack2));
-      printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *hack2));
+      transfer->P(*tmp2, *r_coarse);
+      printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp2));
+      printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *tmp2));
     }
 #if 0
     printfQuda("\nChecking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", 
@@ -175,43 +167,34 @@ namespace quda {
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *(param.B[i]));
       (*coarse)(*x_coarse, *r_coarse);
-      transfer->P(*hack2, *x_coarse);
-      param.matResidual(*hack1,*hack2);
-      printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*hack1));
-      printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*(param.B[i]), *hack1) / blas::norm2(*param.B[i])) );
+      transfer->P(*tmp2, *x_coarse);
+      param.matResidual(*tmp1,*tmp2);
+      printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp1));
+      printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*(param.B[i]), *tmp1) / blas::norm2(*param.B[i])) );
     }
 #endif
 
     printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c \n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
-    transfer->P(*hack2, *x_coarse);
-    transfer->R(*r_coarse, *hack2);
+    transfer->P(*tmp2, *x_coarse);
+    transfer->R(*r_coarse, *tmp2);
     printfQuda("Vector norms %e %e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     printfQuda("deviation = %e\n", blas::xmyNorm(*x_coarse, *r_coarse));
 
     printfQuda("\nComparing native coarse operator to emulated operator\n");
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
-    //for(int s=0; s<tmp_coarse->Nspin(); s++) {
-    //  for(int c=0; c<tmp_coarse->Ncolor(); c++) {
     blas::zero(*tmp_coarse);
-    //tmp_coarse->Source(QUDA_POINT_SOURCE, 0, s, c);
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
-    //printfQuda("Source s=%d c=%d=\n",s,c);
-    //for (int x=0; x<tmp_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(tmp_coarse)->PrintVector(x);
-    transfer->P(*hack1, *tmp_coarse);
-    param.matResidual(*hack2,*hack1);	
-    transfer->R(*x_coarse, *hack2);
-    //printfQuda("Emulated=\n");
-    //for (int x=0; x<x_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
-    //printfQuda("Native=\n");
+    transfer->P(*tmp1, *tmp_coarse);
+    param.matResidual(*tmp2,*tmp1);	
+    transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
-    //for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     printfQuda("deviation = %e\n\n", blas::xmyNorm(*x_coarse, *r_coarse));
-    //  }
-    //}
+
+    delete tmp1;
+    delete tmp2;
     delete tmp_coarse;
-    
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {

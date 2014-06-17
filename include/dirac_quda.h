@@ -466,7 +466,7 @@ namespace quda {
   public:
   DiracMatrix(const Dirac &d) : dirac(&d) { }
   DiracMatrix(const Dirac *d) : dirac(d) { }
-    virtual ~DiracMatrix() = 0;
+    virtual ~DiracMatrix() { }
 
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
     virtual void operator()(ColorSpinorField &out, const ColorSpinorField &in,
@@ -480,11 +480,6 @@ namespace quda {
 
     const Dirac* Expose() { return dirac; }
   };
-
-  inline DiracMatrix::~DiracMatrix()
-  {
-
-  }
 
   class DiracM : public DiracMatrix {
 

@@ -29,7 +29,6 @@ namespace quda {
     else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = param.siteDim;
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
-
       gauge = (void**) safe_malloc(siteDim * sizeof(void*));
 
       for (int d=0; d<siteDim; d++) {
@@ -66,7 +65,7 @@ namespace quda {
       // Ghost zone is always 2-dimensional    
       for (int i=0; i<nDim; i++) {
 	size_t nbytes = nFace * surface[i] * nInternal * precision;
-	ghost[i] = safe_malloc(nbytes); // no need to use pinned memory for this
+	ghost[i] = nbytes ? safe_malloc(nbytes) : 0; // no need to use pinned memory for this
       }  
 
       if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
@@ -84,6 +83,7 @@ namespace quda {
 
   cpuGaugeField::~cpuGaugeField()
   {
+    
     int siteDim = 0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
