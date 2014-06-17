@@ -94,8 +94,8 @@ namespace quda {
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       y = new cudaColorSpinorField(csParam);
 
-      // note last two fields are cpu fields!
       std::cout << "MG: level " << param.level << " creating coarse operator of type " << typeid(matCoarse).name() << std::endl;
+
       DiracCoarse *matCoarse = new DiracCoarse(param.matResidual.Expose(), transfer, *hack1, *hack2);
       std::cout << "MG: level " << param.level << " coarse operator of type " << typeid(matCoarse).name() << "created" << std::endl;
 
@@ -103,6 +103,7 @@ namespace quda {
       printfQuda("Creating coarse null-space vectors\n");
       B_coarse = new std::vector<ColorSpinorField*>();
       B_coarse->resize(param.Nvec);
+
       for (int i=0; i<param.Nvec; i++) {
 	(*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
 	transfer->R(*(*B_coarse)[i], *(param.B[i]));
@@ -325,56 +326,6 @@ namespace quda {
     }
 
     printfQuda("Done loading vectors\n");
-  }
-
-  void DiracCoarse::initializeCoarse() {
-
-    QudaPrecision prec = t->Vectors().Precision();
-    int ndim = t->Vectors().Ndim();
-    int x[QUDA_MAX_DIM];
-    //Number of coarse sites.
-    const int *geo_bs = t->Geo_bs();
-    for(int i = 0; i < ndim; i++) {
-      x[i] = t->Vectors().X(i)/geo_bs[i];
-    }
-
-    //Coarse Color
-    int Nc_c = t->nvec();
-
-    //Coarse Spin
-    int Ns_c = t->Vectors().Nspin()/t->Spin_bs();
-
-    GaugeFieldParam gParam = new GaugeFieldParam();
-    memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
-    gParam.nColor = Nc_c*Ns_c;
-    gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam.order = QUDA_QDP_GAUGE_ORDER;
-    gParam.link_type = QUDA_COARSE_LINKS;
-    gParam.t_boundary = QUDA_PERIODIC_T;
-    gParam.create = QUDA_ZERO_FIELD_CREATE;
-    gParam.precision = prec;
-    gParam.nDim = ndim;
-    //gParam.siteDim= 2*ndim+1;
-    //gParam.geometry = QUDA_COARSE_GEOMETRY;
-    gParam.geometry = QUDA_VECTOR_GEOMETRY;
-    gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    Y = new cpuGaugeField(gParam);
-
-   GaugeFieldParam gParam2 = new GaugeFieldParam();
-    memcpy(gParam2.x, x, QUDA_MAX_DIM*sizeof(int));
-    gParam2.nColor = Nc_c*Ns_c;
-    gParam2.reconstruct = QUDA_RECONSTRUCT_NO;
-    gParam2.order = QUDA_QDP_GAUGE_ORDER;
-    gParam2.link_type = QUDA_COARSE_LINKS;
-    gParam2.t_boundary = QUDA_PERIODIC_T;
-    gParam2.create = QUDA_ZERO_FIELD_CREATE;
-    gParam2.precision = prec;
-    gParam2.nDim = ndim;
-    gParam2.geometry = QUDA_SCALAR_GEOMETRY;
-    gParam2.siteSubset = QUDA_FULL_SITE_SUBSET;
-    X = new cpuGaugeField(gParam2);
-    
-    dirac->createCoarseOp(*t,*Y,*X);
   }
 
 }

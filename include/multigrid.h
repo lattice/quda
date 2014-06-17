@@ -164,8 +164,11 @@ namespace quda {
       operator()(static_cast<ColorSpinorField&>(out), static_cast<ColorSpinorField&>(in));
     }
   };
+
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, QudaPrecision precision, double kappa);
+
+  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, 
+		   const GaugeField &X, QudaPrecision precision, double kappa);
 
   class DiracCoarse : public DiracMatrix {
 
@@ -179,55 +182,19 @@ namespace quda {
     void initializeCoarse();  //Initialize the coarse gauge field
 
   public:
-  DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2) : DiracMatrix(d), t(&t), tmp(tmp), tmp2(tmp2) {
-      initializeCoarse();
-    }
-      
-  DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2) : DiracMatrix(d), t(t), tmp(tmp), tmp2(tmp2) {
-      initializeCoarse();
-    }
-	
-    ~DiracCoarse() {
-      if (Y) delete Y;
-      if (X) delete X;
-    }	
+    DiracCoarse(const Dirac &d, const Transfer &t, ColorSpinorField &tmp, ColorSpinorField &tmp2);
+    DiracCoarse(const Dirac *d, const Transfer *t, ColorSpinorField &tmp, ColorSpinorField &tmp2);
+    virtual ~DiracCoarse();
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
-    {
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-#if 1
-      ApplyCoarse(out,in,*Y,*X,dirac->kappa); 
-#else
-      t->P(tmp, in);
-      dirac->M(tmp2, tmp);
-      t->R(out, tmp2);
-#endif
-    }
-
-    // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &dummy) const
-    {
-#if 1
-      ApplyCoarse(out,in,*Y,*X,dirac->kappa);
-#else
-      t->P(tmp, in);
-      dirac->M(tmp2, tmp);
-      t->R(out, tmp2);
-#endif
-    }
+    { (*this)(out,in); }
 
-    // FIXME - additional dummy fields not used
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
 		    ColorSpinorField &dummy, ColorSpinorField &dummy2) const
-    {
-#if 1
-      ApplyCoarse(out,in,*Y,*X,dirac->kappa);
-#else
-      t->P(tmp, in);
-      dirac->M(tmp2, tmp);
-      t->R(out, tmp2);
-#endif
-    }
+    { (*this)(out,in); }
+
   };
 
 } // namespace quda

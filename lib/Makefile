@@ -3,9 +3,9 @@ include ../make.inc
 QUDA = libquda.a
 
 # put the long to compile files at the end for easier header debugging
-QUDA_OBJS = coarse_op.o multigrid.o transfer.o transfer_util.o		\
-	prolongator.o restrictor.o timer.o malloc.o solver.o		\
-	gauge_phase.o timer.o malloc.o solver.o			\
+QUDA_OBJS = dirac_coarse.o coarse_op.o multigrid.o transfer.o		\
+	transfer_util.o prolongator.o restrictor.o timer.o malloc.o	\
+	solver.o gauge_phase.o timer.o malloc.o solver.o		\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
 	inv_gcr_quda.o inv_mr_quda.o inv_mre.o interface_quda.o		\
 	util_quda.o color_spinor_field.o color_spinor_util.o		\
@@ -21,10 +21,14 @@ QUDA_OBJS = coarse_op.o multigrid.o transfer.o transfer_util.o		\
 	${COMM_OBJS} ${NUMA_AFFINITY_OBJS} clover_deriv_quda.o		\
 	clover_invert.o copy_gauge_extended.o				\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
-	copy_gauge.o copy_clover.o staggered_oprod.o			\
-	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
-	unitarize_force_quda.o unitarize_links_quda.o			\
-	milc_interface.o
+	copy_color_spinor_dd.o copy_color_spinor_ds.o			\
+	copy_color_spinor_dh.o copy_color_spinor_sd.o			\
+	copy_color_spinor_ss.o copy_color_spinor_sh.o			\
+	copy_color_spinor_hd.o copy_color_spinor_hs.o			\
+	copy_color_spinor_hh.o copy_gauge.o copy_clover.o		\
+	staggered_oprod.o clover_trace_quda.o ks_force_quda.o		\
+	hisq_paths_force_quda.o unitarize_force_quda.o			\
+	unitarize_links_quda.o milc_interface.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
