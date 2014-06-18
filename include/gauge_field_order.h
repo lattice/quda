@@ -151,6 +151,16 @@ namespace quda {
 	/** Returns the number of coarse gauge field colors */
 	__device__ __host__ inline int NcolorCoarse() const { return nColorCoarse; }
 
+
+	__host__ double norm2(int dim) const {
+	  double nrm2 = 0.0;
+	  for (int parity=0; parity<2; parity++)
+	    for (int x_cb=0; x_cb<volumeCB; x_cb++)
+	      for (int row=0; row<nColor; row++)
+		for (int col=0; col<nColor; col++)
+		  nrm2 += norm((*this)(dim,parity,x_cb,row,col));
+	  return nrm2;
+	}
       };
 
 

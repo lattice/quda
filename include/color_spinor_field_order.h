@@ -429,6 +429,17 @@ namespace quda {
       /** Returns the number of packed spins (for mg prolongator) */
       //__device__ __host__ inline int NspinPacked() const { return nSpin; }    
 
+      __host__ double norm2() const {
+	double nrm2 = 0.0;
+	for (int parity=0; parity<2; parity++)
+	  for (int x_cb=0; x_cb<volume/2; x_cb++)
+	    for (int s=0; s<nSpin; s++)
+	      for (int c=0; c<nColor; c++)
+		for (int v=0; v<nVec; v++)
+		  nrm2 += norm((*this)(parity,x_cb,s,c,v));
+	return nrm2;
+      }
+
     };
 
     template <typename Float, int Ns, int Nc, int N>
