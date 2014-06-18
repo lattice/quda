@@ -8,21 +8,21 @@
 namespace quda {
 
   //A simple Euclidean gamma matrix class for use with the Wilson projectors.
-  template <typename ValueType>
+  template <typename ValueType, QudaGammaBasis basis, int dir>
   class Gamma {
   private:
-    int ndim;
+    const int ndim;
 
   protected:
 
     //Which gamma matrix (dir = 0,4)
     //dir = 0: gamma^1, dir = 1: gamma^2, dir = 2: gamma^3, dir = 3: gamma^4, dir =4: gamma^5
-    int dir;
+    //int dir;
 
     //The basis to be used.
     //QUDA_DEGRAND_ROSSI_GAMMA_BASIS is the chiral basis
     //QUDA_UKQCD_GAMMA_BASIS is the non-relativistic basis.
-    QudaGammaBasis basis;
+    //QudaGammaBasis basis;
 
     //The column with the non-zero element for each row
     int coupling[4];
@@ -31,7 +31,7 @@ namespace quda {
 
   public:
 
-    Gamma(int dir, QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS) : ndim(4), dir(dir), basis(basis) {
+    Gamma() : ndim(4) {
       complex<ValueType> I(0,1);
       if((dir==0) || (dir==1)) {
 	coupling[0] = 3;
@@ -120,7 +120,7 @@ namespace quda {
       }
     } 
 
-    Gamma(const Gamma &g) : ndim(4), dir(g.dir), basis(g.basis) {
+    Gamma(const Gamma &g) : ndim(4) {
       for(int i = 0; i < ndim+1; i++) {
 	coupling[i] = g.coupling[i];
 	elem[i] = g.elem[i];
@@ -131,11 +131,7 @@ namespace quda {
 
     //Returns the matrix element.
     __device__ __host__ inline complex<ValueType> getelem(int row, int col) const {
-      if(coupling[row] == col) {
-	return elem[row];
-      } else {
-	return 0;
-      }
+      return coupling[row] == col ? elem[row] : 0;
     }
 
     //Like getelem, but one only needs to specify the row.
@@ -164,7 +160,7 @@ namespace quda {
     return gauge_index;
   }
 
-  #define PARITY_LOOP
+  //#define PARITY_LOOP
 
 #ifndef PARITY_LOOP
   //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
@@ -203,8 +199,8 @@ namespace quda {
     }  //Volume
   }  //UV
 
-  template<typename Float, typename F, typename coarseGauge, typename fineGauge>
-  void computeVUV(int dir, coarseGauge &Y, coarseGauge &X, const F &UV, const F &V, const Gamma<Float> &gamma, int ndim, const fineGauge &G, const int *x_size, const int *xc_size, const int *geo_bs, int spin_bs) {
+  template<typename Float, int dir, typename F, typename coarseGauge, typename fineGauge, typename Gamma>
+  void computeVUV(coarseGauge &Y, coarseGauge &X, const F &UV, const F &V, const Gamma &gamma, int ndim, const fineGauge &G, const int *x_size, const int *xc_size, const int *geo_bs, int spin_bs) {
 
     for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
 
@@ -381,9 +377,9 @@ namespace quda {
 
   }  //UV
 
-  template<typename Float, int dir, typename F, typename coarseGauge, typename fineGauge>
+  template<typename Float, int dir, typename F, typename coarseGauge, typename fineGauge, typename Gamma>
   void computeVUV(coarseGauge &Y, coarseGauge &X, const F &UV, const F &V, 
-		  const Gamma<Float> &gamma, int ndim, const fineGauge &G, const int *x_size, 
+		  const Gamma &gamma, int ndim, const fineGauge &G, const int *x_size, 
 		  const int *xc_size, const int *geo_bs, int spin_bs) {
 
     const Float half = 0.5;
@@ -409,6 +405,7 @@ namespace quda {
 	      //adjacent site is in same block, M = X, else M = Y
 	      coarseGauge &M = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? X : Y;
 	      int dim_index = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? 0 : dir;
+	      coord[0] /= 2;
 	      
 	      for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin
 		//Spin part of the color matrix.  Will always consist
@@ -440,7 +437,6 @@ namespace quda {
 
 	      } //Fine spin
 
-	      coord[0] /= 2;
 	      x_cb++;
 	    } // coord[0]
 	  } // coord[1]
@@ -527,6 +523,10 @@ namespace quda {
     int spin_bs = V.Nspin()/Y.NspinCoarse();
 #endif
 
+    if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
+      errorQuda("Gamma basis not supported");
+    const QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+
     for(int d = 0; d < ndim; d++) {
       //First calculate UV
       setZero<Float,F>(UV);
@@ -537,15 +537,21 @@ namespace quda {
       else if (d==2) computeUV<Float,2>(UV, V, G, ndim, x_size);
       else computeUV<Float,3>(UV, V, G, ndim, x_size);
 
-      //Gamma matrix for this direction
-      Gamma<Float> gamma(d, UV.GammaBasis());
-
       printfQuda("Computing %d VUV\n", d);
       //Calculate VUV for this direction, accumulate in the appropriate place
-      if (d==0) computeVUV<Float,0>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
-      else if (d==1) computeVUV<Float,1>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
-      else if (d==2) computeVUV<Float,2>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
-      else computeVUV<Float,3>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+      if (d==0) {
+	Gamma<Float, basis, 0> gamma;
+	computeVUV<Float,0>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+      } else if (d==1) {
+	Gamma<Float, basis, 1> gamma;
+	computeVUV<Float,1>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+      } else if (d==2) {
+	Gamma<Float, basis, 2> gamma;
+	computeVUV<Float,2>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+      } else {
+	Gamma<Float, basis, 3> gamma;
+	computeVUV<Float,3>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+      }
 
       Float norm2 = 0;
       for (int parity = 0; parity<2; parity++) 
