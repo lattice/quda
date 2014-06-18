@@ -355,7 +355,7 @@ namespace quda {
 	      if (dir==0) coord[0] = 2*coord[0] + parity;
 	      coord[dir] = (coord[dir]+1)%x_size[dir];
 	      if (dir==0) coord[0] /= 2;
-	      int y_cb = ((coord[3]*x_size[2]+coord[2])*x_size[1]+coord[1])*x_size[0]/2 + coord[0];
+	      int y_cb = ((coord[3]*x_size[2]+coord[2])*x_size[1]+coord[1])*(x_size[0]/2) + coord[0];
 		
 	      for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
 		for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
@@ -401,18 +401,16 @@ namespace quda {
 	      //Check to see if we are on the edge of a block, i.e.
 	      //if this color matrix connects adjacent blocks.  If
 	      //adjacent site is in same block, M = X, else M = Y
-	      coarseGauge &M = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? X : Y;
-	      int dim_index = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? 0 : dir;
+	      const bool isDiagonal = ((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir] ? true : false;
+	      coarseGauge &M =  isDiagonal ? X : Y;
+	      const int dim_index = isDiagonal ? 0 : dir;
 	      coord[0] /= 2;
 	      
-	      // int coarse_parity = 0;
-	      //int coarse_x_cb = gauge_offset_index(coord_coarse, xc_size, ndim, coarse_parity) / 2;
-
 	      int coarse_parity = 0;
-	      for (int d=0; d<nDim; d++) coarse_parity += coarse_coord[d];
+	      for (int d=0; d<ndim; d++) coarse_parity += coord_coarse[d];
 	      coarse_parity &= 1;
-	      coarse_coord[0] /= 2;
-	      int coarse_x_cb = ((coarse_coord[3]*xc_size[2]+coarse_coord[2])*xc_size[1]+coarse_coord[1])*xc_size[0]/2 + coarse_coord[0];
+	      coord_coarse[0] /= 2;
+	      int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
 	      
 	      for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin
 		//Spin part of the color matrix.  Will always consist
@@ -463,7 +461,6 @@ namespace quda {
     complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
 	
     for (int parity=0; parity<2; parity++) {
-      int x_cb = 0;
       for (int x_cb=0; x_cb<X.Volume()/2; x_cb++) {
 
 	for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
