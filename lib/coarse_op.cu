@@ -160,186 +160,6 @@ namespace quda {
     return gauge_index;
   }
 
-      #define PARITY_LOOP
-
-#ifndef PARITY_LOOP
-  //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
-  //Where:
-  //mu = dir
-  //s = fine spin
-  //c' = coarse color
-  //c = fine color
-  //FIXME: N.B. Only works if color-spin field and gauge field are parity ordered in the same way.  Need LatticeIndex function for generic ordering
-  template<typename Float, int dir, typename F, typename fineGauge>
-  void computeUV(F &UV, const F &V, const fineGauge &G, int ndim, const int *x_size) {
-	
-    for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
-      //U connects site x to site x+mu.  Thus, V lives at site x+mu if U_mu lives at site x.
-      //FIXME: Uses LatticeIndex() for the color spinor field to determine gauge field index.
-      //This only works if sites are ordered same way in both G and V.
-      int coord[QUDA_MAX_DIM];
-      V.LatticeIndex(coord, i);
-      int parity = 0;
-      int gauge_index_cb = gauge_offset_index(coord, x_size, ndim, parity) / 2;
-      //int gauge_index_cb = i - parity*V.Volume()/2;
-
-      //Shift the V field w/respect to G
-      coord[dir] = (coord[dir]+1)%x_size[dir];
-      int i_V = 0;
-      V.OffsetIndex(i_V, coord);
-      for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
-	for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
-	  for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
-	    for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
-	      UV(i, s, ic, ic_c) += G(dir, parity, gauge_index_cb, ic, jc) * V(i_V, s, jc, ic_c);
-	    }  //Fine color columns
-	  }  //Fine color rows
-	}  //Coarse color
-      }  //Fine Spin
-    }  //Volume
-  }  //UV
-
-  template<typename Float, int dir, typename F, typename coarseGauge, typename fineGauge, typename Gamma>
-  void computeVUV(coarseGauge &Y, coarseGauge &X, const F &UV, const F &V, const Gamma &gamma, int ndim, const fineGauge &G, const int *x_size, const int *xc_size, const int *geo_bs, int spin_bs) {
-
-    for(int i = 0; i < V.Volume(); i++) {  //Loop over entire fine lattice volume i.e. both parities
-
-      Float half = 1.0/2.0;
-      int coord[QUDA_MAX_DIM];
-      int coord_coarse[QUDA_MAX_DIM];
-      int coarse_size = 1;
-      int coarse_parity = 0;
-      V.LatticeIndex(coord, i);
-      for(int d = ndim-1; d >= 0; d--) {
-	coord_coarse[d] = coord[d]/geo_bs[d];
-	coarse_size *= xc_size[d];
-      }
-      int coarse_index_cb = gauge_offset_index(coord_coarse, xc_size, ndim, coarse_parity) / 2;
-
-      //Check to see if we are on the edge of a block, i.e.
-      //if this color matrix connects adjacent blocks.
-      coarseGauge *M;
-      //int dim_index = 2*dir+1;
-      int dim_index = dir;
-      //If adjacent site is in same block, M = X
-      if(((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) {
-	M = &X;
-	dim_index = 0;
-      }
-      //If adjacent site is in different block, M = Y
-      else {
-     	M = &Y;
-      }
-
-      int parity;
-      int x_cb = gauge_offset_index(coord,x_size,ndim,parity) / 2;
-
-      //printf("dir = %d (%d,%d,%d,%d)=(%d,%d) (%d,%d,%d,%d)=(%d,%d)\n", dir, 
-      //   coord[0], coord[1], coord[2], coord[3], x_cb, parity,
-      //   coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3], coarse_index_cb, coarse_parity);
-
-      for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin
-
-	//Spin part of the color matrix.  Will always
-	//consist of two terms - diagonal and off-diagonal part
-	//of P_mu = (1+\gamma_mu)
-
-	//Coarse spin row index
-	int s_c_row = s/spin_bs;
-
-	//Use Gamma to calculate off-diagonal coupling and
-	//column index.  Diagonal coupling is always 1.
-	int s_col;
-	complex<Float> coupling = gamma.getrowelem(s, s_col);
-	int s_c_col = s_col/spin_bs;
-
-	for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
-	  for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
-
-	    for(int ic = 0; ic < G.Ncolor(); ic++) { //Sum over fine color
-	      //Diagonal Spin
-	      (*M)(dim_index,coarse_parity,coarse_index_cb,s_c_row,s_c_row,ic_c,jc_c) += half * conj(V(i, s, ic, ic_c)) * UV(i, s, ic, jc_c); 
-
-	      //Off-diagonal Spin
-	      (*M)(dim_index,coarse_parity,coarse_index_cb,s_c_row,s_c_col,ic_c,jc_c) += half * coupling * conj(V(i, s, ic, ic_c)) * UV(i, s_col, ic, jc_c);
-	    } //Fine color
-	  } //Coarse Color column
-	} //Coarse Color row
-
-      } //Fine spin
-
-    } //Volume
-
-  }
-
- //Adds the reverse links to the coarse diagonal term, which is just
-  //the conjugate of the existing coarse diagonal term but with
-  //plus/minus signs for off-diagonal spin components
-  //Also add the diagonal mass term from the original fine wilson operator:
-  template<typename Float, typename Gauge>
-  void coarseDiagonal(Gauge &X, int ndim, const int *xc_size) {
-    int csize = 1;
-    for(int d = 0; d < ndim; d++) {
-      csize *= xc_size[d];
-    }
-
-    const int nColor = X.NcolorCoarse();
-    const int nSpin = X.NspinCoarse();
-    const int local = nSpin*nSpin*nColor*nColor;
-    complex<Float> *Xlocal = new complex<Float>[local];
-	
-    for(int i = 0; i < csize; i++) { //Volume
-      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
-	for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-	     
-	  //Copy the Hermitian conjugate term to temp location 
-	  for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-	    for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
-	      //Flip s_col, s_row on the rhs because of Hermitian conjugation.  Color part left untransposed.
-	      Xlocal[nColor*nColor*(nSpin*s_col+s_row)+nColor*ic_c+jc_c] = X(0,i%2,i/2,s_row, s_col, ic_c, jc_c);
-	    }	
-	  }
-	}
-      }
-
-      for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
-	for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
-
-	  Float sign = 1.0;	
-	  if(s_row != s_col) {
-	    sign = -1.0;
-	  }
-
-	  for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
-	    for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
-	      //Transpose color part
-	      X(0,i%2,i/2,s_row,s_col,ic_c,jc_c) =  sign*X(0,i%2,i/2,s_row,s_col,ic_c,jc_c)+conj(Xlocal[nColor*nColor*(nSpin*s_row+s_col)+nColor*jc_c+ic_c]);
-	    } //Color column
-	  } //Color row
-	} //Spin column
-      } //Spin row
-
-
-    } //Volume
-    delete [] Xlocal;
-  }
-
-  //Zero out a field, using the accessor.
-  template<typename Float, typename F>
-  void setZero(F &f) {
-    for(int i = 0; i < f.Volume(); i++) {
-      for(int s = 0; s < f.Nspin(); s++) {
-	for(int c = 0; c < f.Ncolor(); c++) {
-	  for(int v = 0; v < f.Nvec(); v++) {
-	    f(i,s,c,v) = (Float) 0.0;
-	  }
-        }
-      }
-    }
-  }
-
-#else
-
   //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
   //Where:
   //mu = dir
@@ -388,14 +208,15 @@ namespace quda {
 
   template<typename Float, int dir, typename F, typename coarseGauge, typename fineGauge, typename Gamma>
   void computeVUV(coarseGauge &Y, coarseGauge &X, const F &UV, const F &V, 
-		  const Gamma &gamma, int ndim, const fineGauge &G, const int *x_size, 
+		  const Gamma &gamma, const fineGauge &G, const int *x_size, 
 		  const int *xc_size, const int *geo_bs, int spin_bs) {
 
+    const int nDim = 4;
     const Float half = 0.5;
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
     int coarse_size = 1;
-    for(int d = ndim-1; d >= 0; d--) coarse_size *= xc_size[d];
+    for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
 
     for (int parity=0; parity<2; parity++) {
       int x_cb = 0;
@@ -406,7 +227,7 @@ namespace quda {
 
 	      int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
 	      coord[0] = 2*coord[0] + oddBit;
-	      for(int d = ndim-1; d >= 0; d--) coord_coarse[d] = coord[d]/geo_bs[d];
+	      for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
 
 	      //Check to see if we are on the edge of a block, i.e.
 	      //if this color matrix connects adjacent blocks.  If
@@ -420,12 +241,12 @@ namespace quda {
 	      //   coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3]);
 
 	      int coarse_parity = 0;
-	      for (int d=0; d<ndim; d++) coarse_parity += coord_coarse[d];
+	      for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
 	      coarse_parity &= 1;
 	      coord_coarse[0] /= 2;
 	      int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
 	      
-	      printf("(%d,%d)\n", coarse_x_cb, coarse_parity);
+	      //printf("(%d,%d)\n", coarse_x_cb, coarse_parity);
 
 	      coord[0] /= 2;
 
@@ -531,71 +352,52 @@ namespace quda {
     }
   }
 
-#endif
-
   //Does the heavy lifting of creating the coarse color matrices Y
   template<typename Float, typename F, typename coarseGauge, typename fineGauge>
   void calculateY(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, const int *x_size) {
-#if 1
-    int ndim = G.Ndim();
-    const int *xc_size = Y.Field().X();
-    int geo_bs[QUDA_MAX_DIM]; 
-    for(int d = 0; d < ndim; d++) geo_bs[d] = x_size[d]/xc_size[d];
-    int spin_bs = V.Nspin()/Y.NspinCoarse();
-#endif
-
-    if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
-      errorQuda("Gamma basis not supported");
+    if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
     const QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
-    for(int d = 0; d < ndim; d++) {
+    if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
+    const int nDim = 4;
+
+    const int *xc_size = Y.Field().X();
+    int geo_bs[QUDA_MAX_DIM]; 
+    for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
+    int spin_bs = V.Nspin()/Y.NspinCoarse();
+
+    for(int d = 0; d < nDim; d++) {
       //First calculate UV
       setZero<Float,F>(UV);
 
-      printfQuda("Computing %d UV\n", d); fflush(stdout);
-      if (d==0) computeUV<Float,0>(UV, V, G, ndim, x_size);
-      else if (d==1) computeUV<Float,1>(UV, V, G, ndim, x_size);
-      else if (d==2) computeUV<Float,2>(UV, V, G, ndim, x_size);
-      else computeUV<Float,3>(UV, V, G, ndim, x_size);
-
-      printfQuda("Computing %d VUV\n", d);
-      //Calculate VUV for this direction, accumulate in the appropriate place
+      printfQuda("Computing %d UV and VUV\n", d);
+      //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y
       if (d==0) {
+	computeUV<Float,0>(UV, V, G, nDim, x_size);
 	Gamma<Float, basis, 0> gamma;
-	computeVUV<Float,0>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+	computeVUV<Float,0>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       } else if (d==1) {
+	computeUV<Float,1>(UV, V, G, nDim, x_size);
 	Gamma<Float, basis, 1> gamma;
-	computeVUV<Float,1>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+	computeVUV<Float,1>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       } else if (d==2) {
+	computeUV<Float,2>(UV, V, G, nDim, x_size);
 	Gamma<Float, basis, 2> gamma;
-	computeVUV<Float,2>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+	computeVUV<Float,2>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       } else {
+	computeUV<Float,3>(UV, V, G, nDim, x_size);
 	Gamma<Float, basis, 3> gamma;
-	computeVUV<Float,3>(Y, X, UV, V, gamma, ndim, G, x_size, xc_size, geo_bs, spin_bs);
+	computeVUV<Float,3>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       }
 
-      Float norm2 = 0;
-      for (int parity = 0; parity<2; parity++) 
-	for (int x_cb=0; x_cb<UV.Volume()/2; x_cb++) 
-	  for (int s=0; s<UV.Nspin(); s++) 
-	    for (int c=0; c<UV.Ncolor(); c++) 
-	      for (int v=0; v<UV.Nvec(); v++)
-#ifdef PARITY_LOOP
-		norm2 += norm(UV(parity,x_cb,s,c,v));
-#else
-      norm2 += norm(UV(parity*UV.Volume()/2+x_cb,s,c,v));
-#endif
+      printf("UV2[%d] = %e\n", d, UV.norm2());
+      printf("Y2[%d] = %e\n", d, Y.norm2(d));
+    }
 
-      printf("UV2[%d] = %e\n", d, norm2);
-
-      norm2 = 0.0;
-      for (int parity = 0; parity<2; parity++) 
-	for (int x_cb=0; x_cb<Y.Volume()/2; x_cb++)
-	  for (int s=0; s<Y.Ncolor(); s++) 
-	    for (int c=0; c<Y.Ncolor(); c++) 
-	      norm2 += norm(Y(d,parity,x_cb,s,c));
-
-      printf("Y2[%d] = %e\n", d, norm2);
+    printf("X2 = %e\n", X.norm2(0));
+    printfQuda("Computing coarse diagonal\n");
+    coarseDiagonal<Float>(X, nDim, xc_size);
+    printf("X2 = %e\n", X.norm2(0));
 
 #if 0
       for(int i = 0; i < Y.Volume(); i++) {
@@ -605,31 +407,7 @@ namespace quda {
               for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
                 printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e, Y(2*d+1) = %e %e\n",d,i,s,s_col,c,c_col,Y(2*d,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d,i%2,i/2,s,s_col,c,c_col).imag(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).imag());
               }}}}}
-#endif
-    }
 
-    Float norm2 = 0;
-    for (int parity=0; parity<2; parity++)
-      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++)
-	for (int s=0; s<X.Ncolor(); s++) 
-	  for (int c=0; c<X.Ncolor(); c++) 
-	    norm2 += norm(X(0,parity,x_cb,s,c));
-
-    printf("X2 = %e\n", norm2);
-
-    printfQuda("Computing coarse diagonal\n");
-    coarseDiagonal<Float>(X, ndim, xc_size);
-
-    norm2 = 0;
-    for (int parity=0; parity<2; parity++)
-      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++)
-	for (int s=0; s<X.Ncolor(); s++) 
-	  for (int c=0; c<X.Ncolor(); c++) 
-	    norm2 += norm(X(0,parity,x_cb,s,c));
-
-    printf("X2 = %e\n", norm2);
-
-#if 0
     for(int i = 0; i < Y.Volume(); i++) {
       for(int s = 0; s < Y.NspinCoarse(); s++) {
 	for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
@@ -643,11 +421,7 @@ namespace quda {
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, 
 	    int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-#ifndef PARITY_LOOP
-    typedef typename colorspinor::FieldOrder<Float,fineSpin,fineColor,coarseColor,csOrder> F;
-#else
     typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder> F;
-#endif
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
 
