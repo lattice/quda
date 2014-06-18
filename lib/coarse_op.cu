@@ -535,83 +535,6 @@ namespace quda {
 
     calculateY(Y, X, uv, T, g);
   }  
-#if 0
-  //Apply the coarse Dslash to a vector:
-  //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
-  template<typename Float, typename F, typename Gauge>
-  void coarseDslash(F &out, F &in, Gauge &Y) {
-    int Nc = in.Ncolor();
-    int Ns = in.Nspin();
-    int ndim = in.Ndim();
-    int sites = in.Volume();
-    int x_size[QUDA_MAX_DIM];
-    for(int d = 0; d < ndim; d++) x_size[d] = in.X(d);
-
-    for(int i = 0; i < sites; i++) { //Volume
-      int coord[QUDA_MAX_DIM];
-      int parity = 0;
-      int gauge_index = 0;
-      in.LatticeIndex(coord,i);
-      gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
-
-      for(int d = 0; d < ndim; d++) { //Ndim
-
-	int forward[QUDA_MAX_DIM];
-	int forward_spinor_index;
-
-        //We need the coordinates of the forward site to index into the "out" field.
-        //We need the coordinates of the backward site to index into the "out" field, 
-	//as well as to retrieve the gauge field there for parallel transport.
-	in.LatticeIndex(forward,i);
-	forward[d] = (forward[d] + 1)%x_size[d];
-	out.OffsetIndex(forward_spinor_index, forward);
-
-        for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
-	  for(int c_row = 0; c_row < Nc; c_row++) { //Color row
-            for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-              for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-	        //Forward link  
-		out(forward_spinor_index, s_row, c_row) += conj(Y(d,parity, gauge_index/2, s_col, s_row, c_col, c_row))*in(i, s_col, c_col);
-	      } //Color column
-	    } //Spin column
-	  } //Color row
-        } //Spin row 
-
-	int backward[QUDA_MAX_DIM];
-        int backward_spinor_index;
-	int backward_gauge_index = 0;
-        int backward_parity = 0;
-
-        in.LatticeIndex(backward,i);
-	backward[d] = (backward[d] - 1 + x_size[d])%x_size[d];
-	out.OffsetIndex(backward_spinor_index, backward);
-
-        for(int dim = ndim-1; dim >= 0; dim--) {
-          backward_parity += backward[dim];
-          backward_gauge_index *= x_size[dim];
-          backward_gauge_index += backward[dim];
-        }
-	backward_parity = backward_parity%2;
-
-        for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
-	  for(int c_row = 0; c_row < Nc; c_row++) { //Color row
-            for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-
-	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
-
-              for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-	        //Backward link
-		out(backward_spinor_index, s_row, c_row) += sign*Y(d, backward_parity, backward_gauge_index/2, s_row, s_col, c_row, c_col)*in(i, s_col, c_col);
-	      } //Color column
-	    } //Spin column
-	  } //Color row
-        } //Spin row 
-      } //Ndim
-
-    }//Volume
-
-  }
-#else
 
  //Apply the coarse Dslash to a vector:
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
@@ -620,128 +543,77 @@ namespace quda {
     int Nc = in.Ncolor();
     int Ns = in.Nspin();
     int ndim = in.Ndim();
-    int sites = in.Volume();
     int x_size[QUDA_MAX_DIM];
     for(int d = 0; d < ndim; d++) x_size[d] = in.X(d);
 
-    for(int i = 0; i < sites; i++) { //Volume
-      int coord[QUDA_MAX_DIM];
-      int parity = 0;
-      int gauge_index = 0;
-      in.LatticeIndex(coord,i);
-      gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
+    for (int parity=0; parity<2; parity++) {
+      for(int x_cb = 0; x_cb < in.Volume()/2; x_cb++) { //Volume
+	int coord[QUDA_MAX_DIM];
+	in.LatticeIndex(coord,parity*in.Volume()/2+x_cb);
 
-      for(int s = 0; s < Ns; s++) for(int c = 0; c < Nc; c++) out(i, s, c) = (Float)0.0; 
+	for(int s = 0; s < Ns; s++) for(int c = 0; c < Nc; c++) out(parity, x_cb, s, c) = (Float)0.0; 
 
-      for(int d = 0; d < ndim; d++) { //Ndim
+	for(int d = 0; d < ndim; d++) { //Ndim
+	  //Forward link - compute fwd offset for spinor fetch
+	  int coordTmp = coord[d];
+	  coord[d] = (coord[d] + 1)%x_size[d];
+	  int fwd_idx = 0;
+	  for(int dim = ndim-1; dim >= 0; dim--) fwd_idx = x_size[dim] * fwd_idx + coord[dim];
+	  coord[d] = coordTmp;
 
-	int forward[QUDA_MAX_DIM];
-	int forward_spinor_index;
+	  for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
+	    for(int c_row = 0; c_row < Nc; c_row++) { //Color row
+	      for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
+		Float sign = (s_row == s_col) ? 1.0 : -1.0;    
+		for(int c_col = 0; c_col < Nc; c_col++) { //Color column
+		  out(parity, x_cb, s_row, c_row) += sign*Y(d, parity, x_cb, s_row, s_col, c_row, c_col)
+		    * in((parity+1)&1, fwd_idx/2, s_col, c_col);
+		} //Color column
+	      } //Spin column
+	    } //Color row
+	  } //Spin row 
 
-        //We need the coordinates of the forward site to index into the "out" field.
-        //We need the coordinates of the backward site to index into the "out" field, 
-	//as well as to retrieve the gauge field there for parallel transport.
-	in.LatticeIndex(forward,i);
-	forward[d] = (forward[d] + 1)%x_size[d];
-	out.OffsetIndex(forward_spinor_index, forward);
+	  //Backward link - compute back offset for spinor and gauge fetch
+	  int back_idx = 0;
+	  coord[d] = (coordTmp - 1 + x_size[d])%x_size[d];
+	  for(int dim = ndim-1; dim >= 0; dim--) back_idx = x_size[dim] * back_idx + coord[dim];
+	  coord[d] = coordTmp;
 
-        for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
-	  for(int c_row = 0; c_row < Nc; c_row++) { //Color row
-            for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
+	  for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
+	    for(int c_row = 0; c_row < Nc; c_row++) { //Color row
+	      for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
+		for(int c_col = 0; c_col < Nc; c_col++) { //Color column
+		  out(parity, x_cb, s_row, c_row) += conj(Y(d,(parity+1)&1, back_idx/2, s_col, s_row, c_col, c_row))
+		    * in((parity+1)&1, back_idx/2, s_col, c_col);
+		} //Color column
+	      } //Spin column
+	    } //Color row
+	  } //Spin row 
+	} //Ndim
 
-              for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-	        //Forward link  
-		out(i, s_row, c_row) += sign*Y(d, parity, gauge_index/2, s_row, s_col, c_row, c_col)
-		  * in(forward_spinor_index, s_col, c_col);
-	      } //Color column
-	    } //Spin column
-	  } //Color row
-        } //Spin row 
+	// apply kappa
+	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out(parity, x_cb, s, c) *= -(Float)2.0*kappa;
 
-	int backward[QUDA_MAX_DIM];
-        int backward_spinor_index;
-	int backward_gauge_index = 0;
+	// apply clover term
+	for(int s = 0; s < Ns; s++) { //Spin out
+	  for(int c = 0; c < Nc; c++) { //Color out
+	    out(parity,x_cb,s,c) += in(parity,x_cb,s,c);
+	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
+	      for(int c_col = 0; c_col < Nc; c_col++) { //Color in
+		out(parity,x_cb,s,c) -= 2*kappa*X(0, parity, x_cb, s, s_col, c, c_col)*in(parity,x_cb,s_col,c_col);
+	      } //Color in
+	    } //Spin in
+	  } //Color out
+	} //Spin out
 
-        in.LatticeIndex(backward,i);
-	backward[d] = (backward[d] - 1 + x_size[d])%x_size[d];
-	out.OffsetIndex(backward_spinor_index, backward);
+      }//VolumeCB
+    } // parity
 
-        for(int dim = ndim-1; dim >= 0; dim--) {
-          backward_gauge_index *= x_size[dim];
-          backward_gauge_index += backward[dim];
-        }
-
-        for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
-	  for(int c_row = 0; c_row < Nc; c_row++) { //Color row
-            for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
-
-              for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-	        //Backward link
-		out(i, s_row, c_row) += conj(Y(d,(parity+1)&1, backward_gauge_index/2, s_col, s_row, c_col, c_row))
-		  * in(backward_spinor_index, s_col, c_col);
-
-	      } //Color column
-	    } //Spin column
-	  } //Color row
-        } //Spin row 
-      } //Ndim
-
-      for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out(i, s, c) *= -(Float)2.0*kappa;
-
-      for(int s = 0; s < Ns; s++) { //Spin out
-        for(int c = 0; c < Nc; c++) { //Color out
-	  out(i,s,c) += in(i,s,c);
-	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
-	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
-	      out(i,s,c) -= 2*kappa*X(0, parity, gauge_index/2, s, s_col, c, c_col)*in(i,s_col,c_col);
-	    } //Color in
-          } //Spin in
-        } //Color out
-      } //Spin out
-
-    }//Volume
-
-  }
-#endif
-  //out(x) = -X*in(x), where X is the local color-spin matrix on the coarse grid.
-  template<typename Float, typename F, typename G>
-  void coarseClover(F &out, const F &in, const G &X, Float kappa) {
-    int Nc = out.Ncolor();
-    int Ns = out.Nspin();
-    int ndim = out.Ndim();
-    int sites = out.Volume();
-    int x_size[QUDA_MAX_DIM];
-    for(int d = 0; d < ndim; d++) x_size[d] = out.X(d);
-
-    for(int i = 0; i < out.Volume(); i++) { //Volume
-      int coord[QUDA_MAX_DIM];
-      int parity = 0;
-      int gauge_index = 0;
-      out.LatticeIndex(coord,i);
-      gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
-
-      for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out(i, s, c) *= -(Float)2.0*kappa;
-
-      for(int s = 0; s < Ns; s++) { //Spin out
-        for(int c = 0; c < Nc; c++) { //Color out
-	  out(i,s,c) += in(i,s,c);
-	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
-	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
-	      out(i,s,c) -= 2*kappa*X(0, parity, gauge_index/2, s, s_col, c, c_col)*in(i,s_col,c_col);
-	    } //Color in
-          } //Spin in
-        } //Color out
-      } //Spin out
-    } //Volume
   }
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseColor, int coarseSpin>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, double kappa) {
-    int Ns_c = in.Nspin();
-    int ndim = in.Ndim();
-    
-    typedef typename colorspinor::FieldOrder<Float,coarseSpin,coarseColor,1,csOrder> F;
+    typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder> F;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
 
     F outAccessor(const_cast<ColorSpinorField&>(out));
@@ -749,7 +621,6 @@ namespace quda {
     G yAccessor(const_cast<GaugeField&>(Y));
     G xAccessor(const_cast<GaugeField&>(X));
     coarseDslash<Float,F,G>(outAccessor, inAccessor, yAccessor, xAccessor, (Float)kappa);
-    //coarseClover(outAccessor, inAccessor, xAccessor, (Float)kappa);
   }
 
   // template on the number of coarse colors
