@@ -160,7 +160,7 @@ namespace quda {
     return gauge_index;
   }
 
-  //    #define PARITY_LOOP
+      #define PARITY_LOOP
 
 #ifndef PARITY_LOOP
   //Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
@@ -235,8 +235,8 @@ namespace quda {
       int x_cb = gauge_offset_index(coord,x_size,ndim,parity) / 2;
 
       //printf("dir = %d (%d,%d,%d,%d)=(%d,%d) (%d,%d,%d,%d)=(%d,%d)\n", dir, 
-      //     coord[0], coord[1], coord[2], coord[3], x_cb, parity,
-      //     coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3], coarse_index_cb, coarse_parity);
+      //   coord[0], coord[1], coord[2], coord[3], x_cb, parity,
+      //   coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3], coarse_index_cb, coarse_parity);
 
       for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin
 
@@ -353,13 +353,14 @@ namespace quda {
     int coord[QUDA_MAX_DIM];
     for (int parity=0; parity<2; parity++) {
       int x_cb = 0;
-      int oddBit = parity;
       for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
 	for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
 	  for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
 	    for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
-	      //Shift the V field w/respect to G (must be on full field coords)
 	      int coord_tmp = coord[dir];
+
+	      //Shift the V field w/respect to G (must be on full field coords)
+	      int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
 	      if (dir==0) coord[0] = 2*coord[0] + oddBit;
 	      coord[dir] = (coord[dir]+1)%x_size[dir];
 	      if (dir==0) coord[0] /= 2;
@@ -378,7 +379,6 @@ namespace quda {
 	      coord[dir] = coord_tmp; //restore
 	      x_cb++;
 	    }
-	    oddBit = (oddBit+1)&1;
 	  }
 	}
       }
@@ -399,12 +399,12 @@ namespace quda {
 
     for (int parity=0; parity<2; parity++) {
       int x_cb = 0;
-      int oddBit = parity;
       for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
 	for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
 	  for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
 	    for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
 
+	      int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
 	      coord[0] = 2*coord[0] + oddBit;
 	      for(int d = ndim-1; d >= 0; d--) coord_coarse[d] = coord[d]/geo_bs[d];
 
@@ -416,8 +416,8 @@ namespace quda {
 	      const int dim_index = isDiagonal ? 0 : dir;
 	      
 	      //printf("dir = %d (%d,%d,%d,%d)=(%d,%d) (%d,%d,%d,%d)=", dir, 
-	      //     coord[0], coord[1], coord[2], coord[3], x_cb, parity,
-	      //     coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3]);
+	      //   coord[0], coord[1], coord[2], coord[3], x_cb, parity,
+	      //   coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3]);
 
 	      int coarse_parity = 0;
 	      for (int d=0; d<ndim; d++) coarse_parity += coord_coarse[d];
@@ -425,7 +425,7 @@ namespace quda {
 	      coord_coarse[0] /= 2;
 	      int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
 	      
-	      //printf("(%d,%d)\n", coarse_x_cb, coarse_parity);
+	      printf("(%d,%d)\n", coarse_x_cb, coarse_parity);
 
 	      coord[0] /= 2;
 
@@ -461,7 +461,6 @@ namespace quda {
 
 	      x_cb++;
 	    } // coord[0]
-	    oddBit = (oddBit+1)&1;
 	  } // coord[1]
 	} // coord[2]
       } // coord[3]
