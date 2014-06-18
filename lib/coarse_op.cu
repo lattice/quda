@@ -538,13 +538,12 @@ namespace quda {
 
  //Apply the coarse Dslash to a vector:
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
-  template<typename Float, typename F, typename Gauge>
+  template<typename Float, int nDim, typename F, typename Gauge>
   void coarseDslash(F &out, F &in, Gauge &Y, Gauge &X, Float kappa) {
     int Nc = in.Ncolor();
     int Ns = in.Nspin();
-    int ndim = in.Ndim();
     int x_size[QUDA_MAX_DIM];
-    for(int d = 0; d < ndim; d++) x_size[d] = in.X(d);
+    for(int d = 0; d < nDim; d++) x_size[d] = in.X(d);
 
     for (int parity=0; parity<2; parity++) {
       for(int x_cb = 0; x_cb < in.Volume()/2; x_cb++) { //Volume
@@ -553,12 +552,12 @@ namespace quda {
 
 	for(int s = 0; s < Ns; s++) for(int c = 0; c < Nc; c++) out(parity, x_cb, s, c) = (Float)0.0; 
 
-	for(int d = 0; d < ndim; d++) { //Ndim
+	for(int d = 0; d < nDim; d++) { //Ndim
 	  //Forward link - compute fwd offset for spinor fetch
 	  int coordTmp = coord[d];
 	  coord[d] = (coord[d] + 1)%x_size[d];
 	  int fwd_idx = 0;
-	  for(int dim = ndim-1; dim >= 0; dim--) fwd_idx = x_size[dim] * fwd_idx + coord[dim];
+	  for(int dim = nDim-1; dim >= 0; dim--) fwd_idx = x_size[dim] * fwd_idx + coord[dim];
 	  coord[d] = coordTmp;
 
 	  for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
@@ -576,7 +575,7 @@ namespace quda {
 	  //Backward link - compute back offset for spinor and gauge fetch
 	  int back_idx = 0;
 	  coord[d] = (coordTmp - 1 + x_size[d])%x_size[d];
-	  for(int dim = ndim-1; dim >= 0; dim--) back_idx = x_size[dim] * back_idx + coord[dim];
+	  for(int dim = nDim-1; dim >= 0; dim--) back_idx = x_size[dim] * back_idx + coord[dim];
 	  coord[d] = coordTmp;
 
 	  for(int s_row = 0; s_row < Ns; s_row++) { //Spin row
@@ -589,7 +588,7 @@ namespace quda {
 	      } //Spin column
 	    } //Color row
 	  } //Spin row 
-	} //Ndim
+	} //nDim
 
 	// apply kappa
 	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out(parity, x_cb, s, c) *= -(Float)2.0*kappa;
@@ -608,7 +607,7 @@ namespace quda {
 
       }//VolumeCB
     } // parity
-
+    
   }
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseColor, int coarseSpin>
@@ -620,7 +619,7 @@ namespace quda {
     F inAccessor(const_cast<ColorSpinorField&>(in));
     G yAccessor(const_cast<GaugeField&>(Y));
     G xAccessor(const_cast<GaugeField&>(X));
-    coarseDslash<Float,F,G>(outAccessor, inAccessor, yAccessor, xAccessor, (Float)kappa);
+    coarseDslash<Float,4,F,G>(outAccessor, inAccessor, yAccessor, xAccessor, (Float)kappa);
   }
 
   // template on the number of coarse colors
