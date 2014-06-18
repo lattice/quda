@@ -395,17 +395,24 @@ namespace quda {
 	  for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
 	    for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
 
-	      int coarse_parity = 0;
 	      coord[0] = 2*coord[0] + parity;
 	      for(int d = ndim-1; d >= 0; d--) coord_coarse[d] = coord[d]/geo_bs[d];
-	      int coarse_x_cb = gauge_offset_index(coord_coarse, xc_size, ndim, coarse_parity) / 2;
-	      
+
 	      //Check to see if we are on the edge of a block, i.e.
 	      //if this color matrix connects adjacent blocks.  If
 	      //adjacent site is in same block, M = X, else M = Y
 	      coarseGauge &M = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? X : Y;
 	      int dim_index = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? 0 : dir;
 	      coord[0] /= 2;
+	      
+	      // int coarse_parity = 0;
+	      //int coarse_x_cb = gauge_offset_index(coord_coarse, xc_size, ndim, coarse_parity) / 2;
+
+	      int coarse_parity = 0;
+	      for (int d=0; d<nDim; d++) coarse_parity += coarse_coord[d];
+	      coarse_parity &= 1;
+	      coarse_coord[0] /= 2;
+	      int coarse_x_cb = ((coarse_coord[3]*xc_size[2]+coarse_coord[2])*xc_size[1]+coarse_coord[1])*xc_size[0]/2 + coarse_coord[0];
 	      
 	      for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin
 		//Spin part of the color matrix.  Will always consist
@@ -567,7 +574,7 @@ namespace quda {
 
       printf("UV2[%d] = %e\n", d, norm2);
 
-      norm2 = 0;
+      norm2 = 0.0;
       for (int parity = 0; parity<2; parity++) 
 	for (int x_cb=0; x_cb<Y.Volume()/2; x_cb++)
 	  for (int s=0; s<Y.Ncolor(); s++) 
@@ -587,14 +594,24 @@ namespace quda {
 #endif
     }
 
+    Float norm2 = 0;
+    for (int parity=0; parity<2; parity++)
+      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++)
+	for (int s=0; s<X.Ncolor(); s++) 
+	  for (int c=0; c<X.Ncolor(); c++) 
+	    norm2 += norm(X(0,parity,x_cb,s,c));
+
+    printf("X2 = %e\n", norm2);
+
     printfQuda("Computing coarse diagonal\n");
     coarseDiagonal<Float>(X, ndim, xc_size);
 
-    Float norm2 = 0;
-    for (int x=0; x<X.Volume(); x++)
-      for (int s=0; s<X.Ncolor(); s++) 
-	for (int c=0; c<X.Ncolor(); c++) 
-	  norm2 += norm(X(0,0,x,s,c));
+    norm2 = 0;
+    for (int parity=0; parity<2; parity++)
+      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++)
+	for (int s=0; s<X.Ncolor(); s++) 
+	  for (int c=0; c<X.Ncolor(); c++) 
+	    norm2 += norm(X(0,parity,x_cb,s,c));
 
     printf("X2 = %e\n", norm2);
 
