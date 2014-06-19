@@ -161,15 +161,15 @@ namespace quda {
   // Orthogonalise the nc vectors v[] of length n
   // this assumes the ordering v[(b * Nvec + v) * blocksize + i]
 
-  template <class Complex, int N>
-  void blockGramSchmidt(Complex *v, int nBlocks, int blockSize) {
+  template <typename sumFloat, typename Float, int N>
+  void blockGramSchmidt(complex<Float> *v, int nBlocks, int blockSize) {
     
     for (int b=0; b<nBlocks; b++) {
       for (int jc=0; jc<N; jc++) {
       
 	for (int ic=0; ic<jc; ic++) {
 	  // Calculate dot product.
-	  Complex dot = 0.0;
+	  complex<Float> dot = 0.0;
 	  for (int i=0; i<blockSize; i++) 
 	    dot += conj(v[(b*N+ic)*blockSize+i]) * v[(b*N+jc)*blockSize+i];
 	  
@@ -180,9 +180,9 @@ namespace quda {
 	
 	// Normalize the block
 	// nrm2 is pure real, but need to use Complex because of template.
-	Complex nrm2 = 0.0;
+	complex<sumFloat> nrm2 = 0.0;
 	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*N+jc)*blockSize+i]);
-	double scale = nrm2.real() > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
+	sumFloat scale = nrm2.real() > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
 	for (int i=0; i<blockSize; i++) v[(b*N+jc)*blockSize+i] *= scale;
       }
 
@@ -207,7 +207,7 @@ namespace quda {
     printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
     
     blockOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
-    blockGramSchmidt<complex<Float>,nVec>(Vblock, numblocks, blocksize);  
+    blockGramSchmidt<double,Float,nVec>(Vblock, numblocks, blocksize);  
     blockOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
 
     delete []Vblock;
