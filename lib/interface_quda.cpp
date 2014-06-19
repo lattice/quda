@@ -1756,6 +1756,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   
   printfQuda("Creating vector of null space fields of length %d\n", nvec);
   cpuParam.create = QUDA_ZERO_FIELD_CREATE;
+  cpuParam.precision = param->cuda_prec_sloppy;
   std::vector<ColorSpinorField*>B;
   B.resize(nvec);
   for (int i=0; i<nvec; i++) {
@@ -1765,7 +1766,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   loadVectors(B);
 
   // fill out the MG parameters for the fine level
-  MGParam mgParam(*param, B, m, mSloppy);  
+  MGParam mgParam(*param, B, mSloppy, mSloppy);  
   mgParam.level = 1;         // set this level
   mgParam.Nlevel = 2;        // total number of levels
   // set the block size
@@ -1786,7 +1787,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   //Solver *solve = new GCR(m, mSloppy, mPre, solverParam, profileInvert);
   (*solve)(*out, *in);
   delete solve;
-  // delete K; // GCR presently deletes the preconditoner
+  // delete K; // GCR presently deletes the preconditioner
 
   for (int i=0; i<nvec; i++) delete B[i];
 

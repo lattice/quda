@@ -407,14 +407,19 @@ namespace quda {
               for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
                 printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e, Y(2*d+1) = %e %e\n",d,i,s,s_col,c,c_col,Y(2*d,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d,i%2,i/2,s,s_col,c,c_col).imag(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).imag());
               }}}}}
-
     for(int i = 0; i < Y.Volume(); i++) {
       for(int s = 0; s < Y.NspinCoarse(); s++) {
 	for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
 	  for(int c = 0; c < Y.NcolorCoarse(); c++) {
 	    for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
-	      printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e\n",ndim,i,s,s_col,c,c_col,Y(2*ndim,i%2,i/2,s,s_col,c,c_col).real(),Y(2*ndim,i%2,i/2,s,s_col,c,c_col).imag());
-	    }}}}}
+	      printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e\n",nDim,i,s,s_col,c,c_col,
+		     X(0,i%2,i/2,s,s_col,c,c_col).real(),
+		     X(0,i%2,i/2,s,s_col,c,c_col).imag());
+	    }
+	  }
+	}
+      }
+    }
 #endif
   }
 
@@ -492,6 +497,9 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
+    if (X.Precision() != Y.Precision() || Y.Precision() != uv.Precision() || 
+	Y.Precision() != T.Vectors().Precision() || Y.Precision() != g.Precision())
+      errorQuda("Unsupported precision mix");
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -507,8 +515,6 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge) {
-    //  void CoarseOp(const Transfer &T, void *Y[], QudaPrecision precision, const cudaGaugeField &gauge) {
-
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
 
@@ -614,7 +620,6 @@ namespace quda {
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, double kappa) {
     typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder> F;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> G;
-
     F outAccessor(const_cast<ColorSpinorField&>(out));
     F inAccessor(const_cast<ColorSpinorField&>(in));
     G yAccessor(const_cast<GaugeField&>(Y));
@@ -662,6 +667,11 @@ namespace quda {
   //Note factor of 2*kappa compensates for the factor of 1/2 already
   //absorbed into the Y matrices.
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, double kappa) {
+    if (Y.Precision() != in.Precision() || X.Precision() != Y.Precision() || Y.Precision() != out.Precision())
+      errorQuda("Unsupported precision mix");
+
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyCoarse<double>(out, in, Y, X, kappa);
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
