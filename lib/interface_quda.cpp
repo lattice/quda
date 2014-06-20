@@ -2884,7 +2884,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   profileMulti.Stop(QUDA_PROFILE_TOTAL);
 }
 
-void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u/*=0*/, bool last_rhs/*=false*/)
+void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, int last_rhs)
 {
   if(!InitMagma) openMagma();
 
