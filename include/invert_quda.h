@@ -448,28 +448,17 @@ namespace quda {
     //host   projection matrix:
     Complex *proj_matrix; //VH A V
 
-//currently this is just host buffer, in the future it'd be more consistent/convenient to create cpuColorSpinorField. 
-    QudaPrecision           ritz_prec;      //keep it right now.    
-    void                    *cpuRitzVectors;       //host buffer for Ritz vectors
-
+    QudaPrecision           ritz_prec;             //keep it right now.    
     cudaColorSpinorField    *cudaRitzVectors;      //device buffer for Ritz vectors
-
-    int  cpu_ritz_dim; //number of Ritz vectors allocated on the host
-    int  cuda_ritz_dim; //number of Ritz vectors allocated on the device
 
     int ld;                 //projection matrix leading dimension
     int tot_dim;            //projection matrix full (maximum) dimension (nev*deflation_grid)
     int cur_dim;            //current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) 
     int added_nevs;
-    
-    size_t ritz_bytes;
 
     bool cuda_ritz_alloc;
-    bool cpu_ritz_alloc;
 
-    DeflationParam(SolverParam &param, const int eigv_volume) : proj_matrix(0),  cpuRitzVectors(0),  cudaRitzVectors(0), cpu_ritz_dim(0), cuda_ritz_dim(0), cur_dim(0), added_nevs(0), cuda_ritz_alloc(false), cpu_ritz_alloc(false){
-
-       const int spinorSiteSize = 24;
+    DeflationParam(ColorSpinorParam &eigv_param, SolverParam &param) : proj_matrix(0),  cudaRitzVectors(0), cur_dim(0), added_nevs(0), cuda_ritz_alloc(false){
 
        if(param.nev == 0 || param.deflation_grid == 0) errorQuda("\nIncorrect deflation space parameters...\n");
        
@@ -482,25 +471,23 @@ namespace quda {
        
        ritz_prec = param.precision_ritz;
 
-       ritz_bytes      = eigv_volume*spinorSiteSize*ritz_prec;
+       eigv_param.setPrecision(ritz_prec);//the same as for full precision iterations (see diracDeflateParam)
+       eigv_param.create   = QUDA_ZERO_FIELD_CREATE;
+       eigv_param.eigv_dim = tot_dim;
+       eigv_param.eigv_id  = -1;
+  
+       //if(eigv_param.siteSubset == QUDA_FULL_SITE_SUBSET) eigv_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+       cudaRitzVectors = new cudaColorSpinorField(eigv_param);
 
-       cpu_ritz_dim    = tot_dim; 
+       cuda_ritz_alloc  = true;
 
-       cpuRitzVectors  = malloc(cpu_ritz_dim * ritz_bytes);//mm_malloc(cpu_ritz_dim * ritz_bytes, 32);
-
-printfQuda("\nAllocating %lu bytes\n", cpu_ritz_dim * ritz_bytes);
-
-       cpu_ritz_alloc  = true;
+       return;
     }
 
     ~DeflationParam(){
-
        if(proj_matrix)        delete[] proj_matrix;
 
        if(cuda_ritz_alloc)    delete cudaRitzVectors;
-
-       if(cpu_ritz_alloc)     free(cpuRitzVectors);
-
     }
 
     //reset current dimension:
@@ -516,31 +503,6 @@ printfQuda("\nAllocating %lu bytes\n", cpu_ritz_dim * ritz_bytes);
       return;
     }   
 
-    void AllocateRitzCuda(ColorSpinorParam &eigv_param)
-    {
-      if(eigv_param.siteSubset == QUDA_FULL_SITE_SUBSET) errorQuda("\nError: Ritz vectors must be parity spinors.\n");
-      
-      if(cuda_ritz_alloc == false)
-      {
-        eigv_param.setPrecision(ritz_prec);
-
-        eigv_param.eigv_dim  = cuda_ritz_dim;
-        eigv_param.eigv_id   = -1;
-
-        eigv_param.create  = QUDA_ZERO_FIELD_CREATE; 
-      
-        cudaRitzVectors = new cudaColorSpinorField(eigv_param);
-
-        cuda_ritz_alloc = true;
-      }
-      else
-      {
-        errorQuda("\nError: CUDA Ritz vectors were already allocated.\n");//or just warning?
-      }
-
-      return;
-    }
-
     //print information about the deflation space:
     void PrintInfo(){
 
@@ -550,24 +512,18 @@ printfQuda("\nAllocating %lu bytes\n", cpu_ritz_dim * ritz_bytes);
        printfQuda("Current dimension %d\n", cur_dim);
        printfQuda("Host pointer: %p\n", proj_matrix);
 
-       printfQuda("\nRitz vector set information:\n");
-       printfQuda("Number of CUDA-allocated Ritz vectors %d\n", cuda_ritz_dim);
-       printfQuda("Number of CPU-allocated Ritz vectors %d\n", cpu_ritz_dim);
+       return;
+
     }
 
-    void CleanHostRitzVectors()  
-    {
-       if( cpu_ritz_alloc ){
-         free(cpuRitzVectors);
-         cpu_ritz_alloc = false;
-       }
-    }
     void CleanDeviceRitzVectors()
     {
        if( cuda_ritz_alloc ){
          delete cudaRitzVectors;
          cuda_ritz_alloc = false;
        }
+
+       return;
     }
 
   };
@@ -585,9 +541,8 @@ printfQuda("\nAllocating %lu bytes\n", cpu_ritz_dim * ritz_bytes);
 
     virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
 
-    virtual void SaveRitzVecs(cudaColorSpinorField *out, const int nevs, bool cleanResources = false) = 0;
-
-    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+//    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
+    virtual void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) = 0;//extrenal method
 
     virtual void CleanResources() = 0;
 
@@ -642,24 +597,22 @@ printfQuda("\nAllocating %lu bytes\n", cpu_ritz_dim * ritz_bytes);
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
 
     //Compute  u dH^{-1} u^{dagger}b: 
-    void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param);
-    //
-    void RelocateRitzVectors(cudaColorSpinorField &eigcgSpinor, DeflationParam *param);//move host Ritz vectors to the device...
+    void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
 
     //Deflation space management
     void CreateDeflationSpace(cudaColorSpinorField &eigcgSpinor, DeflationParam *&param);
+
     //extend projection matrix:
     //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
     //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
     //extend H-matrix with the components
-    void ExpandDeflationSpace(DeflationParam *param, const int new_nevs);
+    void ExpandDeflationSpace(DeflationParam *param, const int new_nev);
     //
     void DeleteDeflationSpace(DeflationParam *&param);
-
-    //External methods to manage/use deflation space resources:
-    void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) {  };//not implemented.
     //
-    void SaveRitzVecs(cudaColorSpinorField *out, const int nevs, bool cleanResources = false);
+    void SaveEigCGRitzVecs(DeflationParam *param, int first_idx = 0, bool cleanResources = false);
+    //
+    void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) {};//extrenal method
     //
     void CleanResources(); 
 

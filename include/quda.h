@@ -529,7 +529,7 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u = 0, bool last_rhs=false);
+  void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, int last_rhs);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
