@@ -1,0 +1,2 @@
+mpicxx			 -Wall -O3 -D__COMPUTE_CAPABILITY__=350 -DMULTI_GPU -DPTHREADS -DGPU_STAGGERED_DIRAC -DGPU_DIRECT -DBUILD_QDP_INTERFACE -DBUILD_MILC_INTERFACE -DNUMA_AFFINITY -I/usr/local/cuda/include -DMPI_COMMS  -I/uufs/chpc.utah.edu/sys/pkg/mpich2/3.0.4/include/mpi -I../include -I.  staggered_invert_test.cpp -c -o staggered_invert_test.o
+mpicxx			 -fPIC -L/usr/local/cuda/lib64 -lcudart   -lpthread staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o ../lib/libquda.a -o staggered_invert_test -fPIC -L/usr/local/cuda/lib64 -lcudart   -lpthread

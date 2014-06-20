@@ -620,6 +620,9 @@ int main(int argc, char** argv)
 
   display_test_info();
 
+  
+  printfQuda("dslash_type = %d\n", dslash_type);
+
   int ret = invert_test();
 
   // finalize the communications layer

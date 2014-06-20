@@ -24,7 +24,8 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
 	unitarize_force_quda.o unitarize_links_quda.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\
-	eig_lanczos_quda.o ritz_quda.o eig_solver.o blas_magma.o
+	eig_lanczos_quda.o ritz_quda.o eig_solver.o blas_magma.o	\
+	color_spinor_orthogonalize.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -35,7 +36,8 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	texture.h eig_variables.h numa_affinity.h misc_helpers.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
-	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h
+	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h	\
+	orthogonalize.h
 
 
 # These are only inlined into blas_quda.cu

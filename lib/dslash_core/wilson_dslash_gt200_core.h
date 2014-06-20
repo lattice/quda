@@ -389,6 +389,7 @@ int sp_norm_idx;
 
 int sid;
 
+
 #ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
@@ -399,6 +400,8 @@ if (kernel_type == INTERIOR_KERNEL) {
 
   // Inline by hand for the moment and assume even dimensions
   coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
+
+
 
   o00_re = 0;  o00_im = 0;
   o01_re = 0;  o01_im = 0;
@@ -464,6 +467,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   // i 0 0 1 
   
 #ifdef MULTI_GPU
+  if(kernel_type == EXTERIOR_KERNEL_X){
+    face_idx = (x4*X3*X2 + x3*X2 + x2 + 0) >> 1;
+  }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==X1m1 ? X-X1m1 : X+1) >> 1 :
     face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else
@@ -655,6 +661,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   // -i 0 0 1 
   
 #ifdef MULTI_GPU
+  
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==0 ? X+X1m1 : X-1) >> 1 :
     face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
 #else

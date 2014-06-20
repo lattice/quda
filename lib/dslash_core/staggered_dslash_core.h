@@ -199,6 +199,7 @@
 #define VOLATILE volatile
 #endif
 
+/*
 // output spinor
 #if (DD_PREC == 0)
 #if (__COMPUTE_CAPABILITY__ >= 200)
@@ -219,7 +220,6 @@ VOLATILE spinorFloat *s = sd_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(threadIdx.x/SHARED_STRIDE)
   + (threadIdx.x % SHARED_STRIDE);
 #endif
-
   // output spinor
 #define o00_re s[0*SHARED_STRIDE]
 #define o00_im s[1*SHARED_STRIDE]
@@ -227,7 +227,13 @@ VOLATILE spinorFloat *s = ss_data + SHARED_FLOATS_PER_THREAD*SHARED_STRIDE*(thre
 #define o01_im s[3*SHARED_STRIDE]
 #define o02_re s[4*SHARED_STRIDE]
 #define o02_im s[5*SHARED_STRIDE]
-
+*/
+spinorFloat o00_re;
+spinorFloat o00_im;
+spinorFloat o01_re;
+spinorFloat o01_im;
+spinorFloat o02_re;
+spinorFloat o02_im;
 
 #include "read_gauge.h"
 #include "io_spinor.h"

@@ -116,7 +116,7 @@ void init()
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
+  inv_param.dslash_type = dslash_type;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;

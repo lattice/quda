@@ -397,15 +397,29 @@ int X;
 int sp_norm_idx;
 #endif // MULTI_GPU half precision
 
+return;
 int sid;
+
+int num  = 0;
 
 #ifdef MULTI_GPU
 int face_idx;
 if (kernel_type == INTERIOR_KERNEL) {
+
 #endif
+
+  if(0 == atomicAdd(&num,1)){
+    printf("wilson_dslash_dagger_fermi_core\n");
+    fflush(stdout);
+  }
 
   // Inline by hand for the moment and assume even dimensions
   coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
+
+  if(sid == 0){
+    printf("wilson_dslash_dagger_fermi_core\n");
+    fflush(stdout);
+  }
 
   // only need to check Y and Z dims currently since X and T set to match exactly
   if (x2 >= X2) return;
