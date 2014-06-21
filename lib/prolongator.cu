@@ -169,6 +169,9 @@ namespace quda {
 
     if (out.Ncolor() == 3) {
       Prolongate<Float,fineSpin,3,order>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } 
+    else if (out.Ncolor() == 24) {
+      Prolongate<Float,fineSpin,24,order>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nColor %d", out.Ncolor());
     }
@@ -180,6 +183,9 @@ namespace quda {
 
     if (out.Nspin() == 4) {
       Prolongate<Float,4,order>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
+    } 
+    else if (out.Nspin() == 2) {
+      Prolongate<Float,2,order>(out, in, v, tmp, Nvec, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nSpin %d", out.Nspin());
     }

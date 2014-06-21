@@ -140,7 +140,6 @@ namespace quda {
 
     void Dagger(QudaDagType dag) { dagger = dag; }
     virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {errorQuda("Not implemented");}
-    virtual void applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X) const {errorQuda("Not implemented");}
   };
 
   // Full Wilson
@@ -170,11 +169,9 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
     virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
-    virtual void applyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X) const; 
   };
 
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge);
-  void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X, double kappa);
 
   // Even-odd preconditioned Wilson
   class DiracWilsonPC : public DiracWilson {

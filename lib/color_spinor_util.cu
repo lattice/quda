@@ -269,9 +269,25 @@ namespace quda {
   // print out the vector at volume point x
   template <typename Float, QudaFieldOrder order>
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
-    if (a.Ncolor() != 3 || a.Nspin() != 4) errorQuda("Not supported");
-    FieldOrder<Float,4,3,1,order> A(a);
-    print_vector(A, x);
+    if (a.Ncolor() == 3 && a.Nspin() == 4)  {
+      FieldOrder<Float,4,3,1,order> A(a);
+      print_vector(A, x);
+    }
+    else if (a.Ncolor() == 24 && a.Nspin() == 2) {
+      FieldOrder<Float,2,24,1,order> A(a);
+      print_vector(A, x);
+    }
+    else if (a.Ncolor() == 72 && a.Nspin() == 4) {
+      FieldOrder<Float,2,24,1,order> A(a);
+      print_vector(A, x);
+    }
+    else if (a.Ncolor() == 576 && a.Nspin() == 2) {
+      FieldOrder<Float,2,576,1,order> A(a);
+      print_vector(A, x);
+    }    
+    else {
+      errorQuda("Not supported Ncolor = %d, Nspin = %d", a.Ncolor(), a.Nspin());	 
+    }
   }
 
   // print out the vector at volume point x

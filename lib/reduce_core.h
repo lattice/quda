@@ -575,6 +575,8 @@ template <typename ReduceType, typename Float, int nSpin, QudaFieldOrder order,
     value = genericReduce<ReduceType,Float,nSpin,24,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 72) {
     value = genericReduce<ReduceType,Float,nSpin,72,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Ncolor() == 576) {
+    value = genericReduce<ReduceType,Float,nSpin,576,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);    
   } else {
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
   }

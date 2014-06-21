@@ -221,6 +221,9 @@ namespace quda {
 
     if (in.Ncolor() == 3) {
       Restrict<Float,fineSpin,3,order>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    }
+    else if (in.Ncolor() == 24) {
+      Restrict<Float,fineSpin,24,order>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
       errorQuda("Unsupported nColor %d", in.Ncolor());
     }
@@ -233,6 +236,9 @@ namespace quda {
 
     if (in.Nspin() == 4) {
       Restrict<Float,4,order>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } 
+    else if (in.Nspin() == 2) {
+      Restrict<Float,2,order>(out, in, v, tmp, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
       errorQuda("Unsupported nSpin %d", in.Nspin());
     }

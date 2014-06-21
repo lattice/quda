@@ -3,7 +3,7 @@ include ../make.inc
 QUDA = libquda.a
 
 # put the long to compile files at the end for easier header debugging
-QUDA_OBJS = dirac_coarse.o coarse_op.o multigrid.o transfer.o		\
+QUDA_OBJS = dirac_coarse.o coarse_op.o coarsecoarse_op.o multigrid.o transfer.o		\
 	transfer_util.o prolongator.o restrictor.o timer.o malloc.o	\
 	solver.o gauge_phase.o timer.o malloc.o solver.o		\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\

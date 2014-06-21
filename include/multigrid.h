@@ -165,7 +165,8 @@ namespace quda {
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, 
-		   const GaugeField &X, QudaPrecision precision, double kappa);
+		   const GaugeField &X, double kappa);
+  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, const cpuGaugeField &clover);
 
   class DiracCoarse : public Dirac {
 
@@ -209,6 +210,8 @@ namespace quda {
 		     const QudaSolutionType) const {
       errorQuda("Not implemented");
     }
+
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
 
   };
 
