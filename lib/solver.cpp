@@ -47,6 +47,14 @@ namespace quda {
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
       break;
+    case QUDA_CG3_INVERTER:
+      report("CG3");
+      solver = new CG3(mat, param, profile);
+      break;
+    case QUDA_NCG3_INVERTER:
+      report("NCG3");
+      solver = new NCG3(mat, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type");
     }
