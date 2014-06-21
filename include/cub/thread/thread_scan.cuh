@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -66,7 +66,7 @@ __device__ __forceinline__ T ThreadScanExclusive(
 {
     T addend = *input;
     inclusive = scan_op(exclusive, addend);
-    output[0] = exclusive;
+    *output = exclusive;
     exclusive = inclusive;
 
     return ThreadScanExclusive(inclusive, exclusive, input + 1, output + 1, scan_op, Int2Type<LENGTH - 1>());
@@ -135,7 +135,7 @@ __device__ __forceinline__ T ThreadScanExclusive(
     T           prefix,                 ///< [in] Prefix to seed scan with
     bool        apply_prefix = true)    ///< [in] Whether or not the calling thread should apply its prefix.  (Handy for preventing thread-0 from applying a prefix.)
 {
-    return ThreadScanExclusive<LENGTH>((T*) input, (T*) output, scan_op, prefix);
+    return ThreadScanExclusive<LENGTH>((T*) input, (T*) output, scan_op, prefix, apply_prefix);
 }
 
 

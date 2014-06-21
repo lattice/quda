@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -34,6 +34,7 @@
 #pragma once
 
 #include "../../util_arch.cuh"
+#include "../../util_ptx.cuh"
 #include "../../warp/warp_scan.cuh"
 #include "../../util_namespace.cuh"
 
@@ -47,24 +48,33 @@ namespace cub {
  * \brief BlockScanWarpScans provides warpscan-based variants of parallel prefix scan across a CUDA threadblock.
  */
 template <
-    typename            T,
-    int                 BLOCK_THREADS>
+    typename    T,
+    int         BLOCK_DIM_X,    ///< The thread block length in threads along the X dimension
+    int         BLOCK_DIM_Y,    ///< The thread block length in threads along the Y dimension
+    int         BLOCK_DIM_Z,    ///< The thread block length in threads along the Z dimension
+    int         PTX_ARCH>       ///< The PTX compute capability for which to to specialize this collective
 struct BlockScanWarpScans
 {
     /// Constants
     enum
     {
+        /// Number of warp threads
+        WARP_THREADS = CUB_WARP_THREADS(PTX_ARCH),
+
+        /// The thread block size in threads
+        BLOCK_THREADS = BLOCK_DIM_X * BLOCK_DIM_Y * BLOCK_DIM_Z,
+
         /// Number of active warps
-        WARPS = (BLOCK_THREADS + CUB_PTX_WARP_THREADS - 1) / CUB_PTX_WARP_THREADS,
+        WARPS = (BLOCK_THREADS + WARP_THREADS - 1) / WARP_THREADS,
     };
 
     ///  WarpScan utility type
-    typedef WarpScan<T, WARPS, CUB_PTX_WARP_THREADS> WarpScan;
+    typedef WarpScan<T, WARP_THREADS, PTX_ARCH> WarpScan;
 
     /// Shared memory storage layout type
     struct _TempStorage
     {
-        typename WarpScan::TempStorage      warp_scan;                  ///< Buffer for warp-synchronous scan
+        typename WarpScan::TempStorage      warp_scan[WARPS];           ///< Buffer for warp-synchronous scans
         T                                   warp_aggregates[WARPS];     ///< Shared totals from each warp-synchronous scan
         T                                   block_prefix;               ///< Shared prefix for the entire threadblock
     };
@@ -83,17 +93,43 @@ struct BlockScanWarpScans
 
     /// Constructor
     __device__ __forceinline__ BlockScanWarpScans(
-        TempStorage &temp_storage,
-        int linear_tid)
+        TempStorage &temp_storage)
     :
         temp_storage(temp_storage.Alias()),
-        linear_tid(linear_tid),
-        warp_id((BLOCK_THREADS <= CUB_PTX_WARP_THREADS) ?
-            0 :
-            linear_tid / CUB_PTX_WARP_THREADS),
-        lane_id((BLOCK_THREADS <= CUB_PTX_WARP_THREADS) ?
-            linear_tid :
-            linear_tid % CUB_PTX_WARP_THREADS)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z)),
+        warp_id((WARPS == 1) ? 0 : linear_tid / WARP_THREADS),
+        lane_id(LaneId())
+    {}
+
+    template <typename ScanOp, int WARP>
+    __device__ __forceinline__ void ApplyWarpAggregates(
+        T               &partial,           ///< [out] The calling thread's partial reduction
+        ScanOp          scan_op,            ///< [in] Binary scan operator
+        T               &block_aggregate,   ///< [out] Threadblock-wide aggregate reduction of input items
+        bool            lane_valid,         ///< [in] Whether or not the partial belonging to the current thread is valid
+        Int2Type<WARP>  addend_warp)
+    {
+            T inclusive = scan_op(block_aggregate, partial);
+            if (warp_id == WARP)
+            {
+                partial = (lane_valid) ?
+                    inclusive :
+                    block_aggregate;
+            }
+
+            T addend = temp_storage.warp_aggregates[WARP];
+            block_aggregate = scan_op(block_aggregate, addend);
+
+            ApplyWarpAggregates(partial, scan_op, block_aggregate, lane_valid, Int2Type<WARP + 1>());
+    }
+
+    template <typename ScanOp>
+    __device__ __forceinline__ void ApplyWarpAggregates(
+        T               &partial,           ///< [out] The calling thread's partial reduction
+        ScanOp          scan_op,            ///< [in] Binary scan operator
+        T               &block_aggregate,   ///< [out] Threadblock-wide aggregate reduction of input items
+        bool            lane_valid,         ///< [in] Whether or not the partial belonging to the current thread is valid
+        Int2Type<WARPS> addend_warp)
     {}
 
 
@@ -102,29 +138,42 @@ struct BlockScanWarpScans
     __device__ __forceinline__ void ApplyWarpAggregates(
         T               &partial,           ///< [out] The calling thread's partial reduction
         ScanOp          scan_op,            ///< [in] Binary scan operator
-        T               warp_aggregate,     ///< [in] <b>[<em>lane</em><sub>0</sub>s only]</b> Warp-wide aggregate reduction of input items
+        T               warp_aggregate,     ///< [in] <b>[<em>lane</em><sub>WARP_THREADS - 1</sub> only]</b> Warp-wide aggregate reduction of input items
         T               &block_aggregate,   ///< [out] Threadblock-wide aggregate reduction of input items
         bool            lane_valid = true)  ///< [in] Whether or not the partial belonging to the current thread is valid
     {
-        // Share lane aggregates
-        temp_storage.warp_aggregates[warp_id] = warp_aggregate;
+        // Last lane in each warp shares its warp-aggregate
+        if (lane_id == WARP_THREADS - 1)
+            temp_storage.warp_aggregates[warp_id] = warp_aggregate;
 
         __syncthreads();
 
         block_aggregate = temp_storage.warp_aggregates[0];
 
+#if __CUDA_ARCH__ <= 130
+
+        // Use template unrolling for SM1x (since the PTX backend can't handle it)
+        ApplyWarpAggregates(partial, scan_op, block_aggregate, lane_valid, Int2Type<1>());
+
+#else
+
+        // Use the pragma unrolling (since it uses less registers)
         #pragma unroll
         for (int WARP = 1; WARP < WARPS; WARP++)
         {
+            T inclusive = scan_op(block_aggregate, partial);
             if (warp_id == WARP)
             {
                 partial = (lane_valid) ?
-                    scan_op(block_aggregate, partial) :     // fold it in our valid partial
-                    block_aggregate;                        // replace our invalid partial with the aggregate
+                    inclusive :
+                    block_aggregate;
             }
 
-            block_aggregate = scan_op(block_aggregate, temp_storage.warp_aggregates[WARP]);
+            T addend = temp_storage.warp_aggregates[WARP];
+            block_aggregate = scan_op(block_aggregate, addend);
         }
+
+#endif
     }
 
 
@@ -137,11 +186,11 @@ struct BlockScanWarpScans
         ScanOp          scan_op,            ///< [in] Binary scan operator
         T               &block_aggregate)   ///< [out] Threadblock-wide aggregate reduction of input items
     {
-        T warp_aggregate;
-        WarpScan(temp_storage.warp_scan, warp_id, lane_id).ExclusiveScan(input, output, identity, scan_op, warp_aggregate);
+        T inclusive_output;
+        WarpScan(temp_storage.warp_scan[warp_id]).Scan(input, inclusive_output, output, identity, scan_op);
 
         // Update outputs and block_aggregate with warp-wide aggregates
-        ApplyWarpAggregates(output, scan_op, warp_aggregate, block_aggregate);
+        ApplyWarpAggregates(output, scan_op, inclusive_output, block_aggregate);
     }
 
 
@@ -159,12 +208,13 @@ struct BlockScanWarpScans
     {
         ExclusiveScan(input, output, identity, scan_op, block_aggregate);
 
-        // Compute and share threadblock prefix
+        // Use the first warp to determine the threadblock prefix, returning the result in lane0
         if (warp_id == 0)
         {
             T block_prefix = block_prefix_callback_op(block_aggregate);
             if (lane_id == 0)
             {
+                // Share the prefix with all threads
                 temp_storage.block_prefix = block_prefix;
             }
         }
@@ -172,7 +222,8 @@ struct BlockScanWarpScans
         __syncthreads();
 
         // Incorporate threadblock prefix into outputs
-        output = scan_op(temp_storage.block_prefix, output);
+        T block_prefix = temp_storage.block_prefix;
+        output = scan_op(block_prefix, output);
     }
 
 
@@ -184,11 +235,11 @@ struct BlockScanWarpScans
         ScanOp          scan_op,                        ///< [in] Binary scan operator
         T               &block_aggregate)               ///< [out] Threadblock-wide aggregate reduction of input items
     {
-        T warp_aggregate;
-        WarpScan(temp_storage.warp_scan, warp_id, lane_id).ExclusiveScan(input, output, scan_op, warp_aggregate);
+        T inclusive_output;
+        WarpScan(temp_storage.warp_scan[warp_id]).Scan(input, inclusive_output, output, scan_op);
 
         // Update outputs and block_aggregate with warp-wide aggregates
-        ApplyWarpAggregates(output, scan_op, warp_aggregate, block_aggregate, (lane_id > 0));
+        ApplyWarpAggregates(output, scan_op, inclusive_output, block_aggregate, (lane_id > 0));
     }
 
 
@@ -205,12 +256,13 @@ struct BlockScanWarpScans
     {
         ExclusiveScan(input, output, scan_op, block_aggregate);
 
-        // Compute and share threadblock prefix
+        // Use the first warp to determine the threadblock prefix, returning the result in lane0
         if (warp_id == 0)
         {
             T block_prefix = block_prefix_callback_op(block_aggregate);
             if (lane_id == 0)
             {
+                // Share the prefix with all threads
                 temp_storage.block_prefix = block_prefix;
             }
         }
@@ -218,23 +270,26 @@ struct BlockScanWarpScans
         __syncthreads();
 
         // Incorporate threadblock prefix into outputs
+        T block_prefix = temp_storage.block_prefix;
         output = (linear_tid == 0) ?
-            temp_storage.block_prefix :
-            scan_op(temp_storage.block_prefix, output);
+            block_prefix :
+            scan_op(block_prefix, output);
     }
 
 
     /// Computes an exclusive threadblock-wide prefix scan using addition (+) as the scan operator.  Each thread contributes one input element.  Also provides every thread with the block-wide \p block_aggregate of all inputs.
     __device__ __forceinline__ void ExclusiveSum(
-        T               input,                          ///< [in] Calling thread's input item
-        T               &output,                        ///< [out] Calling thread's output item (may be aliased to \p input)
-        T               &block_aggregate)               ///< [out] Threadblock-wide aggregate reduction of input items
+        T                       input,                          ///< [in] Calling thread's input item
+        T                       &output,                        ///< [out] Calling thread's output item (may be aliased to \p input)
+        T                       &block_aggregate)               ///< [out] Threadblock-wide aggregate reduction of input items
     {
-        T warp_aggregate;
-        WarpScan(temp_storage.warp_scan, warp_id, lane_id).ExclusiveSum(input, output, warp_aggregate);
+        Sum     scan_op;
+        T       inclusive_output;
 
-        // Update outputs and block_aggregate with warp-wide aggregates from lane-0s
-        ApplyWarpAggregates(output, Sum(), warp_aggregate, block_aggregate);
+        WarpScan(temp_storage.warp_scan[warp_id]).Sum(input, inclusive_output, output);
+
+        // Update outputs and block_aggregate with warp-wide aggregates from lane WARP_THREADS-1
+        ApplyWarpAggregates(output, scan_op, inclusive_output, block_aggregate);
     }
 
 
@@ -248,12 +303,13 @@ struct BlockScanWarpScans
     {
         ExclusiveSum(input, output, block_aggregate);
 
-        // Compute and share threadblock prefix
+        // Use the first warp to determine the threadblock prefix, returning the result in lane0
         if (warp_id == 0)
         {
             T block_prefix = block_prefix_callback_op(block_aggregate);
             if (lane_id == 0)
             {
+                // Share the prefix with all threads
                 temp_storage.block_prefix = block_prefix;
             }
         }
@@ -262,7 +318,8 @@ struct BlockScanWarpScans
 
         // Incorporate threadblock prefix into outputs
         Sum scan_op;
-        output = scan_op(temp_storage.block_prefix, output);
+        T block_prefix = temp_storage.block_prefix;
+        output = scan_op(block_prefix, output);
     }
 
 
@@ -274,11 +331,10 @@ struct BlockScanWarpScans
         ScanOp          scan_op,                        ///< [in] Binary scan operator
         T               &block_aggregate)               ///< [out] Threadblock-wide aggregate reduction of input items
     {
-        T warp_aggregate;
-        WarpScan(temp_storage.warp_scan, warp_id, lane_id).InclusiveScan(input, output, scan_op, warp_aggregate);
+        WarpScan(temp_storage.warp_scan[warp_id]).InclusiveScan(input, output, scan_op);
 
-        // Update outputs and block_aggregate with warp-wide aggregates from lane-0s
-        ApplyWarpAggregates(output, scan_op, warp_aggregate, block_aggregate);
+        // Update outputs and block_aggregate with warp-wide aggregates from lane WARP_THREADS-1
+        ApplyWarpAggregates(output, scan_op, output, block_aggregate);
 
     }
 
@@ -296,12 +352,13 @@ struct BlockScanWarpScans
     {
         InclusiveScan(input, output, scan_op, block_aggregate);
 
-        // Compute and share threadblock prefix
+        // Use the first warp to determine the threadblock prefix, returning the result in lane0
         if (warp_id == 0)
         {
             T block_prefix = block_prefix_callback_op(block_aggregate);
             if (lane_id == 0)
             {
+                // Share the prefix with all threads
                 temp_storage.block_prefix = block_prefix;
             }
         }
@@ -309,7 +366,8 @@ struct BlockScanWarpScans
         __syncthreads();
 
         // Incorporate threadblock prefix into outputs
-        output = scan_op(temp_storage.block_prefix, output);
+        T block_prefix = temp_storage.block_prefix;
+        output = scan_op(block_prefix, output);
     }
 
 
@@ -319,11 +377,10 @@ struct BlockScanWarpScans
         T               &output,                        ///< [out] Calling thread's output item (may be aliased to \p input)
         T               &block_aggregate)               ///< [out] Threadblock-wide aggregate reduction of input items
     {
-        T warp_aggregate;
-        WarpScan(temp_storage.warp_scan, warp_id, lane_id).InclusiveSum(input, output, warp_aggregate);
+        WarpScan(temp_storage.warp_scan[warp_id]).InclusiveSum(input, output);
 
-        // Update outputs and block_aggregate with warp-wide aggregates from lane-0s
-        ApplyWarpAggregates(output, Sum(), warp_aggregate, block_aggregate);
+        // Update outputs and block_aggregate with warp-wide aggregates from lane WARP_THREADS-1
+        ApplyWarpAggregates(output, Sum(), output, block_aggregate);
     }
 
 
@@ -337,12 +394,13 @@ struct BlockScanWarpScans
     {
         InclusiveSum(input, output, block_aggregate);
 
-        // Compute and share threadblock prefix
+        // Use the first warp to determine the threadblock prefix, returning the result in lane0
         if (warp_id == 0)
         {
             T block_prefix = block_prefix_callback_op(block_aggregate);
             if (lane_id == 0)
             {
+                // Share the prefix with all threads
                 temp_storage.block_prefix = block_prefix;
             }
         }
@@ -351,7 +409,8 @@ struct BlockScanWarpScans
 
         // Incorporate threadblock prefix into outputs
         Sum scan_op;
-        output = scan_op(temp_storage.block_prefix, output);
+        T block_prefix = temp_storage.block_prefix;
+        output = scan_op(block_prefix, output);
     }
 
 };

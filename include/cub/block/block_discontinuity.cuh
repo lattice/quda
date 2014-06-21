@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -34,6 +34,7 @@
 #pragma once
 
 #include "../util_type.cuh"
+#include "../util_ptx.cuh"
 #include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -46,13 +47,17 @@ namespace cub {
  * \brief The BlockDiscontinuity class provides [<em>collective</em>](index.html#sec0) methods for flagging discontinuities within an ordered set of items partitioned across a CUDA thread block. ![](discont_logo.png)
  * \ingroup BlockModule
  *
- * \tparam T                    The data type to be flagged.
- * \tparam BLOCK_THREADS        The thread block size in threads.
+ * \tparam T                The data type to be flagged.
+ * \tparam BLOCK_DIM_X      The thread block length in threads along the X dimension
+ * \tparam BLOCK_DIM_Y      <b>[optional]</b> The thread block length in threads along the Y dimension (default: 1)
+ * \tparam BLOCK_DIM_Z      <b>[optional]</b> The thread block length in threads along the Z dimension (default: 1)
+ * \tparam PTX_ARCH         <b>[optional]</b> \ptxversion
  *
  * \par Overview
  * - A set of "head flags" (or "tail flags") is often used to indicate corresponding items
  *   that differ from their predecessors (or successors).  For example, head flags are convenient
  *   for demarcating disjoint data segments as part of a segmented scan or reduction.
+ * - \blocked
  *
  * \par Performance Considerations
  * - \granularity
@@ -61,7 +66,7 @@ namespace cub {
  * \blockcollective{BlockDiscontinuity}
  * \par
  * The code snippet below illustrates the head flagging of 512 integer items that
- * are partitioned in a [<em>blocked arrangement</em>](index.html#sec4sec3) across 128 threads
+ * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
  * where each thread owns 4 consecutive items.
  * \par
  * \code
@@ -69,7 +74,7 @@ namespace cub {
  *
  * __global__ void ExampleKernel(...)
  * {
- *     // Specialize BlockDiscontinuity for 128 threads on type int
+ *     // Specialize BlockDiscontinuity for a 1D block of 128 threads on type int
  *     typedef cub::BlockDiscontinuity<int, 128> BlockDiscontinuity;
  *
  *     // Allocate shared memory for BlockDiscontinuity
@@ -96,14 +101,25 @@ namespace cub {
  */
 template <
     typename    T,
-    int         BLOCK_THREADS>
+    int         BLOCK_DIM_X,
+    int         BLOCK_DIM_Y     = 1,
+    int         BLOCK_DIM_Z     = 1,
+    int         PTX_ARCH        = CUB_PTX_ARCH>
 class BlockDiscontinuity
 {
 private:
 
     /******************************************************************************
-     * Type definitions
+     * Constants and type definitions
      ******************************************************************************/
+
+    /// Constants
+    enum
+    {
+        /// The thread block size in threads
+        BLOCK_THREADS = BLOCK_DIM_X * BLOCK_DIM_Y * BLOCK_DIM_Z,
+    };
+
 
     /// Shared memory storage layout type (last element from each thread's input)
     typedef T _TempStorage[BLOCK_THREADS];
@@ -143,6 +159,46 @@ private:
         }
     };
 
+    /// Templated unrolling of item comparison (inductive case)
+    template <int ITERATION, int MAX_ITERATIONS>
+    struct Iterate
+    {
+        template <
+            int             ITEMS_PER_THREAD,
+            typename        FlagT,
+            typename        FlagOp>
+        static __device__ __forceinline__ void FlagItems(
+            int                     linear_tid,
+            FlagT                   (&flags)[ITEMS_PER_THREAD],         ///< [out] Calling thread's discontinuity head_flags
+            T                       (&input)[ITEMS_PER_THREAD],         ///< [in] Calling thread's input items
+            FlagOp                  flag_op)                            ///< [in] Binary boolean flag predicate
+        {
+            flags[ITERATION] = ApplyOp<FlagOp>::Flag(
+                flag_op,
+                input[ITERATION - 1],
+                input[ITERATION],
+                (linear_tid * ITEMS_PER_THREAD) + ITERATION);
+
+            Iterate<ITERATION + 1, MAX_ITERATIONS>::FlagItems(linear_tid, flags, input, flag_op);
+        }
+    };
+
+    /// Templated unrolling of item comparison (termination case)
+    template <int MAX_ITERATIONS>
+    struct Iterate<MAX_ITERATIONS, MAX_ITERATIONS>
+    {
+        template <
+            int             ITEMS_PER_THREAD,
+            typename        FlagT,
+            typename        FlagOp>
+        static __device__ __forceinline__ void FlagItems(
+            int                     linear_tid,
+            FlagT                   (&flags)[ITEMS_PER_THREAD],         ///< [out] Calling thread's discontinuity head_flags
+            T                       (&input)[ITEMS_PER_THREAD],         ///< [in] Calling thread's input items
+            FlagOp                  flag_op)                            ///< [in] Binary boolean flag predicate
+        {}
+    };
+
 
     /******************************************************************************
      * Thread fields
@@ -167,48 +223,24 @@ public:
     //@{
 
     /**
-     * \brief Collective constructor for 1D thread blocks using a private static allocation of shared memory as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.
      */
     __device__ __forceinline__ BlockDiscontinuity()
     :
         temp_storage(PrivateStorage()),
-        linear_tid(threadIdx.x)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
 
 
     /**
-     * \brief Collective constructor for 1D thread blocks using the specified memory allocation as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using the specified memory allocation as temporary storage.
      */
     __device__ __forceinline__ BlockDiscontinuity(
         TempStorage &temp_storage)  ///< [in] Reference to memory allocation having layout type TempStorage
     :
         temp_storage(temp_storage.Alias()),
-        linear_tid(threadIdx.x)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
-
-
-    /**
-     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.  Each thread is identified using the supplied linear thread identifier
-     */
-    __device__ __forceinline__ BlockDiscontinuity(
-        int linear_tid)             ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(PrivateStorage()),
-        linear_tid(linear_tid)
-    {}
-
-
-    /**
-     * \brief Collective constructor using the specified memory allocation as temporary storage.  Each thread is identified using the supplied linear thread identifier.
-     */
-    __device__ __forceinline__ BlockDiscontinuity(
-        TempStorage &temp_storage,  ///< [in] Reference to memory allocation having layout type TempStorage
-        int linear_tid)             ///< [in] <b>[optional]</b> A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(temp_storage.Alias()),
-        linear_tid(linear_tid)
-    {}
-
 
 
     //@}  end member group
@@ -232,9 +264,9 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates the head-flagging of 512 integer items that
-     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec4sec3) across 128 threads
+     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive items.
      * \par
      * \code
@@ -242,7 +274,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockDiscontinuity for 128 threads on type int
+     *     // Specialize BlockDiscontinuity for a 1D block of 128 threads on type int
      *     typedef cub::BlockDiscontinuity<int, 128> BlockDiscontinuity;
      *
      *     // Allocate shared memory for BlockDiscontinuity
@@ -291,15 +323,7 @@ public:
                 linear_tid * ITEMS_PER_THREAD);
 
         // Set head_flags for remaining items
-        #pragma unroll
-        for (int ITEM = 1; ITEM < ITEMS_PER_THREAD; ITEM++)
-        {
-            head_flags[ITEM] = ApplyOp<FlagOp>::Flag(
-                flag_op,
-                input[ITEM - 1],
-                input[ITEM],
-                (linear_tid * ITEMS_PER_THREAD) + ITEM);
-        }
+        Iterate<1, ITEMS_PER_THREAD>::FlagItems(linear_tid, head_flags, input, flag_op);
     }
 
 
@@ -318,9 +342,9 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates the head-flagging of 512 integer items that
-     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec4sec3) across 128 threads
+     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive items.
      * \par
      * \code
@@ -328,7 +352,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockDiscontinuity for 128 threads on type int
+     *     // Specialize BlockDiscontinuity for a 1D block of 128 threads on type int
      *     typedef cub::BlockDiscontinuity<int, 128> BlockDiscontinuity;
      *
      *     // Allocate shared memory for BlockDiscontinuity
@@ -384,16 +408,8 @@ public:
             input[0],
             linear_tid * ITEMS_PER_THREAD);
 
-        // Set flag for remaining items
-        #pragma unroll
-        for (int ITEM = 1; ITEM < ITEMS_PER_THREAD; ITEM++)
-        {
-            head_flags[ITEM] = ApplyOp<FlagOp>::Flag(
-                flag_op,
-                input[ITEM - 1],
-                input[ITEM],
-                (linear_tid * ITEMS_PER_THREAD) + ITEM);
-        }
+        // Set head_flags for remaining items
+        Iterate<1, ITEMS_PER_THREAD>::FlagItems(linear_tid, head_flags, input, flag_op);
     }
 
 
@@ -419,9 +435,9 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates the tail-flagging of 512 integer items that
-     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec4sec3) across 128 threads
+     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive items.
      * \par
      * \code
@@ -429,7 +445,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockDiscontinuity for 128 threads on type int
+     *     // Specialize BlockDiscontinuity for a 1D block of 128 threads on type int
      *     typedef cub::BlockDiscontinuity<int, 128> BlockDiscontinuity;
      *
      *     // Allocate shared memory for BlockDiscontinuity
@@ -477,16 +493,8 @@ public:
                 temp_storage[linear_tid + 1],
                 (linear_tid * ITEMS_PER_THREAD) + (ITEMS_PER_THREAD - 1));
 
-        // Set flags for remaining items
-        #pragma unroll
-        for (int ITEM = 0; ITEM < ITEMS_PER_THREAD - 1; ITEM++)
-        {
-            tail_flags[ITEM] = ApplyOp<FlagOp>::Flag(
-                flag_op,
-                input[ITEM],
-                input[ITEM + 1],
-                (linear_tid * ITEMS_PER_THREAD) + ITEM);
-        }
+        // Set tail_flags for remaining items
+        Iterate<0, ITEMS_PER_THREAD - 1>::FlagItems(linear_tid, tail_flags, input, flag_op);
     }
 
 
@@ -506,9 +514,9 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates the tail-flagging of 512 integer items that
-     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec4sec3) across 128 threads
+     * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive items.
      * \par
      * \code
@@ -516,7 +524,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockDiscontinuity for 128 threads on type int
+     *     // Specialize BlockDiscontinuity for a 1D block of 128 threads on type int
      *     typedef cub::BlockDiscontinuity<int, 128> BlockDiscontinuity;
      *
      *     // Allocate shared memory for BlockDiscontinuity
@@ -572,16 +580,8 @@ public:
             successor_item,
             (linear_tid * ITEMS_PER_THREAD) + (ITEMS_PER_THREAD - 1));
 
-        // Set flags for remaining items
-        #pragma unroll
-        for (int ITEM = 0; ITEM < ITEMS_PER_THREAD - 1; ITEM++)
-        {
-            tail_flags[ITEM] = ApplyOp<FlagOp>::Flag(
-                flag_op,
-                input[ITEM],
-                input[ITEM + 1],
-                (linear_tid * ITEMS_PER_THREAD) + ITEM);
-        }
+        // Set tail_flags for remaining items
+        Iterate<0, ITEMS_PER_THREAD - 1>::FlagItems(linear_tid, tail_flags, input, flag_op);
     }
 
     //@}  end member group

@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -275,7 +275,7 @@ struct IterateThreadLoad<MAX, MAX>
 /**
  * Define powers-of-two ThreadLoad specializations for the various Cache load modifiers
  */
-#if CUB_PTX_VERSION >= 200
+#if CUB_PTX_ARCH >= 200
     CUB_LOAD_ALL(LOAD_CA, ca)
     CUB_LOAD_ALL(LOAD_CG, cg)
     CUB_LOAD_ALL(LOAD_CS, cs)
@@ -288,7 +288,7 @@ struct IterateThreadLoad<MAX, MAX>
     CUB_LOAD_ALL(LOAD_CV, volatile.global)
 #endif
 
-#if CUB_PTX_VERSION >= 350
+#if CUB_PTX_ARCH >= 350
     CUB_LOAD_ALL(LOAD_LDG, global.nc)
 #else
     CUB_LOAD_ALL(LOAD_LDG, global)
@@ -331,7 +331,7 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
 {
     T retval = *reinterpret_cast<volatile T*>(ptr);
 
-#if (CUB_PTX_VERSION <= 130)
+#if (CUB_PTX_ARCH <= 130)
     if (sizeof(T) == 1) __threadfence_block();
 #endif
 
@@ -348,7 +348,7 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
     Int2Type<false>          is_primitive)
 {
 
-#if CUB_PTX_VERSION <= 130
+#if CUB_PTX_ARCH <= 130
 
     T retval = *ptr;
     __threadfence_block();
@@ -359,7 +359,7 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
     typedef typename UnitWord<T>::VolatileWord VolatileWord;   // Word type for memcopying
 
     const int VOLATILE_MULTIPLE = sizeof(T) / sizeof(VolatileWord);
-
+/*
     VolatileWord words[VOLATILE_MULTIPLE];
 
     IterateThreadLoad<0, VOLATILE_MULTIPLE>::Dereference(
@@ -367,8 +367,16 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
         words);
 
     return *reinterpret_cast<T*>(words);
+*/
 
-#endif  // CUB_PTX_VERSION <= 130
+    T retval;
+    VolatileWord *words = reinterpret_cast<VolatileWord*>(&retval);
+    IterateThreadLoad<0, VOLATILE_MULTIPLE>::Dereference(
+        reinterpret_cast<volatile VolatileWord*>(ptr),
+        words);
+    return retval;
+
+#endif  // CUB_PTX_ARCH <= 130
 }
 
 

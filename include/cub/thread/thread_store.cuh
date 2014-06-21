@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -263,7 +263,7 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define ThreadStore specializations for the various Cache load modifiers
  */
-#if CUB_PTX_VERSION >= 200
+#if CUB_PTX_ARCH >= 200
     CUB_STORE_ALL(STORE_WB, ca)
     CUB_STORE_ALL(STORE_CG, cg)
     CUB_STORE_ALL(STORE_CS, cs)
@@ -326,7 +326,7 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     T                           val,
     Int2Type<false>             is_primitive)
 {
-#if CUB_PTX_VERSION <= 130
+#if CUB_PTX_ARCH <= 130
 
     *ptr = val;
     __threadfence_block();
@@ -340,11 +340,13 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     VolatileWord words[VOLATILE_MULTIPLE];
     *reinterpret_cast<T*>(words) = val;
 
+//    VolatileWord *words = reinterpret_cast<VolatileWord*>(&val);
+
     IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
         reinterpret_cast<volatile VolatileWord*>(ptr),
         words);
 
-#endif  // CUB_PTX_VERSION <= 130
+#endif  // CUB_PTX_ARCH <= 130
 
 }
 
