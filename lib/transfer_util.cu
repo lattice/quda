@@ -93,7 +93,7 @@ namespace quda {
   void blockOrderV(Complex *out, FieldOrder &in,
 		   const int *geo_map, const int *geo_bs, int spin_bs,
 		   const cpuColorSpinorField &V) {
-    printfQuda("in.Ncolor = %d\n", in.Ncolor());
+    //printfQuda("in.Ncolor = %d\n", in.Ncolor());
     int nSpin_coarse = in.Nspin() / spin_bs; // this is number of chiral blocks
 
     //Compute the size of each block
@@ -195,11 +195,13 @@ namespace quda {
 	sumFloat scale = nrm2.real() > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
 	for (int i=0; i<blockSize; i++) v[(b*N+jc)*blockSize+i] *= scale;
       }
+
+      
       if(blockSize == 384) {
       for (int jc=0; jc<N; jc++) {
         complex<sumFloat> nrm2 = 0.0;
         for(int i=0; i<blockSize; i++) nrm2 += norm(v[(b*N+jc)*blockSize+i]);
-	printfQuda("block = %d jc = %d nrm2 = %f\n", b, jc, nrm2.real());
+	//printfQuda("block = %d jc = %d nrm2 = %f\n", b, jc, nrm2.real());
       }
       }
 

@@ -1768,7 +1768,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // fill out the MG parameters for the fine level
   MGParam mgParam(*param, B, mSloppy, mSloppy);  
   mgParam.level = 1;         // set this level
-  mgParam.Nlevel = 3;        // total number of levels
+  mgParam.Nlevel = 2;        // total number of levels
   // set the block size
   for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = 4;
   mgParam.spinBlockSize = 2;

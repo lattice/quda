@@ -110,7 +110,7 @@ namespace quda {
 	transfer->R(*(*B_coarse)[i], *(param.B[i]));
 	#if 0
 	if (param.level== 2) {
-          (*B_coarse)[i]->Source(QUDA_RANDOM_SOURCE);                                                                                      
+          //(*B_coarse)[i]->Source(QUDA_RANDOM_SOURCE);                                                                                      
           printfQuda("B_coarse[%d]\n", i);
           for (int x=0; x<(*B_coarse)[i]->Volume(); x++) static_cast<cpuColorSpinorField*>((*B_coarse)[i])->PrintVector(x);
 	}
@@ -122,6 +122,8 @@ namespace quda {
       printfQuda("Creating next multigrid level\n");
       param_coarse = new MGParam(param, *B_coarse, *matCoarse, *matCoarse);
       for (int i=0; i<4; i++) param_coarse->geoBlockSize[i] = 2;
+      param_coarse->nu_pre = 8; // set the number of pre-smoothing applications 
+      param_coarse->nu_post = 8; // set the number of pre-smoothing applications 
       param_coarse->spinBlockSize = 1;
       param_coarse->level++;
       param_coarse->fine = this;
@@ -136,7 +138,7 @@ namespace quda {
     printfQuda("MG: Setup of level %d completed\n", param.level);
 
     // now we can run through the verificaion
-    if (param.level < 3) {
+    if (param.level < param.Nlevel) {
       verify();  //exit(0);
     }
 
@@ -215,12 +217,10 @@ namespace quda {
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
     if(param.level == 2) {
-    #if 1
-    printfQuda("x_coarse\n");
-    for (int x=0; x<x_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
-    printfQuda("r_coarse\n");
-    for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
-    #endif
+    //printfQuda("x_coarse\n");
+    //for (int x=0; x<x_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
+    //printfQuda("r_coarse\n");
+    //for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
     }
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     printfQuda("deviation = %e\n\n", blas::xmyNorm(*x_coarse, *r_coarse));
