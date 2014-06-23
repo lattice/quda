@@ -144,6 +144,8 @@ namespace quda {
       K = new MR(matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner MR preconditioner
       K = new SD(matPrecon, Kparam, profile);
+    else if (param.inv_type_precondition == QUDA_XSD_INVERTER) // inner XSD preconditioner
+      K = new XSD(matPrecon, Kparam, profile);
     else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
 
