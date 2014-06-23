@@ -361,6 +361,12 @@ namespace quda {
     case 9:
       copyGenericColorSpinor<Ns,9>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
       break;
+    case 24:
+      copyGenericColorSpinor<Ns,24>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
+      break;
+    case 72:
+      copyGenericColorSpinor<Ns,72>(dst, src, location, Dst, Src, dstNorm, srcNorm);      
+      break;
     default:
       errorQuda("Ncolors=%d not supported", src.Ncolor());
     }

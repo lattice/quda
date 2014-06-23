@@ -219,6 +219,7 @@ namespace quda {
     int coarse_size = 1;
     for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
 
+    //#pragma omp parallel for 
     for (int parity=0; parity<2; parity++) {
       int x_cb = 0;
       for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
@@ -266,7 +267,6 @@ namespace quda {
 
 		  for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
 		    for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
-		    
 		      for(int ic = 0; ic < G.Ncolor(); ic++) { //Sum over fine color
 		        //Diagonal Spin
 		        M(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_row,ic_c,jc_c) += 
@@ -599,6 +599,7 @@ namespace quda {
     int x_size[QUDA_MAX_DIM];
     for(int d = 0; d < nDim; d++) x_size[d] = in.X(d);
 
+    //#pragma omp parallel for 
     for (int parity=0; parity<2; parity++) {
       for(int x_cb = 0; x_cb < in.Volume()/2; x_cb++) { //Volume
 	int coord[QUDA_MAX_DIM];

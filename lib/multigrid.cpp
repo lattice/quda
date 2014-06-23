@@ -29,7 +29,7 @@ namespace quda {
     if (param.level==2) {
       param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
-      param_presmooth->tol = 1e-4;
+      param_presmooth->tol = 1e-3;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-7;
     }
