@@ -20,13 +20,13 @@ namespace quda {
     param_presmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
 
     param_presmooth->inv_type = param.smoother;
-    if (param_presmooth->level == 1) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
+    if (param_presmooth->level < param.Nlevel) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
-    if (param.level==2) {
+    if (param.level==param.Nlevel) {
       param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
       param_presmooth->tol = 1e-3;
@@ -127,7 +127,7 @@ namespace quda {
       param_coarse->spinBlockSize = 1;
       param_coarse->level++;
       param_coarse->fine = this;
-      param_coarse->smoother = QUDA_GCR_INVERTER;
+      if (param.level == param.Nlevel-1) param_coarse->smoother = QUDA_GCR_INVERTER;
       param_coarse->delta = 1e-1;
       //This is already set in MGParam constructor, but put it here explicitly so it can be changed.
       param_coarse->Nvec = param.Nvec;
@@ -138,7 +138,7 @@ namespace quda {
     printfQuda("MG: Setup of level %d completed\n", param.level);
 
     // now we can run through the verificaion
-    if (param.level == 1) {
+    if (param.level < param.Nlevel) {
       verify();  
     }
 
@@ -151,9 +151,9 @@ namespace quda {
       if (transfer) delete transfer;
       if (matCoarse) delete matCoarse;
       if (diracCoarse) delete diracCoarse;
+      if (postsmoother) delete postsmoother;
     }
     if (presmoother) delete presmoother;
-    if (postsmoother) delete postsmoother;
 
     if (r) delete r;
     if (r_coarse) delete r_coarse;
