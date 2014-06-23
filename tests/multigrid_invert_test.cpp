@@ -44,8 +44,14 @@ extern QudaPrecision  prec_sloppy;
 extern double mass;
 extern char latfile[];
 extern int niter;
+extern int mg_levels;
+extern int gpu_prolongate;
 
 extern void usage(char** );
+
+namespace quda {
+  extern void setTransferGPU(bool);
+}
 
 void
 display_test_info()
@@ -271,6 +277,8 @@ int main(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
+
+  quda::setTransferGPU(gpu_prolongate);
 
   setSpinorSiteSize(24);
 
