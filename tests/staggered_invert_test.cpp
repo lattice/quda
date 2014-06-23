@@ -141,7 +141,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   //inv_param->gcrNkrylov = 10;
 
   // domain decomposition preconditioner parameters
-  inv_param->inv_type_precondition = QUDA_SD_INVERTER;
+  //inv_param->inv_type_precondition = QUDA_SD_INVERTER;
+  inv_param->inv_type_precondition = QUDA_XSD_INVERTER;
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
