@@ -369,6 +369,7 @@ namespace quda {
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
     checkField(*this, src);
+    if (this->GammaBasis() != src.GammaBasis()) errorQuda("cannot call this copy with different basis");
     blas::copy(*this, src);
   }
 
@@ -376,7 +377,8 @@ namespace quda {
     
     // src is on the device and is native
     if (typeid(src) == typeid(cudaColorSpinorField) && 
-	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative()) {
+	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative() &&
+	this->GammaBasis() == src.GammaBasis()) {
       copy(dynamic_cast<const cudaColorSpinorField&>(src));
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
