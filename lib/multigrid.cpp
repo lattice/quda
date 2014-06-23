@@ -125,7 +125,7 @@ namespace quda {
 
     // now we can run through the verificaion
     if (param.level == 1) {
-      verify();  //exit(0);
+      verify();  
     }
 
   }
@@ -206,6 +206,8 @@ namespace quda {
     delete tmp_coarse;
   }
 
+  void setTransferGPU(bool use_gpu);
+
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
 
     if (getVerbosity() >= QUDA_VERBOSE)
@@ -224,7 +226,13 @@ namespace quda {
 
       // restrict to the coarse grid
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("MG: level %d, restriction\n", param.level);
+
       transfer->R(*r_coarse, *r);
+
+      /*printf("now doing CPU\n");
+      setTransferGPU(false);
+      transfer->R(*x_coarse, *r);*/
+
       if (getVerbosity() >= QUDA_VERBOSE) 
 	printfQuda("MG: level %d after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", 
 		   param.level, blas::norm2(x), r2, blas::norm2(*r_coarse));
@@ -248,7 +256,6 @@ namespace quda {
 
       // do the post smoothing
       (*postsmoother)(x,b);
-
     } else { // do the coarse grid solve
       (*presmoother)(x, b);
     }
@@ -296,7 +303,7 @@ namespace quda {
 
       for (int i = 0; i < (nvec < 2 ? nvec : 2); i++) {
 	blas::zero(*B[i]);
-	#if 1
+#if 1
 	ColorSpinorParam csParam(*B[i]);
 	csParam.create = QUDA_ZERO_FIELD_CREATE;
 	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
@@ -308,10 +315,10 @@ namespace quda {
 	  }
 	}
 	delete tmp;
-	#else
+#else
 	printfQuda("Using random source for nullvector = %d\n",i);
 	B[i]->Source(QUDA_RANDOM_SOURCE);
-	#endif
+#endif
       }
 
       for (int i=2; i<nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
