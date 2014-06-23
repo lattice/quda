@@ -45,6 +45,9 @@ namespace quda {
     if (B[0]->Ncolor()*Nvec != V.Ncolor()) errorQuda("Something wrong here");
     if (B[0]->Ncolor() == 3) {
       FillV<Float,nSpin,3,order>(V,B,Nvec);
+    } 
+    else if(B[0]->Ncolor() == 24) {
+      FillV<Float,nSpin,24,order>(V,B,Nvec);
     } else {
       errorQuda("Unsupported nColor %d", B[0]->Ncolor());
     }
@@ -54,7 +57,11 @@ namespace quda {
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (V.Nspin() == 4) {
       FillV<Float,4,order>(V,B,Nvec);
-    } else {
+    } 
+    else if (V.Nspin() == 2) {
+      FillV<Float,2,order>(V,B,Nvec);
+    }
+    else {
       errorQuda("Unsupported nSpin %d", V.Nspin());
     }
   }
@@ -86,7 +93,7 @@ namespace quda {
   void blockOrderV(Complex *out, FieldOrder &in,
 		   const int *geo_map, const int *geo_bs, int spin_bs,
 		   const cpuColorSpinorField &V) {
-
+    //printfQuda("in.Ncolor = %d\n", in.Ncolor());
     int nSpin_coarse = in.Nspin() / spin_bs; // this is number of chiral blocks
 
     //Compute the size of each block
@@ -122,6 +129,7 @@ namespace quda {
       for (int v=0; v<in.Nvec(); v++) {
 	for (int s=0; s<in.Nspin(); s++) {
 	  for (int c=0; c<in.Ncolor(); c++) {
+
 	    int chirality = s / spin_bs; // chirality is the coarse spin
 	    int blockSpin = s % spin_bs; // the remaining spin dof left in each block
 
@@ -149,10 +157,12 @@ namespace quda {
     }
 
     // nned non-quadratic check
+    if (blockSize == 384) {
     for (int i=0; i<checkLength; i++) {
       for (int j=0; j<i; j++) {
 	//if (check[i] == check[j]) errorQuda("Collision detected in block ordering\n");
       }
+    }
     }
 
     delete []check;
@@ -184,6 +194,15 @@ namespace quda {
 	for (int i=0; i<blockSize; i++) nrm2 += norm(v[(b*N+jc)*blockSize+i]);
 	sumFloat scale = nrm2.real() > 0.0 ? 1.0/sqrt(nrm2.real()) : 0.0;
 	for (int i=0; i<blockSize; i++) v[(b*N+jc)*blockSize+i] *= scale;
+      }
+
+      
+      if(blockSize == 384) {
+      for (int jc=0; jc<N; jc++) {
+        complex<sumFloat> nrm2 = 0.0;
+        for(int i=0; i<blockSize; i++) nrm2 += norm(v[(b*N+jc)*blockSize+i]);
+	//printfQuda("block = %d jc = %d nrm2 = %f\n", b, jc, nrm2.real());
+      }
       }
 
       //printf("blockGramSchmidt done %d / %d\n", b, nBlocks);
@@ -230,6 +249,9 @@ namespace quda {
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
     if (V.Ncolor()/Nvec == 3) {
       BlockOrthogonalize<Float,nSpin,3,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    }
+    else if (V.Ncolor()/Nvec == 24) {
+      BlockOrthogonalize<Float,nSpin,24,order>(V, Nvec, geo_bs, geo_map, spin_bs);
     } else {
       errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
     }
@@ -240,6 +262,9 @@ namespace quda {
 			  const int *geo_bs, const int *geo_map, int spin_bs) {
     if (V.Nspin() == 4) {
       BlockOrthogonalize<Float,4,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    }
+    else if(V.Nspin() ==2) {
+      BlockOrthogonalize<Float,2,order>(V, Nvec, geo_bs, geo_map, spin_bs);
     } else {
       errorQuda("Unsupported nSpin %d\n", V.Nspin());
     }

@@ -15,6 +15,7 @@ namespace quda {
 
   protected:
 
+
     //Which gamma matrix (dir = 0,4)
     //dir = 0: gamma^1, dir = 1: gamma^2, dir = 2: gamma^3, dir = 3: gamma^4, dir =4: gamma^5
     //int dir;
@@ -185,10 +186,10 @@ namespace quda {
 	      coord[dir] = (coord[dir]+1)%x_size[dir];
 	      if (dir==0) coord[0] /= 2;
 	      int y_cb = ((coord[3]*x_size[2]+coord[2])*x_size[1]+coord[1])*(x_size[0]/2) + coord[0];
-		
-	      for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
+
+              for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
 		for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
-		  for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
+                  for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
 		    for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
 		      UV(parity, x_cb, s, ic, ic_c) += G(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y_cb, s, jc, ic_c);
 		    }  //Fine color columns
@@ -250,35 +251,35 @@ namespace quda {
 
 	      coord[0] /= 2;
 
-	      for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin
-		//Spin part of the color matrix.  Will always consist
-		//of two terms - diagonal and off-diagonal part of
-		//P_mu = (1+\gamma_mu)
+  	        for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin
+		  //Spin part of the color matrix.  Will always consist
+		  //of two terms - diagonal and off-diagonal part of
+		  //P_mu = (1+\gamma_mu)
 		
-		int s_c_row = s/spin_bs; //Coarse spin row index
+		  int s_c_row = s/spin_bs; //Coarse spin row index
 	
-		//Use Gamma to calculate off-diagonal coupling and
-		//column index.  Diagonal coupling is always 1.
-		int s_col;
-		complex<Float> coupling = gamma.getrowelem(s, s_col);
-		int s_c_col = s_col/spin_bs;
+		  //Use Gamma to calculate off-diagonal coupling and
+		  //column index.  Diagonal coupling is always 1.
+		  int s_col;
+		  complex<Float> coupling = gamma.getrowelem(s, s_col);
+		  int s_c_col = s_col/spin_bs;
 
-		for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
-		  for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
+		  for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
+		    for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
 		    
-		    for(int ic = 0; ic < G.Ncolor(); ic++) { //Sum over fine color
-		      //Diagonal Spin
-		      M(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_row,ic_c,jc_c) += 
-			half * conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s, ic, jc_c); 
+		      for(int ic = 0; ic < G.Ncolor(); ic++) { //Sum over fine color
+		        //Diagonal Spin
+		        M(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_row,ic_c,jc_c) += 
+			  half * conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s, ic, jc_c); 
 		      
-		      //Off-diagonal Spin
-		      M(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_col,ic_c,jc_c) += 
-			half * coupling * conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s_col, ic, jc_c);
-		    } //Fine color
-		  } //Coarse Color column
-		} //Coarse Color row
+		        //Off-diagonal Spin
+		        M(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_col,ic_c,jc_c) += 
+			  half * coupling * conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s_col, ic, jc_c);
+		      } //Fine color
+		    } //Coarse Color column
+		  } //Coarse Color row
 
-	      } //Fine spin
+	        } //Fine spin
 
 	      x_cb++;
 	    } // coord[0]
@@ -463,7 +464,7 @@ namespace quda {
     if (uv.Nspin() == 4) {
       calculateY<Float,csOrder,gOrder,fineColor,4>(Y, X, uv, T, g);
     } else {
-      errorQuda("Unsupported number of colors %d\n", g.Ncolor());
+      errorQuda("Unsupported number of spins %d\n", uv.Nspin());
     }
   }
 
@@ -540,7 +541,54 @@ namespace quda {
     cpuColorSpinorField uv(UVparam);
 
     calculateY(Y, X, uv, T, g);
-  }  
+  }
+
+  //out(x) = (1-2*kappa*X)*in(x), where X is the local color-spin matrix on the coarse grid.
+  template<typename Float, typename F, typename G>
+  void coarseClover(F &out, const F &in, const G &X, Float kappa) {
+    int Nc = out.Ncolor();
+    int Ns = out.Nspin();
+    int ndim = out.Ndim();
+    int sites = out.Volume();
+    int x_size[QUDA_MAX_DIM];
+    for(int d = 0; d < ndim; d++) {
+      x_size[d] = out.X(d);
+    }
+
+
+    for(int i = 0; i < out.Volume(); i++) { //Volume
+      int coord[QUDA_MAX_DIM];
+      int parity = 0;
+      int gauge_index = 0;
+      out.LatticeIndex(coord,i);
+      gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
+
+      for(int s = 0; s < Ns; s++) { //Spin out
+        for(int c = 0; c < Nc; c++) { //Color out
+	  out(i,s,c) += in(i,s,c);
+	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
+	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
+              //printf("pre i = %d, s = %d, c = %d, s_col = %d, c_col = %d, parity = %d, gauge_index = %d, Y = %e, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,parity, gauge_index, Y(2*ndim,parity,gauge_index/2,s,s_col,c,c_col).real(),out(i,s,c).real(),in(i,s_col,c_col).real());
+	      out(i,s,c) -= 2*kappa*X(0, parity, gauge_index/2, s, s_col, c, c_col)*in(i,s_col,c_col);
+              //printf("post i = %d, s = %d, c = %d, s_col = %d, c_col = %d, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,out(i,s,c).real(),in(i,s_col,c_col).real());
+	    } //Color in
+          } //Spin in
+        } //Color out
+      } //Spin out
+    } //Volume
+  }
+
+  //Multiply a field by a real constant
+  template<typename Float, typename F>
+  void F_eq_rF(F &f, Float r) {
+    for(int i = 0; i < f.Volume(); i++) {
+      for(int s = 0; s < f.Nspin(); s++) {
+        for(int c = 0; c < f.Ncolor(); c++) {
+          f(i,s,c) *= r;
+        }
+      }
+    }
+  }
 
  //Apply the coarse Dslash to a vector:
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)

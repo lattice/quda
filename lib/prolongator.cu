@@ -144,7 +144,7 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseColor, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  const int *fine_to_coarse, const int *spin_map) {
-    if (out.Nspin()/in.Nspin() != 2) errorQuda("Spin coarsening not supported");
+    if (in.Nspin() != 2) errorQuda("coarseSpin != 2 not supported");
     const int coarseSpin = 2;
 
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
@@ -183,6 +183,8 @@ namespace quda {
 
     if (out.Ncolor() == 3) {
       Prolongate<Float,fineSpin,3,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+    } else if (out.Ncolor() == 24) {
+      Prolongate<Float,fineSpin,24,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nColor %d", out.Ncolor());
     }
@@ -194,6 +196,8 @@ namespace quda {
 
     if (out.Nspin() == 4) {
       Prolongate<Float,4,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+    } else if (out.Nspin() == 2) {
+      Prolongate<Float,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nSpin %d", out.Nspin());
     }

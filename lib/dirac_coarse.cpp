@@ -15,6 +15,11 @@ namespace quda {
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const 
   { ApplyCoarse(out,in,*Y,*X,kappa); }
 
+  //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
+  void DiracCoarse::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
+    CoarseCoarseOp(T, Y, X, *(this->Y), *(this->X));
+  }
+
   void DiracCoarse::initializeCoarse() {
     QudaPrecision prec = transfer->Vectors().Precision();
     int ndim = transfer->Vectors().Ndim();
