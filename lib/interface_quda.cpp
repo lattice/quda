@@ -4343,9 +4343,9 @@ computeHISQForceCompleteQuda(void* const milc_momentum,
                              const QudaGaugeParam* gParam)
 {
 
+/*
   void* oprod[2];
 
-/*
   computeStaggeredOprodQuda(void** oprod,
     void** fermion,
     int num_terms,
