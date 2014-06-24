@@ -72,6 +72,7 @@ su3_matrix* get_su3_matrix(int gauge_order, su3_matrix* p, int idx, int dir)
   }else{
     errorQuda("get_su3_matrix: unsupported ordering scheme!\n");
   }
+  return NULL;
 }
 
 template<typename su3_matrix>
