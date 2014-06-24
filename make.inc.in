@@ -157,7 +157,11 @@ ifeq ($(strip $(POSIX_THREADS)), yes)
   NVCCOPT += -DPTHREADS
   COPT += -DPTHREADS
 endif
+
+ifeq ($(strip $(POSIX_THREADS)), yes)
   LIB += -lpthread
+endif
+
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
