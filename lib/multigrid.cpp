@@ -20,16 +20,16 @@ namespace quda {
     param_presmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
 
     param_presmooth->inv_type = param.smoother;
-    if (param_presmooth->level == 1) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
+    if (param_presmooth->level < param.Nlevel) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
-    if (param.level==2) {
+    if (param.level==param.Nlevel) {
       param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
-      param_presmooth->tol = 1e-4;
+      param_presmooth->tol = 1e-3;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-7;
     }
@@ -127,7 +127,7 @@ namespace quda {
       param_coarse->spinBlockSize = 1;
       param_coarse->level++;
       param_coarse->fine = this;
-      param_coarse->smoother = QUDA_GCR_INVERTER;
+      if (param.level == param.Nlevel-1) param_coarse->smoother = QUDA_GCR_INVERTER;
       param_coarse->delta = 1e-1;
       //This is already set in MGParam constructor, but put it here explicitly so it can be changed.
       param_coarse->Nvec = param.Nvec;
@@ -139,7 +139,7 @@ namespace quda {
 
     // now we can run through the verificaion
     if (param.level < param.Nlevel) {
-      verify();  //exit(0);
+      verify();  
     }
 
   }
@@ -151,9 +151,9 @@ namespace quda {
       if (transfer) delete transfer;
       if (matCoarse) delete matCoarse;
       if (diracCoarse) delete diracCoarse;
+      if (postsmoother) delete postsmoother;
     }
     if (presmoother) delete presmoother;
-    if (postsmoother) delete postsmoother;
 
     if (r) delete r;
     if (r_coarse) delete r_coarse;
@@ -230,6 +230,8 @@ namespace quda {
     delete tmp_coarse;
   }
 
+  void setTransferGPU(bool use_gpu);
+
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
 
     if (getVerbosity() >= QUDA_VERBOSE)
@@ -248,7 +250,13 @@ namespace quda {
 
       // restrict to the coarse grid
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("MG: level %d, restriction\n", param.level);
+
       transfer->R(*r_coarse, *r);
+
+      /*printf("now doing CPU\n");
+      setTransferGPU(false);
+      transfer->R(*x_coarse, *r);*/
+
       if (getVerbosity() >= QUDA_VERBOSE) 
 	printfQuda("MG: level %d after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", 
 		   param.level, blas::norm2(x), r2, blas::norm2(*r_coarse));
@@ -272,7 +280,6 @@ namespace quda {
 
       // do the post smoothing
       (*postsmoother)(x,b);
-
     } else { // do the coarse grid solve
       (*presmoother)(x, b);
     }
@@ -320,7 +327,7 @@ namespace quda {
 
       for (int i = 0; i < (nvec < 2 ? nvec : 2); i++) {
 	blas::zero(*B[i]);
-	#if 1
+#if 1
 	ColorSpinorParam csParam(*B[i]);
 	csParam.create = QUDA_ZERO_FIELD_CREATE;
 	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
@@ -332,10 +339,10 @@ namespace quda {
 	  }
 	}
 	delete tmp;
-	#else
+#else
 	printfQuda("Using random source for nullvector = %d\n",i);
 	B[i]->Source(QUDA_RANDOM_SOURCE);
-	#endif
+#endif
       }
 
       for (int i=2; i<nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);

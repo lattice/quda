@@ -29,8 +29,11 @@ namespace quda {
     /** The block-normalized null-space components that define the prolongator */
     ColorSpinorField *V;
 
-    /** A temporary field with fine geometry but coarse color */
-    ColorSpinorField *tmp;
+    /** CPU copy of the null-space components */
+    ColorSpinorField *V_h;
+
+    /** CPU copy of the null-space components */
+    ColorSpinorField *V_d;
 
     /** A temporary field with fine geometry and fine color we use for changing gamma basis */
     ColorSpinorField *tmp2; // FIXME - this should be in the transfer kernels
@@ -161,7 +164,7 @@ namespace quda {
      * Returns a const reference to the V field
      * @return The V field const reference
      */
-    const ColorSpinorField& Vectors() const { return *V; }
+    const ColorSpinorField& Vectors() const { return *V_h; }
 
     /**
      * Returns the number of near nullvectors
@@ -188,12 +191,10 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
 			  const int *fine_to_coarse, int spin_bs);
 
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, 
-		  const ColorSpinorField &v, ColorSpinorField &tmp, 
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
 		  int Nvec, const int *fine_to_coarse, const int *spin_map);
 
-  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, 
-		const ColorSpinorField &v, ColorSpinorField &tmp,
+  void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
 		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map);
   
 

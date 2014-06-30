@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,7 +28,7 @@
 
 /**
  * \file
- * cub::BlockReduceRaking provides raking-based methods of parallel reduction across a CUDA threadblock
+ * cub::BlockReduceRaking provides raking-based methods of parallel reduction across a CUDA thread block.  Supports non-commutative reduction operators.
  */
 
 #pragma once
@@ -36,6 +36,7 @@
 #include "../../block/block_raking_layout.cuh"
 #include "../../warp/warp_reduce.cuh"
 #include "../../thread/thread_reduce.cuh"
+#include "../../util_ptx.cuh"
 #include "../../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -46,18 +47,38 @@ namespace cub {
 
 
 /**
- * \brief BlockReduceRaking provides raking-based methods of parallel reduction across a CUDA threadblock
+ * \brief BlockReduceRaking provides raking-based methods of parallel reduction across a CUDA thread block.  Supports non-commutative reduction operators.
+ *
+ * Supports non-commutative binary reduction operators.  Unlike commutative
+ * reduction operators (e.g., addition), the application of a non-commutative
+ * reduction operator (e.g, string concatenation) across a sequence of inputs must
+ * honor the relative ordering of items and partial reductions when applying the
+ * reduction operator.
+ *
+ * Compared to the implementation of BlockReduceRaking (which does not support
+ * non-commutative operators), this implementation requires a few extra
+ * rounds of inter-thread communication.
  */
 template <
     typename    T,              ///< Data type being reduced
-    int         BLOCK_THREADS>  ///< The thread block size in threads
+    int         BLOCK_DIM_X,    ///< The thread block length in threads along the X dimension
+    int         BLOCK_DIM_Y,    ///< The thread block length in threads along the Y dimension
+    int         BLOCK_DIM_Z,    ///< The thread block length in threads along the Z dimension
+    int         PTX_ARCH>       ///< The PTX compute capability for which to to specialize this collective
 struct BlockReduceRaking
 {
-    /// Layout type for padded threadblock raking grid
-    typedef BlockRakingLayout<T, BLOCK_THREADS, 1> BlockRakingLayout;
+    /// Constants
+    enum
+    {
+        /// The thread block size in threads
+        BLOCK_THREADS = BLOCK_DIM_X * BLOCK_DIM_Y * BLOCK_DIM_Z,
+    };
+
+    /// Layout type for padded thread block raking grid
+    typedef BlockRakingLayout<T, BLOCK_THREADS, PTX_ARCH> BlockRakingLayout;
 
     ///  WarpReduce utility type
-    typedef typename WarpReduce<T, 1, BlockRakingLayout::RAKING_THREADS>::InternalWarpReduce WarpReduce;
+    typedef typename WarpReduce<T, BlockRakingLayout::RAKING_THREADS, PTX_ARCH>::InternalWarpReduce WarpReduce;
 
     /// Constants
     enum
@@ -72,7 +93,7 @@ struct BlockReduceRaking
         WARP_SYNCHRONOUS = (RAKING_THREADS == BLOCK_THREADS),
 
         /// Whether or not warp-synchronous reduction should be unguarded (i.e., the warp-reduction elements is a power of two
-        WARP_SYNCHRONOUS_UNGUARDED = ((RAKING_THREADS & (RAKING_THREADS - 1)) == 0),
+        WARP_SYNCHRONOUS_UNGUARDED = PowerOfTwo<RAKING_THREADS>::VALUE,
 
         /// Whether or not accesses into smem are unguarded
         RAKING_UNGUARDED = BlockRakingLayout::UNGUARDED,
@@ -99,11 +120,10 @@ struct BlockReduceRaking
 
     /// Constructor
     __device__ __forceinline__ BlockReduceRaking(
-        TempStorage &temp_storage,
-        int linear_tid)
+        TempStorage &temp_storage)
     :
         temp_storage(temp_storage.Alias()),
-        linear_tid(linear_tid)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
 
 
@@ -111,7 +131,7 @@ struct BlockReduceRaking
     __device__ __forceinline__ T RakingReduction(
         ReductionOp                 reduction_op,       ///< [in] Binary scan operator
         T                           *raking_segment,
-        T                           partial,            ///< [in] <b>[<em>lane</em><sub>0</sub>s only]</b> Warp-wide aggregate reduction of input items
+        T                           partial,            ///< [in] <b>[<em>lane</em><sub>0</sub> only]</b> Warp-wide aggregate reduction of input items
         int                         num_valid,          ///< [in] Number of valid elements (may be less than BLOCK_THREADS)
         Int2Type<ITERATION>         iteration)
     {
@@ -128,7 +148,7 @@ struct BlockReduceRaking
     __device__ __forceinline__ T RakingReduction(
         ReductionOp                 reduction_op,       ///< [in] Binary scan operator
         T                           *raking_segment,
-        T                           partial,            ///< [in] <b>[<em>lane</em><sub>0</sub>s only]</b> Warp-wide aggregate reduction of input items
+        T                           partial,            ///< [in] <b>[<em>lane</em><sub>0</sub> only]</b> Warp-wide aggregate reduction of input items
         int                         num_valid,          ///< [in] Number of valid elements (may be less than BLOCK_THREADS)
         Int2Type<SEGMENT_LENGTH>    iteration)
     {
@@ -147,7 +167,7 @@ struct BlockReduceRaking
         if (WARP_SYNCHRONOUS)
         {
             // Short-circuit directly to warp synchronous reduction (unguarded if active threads is a power-of-two)
-            partial = WarpReduce(temp_storage.warp_storage, 0, linear_tid).template Sum<FULL_TILE, SEGMENT_LENGTH>(
+            partial = WarpReduce(temp_storage.warp_storage).template Sum<FULL_TILE, SEGMENT_LENGTH>(
                 partial,
                 num_valid);
         }
@@ -167,7 +187,7 @@ struct BlockReduceRaking
 
                 partial = RakingReduction<FULL_TILE>(reduction_op, raking_segment, partial, num_valid, Int2Type<1>());
 
-                partial = WarpReduce(temp_storage.warp_storage, 0, linear_tid).template Sum<FULL_TILE && RAKING_UNGUARDED, SEGMENT_LENGTH>(
+                partial = WarpReduce(temp_storage.warp_storage).template Sum<FULL_TILE && RAKING_UNGUARDED, SEGMENT_LENGTH>(
                     partial,
                     num_valid);
             }
@@ -189,7 +209,7 @@ struct BlockReduceRaking
         if (WARP_SYNCHRONOUS)
         {
             // Short-circuit directly to warp synchronous reduction (unguarded if active threads is a power-of-two)
-            partial = WarpReduce(temp_storage.warp_storage, 0, linear_tid).template Reduce<FULL_TILE, SEGMENT_LENGTH>(
+            partial = WarpReduce(temp_storage.warp_storage).template Reduce<FULL_TILE, SEGMENT_LENGTH>(
                 partial,
                 num_valid,
                 reduction_op);
@@ -210,7 +230,7 @@ struct BlockReduceRaking
 
                 partial = RakingReduction<FULL_TILE>(reduction_op, raking_segment, partial, num_valid, Int2Type<1>());
 
-                partial = WarpReduce(temp_storage.warp_storage, 0, linear_tid).template Reduce<FULL_TILE && RAKING_UNGUARDED, SEGMENT_LENGTH>(
+                partial = WarpReduce(temp_storage.warp_storage).template Reduce<FULL_TILE && RAKING_UNGUARDED, SEGMENT_LENGTH>(
                     partial,
                     num_valid,
                     reduction_op);

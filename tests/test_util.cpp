@@ -1560,6 +1560,9 @@ QudaInverterType inv_type;
 int multishift = 0;
 double mass = 0.1;
 
+int gpu_prolongate = 0;
+int mg_levels = 2;
+
 static int dim_partitioned[4] = {0,0,0,0};
 
 int dimPartitioned(int dim)
@@ -1604,7 +1607,9 @@ void usage(char** argv )
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --nvec                                    # Number of vectors to load\n");
   printf("    --mass                                    # Mass of Dirac operator\n");
-  printf("    --load-vec file                           # Load the vectors \"file\" for the multigrid_test (requires QIO\n");
+  printf("    --gpu-prolongate <true/false>             # Whether to do the transfer operators on the GPU (default false)\n");
+  printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
+  printf("    --load-vec file                           # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --help                                    # Print out this message\n"); 
   usage_extra(argv); 
 #ifdef MULTI_GPU
@@ -1842,6 +1847,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if( strcmp(argv[i], "--gpu-prolongate") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      gpu_prolongate = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      gpu_prolongate = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid gpu-prolongate boolean\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--xgridsize") == 0){
     if (i+1 >= argc){ 
       usage(argv);
@@ -1945,6 +1969,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     nvec= atoi(argv[i+1]);
     if (nvec < 0 || nvec > 128){
       printf("ERROR: invalid number of vectors (%d)\n", nvec);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-levels") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    nvec= atoi(argv[i+1]);
+    if (mg_levels < 2 || mg_levels > 4){
+      printf("ERROR: invalid number of multigrid levels (%d)\n", mg_levels);
       usage(argv);
     }
     i++;

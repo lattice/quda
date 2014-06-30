@@ -51,6 +51,7 @@ namespace quda {
       int i = (((s*nColor+c)*nVec+v)*2) % N;      
       int index = ((j*stride+x_cb)*2+i) / 2; // back to a complex offset
       index += parity*cb_offset;
+      return index;
     };
 
     template<typename Float, int nSpin, int nColor, int nVec> 
@@ -259,6 +260,7 @@ namespace quda {
       int i = (((s*nColor+c)*nVec+v)*2) % N;      
       int index = ((j*stride+x_cb)*2+i) / 2; // back to a complex offset
       index += parity*offset_cb;
+      return index;
     };
 
     template<typename Float, int nSpin, int nColor, int nVec> 

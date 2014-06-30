@@ -1754,6 +1754,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
   
+  profileInvert.Start(QUDA_PROFILE_INIT);
   printfQuda("Creating vector of null space fields of length %d\n", nvec);
   cpuParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuParam.precision = param->cuda_prec_sloppy;
@@ -1779,6 +1780,8 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   // create the MG preconditioner
   Solver *K = new MG(mgParam, profileInvert);
+  profileInvert.Stop(QUDA_PROFILE_INIT);
+
   //(*K)(*out, *in);
 
   SolverParam solverParam(*param);
@@ -1796,7 +1799,9 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Solution = %g\n",nx);
   }
 
+  profileInvert.Start(QUDA_PROFILE_EPILOGUE);
   dirac.reconstruct(*x, *b, param->solution_type);
+  profileInvert.Stop(QUDA_PROFILE_EPILOGUE);
 
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution
