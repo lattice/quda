@@ -390,7 +390,7 @@ namespace quda {
       }else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER){
 #ifdef BUILD_QDPJIT_INTERFACE
         QDPJITDiracOrder<FloatIn,Ns,Nc> inOrder(in, In);
-        extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend location, Out, outNorm);
+        extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend,location, Out, outNorm);
 #else
         errorQuda("QDPJIT interface has not been built\n");
 #endif
