@@ -502,7 +502,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField *sloppy = NULL;
-  if (param->cuda_prec != param->cuda_prec_sloppy) {
+  if (param->cuda_prec != param->cuda_prec_sloppy ||
+      param->reconstruct != param->reconstruct_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
     sloppy->copy(*precise);
     param->gaugeGiB += sloppy->GBytes();
@@ -517,7 +518,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField *precondition = NULL;
-  if (param->cuda_prec_sloppy != param->cuda_prec_precondition) {
+  if (param->cuda_prec_sloppy != param->cuda_prec_precondition ||
+      param->reconstruct_sloppy != param->reconstruct_precondition) {
     precondition = new cudaGaugeField(gauge_param);
     precondition->copy(*sloppy);
     param->gaugeGiB += precondition->GBytes();
