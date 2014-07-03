@@ -28,7 +28,7 @@ namespace quda {
 
   }
 
-  void Lanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m) 
+  void Lanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m) 
   {
     profile.Start(QUDA_PROFILE_COMPUTE);
 
@@ -100,7 +100,7 @@ namespace quda {
   {
   }
 
-  void ImpRstLanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m) 
+  void ImpRstLanczos::operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m) 
   {
   }
 } // namespace quda

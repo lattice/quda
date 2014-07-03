@@ -96,6 +96,7 @@ namespace quda {
     } else {
       copyCuda(r, b);
       r2 = b2;
+      zeroCuda(x); // defensive measure in case solution isn't already zero
     }
 
     // Check to see that we're not trying to invert on a zero-field source
