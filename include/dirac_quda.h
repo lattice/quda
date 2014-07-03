@@ -25,8 +25,8 @@ namespace quda {
     int Ls;    //!NEW: used by domain wall and twisted mass
     double *b_5;    //!NEW: used by mobius domain wall only  
     double *c_5;    //!NEW: used by mobius domain wall only
-    MatPCType matpcType;
-    DagType dagger;
+    QudaMatPCType matpcType;
+    QudaDagType dagger;
     cudaGaugeField *gauge;
     cudaGaugeField *fatGauge;  // used by staggered only
     cudaGaugeField *longGauge; // used by staggered only
@@ -86,8 +86,8 @@ namespace quda {
     cudaGaugeField &gauge;
     double kappa;
     double mass;
-    MatPCType matpcType;
-    mutable DagType dagger; // mutable to simplify implementation of Mdag
+    QudaMatPCType matpcType;
+    mutable QudaDagType dagger; // mutable to simplify implementation of Mdag
     mutable unsigned long long flops;
     mutable cudaColorSpinorField *tmp1; // temporary hack
     mutable cudaColorSpinorField *tmp2; // temporary hack
@@ -133,7 +133,7 @@ namespace quda {
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 
 
-    MatPCType getMatPCType() const { return matpcType; }
+    QudaMatPCType getMatPCType() const { return matpcType; }
     void Dagger(QudaDagType dag) { dagger = dag; }
   };
 
@@ -587,7 +587,7 @@ namespace quda {
     unsigned long long flops() const { return dirac->Flops(); }
 
 
-    MatPCType getMatPCType() const { return dirac->getMatPCType(); }
+    QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 
     std::string Type() const { return typeid(*dirac).name(); }
   };
