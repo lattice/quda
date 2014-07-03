@@ -192,7 +192,7 @@ namespace quda {
   }
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCG(0), initCGparam(param), eigcg_alloc(false)
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCG(0), initCGrestart(0), initCGparam(param), eigcg_alloc(false)
   {
     if((param.rhs_idx < param.deflation_grid) || (param.inv_type == QUDA_EIGCG_INVERTER))
     {
@@ -214,9 +214,7 @@ namespace quda {
        //
        if(param.tol_restart < param.tol)//restart was not requested, do normal initCG
        {
-          initCGrestart = 0;
           initCG        = new CG(mat, matSloppy, initCGparam, profile);
-       //  
        }
        else
        {
@@ -249,7 +247,7 @@ namespace quda {
   void IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
-    if (param.precision_sloppy == x.Precision()) errorQuda("\nMixedprecision is not supported for the eigCG.\n");
+    if (param.precision_sloppy != x.Precision()) errorQuda("\nMixed precision is not supported for the eigCG.\n");
 
     profile.Start(QUDA_PROFILE_INIT);
 
@@ -729,13 +727,13 @@ namespace quda {
 
 //!!!!
 //copy EigCG ritz vectors.
-  void IncEigCG::SaveEigCGRitzVecs(DeflationParam *dpar, int first_idx, bool cleanEigCGResources)
+  void IncEigCG::SaveEigCGRitzVecs(DeflationParam *dpar, bool cleanEigCGResources)
   {
+     const int first_idx = dpar->cur_dim; 
 
      if(dpar->cudaRitzVectors->EigvDim() < (first_idx+param.nev)) errorQuda("\nNot enough space to copy %d vectors..\n", param.nev); 
 
      else if(!eigcg_alloc || !dpar->cuda_ritz_alloc) errorQuda("\nEigCG resources were cleaned.\n"); 
-
 
      for(int i = 0; i < param.nev; i++) copyCuda(dpar->cudaRitzVectors->Eigenvec(first_idx+i), Vm->Eigenvec(i));
      
@@ -782,6 +780,9 @@ namespace quda {
 
         //compute current nev Ritz vectors:
         EigCG(*out, *in);        
+	
+	//store computed Ritz vectors:
+        SaveEigCGRitzVecs(defl_param);
 
         //Construct(extend) projection matrix:
         ExpandDeflationSpace(defl_param, param.nev);
