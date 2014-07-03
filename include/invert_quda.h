@@ -570,16 +570,16 @@ namespace quda {
   class IncEigCG : public DeflatedSolver {
 
   private:
-    const DiracMatrix &mat;
-    const DiracMatrix &matSloppy;
+    DiracMatrix &mat;
+    DiracMatrix &matSloppy;
+
     const DiracMatrix &matDefl;
 
     QudaPrecision search_space_prec;
     cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
-    Solver      *initCG;//initCG solver for deflated inversions
-    Solver      *initCGrestart;
-    SolverParam initCGparam; // parameters for initCG solve
+    SolverParam initCGparam; // parameters for initCG solver
+    TimeProfile &profile;    //time profile for initCG solver
 
     bool eigcg_alloc;
     bool use_eigcg;

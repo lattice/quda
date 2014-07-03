@@ -8,6 +8,7 @@ HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h  
 	domain_wall_dslash_reference.h test_util.h dslash_util.h
 
 TESTS = su3_test pack_test blas_test dslash_test invert_test	\
+	deflation_test						\
 	$(DIRAC_TEST) $(STAGGERED_DIRAC_TEST) $(FATLINK_TEST)	\
 	$(GAUGE_FORCE_TEST) $(FERMION_FORCE_TEST)		\
 	$(UNITARIZE_LINK_TEST) $(HISQ_PATHS_FORCE_TEST)		\
@@ -19,6 +20,9 @@ dslash_test: dslash_test.o test_util.o gtest-all.o wilson_dslash_reference.o dom
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+
+deflation_test: deflation_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 staggered_dslash_test: staggered_dslash_test.o gtest-all.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
