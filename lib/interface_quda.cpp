@@ -75,6 +75,9 @@ int numa_affinity_enabled = 1;
 
 using namespace quda;
 
+static cudaGaugeField* cudaStapleField = NULL;
+static cudaGaugeField* cudaStapleField1 = NULL;
+
 //for MAGMA lib:
 #include <blas_magma.h>
 
@@ -1000,6 +1003,9 @@ void endQuda(void)
   FaceBuffer::flushPinnedCache();
   freeGaugeQuda();
   freeCloverQuda();
+
+  if(cudaStapleField) delete cudaStapleField; cudaStapleField=NULL;
+  if(cudaStapleField1) delete cudaStapleField1; cudaStapleField1=NULL;
 
   endBlas();
 
@@ -3177,7 +3183,6 @@ namespace quda {
       for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
     }
 
-    static cudaGaugeField* cudaStapleField=NULL, *cudaStapleField1=NULL;
     if (cudaStapleField == NULL || cudaStapleField1 == NULL) {
       gParam.pad    = qudaGaugeParam->staple_pad;
       gParam.create = QUDA_NULL_FIELD_CREATE;
