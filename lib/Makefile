@@ -10,7 +10,7 @@ QUDA_OBJS = dirac_coarse.o coarse_op.o coarsecoarse_op.o multigrid.o transfer.o	
 	inv_gcr_quda.o inv_mr_quda.o inv_mre.o interface_quda.o		\
 	util_quda.o color_spinor_field.o color_spinor_util.o		\
 	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	\
-	hw_quda.o blas_cpu.o clover_field.o lattice_field.o		\
+	blas_cpu.o clover_field.o lattice_field.o		\
 	gauge_field.o cpu_gauge_field.o cuda_gauge_field.o		\
 	extract_gauge_ghost.o max_gauge.o gauge_update_quda.o		\
 	dirac_clover.o dirac_wilson.o dirac_staggered.o			\

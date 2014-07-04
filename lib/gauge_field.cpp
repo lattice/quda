@@ -112,8 +112,6 @@ namespace quda {
     if (a.link_type != link_type) errorQuda("link_type does not match %d %d", link_type, a.link_type);
     if (a.nColor != nColor) errorQuda("nColor does not match %d %d", nColor, a.nColor);
     if (a.nFace != nFace) errorQuda("nFace does not match %d %d", nFace, a.nFace);
-    if (a.reconstruct != reconstruct) errorQuda("nFace does not match %d %d", reconstruct, a.reconstruct);
-    if (a.nInternal != nInternal) errorQuda("nInternal does not match %d %d", nInternal, a.nInternal);
     if (a.fixed != fixed) errorQuda("fixed does not match %d %d", fixed, a.fixed);
     if (a.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, a.t_boundary);
     if (a.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, a.anisotropy);
