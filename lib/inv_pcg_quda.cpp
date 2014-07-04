@@ -80,11 +80,11 @@ namespace quda {
     int k=0;
     int rUpdate=0;
 
-    cudaColorSpinorField* minvrPre;
-    cudaColorSpinorField* rPre;
-    cudaColorSpinorField* minvr;
-    cudaColorSpinorField* minvrSloppy;
-    cudaColorSpinorField* p;
+    cudaColorSpinorField* minvrPre = NULL;
+    cudaColorSpinorField* rPre = NULL;
+    cudaColorSpinorField* minvr = NULL;
+    cudaColorSpinorField* minvrSloppy = NULL;
+    cudaColorSpinorField* p = NULL;
 
 
     ColorSpinorParam csParam(b);
@@ -161,8 +161,6 @@ namespace quda {
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     double heavy_quark_res = 0.0; // heavy quark residual 
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-    int heavy_quark_check = 10; // how often to check the heavy quark residual
-
 
     double alpha = 0.0, beta=0.0;
     double pAp;
@@ -187,8 +185,6 @@ namespace quda {
 
     quda::blas_flops = 0;
 
-    int steps_since_reliable = 1;
-
     const int maxResIncrease = 0;
 
     while(!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter){
@@ -196,7 +192,6 @@ namespace quda {
       matSloppy(Ap, *p, tmpSloppy);
 
       double sigma;
-      bool breakdown = false;
       pAp   = reDotProductCuda(*p,Ap);
 
       alpha = (K) ? rMinvr/pAp : r2/pAp;
@@ -291,11 +286,8 @@ namespace quda {
 
           beta = r2/r2_old;
           xpayCuda(rSloppy, beta, *p);
-
-          steps_since_reliable = 0;
         }
       }      
-      breakdown = false;
       ++k;
       PrintStats("PCG", k, r2, b2, heavy_quark_res);
     }

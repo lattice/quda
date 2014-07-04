@@ -5067,6 +5067,7 @@ void remove_staggered_phase_quda_() {
 /**
  * BQCD wants a node mapping with x varying fastest.
  */
+#ifdef MULTI_GPU
 static int bqcd_rank_from_coords(const int *coords, void *fdata)
 {
   int *dims = static_cast<int *>(fdata);
@@ -5077,6 +5078,7 @@ static int bqcd_rank_from_coords(const int *coords, void *fdata)
   }
   return rank;
 }
+#endif
 
 void comm_set_gridsize_(int *grid)
 {
