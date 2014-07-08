@@ -2023,7 +2023,7 @@ namespace quda {
           }
 
         }
-        it = (it^1);
+	inSpinor->switchBufferPinned(); // Use a different pinned memory buffer for the next application
 #endif // MULTI_GPU
         profile.Stop(QUDA_PROFILE_TOTAL);
       }

@@ -997,7 +997,8 @@ void endQuda(void)
   if (!initialized) return;
 
   LatticeField::freeBuffer();
-  cudaColorSpinorField::freeBuffer();
+  cudaColorSpinorField::freeBuffer(0);
+  cudaColorSpinorField::freeBuffer(1);
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
   FaceBuffer::flushPinnedCache();
