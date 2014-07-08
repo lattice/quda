@@ -192,7 +192,7 @@ namespace quda {
   }
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCG(0), initCGparam(param), eigcg_alloc(false)
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCGparam(param), profile(profile), eigcg_alloc(false)
   {
     if((param.rhs_idx < param.deflation_grid) || (param.inv_type == QUDA_EIGCG_INVERTER))
     {
@@ -212,24 +212,6 @@ namespace quda {
     {
        fillInitCGSolveParam(initCGparam);
        //
-       if(param.tol_restart < param.tol)//restart was not requested, do normal initCG
-       {
-          initCGrestart = 0;
-          initCG        = new CG(mat, matSloppy, initCGparam, profile);
-       //  
-       }
-       else
-       {
-////
-          initCGparam.tol = param.tol_restart;
-
-          initCGrestart = new CG(mat, matSloppy, initCGparam, profile);
-
-          initCGparam.tol = param.tol;
-
-          initCG = new CG(mat, matSloppy, initCGparam, profile);
-       }
-
        use_eigcg = false;
        //
        printfQuda("\nIncEigCG will deploy initCG solver.\n");
@@ -241,15 +223,13 @@ namespace quda {
   IncEigCG::~IncEigCG() {
 
     if(eigcg_alloc)   delete Vm;
-    if(initCG)        delete initCG;
-    if(initCGrestart) delete initCGrestart;
-    return;
+
   }
 
   void IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
-    if (param.precision_sloppy == x.Precision()) errorQuda("\nMixedprecision is not supported for the eigCG.\n");
+    if (param.precision_sloppy != x.Precision()) errorQuda("\nMixed precision is not supported for the eigCG.\n");
 
     profile.Start(QUDA_PROFILE_INIT);
 
@@ -729,13 +709,13 @@ namespace quda {
 
 //!!!!
 //copy EigCG ritz vectors.
-  void IncEigCG::SaveEigCGRitzVecs(DeflationParam *dpar, int first_idx, bool cleanEigCGResources)
+  void IncEigCG::SaveEigCGRitzVecs(DeflationParam *dpar, bool cleanEigCGResources)
   {
+     const int first_idx = dpar->cur_dim; 
 
      if(dpar->cudaRitzVectors->EigvDim() < (first_idx+param.nev)) errorQuda("\nNot enough space to copy %d vectors..\n", param.nev); 
 
      else if(!eigcg_alloc || !dpar->cuda_ritz_alloc) errorQuda("\nEigCG resources were cleaned.\n"); 
-
 
      for(int i = 0; i < param.nev; i++) copyCuda(dpar->cudaRitzVectors->Eigenvec(first_idx+i), Vm->Eigenvec(i));
      
@@ -782,38 +762,62 @@ namespace quda {
 
         //compute current nev Ritz vectors:
         EigCG(*out, *in);        
+	
+	//store computed Ritz vectors:
+        SaveEigCGRitzVecs(defl_param);
 
         //Construct(extend) projection matrix:
         ExpandDeflationSpace(defl_param, param.nev);
      }
-     //second stage here: param.rhs_idx >= param.deflation_grid 
+     //else: use deflated CG solver with proper restarting. 
      else{
+        double full_tol    = initCGparam.tol;
+
+        double restart_tol = initCGparam.tol_restart;
+
+        ColorSpinorParam cudaParam(*out);
+
+        cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+
+        cudaParam.eigv_dim  = 0;
+
+        cudaParam.eigv_id   = -1;
+
+        cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam);
+
+        cudaColorSpinorField tmp (*W, cudaParam);
+
+        Solver *initCG = 0;
 
         DeflateSpinor(*out, *in, defl_param);
 
         //launch initCG:
-        if(initCGrestart)//just one restart...
+        while(restart_tol > full_tol)//currently just one restart, think about better algorithm for the restarts. 
         {
-          ColorSpinorParam cudaParam(*out);
-          cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+          initCGparam.tol = restart_tol; 
 
-          cudaParam.eigv_dim  = 0;
-          cudaParam.eigv_id   = -1;
+          initCG = new CG(mat, matSloppy, initCGparam, profile);
 
-          cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam); 
-          cudaColorSpinorField tmp (*W, cudaParam);
+          (*initCG)(*out, *in);           
 
-          (*initCGrestart)(*out, *in);           
+          delete initCG;
 
           matDefl(*W, *out, tmp);
 
           xpayCuda(*in, -1, *W); 
 
           DeflateSpinor(*out, *W, defl_param, false);
-          delete W;                     
+
+          restart_tol = full_tol;//one restart.                              
         }
 
-        (*initCG)(*out, *in); 
+        initCGparam.tol = full_tol; 
+
+        initCG = new CG(mat, matSloppy, initCGparam, profile);
+
+        (*initCG)(*out, *in);           
+
+        delete initCG;
 
         //copy solver statistics:
         param.iter   = initCGparam.iter;
@@ -821,6 +825,8 @@ namespace quda {
         param.secs   = initCGparam.secs;
         //
         param.gflops = initCGparam.gflops;
+
+        delete W;
      } 
 
      param.rhs_idx += 1;

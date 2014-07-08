@@ -22,7 +22,8 @@ namespace quda {
 
 #ifdef MULTI_GPU
     if (link_type != QUDA_ASQTAD_MOM_LINKS &&
-	ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+	ghostExchange == QUDA_GHOST_EXCHANGE_PAD && 
+	isNative()) {
       bool pad_check = true;
       for (int i=0; i<nDim; i++)
 	if (pad < nFace*surfaceCB[i]) pad_check = false;

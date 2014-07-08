@@ -239,6 +239,9 @@ AC_ARG_WITH(magma,
   [ magma_home="" ; build_magma="no" ]
 )
 
+
+AC_ARG_VAR(NVCCFLAGS, [ Extra flags for NVCC ])
+AC_MSG_NOTICE([User supplied NVCCFLAGS: ${NVCCFLAGS} ])
 if test "X${build_qdpjit}X" = "XyesX" ; then
   if test "X${qdp_home}X" = "XX" ; then
     AC_PATH_PROG(QDPXX_CONFIG, [qdp++-config], [])

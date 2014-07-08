@@ -18,7 +18,7 @@ namespace quda {
     bool twisted; // whether to create twisted mass clover
     double mu2;
 
-    CloverFieldOrder order;
+    QudaCloverFieldOrder order;
     QudaFieldCreate create;
     void setPrecision(QudaPrecision precision) {
       this->precision = precision;
@@ -45,7 +45,7 @@ namespace quda {
     bool twisted; 
     double mu2;
 
-    CloverFieldOrder order;
+    QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
     double *trlog;
@@ -61,7 +61,7 @@ namespace quda {
 
     double* TrLog() const { return trlog; }
     
-    CloverFieldOrder Order() const { return order; }
+    QudaCloverFieldOrder Order() const { return order; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
 //new!
