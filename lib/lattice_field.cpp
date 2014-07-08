@@ -99,7 +99,7 @@ namespace quda {
 
   void LatticeField::resizeBufferDevice(size_t bytes) const {
     if ((bytes > bufferDeviceBytes || bufferDeviceInit == 0) && bytes > 0) {
-      if (bufferDeviceInit) host_free(bufferPinned[0]);
+      if (bufferDeviceInit) host_free(bufferDevice);
       bufferDevice = device_malloc(bytes);
       bufferDeviceBytes = bytes;
       bufferDeviceInit = true;
