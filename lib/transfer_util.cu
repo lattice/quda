@@ -46,6 +46,9 @@ namespace quda {
     if (B[0]->Ncolor() == 3) {
       FillV<Float,nSpin,3,order>(V,B,Nvec);
     } 
+    else if(B[0]->Ncolor() == 2) {
+      FillV<Float,nSpin,2,order>(V,B,Nvec);
+    }
     else if(B[0]->Ncolor() == 24) {
       FillV<Float,nSpin,24,order>(V,B,Nvec);
     } else {
@@ -250,9 +253,13 @@ namespace quda {
     if (V.Ncolor()/Nvec == 3) {
       BlockOrthogonalize<Float,nSpin,3,order>(V, Nvec, geo_bs, geo_map, spin_bs);
     }
+    else if (V.Ncolor()/Nvec == 2) {
+      BlockOrthogonalize<Float,nSpin,2,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    }
     else if (V.Ncolor()/Nvec == 24) {
       BlockOrthogonalize<Float,nSpin,24,order>(V, Nvec, geo_bs, geo_map, spin_bs);
-    } else {
+    } 
+    else {
       errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
     }
   }

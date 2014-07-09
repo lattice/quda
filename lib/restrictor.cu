@@ -233,6 +233,8 @@ namespace quda {
 
     if (in.Ncolor() == 3) {
       Restrict<Float,fineSpin,3,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (in.Ncolor() == 2) {
+      Restrict<Float,fineSpin,2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 24) {
       Restrict<Float,fineSpin,24,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else {

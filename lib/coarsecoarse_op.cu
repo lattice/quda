@@ -371,6 +371,8 @@ namespace quda {
   void calculateYcoarse(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover) {
     if (g.Ncolor()/uv.Nspin() == 24) {
       calculateYcoarse<Float,csOrder,gOrder,24>(Y, X, uv, T, g, clover);
+    } else if (g.Ncolor()/uv.Nspin() == 2) {
+      calculateYcoarse<Float,csOrder,gOrder,2>(Y, X, uv, T, g, clover);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }
