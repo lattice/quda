@@ -418,7 +418,8 @@ static void setInvertParams(const int dim[4],
     QudaPrecision cuda_prec_sloppy,
     QudaPrecision cuda_prec_precondition,
     double mass,
-    double target_residual, 
+    double target_residual,
+    double target_residual_hq,
     int maxiter,
     double reliable_delta,
     QudaParity parity,
@@ -430,6 +431,7 @@ static void setInvertParams(const int dim[4],
   invertParam->verbosity = verbosity;
   invertParam->mass = mass;
   invertParam->tol = target_residual;
+  invertParam->tol_hq =target_residual_hq;
   invertParam->num_offset = 0;
 
   invertParam->inv_type = inverter;
@@ -505,7 +507,7 @@ static void setInvertParams(const int dim[4],
 
 
   setInvertParams(dim, cpu_prec, cuda_prec, cuda_prec_sloppy, cuda_prec_precondition,
-      null_mass, null_residual, maxiter, reliable_delta, parity, verbosity, inverter, invertParam);
+      null_mass, null_residual, null_residual, maxiter, reliable_delta, parity, verbosity, inverter, invertParam);
 
   invertParam->num_offset = num_offset;
   for(int i=0; i<num_offset; ++i){
@@ -776,11 +778,13 @@ void qudaInvert(int external_precision,
   
 
   QudaParity local_parity = inv_args.evenodd;
-  double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
+  //double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
+  double& target_res = target_residual;
+  double& target_res_hq = target_fermilab_residual;
   const double reliable_delta = 1e-1;
 
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
-      mass, target_res, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
+      mass, target_res, target_res_hq, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   invertParam.use_sloppy_partial_accumulator = 0;
 
   ColorSpinorParam csParam;
