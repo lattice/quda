@@ -333,7 +333,7 @@ namespace quda {
 	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
 	for (int s=i; s<4; s+=2) {
 	  for (int c=0; c<B[i]->Ncolor(); c++) {
-	    tmp->Source(QUDA_POINT_SOURCE, 1, s, c);
+	    tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
 	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, 2);
 	    blas::xpy(*tmp,*B[i]);
 	  }
