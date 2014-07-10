@@ -3,7 +3,6 @@
 #include <read_gauge.h>
 #include <gauge_field.h>
 #include <ks_improved_force.h>
-#include <hw_quda.h>
 #include <hisq_force_macros.h>
 #include <utility>
 #include <quda_matrix.h>

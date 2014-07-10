@@ -5,7 +5,7 @@ namespace quda {
 
   void fermion_force_init_cuda(QudaGaugeParam* param);
   void fermion_force_cuda(double eps, double weight1, double weight2, void* act_path_coeff,
-			  FullHw cudaHw, cudaGaugeField &cudaSiteLink, cudaGaugeField &cudaMom, 
+			  cudaColorSpinorField &cudaHw, cudaGaugeField &cudaSiteLink, cudaGaugeField &cudaMom, 
 			  QudaGaugeParam* param);
     
 } // namespace quda

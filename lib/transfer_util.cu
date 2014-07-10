@@ -9,11 +9,11 @@ namespace quda {
   using namespace quda::colorspinor;
 
   // copy the null-space vectors into the V-field
-  template <int nVec, class V, class B>
+  template <int nSpin, int nColor, int nVec, class V, class B>
   void fill(V &out, const B &in, int v) {
     for (int x=0; x<out.Volume(); x++) {
-      for (int s=0; s<in.Nspin(); s++) {
-	for (int c=0; c<in.Ncolor(); c++) {
+      for (int s=0; s<nSpin; s++) {
+	for (int c=0; c<nColor; c++) {
 	  out(x, s, c, v) = in(x, s, c);
 	}
       }
@@ -25,7 +25,7 @@ namespace quda {
     FieldOrder<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
     for (int v=0; v<nVec; v++) {
       FieldOrder<Float,nSpin,nColor,1,order> bOrder(const_cast<ColorSpinorField&>(*B[v]));
-      fill<nVec>(vOrder, bOrder, v);
+      fill<nSpin,nColor,nVec>(vOrder, bOrder, v);
     }
   }
 
@@ -159,14 +159,14 @@ namespace quda {
 		count, checkLength, in.Nvec(), in.Nspin(), in.Ncolor());
     }
 
-    // nned non-quadratic check
-    if (blockSize == 384) {
+    /*
+    // need non-quadratic check
     for (int i=0; i<checkLength; i++) {
       for (int j=0; j<i; j++) {
 	//if (check[i] == check[j]) errorQuda("Collision detected in block ordering\n");
       }
     }
-    }
+    */
 
     delete []check;
   }
@@ -199,14 +199,14 @@ namespace quda {
 	for (int i=0; i<blockSize; i++) v[(b*N+jc)*blockSize+i] *= scale;
       }
 
-      
-      if(blockSize == 384) {
+
+      /*      
       for (int jc=0; jc<N; jc++) {
         complex<sumFloat> nrm2 = 0.0;
         for(int i=0; i<blockSize; i++) nrm2 += norm(v[(b*N+jc)*blockSize+i]);
 	//printfQuda("block = %d jc = %d nrm2 = %f\n", b, jc, nrm2.real());
       }
-      }
+      */
 
       //printf("blockGramSchmidt done %d / %d\n", b, nBlocks);
     }
