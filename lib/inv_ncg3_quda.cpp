@@ -112,7 +112,7 @@ namespace quda {
     mat(r, x, temp);
     param.true_res = sqrt(xmyNormCuda(b, r)/b2);
 
-    PrintSummary("NCG3", k, r2, b2);
+    PrintSummary("NCG3", it, r2, b2);
 
     return;
   }

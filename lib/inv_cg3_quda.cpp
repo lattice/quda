@@ -82,7 +82,8 @@ namespace quda {
       mat(w, r, temp);
       rAr = reDotProductCuda(r,w);
       r2_prev = r2;
-      r2 = norm2(r); 
+      r2 = norm2(r);
+
       // Need to rearrange this!
       PrintStats("CG3", k, r2, b2, 0.0);
 
@@ -99,7 +100,8 @@ namespace quda {
       axCuda(rho,r_new);
       axpyCuda(-rho*gamma,w,r_new);
       axpyCuda((1.-rho),r_prev,r_new);
-  
+ 
+      printfQuda("r_new = %lf\n", norm2(r_new)); 
       k++;
     }
 

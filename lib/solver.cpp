@@ -55,6 +55,10 @@ namespace quda {
       report("NCG3");
       solver = new NCG3(mat, param, profile);
       break;
+    case QUDA_MPCG_INVERTER:
+      report("MPCG");
+      solver = new MPCG(mat, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type");
     }

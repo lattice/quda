@@ -287,7 +287,21 @@ namespace quda {
       virtual ~NCG3();
 
       void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-  };  
+  }; 
+
+  class MPCG : public Solver {
+    private:
+      const DiracMatrix &mat;
+      void computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec);
+      void computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps);
+
+
+    public:
+      MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+      virtual ~MPCG();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  }; 
 
 
 
