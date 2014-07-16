@@ -22,7 +22,8 @@ namespace quda {
 
 #ifdef MULTI_GPU
     if (link_type != QUDA_ASQTAD_MOM_LINKS &&
-	ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+	ghostExchange == QUDA_GHOST_EXCHANGE_PAD && 
+	isNative()) {
       bool pad_check = true;
       for (int i=0; i<nDim; i++)
 	if (pad < nFace*surfaceCB[i]) pad_check = false;
@@ -217,7 +218,7 @@ namespace quda {
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
 
-      recv_h[d] = static_cast<char*>(bufferPinned) + offset;
+      recv_h[d] = static_cast<char*>(bufferPinned[0]) + offset;
       send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
       offset += 4*bytes[d];
     }
@@ -349,11 +350,11 @@ namespace quda {
       LatticeField::resizeBufferPinned(bytes);
 
       // copy field and ghost zone into bufferPinned
-      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
+      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned[0], 
 		       static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
-      cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(gauge, bufferPinned[0], bytes, cudaMemcpyHostToDevice);
     } else {
       errorQuda("Invalid gauge field type");
     }
@@ -373,11 +374,11 @@ namespace quda {
       if (cpu.Order() == QUDA_MILC_GAUGE_ORDER ||
 	  cpu.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
 	resizeBufferPinned(cpu.Bytes());
-	memcpy(bufferPinned, cpu.Gauge_p(), cpu.Bytes());
+	memcpy(bufferPinned[0], cpu.Gauge_p(), cpu.Bytes());
 
 	// run kernel directly using host-mapped input data
 	void *bufferPinnedMapped;
-	cudaHostGetDevicePointer(&bufferPinnedMapped, bufferPinned, 0);
+	cudaHostGetDevicePointer(&bufferPinnedMapped, bufferPinned[0], 0);
 	copyGenericGauge(*this, cpu, QUDA_CUDA_FIELD_LOCATION, gauge, bufferPinnedMapped);
       } else {
 	errorQuda("Not implemented for order %d", cpu.Order());
@@ -460,10 +461,10 @@ namespace quda {
       resizeBufferPinned(bytes);
 
       // this copies over both even and odd
-      cudaMemcpy(bufferPinned, gauge, bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy(bufferPinned[0], gauge, bytes, cudaMemcpyDeviceToHost);
       checkCudaError();
 
-      copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, bufferPinned);
+      copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, bufferPinned[0]);
     } else {
       errorQuda("Invalid pack location %d", pack_location);
     }

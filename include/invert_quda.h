@@ -608,16 +608,16 @@ namespace quda {
   class IncEigCG : public DeflatedSolver {
 
   private:
-    const DiracMatrix &mat;
-    const DiracMatrix &matSloppy;
+    DiracMatrix &mat;
+    DiracMatrix &matSloppy;
+
     const DiracMatrix &matDefl;
 
     QudaPrecision search_space_prec;
     cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
-    Solver      *initCG;//initCG solver for deflated inversions
-    Solver      *initCGrestart;
-    SolverParam initCGparam; // parameters for initCG solve
+    SolverParam initCGparam; // parameters for initCG solver
+    TimeProfile &profile;    //time profile for initCG solver
 
     bool eigcg_alloc;
     bool use_eigcg;
@@ -648,7 +648,7 @@ namespace quda {
     //
     void DeleteDeflationSpace(DeflationParam *&param);
     //
-    void SaveEigCGRitzVecs(DeflationParam *param, int first_idx = 0, bool cleanResources = false);
+    void SaveEigCGRitzVecs(DeflationParam *param, bool cleanResources = false);
     //
     void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) {};//extrenal method
     //

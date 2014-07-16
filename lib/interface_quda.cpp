@@ -75,6 +75,9 @@ int numa_affinity_enabled = 1;
 
 using namespace quda;
 
+static cudaGaugeField* cudaStapleField = NULL;
+static cudaGaugeField* cudaStapleField1 = NULL;
+
 //for MAGMA lib:
 #include <blas_magma.h>
 
@@ -502,7 +505,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField *sloppy = NULL;
-  if (param->cuda_prec != param->cuda_prec_sloppy) {
+  if (param->cuda_prec != param->cuda_prec_sloppy ||
+      param->reconstruct != param->reconstruct_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
     sloppy->copy(*precise);
     param->gaugeGiB += sloppy->GBytes();
@@ -517,7 +521,8 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
       gauge_param.reconstruct == QUDA_RECONSTRUCT_NO ) ?
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
   cudaGaugeField *precondition = NULL;
-  if (param->cuda_prec_sloppy != param->cuda_prec_precondition) {
+  if (param->cuda_prec_sloppy != param->cuda_prec_precondition ||
+      param->reconstruct_sloppy != param->reconstruct_precondition) {
     precondition = new cudaGaugeField(gauge_param);
     precondition->copy(*sloppy);
     param->gaugeGiB += precondition->GBytes();
@@ -992,12 +997,16 @@ void endQuda(void)
   if (!initialized) return;
 
   LatticeField::freeBuffer();
-  cudaColorSpinorField::freeBuffer();
+  cudaColorSpinorField::freeBuffer(0);
+  cudaColorSpinorField::freeBuffer(1);
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
   FaceBuffer::flushPinnedCache();
   freeGaugeQuda();
   freeCloverQuda();
+
+  if(cudaStapleField) delete cudaStapleField; cudaStapleField=NULL;
+  if(cudaStapleField1) delete cudaStapleField1; cudaStapleField1=NULL;
 
   endBlas();
 
@@ -3175,7 +3184,6 @@ namespace quda {
       for(int dir=0; dir<4; ++dir) gParam.x[dir] = qudaGaugeParam->X[dir] + 4;
     }
 
-    static cudaGaugeField* cudaStapleField=NULL, *cudaStapleField1=NULL;
     if (cudaStapleField == NULL || cudaStapleField1 == NULL) {
       gParam.pad    = qudaGaugeParam->staple_pad;
       gParam.create = QUDA_NULL_FIELD_CREATE;
@@ -4343,9 +4351,9 @@ computeHISQForceCompleteQuda(void* const milc_momentum,
                              const QudaGaugeParam* gParam)
 {
 
+/*
   void* oprod[2];
 
-/*
   computeStaggeredOprodQuda(void** oprod,
     void** fermion,
     int num_terms,
@@ -5060,6 +5068,7 @@ void remove_staggered_phase_quda_() {
 /**
  * BQCD wants a node mapping with x varying fastest.
  */
+#ifdef MULTI_GPU
 static int bqcd_rank_from_coords(const int *coords, void *fdata)
 {
   int *dims = static_cast<int *>(fdata);
@@ -5070,6 +5079,7 @@ static int bqcd_rank_from_coords(const int *coords, void *fdata)
   }
   return rank;
 }
+#endif
 
 void comm_set_gridsize_(int *grid)
 {

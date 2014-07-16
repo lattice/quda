@@ -21,7 +21,7 @@ namespace quda {
     virtual ~Eig_Solver() { ; }
 
     virtual void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
-                            cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m) = 0;
+                            cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m) = 0;
 
     // solver factory
     static Eig_Solver* create(QudaEigParam &param, RitzMat &ritz_mat, TimeProfile &profile);
@@ -55,7 +55,7 @@ namespace quda {
     virtual ~Lanczos();
 
     void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
-                    cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m);
+                    cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m);
   };
 
   class ImpRstLanczos : public Eig_Solver {
@@ -68,7 +68,7 @@ namespace quda {
     virtual ~ImpRstLanczos();
 
     void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
-                    cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int &k0, int &m);
+                    cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m);
   };
 
 
