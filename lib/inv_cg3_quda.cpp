@@ -101,7 +101,6 @@ namespace quda {
       axpyCuda(-rho*gamma,w,r_new);
       axpyCuda((1.-rho),r_prev,r_new);
  
-      printfQuda("r_new = %lf\n", norm2(r_new)); 
       k++;
     }
 
