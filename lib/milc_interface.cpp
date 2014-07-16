@@ -513,7 +513,7 @@ static void setInvertParams(const int dim[4],
   for(int i=0; i<num_offset; ++i){
     invertParam->offset[i] = offset[i];
     invertParam->tol_offset[i] = target_residual_offset[i];
-    if(invertParam->residual_type == QUDA_HEAVY_QUARK_RESIDUAL){
+    if(invertParam->residual_type & QUDA_HEAVY_QUARK_RESIDUAL){
       invertParam->tol_hq_offset[i] = target_residual_hq_offset[i];
     }
   }
