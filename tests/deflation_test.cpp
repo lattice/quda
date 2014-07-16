@@ -331,7 +331,7 @@ int main(int argc, char **argv)
   void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
-  void *spinorOut = NULL, **spinorOutMulti = NULL;
+  void *spinorOut = NULL;
   spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
   void *ritzVects = 0;
