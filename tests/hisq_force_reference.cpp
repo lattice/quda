@@ -72,6 +72,7 @@ su3_matrix* get_su3_matrix(int gauge_order, su3_matrix* p, int idx, int dir)
   }else{
     errorQuda("get_su3_matrix: unsupported ordering scheme!\n");
   }
+  return NULL;
 }
 
 template<typename su3_matrix>
@@ -1131,22 +1132,6 @@ void do_halfwilson_hisq_force_reference(Real eps, Real weight,
 #undef Qrhonumu
 
 
-
-static
-void set_identity(fsu3_matrix *sitelink){
-  int tot = V*4;
-  for(int i=0; i<tot; i++){ // loop over sites and directions
-   for(int a=0; a<3; a++){
-     for(int b=0; b<3; b++){
-        sitelink[i].e[a][b].real = sitelink[i].e[a][b].imag = 0.;
-     }
-   }
-   for(int a=0; a<3; a++){ // set the diagonal elements to unity
-     sitelink[i].e[a][a].real = 1.;
-   }
-  }
-  return;
-}
 
 
 

@@ -335,3 +335,7 @@ else
   NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 endif
+
+
+### Add any other user options like keep to NVCCOPT
+NVCCFLAGS += @NVCCFLAGS@
