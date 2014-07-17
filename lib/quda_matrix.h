@@ -2,6 +2,7 @@
 #define _QUDA_MATRIX_H_
 
 #include <cstdio>
+
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
@@ -485,6 +486,17 @@ namespace quda{
       result(2,2) = a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2);
       return result;
     }
+
+  template<class T, int N>
+    __device__ __host__ inline Matrix<T,N> operator *=(Matrix<T,N> & a, const Matrix<T,N>& b){
+
+    Matrix<T,N> c = a;
+    a = c*b;
+    return a;
+  }
+
+  
+  
 
 
 
