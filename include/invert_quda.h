@@ -534,9 +534,16 @@ namespace quda {
     SolverParam &param;
     TimeProfile &profile;
 
+    //WARNING: eigcg_precision may not coinside with param.precision and param.precision_sloppy (both used for the initCG).
+    //
+    QudaPrecision eigcg_precision;//may be double or single.
+
   public:
-    DeflatedSolver(SolverParam &param, TimeProfile &profile) : 
-    param(param), profile(profile) { ; }
+    DeflatedSolver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) 
+    { 
+       eigcg_precision = param.precision;//for mixed presicion use param.precision_sloppy 
+    }
+
     virtual ~DeflatedSolver() { ; }
 
     virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
