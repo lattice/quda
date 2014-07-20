@@ -869,6 +869,8 @@ get_solver_type(char* s)
     ret = QUDA_NCG3_INVERTER;
   }else if (strcmp(s, "mpcg") == 0){
     ret = QUDA_MPCG_INVERTER; 
+  }else if (strcmp(s, "mpcg3") == 0){
+    ret = QUDA_MPCG3_INVERTER; 
   }else{
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);

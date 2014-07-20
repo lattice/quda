@@ -44,7 +44,7 @@ namespace quda {
     return;
   }
 
-  void print(const double d[], int n){
+  static void print(const double d[], int n){
     for(int i=0; i<n; ++i){
       std::cout << d[i] << " ";
     }
@@ -64,16 +64,26 @@ namespace quda {
     const int dim = 2*s + 1;    
 
     zero(d_out, dim);
-    if(k) applyT(d_out, d_in, gamma_prev, rho_prev, s); // compute the upper half of the vector
+
+ //   if(k) applyT(d_out, d_in, gamma_prev, rho_prev, s); // compute the upper half of the vector
 
 
     applyB(d_out+s, d_in+s, s+1); // update the lower half
 
+ 
+    printfQuda("B:\n"); 
+    print(d_out, 2*s+1); 
+    print(gamma_prev,s);
+    print(gamma,s);
+
     // This has to come after applyB
-    if(k) d_out[s] -= d_in[s-1]/(rho_prev[s-1]*gamma_prev[s-1]);
+  //  if(k) d_out[s] -= d_in[s-1]/(rho_prev[s-1]*gamma_prev[s-1]);
 
     // Finally scale everything
     for(int i=0; i<dim; ++i) d_out[i] *= -rho[j]*gamma[j];
+    
+    
+
 
     return;
   }
@@ -82,6 +92,7 @@ namespace quda {
   static void computeCoeffs(T d_out[], const T d_p1[], const T d_p2[], int k, int j, int s, const T gamma[], const T rho[], const T gamma_prev[], const T rho_prev[])
   {
     applyThirdTerm(d_out, d_p1, k, j-1, s, gamma, rho, gamma_prev, rho_prev);
+
 
 
     for(int i=0; i<(2*s+1); ++i){
@@ -93,17 +104,17 @@ namespace quda {
 
 
 
-  MPCG::MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+  MPCG3::MPCG3(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat)
   {
 
   }
 
-  MPCG::~MPCG() {
+  MPCG3::~MPCG3() {
 
   }
 
-  void MPCG::computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec)
+  void MPCG3::computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec)
   {
     cudaColorSpinorField temp(in);
     out[0] = in;
@@ -113,7 +124,7 @@ namespace quda {
     return;
   }
 
-  void MPCG::computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps)
+  void MPCG3::computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps)
   {
     cudaColorSpinorField temp(in[0]);
 
@@ -126,7 +137,7 @@ namespace quda {
 
 
 
-  void MPCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void MPCG3::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
     // Check to see that we're not trying to invert on a zero-field source    
@@ -153,20 +164,13 @@ namespace quda {
     // create the residual array and the matrix powers array
     std::vector<cudaColorSpinorField> R(s+1,cudaColorSpinorField(b,csParam));
  //   std::vector<cudaColorSpinorField> R_new(s+1,cudaColorSpinorField(b,csParam));
- //
-    std::vector<cudaColorSpinorField> W(s+1,cudaColorSpinorField(b,csParam));
     std::vector<cudaColorSpinorField> V(2*s+1,cudaColorSpinorField(b,csParam));
 
     // Set up the first residual
     //
-    for(int i=0; i<s; ++i) zeroCuda(R[i]);
-    for(int i=0; i<=s; ++i) zeroCuda(W[i]);
-    
-
+    for(int i=0; i<s; ++i) zeroCuda(R[s]);
     mat(R[s], x, temp);
     double r2 = xmyNormCuda(b,R[s]);
-
-    W[s] = R[s];
 
 
     double stop = stopping(param.tol, b2, param.residual_type);
@@ -204,12 +208,8 @@ namespace quda {
     int k = 0;
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
       // compute the matrix powers kernel - need to set r[s] above
-      //computeMatrixPowers(V, R, s); 
       computeMatrixPowers(V, R, s); 
 
-      for(int i=0; i<s; ++i){
-        V[i] = W[i];
-      }
 
 
       zero(d_p2, 2*s+1);
@@ -226,13 +226,13 @@ namespace quda {
         
           if(k>0) print(d, 2*s+1);
 
-          w = V[s+1];
+        //  w = V[s+1];
 
+          mat(w, R[j], temp);
           r2 = norm2(R[j]); // v[s] = r[s*k]
           rAr = cDotProductCuda(w,R[j]);
 
           printfQuda("w2 = %lf\n", norm2(w));
-
           printfQuda("r2 = %lf\n", r2);
 
           mu[j] = r2;
@@ -245,52 +245,44 @@ namespace quda {
             rho[j] = 1.0/(1.0 - (gamma[j]/gamma_old)*(mu[j]/mu_old)*(1.0/rho_old));  
           }
 
-          printfQuda("gamma[0] = %lf\n", gamma[0]);
-          printfQuda("mu[0] = %lf\n", mu[0]);
-          printfQuda("rho[0] = %lf\n", rho[0]);
-
-
-
           R[j+1] = r_old;
-          W[j] = w;
-
           axCuda((1.0 - rho[j]), R[j+1]);
           axpyCuda(rho[j], R[j], R[j+1]);
           axpyCuda(-rho[j]*gamma[j], w, R[j+1]);
 
           // copy d to d_p1
           for(int i=0; i<(2*s+1); ++i) d_p1[i] = d[i];
+
+
+          printfQuda("gamma[0] = %lf\n", gamma[0]);
+          printfQuda("mu[0] = %lf\n", mu[0]);
+          printfQuda("rho[0] = %lf\n", rho[0]);
+
+
+
         }
 
         zeroCuda(w); 
         if(j>=1){
 
-          zero(d_p2, 2*s+1);
-          if(k > 0 && j==1) d_p2[s-1] = 1.0; 
+         // zero(d_p2, 2*s+1);
+         // if(k > 0 && j==1) d_p2[s-1] = 1.0; 
+          //if(k > 0 && j==1) d_p2[s] = 1.0; 
 
-          computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_prev, rho_prev);
+         // computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_prev, rho_prev);
    
-          if(k>0) print(d, 2*s+1);
+         // if(k>0) print(d, 2*s+1);
  
-          for(int i=0; i<(2*s+1); ++i){
-            if(d[i] != 0.) axpyCuda(d[i], V[i], w);
-          }
+//          for(int i=0; i<(2*s+1); ++i){
+//            if(d[i] != 0.) axpyCuda(d[i], V[i], w);
+//          }
 
-/*
-          w = V[s-1];
-          axCuda(d[s-1],w);
-          axpyCuda(d[s+1], V[s+1], w);
-          axpyCuda(d[s+2], V[s+2], w);
-*/
 
-          printfQuda("Printing coeffs...\n");
-          printfQuda("%lf, %lf\n", d[s-1], (1-rho[j-1]));
-          printfQuda("%lf, %lf\n", d[s+1], rho[j-1]);
-          printfQuda("%lf, %lf\n", d[s+2], -gamma[j-1]*rho[j-1]);
-
+          mat(w, R[j], temp);
+         
           printfQuda("w2 = %lf\n", norm2(w));
 
-  
+ 
           r2 = norm2(R[j]); // v[s] = r[s*k];
           rAr = cDotProductCuda(w,R[j]);
           mu[j] = r2;
@@ -301,30 +293,27 @@ namespace quda {
           printfQuda("gamma[1] = %lf\n", gamma[1]);
           printfQuda("mu[1] = %lf\n", mu[1]);
           printfQuda("rho[1] = %lf\n", rho[1]);
-
           printfQuda("R[0]_sq = %lf\n", norm2(R[0]));
           printfQuda("R[1]_sq = %lf\n", norm2(R[1]));
 
-
-          W[j] = w;
           R[j+1] = R[j-1];
           axCuda((1.0 - rho[j]),R[j+1]);
-
           axpyCuda(rho[j], R[j], R[j+1]);
-          printfQuda("R[2]_sq = %lf\n", norm2(R[2]));
-          axpyCuda(-gamma[j]*rho[j], w, R[j+1]);
 
+          printfQuda("R[2]_sq = %lf\n", norm2(R[2]));
+
+          axpyCuda(-gamma[j]*rho[j], w, R[j+1]);
 
           double r2_new = norm2(R[j+1]);
           printfQuda("r2_new = %lf\n", r2_new);
 
-          for(int i=0; i<(2*s+1); ++i){
-            d_p2[i] = d_p1[i];
-            d_p1[i] = d[i];
-          }
+     //     for(int i=0; i<(2*s+1); ++i){
+     //       d_p2[i] = d_p1[i];
+    //        d_p1[i] = d[i];
+    //      }
         } // j == 1
 
-        PrintStats("MPCG", it, r2, b2, 0.0);
+        PrintStats("MPCG3", it, r2, b2, 0.0);
 
         it++; 
       } // loop over j
@@ -334,6 +323,7 @@ namespace quda {
         gamma_prev[i] = gamma[i];
       }
 
+      printfQuda("update k\n");
       k++;
       gamma_old = gamma[s-1];
       mu_old = mu[s-1];
@@ -342,7 +332,7 @@ namespace quda {
 
   
 
-    PrintSummary("MPCG", it, r2, b2);
+    PrintSummary("MPCG3", it, r2, b2);
  
     delete[] d;
     delete[] d_p1;
