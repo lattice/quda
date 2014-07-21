@@ -18,31 +18,31 @@ namespace quda {
 
 
   template<typename T>
-  static void applyT(T d_out[], const T d_in[], const T gamma[], const T rho[], int N)
-  { 
-    if(N <= 0) return;
-    for(int i=0; i<N; ++i){
-      d_out[i] = d_in[i]/gamma[i];
-    }
+    static void applyT(T d_out[], const T d_in[], const T gamma[], const T rho[], int N)
+    { 
+      if(N <= 0) return;
+      for(int i=0; i<N; ++i){
+        d_out[i] = d_in[i]/gamma[i];
+      }
 
-    for(int i=0; i<N-1; ++i){
-      d_out[i] += (d_in[i+1]*(1-rho[i+1])/(gamma[i+1]*rho[i+1]));
-    }
+      for(int i=0; i<N-1; ++i){
+        d_out[i] += (d_in[i+1]*(1-rho[i+1])/(gamma[i+1]*rho[i+1]));
+      }
 
-    for(int i=1; i<N; ++i){
-      d_out[i] -= d_in[i-1]/(rho[i-1]*gamma[i-1]);
-    }
+      for(int i=1; i<N; ++i){
+        d_out[i] -= d_in[i-1]/(rho[i-1]*gamma[i-1]);
+      }
 
-    return;
-  }
+      return;
+    }
 
   template<typename T>
-  static void applyB(T d_out[], const T d_in[], int N)
-  {
-    d_out[0] = static_cast<T>(0);
-    for(int i=1; i<N; ++i) d_out[i] = d_in[i-1]; 
-    return;
-  }
+    static void applyB(T d_out[], const T d_in[], int N)
+    {
+      d_out[0] = static_cast<T>(0);
+      for(int i=1; i<N; ++i) d_out[i] = d_in[i-1]; 
+      return;
+    }
 
   void print(const double d[], int n){
     for(int i=0; i<n; ++i){
@@ -52,44 +52,44 @@ namespace quda {
   }
 
   template<typename T>
-  static void zero(T d[], int N){
-    for(int i=0; i<N; ++i) d[i] = static_cast<T>(0);
-  }
-
-  template<typename T>
-  static void applyThirdTerm(T d_out[], const T d_in[], int k, int j, int s, const T gamma[], const T rho[], const T gamma_prev[], const T rho_prev[])
-  {
-    // s is the number of steps
-    // The input and output vectors are of dimension 2*s + 1
-    const int dim = 2*s + 1;    
-
-    zero(d_out, dim);
-    if(k) applyT(d_out, d_in, gamma_prev, rho_prev, s); // compute the upper half of the vector
-
-
-    applyB(d_out+s, d_in+s, s+1); // update the lower half
-
-    // This has to come after applyB
-    if(k) d_out[s] -= d_in[s-1]/(rho_prev[s-1]*gamma_prev[s-1]);
-
-    // Finally scale everything
-    for(int i=0; i<dim; ++i) d_out[i] *= -rho[j]*gamma[j];
-
-    return;
-  }
-
-  template<typename T>
-  static void computeCoeffs(T d_out[], const T d_p1[], const T d_p2[], int k, int j, int s, const T gamma[], const T rho[], const T gamma_prev[], const T rho_prev[])
-  {
-    applyThirdTerm(d_out, d_p1, k, j-1, s, gamma, rho, gamma_prev, rho_prev);
-
-
-    for(int i=0; i<(2*s+1); ++i){
-      d_out[i] += rho[j-1]*d_p1[i] + (1 - rho[j-1])*d_p2[i];
+    static void zero(T d[], int N){
+      for(int i=0; i<N; ++i) d[i] = static_cast<T>(0);
     }
-    return;
-  }
-                  
+
+  template<typename T>
+    static void applyThirdTerm(T d_out[], const T d_in[], int k, int j, int s, const T gamma[], const T rho[], const T gamma_kprev[], const T rho_kprev[])
+    {
+      // s is the number of steps
+      // The input and output vectors are of dimension 2*s + 1
+      const int dim = 2*s + 1;    
+
+      zero(d_out, dim);
+      if(k) applyT(d_out, d_in, gamma_kprev, rho_kprev, s); // compute the upper half of the vector
+
+
+      applyB(d_out+s, d_in+s, s+1); // update the lower half
+
+      // This has to come after applyB
+      if(k) d_out[s] -= d_in[s-1]/(rho_kprev[s-1]*gamma_kprev[s-1]);
+
+      // Finally scale everything
+      for(int i=0; i<dim; ++i) d_out[i] *= -rho[j]*gamma[j];
+
+      return;
+    }
+
+  template<typename T>
+    static void computeCoeffs(T d_out[], const T d_p1[], const T d_p2[], int k, int j, int s, const T gamma[], const T rho[], const T gamma_kprev[], const T rho_kprev[])
+    {
+      applyThirdTerm(d_out, d_p1, k, j-1, s, gamma, rho, gamma_kprev, rho_kprev);
+
+
+      for(int i=0; i<(2*s+1); ++i){
+        d_out[i] += rho[j-1]*d_p1[i] + (1 - rho[j-1])*d_p2[i];
+      }
+      return;
+    }
+
 
 
 
@@ -142,13 +142,13 @@ namespace quda {
 
 
     cudaColorSpinorField temp(b); // temporary field
-  
+
     // Use ColorSpinorParam to create zerod fields
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField x_prev(x,csParam);
 
-    const int s = 5;
+    const int s = 4;
 
     printf("Nstep = %d\n", s);
 
@@ -158,7 +158,7 @@ namespace quda {
 
     // Set up the first residual
     for(int i=0; i<s; ++i) zeroCuda(R[i]);
-    
+
 
     mat(R[s], x, temp);
     double r2 = xmyNormCuda(b,R[s]);
@@ -177,118 +177,91 @@ namespace quda {
     // v[s+1] holds A r
     // v[s+2] holds A^(2)r
     // v[2*s] holds A^(s)r
-    //cudaColorSpinorField* v = new cudaColorSpinorField[2*s+1];
-    cudaColorSpinorField* v;
     cudaColorSpinorField w(b);
 
-    Complex rAr(0,0);
-    
-    double gamma_old = 0.0;
-    double mu_old = 0.0;
-    double rho_old = 0.0;
+    double rAr;
+
+    //   double gamma_prev = 0.0;
+    //   double mu_prev = 0.0;
+    //    double rho_prev = 0.0;
     double rho[s];
     double mu[s];
     double gamma[s];   
-    double rho_prev[s];
-    double gamma_prev[s];
-     
+    double rho_kprev[s];
+    double gamma_kprev[s];
 
- //   cudaColorSpinorField r_old(x,csParam);
- 
+
     int k = 0;
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
       // compute the matrix powers kernel - need to set r[s] above
       //computeMatrixPowers(V, R, s); 
       computeMatrixPowers(V, R, s); 
 
-      zero(d_p2, 2*s+1);
-
       R[0] = R[s];
 
       for(int j=0; j<s; ++j){ 
-        cudaColorSpinorField& R_prev = (j) ? R[j-1] : R[s-1];
-      
-        if(j==0){
+        const int prev_idx = j ? j-1 : s-1;
+        cudaColorSpinorField& R_prev = R[prev_idx];
+        double& mu_prev    = mu[prev_idx];
+        double& rho_prev   = rho[prev_idx];
+        double& gamma_prev = gamma[prev_idx];
+
+
+
+        if(j == 0){ 
           zero(d, 2*s+1); d[s+1] = 1.0;
           w = V[s+1];
-
-          r2 = norm2(R[j]); // v[s] = r[s*k]
-          rAr = cDotProductCuda(w,R[j]);
-
-          mu[j] = r2;
-          gamma[j] = r2/real(rAr);
-         
- 
-          if(it==0){
-            rho[j] = 1.0;
-          }else{
-            rho[j] = 1.0/(1.0 - (gamma[j]/gamma_old)*(mu[j]/mu_old)*(1.0/rho_old));  
+        }else{
+          if(j==1){ 
+            zero(d_p2, 2*s+1);
+            if(k > 0){
+              d_p2[s-2] = (1 - rho_kprev[s-1])/(rho_kprev[s-1]*gamma_kprev[s-1]);
+              d_p2[s-1] = (1./gamma_kprev[s-1]);
+              d_p2[s]   = (-1./(gamma_kprev[s-1]*rho_kprev[s-1]));
+            }
           }
-
-          R[j+1] = R_prev;
-          axCuda((1.0 - rho[j]), R[j+1]);
-          axpyCuda(rho[j], R[j], R[j+1]);
-          axpyCuda(-rho[j]*gamma[j], w, R[j+1]);
-
-          // copy d to d_p1
-          for(int i=0; i<(2*s+1); ++i) d_p1[i] = d[i];
-        }
-
-        zeroCuda(w); 
-        if(j>=1){
-
-          if(j==1) zero(d_p2, 2*s+1);
-          if(k > 0 && j==1){
-            d_p2[s-2] = (1 - rho_prev[s-1])/(rho_prev[s-1]*gamma_prev[s-1]);
-            d_p2[s-1] = (1./gamma_prev[s-1]);
-            d_p2[s]   = (-1./(gamma_prev[s-1]*rho_prev[s-1]));
-          }
-
-          computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_prev, rho_prev);
-   
+          computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_kprev, rho_kprev);
+          zeroCuda(w); 
           for(int i=0; i<(2*s+1); ++i){
             if(d[i] != 0.) axpyCuda(d[i], V[i], w);
           }
-
-  
-          r2 = norm2(R[j]); // v[s] = r[s*k];
-          rAr = cDotProductCuda(w,R[j]);
-          mu[j] = r2;
-          gamma[j] = r2/real(rAr);
-    
-          rho[j] = 1.0/(1.0 - (gamma[j]/gamma[j-1])*(mu[j]/mu[j-1])*(1.0/rho[j-1]));
+        }
 
 
-          R[j+1] = R_prev;
-          axCuda((1.0 - rho[j]),R[j+1]);
-          axpyCuda(rho[j], R[j], R[j+1]);
-          axpyCuda(-gamma[j]*rho[j], w, R[j+1]);
+        r2 = norm2(R[j]); // v[s] = r[s*k]
+        rAr = reDotProductCuda(w,R[j]);
+        mu[j] = r2;
+        gamma[j] = r2/rAr;
 
 
-          for(int i=0; i<(2*s+1); ++i){
-            d_p2[i] = d_p1[i];
-            d_p1[i] = d[i];
-          }
-        } // j == 1
+        if(it==0){
+          rho[j] = 1.0;
+        }else{
+          rho[j] = 1.0/(1.0 - (gamma[j]/gamma_prev)*(mu[j]/mu_prev)*(1.0/rho_prev));  
+        }
+
+        R[j+1] = R_prev;
+        axCuda((1.0 - rho[j]), R[j+1]);
+        axpyCuda(rho[j], R[j], R[j+1]);
+        axpyCuda(-rho[j]*gamma[j], w, R[j+1]);
+
+        // copy d to d_p1
+        if(j>0) for(int i=0; i<(2*s+1); ++i) d_p2[i] = d_p1[i];
+        for(int i=0; i<(2*s+1); ++i) d_p1[i] = d[i];
 
         PrintStats("MPCG", it, r2, b2, 0.0);
-
         it++; 
       } // loop over j
 
       for(int i=0; i<s; ++i){
-        rho_prev[i] = rho[i];
-        gamma_prev[i] = gamma[i];
+        rho_kprev[i] = rho[i];
+        gamma_kprev[i] = gamma[i];
       }
-
       k++;
-      gamma_old = gamma[s-1];
-      mu_old = mu[s-1];
-      rho_old = rho[s-1];
     }
 
     PrintSummary("MPCG", it, r2, b2);
- 
+
     delete[] d;
     delete[] d_p1;
     delete[] d_p2;
