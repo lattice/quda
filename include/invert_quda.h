@@ -541,7 +541,7 @@ namespace quda {
   public:
     DeflatedSolver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) 
     { 
-       eigcg_precision = param.precision;//for mixed presicion use param.precision_sloppy 
+       eigcg_precision = param.precision_sloppy;//for mixed presicion use param.precision_sloppy 
     }
 
     virtual ~DeflatedSolver() { ; }
