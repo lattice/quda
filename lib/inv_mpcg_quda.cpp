@@ -122,9 +122,33 @@ namespace quda {
     for(int i=(nsteps+1); i<=(2*nsteps); ++i){
       mat(out[i], out[i-1], temp);
     }
+    return;
   }
 
 
+  void computeGramMatrix(Complex** G, std::vector<cudaColorSpinorField>& v){
+  
+    const int dim = v.size();
+  
+    for(int i=0; i<dim; ++i){
+      for(int j=0; j<dim; ++j){
+        G[i][j] = cDotProductCuda(v[i],v[j]);
+      }
+    }  
+    return;
+  }
+
+  void computeMuNu(double& result, const double* u, Complex** G, const double* v, int dim){
+
+    result = 0.0;
+
+    for(int i=0; i<dim; ++i){
+      for(int j=0; j<dim; ++j){
+        result += real(u[i]*v[j]*G[i][j]);
+      }
+    }
+    return;
+  }
 
   void MPCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
@@ -170,6 +194,14 @@ namespace quda {
     double* d    = new double[2*s+1];
     double* d_p1 = new double[2*s+1];
     double* d_p2 = new double[2*s+1];
+    double* g    = new double[2*s+1];
+    double* g_p1 = new double[2*s+1];
+    double* g_p2 = new double[2*s+1];
+    Complex** G  = new Complex*[2*s+1];
+    for(int i=0; i<(2*s+1); ++i){
+      G[i] = new Complex[2*s+1];
+    } 
+
 
     // Matrix powers kernel
     // The first s vectors hold the previous s residuals 
@@ -196,7 +228,8 @@ namespace quda {
       // compute the matrix powers kernel - need to set r[s] above
       //computeMatrixPowers(V, R, s); 
       computeMatrixPowers(V, R, s); 
-
+      computeGramMatrix(G,V);
+    
       R[0] = R[s];
 
       for(int j=0; j<s; ++j){ 
@@ -211,6 +244,7 @@ namespace quda {
         if(j == 0){ 
           zero(d, 2*s+1); d[s+1] = 1.0;
           w = V[s+1];
+          zero(g, 2*s+1); g[s] = 1.0;
         }else{
           if(j==1){ 
             zero(d_p2, 2*s+1);
@@ -219,7 +253,16 @@ namespace quda {
               d_p2[s-1] = (1./gamma_kprev[s-1]);
               d_p2[s]   = (-1./(gamma_kprev[s-1]*rho_kprev[s-1]));
             }
+            zero(g_p2, 2*s+1);
+            if(k > 0) g_p2[s-1] = 1.0;
           }
+          // compute g coeffs
+          for(int i=0; i<(2*s+1); ++i){
+            g[i] = rho[j-1]*g_p1[i] - rho[j-1]*gamma[j-1]*d_p1[i] 
+                 + (1 - rho[j-1])*g_p2[i];
+          }
+       
+          // compute d coeffs 
           computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_kprev, rho_kprev);
           zeroCuda(w); 
           for(int i=0; i<(2*s+1); ++i){
@@ -227,18 +270,12 @@ namespace quda {
           }
         }
 
+        computeMuNu(r2, g, G, g, 2*s+1);
+        computeMuNu(rAr, g, G, d, 2*s+1);
 
-        r2 = norm2(R[j]); // v[s] = r[s*k]
-        rAr = reDotProductCuda(w,R[j]);
         mu[j] = r2;
         gamma[j] = r2/rAr;
-
-
-        if(it==0){
-          rho[j] = 1.0;
-        }else{
-          rho[j] = 1.0/(1.0 - (gamma[j]/gamma_prev)*(mu[j]/mu_prev)*(1.0/rho_prev));  
-        }
+        rho[j] = (it==0) ? 1.0 : 1.0/(1.0 - (gamma[j]/gamma_prev)*(mu[j]/mu_prev)*(1.0/rho_prev));  
 
         R[j+1] = R_prev;
         axCuda((1.0 - rho[j]), R[j+1]);
@@ -246,8 +283,13 @@ namespace quda {
         axpyCuda(-rho[j]*gamma[j], w, R[j+1]);
 
         // copy d to d_p1
-        if(j>0) for(int i=0; i<(2*s+1); ++i) d_p2[i] = d_p1[i];
+        if(j>0){ 
+          for(int i=0; i<(2*s+1); ++i) d_p2[i] = d_p1[i];
+          for(int i=0; i<(2*s+1); ++i) g_p2[i] = g_p1[i];
+        }
         for(int i=0; i<(2*s+1); ++i) d_p1[i] = d[i];
+        for(int i=0; i<(2*s+1); ++i) g_p1[i] = g[i];
+    
 
         PrintStats("MPCG", it, r2, b2, 0.0);
         it++; 
@@ -265,6 +307,15 @@ namespace quda {
     delete[] d;
     delete[] d_p1;
     delete[] d_p2;
+
+    delete[] g;
+    delete[] g_p1;
+    delete[] g_p2;
+
+    for(int i=0; i<(2*s+1); ++i){
+      delete[] G[i];
+    }
+    delete G;
 
     return;
   }
