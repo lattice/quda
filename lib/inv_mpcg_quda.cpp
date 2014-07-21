@@ -126,25 +126,25 @@ namespace quda {
   }
 
 
-  void computeGramMatrix(Complex** G, std::vector<cudaColorSpinorField>& v){
+  void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v){
   
     const int dim = v.size();
   
     for(int i=0; i<dim; ++i){
       for(int j=0; j<dim; ++j){
-        G[i][j] = cDotProductCuda(v[i],v[j]);
+        G[i][j] = reDotProductCuda(v[i],v[j]);
       }
     }  
     return;
   }
 
-  void computeMuNu(double& result, const double* u, Complex** G, const double* v, int dim){
+  void computeMuNu(double& result, const double* u, double** G, const double* v, int dim){
 
     result = 0.0;
 
     for(int i=0; i<dim; ++i){
       for(int j=0; j<dim; ++j){
-        result += real(u[i]*v[j]*G[i][j]);
+        result += u[i]*v[j]*G[i][j];
       }
     }
     return;
@@ -197,9 +197,9 @@ namespace quda {
     double* g    = new double[2*s+1];
     double* g_p1 = new double[2*s+1];
     double* g_p2 = new double[2*s+1];
-    Complex** G  = new Complex*[2*s+1];
+    double** G  = new double*[2*s+1];
     for(int i=0; i<(2*s+1); ++i){
-      G[i] = new Complex[2*s+1];
+      G[i] = new double[2*s+1];
     } 
 
 
