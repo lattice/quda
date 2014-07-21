@@ -554,7 +554,7 @@ namespace quda {
     virtual void CleanResources() = 0;
 
     // solver factory
-    static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDeflate, TimeProfile &profile);
+    static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDeflate, TimeProfile &profile);
 
     bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
 		     const double &hq_tol);
@@ -580,6 +580,8 @@ namespace quda {
     DiracMatrix &mat;
     DiracMatrix &matSloppy;
 
+    DiracMatrix &matCGSloppy;
+
     const DiracMatrix &matDefl;
 
     QudaPrecision search_space_prec;
@@ -593,7 +595,7 @@ namespace quda {
 
   public:
 
-    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
+    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
 

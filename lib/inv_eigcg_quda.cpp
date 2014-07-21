@@ -191,8 +191,9 @@ namespace quda {
     initCGparam.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
   }
 
-  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCGparam(param), profile(profile), eigcg_alloc(false)
+  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matCGSloppy(matCGSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), 
+    Vm(0), initCGparam(param), profile(profile), eigcg_alloc(false)
   {
     if((param.rhs_idx < param.deflation_grid) || (param.inv_type == QUDA_EIGCG_INVERTER))
     {
@@ -713,10 +714,13 @@ namespace quda {
 
            initCGparam.tol       = param.tol;
            initCGparam.precision = eigcg_precision;//the same as eigcg
-           
+           //
+           initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
+           initCGparam.use_sloppy_partial_accumulator=false;   //more stable single-half solver
+     
            //no reliable updates?
 
-           initCG = new CG(matSloppy, matSloppy, initCGparam, profile);
+           initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
 
            //
            copyCuda(*out, *outSloppy);
@@ -796,7 +800,7 @@ namespace quda {
         {
           initCGparam.tol = restart_tol; 
 
-          initCG = new CG(mat, matSloppy, initCGparam, profile);
+          initCG = new CG(mat, matCGSloppy, initCGparam, profile);
 
           (*initCG)(*out, *in);           
 
@@ -813,7 +817,7 @@ namespace quda {
 
         initCGparam.tol = full_tol; 
 
-        initCG = new CG(mat, matSloppy, initCGparam, profile);
+        initCG = new CG(mat, matCGSloppy, initCGparam, profile);
 
         (*initCG)(*out, *in);           
 
