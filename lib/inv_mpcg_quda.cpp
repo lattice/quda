@@ -148,15 +148,12 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField x_prev(x,csParam);
 
-    const int s = 8;
+    const int s = 5;
 
     printf("Nstep = %d\n", s);
 
     // create the residual array and the matrix powers array
     std::vector<cudaColorSpinorField> R(s+1,cudaColorSpinorField(b,csParam));
- //   std::vector<cudaColorSpinorField> R_new(s+1,cudaColorSpinorField(b,csParam));
- //
-    std::vector<cudaColorSpinorField> W(s+1,cudaColorSpinorField(b,csParam));
     std::vector<cudaColorSpinorField> V(2*s+1,cudaColorSpinorField(b,csParam));
 
     // Set up the first residual
@@ -196,7 +193,7 @@ namespace quda {
     double gamma_prev[s];
      
 
-    cudaColorSpinorField r_old(x,csParam);
+ //   cudaColorSpinorField r_old(x,csParam);
  
     int k = 0;
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
@@ -206,10 +203,10 @@ namespace quda {
 
       zero(d_p2, 2*s+1);
 
-      r_old = R[s-1];
       R[0] = R[s];
 
       for(int j=0; j<s; ++j){ 
+        cudaColorSpinorField& R_prev = (j) ? R[j-1] : R[s-1];
       
         if(j==0){
           zero(d, 2*s+1); d[s+1] = 1.0;
@@ -228,8 +225,7 @@ namespace quda {
             rho[j] = 1.0/(1.0 - (gamma[j]/gamma_old)*(mu[j]/mu_old)*(1.0/rho_old));  
           }
 
-          R[j+1] = r_old;
-
+          R[j+1] = R_prev;
           axCuda((1.0 - rho[j]), R[j+1]);
           axpyCuda(rho[j], R[j], R[j+1]);
           axpyCuda(-rho[j]*gamma[j], w, R[j+1]);
@@ -263,7 +259,7 @@ namespace quda {
           rho[j] = 1.0/(1.0 - (gamma[j]/gamma[j-1])*(mu[j]/mu[j-1])*(1.0/rho[j-1]));
 
 
-          R[j+1] = R[j-1];
+          R[j+1] = R_prev;
           axCuda((1.0 - rho[j]),R[j+1]);
           axpyCuda(rho[j], R[j], R[j+1]);
           axpyCuda(-gamma[j]*rho[j], w, R[j+1]);
