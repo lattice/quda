@@ -86,6 +86,8 @@ extern "C" {
 
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
+    QUDA_MPBICGSTAB_INVERTER,
+    QUDA_SBICGSTAB_INVERTER, // SimpleBICGStab
     QUDA_BICGSTAB_INVERTER,
     QUDA_GCR_INVERTER,
     QUDA_SD_INVERTER,

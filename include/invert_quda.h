@@ -342,6 +342,40 @@ namespace quda {
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
+  class SimpleBiCGstab : public Solver {
+
+  private:
+    DiracMatrix &mat;
+
+    // pointers to fields to avoid multiple creation overhead
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    bool init;
+
+  public:
+    SimpleBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~SimpleBiCGstab();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+  
+  class MPBiCGstab : public Solver {
+
+  private:
+    DiracMatrix &mat;
+
+    // pointers to fields to avoid multiple creation overhead
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    bool init;
+
+  public:
+    MPBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~MPBiCGstab();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
+
+
   class GCR : public Solver {
 
   private:

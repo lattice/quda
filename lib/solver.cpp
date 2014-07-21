@@ -59,6 +59,14 @@ namespace quda {
       report("MPCG");
       solver = new MPCG(mat, param, profile);
       break;
+    case QUDA_SBICGSTAB_INVERTER:
+      report("SBICGSTAB");
+      solver = new SimpleBiCGstab(mat, param, profile);
+      break;
+    case QUDA_MPBICGSTAB_INVERTER:
+      report("MPBICGSTAB");
+      solver = new MPBiCGstab(mat, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type");
     }

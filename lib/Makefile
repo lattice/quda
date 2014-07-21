@@ -26,7 +26,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	milc_interface.o extended_color_spinor_utilities.o		\
 	eig_lanczos_quda.o ritz_quda.o eig_solver.o blas_magma.o	\
 	color_spinor_orthogonalize.o inv_cg3_quda.o inv_ncg3_quda.o	\
-	inv_mpcg_quda.o 
+	inv_mpcg_quda.o inv_sbicgstab_quda.o inv_mpbicgstab_quda.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
