@@ -171,6 +171,8 @@ namespace quda {
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField x_prev(x,csParam);
+    cudaColorSpinorField x_new(x,csParam);
+
 
     const int s = 4;
 
@@ -223,6 +225,8 @@ namespace quda {
     double gamma_kprev[s];
 
 
+
+
     int k = 0;
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
       // compute the matrix powers kernel - need to set r[s] above
@@ -232,7 +236,8 @@ namespace quda {
     
       R[0] = R[s];
 
-      for(int j=0; j<s; ++j){ 
+      int j = 0;
+      while(!convergence(r2,0.0,stop,0.0) && j<s){ 
         const int prev_idx = j ? j-1 : s-1;
         cudaColorSpinorField& R_prev = R[prev_idx];
         double& mu_prev    = mu[prev_idx];
@@ -282,6 +287,13 @@ namespace quda {
         axpyCuda(rho[j], R[j], R[j+1]);
         axpyCuda(-rho[j]*gamma[j], w, R[j+1]);
 
+        x_new = x_prev;
+        axCuda((1.0 - rho[j]), x_new);
+        axpyCuda(rho[j], x, x_new);
+        axpyCuda(gamma[j]*rho[j], R[j], x_new);
+
+
+
         // copy d to d_p1
         if(j>0){ 
           for(int i=0; i<(2*s+1); ++i) d_p2[i] = d_p1[i];
@@ -292,8 +304,14 @@ namespace quda {
     
 
         PrintStats("MPCG", it, r2, b2, 0.0);
-        it++; 
+        it++;
+
+        x_prev = x;
+        x = x_new;
+        ++j;
       } // loop over j
+
+
 
       for(int i=0; i<s; ++i){
         rho_kprev[i] = rho[i];
@@ -301,6 +319,11 @@ namespace quda {
       }
       k++;
     }
+
+
+    mat(R[0], x_prev, temp);
+    param.true_res = sqrt(xmyNormCuda(b, R[0]) / b2);
+
 
     PrintSummary("MPCG", it, r2, b2);
 
