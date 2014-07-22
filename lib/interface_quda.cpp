@@ -531,6 +531,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     int R[4]; // domain-overlap widths in different directions 
     for(int i=0; i<4; ++i){ 
       R[i] = param->overlap*commDimPartitioned(i);
+      printfQuda("loadGaugeQuda R[%d] = %d*%d\n", i, param->overlap, commDimPartitioned(i));
       gauge_param.x[i] += 2*R[i];
     }
     // the extended field does not require any ghost padding

@@ -109,6 +109,7 @@ void init()
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gaugeParam.gaugeGiB = 0;
+  //gaugeParam.overlap = 2; //test regular staggered with overlap 2 and comms off
 
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
@@ -117,6 +118,7 @@ void init()
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
+  //inv_param.dslash_type = QUDA_STAGGERED_DSLASH;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
@@ -275,6 +277,11 @@ void init()
     bool pc = (test_type != 2);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
+
+    //set up staggered dslash test with overlap
+    for(int i=0; i<4; i++) {
+      //diracParam.commDim[i] = 0; //turn off comms
+    }
 
     diracParam.tmp1=tmp;
 

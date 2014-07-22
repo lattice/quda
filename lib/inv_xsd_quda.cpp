@@ -21,7 +21,11 @@ namespace quda {
     Solver(param,profile), mat(mat)
   {
     sd = new SD(mat,param,profile);
-    for(int i=0; i<4; ++i) R[i] = param.overlap_precondition*commDimPartitioned(i);
+    for(int i=0; i<4; ++i) { 
+      R[i] = param.overlap_precondition*commDimPartitioned(i);
+      printfQuda("R[%d] = %d*%d\n", i, param.overlap_precondition,
+		 commDimPartitioned(i));
+    }
   }
 
   XSD::~XSD(){
