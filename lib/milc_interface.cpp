@@ -26,12 +26,34 @@ using namespace quda;
 using namespace quda::fermion_force;
 
 
+
+#define QUDAMILC_VERBOSE 1
+template <bool start>
+void  inline qudamilc_called(const char* func, QudaVerbosity verb){
+#ifdef QUDAMILC_VERBOSE
+if (verb >= QUDA_VERBOSE) {
+     if(start)
+       printf("QUDA_MILC_INTERFACE: %s (called) \n",func);
+     else
+      printf("QUDA_MILC_INTERFACE: %s (return) \n",func);
+   }
+#endif
+}
+
+template <bool start>
+void inline qudamilc_called(const char * func){
+  qudamilc_called<start>(func, getVerbosity());
+}
+
+
 void qudaInit(QudaInitArgs_t input)
 {
+
   if(initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
   qudaSetLayout(input.layout);
   initialized = true;
+
 }
 
 void qudaFinalize()
@@ -42,7 +64,7 @@ void qudaFinalize()
 /**
  *  Implements a lexicographical mapping of node coordinates to ranks,
  *  with t varying fastest.
- */ 
+ */
 static int rankFromCoords(const int *coords, void *fdata)
 {
   int *dims = static_cast<int *>(fdata);
@@ -120,7 +142,7 @@ void qudaHisqParamsInit(QudaHisqParams_t params)
       reunit_svd_only,
       params.reunit_svd_rel_error,
       params.reunit_svd_abs_error);
-#endif // UNITARIZE_GPU                            
+#endif // UNITARIZE_GPU
 
   initialized = true;
 
@@ -168,7 +190,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
  // create_quda_gauge = true;
 
-#ifdef MULTI_GPU  
+#ifdef MULTI_GPU
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
 #else
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
@@ -181,7 +203,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
   computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
 
   // require loadGaugeQuda to be called in subsequent solve
-//  invalidateGaugeQuda(); 
+//  invalidateGaugeQuda();
 }
 
 
@@ -190,7 +212,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
     const double act_path_coeff[6], void* inlink, void* fatlink, void* ulink)
 {
 
-#ifdef MULTI_GPU  
+#ifdef MULTI_GPU
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
 #else
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
@@ -214,7 +236,7 @@ void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coe
     const void* const w_link, const void* const v_link, const void* const u_link,
     void* const milc_momentum)
 {
-
+  qudamilc_called<true>(__func__);
 
   QudaGaugeParam gParam = newMILCGaugeParam(localDim,
       (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
@@ -224,15 +246,17 @@ void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coe
   computeHISQForceQuda(milc_momentum, &flops, level2_coeff, fat7_coeff,
       staple_src, one_link_src, naik_src,
       w_link, v_link, u_link, &gParam);
-
+  qudamilc_called<false>(__func__);
   return;
 }
 
 
-void qudaAsqtadForce(int prec, const double act_path_coeff[6], 
+void qudaAsqtadForce(int prec, const double act_path_coeff[6],
     const void* const one_link_src[4], const void* const naik_src[4],
     const void* const link, void* const milc_momentum)
 {
+  qudamilc_called<true>(__func__);
+
 
   QudaGaugeParam gParam = newMILCGaugeParam(localDim,
       (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
@@ -241,6 +265,7 @@ void qudaAsqtadForce(int prec, const double act_path_coeff[6],
   long long flops;
   computeAsqtadForceQuda(milc_momentum, &flops, act_path_coeff, one_link_src, naik_src, link, &gParam);
 
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -287,7 +312,7 @@ static void setLoopCoeffs(const double milc_loop_coeff[3],
     Real loop_coeff[48])
 {
   // 6 plaquette terms
-  for(int i=0; i<6; ++i) loop_coeff[i] = milc_loop_coeff[0];      
+  for(int i=0; i<6; ++i) loop_coeff[i] = milc_loop_coeff[0];
 
   // 18 rectangle terms
   for(int i=0; i<18; ++i) loop_coeff[i+6] = milc_loop_coeff[1];
@@ -318,16 +343,16 @@ static void createGaugeForcePaths(int **paths, int dir){
   for(int i=0; i<4; ++i){
     if(i==dir) continue;
     paths[index][0] = paths[index][1] = i;       paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = opp(i);
-    index++;  
+    index++;
     paths[index][0] = paths[index][1] = opp(i);  paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = i;
     index++;
     paths[index][0] = dir; paths[index][1] = i; paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = opp(i);
     index++;
     paths[index][0] = dir; paths[index][1] = opp(i); paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = i;
     index++;
-    paths[index][0] = i;  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = opp(i); paths[index][4] = dir; 
+    paths[index][0] = i;  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = opp(i); paths[index][4] = dir;
     index++;
-    paths[index][0] = opp(i);  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = i; paths[index][4] = dir; 
+    paths[index][0] = opp(i);  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = i; paths[index][4] = dir;
     index++;
   }
 
@@ -362,8 +387,8 @@ void qudaGaugeForce( int precision,
 {
 
   const int numPaths = 48;
-  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
-      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim,
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_SU3_LINKS);
 
   static double loop_coeff[numPaths];
@@ -393,7 +418,7 @@ void qudaGaugeForce( int precision,
 
   memset(milc_momentum, 0, 4*getVolume(localDim)*10*qudaGaugeParam.cpu_prec);
   computeGaugeForceQuda(milc_momentum, milc_sitelink,  input_path_buf, length,
-      loop_coeff, numPaths, max_length, eb3, 
+      loop_coeff, numPaths, max_length, eb3,
       &qudaGaugeParam, timeinfo);
 
   for(int dir=0; dir<4; ++dir){
@@ -418,7 +443,7 @@ static void setInvertParams(const int dim[4],
     QudaPrecision cuda_prec_sloppy,
     QudaPrecision cuda_prec_precondition,
     double mass,
-    double target_residual, 
+    double target_residual,
     int maxiter,
     double reliable_delta,
     QudaParity parity,
@@ -442,7 +467,7 @@ static void setInvertParams(const int dim[4],
   invertParam->cuda_prec_sloppy = cuda_prec_sloppy;
 
   invertParam->solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-  invertParam->solve_type = QUDA_NORMEQ_PC_SOLVE; 
+  invertParam->solve_type = QUDA_NORMEQ_PC_SOLVE;
   invertParam->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   invertParam->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not used, but required by the code.
   invertParam->dirac_order = QUDA_DIRAC_ORDER;
@@ -466,7 +491,7 @@ static void setInvertParams(const int dim[4],
 
   invertParam->dagger = QUDA_DAG_NO;
   invertParam->sp_pad = dim[0]*dim[1]*dim[2]/2;
-  invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES; 
+  invertParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   // for the preconditioner
   invertParam->inv_type_precondition = QUDA_CG_INVERTER;
@@ -532,7 +557,7 @@ static void setGaugeParams(const int dim[4],
     QudaPrecision cuda_prec_sloppy,
     QudaPrecision cuda_prec_precondition,
     const double tadpole,
-    QudaGaugeParam *gaugeParam)   
+    QudaGaugeParam *gaugeParam)
 {
 
   for(int dir=0; dir<4; ++dir){
@@ -549,7 +574,7 @@ static void setGaugeParams(const int dim[4],
   gaugeParam->anisotropy = 1.0;
   gaugeParam->tadpole_coeff = tadpole;
   gaugeParam->t_boundary = QUDA_PERIODIC_T; // anti-periodic boundary conditions are built into the gauge field
-  gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER; 
+  gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = getFatLinkPadding(dim);
   gaugeParam->scale = -1.0/(24.0*gaugeParam->tadpole_coeff*gaugeParam->tadpole_coeff);
 
@@ -573,7 +598,7 @@ static void setColorSpinorParams(const int dim[4],
   param->nDim = 4;
 
   for(int dir=0; dir<4; ++dir) param->x[dir] = dim[dir];
-  param->x[0] /= 2; 
+  param->x[0] /= 2;
 
   param->precision = precision;
   param->pad = 0;
@@ -583,13 +608,13 @@ static void setColorSpinorParams(const int dim[4],
   param->gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.
   param->create = QUDA_ZERO_FIELD_CREATE;
   return;
-} 
+}
 
 
 static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchange, const int dim[4])
 {
   size_t offset;
-  int volume = dim[0]*dim[1]*dim[2]*dim[3];  
+  int volume = dim[0]*dim[1]*dim[2]*dim[3];
 
   if(local_parity == QUDA_EVEN_PARITY){
     offset = even_odd_exchange ? volume*6/2 : 0;
@@ -600,12 +625,12 @@ static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchan
 }
 
 
-void qudaMultishiftInvert(int external_precision, 
+void qudaMultishiftInvert(int external_precision,
     int quda_precision,
     int num_offsets,
     double* const offset,
     QudaInvertArgs_t inv_args,
-    const double target_residual[], 
+    const double target_residual[],
     const double target_fermilab_residual[],
     const void* const fatlink,
     const void* const longlink,
@@ -617,6 +642,12 @@ void qudaMultishiftInvert(int external_precision,
     int *num_iters)
 {
 
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+  // if (verbosity >= QUDA_VERBOSE) {
+  //   printf("QUDA_MILC_INTERFACE: %s (called) \n",__func__);
+  // }
+
   for(int i=0; i<num_offsets; ++i){
     if(target_residual[i] == 0){
       errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
@@ -627,25 +658,25 @@ void qudaMultishiftInvert(int external_precision,
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) || 
+  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
                                      ((quda_precision==1) && (inv_args.mixed_precision==2)) ) ? true : false;
-  QudaPrecision device_precision_sloppy; 
+  QudaPrecision device_precision_sloppy;
   if(inv_args.mixed_precision == 2){
     device_precision_sloppy = QUDA_HALF_PRECISION;
   }else if(inv_args.mixed_precision == 1){
     device_precision_sloppy = QUDA_SINGLE_PRECISION;
   }else{
-    device_precision_sloppy = device_precision; 
+    device_precision_sloppy = device_precision;
   }
 
   QudaPrecision device_precision_precondition = device_precision_sloppy;
 
 
 
-  static const QudaVerbosity verbosity = getVerbosity();
+
 
 /*
-  if(verbosity >= QUDA_VERBOSE){ 
+  if(verbosity >= QUDA_VERBOSE){
     if(quda_precision == 2){
       printfQuda("Using %s double-precision multi-mass inverter\n", use_mixed_precision?"mixed":"pure");
     }else if(quda_precision == 1){
@@ -671,9 +702,9 @@ void qudaMultishiftInvert(int external_precision,
   {
     const double reliable_delta = 1e-1;
     setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
-        num_offsets, offset, target_residual, target_fermilab_residual, 
+        num_offsets, offset, target_residual, target_fermilab_residual,
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
-  }  
+  }
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
@@ -685,11 +716,11 @@ void qudaMultishiftInvert(int external_precision,
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;  // don't know if this is correct
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
+    loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
 
     const int long_pad = 3*fat_pad;
     gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad; 
+    gaugeParam.ga_pad = long_pad;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
 
    // invalidate_quda_gauge = false;
@@ -702,7 +733,7 @@ void qudaMultishiftInvert(int external_precision,
   for(int i=0; i<num_offsets; ++i) sln_pointer[i] = (char*)solutionArray[i] + quark_offset;
 
   invertMultiShiftQuda(sln_pointer, src_pointer, &invertParam);
-  free(sln_pointer); 
+  free(sln_pointer);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -713,6 +744,7 @@ void qudaMultishiftInvert(int external_precision,
 
   freeGaugeQuda();
  // if(!create_quda_gauge) invalidateGaugeQuda();
+  qudamilc_called<false>(__func__, verbosity);
   return;
 } // qudaMultiShiftInvert
 
@@ -723,7 +755,7 @@ void qudaInvert(int external_precision,
     int quda_precision,
     double mass,
     QudaInvertArgs_t inv_args,
-    double target_residual, 
+    double target_residual,
     double target_fermilab_residual,
     const void* const fatlink,
     const void* const longlink,
@@ -735,6 +767,11 @@ void qudaInvert(int external_precision,
     int* num_iters)
 {
 
+
+	static const QudaVerbosity verbosity = getVerbosity();
+ 	qudamilc_called<true>(__func__, verbosity);
+
+
   if(target_fermilab_residual && target_residual){
     errorQuda("qudaInvert: conflicting residuals requested\n");
     exit(1);
@@ -743,10 +780,10 @@ void qudaInvert(int external_precision,
     exit(1);
   }
 
-  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) || 
+  const bool use_mixed_precision = (((quda_precision==2) && inv_args.mixed_precision) ||
                                      ((quda_precision==1) && (inv_args.mixed_precision==2) ) ) ? true : false;
 
-  static const QudaVerbosity verbosity = getVerbosity();
+  // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision_sloppy;
@@ -758,7 +795,7 @@ void qudaInvert(int external_precision,
   }else{
     device_precision_sloppy = device_precision;
   }
-  
+
 
 
   QudaPrecision device_precision_precondition = device_precision_sloppy;
@@ -777,18 +814,18 @@ void qudaInvert(int external_precision,
   setColorSpinorParams(localDim, host_precision, &csParam);
 
 
-  const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION; 
+  const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   const int fat_pad  = getFatLinkPadding(localDim);
   const int long_pad = 3*fat_pad;
 
 //  if(invalidate_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
-    gaugeParam.ga_pad = fat_pad; 
+    gaugeParam.ga_pad = fat_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
+    loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam);
 
     gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad; 
+    gaugeParam.ga_pad = long_pad;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
 
@@ -797,9 +834,9 @@ void qudaInvert(int external_precision,
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
 
-  invertQuda(((char*)solution + quark_offset*host_precision), 
-      ((char*)source + quark_offset*host_precision), 
-      &invertParam); 
+  invertQuda(((char*)solution + quark_offset*host_precision),
+      ((char*)source + quark_offset*host_precision),
+      &invertParam);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -807,6 +844,7 @@ void qudaInvert(int external_precision,
   *final_fermilab_residual = invertParam.true_res_hq;
 
   freeGaugeQuda();
+  qudamilc_called<false>(__func__, verbosity);
 //  if(!create_quda_gauge) invalidateGaugeQuda();
   return;
 } // qudaInvert
@@ -818,7 +856,7 @@ void qudaInvert(int external_precision,
 void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
 {
 
-  QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION; 
+  QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
       (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
 
@@ -865,7 +903,7 @@ void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, d
 {
 
   QudaParity qudaParity = (parity==2) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
-  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
@@ -881,7 +919,7 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
 
   const QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   const QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
-  QudaPrecision device_precision_sloppy; 
+  QudaPrecision device_precision_sloppy;
 
   if(inv_args.mixed_precision == 2){
     device_precision_sloppy = QUDA_HALF_PRECISION;
@@ -895,20 +933,20 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
 
   gaugeParam.anisotropy               = 1.0;
   gaugeParam.type                     = QUDA_WILSON_LINKS;
-  gaugeParam.gauge_order              = QUDA_MILC_GAUGE_ORDER; 
+  gaugeParam.gauge_order              = QUDA_MILC_GAUGE_ORDER;
 
   // Check the boundary conditions
-  // Can't have twisted or anti-periodic boundary conditions in the spatial 
+  // Can't have twisted or anti-periodic boundary conditions in the spatial
   // directions with 12 reconstruct at the moment.
   bool trivial_phase = true;
   for(int dir=0; dir<3; ++dir){
     if(inv_args.boundary_phase[dir] != 0) trivial_phase = false;
   }
-  if(inv_args.boundary_phase[3] != 0 && inv_args.boundary_phase[3] != 1) trivial_phase = false;  
+  if(inv_args.boundary_phase[3] != 0 && inv_args.boundary_phase[3] != 1) trivial_phase = false;
 
   if(trivial_phase){
     gaugeParam.t_boundary               = (inv_args.boundary_phase[3]) ? QUDA_ANTI_PERIODIC_T : QUDA_PERIODIC_T;
-    gaugeParam.reconstruct              = QUDA_RECONSTRUCT_12; 
+    gaugeParam.reconstruct              = QUDA_RECONSTRUCT_12;
     gaugeParam.reconstruct_sloppy       = QUDA_RECONSTRUCT_12;
   }else{
     gaugeParam.t_boundary               = QUDA_PERIODIC_T;
@@ -926,7 +964,7 @@ void setGaugeParams(QudaGaugeParam &gaugeParam, const int dim[4], QudaInvertArgs
 
 
 
-void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args, 
+void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
     int external_precision, int quda_precision, double kappa) {
 
   const QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -939,15 +977,15 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   }else{
     device_precision_sloppy = device_precision;
   }
- 
-   
+
+
 
   invertParam.dslash_type                   = QUDA_CLOVER_WILSON_DSLASH;
   invertParam.kappa                         = kappa;
   invertParam.dagger                        = QUDA_DAG_NO;
   invertParam.mass_normalization            = QUDA_KAPPA_NORMALIZATION;
-  invertParam.gcrNkrylov                    = 30; 
-  invertParam.reliable_delta                = 1e-1; 
+  invertParam.gcrNkrylov                    = 30;
+  invertParam.reliable_delta                = 1e-1;
   invertParam.maxiter                       = inv_args.max_iter;
 
   invertParam.cuda_prec_precondition        = device_precision_sloppy;
@@ -969,7 +1007,7 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
 }
 
 
-void qudaLoadGaugeField(int external_precision, 
+void qudaLoadGaugeField(int external_precision,
     int quda_precision,
     QudaInvertArgs_t inv_args,
     const void* milc_link) {
@@ -986,10 +1024,10 @@ void qudaFreeGaugeField() {
 } // qudaFreeGaugeField
 
 
-void qudaLoadCloverField(int external_precision, 
+void qudaLoadCloverField(int external_precision,
     int quda_precision,
     QudaInvertArgs_t inv_args,
-    void* milc_clover, 
+    void* milc_clover,
     void* milc_clover_inv,
     QudaSolutionType solution_type,
     QudaSolveType solve_type,
@@ -1030,7 +1068,7 @@ void qudaFreeCloverField() {
 } // qudaFreeCloverField
 
 
-void qudaCloverInvert(int external_precision, 
+void qudaCloverInvert(int external_precision,
     int quda_precision,
     double kappa,
     QudaInvertArgs_t inv_args,
@@ -1041,7 +1079,7 @@ void qudaCloverInvert(int external_precision,
     void* cloverInverse,
     void* source,
     void* solution,
-    double* const final_residual, 
+    double* const final_residual,
     double* const final_fermilab_residual,
     int* num_iters)
 {
@@ -1071,7 +1109,7 @@ void qudaCloverInvert(int external_precision,
   invertParam.inv_type           = QUDA_BICGSTAB_INVERTER;
   invertParam.matpc_type         = QUDA_MATPC_ODD_ODD;
 
-  invertQuda(solution, source, &invertParam); 
+  invertQuda(solution, source, &invertParam);
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
@@ -1083,7 +1121,7 @@ void qudaCloverInvert(int external_precision,
 } // qudaCloverInvert
 
 
-void qudaCloverMultishiftInvert(int external_precision, 
+void qudaCloverMultishiftInvert(int external_precision,
     int quda_precision,
     int num_offsets,
     double* const offset,
@@ -1092,11 +1130,11 @@ void qudaCloverMultishiftInvert(int external_precision,
     QudaInvertArgs_t inv_args,
     const double* target_residual_offset,
     const void* milc_link,
-    void* milc_clover, 
+    void* milc_clover,
     void* milc_clover_inv,
     void* source,
     void** solutionArray,
-    double* const final_residual, 
+    double* const final_residual,
     int* num_iters)
 {
 
@@ -1124,7 +1162,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   invertParam.inv_type           = QUDA_CG_INVERTER;
   invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
 
-  invertMultiShiftQuda(solutionArray, source, &invertParam); 
+  invertMultiShiftQuda(solutionArray, source, &invertParam);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -1137,7 +1175,7 @@ void qudaCloverMultishiftInvert(int external_precision,
 
 
 
-void qudaCloverMultishiftMDInvert(int external_precision, 
+void qudaCloverMultishiftMDInvert(int external_precision,
     int quda_precision,
     int num_offsets,
     double* const offset,
@@ -1146,14 +1184,14 @@ void qudaCloverMultishiftMDInvert(int external_precision,
     QudaInvertArgs_t inv_args,
     const double* target_residual_offset,
     const void* milc_link,
-    void* milc_clover, 
+    void* milc_clover,
     void* milc_clover_inv,
     void* source,
     void** psiEven,
     void** psiOdd,
     void** pEven,
     void** pOdd,
-    double* const final_residual, 
+    double* const final_residual,
     int* num_iters)
 {
   for(int i=0; i<num_offsets; ++i){
@@ -1180,7 +1218,7 @@ void qudaCloverMultishiftMDInvert(int external_precision,
   invertParam.inv_type           = QUDA_CG_INVERTER;
   invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
 
-  invertMultiShiftMDQuda(psiEven, psiOdd, pEven, pOdd, source, &invertParam); 
+  invertMultiShiftMDQuda(psiEven, psiOdd, pEven, pOdd, source, &invertParam);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
