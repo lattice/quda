@@ -1006,7 +1006,8 @@ void endQuda(void)
   if (!initialized) return;
 
   LatticeField::freeBuffer();
-  cudaColorSpinorField::freeBuffer();
+  cudaColorSpinorField::freeBuffer(0);
+  cudaColorSpinorField::freeBuffer(1);
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
   FaceBuffer::flushPinnedCache();
@@ -2948,18 +2949,40 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   DiracParam diracParam;
   DiracParam diracSloppyParam;
   //DiracParam diracDeflateParam;
-
+//!
+  DiracParam diracHalfPrecParam;//sloppy precision for initCG
+//!
   setDiracParam(diracParam, param, pc_solve);
   setDiracSloppyParam(diracSloppyParam, param, pc_solve);
+
+
+//!half precision Dirac field (for the initCG)
+  setDiracParam(diracHalfPrecParam, param, pc_solve);
+
+  diracHalfPrecParam.gauge = gaugePrecondition;
+  diracHalfPrecParam.fatGauge = gaugeFatPrecondition;
+  diracHalfPrecParam.longGauge = gaugeLongPrecondition;    
+  
+  diracHalfPrecParam.clover = cloverPrecondition;
+  diracHalfPrecParam.cloverInv = cloverInvPrecondition;
+
+  for (int i=0; i<4; i++) {
+      diracHalfPrecParam.commDim[i] = 1; // comms are on.
+  }
+//!
 
   Dirac *d        = Dirac::create(diracParam); // create the Dirac operator   
   Dirac *dSloppy  = Dirac::create(diracSloppyParam);
   //Dirac *dDeflate = Dirac::create(diracPreParam);
+  Dirac *dHalfPrec = Dirac::create(diracHalfPrecParam);
 
   Dirac &dirac = *d;
-  Dirac &diracSloppy = param->rhs_idx < param->deflation_grid ? *d : *dSloppy; //hack!!!
-  //Dirac &diracSloppy  = *dSloppy; //hack!!!
-  Dirac &diracDeflate = *d;//full precision 
+  //Dirac &diracSloppy = param->rhs_idx < param->deflation_grid ? *d : *dSloppy; //hack!!!
+  //Dirac &diracSloppy   = param->rhs_idx < param->deflation_grid ? *dSloppy : *dHalfPrec;
+  Dirac &diracSloppy   = *dSloppy;
+  Dirac &diracHalf     = *dHalfPrec;  
+  Dirac &diracDeflate  = *d;//full precision deflation
+  //Dirac &diracHalfPrec = *dHalfPrec;  
 
   profileInvert.Start(QUDA_PROFILE_H2D);
 
@@ -3055,10 +3078,10 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   if(param->inv_type == QUDA_INC_EIGCG_INVERTER || param->inv_type == QUDA_EIGCG_INVERTER)
   {  
-    DiracMdagM m(dirac), mSloppy(diracSloppy), mDeflate(diracDeflate);
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
     SolverParam solverParam(*param);
 
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mDeflate, profileInvert);  
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mDeflate, profileInvert);  
     
     (*solve)(out, in);//run solver
 
@@ -3109,6 +3132,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   delete d;
   delete dSloppy;
 //  delete dDeflate;
+  delete dHalfPrec;
 
   popVerbosity();
 

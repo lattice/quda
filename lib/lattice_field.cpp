@@ -8,9 +8,9 @@
 
 namespace quda {
 
-  void* LatticeField::bufferPinned = NULL;
-  bool LatticeField::bufferPinnedInit = false;
-  size_t LatticeField::bufferPinnedBytes = 0;
+  void* LatticeField::bufferPinned[] = {NULL};
+  bool LatticeField::bufferPinnedInit[] = {false};
+  size_t LatticeField::bufferPinnedBytes[] = {0};
 
   void* LatticeField::bufferDevice = NULL;
   bool LatticeField::bufferDeviceInit = false;
@@ -88,30 +88,30 @@ namespace quda {
     return -1;
   }
 
-  void LatticeField::resizeBufferPinned(size_t bytes) const {
-    if ((bytes > bufferPinnedBytes || bufferPinnedInit == 0) && bytes > 0) {
-      if (bufferPinnedInit) host_free(bufferPinned);
-      bufferPinned = pinned_malloc(bytes);
-      bufferPinnedBytes = bytes;
-      bufferPinnedInit = true;
+  void LatticeField::resizeBufferPinned(size_t bytes, const int index) const {
+    if ((bytes > bufferPinnedBytes[index] || bufferPinnedInit[index] == 0) && bytes > 0) {
+      if (bufferPinnedInit[index]) host_free(bufferPinned[index]);
+      bufferPinned[index] = pinned_malloc(bytes);
+      bufferPinnedBytes[index] = bytes;
+      bufferPinnedInit[index] = true;
     }
   }
 
   void LatticeField::resizeBufferDevice(size_t bytes) const {
     if ((bytes > bufferDeviceBytes || bufferDeviceInit == 0) && bytes > 0) {
-      if (bufferDeviceInit) host_free(bufferPinned);
+      if (bufferDeviceInit) host_free(bufferDevice);
       bufferDevice = device_malloc(bytes);
       bufferDeviceBytes = bytes;
       bufferDeviceInit = true;
     }
   }
 
-  void LatticeField::freeBuffer() {
-    if (bufferPinnedInit) {
-      host_free(bufferPinned);
-      bufferPinned = NULL;
-      bufferPinnedBytes = 0;
-      bufferPinnedInit = false;
+  void LatticeField::freeBuffer(const int index) {
+    if (bufferPinnedInit[index]) {
+      host_free(bufferPinned[index]);
+      bufferPinned[index] = NULL;
+      bufferPinnedBytes[index] = 0;
+      bufferPinnedInit[index] = false;
     }
     if (bufferDeviceInit) {
       device_free(bufferDevice);

@@ -267,7 +267,7 @@ int main(int argc, char **argv)
   gauge_param.ga_pad = pad_size;    
 #endif
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
