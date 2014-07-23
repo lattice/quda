@@ -24,6 +24,110 @@ namespace quda {
   MPBiCGstab::~MPBiCGstab() {
   }
 
+
+  void MPBiCGstab::computeMatrixPowers(std::vector<cudaColorSpinorField>& pr, cudaColorSpinorField& p, cudaColorSpinorField& r, int nsteps){
+    cudaColorSpinorField temp(p);
+    pr[0] = p;
+    for(int i=1; i<=nsteps; ++i){
+      mat(pr[i], pr[i-1], temp);
+    }
+
+    pr[nsteps+1] = r;
+    for(int i=nsteps+2; i<(2*nsteps+2); ++i){
+      mat(pr[i], pr[i-1], temp);
+    }
+  }
+
+  static void print(const double d[], int n){
+    for(int i=0; i<n; ++i){
+      std::cout << d[i] << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  static void print(const Complex d[], int n){
+    for(int i=0; i<n; ++i){
+      std::cout <<  "(" << real(d[i]) << "," << imag(d[i]) << ") ";
+    }
+    std::cout << std::endl;
+  }
+
+
+  template<typename T>
+    static void zero(T d[], int N){
+      for(int i=0; i<N; ++i) d[i] = static_cast<T>(0);
+    }
+
+
+  static void computeGramMatrix(Complex** G, std::vector<cudaColorSpinorField>& v){
+
+    const int dim = v.size();
+
+    for(int i=0; i<dim; ++i){
+      for(int j=0; j<dim; ++j){
+        G[i][j] = cDotProductCuda(v[i],v[j]);
+      }
+    }
+    return;
+  }
+
+  static void computeGramVector(Complex* g, cudaColorSpinorField& r0, std::vector<cudaColorSpinorField>& pr){
+
+    const int dim = pr.size();
+
+    for(int i=0; i<dim; ++i){
+      g[i] = cDotProductCuda(r0,pr[i]);
+    }
+  }
+
+  // Here, B is an (s+1)x(s+1) matrix with 1s on the subdiagonal
+  template<class T>
+    static void getBColumn(T *col, int col_index, int nsteps){
+      zero(col,nsteps+1);
+      col[col_index] = static_cast<T>(1);
+    }
+
+  template<typename T>
+    static void init_c_vector(T *c, int index, int nsteps){
+      zero(c,2*nsteps+2);
+      getBColumn(c+(nsteps+1),index,nsteps);
+    }
+
+  template<typename T>
+    static void init_a_vector(T *a, int index, int nsteps){
+      zero(a,2*nsteps+2);
+      getBColumn(a,index,nsteps);
+    }
+
+  template<typename T>
+    static void init_e_vector(T *e, int nsteps){
+      zero(e,2*nsteps+2);
+      e[2*nsteps+2] = static_cast<T>(1);
+    }
+
+
+  template<typename T>
+    static T zip(T a[], T b[], int dim){
+      T result = 0.0;
+      for(int i=0; i<dim; ++i){
+        result += a[i]*b[i];
+      }
+      return result;
+    }
+
+  static Complex computeUdaggerMV(Complex* u, Complex** M, Complex* v, int dim)
+  {
+    Complex result(0,0);
+
+    for(int i=0; i<dim; ++i){
+      for(int j=0; j<dim; ++j){
+        result += conj(u[i])*v[j]*M[i][j];
+      }
+    }
+    return result;
+  } 
+
+
   void MPBiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
@@ -40,79 +144,173 @@ namespace quda {
 
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-  
-    
-    cudaColorSpinorField x_prev(b, csParam);  
-    cudaColorSpinorField r_prev(b, csParam);
+
     cudaColorSpinorField temp(b, csParam);
 
     cudaColorSpinorField r(b);
-    cudaColorSpinorField w(b);
 
 
-    mat(r, x, temp);  // r = Mx
-    double r2 = xmyNormCuda(b,r); // r = b - Mx
-    PrintStats("MPBiCGstab", 0, r2, b2, 0.0);
+
+    mat(r, x, temp);  // r = Ax
+    double r2 = xmyNormCuda(b,r); // r = b - Ax
 
 
-    double stop = stopping(param.tol, b2, param.residual_type);
-    if(convergence(r2, 0.0, stop, 0.0)) return;
-    // First iteration 
-    mat(w, r, temp);
-    double rAr = reDotProductCuda(r,w);
-    double rho = 1.0;
-    double gamma_prev = 0.0;
-    double gamma = r2/rAr;
 
-
-    cudaColorSpinorField x_new(x);
+    cudaColorSpinorField r0(r);
+    cudaColorSpinorField p(r);
+    cudaColorSpinorField Ap(r);
+    cudaColorSpinorField s(r);  
+    cudaColorSpinorField As(r);
     cudaColorSpinorField r_new(r);
-    axpyCuda(gamma, r, x_new);  // x_new += gamma*r
-    axpyCuda(-gamma, w, r_new); // r_new -= gamma*w
-    // end of first iteration  
+    cudaColorSpinorField p_new(r);
 
-    // axpbyCuda(a,b,x,y) => y = a*x + b*y
 
-    int k = 1; // First iteration performed above
+    const int Ns = 2;
 
-    double r2_prev;
-    while(!convergence(r2, 0.0, stop, 0.0) && k<param.maxiter){
-      x_prev = x; x = x_new;
-      r_prev = r; r = r_new;
-      mat(w, r, temp);
-      rAr = reDotProductCuda(r,w);
-      r2_prev = r2;
-      r2 = norm2(r);
+    // Vector of matrix powers
+    std::vector<cudaColorSpinorField> PR(2*Ns+2,cudaColorSpinorField(b,csParam));
 
-      // Need to rearrange this!
-      PrintStats("MPBiCGstab", k, r2, b2, 0.0);
 
-      gamma_prev = gamma;
-      gamma = r2/rAr;
-      rho = 1.0/(1. - (gamma/gamma_prev)*(r2/r2_prev)*(1.0/rho));
-      
-      x_new = x;
-      axCuda(rho,x_new); 
-      axpyCuda(rho*gamma,r,x_new);
-      axpyCuda((1. - rho),x_prev,x_new);
+    Complex r0r;
+    Complex alpha;
+    Complex omega;
+    Complex beta;
 
-      r_new = r;
-      axCuda(rho,r_new);
-      axpyCuda(-rho*gamma,w,r_new);
-      axpyCuda((1.-rho),r_prev,r_new);
- 
-      k++;
+    Complex** G = new Complex*[2*Ns+2];
+    for(int i=0; i<(2*Ns+2); ++i){
+      G[i] = new Complex[2*Ns+2];   
+    }
+    Complex* g = new Complex[2*Ns+2];
+
+    Complex** a = new Complex*[2*Ns+3];
+    Complex** c = new Complex*[2*Ns+3];
+    Complex** a_new = new Complex*[2*Ns+3];
+    Complex** c_new = new Complex*[2*Ns+3];
+
+    for(int i=0; i<(2*Ns+3); ++i){
+      a[i] = new Complex[2*Ns+2];
+      c[i] = new Complex[2*Ns+2];
+      a_new[i] = new Complex[2*Ns+2];
+      c_new[i] = new Complex[2*Ns+2];
     }
 
 
-    if(k == param.maxiter)
+    Complex* e = new Complex[2*Ns+2];
+
+
+
+
+
+    double stop = stopping(param.tol, b2, param.residual_type);
+
+    int it=0;
+    PrintStats("MPBiCGstab", it, r2, b2, 0.0);
+
+    int m=0;
+    while(!convergence(r2, 0.0, stop, 0.0 ) && it<param.maxiter){
+
+      computeMatrixPowers(PR, p, r, Ns); 
+      computeGramVector(g, r0, PR); 
+      computeGramMatrix(G, PR);
+
+      // initialize coefficient vectors
+      for(int i=0; i<(2*Ns+3); ++i){
+        zero(a[i],(2*Ns+2));
+        zero(c[i],(2*Ns+2));
+        if(i < (Ns+1)){
+          init_a_vector(a[i],i,Ns);
+          init_c_vector(c[i],i,Ns); 
+        }
+      }
+      zero(e,(2*Ns+2));
+
+
+      for(int j=0; j<Ns; ++j){
+        alpha = zip(g,c[0],2*Ns+2)/zip(g,a[1],2*Ns+2);
+
+        Complex omega_num = computeUdaggerMV(c[0],G,c[1],(2*Ns+2)) 
+          - alpha*computeUdaggerMV(c[0],G,a[2],(2*Ns+2))
+          - conj(alpha)*computeUdaggerMV(a[1],G,c[1],(2*Ns+2))
+          + conj(alpha)*alpha*computeUdaggerMV(a[1],G,a[2],(2*Ns+2));
+
+        Complex omega_denom = computeUdaggerMV(c[1],G,c[1],(2*Ns+2))
+          - alpha*computeUdaggerMV(c[1],G,a[2],(2*Ns+2))
+          - conj(alpha)*computeUdaggerMV(a[2],G,c[1],(2*Ns+2))
+          + conj(alpha)*alpha*computeUdaggerMV(a[2],G,a[2],(2*Ns+2));
+
+        omega = omega_num/omega_denom;
+        // Update candidate solution
+        for(int i=0; i<(2*Ns+2); ++i){
+          e[i] += alpha*a[0][i] + omega*c[0][i] - alpha*omega*a[1][i];
+        }
+
+        // Update residual
+        for(int k=0; k<=(2*(Ns - j - 1)); ++k){
+          for(int i=0; i<(2*Ns+2); ++i){
+            c_new[k][i] = c[k][i] - alpha*a[k+1][i] - omega*c[k+1][i] + alpha*omega*a[k+2][i];
+          }
+        }
+
+        // update search direction
+        beta = (zip(g,c_new[0],(2*Ns+2))/zip(g,c[0],(2*Ns+2)))*(alpha/omega);
+
+        for(int k=0; k<=(2*(Ns - j - 1)); ++k){
+          for(int i=0; i<(2*Ns+2); ++i){
+            a_new[k][i] = c_new[k][i] + beta*a[k][i] - beta*omega*a[k+1][i];
+          }
+
+          for(int i=0; i<(2*Ns+2); ++i){
+            a[k][i] = a_new[k][i];
+            c[k][i] = c_new[k][i];
+          }
+        }
+        it++;
+        zeroCuda(r);
+        zeroCuda(p);
+        for(int i=0; i<(2*Ns+2); ++i){
+          caxpyCuda(c[0][i], PR[i], r);
+          caxpyCuda(a[0][i], PR[i], p);
+          caxpyCuda(e[i],PR[i],x);
+        }
+        r2 = norm2(r);
+        PrintStats("MPBiCGstab", it, r2, b2, 0.0);
+
+      } // j
+
+      m++;
+    } 
+
+    if(it >= param.maxiter)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residual
     mat(r, x, temp);
     param.true_res = sqrt(xmyNormCuda(b, r)/b2);
 
-    PrintSummary("MPBiCGstab", k, r2, b2);
+    PrintSummary("MPBiCGstab", it, r2, b2);
+
+
+
+    for(int i=0; i<(2*Ns+2); ++i){
+      delete[] G[i];
+    }
+    delete[] G;
+
+
+    delete[] g;
+
+    // Is 2*Ns + 3 really correct?
+    for(int i=0; i<(2*Ns+3); ++i){
+      delete[] a[i];
+      delete[] a_new[i];
+      delete[] c[i];
+      delete[] c_new[i];
+    }
+    delete[] a;
+    delete[] a_new;
+    delete[] c;
+    delete[] c_new;
+    delete[] e;
 
     return;
   }

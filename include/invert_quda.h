@@ -366,6 +366,7 @@ namespace quda {
     // pointers to fields to avoid multiple creation overhead
     cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
     bool init;
+    void computeMatrixPowers(std::vector<cudaColorSpinorField>& pr, cudaColorSpinorField& p, cudaColorSpinorField& r, int nsteps);
 
   public:
     MPBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);

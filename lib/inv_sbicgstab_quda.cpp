@@ -80,6 +80,7 @@ namespace quda {
       caxpyCuda(-alpha, Ap, s);
 
       mat(As, s, temp);
+    
       omega = cDotProductCuda(s,As)/norm2(As);
     
       // x ---> x + alpha p + omega s 
@@ -91,6 +92,7 @@ namespace quda {
     
       beta = (cDotProductCuda(r0,r_new)/r0r)*(alpha/omega);
 
+      
       // p = r_new + beta p - omega*beta Ap
       p_new = r_new;
       caxpyCuda(beta, p, p_new);

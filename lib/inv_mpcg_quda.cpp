@@ -126,7 +126,7 @@ namespace quda {
   }
 
 
-  void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v){
+  static void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v){
   
     const int dim = v.size();
   
@@ -138,7 +138,7 @@ namespace quda {
     return;
   }
 
-  void computeMuNu(double& result, const double* u, double** G, const double* v, int dim){
+  static void computeMuNu(double& result, const double* u, double** G, const double* v, int dim){
 
     result = 0.0;
 
@@ -174,7 +174,7 @@ namespace quda {
     cudaColorSpinorField x_new(x,csParam);
 
 
-    const int s = 4;
+    const int s = 10;
 
     printf("Nstep = %d\n", s);
 
