@@ -570,7 +570,6 @@ hisq_force_test(void)
 
 
 #ifdef MULTI_GPU
-  int optflag = 0;
   int R[4] = {2, 2, 2, 2};
   cpuGauge_ex->exchangeExtendedGhost(R,true);
   cudaGauge_ex->loadCPUField(*cpuGauge_ex, QUDA_CPU_FIELD_LOCATION);

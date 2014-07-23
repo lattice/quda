@@ -21,6 +21,7 @@ int zeroCopy = 0;
 
 namespace quda {
 
+  int cudaColorSpinorField::bufferIndex = 0;
   int cudaColorSpinorField::initGhostFaceBuffer = 0;
   void* cudaColorSpinorField::ghostFaceBuffer; //gpu memory
   void* cudaColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
@@ -188,6 +189,11 @@ namespace quda {
     }
 
     return false;
+  }
+
+
+  void cudaColorSpinorField::switchBufferPinned(){
+    bufferIndex = (bufferIndex^1);
   }
 
   void cudaColorSpinorField::create(const QudaFieldCreate create) {
@@ -450,14 +456,14 @@ namespace quda {
 
     if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
 	typeid(src) == typeid(cpuColorSpinorField)) {
-      resizeBufferPinned(bytes + norm_bytes);
-      memset(bufferPinned, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
+      resizeBufferPinned(bytes + norm_bytes, bufferIndex);
+      memset(bufferPinned[bufferIndex], 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
 
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION, 
-			     bufferPinned, 0, (char*)bufferPinned+bytes, 0);
+			     bufferPinned[bufferIndex], 0, (char*)bufferPinned[bufferIndex]+bytes, 0);
 
-      cudaMemcpy(v, bufferPinned, bytes, cudaMemcpyHostToDevice);
-      cudaMemcpy(norm, (char*)bufferPinned+bytes, norm_bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(v, bufferPinned[bufferIndex], bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(norm, (char*)bufferPinned[bufferIndex]+bytes, norm_bytes, cudaMemcpyHostToDevice);
     } else if (typeid(src) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else {
@@ -469,11 +475,11 @@ namespace quda {
 	cudaMemcpy(Src, src.V(), src.Bytes(), cudaMemcpyHostToDevice);
 	cudaMemcpy(srcNorm, src.Norm(), src.NormBytes(), cudaMemcpyHostToDevice);
       } else {
-	resizeBufferPinned(src.Bytes()+src.NormBytes());
-	memcpy(bufferPinned, src.V(), src.Bytes());
-	memcpy((char*)bufferPinned+src.Bytes(), src.Norm(), src.NormBytes());
+	resizeBufferPinned(src.Bytes()+src.NormBytes(), bufferIndex);
+	memcpy(bufferPinned[bufferIndex], src.V(), src.Bytes());
+	memcpy((char*)bufferPinned[bufferIndex]+src.Bytes(), src.Norm(), src.NormBytes());
 
-	cudaHostGetDevicePointer(&Src, bufferPinned, 0);
+	cudaHostGetDevicePointer(&Src, bufferPinned[bufferIndex], 0);
 	srcNorm = (void*)((char*)Src + src.Bytes());
       }
 
@@ -490,12 +496,12 @@ namespace quda {
 
     if (REORDER_LOCATION == QUDA_CPU_FIELD_LOCATION && 
 	typeid(dest) == typeid(cpuColorSpinorField)) {
-      resizeBufferPinned(bytes+norm_bytes);
-      cudaMemcpy(bufferPinned, v, bytes, cudaMemcpyDeviceToHost);
-      cudaMemcpy((char*)bufferPinned+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      resizeBufferPinned(bytes+norm_bytes, bufferIndex);
+      cudaMemcpy(bufferPinned[bufferIndex], v, bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy((char*)bufferPinned[bufferIndex]+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
 
       copyGenericColorSpinor(dest, *this, QUDA_CPU_FIELD_LOCATION, 
-			     0, bufferPinned, 0, (char*)bufferPinned+bytes);
+			     0, bufferPinned[bufferIndex], 0, (char*)bufferPinned[bufferIndex]+bytes);
     } else if (typeid(dest) == typeid(cudaColorSpinorField)) {
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION);
     } else {
@@ -505,8 +511,8 @@ namespace quda {
 	dst = bufferDevice;
 	dstNorm = (char*)bufferDevice+dest.Bytes();
       } else {
-	resizeBufferPinned(dest.Bytes()+dest.NormBytes());
-	cudaHostGetDevicePointer(&dst, bufferPinned, 0);
+	resizeBufferPinned(dest.Bytes()+dest.NormBytes(), bufferIndex);
+	cudaHostGetDevicePointer(&dst, bufferPinned[bufferIndex], 0);
 	dstNorm = (char*)dst+dest.Bytes();
       }
       copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, v, dstNorm, 0);
@@ -515,8 +521,8 @@ namespace quda {
 	cudaMemcpy(dest.V(), dst, dest.Bytes(), cudaMemcpyDeviceToHost);
 	cudaMemcpy(dest.Norm(), dstNorm, dest.NormBytes(), cudaMemcpyDeviceToHost);
       } else {
-	memcpy(dest.V(), bufferPinned, dest.Bytes());
-	memcpy(dest.Norm(), (char*)bufferPinned+dest.Bytes(), dest.NormBytes());
+	memcpy(dest.V(), bufferPinned[bufferIndex], dest.Bytes());
+	memcpy(dest.Norm(), (char*)bufferPinned[bufferIndex]+dest.Bytes(), dest.NormBytes());
       }
     }
 
@@ -860,10 +866,10 @@ namespace quda {
       }
       
       // use static pinned memory for face buffers
-      resizeBufferPinned(2*faceBytes); // oversizes for GPU_COMMS case
+      resizeBufferPinned(2*faceBytes, bufferIndex); // oversizes for GPU_COMMS case
 
-      my_face = bufferPinned;
-      from_face = static_cast<char*>(bufferPinned) + faceBytes;
+      my_face = bufferPinned[bufferIndex];
+      from_face = static_cast<char*>(bufferPinned[bufferIndex]) + faceBytes;
 
       // assign pointers for each face - it's ok to alias for different Nface parameters
 #ifndef GPU_COMMS

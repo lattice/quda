@@ -87,16 +87,18 @@ namespace quda {
     QudaSiteSubset siteSubset;
 
     /** Pinned-memory buffer that is used by all derived classes */
-    static void *bufferPinned; 
+    static void *bufferPinned[2]; 
 
     /** Whether the pinned-memory buffer has already been initialized or not */
-    static bool bufferPinnedInit;
+    static bool bufferPinnedInit[2];
 
     /** The size in bytes of pinned-memory buffer */
-    static size_t bufferPinnedBytes;
+    static size_t bufferPinnedBytes[2];
+
+    static int bufferIndex;
 
     /** Resize the pinned-memory buffer */
-    void resizeBufferPinned(size_t bytes) const;
+    void resizeBufferPinned(size_t bytes, const int index=0) const;
 
     /** Device-memory buffer that is used by all derived classes */
     static void *bufferDevice; 
@@ -148,7 +150,7 @@ namespace quda {
     virtual ~LatticeField();
 
     /** Free the pinned-memory buffer */
-    static void freeBuffer();
+    static void freeBuffer(const int index=0);
 
     int Ndim() const { return nDim; }
     const int* X() const { return x; }

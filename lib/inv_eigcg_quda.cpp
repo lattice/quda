@@ -191,8 +191,9 @@ namespace quda {
     initCGparam.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
   }
 
-  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCG(0), initCGparam(param), eigcg_alloc(false)
+  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matCGSloppy(matCGSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), 
+    Vm(0), initCGparam(param), profile(profile), eigcg_alloc(false)
   {
     if((param.rhs_idx < param.deflation_grid) || (param.inv_type == QUDA_EIGCG_INVERTER))
     {
@@ -212,24 +213,6 @@ namespace quda {
     {
        fillInitCGSolveParam(initCGparam);
        //
-       if(param.tol_restart < param.tol)//restart was not requested, do normal initCG
-       {
-          initCGrestart = 0;
-          initCG        = new CG(mat, matSloppy, initCGparam, profile);
-       //  
-       }
-       else
-       {
-////
-          initCGparam.tol = param.tol_restart;
-
-          initCGrestart = new CG(mat, matSloppy, initCGparam, profile);
-
-          initCGparam.tol = param.tol;
-
-          initCG = new CG(mat, matSloppy, initCGparam, profile);
-       }
-
        use_eigcg = false;
        //
        printfQuda("\nIncEigCG will deploy initCG solver.\n");
@@ -241,20 +224,19 @@ namespace quda {
   IncEigCG::~IncEigCG() {
 
     if(eigcg_alloc)   delete Vm;
-    if(initCG)        delete initCG;
-    if(initCGrestart) delete initCGrestart;
-    return;
+
   }
 
   void IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
-    if (param.precision_sloppy == x.Precision()) errorQuda("\nMixedprecision is not supported for the eigCG.\n");
+    if (eigcg_precision != x.Precision()) errorQuda("\nInput/output field precision is incorrect (solver precision: %u spinor precision: %u).\n", eigcg_precision, x.Precision());
 
     profile.Start(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
+
     if(b2 == 0){
       profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
@@ -270,14 +252,20 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b, csParam);
 
-    mat(r, x, y);
-    double r2 = xmyNormCuda(b, r);//compute residual
+    //mat(r, x, y);
+    //double r2 = xmyNormCuda(b, r);//compute residual
   
-    csParam.setPrecision(param.precision_sloppy);
+    csParam.setPrecision(eigcg_precision);
+
     cudaColorSpinorField Ap(x, csParam);
+
     cudaColorSpinorField tmp(x, csParam);
 
     cudaColorSpinorField *tmp2_p = &tmp;
+
+    //matSloppy(r, x, tmp, tmp2);
+    //double r2 = xmyNormCuda(b, r);//compute residual
+
     // tmp only needed for multi-gpu Wilson-like kernels
     if (mat.Type() != typeid(DiracStaggeredPC).name() && 
 	mat.Type() != typeid(DiracStaggered).name()) {
@@ -285,27 +273,12 @@ namespace quda {
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
-    cudaColorSpinorField *x_sloppy, *r_sloppy;
-    if (param.precision_sloppy == x.Precision()) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      x_sloppy = &x;
-      r_sloppy = &r;
-    } else {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = new cudaColorSpinorField(x, csParam);
-      r_sloppy = new cudaColorSpinorField(r, csParam);
-    }
+    matSloppy(r, x, tmp, tmp2);
+    double r2 = xmyNormCuda(b, r);//compute residual
 
-    cudaColorSpinorField &xSloppy = *x_sloppy;
-    cudaColorSpinorField &rSloppy = *r_sloppy;
-    cudaColorSpinorField p(rSloppy);
+    cudaColorSpinorField p(r);
 
-    if(&x != &xSloppy){
-      copyCuda(y,x);
-      zeroCuda(xSloppy);
-    }else{
-      zeroCuda(y);
-    }
+    zeroCuda(y);
     
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -323,20 +296,8 @@ namespace quda {
     double alpha=1.0, beta=0.0;
  
     double pAp;
-    int rUpdate = 0;
 
     int eigvRestart = 0;
-
-    double rNorm = sqrt(r2);
-    double r0Norm = rNorm;
-    double maxrx = rNorm;
-    double maxrr = rNorm;
-    double delta = param.delta;
-
-    // this parameter determines how many consective reliable update
-    // reisudal increases we tolerate before terminating the solver,
-    // i.e., how long do we want to keep trying to converge
-    int maxResIncrease = 0; // 0 means we have no tolerance 
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
@@ -377,48 +338,28 @@ namespace quda {
     
     PrintStats("EigCG", k, r2, b2, heavy_quark_res);
 
-    int steps_since_reliable = 1;
-    bool relup_flag = false;
     double sigma = 0.0;
 
-
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
-	    k < param.maxiter) {
-
-      double scale = 1.0;
+    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
       if(k > 0)
       {
         beta0 = beta;
 
-        if(!relup_flag)
-        {
-           beta = sigma / r2_old;
-           axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
-	   if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	     copyCuda(tmp,y);
-	     heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
-	   }
-	   steps_since_reliable++;
-        }
-       else
-       {//after reliable update:
-           beta = r2 / r2_old;
-	   // explicitly restore the orthogonality of the gradient vector
-	   double rp = reDotProductCuda(rSloppy, p) / (r2);
-	   axpyCuda(-rp, rSloppy, p);
-	   xpayCuda(rSloppy, beta, p);
-           scale /= (1.0-rp*beta);
-           relup_flag = (l == param.m) ? relup_flag : false;
-        }
+        beta = sigma / r2_old;
+        axpyZpbxCuda(alpha, p, x, r, beta);
 
+        if (use_heavy_quark_res && k%heavy_quark_check==0) { 
+	     heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);//note:y is a zero array here.
+        }
       }
 
       //save previous mat-vec result 
       if (l == param.m) copyCuda(Ap0, Ap);
 
-      matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
-  
+      //mat(Ap, p, tmp, tmp2); // tmp as tmp
+      matSloppy(Ap, p, tmp, tmp2);  
+
       //construct the Lanczos matrix:
       if(l > 0){
         eigcg_args->LoadLanczosDiag(l-1, alpha, alpha0, beta0);
@@ -438,28 +379,26 @@ namespace quda {
 
          //Compute Ap0 = Ap - beta*Ap0:
          xpayCuda(Ap, -beta, Ap0);//mind precision...
-
-         if(relup_flag){
-           axCuda(scale, Ap0);
-           relup_flag = false;
-         }
            
          copyCuda(*v0, Ap0);//convert arrays here:
          eigcg_args->FillLanczosOffDiag(_2nev, v0, Vm, 1.0 / sqrt(r2));
 
          eigvRestart++;
          l = _2nev;
+
       } else{ //no-RR branch:
+
          if(l > 0){
             eigcg_args->LoadLanczosOffDiag(l-1, alpha, beta);
          }
       }
 
       //construct Lanczos basis:
-      copyCuda(Vm->Eigenvec(l), *r_sloppy);//convert arrays
+      copyCuda(Vm->Eigenvec(l), r);//convert arrays
+
       //rescale the vector
-      scale = 1.0 / sqrt(r2);
-      axCuda(scale, Vm->Eigenvec(l));
+      axCuda(1.0 / sqrt(r2), Vm->Eigenvec(l));
+
       //update search space index
       l += 1;
 
@@ -473,53 +412,9 @@ namespace quda {
       // here we are deploying the alternative beta computation 
 
       r2_old = r2;
-      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r);
       r2 = real(cg_norm); // (r_new, r_new)
       sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
-      // reliable update conditions
-      rNorm = sqrt(r2);
-      if (rNorm > maxrx) maxrx = rNorm;
-      if (rNorm > maxrr) maxrr = rNorm;
-      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-    
-      // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
-
-      if (updateR || updateX) 
-      {
-	axpyCuda(alpha, p, xSloppy);
-	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
-      
-	xpyCuda(x, y); // swap these around?
-	mat(r, y, x); // here we can use x as tmp
-	r2 = xmyNormCuda(b, r);
-
-	if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
-	zeroCuda(xSloppy);
-
-	// break-out check if we have reached the limit of the precision
-	static int resIncrease = 0;
-	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
-	  warningQuda("EigCG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
-	  k++;
-	  rUpdate++;
-	  if (++resIncrease > maxResIncrease) break; 
-	} else {
-	  resIncrease = 0;
-	}
-
-	rNorm = sqrt(r2);
-	maxrr = rNorm;
-	maxrx = rNorm;
-	r0Norm = rNorm;      
-	rUpdate++;
-
-	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
-        
-        relup_flag = true;	
-	steps_since_reliable = 0;
-      }//end of the reliable update
 
       k++;
 
@@ -529,14 +424,11 @@ namespace quda {
 //Free eigcg resources:
     delete eigcg_args;
 
-    if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
-    xpyCuda(y, x);
-
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (quda::blas_flops + mat.flops())*1e-9;
     reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
@@ -545,12 +437,13 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE){
-      printfQuda("EigCG: Reliable updates = %d\n", rUpdate);
       printfQuda("EigCG: Eigenspace restarts = %d\n", eigvRestart);
     }
 
     // compute the true residuals
-    mat(r, x, y);
+    //mat(r, x, y);
+    matSloppy(r, x, tmp, tmp2);
+
     param.true_res = sqrt(xmyNormCuda(b, r) / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
     param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
@@ -562,17 +455,12 @@ namespace quda {
     // reset the flops counters
     quda::blas_flops = 0;
     mat.flops();
-    matSloppy.flops();
 
     profile.Stop(QUDA_PROFILE_EPILOGUE);
     profile.Start(QUDA_PROFILE_FREE);
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
-    if (param.precision_sloppy != x.Precision()) {
-      delete r_sloppy;
-      delete x_sloppy;
-    }
 //Clean EigCG resources:
     delete v0;
 
@@ -590,7 +478,9 @@ namespace quda {
 
     if(eigcgSpinor.SiteSubset() != QUDA_PARITY_SITE_SUBSET) errorQuda("\nRitz spinors must be parity spinors\n");//or adjust it
 
-    dpar = new DeflationParam(param, eigcgSpinor.Volume());
+    ColorSpinorParam cudaEigvParam(eigcgSpinor);
+
+    dpar = new DeflationParam(cudaEigvParam, param);
 
     printfQuda("\n...done.\n");
 
@@ -619,316 +509,104 @@ namespace quda {
      
      printfQuda("\nConstruct projection matrix..\n");
 
-     int added_vecs = 0;
+     int addednev = 0;
 
-     int new_nevs = newnevs;
-
-     if((new_nevs + dpar->cur_dim) > dpar->tot_dim)
-     {
-       warningQuda("\nTrying to add too big number of Ritz vectors.\n"); //nothing to do...
-       new_nevs = dpar->tot_dim - dpar->cur_dim; 
-     }
+     if((newnevs + dpar->cur_dim) > dpar->ld) errorQuda("\nIncorrect deflation space...\n"); //nothing to do...
 
      //GS orthogonalization
+
      Complex alpha;
 
-     //alias pointers:
-     cpuColorSpinorField *tmpj = 0;
-     cpuColorSpinorField *tmpi = 0;
-
-     int l = 0;
-
-     ColorSpinorParam cpuParam(Vm->Eigenvec(0));
-     cpuParam.pad       =   0;   //no pad is allowed
-     cpuParam.eigv_dim  =   0;
-     cpuParam.eigv_id   =  -1;
-
-     cpuParam.create     = QUDA_REFERENCE_FIELD_CREATE;
-     cpuParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-     cpuParam.precision  = dpar->ritz_prec;
-
-     for(int i = dpar->cur_dim; i < (dpar->cur_dim + new_nevs); i++)
+     for(int i = dpar->cur_dim; i < (dpar->cur_dim + newnevs); i++)
      {
-       size_t offseti = i*dpar->ritz_bytes;
-       void   *hptri  = (void*)((char*)dpar->cpuRitzVectors+offseti); 
-       cpuParam.v  = hptri;
-
-       tmpi        = new cpuColorSpinorField(cpuParam);
-
-       *tmpi       = Vm->Eigenvec(l);//copy gpu field
-
        for(int j = 0; j < i; j++)
        {
-         size_t offsetj    = j*dpar->ritz_bytes;
-         void   *hptrj     = (void*)((char*)dpar->cpuRitzVectors+offsetj); 
-         cpuParam.v        = hptrj; 
-
-         tmpj = new cpuColorSpinorField(cpuParam);
-
-         alpha = cDotProductCpu(*tmpj, *tmpi);//<j,i>
-         caxpyCpu(-alpha, *tmpj, *tmpi); //i-<j,i>j
-
-         delete tmpj;
-         tmpj = 0;
+         alpha = cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(j), dpar->cudaRitzVectors->Eigenvec(i));//<j,i>
+         Complex scale = Complex(-alpha.real(), -alpha.imag());
+         caxpyCuda(scale, dpar->cudaRitzVectors->Eigenvec(j), dpar->cudaRitzVectors->Eigenvec(i)); //i-<j,i>j
        }
          
-       alpha = norm2(*tmpi);
-
-       const double norm2_tol = dpar->ritz_prec == sizeof(double) ? 1e-22 : 1e-16;
-
-       if(alpha.real() > norm2_tol)
+       alpha = norm2(dpar->cudaRitzVectors->Eigenvec(i));
+       if(alpha.real() > 1e-16)
        {
-         axCpu(1.0 /sqrt(alpha.real()), *tmpi);  
-         added_vecs += 1;
+          axCuda(1.0 /sqrt(alpha.real()), dpar->cudaRitzVectors->Eigenvec(i));  
+          addednev += 1;
        }
        else
        {
           errorQuda("\nCannot orthogonalize %dth vector\n", i);
        }
+     }
 
-       Vm->Eigenvec(l) = *tmpi;//use Vm as GPU buffer for futher manipulations...
-    
-       delete tmpi;
-       tmpi = 0;
+     ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
+     csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-       l+=1;
-    }
+     csParam.eigv_dim  = 0;
+     csParam.eigv_id   = -1;
 
-    //Create temporary fileds:
+     cudaColorSpinorField *W   = new cudaColorSpinorField(csParam); 
+     cudaColorSpinorField *W2  = new cudaColorSpinorField(csParam);
 
-    ColorSpinorParam cudaParam(Vm->Eigenvec(0));
-    cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+     cudaColorSpinorField tmp (*W, csParam);
 
-    cudaParam.eigv_dim  = 0;
-    cudaParam.eigv_id   = -1;
-
-    cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam); 
-
-    cudaColorSpinorField tmp (*W, cudaParam);
-
-    l = 0;
-
-    void *buff = malloc(dpar->ritz_bytes); 
-
-    cpuParam.v = buff;
-
-    tmpj = new cpuColorSpinorField(cpuParam);
-  
-    for (int j = dpar->cur_dim; j < (dpar->cur_dim+added_vecs); j++)//
-    {
-
-       matDefl(*W, Vm->Eigenvec(l), tmp);
-
-       *tmpj = *W;
+     for (int j = dpar->cur_dim; j < (dpar->cur_dim+addednev); j++)//
+     {
+       matDefl(*W, dpar->cudaRitzVectors->Eigenvec(j), tmp);
 
        //off-diagonal:
        for (int i = 0; i < j; i++)//row id
        {
-          size_t offseti = i*dpar->ritz_bytes;
-          void *hptri    = (void*)((char*)dpar->cpuRitzVectors+offseti); 
-
-          cpuParam.v = hptri;
-
-          tmpi = new cpuColorSpinorField(cpuParam);
-
-          alpha  =  cDotProductCpu(*tmpi, *tmpj);
+          alpha  =  cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(i), *W);
           //
           dpar->proj_matrix[j*dpar->ld+i] = alpha;
           dpar->proj_matrix[i*dpar->ld+j] = conj(alpha);//conj
-
-          delete tmpi;
-          tmpi = 0;
        }
 
        //diagonal:
-       alpha  =  cDotProductCuda(Vm->Eigenvec(l), *W);
+       alpha  =  cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(j), *W);
        //
        dpar->proj_matrix[j*dpar->ld+j] = alpha;
+     }
 
-       l += 1;
-    }
+     dpar->ResetDeflationCurrentDim(addednev);
 
-    dpar->ResetDeflationCurrentDim(added_vecs);
+     printfQuda("\n.. done.\n");
 
-    printfQuda("\n.. done.\n");
+     delete W;
+     delete W2;
 
-    free(buff);
-    delete W;
-
-    return;
-  }
-
-  void IncEigCG::RelocateRitzVectors(cudaColorSpinorField &spinor, DeflationParam *dpar)
-  {
-    //clean eigcg CUDA resources
-    if(eigcg_alloc)
-    {
-      delete Vm;
-      Vm          = 0;
-      eigcg_alloc = false;
-    }
-
-    //allocate Ritz vectors on gpu:
-    size_t free_bytes, total_bytes;
-
-    cudaMemGetInfo(&free_bytes, &total_bytes);
-
-    printfQuda("\nFree GPU memory: %lu bytes (of total %lu bytes)\n", free_bytes, total_bytes);
-
-    //ok, must take into account initCG resources, just estimate...
-    size_t init_cg_bytes  = dpar->ritz_bytes*10;
-
-    free_bytes -= init_cg_bytes;   
-
-    if (free_bytes < param.m*dpar->ritz_bytes) //this won't happen, though
-    {
-       warningQuda("\nWarning : not enough memory on the device, continue using host resources\n");
-       return;
-    }
-
-    const int max_cuda_ritz_num = free_bytes /  dpar->ritz_bytes;
-
-    dpar->cuda_ritz_dim = max_cuda_ritz_num > dpar->cpu_ritz_dim ? dpar->cpu_ritz_dim : max_cuda_ritz_num;
-
-    printfQuda("\nAllocating %d cuda Ritz vectors\n", dpar->cuda_ritz_dim);
-
-    //allocate Ritz vectors on the device:
-    ColorSpinorParam eigvParam(spinor);
-
-    dpar->AllocateRitzCuda(eigvParam);
-
-    //exctract host eigenvectors:
-    eigvParam.pad      =   0;//now pad is allowed
-    eigvParam.eigv_dim =   0;    
-    eigvParam.eigv_id  =  -1;
-    eigvParam.create     = QUDA_REFERENCE_FIELD_CREATE;
-    eigvParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    eigvParam.precision  = dpar->ritz_prec;
-
-    cpuColorSpinorField *tmp = 0;
-  
-    //naive:
-    for(int i = 0; i < dpar->cuda_ritz_dim; i++)
-    {
-       size_t offset    = i*dpar->ritz_bytes;
-
-       void *hptr       = (void*)((char*)dpar->cpuRitzVectors+offset); 
-
-       eigvParam.v      = hptr;
-
-       tmp = new cpuColorSpinorField(eigvParam);
-
-       dpar->cudaRitzVectors->Eigenvec(i) = *tmp;
-      
-       delete tmp;
-       tmp = 0;  
-    }
-
-    //update host projection matrix.
-    //...not in the current implementation
-
-    //delete host ritz vectors:
-    dpar->CleanHostRitzVectors(); //this should be optional.
-
-    return;
+     return;
   }
 
 
-  void IncEigCG::DeflateSpinor(cudaColorSpinorField &x, cudaColorSpinorField &b, DeflationParam *dpar)
+  void IncEigCG::DeflateSpinor(cudaColorSpinorField &x, cudaColorSpinorField &b, DeflationParam *dpar, bool set2zero)
   {
-    zeroCuda(x);
+    if(set2zero) zeroCuda(x);
+    if(dpar->cur_dim == 0) return;//nothing to do
 
-    if(defl_param == 0) errorQuda("\nError: no deflation matrix is available\n");//for now report this as an error.
-    //
-    if(defl_param->cur_dim == 0) return;//nothing to do
-
-    BlasMagmaArgs *magma_args = new BlasMagmaArgs(sizeof(double));
+    BlasMagmaArgs *magma_args = new BlasMagmaArgs(sizeof(double));//change precision..
 
     Complex  *vec   = new Complex[dpar->ld];
 
-    if(dpar->cuda_ritz_alloc && !use_eigcg) //currently for initCG phase only.
+    double check_nrm2 = norm2(b);
+    printfQuda("\nSource norm (gpu): %1.15e\n", sqrt(check_nrm2));
+
+
+    for(int i = 0; i < dpar->cur_dim; i++)
     {
-      for(int i = 0; i < dpar->cuda_ritz_dim; i++)  vec[i] = cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(i), b);
+      vec[i] = cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(i), b);//<i, b>
+    }    
 
-      magma_args->SolveProjMatrix((void*)vec, dpar->ld,  dpar->cur_dim, (void*)dpar->proj_matrix, dpar->ld);
+    magma_args->SolveProjMatrix((void*)vec, dpar->ld,  dpar->cur_dim, (void*)dpar->proj_matrix, dpar->ld);
 
-      for(int i = 0; i < dpar->cuda_ritz_dim; i++)  caxpyCuda(vec[i], dpar->cudaRitzVectors->Eigenvec(i), x); //a*i+x
-    }
-    else if(dpar->cpu_ritz_alloc && (dpar->cpu_ritz_dim >= dpar->cur_dim))
+    for(int i = 0; i < dpar->cur_dim; i++)
     {
-      void *hbuff1   = malloc(dpar->ritz_bytes);
-      void *hbuff2   = malloc(dpar->ritz_bytes);
-
-      memset(hbuff1, 0, dpar->ritz_bytes);
-      memset(hbuff2, 0, dpar->ritz_bytes);
-
-      ColorSpinorParam eigvParam(b); //Eigenvector set is always a parity spinor
-
-      eigvParam.pad      =   0;    
-      eigvParam.eigv_dim =   0;    
-      eigvParam.eigv_id  =  -1; 
-
-      eigvParam.create     = QUDA_REFERENCE_FIELD_CREATE;
-      eigvParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-      eigvParam.precision  = dpar->ritz_prec;
-
-      eigvParam.v             = hbuff1;
-      cpuColorSpinorField *hb = new cpuColorSpinorField(eigvParam);
-      *hb = b;//copy gpu spinor
-
-      eigvParam.v             = hbuff2;
-      cpuColorSpinorField *hx = new cpuColorSpinorField(eigvParam);
-
-      //alias pointer:
-      cpuColorSpinorField *tmp = 0;
-
-      for(int i = 0; i < dpar->cur_dim; i++)
-      {
-        size_t offset    = i*dpar->ritz_bytes;
-        void *hptr       = (void*)((char*)dpar->cpuRitzVectors+offset); 
-
-        eigvParam.v      = hptr;
-
-        tmp = new cpuColorSpinorField(eigvParam); 
-     
-        vec[i] = cDotProductCpu(*tmp, *hb);//<i, b>
-     
-        delete tmp;
-        tmp = 0;
-      }    
-
-      //lapackF77_zgesv(curnev, H, ldH, (void*)vec);
-      magma_args->SolveProjMatrix((void*)vec, dpar->ld,  dpar->cur_dim, (void*)dpar->proj_matrix, dpar->ld);
-
-      for(int i = 0; i < dpar->cur_dim; i++)
-      {
-        size_t offset    = i*dpar->ritz_bytes;
-        void *hptr       = (void*)((char*)dpar->cpuRitzVectors+offset); 
-
-        eigvParam.v      = hptr;
-
-        tmp = new cpuColorSpinorField(eigvParam); 
-
-        caxpyCpu(vec[i], *tmp, *hx); //a*i+x
-
-        delete tmp;
-        tmp = 0;
-      }
-      //copy back to device:
-      x = *hx;
-
-      delete hb;
-      delete hx;
-
-      free(hbuff1);
-      free(hbuff2);
-    }
-    else //gpu version
-    {
-      errorQuda("\nError: cannot find Ritz vectors needed for the projection.\n");
+      caxpyCuda(vec[i], dpar->cudaRitzVectors->Eigenvec(i), x); //a*i+x
     }
 
-    printfQuda("\nDone...\n");
+    check_nrm2 = norm2(x);
+    printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
+
 
     delete magma_args;
 
@@ -937,20 +615,18 @@ namespace quda {
     return;
   }
 
-  //copy EigCG ritz vectors.
-  void IncEigCG::SaveRitzVecs(cudaColorSpinorField *out, const int nevs, bool cleanEigCGResources)
+//!!!!
+//copy EigCG ritz vectors.
+  void IncEigCG::SaveEigCGRitzVecs(DeflationParam *dpar, bool cleanEigCGResources)
   {
-     if(out->EigvDim() < nevs) errorQuda("\nNot enough space to copy %d eigenvectors..\n", nevs); 
+     const int first_idx = dpar->cur_dim; 
 
-     if(!eigcg_alloc) 
-     {
-       warningQuda("\nEigCG resources were cleaned.\n"); 
-       return;
-     } 
+     if(dpar->cudaRitzVectors->EigvDim() < (first_idx+param.nev)) errorQuda("\nNot enough space to copy %d vectors..\n", param.nev); 
 
+     else if(!eigcg_alloc || !dpar->cuda_ritz_alloc) errorQuda("\nEigCG resources were cleaned.\n"); 
 
-     for(int i = 0; i < nevs; i++) copyCuda(out->Eigenvec(i), Vm->Eigenvec(i));
-
+     for(int i = 0; i < param.nev; i++) copyCuda(dpar->cudaRitzVectors->Eigenvec(first_idx+i), Vm->Eigenvec(i));
+     
      if(cleanEigCGResources)
      {
        delete Vm;
@@ -982,9 +658,6 @@ namespace quda {
     return;
   } 
 
-
-  static bool first_time_initcg = true; 
-
   void IncEigCG::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) 
   {
      if(defl_param == 0) CreateDeflationSpace(*in, defl_param);
@@ -992,51 +665,163 @@ namespace quda {
      //if this operator applied during the first stage of the incremental eigCG (to construct deflation space):
      //then: call eigCG inverter 
      if(use_eigcg){
+
+        const bool use_mixed_prec = (eigcg_precision != param.precision); 
+
         //deflate initial guess:
         DeflateSpinor(*out, *in, defl_param);
 
-        //compute current nev Ritz vectors:
-        EigCG(*out, *in);        
+        cudaColorSpinorField *outSloppy = 0;
+        cudaColorSpinorField *inSloppy  = 0;
+
+        double ext_tol = param.tol;
+
+        if(use_mixed_prec)
+        {
+           ColorSpinorParam cudaParam(*out);
+           //
+           cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+           //
+           cudaParam.setPrecision(eigcg_precision);
+
+           outSloppy = new cudaColorSpinorField(cudaParam);
+           inSloppy  = new cudaColorSpinorField(cudaParam);
+
+           copyCuda(*inSloppy, *in);//input is outer residual
+           copyCuda(*outSloppy, *out);
+
+           param.tol = 1e-7;//single precision eigcg tolerance
+        }
+        else//full precision solver:
+        {
+           outSloppy = out;
+           inSloppy  = in;
+        }
+
+        EigCG(*outSloppy, *inSloppy);
+
+        if(use_mixed_prec)
+        {
+           double b2   = norm2(*in);
+           double stop = b2*ext_tol*ext_tol;
+      
+           param.tol   = 5e-3;//initcg sloppy precision tolerance
+
+           cudaColorSpinorField y(*in);//full precision accumulator
+           cudaColorSpinorField r(*in);//full precision residual
+
+           Solver *initCG = 0;
+
+           initCGparam.tol       = param.tol;
+           initCGparam.precision = eigcg_precision;//the same as eigcg
+           //
+           initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
+           initCGparam.use_sloppy_partial_accumulator=false;   //more stable single-half solver
+     
+           //no reliable updates?
+
+           initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
+
+           //
+           copyCuda(*out, *outSloppy);
+           //
+           mat(r, *out, y); // here we can use y as tmp
+           //
+           double r2 = xmyNormCuda(*in, r);//new residual (and RHS)
+          
+           while(r2 > stop)
+           {
+              zeroCuda(y);//deflate initial guess:
+              //
+              DeflateSpinor(y, r, defl_param);
+              //
+              copyCuda(*inSloppy, r);
+              //
+              copyCuda(*outSloppy, y);
+              // 
+              (*initCG)(*outSloppy, *inSloppy);
+
+              copyCuda(y, *outSloppy);
+              //
+              xpyCuda(y, *out); //accumulate solution
+              //
+              mat(r, *out, y);  //here we can use y as tmp
+              //
+              r2 = xmyNormCuda(*in, r);//new residual (and RHS)
+           }
+
+           //clean objects:
+           //
+           delete initCG;
+           //
+           delete outSloppy;
+           //
+           delete inSloppy;
+        }
+
+	//store computed Ritz vectors:
+        SaveEigCGRitzVecs(defl_param);
 
         //Construct(extend) projection matrix:
         ExpandDeflationSpace(defl_param, param.nev);
-     }
-     //second stage here: param.rhs_idx >= param.deflation_grid 
-     else{
 
-        if(first_time_initcg)
-        {
-          RelocateRitzVectors(*out, defl_param);
-          first_time_initcg = false;
-        }
+        //copy solver statistics:
+        param.iter   += initCGparam.iter;
+        //
+        param.secs   += initCGparam.secs;
+        //
+        param.gflops += initCGparam.gflops;
+
+     }
+     //else: use deflated CG solver with proper restarting. 
+     else{
+        double full_tol    = initCGparam.tol;
+
+        double restart_tol = initCGparam.tol_restart;
+
+        ColorSpinorParam cudaParam(*out);
+
+        cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+
+        cudaParam.eigv_dim  = 0;
+
+        cudaParam.eigv_id   = -1;
+
+        cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam);
+
+        cudaColorSpinorField tmp (*W, cudaParam);
+
+        Solver *initCG = 0;
 
         DeflateSpinor(*out, *in, defl_param);
 
         //launch initCG:
-        if(initCG)
-          (*initCG)(*out, *in);
-        else //think about this!
+        while(restart_tol > full_tol)//currently just one restart, think about better algorithm for the restarts. 
         {
-          ColorSpinorParam cudaParam(*out);
-          cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+          initCGparam.tol = restart_tol; 
 
-          cudaParam.eigv_dim  = 0;
-          cudaParam.eigv_id   = -1;
+          initCG = new CG(mat, matCGSloppy, initCGparam, profile);
 
-          cudaColorSpinorField *W   = new cudaColorSpinorField(cudaParam); 
-          cudaColorSpinorField tmp (*W, cudaParam);
+          (*initCG)(*out, *in);           
 
-          (*initCGrestart)(*out, *in);           
+          delete initCG;
 
           matDefl(*W, *out, tmp);
 
           xpayCuda(*in, -1, *W); 
 
-          DeflateSpinor(*out, *W, defl_param);
+          DeflateSpinor(*out, *W, defl_param, false);
 
-          (*initCG)(*out, *in);
-          delete W;                     
-        } 
+          restart_tol = full_tol;//one restart.                              
+        }
+
+        initCGparam.tol = full_tol; 
+
+        initCG = new CG(mat, matCGSloppy, initCGparam, profile);
+
+        (*initCG)(*out, *in);           
+
+        delete initCG;
 
         //copy solver statistics:
         param.iter   = initCGparam.iter;
@@ -1044,7 +829,25 @@ namespace quda {
         param.secs   = initCGparam.secs;
         //
         param.gflops = initCGparam.gflops;
+
+        delete W;
      } 
+
+     //compute true residual: 
+     ColorSpinorParam cudaParam(*out);
+     //
+     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+     //
+     cudaColorSpinorField   *final_r = new cudaColorSpinorField(cudaParam);
+     cudaColorSpinorField   *tmp2    = new cudaColorSpinorField(cudaParam);
+           
+     
+     mat(*final_r, *out, *tmp2);
+    
+     param.true_res = sqrt(xmyNormCuda(*in, *final_r) / norm2(*in));
+    
+     delete final_r;
+     delete tmp2;
 
      param.rhs_idx += 1;
 

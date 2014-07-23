@@ -89,14 +89,30 @@ namespace quda {
   };
 
   template <typename Float>
+    __device__ __host__ inline Float timeBoundary(int idx, const int X[QUDA_MAX_DIM], QudaTboundary tBoundary,
+						  bool isFirstTimeSlice, bool isLastTimeSlice) {
+    if ( idx >= X[3]*X[2]*X[1]*X[0]/2 ) { // halo region on the first time slice
+      return isFirstTimeSlice ? tBoundary : 1.0;
+    } else if ( idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ) { // last link on the last time slice
+      return isLastTimeSlice ? tBoundary : 1.0;
+    } else {
+      return 1.0;
+    }
+  }
+
+  template <typename Float>
     struct Reconstruct<12,Float> {
     typedef typename mapper<Float>::type RegType;
     int X[QUDA_MAX_DIM];
     const RegType anisotropy;
     const QudaTboundary tBoundary;
+    bool isFirstTimeSlice;
+    bool isLastTimeSlice;
 
-  Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary())
-      {	for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
+  Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
+      isFirstTimeSlice(comm_coord(3) == 0 ?true : false),
+      isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false) 
+	{ for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
 
     __device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
       for (int i=0; i<12; i++) out[i] = in[i];
@@ -112,13 +128,9 @@ namespace quda {
       accumulateConjugateProduct(&out[14], &out[0], &out[10], -1);
       accumulateConjugateProduct(&out[16], &out[0], &out[8], +1);
       accumulateConjugateProduct(&out[16], &out[2], &out[6], -1);
-//      RegType u0 = (dir < 3 ? anisotropy :
-//		    (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
 
-
-            RegType u0 = (dir < 3 ? anisotropy :
-                    (((idx >= (X[3]-1)*X[0]*X[1]*X[2]/2) && true) ? tBoundary : 1));
-
+      RegType u0 = dir < 3 ? anisotropy : 
+	timeBoundary<RegType>(idx, X, tBoundary,isFirstTimeSlice, isLastTimeSlice);
 
       for (int i=12; i<18; i++) out[i]*=u0;
     }
@@ -229,9 +241,13 @@ namespace quda {
     int X[QUDA_MAX_DIM];
     const RegType anisotropy;
     const QudaTboundary tBoundary;
+    bool isFirstTimeSlice;
+    bool isLastTimeSlice;
 
-  Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()) 
-      {	for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
+  Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
+      isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
+      isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false) 
+	{ for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
       out[0] = Trig<isHalf<Float>::value>::Atan2(in[1], in[0]);
@@ -248,8 +264,9 @@ namespace quda {
 	row_sum += in[i]*in[i];
       }
 
-      RegType u0 = (dir < 3 ? anisotropy :
-		    (idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ? tBoundary : 1));
+      RegType u0 = dir < 3 ? anisotropy : 
+	timeBoundary<RegType>(idx, X, tBoundary,isFirstTimeSlice, isLastTimeSlice);
+
       RegType diff = 1.0/(u0*u0) - row_sum;
       RegType U00_mag = sqrt(diff >= 0 ? diff : 0.0);
 

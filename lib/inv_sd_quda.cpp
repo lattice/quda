@@ -50,7 +50,6 @@ namespace quda {
     zeroCuda(*r), zeroCuda(x);
     double r2 = xmyNormCuda(b,*r);
     double alpha=0.; 
-    double beta=0;
     double2 rAr;
 
     int k=0;
