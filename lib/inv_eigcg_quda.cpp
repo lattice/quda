@@ -191,8 +191,9 @@ namespace quda {
     initCGparam.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
   }
 
-  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), Vm(0), initCGparam(param), profile(profile), eigcg_alloc(false)
+  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matCGSloppy(matCGSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), 
+    Vm(0), initCGparam(param), profile(profile), eigcg_alloc(false)
   {
     if((param.rhs_idx < param.deflation_grid) || (param.inv_type == QUDA_EIGCG_INVERTER))
     {
@@ -229,12 +230,13 @@ namespace quda {
   void IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
-    if (param.precision_sloppy != x.Precision()) errorQuda("\nMixed precision is not supported for the eigCG.\n");
+    if (eigcg_precision != x.Precision()) errorQuda("\nInput/output field precision is incorrect (solver precision: %u spinor precision: %u).\n", eigcg_precision, x.Precision());
 
     profile.Start(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
+
     if(b2 == 0){
       profile.Stop(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
@@ -250,14 +252,20 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b, csParam);
 
-    mat(r, x, y);
-    double r2 = xmyNormCuda(b, r);//compute residual
+    //mat(r, x, y);
+    //double r2 = xmyNormCuda(b, r);//compute residual
   
-    csParam.setPrecision(param.precision_sloppy);
+    csParam.setPrecision(eigcg_precision);
+
     cudaColorSpinorField Ap(x, csParam);
+
     cudaColorSpinorField tmp(x, csParam);
 
     cudaColorSpinorField *tmp2_p = &tmp;
+
+    //matSloppy(r, x, tmp, tmp2);
+    //double r2 = xmyNormCuda(b, r);//compute residual
+
     // tmp only needed for multi-gpu Wilson-like kernels
     if (mat.Type() != typeid(DiracStaggeredPC).name() && 
 	mat.Type() != typeid(DiracStaggered).name()) {
@@ -265,27 +273,12 @@ namespace quda {
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
-    cudaColorSpinorField *x_sloppy, *r_sloppy;
-    if (param.precision_sloppy == x.Precision()) {
-      csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      x_sloppy = &x;
-      r_sloppy = &r;
-    } else {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = new cudaColorSpinorField(x, csParam);
-      r_sloppy = new cudaColorSpinorField(r, csParam);
-    }
+    matSloppy(r, x, tmp, tmp2);
+    double r2 = xmyNormCuda(b, r);//compute residual
 
-    cudaColorSpinorField &xSloppy = *x_sloppy;
-    cudaColorSpinorField &rSloppy = *r_sloppy;
-    cudaColorSpinorField p(rSloppy);
+    cudaColorSpinorField p(r);
 
-    if(&x != &xSloppy){
-      copyCuda(y,x);
-      zeroCuda(xSloppy);
-    }else{
-      zeroCuda(y);
-    }
+    zeroCuda(y);
     
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -303,20 +296,8 @@ namespace quda {
     double alpha=1.0, beta=0.0;
  
     double pAp;
-    int rUpdate = 0;
 
     int eigvRestart = 0;
-
-    double rNorm = sqrt(r2);
-    double r0Norm = rNorm;
-    double maxrx = rNorm;
-    double maxrr = rNorm;
-    double delta = param.delta;
-
-    // this parameter determines how many consective reliable update
-    // reisudal increases we tolerate before terminating the solver,
-    // i.e., how long do we want to keep trying to converge
-    int maxResIncrease = 0; // 0 means we have no tolerance 
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
@@ -357,48 +338,28 @@ namespace quda {
     
     PrintStats("EigCG", k, r2, b2, heavy_quark_res);
 
-    int steps_since_reliable = 1;
-    bool relup_flag = false;
     double sigma = 0.0;
 
-
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && 
-	    k < param.maxiter) {
-
-      double scale = 1.0;
+    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
 
       if(k > 0)
       {
         beta0 = beta;
 
-        if(!relup_flag)
-        {
-           beta = sigma / r2_old;
-           axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
-	   if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	     copyCuda(tmp,y);
-	     heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
-	   }
-	   steps_since_reliable++;
-        }
-       else
-       {//after reliable update:
-           beta = r2 / r2_old;
-	   // explicitly restore the orthogonality of the gradient vector
-	   double rp = reDotProductCuda(rSloppy, p) / (r2);
-	   axpyCuda(-rp, rSloppy, p);
-	   xpayCuda(rSloppy, beta, p);
-           scale /= (1.0-rp*beta);
-           relup_flag = (l == param.m) ? relup_flag : false;
-        }
+        beta = sigma / r2_old;
+        axpyZpbxCuda(alpha, p, x, r, beta);
 
+        if (use_heavy_quark_res && k%heavy_quark_check==0) { 
+	     heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);//note:y is a zero array here.
+        }
       }
 
       //save previous mat-vec result 
       if (l == param.m) copyCuda(Ap0, Ap);
 
-      matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
-  
+      //mat(Ap, p, tmp, tmp2); // tmp as tmp
+      matSloppy(Ap, p, tmp, tmp2);  
+
       //construct the Lanczos matrix:
       if(l > 0){
         eigcg_args->LoadLanczosDiag(l-1, alpha, alpha0, beta0);
@@ -418,28 +379,26 @@ namespace quda {
 
          //Compute Ap0 = Ap - beta*Ap0:
          xpayCuda(Ap, -beta, Ap0);//mind precision...
-
-         if(relup_flag){
-           axCuda(scale, Ap0);
-           relup_flag = false;
-         }
            
          copyCuda(*v0, Ap0);//convert arrays here:
          eigcg_args->FillLanczosOffDiag(_2nev, v0, Vm, 1.0 / sqrt(r2));
 
          eigvRestart++;
          l = _2nev;
+
       } else{ //no-RR branch:
+
          if(l > 0){
             eigcg_args->LoadLanczosOffDiag(l-1, alpha, beta);
          }
       }
 
       //construct Lanczos basis:
-      copyCuda(Vm->Eigenvec(l), *r_sloppy);//convert arrays
+      copyCuda(Vm->Eigenvec(l), r);//convert arrays
+
       //rescale the vector
-      scale = 1.0 / sqrt(r2);
-      axCuda(scale, Vm->Eigenvec(l));
+      axCuda(1.0 / sqrt(r2), Vm->Eigenvec(l));
+
       //update search space index
       l += 1;
 
@@ -453,53 +412,9 @@ namespace quda {
       // here we are deploying the alternative beta computation 
 
       r2_old = r2;
-      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
+      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, r);
       r2 = real(cg_norm); // (r_new, r_new)
       sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
-      // reliable update conditions
-      rNorm = sqrt(r2);
-      if (rNorm > maxrx) maxrx = rNorm;
-      if (rNorm > maxrr) maxrr = rNorm;
-      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-    
-      // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
-
-      if (updateR || updateX) 
-      {
-	axpyCuda(alpha, p, xSloppy);
-	if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
-      
-	xpyCuda(x, y); // swap these around?
-	mat(r, y, x); // here we can use x as tmp
-	r2 = xmyNormCuda(b, r);
-
-	if (x.Precision() != rSloppy.Precision()) copyCuda(rSloppy, r);            
-	zeroCuda(xSloppy);
-
-	// break-out check if we have reached the limit of the precision
-	static int resIncrease = 0;
-	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
-	  warningQuda("EigCG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
-	  k++;
-	  rUpdate++;
-	  if (++resIncrease > maxResIncrease) break; 
-	} else {
-	  resIncrease = 0;
-	}
-
-	rNorm = sqrt(r2);
-	maxrr = rNorm;
-	maxrx = rNorm;
-	r0Norm = rNorm;      
-	rUpdate++;
-
-	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
-        
-        relup_flag = true;	
-	steps_since_reliable = 0;
-      }//end of the reliable update
 
       k++;
 
@@ -509,14 +424,11 @@ namespace quda {
 //Free eigcg resources:
     delete eigcg_args;
 
-    if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
-    xpyCuda(y, x);
-
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (quda::blas_flops + mat.flops())*1e-9;
     reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
@@ -525,12 +437,13 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE){
-      printfQuda("EigCG: Reliable updates = %d\n", rUpdate);
       printfQuda("EigCG: Eigenspace restarts = %d\n", eigvRestart);
     }
 
     // compute the true residuals
-    mat(r, x, y);
+    //mat(r, x, y);
+    matSloppy(r, x, tmp, tmp2);
+
     param.true_res = sqrt(xmyNormCuda(b, r) / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
     param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
@@ -542,17 +455,12 @@ namespace quda {
     // reset the flops counters
     quda::blas_flops = 0;
     mat.flops();
-    matSloppy.flops();
 
     profile.Stop(QUDA_PROFILE_EPILOGUE);
     profile.Start(QUDA_PROFILE_FREE);
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
-    if (param.precision_sloppy != x.Precision()) {
-      delete r_sloppy;
-      delete x_sloppy;
-    }
 //Clean EigCG resources:
     delete v0;
 
@@ -757,17 +665,113 @@ namespace quda {
      //if this operator applied during the first stage of the incremental eigCG (to construct deflation space):
      //then: call eigCG inverter 
      if(use_eigcg){
+
+        const bool use_mixed_prec = (eigcg_precision != param.precision); 
+
         //deflate initial guess:
         DeflateSpinor(*out, *in, defl_param);
 
-        //compute current nev Ritz vectors:
-        EigCG(*out, *in);        
-	
+        cudaColorSpinorField *outSloppy = 0;
+        cudaColorSpinorField *inSloppy  = 0;
+
+        double ext_tol = param.tol;
+
+        if(use_mixed_prec)
+        {
+           ColorSpinorParam cudaParam(*out);
+           //
+           cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+           //
+           cudaParam.setPrecision(eigcg_precision);
+
+           outSloppy = new cudaColorSpinorField(cudaParam);
+           inSloppy  = new cudaColorSpinorField(cudaParam);
+
+           copyCuda(*inSloppy, *in);//input is outer residual
+           copyCuda(*outSloppy, *out);
+
+           param.tol = 1e-7;//single precision eigcg tolerance
+        }
+        else//full precision solver:
+        {
+           outSloppy = out;
+           inSloppy  = in;
+        }
+
+        EigCG(*outSloppy, *inSloppy);
+
+        if(use_mixed_prec)
+        {
+           double b2   = norm2(*in);
+           double stop = b2*ext_tol*ext_tol;
+      
+           param.tol   = 5e-3;//initcg sloppy precision tolerance
+
+           cudaColorSpinorField y(*in);//full precision accumulator
+           cudaColorSpinorField r(*in);//full precision residual
+
+           Solver *initCG = 0;
+
+           initCGparam.tol       = param.tol;
+           initCGparam.precision = eigcg_precision;//the same as eigcg
+           //
+           initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
+           initCGparam.use_sloppy_partial_accumulator=false;   //more stable single-half solver
+     
+           //no reliable updates?
+
+           initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
+
+           //
+           copyCuda(*out, *outSloppy);
+           //
+           mat(r, *out, y); // here we can use y as tmp
+           //
+           double r2 = xmyNormCuda(*in, r);//new residual (and RHS)
+          
+           while(r2 > stop)
+           {
+              zeroCuda(y);//deflate initial guess:
+              //
+              DeflateSpinor(y, r, defl_param);
+              //
+              copyCuda(*inSloppy, r);
+              //
+              copyCuda(*outSloppy, y);
+              // 
+              (*initCG)(*outSloppy, *inSloppy);
+
+              copyCuda(y, *outSloppy);
+              //
+              xpyCuda(y, *out); //accumulate solution
+              //
+              mat(r, *out, y);  //here we can use y as tmp
+              //
+              r2 = xmyNormCuda(*in, r);//new residual (and RHS)
+           }
+
+           //clean objects:
+           //
+           delete initCG;
+           //
+           delete outSloppy;
+           //
+           delete inSloppy;
+        }
+
 	//store computed Ritz vectors:
         SaveEigCGRitzVecs(defl_param);
 
         //Construct(extend) projection matrix:
         ExpandDeflationSpace(defl_param, param.nev);
+
+        //copy solver statistics:
+        param.iter   += initCGparam.iter;
+        //
+        param.secs   += initCGparam.secs;
+        //
+        param.gflops += initCGparam.gflops;
+
      }
      //else: use deflated CG solver with proper restarting. 
      else{
@@ -796,7 +800,7 @@ namespace quda {
         {
           initCGparam.tol = restart_tol; 
 
-          initCG = new CG(mat, matSloppy, initCGparam, profile);
+          initCG = new CG(mat, matCGSloppy, initCGparam, profile);
 
           (*initCG)(*out, *in);           
 
@@ -813,7 +817,7 @@ namespace quda {
 
         initCGparam.tol = full_tol; 
 
-        initCG = new CG(mat, matSloppy, initCGparam, profile);
+        initCG = new CG(mat, matCGSloppy, initCGparam, profile);
 
         (*initCG)(*out, *in);           
 
@@ -828,6 +832,22 @@ namespace quda {
 
         delete W;
      } 
+
+     //compute true residual: 
+     ColorSpinorParam cudaParam(*out);
+     //
+     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+     //
+     cudaColorSpinorField   *final_r = new cudaColorSpinorField(cudaParam);
+     cudaColorSpinorField   *tmp2    = new cudaColorSpinorField(cudaParam);
+           
+     
+     mat(*final_r, *out, *tmp2);
+    
+     param.true_res = sqrt(xmyNormCuda(*in, *final_r) / norm2(*in));
+    
+     delete final_r;
+     delete tmp2;
 
      param.rhs_idx += 1;
 
