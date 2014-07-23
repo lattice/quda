@@ -28,12 +28,13 @@ namespace quda {
   void MPBiCGstab::computeMatrixPowers(std::vector<cudaColorSpinorField>& pr, cudaColorSpinorField& p, cudaColorSpinorField& r, int nsteps){
     cudaColorSpinorField temp(p);
     pr[0] = p;
-    for(int i=1; i<=nsteps; ++i){
+    for(int i=1; i<=(2*nsteps); ++i){
       mat(pr[i], pr[i-1], temp);
     }
 
-    pr[nsteps+1] = r;
-    for(int i=nsteps+2; i<(2*nsteps+2); ++i){
+    pr[(2*nsteps)+1] = r;
+  //  for(int i=(2*nsteps+2); i<(4*nsteps+2); ++i){
+    for(int i=(2*nsteps+2); i<(4*nsteps+1); ++i){
       mat(pr[i], pr[i-1], temp);
     }
   }
@@ -80,6 +81,7 @@ namespace quda {
     }
   }
 
+/*
   // Here, B is an (s+1)x(s+1) matrix with 1s on the subdiagonal
   template<class T>
     static void getBColumn(T *col, int col_index, int nsteps){
@@ -104,7 +106,7 @@ namespace quda {
       zero(e,2*nsteps+2);
       e[2*nsteps+2] = static_cast<T>(1);
     }
-
+*/
 
   template<typename T>
     static T zip(T a[], T b[], int dim){
@@ -159,16 +161,12 @@ namespace quda {
     cudaColorSpinorField r0(r);
     cudaColorSpinorField p(r);
     cudaColorSpinorField Ap(r);
-    cudaColorSpinorField s(r);  
-    cudaColorSpinorField As(r);
-    cudaColorSpinorField r_new(r);
-    cudaColorSpinorField p_new(r);
 
 
-    const int Ns = 2;
+    const int s = 3;
 
     // Vector of matrix powers
-    std::vector<cudaColorSpinorField> PR(2*Ns+2,cudaColorSpinorField(b,csParam));
+    std::vector<cudaColorSpinorField> PR(4*s+2,cudaColorSpinorField(b,csParam));
 
 
     Complex r0r;
@@ -176,106 +174,105 @@ namespace quda {
     Complex omega;
     Complex beta;
 
-    Complex** G = new Complex*[2*Ns+2];
-    for(int i=0; i<(2*Ns+2); ++i){
-      G[i] = new Complex[2*Ns+2];   
+    Complex** G = new Complex*[4*s+2];
+    for(int i=0; i<(4*s+2); ++i){
+      G[i] = new Complex[4*s+2];   
     }
-    Complex* g = new Complex[2*Ns+2];
+    Complex* g = new Complex[4*s+2];
 
-    Complex** a = new Complex*[2*Ns+3];
-    Complex** c = new Complex*[2*Ns+3];
-    Complex** a_new = new Complex*[2*Ns+3];
-    Complex** c_new = new Complex*[2*Ns+3];
+    Complex** a = new Complex*[2*s+1];
+    Complex** c = new Complex*[2*s+1];
+    Complex** a_new = new Complex*[2*s+1];
+    Complex** c_new = new Complex*[2*s+1];
 
-    for(int i=0; i<(2*Ns+3); ++i){
-      a[i] = new Complex[2*Ns+2];
-      c[i] = new Complex[2*Ns+2];
-      a_new[i] = new Complex[2*Ns+2];
-      c_new[i] = new Complex[2*Ns+2];
+    for(int i=0; i<(2*s+1); ++i){
+      a[i] = new Complex[4*s+2];
+      c[i] = new Complex[4*s+2];
+      a_new[i] = new Complex[4*s+2];
+      c_new[i] = new Complex[4*s+2];
     }
 
 
-    Complex* e = new Complex[2*Ns+2];
-
+    Complex* e = new Complex[4*s+2];
 
 
 
 
     double stop = stopping(param.tol, b2, param.residual_type);
-
     int it=0;
-    PrintStats("MPBiCGstab", it, r2, b2, 0.0);
-
     int m=0;
     while(!convergence(r2, 0.0, stop, 0.0 ) && it<param.maxiter){
 
-      computeMatrixPowers(PR, p, r, Ns); 
+      computeMatrixPowers(PR, p, r, s); 
       computeGramVector(g, r0, PR); 
       computeGramMatrix(G, PR);
 
       // initialize coefficient vectors
-      for(int i=0; i<(2*Ns+3); ++i){
-        zero(a[i],(2*Ns+2));
-        zero(c[i],(2*Ns+2));
-        if(i < (Ns+1)){
-          init_a_vector(a[i],i,Ns);
-          init_c_vector(c[i],i,Ns); 
-        }
+      for(int i=0; i<(2*s+1); ++i){
+        zero(a[i],(4*s+2));
+        zero(c[i],(4*s+2));
+        a[i][i] = static_cast<Complex>(1);
+        c[i][i + (2*s+1)] = static_cast<Complex>(1);
       }
-      zero(e,(2*Ns+2));
 
 
-      for(int j=0; j<Ns; ++j){
-        alpha = zip(g,c[0],2*Ns+2)/zip(g,a[1],2*Ns+2);
+      zero(e,(4*s+2));
 
-        Complex omega_num = computeUdaggerMV(c[0],G,c[1],(2*Ns+2)) 
-          - alpha*computeUdaggerMV(c[0],G,a[2],(2*Ns+2))
-          - conj(alpha)*computeUdaggerMV(a[1],G,c[1],(2*Ns+2))
-          + conj(alpha)*alpha*computeUdaggerMV(a[1],G,a[2],(2*Ns+2));
+      for(int j=0; j<s; ++j){
+        PrintStats("MPBiCGstab", it, r2, b2, 0.0);
 
-        Complex omega_denom = computeUdaggerMV(c[1],G,c[1],(2*Ns+2))
-          - alpha*computeUdaggerMV(c[1],G,a[2],(2*Ns+2))
-          - conj(alpha)*computeUdaggerMV(a[2],G,c[1],(2*Ns+2))
-          + conj(alpha)*alpha*computeUdaggerMV(a[2],G,a[2],(2*Ns+2));
+        alpha = zip(g,c[0],4*s+2)/zip(g,a[1],4*s+2);
+
+        Complex omega_num = computeUdaggerMV(c[0],G,c[1],(4*s+2)) 
+          - alpha*computeUdaggerMV(c[0],G,a[2],(4*s+2))
+          - conj(alpha)*computeUdaggerMV(a[1],G,c[1],(4*s+2))
+          + conj(alpha)*alpha*computeUdaggerMV(a[1],G,a[2],(4*s+2));
+
+        Complex omega_denom = computeUdaggerMV(c[1],G,c[1],(4*s+2))
+          - alpha*computeUdaggerMV(c[1],G,a[2],(4*s+2))
+          - conj(alpha)*computeUdaggerMV(a[2],G,c[1],(4*s+2))
+          + conj(alpha)*alpha*computeUdaggerMV(a[2],G,a[2],(4*s+2));
 
         omega = omega_num/omega_denom;
         // Update candidate solution
-        for(int i=0; i<(2*Ns+2); ++i){
+        for(int i=0; i<(4*s+2); ++i){
           e[i] += alpha*a[0][i] + omega*c[0][i] - alpha*omega*a[1][i];
         }
 
         // Update residual
-        for(int k=0; k<=(2*(Ns - j - 1)); ++k){
-          for(int i=0; i<(2*Ns+2); ++i){
+        for(int k=0; k<=(2*(s - j - 1)); ++k){
+          for(int i=0; i<(4*s+2); ++i){
             c_new[k][i] = c[k][i] - alpha*a[k+1][i] - omega*c[k+1][i] + alpha*omega*a[k+2][i];
           }
         }
 
         // update search direction
-        beta = (zip(g,c_new[0],(2*Ns+2))/zip(g,c[0],(2*Ns+2)))*(alpha/omega);
+        beta = (zip(g,c_new[0],(4*s+2))/zip(g,c[0],(4*s+2)))*(alpha/omega);
 
-        for(int k=0; k<=(2*(Ns - j - 1)); ++k){
-          for(int i=0; i<(2*Ns+2); ++i){
+        for(int k=0; k<=(2*(s - j - 1)); ++k){
+          for(int i=0; i<(4*s+2); ++i){
             a_new[k][i] = c_new[k][i] + beta*a[k][i] - beta*omega*a[k+1][i];
           }
 
-          for(int i=0; i<(2*Ns+2); ++i){
+          for(int i=0; i<(4*s+2); ++i){
             a[k][i] = a_new[k][i];
             c[k][i] = c_new[k][i];
           }
         }
-        it++;
         zeroCuda(r);
-        zeroCuda(p);
-        for(int i=0; i<(2*Ns+2); ++i){
+        for(int i=0; i<(4*s+2); ++i){
           caxpyCuda(c[0][i], PR[i], r);
-          caxpyCuda(a[0][i], PR[i], p);
-          caxpyCuda(e[i],PR[i],x);
         }
         r2 = norm2(r);
-        PrintStats("MPBiCGstab", it, r2, b2, 0.0);
 
+        it++;
       } // j
+
+      zeroCuda(p);
+      for(int i=0; i<(4*s+2); ++i){
+        caxpyCuda(a[0][i], PR[i], p);
+        caxpyCuda(e[i], PR[i], x);
+      }
 
       m++;
     } 
@@ -291,7 +288,7 @@ namespace quda {
 
 
 
-    for(int i=0; i<(2*Ns+2); ++i){
+    for(int i=0; i<(4*s+2); ++i){
       delete[] G[i];
     }
     delete[] G;
@@ -299,8 +296,8 @@ namespace quda {
 
     delete[] g;
 
-    // Is 2*Ns + 3 really correct?
-    for(int i=0; i<(2*Ns+3); ++i){
+    // Is 2*s + 3 really correct?
+    for(int i=0; i<(2*s+1); ++i){
       delete[] a[i];
       delete[] a_new[i];
       delete[] c[i];

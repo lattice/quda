@@ -55,8 +55,6 @@ namespace quda {
     cudaColorSpinorField Ap(r);
     cudaColorSpinorField A2p(r);
     cudaColorSpinorField Ar(r);
-    cudaColorSpinorField s(r);  
-    cudaColorSpinorField As(r);
     cudaColorSpinorField r_new(r);
     cudaColorSpinorField p_new(r);
     Complex r0r;
@@ -65,7 +63,7 @@ namespace quda {
     Complex beta;
 
 
-
+    double p2 = norm2(p);
     double stop = stopping(param.tol, b2, param.residual_type);
     int k=0;
     while(!convergence(r2, 0.0, stop, 0.0) && k<param.maxiter){
@@ -80,14 +78,20 @@ namespace quda {
       r0r   = cDotProductCuda(r0,r);
       alpha = r0r/cDotProductCuda(r0,Ap); 
 
-      // s = r - alpha Ap
-      s = r;
-      caxpyCuda(-alpha, Ap, s);
 
-      mat(As, s, temp);
-    
-      omega = cDotProductCuda(s,As)/norm2(As);
+      Complex omega_num    =  cDotProductCuda(r,Ar) 
+                           -  alpha*cDotProductCuda(r,A2p)
+                           -  conj(alpha)*cDotProductCuda(Ap,Ar)
+                           +  conj(alpha)*alpha*cDotProductCuda(Ap,A2p);
 
+
+      Complex omega_denom  = cDotProductCuda(Ar,Ar) 
+                           - alpha*cDotProductCuda(Ar,A2p) 
+                           - conj(alpha)*cDotProductCuda(A2p,Ar)
+                           + conj(alpha)*alpha*cDotProductCuda(A2p,A2p);
+
+
+      omega = omega_num/omega_denom;
 
 
     
@@ -96,6 +100,8 @@ namespace quda {
       caxpyCuda(omega,r,x);
       caxpyCuda(-alpha*omega,Ap,x);
 
+
+      // r_new = r - omega*Ar - alpha*Ap + alpha*omega*A2p
       r_new = r;
       caxpyCuda(-omega,Ar,r_new);
       caxpyCuda(-alpha,Ap,r_new);
@@ -112,9 +118,11 @@ namespace quda {
       p = p_new; 
       r = r_new;
       r2 = norm2(r);
+      p2 = norm2(p);
       k++;
     }
 
+  
     if(k == param.maxiter)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
