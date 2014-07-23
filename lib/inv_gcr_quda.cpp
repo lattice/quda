@@ -28,6 +28,7 @@ namespace quda {
   void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
     inner.tol = outer.tol_precondition;
     inner.maxiter = outer.maxiter_precondition;
+    inner.overlap_precondition = outer.overlap_precondition;
     inner.delta = 1e-20; // no reliable updates within the inner solver
   
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
