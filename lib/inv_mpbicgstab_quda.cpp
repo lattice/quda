@@ -217,8 +217,8 @@ namespace quda {
 
 
       zero(e,(4*s+2));
-
-      for(int j=0; j<s; ++j){
+      int j=0;
+      while(!convergence(r2,0.0,stop,0.0) && j<s){
         PrintStats("MPBiCGstab", it, r2, b2, 0.0);
 
         alpha = zip(g,c[0],4*s+2)/zip(g,a[1],4*s+2);
@@ -264,7 +264,7 @@ namespace quda {
           caxpyCuda(c[0][i], PR[i], r);
         }
         r2 = norm2(r);
-
+        j++;
         it++;
       } // j
 

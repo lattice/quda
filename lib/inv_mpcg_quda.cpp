@@ -230,7 +230,6 @@ namespace quda {
     int k = 0;
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
       // compute the matrix powers kernel - need to set r[s] above
-      //computeMatrixPowers(V, R, s); 
       computeMatrixPowers(V, R, s); 
       computeGramMatrix(G,V);
     
