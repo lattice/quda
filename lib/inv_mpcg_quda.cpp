@@ -126,27 +126,43 @@ namespace quda {
   }
 
 
-  static void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v){
+  static void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v, double* mu){
   
     const int dim = v.size();
+    const int nsteps = (dim-1)/2;
   
     for(int i=0; i<dim; ++i){
-      for(int j=0; j<dim; ++j){
+      for(int j=nsteps; j<dim; ++j){
         G[i][j] = reDotProductCuda(v[i],v[j]);
       }
-    }  
+    }
+
+    for(int i=0; i<nsteps; ++i){
+      G[i][i] = mu[i];
+    }
+
     return;
   }
 
   static void computeMuNu(double& result, const double* u, double** G, const double* v, int dim){
 
     result = 0.0;
-
-    for(int i=0; i<dim; ++i){
-      for(int j=0; j<dim; ++j){
+    const int nsteps = (dim-1)/2;
+    
+    for(int i=nsteps; i<dim; ++i){
+      for(int j=nsteps; j<dim; ++j){
         result += u[i]*v[j]*G[i][j];
       }
     }
+
+    for(int i=0; i<nsteps; ++i){
+      for(int j=nsteps; j<dim; ++j){
+        result += (u[i]*v[j] + u[j]*v[i])*G[i][j];
+      }
+      result += u[i]*v[i]*G[i][i];
+    }
+
+
     return;
   }
 
@@ -174,7 +190,7 @@ namespace quda {
     cudaColorSpinorField x_new(x,csParam);
 
 
-    const int s = 10;
+    const int s = 5;
 
     printf("Nstep = %d\n", s);
 
@@ -224,14 +240,18 @@ namespace quda {
     double rho_kprev[s];
     double gamma_kprev[s];
 
+    zero(mu,s); 
 
+    for(int i=0; i<(2*s+1); ++i){
+      zero(G[i], (2*s+1)); 
+    }
 
 
     int k = 0;
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
       // compute the matrix powers kernel - need to set r[s] above
       computeMatrixPowers(V, R, s); 
-      computeGramMatrix(G,V);
+      computeGramMatrix(G,V, mu);
     
       R[0] = R[s];
 
