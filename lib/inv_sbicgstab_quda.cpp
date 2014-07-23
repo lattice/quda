@@ -53,6 +53,8 @@ namespace quda {
     cudaColorSpinorField r0(r);
     cudaColorSpinorField p(r);
     cudaColorSpinorField Ap(r);
+    cudaColorSpinorField A2p(r);
+    cudaColorSpinorField Ar(r);
     cudaColorSpinorField s(r);  
     cudaColorSpinorField As(r);
     cudaColorSpinorField r_new(r);
@@ -71,7 +73,10 @@ namespace quda {
       PrintStats("SimpleBiCGstab", k, r2, b2, 0.0);
    
       mat(Ap,p,temp); 
-    
+      mat(A2p,Ap,temp);
+      mat(Ar,r,temp);   
+
+ 
       r0r   = cDotProductCuda(r0,r);
       alpha = r0r/cDotProductCuda(r0,Ap); 
 
@@ -82,14 +87,20 @@ namespace quda {
       mat(As, s, temp);
     
       omega = cDotProductCuda(s,As)/norm2(As);
+
+
+
     
       // x ---> x + alpha p + omega s 
       caxpyCuda(alpha,p,x);
-      caxpyCuda(omega,s,x);
-      // r --> s - omega As
-      r_new = s;
-      caxpyCuda(-omega,As,r_new);
-    
+      caxpyCuda(omega,r,x);
+      caxpyCuda(-alpha*omega,Ap,x);
+
+      r_new = r;
+      caxpyCuda(-omega,Ar,r_new);
+      caxpyCuda(-alpha,Ap,r_new);
+      caxpyCuda(alpha*omega,A2p,r_new);
+
       beta = (cDotProductCuda(r0,r_new)/r0r)*(alpha/omega);
 
       
