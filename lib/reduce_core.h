@@ -46,6 +46,23 @@ template<> __device__ void add<double3,double>(double *s, const int i, const int
 template<> __device__ void add<double3,double>(volatile double *s, const int i, const int j, const int block) 
 { s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
 
+
+template<int block_size, typename ReduceType, typename ReduceSimpleType>
+__device__ void warpReduce(ReduceType& sum, ReduceSimpleType* s){
+  
+  volatile ReduceSimpleType *sv = s;
+  copytoshared(sv, 0, sum, block_size);
+
+  if(block_size >= 32) { add<ReduceType>(sv, 0, 16, block_size); }
+  if(block_size >= 16) { add<ReduceType>(sv, 0, 8, block_size); }
+  if(block_size >= 8) { add<ReduceType>(sv, 0, 4, block_size); }
+  if(block_size >= 4) { add<ReduceType>(sv, 0, 2, block_size); }
+  if(block_size >= 2) { add<ReduceType>(sv, 0, 1, block_size); }
+}
+
+
+
+
 #if (__COMPUTE_CAPABILITY__ < 130)
 __host__ __device__ void zero(doublesingle &x) { x = 0.0; }
 __host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
@@ -164,19 +181,7 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
 #pragma unroll
     for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
 
-    // Intra-warp reduction
-    volatile ReduceSimpleType *sv = s;
-    copytoshared(sv, 0, sum, block_size);
-
-    if (block_size >= 32) { add<ReduceType>(sv, 0, 16, block_size); } 
-    if (block_size >= 16) { add<ReduceType>(sv, 0, 8, block_size); } 
-    if (block_size >= 8) { add<ReduceType>(sv, 0, 4, block_size); } 
-    if (block_size >= 4) { add<ReduceType>(sv, 0, 2, block_size); } 
-    if (block_size >= 2) { add<ReduceType>(sv, 0, 1, block_size); } 
-
-    // warpSize generic warp reduction - open64 can't handle it, only nvvm
-    //#pragma unroll
-    //for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); }
+    warpReduce<block_size>(sum, s);
   }
 
   // write result for this block to global mem 
@@ -217,19 +222,8 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
       // Warp raking
 #pragma unroll
       for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
-      
-      // Intra-warp reduction
-      volatile ReduceSimpleType *sv = s;
-      copytoshared(sv, 0, sum, block_size);
-
-      if (block_size >= 32) { add<ReduceType>(sv, 0, 16, block_size); } 
-      if (block_size >= 16) { add<ReduceType>(sv, 0, 8, block_size); } 
-      if (block_size >= 8) { add<ReduceType>(sv, 0, 4, block_size); } 
-      if (block_size >= 4) { add<ReduceType>(sv, 0, 2, block_size); } 
-      if (block_size >= 2) { add<ReduceType>(sv, 0, 1, block_size); } 
-
-      //#pragma unroll
-      //for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); } 
+    
+      warpReduce<block_size>(sum, s);
     }
  
     // write out the final reduced value
