@@ -513,9 +513,9 @@ static void setInvertParams(const int dim[4],
   for(int i=0; i<num_offset; ++i){
     invertParam->offset[i] = offset[i];
     invertParam->tol_offset[i] = target_residual_offset[i];
-    if(invertParam->residual_type & QUDA_HEAVY_QUARK_RESIDUAL){
+    //if(invertParam->residual_type & QUDA_HEAVY_QUARK_RESIDUAL){
       invertParam->tol_hq_offset[i] = target_residual_hq_offset[i];
-    }
+    //}
   }
   return;
 }
@@ -667,7 +667,14 @@ void qudaMultishiftInvert(int external_precision,
   invertParam.residual_type = static_cast<QudaResidualType_s>(0);
   invertParam.residual_type = (target_residual[0] != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
   invertParam.residual_type = (target_fermilab_residual[0] != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
-  
+  if (invertParam.residual_type ==QUDA_L2_RELATIVE_RESIDUAL) 
+    printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL only");
+  else{
+    if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+      printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL");      
+     if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+      printfQuda("Using QUDA_HEAVY_QUARK_RESIDUAL"); 
+  }
 
   invertParam.use_sloppy_partial_accumulator = 0;
 
@@ -676,7 +683,7 @@ void qudaMultishiftInvert(int external_precision,
 
   QudaParity local_parity = inv_args.evenodd;
   {
-    const double reliable_delta = 1e-1;
+    const double reliable_delta = 0;//1e-1;
     setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
         num_offsets, offset, target_residual, target_fermilab_residual, 
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
