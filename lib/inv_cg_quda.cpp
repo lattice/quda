@@ -105,7 +105,7 @@ namespace quda {
 
     double heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-    int heavy_quark_check = 10; // how often to check the heavy quark residual
+    int heavy_quark_check = 1; // how often to check the heavy quark residual
 
     double alpha=0.0, beta=0.0;
     double pAp;
@@ -120,7 +120,9 @@ namespace quda {
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    int maxResIncrease = 0; // 0 means we have no tolerance 
+    const int maxResIncrease = 2; // 0 means we have no tolerance 
+    const int maxtotResIncrease = 20;
+    int totresIncrease = 0;
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
@@ -206,11 +208,14 @@ namespace quda {
 
 	// break-out check if we have reached the limit of the precision
 	static int resIncrease = 0;
+  
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
-	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
+	  resIncrease++;
+    totresIncrease++;
+    warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (%i,%i)", sqrt(r2), r0Norm,resIncrease, totresIncrease);
 	  k++;
 	  rUpdate++;
-	  if (++resIncrease > maxResIncrease) break; 
+	  if (resIncrease > maxResIncrease or totresIncrease > maxtotResIncrease) break; 
 	} else {
 	  resIncrease = 0;
 	}
@@ -227,6 +232,11 @@ namespace quda {
 
 	beta = r2 / r2_old; 
 	xpayCuda(rSloppy, beta, p);
+
+  if (resIncrease > 0){
+    warningQuda("Set p=r");
+    copyCuda(p,rSloppy);
+}
 
 	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
 	
