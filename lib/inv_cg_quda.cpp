@@ -95,6 +95,7 @@ namespace quda {
     
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    bool heavy_quark_restart = false;
     
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
@@ -104,7 +105,11 @@ namespace quda {
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     double heavy_quark_res = 0.0; // heavy quark residual
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    double heavy_quark_res_old = 0.0; // heavy quark residual
+    if(use_heavy_quark_res) {
+      heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+      heavy_quark_res_old = heavy_quark_res; // heavy quark residual
+    }
     int heavy_quark_check = 1; // how often to check the heavy quark residual
 
     double alpha=0.0, beta=0.0;
@@ -120,9 +125,10 @@ namespace quda {
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    const int maxResIncrease = 2; // 0 means we have no tolerance 
-    const int maxtotResIncrease = 20;
+    const int maxResIncrease = 0; // 0 means we have no tolerance 
+    const int maxtotResIncrease = 10;
     int totresIncrease = 0;
+    int hqresIncrease = 0;
 
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
@@ -175,7 +181,8 @@ namespace quda {
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
     
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
-      if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
+      // if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && delta >= param.tol) updateX = 1;
+      if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) ) updateX = 1;
 
       if ( !(updateR || updateX)) {
 	//beta = r2 / r2_old;
@@ -205,19 +212,43 @@ namespace quda {
 
 	copyCuda(rSloppy, r); //nop when these pointers alias
 	zeroCuda(xSloppy);
-
+  if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
 	// break-out check if we have reached the limit of the precision
 	static int resIncrease = 0;
   
+
+
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
+    if (use_heavy_quark_res and delta>0){
+      delta = 0;//*param.delta
+      warningQuda("Setting delta to zero");
+      heavy_quark_restart = true;
+    }
+
 	  resIncrease++;
     totresIncrease++;
-    warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (%i,%i)", sqrt(r2), r0Norm,resIncrease, totresIncrease);
-	  k++;
+  
+    if (use_heavy_quark_res and heavy_quark_res > heavy_quark_res_old)
+      hqresIncrease++;
+    else
+      hqresIncrease =0;
+    
+    if (use_heavy_quark_res)
+      warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (hq %e / %e) (%i,%i,%i)", sqrt(r2), r0Norm, heavy_quark_res, heavy_quark_res_old, resIncrease, totresIncrease,hqresIncrease);
+	  else
+      warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (%i,%i)", sqrt(r2), r0Norm,resIncrease, totresIncrease);
+    
+    k++;
 	  rUpdate++;
-	  if (resIncrease > maxResIncrease or totresIncrease > maxtotResIncrease) break; 
+    if (use_heavy_quark_res and heavy_quark_res > param.tol_hq){
+      if (hqresIncrease > 1) break;
+    }
+    else{
+	   if (resIncrease > maxResIncrease or totresIncrease > maxtotResIncrease) break; 
+   }
 	} else {
 	  resIncrease = 0;
+    hqresIncrease = 0;
 	}
 
 	rNorm = sqrt(r2);
@@ -233,14 +264,16 @@ namespace quda {
 	beta = r2 / r2_old; 
 	xpayCuda(rSloppy, beta, p);
 
-  if (resIncrease > 0){
+  if (use_heavy_quark_res and heavy_quark_restart){
     warningQuda("Set p=r");
     copyCuda(p,rSloppy);
+    // heavy_quark_restart = false;
 }
 
-	if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y,r).z);
+
 	
 	steps_since_reliable = 0;
+      heavy_quark_res_old = heavy_quark_res;
       }
 
       breakdown = false;
