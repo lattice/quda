@@ -256,7 +256,7 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
   dnl AC_MSG_NOTICE([Found QDP++ configuration program ${QDPXX_CONFIG}])
   dnl AC_SUBST(CXX, "`${QDPXX_CONFIG} --cxx`")
   dnl AC_MSG_NOTICE([QDP++ compiler: ${CXX}])
-  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags | sed -e 's/-std=c++0x//g'`")
+  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags | sed -e 's/-std=c++0x//g'| sed -e 's/-fno-exceptions//g'| sed -e 's/-fno-rtti//g'| sed -e 's/-fPIC//g'| sed -e 's/-D_DEBUG//g'| sed -e 's/-D_GNU_SOURCE//g'| sed -e 's/-D__STDC_CONSTANT_MACROS//g'| sed -e 's/-D__STDC_FORMAT_MACROS//g'| sed -e 's/-D__STDC_LIMIT_MACROS//g'| sed -e 's/-fvisibility-inlines-hidden//g'| sed -e 's/-Woverloaded-virtual//g'| sed -e 's/-Wcast-qual//g'`")
   AC_MSG_NOTICE([QDP++ compile flags: ${QDPXX_CXXFLAGS}])
   AC_SUBST(QDPXX_LDFLAGS,  "`${QDPXX_CONFIG} --ldflags`")
   AC_MSG_NOTICE([QDP++ linking flags: ${QDPXX_LDFLAGS}])
