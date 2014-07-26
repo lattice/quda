@@ -253,6 +253,7 @@ namespace quda {
     }
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    double restart_cond = stopping(param.tol_restart, b2, param.residual_type); //when to restart
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -350,7 +351,7 @@ namespace quda {
 
 	k = 0;
 
-	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
+	if ( !convergence(r2, heavy_quark_res, restart_cond, param.tol_hq) ) {
 	  restart++; // restarting if residual is still too great
 
 	  PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
