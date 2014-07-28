@@ -338,14 +338,20 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every Nkrylov steps
       if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || r2/r2_old < param.delta) { 
 
+	printfQuda("low_prec_r2 %e stop %e restart_cond %e\n", r2, stop, restart_cond);
+
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
+
+	if(convergence(r2, heavy_quark_res, stop, param.tol_hq)) { break; }
 
 	// recalculate residual in high precision
 	copyCuda(x, xSloppy);
 	xpyCuda(x, y);
 	mat(r, y, x);
 	r2 = xmyNormCuda(b, r);  
+
+	printfQuda("high_prec_r2 %e stop %e restart_cond %e\n", r2, stop, restart_cond);
 
 	if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
 
