@@ -3786,8 +3786,9 @@ void createCloverQuda(QudaInvertParam* invertParam)
     } 
   }
 
+  int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
   int y[4];
-  for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
+  for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2*R[dir];
   int pad = 0;
   GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
       pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
@@ -3806,7 +3807,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
 
     // copy gaugePrecise into the extended device gauge field
     copyExtendedGauge(*cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
 #if 1
     profileCloverCreate.Stop(QUDA_PROFILE_INIT);
     profileCloverCreate.Start(QUDA_PROFILE_COMMS);
@@ -3822,7 +3822,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
     gParam.t_boundary = gaugePrecise->TBoundary();
     gParam.nFace = 1;
 
-    // create an extended gauge field on the hose
+    // create an extended gauge field on the host
     for(int dir=0; dir<4; ++dir) gParam.x[dir] += 4;
     cpuGaugeField cpuGaugeExtended(gParam);
     cudaGaugeExtended->saveCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
@@ -3840,10 +3840,18 @@ void createCloverQuda(QudaInvertParam* invertParam)
   }
 
   profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
+#ifdef MULTI_GPU
   computeClover(*cloverPrecise, *cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+#else
+  computeClover(*cloverPrecise, *gaugePrecise, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+#endif
 
   if (invertParam->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+#ifdef MULTI_GPU
     computeClover(*cloverInvPrecise, *cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);	//FIXME Only with tmClover
+#else
+    computeClover(*cloverInvPrecise, *gaugePrecise, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);	//FIXME Only with tmClover
+#endif
 
   profileCloverCreate.Stop(QUDA_PROFILE_COMPUTE);
 

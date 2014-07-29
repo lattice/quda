@@ -49,7 +49,6 @@ namespace quda {
     cudaColorSpinorField y(b, csParam); 
   
     mat(r, x, y);
-//    zeroCuda(y);
 
     double r2 = xmyNormCuda(b, r);
   
