@@ -741,7 +741,7 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
 #endif  
   
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
-  int len[4] = {
+  size_t len[4] = {
     Vsh_x*gaugeSiteSize*sizeof(Float),
     Vsh_y*gaugeSiteSize*sizeof(Float),
     Vsh_z*gaugeSiteSize*sizeof(Float),
