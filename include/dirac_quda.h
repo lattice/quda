@@ -23,8 +23,8 @@ namespace quda {
     double mass;
     double m5; // used by domain wall only
     int Ls;    //!NEW: used by domain wall and twisted mass
-    double *b_5;    //!NEW: used by mobius domain wall only  
-    double *c_5;    //!NEW: used by mobius domain wall only
+    double b_5[QUDA_MAX_DWF_LS];    //!NEW: used by mobius domain wall only  
+    double c_5[QUDA_MAX_DWF_LS];    //!NEW: used by mobius domain wall only
     QudaMatPCType matpcType;
     QudaDagType dagger;
     cudaGaugeField *gauge;
@@ -245,6 +245,7 @@ namespace quda {
   protected:
     double m5;
     double kappa5;
+    int Ls; // length of the fifth dimension
 
   public:
     DiracDomainWall(const DiracParam &param);
@@ -323,8 +324,8 @@ namespace quda {
     
   protected:
     //Mobius coefficients
-    double *b_5;
-    double *c_5;
+    double b_5[QUDA_MAX_DWF_LS];
+    double c_5[QUDA_MAX_DWF_LS];
 
   private:
 

@@ -38,6 +38,12 @@
  */
 #define QUDA_MAX_MULTI_SHIFT 32
 
+/**
+ * @def   QUDA_MAX_DWF_LS
+ * @brief Maximum length of the Ls dimension for domain-wall fermions
+ */
+#define QUDA_MAX_DWF_LS 128
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,8 +122,8 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
-    double *b_5;  /**< MDWF coefficients */
-    double *c_5;  /**< will be used only for the mobius type of Fermion */
+    double b_5[QUDA_MAX_DWF_LS];  /**< MDWF coefficients */
+    double c_5[QUDA_MAX_DWF_LS];  /**< will be used only for the mobius type of Fermion */
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */

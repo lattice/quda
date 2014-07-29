@@ -1102,11 +1102,13 @@ namespace quda {
       } else errorQuda("For 4D type of DWF dslash, pc must be turned on, %d", inv_param->dslash_type);
       break;
     case QUDA_MOBIUS_DWF_DSLASH:
+      if (inv_param->Ls > QUDA_MAX_DWF_LS) 
+	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
       if(pc) {
 	diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC;
 	diracParam.Ls = inv_param->Ls;
-	diracParam.b_5 = inv_param->b_5; 
-	diracParam.c_5 = inv_param->c_5;
+	memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
+	memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
       } else errorQuda("At currently, only preconditioned Mobius DWF is supported, %d", inv_param->dslash_type);
       break;
     case QUDA_STAGGERED_DSLASH:
