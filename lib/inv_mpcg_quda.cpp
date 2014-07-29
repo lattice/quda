@@ -125,25 +125,41 @@ namespace quda {
     return;
   }
 
-
   static void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v, double* mu){
-  
+
     const int dim = v.size();
     const int nsteps = (dim-1)/2;
-  
-    for(int i=0; i<dim; ++i){
-      for(int j=nsteps; j<dim; ++j){
+
+
+    for(int i=0; i<nsteps; ++i){
+      for(int j=(nsteps); j<dim; ++j){
         G[i][j] = reDotProductCuda(v[i],v[j]);
+      }
+    }
+
+    const int num = dim-nsteps;
+    const int offset = nsteps;
+    double d[2*nsteps+1];
+    for(int i=0; i<=nsteps; ++i){
+      d[i] = reDotProductCuda(v[0+offset], v[i+offset]);
+    }
+    for(int i=1; i<=nsteps; ++i){
+      d[nsteps+i] = reDotProductCuda(v[i+offset], v[nsteps+offset]);
+    }
+
+
+    for(int i=0; i<num; ++i){
+      for(int j=0; j<=i; ++j){
+        G[j+offset][i+offset] = G[i+offset][j+offset] = d[i+j];
       }
     }
 
     for(int i=0; i<nsteps; ++i){
       G[i][i] = mu[i];
     }
+  } 
 
-    return;
-  }
-
+          
   static void computeMuNu(double& result, const double* u, double** G, const double* v, int dim){
 
     result = 0.0;
@@ -190,7 +206,7 @@ namespace quda {
     cudaColorSpinorField x_new(x,csParam);
 
 
-    const int s = 5;
+    const int s = 2;
 
     printf("Nstep = %d\n", s);
 

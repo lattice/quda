@@ -100,6 +100,12 @@ namespace quda {
       axCuda(rho,r_new);
       axpyCuda(-rho*gamma,w,r_new);
       axpyCuda((1.-rho),r_prev,r_new);
+
+
+       double rr_old = reDotProductCuda(r_new,r);
+      printfQuda("rr_old = %1.14lf\n", rr_old);
+
+
  
       k++;
     }

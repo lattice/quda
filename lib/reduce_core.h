@@ -48,7 +48,7 @@ template<> __device__ void add<double3,double>(volatile double *s, const int i, 
 
 
 template<int block_size, typename ReduceType, typename ReduceSimpleType>
-__device__ void warpReduce(ReduceType& sum, ReduceSimpleType* s){
+__device__ void warpReduce(ReduceSimpleType* s, ReduceType& sum){
   
   volatile ReduceSimpleType *sv = s;
   copytoshared(sv, 0, sum, block_size);
@@ -181,7 +181,7 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
 #pragma unroll
     for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
 
-    warpReduce<block_size>(sum, s);
+    warpReduce<block_size>(s, sum);
   }
 
   // write result for this block to global mem 
@@ -223,7 +223,7 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
 #pragma unroll
       for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
     
-      warpReduce<block_size>(sum, s);
+      warpReduce<block_size>(s, sum);
     }
  
     // write out the final reduced value
@@ -516,3 +516,4 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   return value;
 }
 
+#include "multi_reduce_core.h"
