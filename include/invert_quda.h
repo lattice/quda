@@ -278,16 +278,6 @@ namespace quda {
   };  
 
 
-  class NCG3 : public Solver {
-    private:
-      const DiracMatrix &mat; 
-
-    public:
-      NCG3(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-      virtual ~NCG3();
-
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-  }; 
 
   class MPCG : public Solver {
     private:

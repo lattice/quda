@@ -51,10 +51,6 @@ namespace quda {
       report("CG3");
       solver = new CG3(mat, param, profile);
       break;
-    case QUDA_NCG3_INVERTER:
-      report("NCG3");
-      solver = new NCG3(mat, param, profile);
-      break;
     case QUDA_MPCG_INVERTER:
       report("MPCG");
       solver = new MPCG(mat, param, profile);
