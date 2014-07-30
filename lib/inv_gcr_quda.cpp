@@ -292,7 +292,11 @@ namespace quda {
 	    copyCuda(rPre, *rM);
 	  }
 	
-	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
+	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) { 
+	    printfQuda("GCR: before inner solve!\n");
+	    (*K)(pPre, rPre);
+	    printfQuda("GCR: after inner solve!\n");
+	  }
 	  else copyCuda(pPre, rPre);
 	
 	  // relaxation p = omega*p + (1-omega)*r
