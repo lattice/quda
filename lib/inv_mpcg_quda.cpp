@@ -130,30 +130,49 @@ namespace quda {
     const int dim = v.size();
     const int nsteps = (dim-1)/2;
 
-
-    for(int i=0; i<nsteps; ++i){
-      for(int j=(nsteps); j<dim; ++j){
-        G[i][j] = reDotProductCuda(v[i],v[j]);
+    {
+      std::vector<cudaColorSpinorField*> vp1; vp1.reserve((nsteps+1)*nsteps);
+      std::vector<cudaColorSpinorField*> vp2; vp2.reserve((nsteps+1)*nsteps);
+      double g[(nsteps+1)*nsteps];
+    
+      for(int i=0; i<nsteps; ++i){
+        for(int j=nsteps; j<dim; j++){
+          vp1.push_back(&v[i]);
+          vp2.push_back(&v[j]);
+        }
       }
-    }
+      reDotProductCuda(g, vp1, vp2);
+      int k=0;
+      for(int i=0; i<nsteps; ++i){
+        for(int j=nsteps; j<dim; j++){
+          G[i][j] = g[k++];
+        }
+      }
+   }
+
 
     const int num = dim-nsteps;
     const int offset = nsteps;
     double d[2*nsteps+1];
+    std::vector<cudaColorSpinorField*> vp1; vp1.reserve(2*nsteps+1);
+    std::vector<cudaColorSpinorField*> vp2; vp2.reserve(2*nsteps+1);
     for(int i=0; i<=nsteps; ++i){
-      d[i] = reDotProductCuda(v[0+offset], v[i+offset]);
+      vp1.push_back(&v[0+offset]);
+      vp2.push_back(&v[i+offset]);
     }
     for(int i=1; i<=nsteps; ++i){
-      d[nsteps+i] = reDotProductCuda(v[i+offset], v[nsteps+offset]);
+      vp1.push_back(&v[i+offset]);
+      vp2.push_back(&v[nsteps+offset]);
     }
 
+
+    reDotProductCuda(d,vp1,vp2); 
 
     for(int i=0; i<num; ++i){
       for(int j=0; j<=i; ++j){
         G[j+offset][i+offset] = G[i+offset][j+offset] = d[i+j];
       }
     }
-
     for(int i=0; i<nsteps; ++i){
       G[i][i] = mu[i];
     }
@@ -206,7 +225,7 @@ namespace quda {
     cudaColorSpinorField x_new(x,csParam);
 
 
-    const int s = 2;
+    const int s = 3;
 
     printf("Nstep = %d\n", s);
 
