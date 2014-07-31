@@ -28,6 +28,7 @@ module quda_fortran
 
      real(8) :: anisotropy    !Used for Wilson and Wilson-clover
      real(8) :: tadpole_coeff !Used for staggered only
+     real(8) :: scale !Used by staggered long links
 
      QudaLinkType :: link_type
      QudaGaugeFieldOrder :: gauge_order
