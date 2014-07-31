@@ -212,8 +212,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(reliable_delta, INVALID_DOUBLE);
 #ifdef INIT_PARAM /**< Default is to use a sloppy accumulator */
   P(use_sloppy_partial_accumulator, 1);
+  P(max_res_increase, 0);
 #else
   P(use_sloppy_partial_accumulator, INVALID_INT);
+  P(max_res_increase, INVALID_INT);
 #endif
 
 #ifndef CHECK_PARAM

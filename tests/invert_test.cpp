@@ -224,6 +224,8 @@ int main(int argc, char **argv)
   }
   inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-2;
+  inv_param.use_sloppy_partial_accumulator = 0;
+  inv_param.max_res_increase = 1;
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = 
