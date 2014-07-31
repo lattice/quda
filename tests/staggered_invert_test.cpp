@@ -111,7 +111,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = X1*X2*X3/2;
-  gaugeParam->overlap = 2;
+  gaugeParam->overlap = 0;
 
   //inv_param->verbosity = QUDA_VERBOSE;
   inv_param->verbosity = QUDA_DEBUG_VERBOSE;
@@ -122,7 +122,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-7; //now theoretical background for this parameter... 
   //inv_param->maxiter = 500000;
-  inv_param->maxiter = 5000;
+  inv_param->maxiter = 100;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
@@ -144,9 +144,9 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   //inv_param->gcrNkrylov = 10;
 
   // domain decomposition preconditioner parameters
-  //inv_param->inv_type_precondition = QUDA_SD_INVERTER;
-  inv_param->inv_type_precondition = QUDA_XSD_INVERTER;
-  inv_param->overlap = 2;
+  inv_param->inv_type_precondition = QUDA_SD_INVERTER;
+  //inv_param->inv_type_precondition = QUDA_XSD_INVERTER;
+  inv_param->overlap = 0;
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
