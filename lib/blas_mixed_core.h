@@ -125,6 +125,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     return;
   }
 
+  blasStrings.vol_str = x.VolString();
+  blasStrings.aux_str = x.AuxString();
+
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>
       (a, b, c, x.Even(), y.Even(), z.Even(), w.Even());

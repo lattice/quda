@@ -1102,11 +1102,13 @@ namespace quda {
       } else errorQuda("For 4D type of DWF dslash, pc must be turned on, %d", inv_param->dslash_type);
       break;
     case QUDA_MOBIUS_DWF_DSLASH:
+      if (inv_param->Ls > QUDA_MAX_DWF_LS) 
+	errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
       if(pc) {
 	diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC;
 	diracParam.Ls = inv_param->Ls;
-	diracParam.b_5 = inv_param->b_5; 
-	diracParam.c_5 = inv_param->c_5;
+	memcpy(diracParam.b_5, inv_param->b_5, sizeof(double)*inv_param->Ls);
+	memcpy(diracParam.c_5, inv_param->c_5, sizeof(double)*inv_param->Ls);
       } else errorQuda("At currently, only preconditioned Mobius DWF is supported, %d", inv_param->dslash_type);
       break;
     case QUDA_STAGGERED_DSLASH:
@@ -3786,8 +3788,9 @@ void createCloverQuda(QudaInvertParam* invertParam)
     } 
   }
 
+  int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
   int y[4];
-  for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
+  for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2*R[dir];
   int pad = 0;
   GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
       pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
@@ -3806,7 +3809,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
 
     // copy gaugePrecise into the extended device gauge field
     copyExtendedGauge(*cudaGaugeExtended, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
 #if 1
     profileCloverCreate.Stop(QUDA_PROFILE_INIT);
     profileCloverCreate.Start(QUDA_PROFILE_COMMS);
@@ -3822,7 +3824,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
     gParam.t_boundary = gaugePrecise->TBoundary();
     gParam.nFace = 1;
 
-    // create an extended gauge field on the hose
+    // create an extended gauge field on the host
     for(int dir=0; dir<4; ++dir) gParam.x[dir] += 4;
     cpuGaugeField cpuGaugeExtended(gParam);
     cudaGaugeExtended->saveCPUField(cpuGaugeExtended, QUDA_CPU_FIELD_LOCATION);
@@ -3840,10 +3842,18 @@ void createCloverQuda(QudaInvertParam* invertParam)
   }
 
   profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
+#ifdef MULTI_GPU
   computeClover(*cloverPrecise, *cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+#else
+  computeClover(*cloverPrecise, *gaugePrecise, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+#endif
 
   if (invertParam->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+#ifdef MULTI_GPU
     computeClover(*cloverInvPrecise, *cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);	//FIXME Only with tmClover
+#else
+    computeClover(*cloverInvPrecise, *gaugePrecise, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);	//FIXME Only with tmClover
+#endif
 
   profileCloverCreate.Stop(QUDA_PROFILE_COMPUTE);
 
