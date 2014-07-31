@@ -347,7 +347,7 @@ namespace quda {
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
 
-	if(convergence(r2, heavy_quark_res, stop, param.tol_hq)) { break; }
+	//if(convergence(r2, heavy_quark_res, stop, param.tol_hq)) { break; }
 
 	// recalculate residual in high precision
 	copyCuda(x, xSloppy);
