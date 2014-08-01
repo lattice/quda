@@ -524,10 +524,16 @@ namespace quda {
 
 // Modification for the 4D preconditioned Mobius domain wall operator
   DiracMobiusDomainWallPC::DiracMobiusDomainWallPC(const DiracParam &param)
-    : DiracDomainWallPC(param), b_5(param.b_5), c_5(param.c_5) { }
+    : DiracDomainWallPC(param) { 
+    memcpy(b_5, param.b_5, sizeof(double)*param.Ls);
+    memcpy(c_5, param.c_5, sizeof(double)*param.Ls);
+  }
 
   DiracMobiusDomainWallPC::DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac) 
-    : DiracDomainWallPC(dirac), b_5(dirac.b_5), c_5(dirac.c_5) { }
+    : DiracDomainWallPC(dirac) {
+    memcpy(b_5, dirac.b_5, Ls);
+    memcpy(c_5, dirac.c_5, Ls);
+  }
 
   DiracMobiusDomainWallPC::~DiracMobiusDomainWallPC()
   { }

@@ -232,12 +232,16 @@ namespace quda {
 	copyCuda(*r_sloppy, *r);            
 
 	// break-out check if we have reached the limit of the precision
+	static int resIncrease = 0; // number of consecutive residual increases 
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
 	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e", 
 		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift]);
 	  k++;
 	  rUpdate++;
-	  if (reliable_shift == j_low) break;
+	  if (reliable_shift == j_low) 
+	    if (++resIncrease > param.max_res_increase) break; // check if we reached the limit of our tolerancebreak;
+	} else if (reliable_shift == j_low) {
+	  resIncrease = 0;
 	}
 
 	// explicitly restore the orthogonality of the gradient vector

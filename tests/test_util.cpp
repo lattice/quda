@@ -1560,6 +1560,7 @@ int test_type = 0;
 QudaInverterType inv_type;
 int multishift = 0;
 bool verify_results = true;
+double mass = 0.1;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1601,6 +1602,7 @@ void usage(char** argv )
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
+  printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
@@ -1936,6 +1938,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--mass") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--load-gauge") == 0){
     if (i+1 >= argc){
       usage(argv);
