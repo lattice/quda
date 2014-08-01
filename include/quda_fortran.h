@@ -11,6 +11,8 @@
  * underscore.
  */
 
+#include <quda_constants.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -156,6 +158,16 @@ extern "C" {
   void invert_quda_(void *h_x, void *h_b, QudaInvertParam *param);
 
   void invert_md_quda_(void *hp_x, void *hp_b, QudaInvertParam *param);
+
+  /**
+   * Solve for multiple shifts (e.g., masses).
+   * @param _hp_x    Array of solution spinor fields
+   * @param _hp_b    Array of source spinor fields
+   * @param param  Contains all metadata regarding host and device
+   *               storage and solver parameters
+   */
+  void invert_multi_shift_quda_(void *_hp_x[QUDA_MAX_MULTI_SHIFT], void *_hp_b, QudaInvertParam *param);
+
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field

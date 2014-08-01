@@ -16,29 +16,29 @@
 
 namespace quda {
 
-CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy)
-{
+  {
 
-}
+  }
 
-CG::~CG() {
+  CG::~CG() {
 
-}
+  }
 
-void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
-{
+  void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  {
     profile.Start(QUDA_PROFILE_INIT);
 
-    // Check to see that we're not trying to invert on a zero-field source
+    // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
-    if (b2 == 0) {
-        profile.Stop(QUDA_PROFILE_INIT);
-        printfQuda("Warning: inverting on zero-field source\n");
-        x = b;
-        param.true_res = 0.0;
-        param.true_res_hq = 0.0;
-        return;
+    if(b2 == 0){
+      profile.Stop(QUDA_PROFILE_INIT);
+      printfQuda("Warning: inverting on zero-field source\n");
+      x=b;
+      param.true_res = 0.0;
+      param.true_res_hq = 0.0;
+      return;
     }
 
 
@@ -46,56 +46,56 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(b, csParam);
-
+    cudaColorSpinorField y(b, csParam); 
+  
     mat(r, x, y);
 
     double r2 = xmyNormCuda(b, r);
-
+  
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField Ap(x, csParam);
     cudaColorSpinorField tmp(x, csParam);
 
     cudaColorSpinorField *tmp2_p = &tmp;
     // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() &&
-            mat.Type() != typeid(DiracStaggered).name()) {
-        tmp2_p = new cudaColorSpinorField(x, csParam);
+    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
+	mat.Type() != typeid(DiracStaggered).name()) {
+      tmp2_p = new cudaColorSpinorField(x, csParam);
     }
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     cudaColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x.Precision()) {
-        r_sloppy = &r;
+      r_sloppy = &r;
     } else {
-        csParam.create = QUDA_COPY_FIELD_CREATE;
-        r_sloppy = new cudaColorSpinorField(r, csParam);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      r_sloppy = new cudaColorSpinorField(r, csParam);
     }
 
     cudaColorSpinorField *x_sloppy;
     if (param.precision_sloppy == x.Precision() ||
-            !param.use_sloppy_partial_accumulator) {
-        x_sloppy = &x;
+	!param.use_sloppy_partial_accumulator) {
+      x_sloppy = &x;
     } else {
-        csParam.create = QUDA_COPY_FIELD_CREATE;
-        x_sloppy = new cudaColorSpinorField(x, csParam);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      x_sloppy = new cudaColorSpinorField(x, csParam);
     }
 
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
     cudaColorSpinorField p(rSloppy);
 
-    if (&x != &xSloppy) {
-        copyCuda(y, x);
-        zeroCuda(xSloppy);
+    if(&x != &xSloppy){
+      copyCuda(y,x);
+      zeroCuda(xSloppy);
     } else {
-        zeroCuda(y);
+      zeroCuda(y);
     }
-
-    const bool use_heavy_quark_res =
-        (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+    
+    const bool use_heavy_quark_res = 
+      (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     bool heavy_quark_restart = false;
-
+    
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
@@ -112,7 +112,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     }
     int heavy_quark_check = 1; // how often to check the heavy quark residual
 
-    double alpha = 0.0, beta = 0.0;
+    double alpha=0.0, beta=0.0;
     double pAp;
     int rUpdate = 0;
 
@@ -125,7 +125,8 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    const int maxResIncrease = 0; // 0 means we have no tolerance
+    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
+.; // 0 means we have no tolerance
     // const int maxtotResIncrease = 10;
     int resIncrease = 0;
     int totresIncrease = 0;
@@ -139,8 +140,8 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     profile.Start(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
 
-    int k = 0;
-
+    int k=0;
+    
     PrintStats("CG", k, r2, b2, heavy_quark_res);
 
     int steps_since_reliable = 1;
@@ -148,45 +149,45 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
 
 
     while ( !converged && k < param.maxiter) {
-        matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
+      matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
+    
+      double sigma;
 
-        double sigma;
+      bool breakdown = false;
 
-        bool breakdown = false;
+      if (param.pipeline) {
+	double3 triplet = tripleCGReductionCuda(rSloppy, Ap, p);
+	r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
+	r2_old = r2;
 
-        if (param.pipeline) {
-            double3 triplet = tripleCGReductionCuda(rSloppy, Ap, p);
-            r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
-            r2_old = r2;
+	alpha = r2 / pAp;        
+	sigma = alpha*(alpha * Ap2 - pAp);
+	if (sigma < 0.0 || steps_since_reliable==0) { // sigma condition has broken down
+	  r2 = axpyNormCuda(-alpha, Ap, rSloppy);
+	  sigma = r2;
+	  breakdown = true;
+	}
 
-            alpha = r2 / pAp;
-            sigma = alpha * (alpha * Ap2 - pAp);
-            if (sigma < 0.0 || steps_since_reliable == 0) { // sigma condition has broken down
-                r2 = axpyNormCuda(-alpha, Ap, rSloppy);
-                sigma = r2;
-                breakdown = true;
-            }
+	r2 = sigma;
+      } else {
+	r2_old = r2;
+	pAp = reDotProductCuda(p, Ap);
+	alpha = r2 / pAp;        
 
-            r2 = sigma;
-        } else {
-            r2_old = r2;
-            pAp = reDotProductCuda(p, Ap);
-            alpha = r2 / pAp;
+	// here we are deploying the alternative beta computation 
+	Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
+	r2 = real(cg_norm); // (r_new, r_new)
+	sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
+      }
 
-            // here we are deploying the alternative beta computation
-            Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
-            r2 = real(cg_norm); // (r_new, r_new)
-            sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
-        }
-
-        // reliable update conditions
-        rNorm = sqrt(r2);
-        if (rNorm > maxrx) maxrx = rNorm;
-        if (rNorm > maxrr) maxrr = rNorm;
-        int updateX = (rNorm < delta * r0Norm && r0Norm <= maxrx) ? 1 : 0;
-        int updateR = ((rNorm < delta * maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-
-        // force a reliable update if we are within target tolerance (only if doing reliable updates)
+      // reliable update conditions
+      rNorm = sqrt(r2);
+      if (rNorm > maxrx) maxrx = rNorm;
+      if (rNorm > maxrr) maxrr = rNorm;
+      int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
+      int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+    
+      // force a reliable update if we are within target tolerance (only if doing reliable updates)
         // use param.delta here to force check also if delta has been set to zero when using heavy-quark residual
         if ( convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) {
             updateX = 1;
@@ -197,34 +198,36 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
             warningQuda("CG: update X -- L2 breakdown and within HQ target tolerance");
         }
 
-        if ( !(updateR || updateX)) {
-            //beta = r2 / r2_old;
-            beta = sigma / r2_old; // use the alternative beta computation
+      if ( !(updateR || updateX)) {
+	//beta = r2 / r2_old;
+	beta = sigma / r2_old; // use the alternative beta computation
 
-            if (param.pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, xSloppy, rSloppy, p);
-            else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
+	if (param.pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, xSloppy, rSloppy, p);
+	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
-            if (use_heavy_quark_res && k % heavy_quark_check == 0) {
-                if (&x != &xSloppy) {
-                    copyCuda(tmp, y);
-                    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
-                } else {
-                    copyCuda(r, rSloppy);
-                    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);
-                }
-            }
 
-            steps_since_reliable++;
-        } else {
-            axpyCuda(alpha, p, xSloppy);
-            copyCuda(x, xSloppy); // nop when these pointers alias
+	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
+	  if (&x != &xSloppy) {
+	    copyCuda(tmp,y);
+	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	  } else {
+	    copyCuda(r, rSloppy);
+	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);	  
+	  }
+	}
 
-            xpyCuda(x, y); // swap these around?
-            mat(r, y, x); // here we can use x as tmp
-            r2 = xmyNormCuda(b, r);
+	steps_since_reliable++;
+      } else {
 
-            copyCuda(rSloppy, r); //nop when these pointers alias
-            zeroCuda(xSloppy);
+	axpyCuda(alpha, p, xSloppy);
+	copyCuda(x, xSloppy); // nop when these pointers alias
+      
+	xpyCuda(x, y); // swap these around?
+	mat(r, y, x); // here we can use x as tmp
+	r2 = xmyNormCuda(b, r);
+
+	copyCuda(rSloppy, r); //nop when these pointers alias
+	zeroCuda(xSloppy);
             // calculate new reliable HQ resididual
             if (use_heavy_quark_res) {
                 // heavy_quark_res_old = heavy_quark_res;
@@ -232,21 +235,21 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
             }
             // break-out check if we have reached the limit of the precision
 
-            if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
+	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
                 resIncrease++;
                 if (use_heavy_quark_res)
                     warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (hq %e / %e) (%i,%i,%i)", sqrt(r2), r0Norm, heavy_quark_res, heavy_quark_res_old, resIncrease, totresIncrease, hqresIncrease);
                 else
                     warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (%i,%i)", sqrt(r2), r0Norm, resIncrease, totresIncrease);
 
-                k++;
-                rUpdate++;
+	  k++;
+	  rUpdate++;
 
                 if (resIncrease > maxResIncrease)
                     if (not use_heavy_quark_res) break;
                     else L2breakdown = true;
 
-            }
+	}
             // if L2 broke down already we turn off reliable updates and restart the CG
             if (use_heavy_quark_res and L2breakdown) {
                 delta = 0;//*param.delta
@@ -255,42 +258,42 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
                 if (heavy_quark_res > heavy_quark_res_old) {
                     hqresIncrease++;
                     warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e (hq %e / %e) (%i/%i)", sqrt(r2), r0Norm, heavy_quark_res, heavy_quark_res_old,  hqresIncrease, hqmaxresIncrease);
-                    
+
                     // break out if we do not improve here anymore
                     if (hqresIncrease > hqmaxresIncrease) break;
                 }
             }
 
 
-            rNorm = sqrt(r2);
-            maxrr = rNorm;
-            maxrx = rNorm;
-            r0Norm = rNorm;
-            rUpdate++;
+	rNorm = sqrt(r2);
+	maxrr = rNorm;
+	maxrx = rNorm;
+	r0Norm = rNorm;      
+	rUpdate++;
 
-            // explicitly restore the orthogonality of the gradient vector
-            double rp = reDotProductCuda(rSloppy, p) / (r2);
-            axpyCuda(-rp, rSloppy, p);
+	// explicitly restore the orthogonality of the gradient vector
+	double rp = reDotProductCuda(rSloppy, p) / (r2);
+	axpyCuda(-rp, rSloppy, p);
 
-            beta = r2 / r2_old;
-            xpayCuda(rSloppy, beta, p);
+	beta = r2 / r2_old; 
+	xpayCuda(rSloppy, beta, p);
 
             if (use_heavy_quark_res and heavy_quark_restart) {
                 warningQuda("Set p=r");
                 copyCuda(p, rSloppy);
                 // heavy_quark_restart = false;
             }
+	
 
 
-
-            steps_since_reliable = 0;
+	steps_since_reliable = 0;
             heavy_quark_res_old = heavy_quark_res;
-        }
+      }
 
-        breakdown = false;
-        k++;
+      breakdown = false;
+      k++;
 
-        PrintStats("CG", k, r2, b2, heavy_quark_res);
+      PrintStats("CG", k, r2, b2, heavy_quark_res);
         // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
         converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
@@ -301,7 +304,7 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
             // HQ is converged and if we do reliable update the HQ residual has been caclculated using a reliable update
             bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
             converged = L2done and HQdone;
-        }
+    }
 
     }
 
@@ -312,25 +315,25 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops()) * 1e-9;
+    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
-    param.gflops = gflops;
+      param.gflops = gflops;
     param.iter += k;
 
-    if (k == param.maxiter)
-        warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    if (k==param.maxiter) 
+      warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE)
-        printfQuda("CG: Reliable updates = %d\n", rUpdate);
+      printfQuda("CG: Reliable updates = %d\n", rUpdate);
 
     // compute the true residuals
     mat(r, x, y);
     param.true_res = sqrt(xmyNormCuda(b, r) / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
-    param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x, r).z);
+    param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 #else
     param.true_res_hq = 0.0;
-#endif
+#endif      
 
     PrintSummary("CG", k, r2, b2);
 
@@ -350,6 +353,6 @@ void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
     profile.Stop(QUDA_PROFILE_FREE);
 
     return;
-}
+  }
 
 } // namespace quda

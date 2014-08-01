@@ -5041,6 +5041,8 @@ void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param)
 { invertQuda(hp_x, hp_b, param); }    
 void invert_md_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) 
 { invertMDQuda(hp_x, hp_b, param); }    
+void invert_multishift_quda_(void *hp_x[QUDA_MAX_MULTI_SHIFT], void *hp_b, QudaInvertParam *param)
+{ invertMultiShiftQuda(hp_x, hp_b, param); }
 void new_quda_gauge_param_(QudaGaugeParam *param) {
   *param = newQudaGaugeParam();
 }

@@ -54,7 +54,7 @@ module quda_fortran
      integer(4) :: preserve_gauge ! Used by link fattening
     
      ! Set the staggered phase type of the links
-     QudaStaggeredPhase :: staggered_phase_type; 
+     QudaStaggeredPhase :: staggered_phase_type
      ! Whether the staggered phase has already been applied to the links
      integer(4) :: staggered_phase_applied 
 
@@ -97,7 +97,8 @@ module quda_fortran
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance 
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
-     
+     integer(4) :: int max_res_increase ! How many residual increases we tolerate when doing reliable updates
+
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver 
     
@@ -112,7 +113,7 @@ module quda_fortran
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_offset
 
      ! Actual heavy quark residual norm achieved in solver for each offset
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset; 
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset
 
      QudaSolutionType :: solution_type  ! Type of system to solve 
      QudaSolveType :: solve_type        ! How to solve it 
