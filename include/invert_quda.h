@@ -255,7 +255,7 @@ namespace quda {
        @param r2_tol Solver L2 tolerance
        @param hq_tol Solver heavy-quark tolerance
      */
-    bool convergenceLW(const double &r2, const double &hq2, const double &r2_tol, 
+    bool convergenceL2(const double &r2, const double &hq2, const double &r2_tol, 
          const double &hq_tol);
 
     /**

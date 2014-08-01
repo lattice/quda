@@ -88,7 +88,7 @@ namespace quda {
   }
 
 // 
-  bool Solver::convergencehq(const double &r2, const double &hq2, const double &r2_tol, 
+  bool Solver::convergenceHQ(const double &r2, const double &hq2, const double &r2_tol, 
          const double &hq_tol) {
     //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
 
