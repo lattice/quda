@@ -18,7 +18,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
   XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param,profile), mat(mat)
+    Solver(param,profile), mat(mat), init(false)
   {
     sd = new SD(mat,param,profile);
     for(int i=0; i<4; ++i) { 
