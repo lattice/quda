@@ -748,6 +748,9 @@ namespace quda {
               mat(r, *out, y);  //here we can use y as tmp
               //
               r2 = xmyNormCuda(*in, r);//new residual (and RHS)
+              //
+              param.secs   += initCGparam.secs;
+
            }
 
            //clean objects:
@@ -768,9 +771,15 @@ namespace quda {
         //copy solver statistics:
         param.iter   += initCGparam.iter;
         //
-        param.secs   += initCGparam.secs;
+        //param.secs   += initCGparam.secs;
         //
         param.gflops += initCGparam.gflops;
+
+        if(getVerbosity() >= QUDA_VERBOSE)
+        {
+              printfQuda("\neigCG  stat: %i iter / %g secs = %g Gflops. \n", param.iter, param.secs, param.gflops);
+              printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", initCGparam.iter, initCGparam.secs, initCGparam.gflops);
+        }
 
      }
      //else: use deflated CG solver with proper restarting. 
@@ -795,8 +804,16 @@ namespace quda {
 
         DeflateSpinor(*out, *in, defl_param);
 
+        //initCGparam.precision_sloppy = QUDA_HALF_PRECISION;
+
+        int max_restart_num = 3;
+
+        int restart_idx  = 0;
+
+        double inc_tol = 1e-2; 
+
         //launch initCG:
-        while(restart_tol > full_tol)//currently just one restart, think about better algorithm for the restarts. 
+        while((restart_tol > full_tol) && (restart_idx < max_restart_num))//currently just one restart, think about better algorithm for the restarts. 
         {
           initCGparam.tol = restart_tol; 
 
@@ -810,9 +827,24 @@ namespace quda {
 
           xpayCuda(*in, -1, *W); 
 
-          DeflateSpinor(*out, *W, defl_param, false);
+          DeflateSpinor(*out, *W, defl_param, false);                
 
-          restart_tol = full_tol;//one restart.                              
+          if(getVerbosity() >= QUDA_VERBOSE)
+          {
+            printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", initCGparam.iter, initCGparam.secs, initCGparam.gflops);
+          }
+
+          double new_restart_tol = restart_tol*inc_tol;
+
+          restart_tol = (new_restart_tol > full_tol) ? new_restart_tol : full_tol;                               
+
+          restart_idx += 1;
+
+          //param.iter   += initCGparam.iter;
+          //
+          param.secs   += initCGparam.secs;
+          //
+          //param.gflops += initCGparam.gflops;              
         }
 
         initCGparam.tol = full_tol; 
@@ -823,12 +855,17 @@ namespace quda {
 
         delete initCG;
 
+        if(getVerbosity() >= QUDA_VERBOSE)
+        {
+            printfQuda("\ninitCG total stat (%d restarts): %i iter / %g secs = %g Gflops. \n", restart_idx, initCGparam.iter, initCGparam.secs, initCGparam.gflops);
+        }
+
         //copy solver statistics:
-        param.iter   = initCGparam.iter;
+        param.iter   += initCGparam.iter;
         //
-        param.secs   = initCGparam.secs;
+        param.secs   += initCGparam.secs;
         //
-        param.gflops = initCGparam.gflops;
+        param.gflops += initCGparam.gflops;
 
         delete W;
      } 
