@@ -3248,3 +3248,7 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
 #include "fermion_force_quda.cu"
 #endif
 
+#ifdef GPU_CONTRACT
+#include "covDev.cu"
+#include "contract.cu"
+#endif

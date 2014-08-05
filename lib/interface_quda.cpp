@@ -196,6 +196,12 @@ static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
+//!< Profiler for contractions
+static TimeProfile profileContract("contractQuda");
+
+//!< Profiler for contractions
+static TimeProfile profileCovDev("covDevCuda");
+
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
 
@@ -5261,4 +5267,4 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   profileAPE.Stop(QUDA_PROFILE_TOTAL);
 }
 
-//#include"ape_interface.cpp"
+//#include"contractions.cpp"	Contraction interface, to be added soon

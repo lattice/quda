@@ -56,6 +56,9 @@ BUILD_TIFR_INTERFACE = @BUILD_TIFR_INTERFACE@                   # build tifr int
 # Packing option
 DEVICE_PACK = @DEVICE_PACK@	     # set to 'yes' to enable packing and unpacking on the device
 
+# GPU contractions of spinors
+BUILD_CONTRACT = @BUILD_CONTRACT@    # build code for bilinear contraction?
+
 BUILD_QIO = @BUILD_QIO@    # set to 'yes' to build QIO code for binary I/O
 
 USE_QDPJIT = @USE_QDPJIT@  # build QDP-JIT support?
@@ -311,6 +314,16 @@ ifeq ($(strip $(NUMA_AFFINITY)), yes)
   NUMA_AFFINITY_OBJS=numa_affinity.o
 endif
 
+ifeq ($(strip $(BUILD_CONTRACT)), yes)
+  LOOPVV_TEST=vvTrickLoops
+  LOOPVV_TUNE=tuneOneEndTrick
+  LOOPTD_TEST=tDilutionLoops
+  LPTDHP_TEST=tDilHPELoops
+  LOOPCV_TEST=loopsPlain
+  LOOPHP_TEST=loopsHPE
+  NVCCOPT += -DGPU_CONTRACT
+  COPT += -DGPU_CONTRACT
+endif
 
 ### Next conditional is necessary.
 ### QDPXX_CXXFLAGS contains "-O3".
