@@ -6,12 +6,16 @@ namespace quda
 {
 	#include <gamma5.h>		// g5 kernel
 
+	/**
+	  Class for the gamma5 kernels, sFloat is the typename of the spinor components (double2, float4...)
+	*/
+
 	template <typename sFloat>
 	class Gamma5Cuda : public Tunable {
 
 	private:
-		cudaColorSpinorField *out;
-		const cudaColorSpinorField *in;
+		cudaColorSpinorField *out;		//Output spinor
+		const cudaColorSpinorField *in;		//Input spinor
 
 		unsigned int sharedBytesPerThread() const { return 0; }
 		unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -19,7 +23,7 @@ namespace quda
 		unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
 
 		char *saveOut, *saveOutNorm;
-		char auxStr[8];
+		char auxStr[8];				//I don't know whether this is strictly neccessary
 
 	public:
 		Gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in) :
@@ -74,6 +78,11 @@ namespace quda
 		long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
 	};
 
+	/**
+	  Applies a gamma5 matrix to a spinor, this is the function to be called in interfaces and it requires only
+	  pointers to the output spinor (out) and the input spinor (in), in that order
+	*/
+
 	void	gamma5Cuda	(cudaColorSpinorField *out, const cudaColorSpinorField *in)
 	{
 		dslashParam.threads = in->Volume();
@@ -90,47 +99,14 @@ namespace quda
 		} else if	(in->Precision() == QUDA_SINGLE_PRECISION) {
 			gamma5 = new Gamma5Cuda<float4>(out, in);
 		} else if	(in->Precision() == QUDA_HALF_PRECISION) {
-			errorQuda("Half precision not supported for gamma5 kernel yet");
-//			gamma5 = new Gamma5Cuda<short4>(out, in);
-		}
+			errorQuda("Half precision not supported for gamma5 kernel yet");	// Support for half precision is very straightforward,
+		}										// but I doubt is useful
 
 		gamma5->apply(streams[Nstream-1]);
 		checkCudaError();
 
 		delete gamma5;
 	}
-
-/*
-	void	gamma5Cuda	(cudaColorSpinorField *out, const cudaColorSpinorField *in, const dim3 &block)
-	{
-		dslashParam.threads	 = in->Volume();
-
-		if	(in->Precision() == QUDA_DOUBLE_PRECISION)
-		{
-
-		#if (__COMPUTE_CAPABILITY__ >= 130)
-			dim3 blockDim (block.x, block.y, block.z);
-			dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-
-			bindSpinorTex<double2>(in); //for multi-gpu usage
-			gamma5Kernel<<<gridDim, blockDim, 0>>> ((double2*)out->V(), (float*)out->Norm(), dslashParam, in->Stride());
-		#else
-			errorQuda("Double precision not supported on this GPU");
-		#endif
-		}
-		else if	(in->Precision() == QUDA_SINGLE_PRECISION)
-		{
-			dim3 blockDim (block.x, block.y, block.z);
-			dim3 gridDim( (dslashParam.threads+blockDim.x-1) / blockDim.x, 1, 1);
-
-			bindSpinorTex<float4>(in); //for multi-gpu usage
-			gamma5Kernel<<<gridDim, blockDim, 0>>> ((float4*)out->V(), (float*)out->Norm(), dslashParam, in->Stride());
-		}
-
-		cudaDeviceSynchronize	();
-		checkCudaError		();
-	}
-*/
 
 	#include "contract_core.h"
 	#include "contract_core_plus.h"
@@ -158,20 +134,44 @@ namespace quda
 			errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());		\
 	}
 
+	/**
+	  Class for the contract kernels, Float2 is the typename of the spinor components (double2, float4...)
+	  whereas rFloat is the typename of the precision (double, float...)
+	*/
+
 	template <typename Float2, typename rFloat>
 	class ContractCuda : public Tunable {
 
 	private:
-		const cudaColorSpinorField x;
-		const cudaColorSpinorField y;
-		const int parity;		//QudaParity parity;
-		const QudaContractType contract_type;
-		void *result;
+		const cudaColorSpinorField x;		// Spinor to be contracted
+		const cudaColorSpinorField y;		// Spinor to be contracted
+		const QudaParity parity;		// Parity of the field, actual kernels act on parity spinors
+		const QudaContractType contract_type;	// Type of contraction, to be detailed later
 
-//		int *tSlice;
-		const int nTSlice;
+		/**
+		  The result of the contraction is stored in a double2 or float2 array, whose size is Volume x 16. This array
+		  must be reserved in the GPU device BEFORE calling the contract functions, and must have the appropiate size.
+		  What is stored is the contraction per point and per gamma index. Since each spinor have a gamma index that
+		  runs from 1 to 4, the result is a 4x4 matrix--> x_\mu y_\nu = result_{\mu\nu}, so 16 components are stored
+		  per point. The order is straightforward:
 
-		char aux[16][256];
+			(  1   2   3   4  )
+			(  5   6   7   8  )
+			(  9  10  11  12  )
+			( 13  14  15  16  )
+
+		  With these 16 components one can reconstruct any gamma structure G for the contraction x_\mu G_@s[\mu\nu} y_\nu.
+
+		  The ordering of the points at the output is such that FFT can be performed just by plugin the output array in
+		  the functions of the cuFFT library.
+
+		*/
+
+		void *result;				// The output array with the result of the contraction
+
+		const int nTSlice;			// Time-slice in case of time-dilution
+
+		char aux[16][256];			// For tuning purposes
 
 		unsigned int sharedBytesPerThread() const { return 16*sizeof(rFloat); }
 		unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -217,32 +217,6 @@ namespace quda
 
 		QudaContractType ContractType() const { return contract_type; }
 
-//		void SetTimeSlice	(const int nTslices, int *tSlices)
-/*		void SetTimeSlice	(const int nTslices)
-		{
-			if	((contract_type != QUDA_CONTRACT_TSLICE) && (contract_type != QUDA_CONTRACT_TSLICE_PLUS) && (contract_type != QUDA_CONTRACT_TSLICE_MINUS))
-			{
-				errorQuda("Can't set time slice for contraction in a full volume contraction\n");
-				return;
-			}
-/*
-			if	(cudaMallocHost(&tSlice, nTslices*sizeof(int)) != cudaSuccess)
-			{
-				errorQuda("Can't allocate memory to store contraction time-slices (...really?)\n");
-				return;
-			}
-*/
-//			nTSlice	= nTslices;
-/*
-			if	(cudaMemCpy((void*) tSlice, (void*) tSlices, nTslice*sizeof(int), cudaMemcpyHostToHost) != cudaSuccess)
-			{
-				errorQuda("Can't copy time-slices\n");
-				return;
-			}
-*/
-//			return;
-//		}	
-
 		TuneKey tuneKey() const
 		{
 			return TuneKey(x.VolString(), typeid(*this).name(), aux[contract_type]);
@@ -254,76 +228,40 @@ namespace quda
 			switch	(contract_type)
 			{
 				default:
-				case	QUDA_CONTRACT_GAMMA5:
+				case	QUDA_CONTRACT_GAMMA5:		// Calculates the volume contraction (x^+ g5)_\mu y_\nu and stores it in result
 				contractGamma5Kernel     <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 				break;
 	
-				case	QUDA_CONTRACT_GAMMA5_PLUS:
+				case	QUDA_CONTRACT_GAMMA5_PLUS:	// Calculates the volume contraction (x^+ g5)_\mu y_\nu and adds it to result
 				contractGamma5PlusKernel <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 				break;
 
-				case	QUDA_CONTRACT_GAMMA5_MINUS:
+				case	QUDA_CONTRACT_GAMMA5_MINUS:	// Calculates the volume contraction (x^+ g5)_\mu y_\nu and substracts it from result
 				contractGamma5MinusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 				break;
 
-				case	QUDA_CONTRACT:
+				case	QUDA_CONTRACT:			// Calculates the volume contraction x^+_\mu y_\nu and stores it in result
 				contractKernel    	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 				break;                                                  
 	                                                                                
-				case	QUDA_CONTRACT_PLUS:                             
+				case	QUDA_CONTRACT_PLUS:		// Calculates the volume contraction x^+_\mu y_\nu and adds it to result
 				contractPlusKernel	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 				break;                                                  
                                                                                         
-				case	QUDA_CONTRACT_MINUS:                            
+				case	QUDA_CONTRACT_MINUS:		// Calculates the volume contraction x^+_\mu y_\nu and substracts it from result
 				contractMinusKernel	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), parity, dslashParam);
 				break;
 
-				case	QUDA_CONTRACT_TSLICE:
-/*				for	(int i=0; i<nTslice; i++) {
-					#ifdef	MULTI_GPU			//In MultiGPU we perform the time-slice contraction only if the corresponding rank is storing that time-slice
-						if	(comm_dim(3) > 1)
-						{
-							tO	= comm_coord(3)*x.X(3);
-							tF	= t_O + x.X(3);
-
-							if	((tSlice[i] < t_O) || (tSlice[i] > t_F))
-								continue;
-						}
-					#endif*/
-					contractTsliceKernel   	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
-//				}
+				case	QUDA_CONTRACT_TSLICE:		// Calculates the time-slice contraction x^+_\mu y_\nu and stores it in result
+				contractTsliceKernel   	 <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
 				break;                                                  
 	                                                                                
-				case	QUDA_CONTRACT_TSLICE_PLUS:                             
-/*				for	(int i=0; i<nTslice; i++) {
-					#ifdef	MULTI_GPU			//In MultiGPU we perform the time-slice contraction only if the corresponding rank is storing that time-slice
-						if	(comm_dim(3) > 1)
-						{
-							tO	= comm_coord(3)*x.X(3);
-							tF	= t_O + x.X(3);
-
-							if	((tSlice[i] < t_O) || (tSlice[i] > t_F))
-								continue;
-						}
-					#endif*/
-					contractTslicePlusKernel <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
-//				}
+				case	QUDA_CONTRACT_TSLICE_PLUS:	// Calculates the time-slice contraction x^+_\mu y_\nu and adds it to result
+				contractTslicePlusKernel <<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
 				break;                                                  
                                                                                         
-				case	QUDA_CONTRACT_TSLICE_MINUS:                            
-		/*		for	(int i=0; i<nTslice; i++) {
-					#ifdef	MULTI_GPU			//In MultiGPU we perform the time-slice contraction only if the corresponding rank is storing that time-slice
-						if	(comm_dim(3) > 1)
-						{
-							tO	= comm_coord(3)*x.X(3);
-							tF	= t_O + x.X(3);
-
-							if	((tSlice[i] < t_O) || (tSlice[i] > t_F))
-								continue;
-						}
-					#endif*/
-					contractTsliceMinusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
-//				}
+				case	QUDA_CONTRACT_TSLICE_MINUS:	// Calculates the time-slice contraction x^+_\mu y_\nu and substracts it from result
+				contractTsliceMinusKernel<<<tp.grid, tp.block, tp.shared_bytes>>>((rFloat*)result, (Float2*)x.V(), (Float2*)y.V(), x.Stride(), nTSlice, parity, dslashParam);
 				break;
 			}
 		}
@@ -343,6 +281,12 @@ namespace quda
 		long long flops() const { return 120ll * dslashConstants.VolumeCB(); }
 		long long bytes() const { return x.Bytes() + x.NormBytes() + y.Bytes() + y.NormBytes(); }
 	};
+
+	/**
+	  Contracts the x and y spinors (x is daggered) and stores the result in the array result. One must specify the contract type (time-sliced or volumed contract, and whether we should include
+	  a gamma5 in the middle), as well as the time-slice (see overloaded version of the same function) in case we don't want a volume contraction. The function works only with parity spinors,
+	  and the parity must be specified.
+	*/
 
 	void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const QudaParity parity)
 	{
@@ -366,7 +310,6 @@ namespace quda
 			contract = new ContractCuda<float4,float2>(x, y, result, parity, contract_type);
 		} else if	(x.Precision() == QUDA_HALF_PRECISION) {
 			errorQuda("Half precision not supported for gamma5 kernel yet");
-//			gamma5 = new Gamma5Cuda<short4>(out, in);
 		}
 
 		contract->apply(streams[Nstream-1]);
@@ -375,7 +318,12 @@ namespace quda
 		delete contract;
 	}
 
-	void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const int nTSlice, const QudaParity parity) //int *tSlices, const int parity)
+	/**
+	  Contracts the x and y spinors (x is daggered) and stores the result in the array result. One must specify the contract type (time-sliced or volumed contract, and whether we should include
+	  a gamma5 in the middle), as well as the time-slice in case we don't want a volume contraction. The function works only with parity spinors, and the parity must be specified.
+	*/
+
+	void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const int nTSlice, const QudaParity parity)
 	{
 		if	((contract_type != QUDA_CONTRACT_TSLICE) || (contract_type != QUDA_CONTRACT_TSLICE_PLUS) || (contract_type != QUDA_CONTRACT_TSLICE_MINUS)) {
 			errorQuda("No time-slice input allowed for volume contractions\n");
@@ -397,7 +345,6 @@ namespace quda
 			contract = new ContractCuda<float4,float2>(x, y, result, parity, contract_type, nTSlice);
 		} else if	(x.Precision() == QUDA_HALF_PRECISION) {
 			errorQuda("Half precision not supported for gamma5 kernel yet");
-//			gamma5 = new Gamma5Cuda<short4>(out, in);
 		}
 
 		contract->apply(streams[Nstream-1]);
@@ -405,238 +352,5 @@ namespace quda
 
 		delete contract;
 	}
-
-/*
-	void	contractGamma5Cuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const int sign, const dim3 &blockDim, int *XS, const int Parity)
-	{
-		dim3 gridDim((x.Volume() - 1) / blockDim.x + 1, 1, 1);	//CHANGE FOR MULTI_GPU
-
-		checkSpinor(x,y);
-
-		if	(x.Precision() == QUDA_HALF_PRECISION)
-			errorQuda("Error: Half precision not supported");
-
-		if	(x.Precision() == QUDA_DOUBLE_PRECISION)
-		{
-			bindSpinorTex<double2>(&x, &y);
-
-			switch	(sign)
-			{
-				default:
-				case	0:
-				contractGamma5Kernel     <<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-	
-				case	1:
-				contractGamma5PlusKernel <<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-
-				case	2:
-				contractGamma5MinusKernel<<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-			}
-		}
-		else if	(x.Precision() == QUDA_SINGLE_PRECISION)
-		{
-			bindSpinorTex<float4>(&x, &y);
-
-			switch	(sign)
-			{
-				default:
-				case	0:
-				contractGamma5Kernel     <<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-	
-				case	1:
-				contractGamma5PlusKernel <<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-
-				case	2:
-				contractGamma5MinusKernel<<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-			}
-		}
-
-		cudaDeviceSynchronize	();
-		checkCudaError		();
-
-		return;
-	}
-*/
-/*
-	void	contractTsliceCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const int sign, const dim3 &blockDim, int *XS, const int Tslice, const int Parity)
-	{
-	        const int tVolume = x.X(0)*x.X(1)*x.X(2);//!half volume (check it!), i.e., x.Volume() / x.X(3);
-		dim3 gridDim((tVolume - 1) / blockDim.x + 1, 1, 1);	//CHANGE FOR MULTI_GPU
-
-		checkSpinor(x,y);
-
-		if	(x.Precision() == QUDA_HALF_PRECISION)
-			errorQuda("Error: Half precision not supported");
-
-		if	(x.Precision() == QUDA_DOUBLE_PRECISION)
-		{
-			#ifndef USE_TEXTURE_OBJECTS
-				int	spinor_bytes	= x.Length()*sizeof(double);
-
-				cudaBindTexture(0, spinorTexDouble, x.V(), spinor_bytes);
-				cudaBindTexture(0, interTexDouble,  y.V(), spinor_bytes);
-			#else
-				dslashParam.inTex	 = (&x)->Tex();
-				dslashParam.inTexNorm	 = (&x)->TexNorm();
-				dslashParam.xTex	 = (&y)->Tex();
-				dslashParam.xTexNorm	 = (&y)->TexNorm();
-			#endif
-
-			switch	(sign)
-			{
-				default:
-				case	0:
-				contractTsliceKernel     <<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), tVolume, x.Stride(), XS[0], XS[1], XS[2], Tslice, Parity, dslashParam);
-				break;
-		
-				case	1:
-				contractTslicePlusKernel <<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), tVolume, x.Stride(), XS[0], XS[1], XS[2], Tslice, Parity, dslashParam);
-				break;
-
-				case	2:
-				contractTsliceMinusKernel<<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), tVolume, x.Stride(), XS[0], XS[1], XS[2], Tslice, Parity, dslashParam);
-				break;
-			}
-
-			#ifndef USE_TEXTURE_OBJECTS
-				cudaUnbindTexture(spinorTexDouble);
-				cudaUnbindTexture(interTexDouble);
-			#endif
-		}
-
-		if	(x.Precision() == QUDA_SINGLE_PRECISION)
-		{
-			#ifndef USE_TEXTURE_OBJECTS
-				int	spinor_bytes	= x.Length()*sizeof(float);
-
-				cudaBindTexture(0, spinorTexSingle, x.V(), spinor_bytes);
-				cudaBindTexture(0, interTexSingle,  y.V(), spinor_bytes);
-			#else
-				dslashParam.inTex	 = (&x)->Tex();
-				dslashParam.inTexNorm	 = (&x)->TexNorm();
-				dslashParam.xTex	 = (&y)->Tex();
-				dslashParam.xTexNorm	 = (&y)->TexNorm();
-			#endif
-
-			switch	(sign)
-			{
-				default:
-				case	0:
-				contractTsliceKernel     <<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), tVolume, x.Stride(), XS[0], XS[1], XS[2], Tslice, Parity, dslashParam);
-				break;
-		
-				case	1:
-				contractTslicePlusKernel <<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), tVolume, x.Stride(), XS[0], XS[1], XS[2], Tslice, Parity, dslashParam);
-				break;
-
-				case	2:
-				contractTsliceMinusKernel<<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), tVolume, x.Stride(), XS[0], XS[1], XS[2], Tslice, Parity, dslashParam);
-				break;
-			}
-
-			#ifndef USE_TEXTURE_OBJECTS
-				cudaUnbindTexture(spinorTexSingle);
-				cudaUnbindTexture(interTexSingle);
-			#endif
-		}
-		cudaDeviceSynchronize	();
-		checkCudaError		();
-
-		return;
-	}
-/*
-	void	contractCuda		(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const int sign, const dim3 &blockDim, int *XS, const int Parity)
-	{
-		dim3 gridDim((x.Volume() - 1) / blockDim.x + 1, 1, 1);	//CHANGE FOR MULTI_GPU
-
-		checkSpinor(x,y);
-
-		if	(x.Precision() == QUDA_HALF_PRECISION)
-			errorQuda("Error: Half precision not supported");
-
-		if	(x.Precision() == QUDA_DOUBLE_PRECISION)
-		{
-			#ifndef USE_TEXTURE_OBJECTS
-				int	spinor_bytes	= x.Length()*sizeof(double);
-
-				cudaBindTexture(0, spinorTexDouble, x.V(), spinor_bytes);
-				cudaBindTexture(0, interTexDouble,  y.V(), spinor_bytes);
-			#else
-				dslashParam.inTex	 = (&x)->Tex();
-				dslashParam.inTexNorm	 = (&x)->TexNorm();
-				dslashParam.xTex	 = (&y)->Tex();
-				dslashParam.xTexNorm	 = (&y)->TexNorm();
-			#endif
-
-			switch	(sign)
-			{
-				default:
-				case	0:
-				contractKernel     <<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-	
-				case	1:
-				contractPlusKernel <<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-
-				case	2:
-				contractMinusKernel<<<gridDim, blockDim, blockDim.x*32*sizeof(double)>>>((double2*)result, (double2*)x.V(), (double2*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-			}
-
-			#ifndef USE_TEXTURE_OBJECTS
-				cudaUnbindTexture(spinorTexDouble);
-				cudaUnbindTexture(interTexDouble);
-			#endif
-		}
-
-		if	(x.Precision() == QUDA_SINGLE_PRECISION)
-		{
-			#ifndef USE_TEXTURE_OBJECTS
-				int	spinor_bytes	= x.Length()*sizeof(float);
-
-				cudaBindTexture(0, spinorTexSingle, x.V(), spinor_bytes);
-				cudaBindTexture(0, interTexSingle,  y.V(), spinor_bytes);
-			#else
-				dslashParam.inTex	 = (&x)->Tex();
-				dslashParam.inTexNorm	 = (&x)->TexNorm();
-				dslashParam.xTex	 = (&y)->Tex();
-				dslashParam.xTexNorm	 = (&y)->TexNorm();
-			#endif
-
-			switch	(sign)
-			{
-				default:
-				case	0:
-				contractKernel     <<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-	
-				case	1:
-				contractPlusKernel <<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-
-				case	2:
-				contractMinusKernel<<<gridDim, blockDim, blockDim.x*32*sizeof(float)>>>((float2*)result, (float4*)x.V(), (float4*)y.V(), x.Volume(), x.Stride(), XS[0], XS[1], XS[2], Parity, dslashParam);
-				break;
-			}
-
-			#ifndef USE_TEXTURE_OBJECTS
-				cudaUnbindTexture(spinorTexSingle);
-				cudaUnbindTexture(interTexSingle);
-			#endif
-		}
-
-		cudaDeviceSynchronize	();
-		checkCudaError		();
-
-		return;
-	}
-*/
 }
 
