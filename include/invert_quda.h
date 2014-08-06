@@ -653,7 +653,7 @@ namespace quda {
     virtual ~IncEigCG();
 
     //GMRES-DR solver
-    void GmresDR(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void GmresDRFirstCycle(cudaColorSpinorField &out, cudaColorSpinorField &in);
 
     //GMRES-DR solver 
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
