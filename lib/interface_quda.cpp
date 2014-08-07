@@ -2527,6 +2527,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       }
 
       SolverParam solverParam(*param);
+      solverParam.iter = 0;
       solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
       solverParam.tol = param->tol_offset[i]; // set L2 tolerance
       solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
