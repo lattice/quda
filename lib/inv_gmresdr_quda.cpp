@@ -330,13 +330,21 @@ namespace quda {
       PrintStats("GMRES DR (first cycle)", k, r2, b2);
     }
 
-    if(convergence(r2, stop))//we done , get solution
+    g[k] /= H[k*m+k].real(); 
+    caxpyCuda(g[k], Vm->Eigenvec(k), x);
+
+    for(int i = k-1; i >= 0; i++)
     {
-       g[k] /= H[k*m+k].real(); 
-       caxpyCuda(g[k], Vm->Eigenvec(k), x);
-    
-       //solve triangular system and update the solution here...
+      for(int j = i+1; j <= k; j++)
+      {
+         g[i] -= H[i*m + j]*g[j];  
+      }
+      g[i] /= H[k*m+k].real(); 
+      caxpyCuda(g[i], Vm->Eigenvec(i), x);
     }
+
+
+    if(convergence(r2, stop)) {};//return
 
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
