@@ -143,66 +143,65 @@ namespace quda {
   // Apply the even-odd preconditioned mobius DWF operator
   void DiracMobiusDomainWallPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    if(dagger == QUDA_DAG_NO)
+    {
+      if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
-    bool reset1 = newTmp(&tmp1, in);
+      bool reset1 = newTmp(&tmp1, in);
 
-    //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
-    //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
-    //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      Dslash4pre(*tmp1, in, QUDA_ODD_PARITY);
-      Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
-      Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5); //kappa5 is dummy value
-      Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
-      Dslash4(*tmp1, out, QUDA_ODD_PARITY);
-      Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      Dslash4pre(*tmp1, in, QUDA_EVEN_PARITY);
-      Dslash4(out, *tmp1, QUDA_ODD_PARITY);
-      Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5); //kappa5 is dummy value
-      Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
-      Dslash4(*tmp1, out, QUDA_EVEN_PARITY);
-      Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
-    } else {
-      errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
+      //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
+      //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
+      //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
+      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+        Dslash4pre(*tmp1, in, QUDA_ODD_PARITY);
+        Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
+        Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5); //kappa5 is dummy value
+        Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
+        Dslash4(*tmp1, out, QUDA_ODD_PARITY);
+        Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
+      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+        Dslash4pre(*tmp1, in, QUDA_EVEN_PARITY);
+        Dslash4(out, *tmp1, QUDA_ODD_PARITY);
+        Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5); //kappa5 is dummy value
+        Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
+        Dslash4(*tmp1, out, QUDA_EVEN_PARITY);
+        Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
+      } else {
+        errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
+      }
+
+      deleteTmp(&tmp1, reset1);
     }
+    else
+    {
+      if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
-    deleteTmp(&tmp1, reset1);
-  }
+      bool reset1 = newTmp(&tmp1, in);
 
-#define flip(x) (x) = ((x) == QUDA_DAG_YES ? QUDA_DAG_NO : QUDA_DAG_YES)
-  void DiracMobiusDomainWallPC::Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
-  {
-    flip(dagger);
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
-    bool reset1 = newTmp(&tmp1, in);
-
-    //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
-    //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
-    //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      Dslash4(*tmp1, in, QUDA_EVEN_PARITY);
-      Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
-      Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5);
-      Dslash4(out, *tmp1, QUDA_ODD_PARITY);
-      Dslash4pre(*tmp1, out, QUDA_EVEN_PARITY);
-      Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      Dslash4(*tmp1, in, QUDA_ODD_PARITY);
-      Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
-      Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5);
-      Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
-      Dslash4pre(*tmp1, out, QUDA_ODD_PARITY);
-      Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
-    } else {
-      errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
+      //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
+      //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
+      //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
+      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+        Dslash4(*tmp1, in, QUDA_EVEN_PARITY);
+        Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
+        Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5);
+        Dslash4(out, *tmp1, QUDA_ODD_PARITY);
+        Dslash4pre(*tmp1, out, QUDA_EVEN_PARITY);
+        //Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
+        Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
+      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+        Dslash4(*tmp1, in, QUDA_ODD_PARITY);
+        Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
+        Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5);
+        Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
+        Dslash4pre(*tmp1, out, QUDA_ODD_PARITY);
+        //Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
+        Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
+      } else {
+        errorQuda("MatPCType %d not valid for DiracMobiusDomainWallPC", matpcType);
+      }
+      deleteTmp(&tmp1, reset1);
     }
-
-//    printf( "MDag is done\n" );
-    deleteTmp(&tmp1, reset1);
-    flip(dagger);
   }
 
   void DiracMobiusDomainWallPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
