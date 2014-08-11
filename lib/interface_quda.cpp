@@ -1456,11 +1456,8 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
-  //Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-
   dirac->M(out, in); // apply the operator
-
   delete dirac; // clean up
 
   double kappa = inv_param->kappa;
