@@ -95,8 +95,6 @@ namespace quda {
     /** The size in bytes of pinned-memory buffer */
     static size_t bufferPinnedBytes[2];
 
-    static int bufferIndex;
-
     /** Resize the pinned-memory buffer */
     void resizeBufferPinned(size_t bytes, const int index=0) const;
 
@@ -124,33 +122,33 @@ namespace quda {
     */
 
     /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *my_face;
-    void *my_fwd_face[QUDA_MAX_DIM];
-    void *my_back_face[QUDA_MAX_DIM];
+    void *my_face[2];
+    void *my_fwd_face[2][QUDA_MAX_DIM];
+    void *my_back_face[2][QUDA_MAX_DIM];
 
     /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *from_face;
-    void *from_back_face[QUDA_MAX_DIM];
-    void *from_fwd_face[QUDA_MAX_DIM];
+    void *from_face[2];
+    void *from_back_face[2][QUDA_MAX_DIM];
+    void *from_fwd_face[2][QUDA_MAX_DIM];
     
     /** Message handles for receiving from forwards */
-    MsgHandle ***mh_recv_fwd;
+    MsgHandle ***mh_recv_fwd[2];
 
     /** Message handles for receiving from backwards */
-    MsgHandle ***mh_recv_back;
+    MsgHandle ***mh_recv_back[2];
 
     /** Message handles for sending forwards */
-    MsgHandle ***mh_send_fwd;
+    MsgHandle ***mh_send_fwd[2];
 
     /** Message handles for sending backwards */
-    MsgHandle ***mh_send_back;
+    MsgHandle ***mh_send_back[2];
     
   public:
     LatticeField(const LatticeFieldParam &param);
     virtual ~LatticeField();
 
     /** Free the pinned-memory buffer */
-    static void freeBuffer(const int index=0);
+    static void freeBuffer(int index=0);
 
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
