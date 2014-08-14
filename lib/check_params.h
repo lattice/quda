@@ -366,7 +366,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(rhs_idx, 0);
   P(deflation_grid, 0);
 #else
-  P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
+  //P(cuda_prec_ritz, QUDA_INVALID_PRECISION);
   P(nev, INVALID_INT);
   P(max_search_dim, INVALID_INT);
   P(rhs_idx, INVALID_INT);
