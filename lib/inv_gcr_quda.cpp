@@ -290,7 +290,7 @@ namespace quda {
 	
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
 	  else copyCuda(pPre, rPre);
-	
+
 	  // relaxation p = omega*p + (1-omega)*r
 	  //if (param.omega!=1.0) axpbyCuda((1.0-param.omega), rPre, param.omega, pPre);
 	
@@ -332,7 +332,7 @@ namespace quda {
    
       // update since Nkrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every Nkrylov steps
-      if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || r2/r2_old < param.delta) { 
+      if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) { 
 
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
