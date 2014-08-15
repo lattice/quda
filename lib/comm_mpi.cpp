@@ -215,9 +215,10 @@ void comm_allreduce_max(double* data)
 
 void comm_allreduce_array(double* data, size_t size)
 {
-  double recvbuf[size];
-  MPI_CHECK( MPI_Allreduce(data, &recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
-  memcpy(data, recvbuf, sizeof(recvbuf));
+  double *recvbuf = new double[size];
+  MPI_CHECK( MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
+  memcpy(data, recvbuf, size*sizeof(double));
+  delete []recvfbuf;
 }
 
 
