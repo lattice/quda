@@ -1677,7 +1677,7 @@ namespace quda {
         // Initialize pack from source spinor
 
         if (inCloverInv == NULL) {
-          PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, twist_a, twist_b), 
+          PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, false, twist_a, twist_b), 
               profile, QUDA_PROFILE_PACK_KERNEL);
         } else {
           PROFILE(face[it]->pack(*inSpinor, *inClover, *inCloverInv, 1-parity, dagger,
@@ -1890,7 +1890,7 @@ namespace quda {
 
         // Initialize pack from source spinor
         if (inCloverInv == NULL) {
-          PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a, twist_b),
+          PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
               profile, QUDA_PROFILE_PACK_KERNEL);
         } else {
           PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
