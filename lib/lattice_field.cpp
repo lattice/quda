@@ -11,6 +11,8 @@ namespace quda {
   void* LatticeField::bufferPinned[] = {NULL};
   bool LatticeField::bufferPinnedInit[] = {false};
   size_t LatticeField::bufferPinnedBytes[] = {0};
+  bool LatticeField::resetComms = true;
+
 
   void* LatticeField::bufferDevice = NULL;
   bool LatticeField::bufferDeviceInit = false;
@@ -94,6 +96,7 @@ namespace quda {
       bufferPinned[idx] = pinned_malloc(bytes);
       bufferPinnedBytes[idx] = bytes;
       bufferPinnedInit[idx] = true;
+      resetComms = true;
     }
   }
 

@@ -827,6 +827,11 @@ namespace quda {
   cudaStream_t *stream;
 
   void cudaColorSpinorField::createComms(int nFace) {
+
+    if(resetComms) destroyComms();
+
+
+
     if (!initComms || nFaceComms != nFace) {
 
 
@@ -1052,7 +1057,8 @@ namespace quda {
 
 	} // loop over dimension
       }
-      
+     
+      resetComms = false; // reset communications next time createComms is called? 
       initComms = true;
       nFaceComms = nFace;
     }
