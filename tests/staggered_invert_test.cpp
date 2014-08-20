@@ -112,15 +112,18 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
   gaugeParam->ga_pad = X1*X2*X3/2;
+  gaugeParam->overlap = 0;
 
   inv_param->verbosity = QUDA_VERBOSE;
+  //inv_param->verbosity = QUDA_DEBUG_VERBOSE;
   inv_param->mass = mass;
 
   // outer solver parameters
   inv_param->inv_type = inv_type;
   inv_param->tol = tol;
-  inv_param->tol_restart = 1e-3; //now theoretical background for this parameter... 
-  inv_param->maxiter = 500000;
+  inv_param->tol_restart = 1e-7; //now theoretical background for this parameter... 
+  //inv_param->maxiter = 500000;
+  inv_param->maxiter = 100;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
@@ -143,6 +146,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   // domain decomposition preconditioner parameters
   inv_param->inv_type_precondition = QUDA_SD_INVERTER;
+  //inv_param->inv_type_precondition = QUDA_XSD_INVERTER;
+  inv_param->overlap = 0;
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
@@ -296,7 +301,9 @@ invert_test(void)
   gaugeParam.ga_pad = fat_pad;
   gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
+  printfQuda("HI1!\n");
   loadGaugeQuda(fatlink, &gaugeParam);
+  printfQuda("HI2!\n");
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
@@ -332,6 +339,7 @@ invert_test(void)
       if(inv_type == QUDA_GCR_INVERTER){
       	inv_param.inv_type = QUDA_GCR_INVERTER;
       	inv_param.gcrNkrylov = 50;
+	printfQuda("GCR! Nkrylov: %d\n", inv_param.gcrNkrylov);
       }else if(inv_type == QUDA_PCG_INVERTER){
 	inv_param.inv_type = QUDA_PCG_INVERTER;
       }

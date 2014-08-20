@@ -28,6 +28,7 @@ namespace quda {
   void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
     inner.tol = outer.tol_precondition;
     inner.maxiter = outer.maxiter_precondition;
+    inner.overlap_precondition = outer.overlap_precondition;
     inner.delta = 1e-20; // no reliable updates within the inner solver
   
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
@@ -144,6 +145,8 @@ namespace quda {
       K = new MR(matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner MR preconditioner
       K = new SD(matPrecon, Kparam, profile);
+    else if (param.inv_type_precondition == QUDA_XSD_INVERTER) // inner XSD preconditioner
+      K = new XSD(matPrecon, Kparam, profile);
     else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
 
@@ -250,6 +253,7 @@ namespace quda {
     }
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+    double restart_cond = stopping(param.tol_restart, b2, param.residual_type); //when to restart
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -288,7 +292,11 @@ namespace quda {
 	    copyCuda(rPre, *rM);
 	  }
 	
-	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
+	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) { 
+	    printfQuda("GCR: before inner solve!\n");
+	    (*K)(pPre, rPre);
+	    printfQuda("GCR: after inner solve!\n");
+	  }
 	  else copyCuda(pPre, rPre);
 
 	  // relaxation p = omega*p + (1-omega)*r
@@ -334,8 +342,12 @@ namespace quda {
       // note that the heavy quark residual will by definition only be checked every Nkrylov steps
       if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) { 
 
+	printfQuda("low_prec_r2 %e stop %e restart_cond %e\n", r2, stop, restart_cond);
+
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
+
+	//if(convergence(r2, heavy_quark_res, stop, param.tol_hq)) { break; }
 
 	// recalculate residual in high precision
 	copyCuda(x, xSloppy);
@@ -343,11 +355,13 @@ namespace quda {
 	mat(r, y, x);
 	r2 = xmyNormCuda(b, r);  
 
+	printfQuda("high_prec_r2 %e stop %e restart_cond %e\n", r2, stop, restart_cond);
+
 	if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
 
 	k = 0;
 
-	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
+	if ( !convergence(r2, heavy_quark_res, restart_cond, param.tol_hq) ) {
 	  restart++; // restarting if residual is still too great
 
 	  PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
