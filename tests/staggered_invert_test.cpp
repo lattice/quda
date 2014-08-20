@@ -123,7 +123,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-7; //now theoretical background for this parameter... 
   //inv_param->maxiter = 500000;
-  inv_param->maxiter = 100;
+  inv_param->maxiter = 5000;
   inv_param->reliable_delta = 1e-1;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
