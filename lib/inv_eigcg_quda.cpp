@@ -756,7 +756,7 @@ namespace quda {
      magma_args.MagmaHEEVD(projm, evals, dpar->cur_dim, true);
 
      //reset projection matrix:
-     memcpy(dpar->ritz_values, evals, dpar->cur_dim*sizeof(double));
+     for(int i = 0; i < dpar->cur_dim; i++) dpar->ritz_values[i] = (fabs(evals[i]) > 1e-16) ? 1.0 / evals[i] : 0.0;
 
      ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
      csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -812,7 +812,7 @@ namespace quda {
             
          	relerr = sqrt( normCuda(*W) / norm2W );
                 //
-         	printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", idx, evals[(idx-1)], relerr);
+         	printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", (idx+1), evals[idx], relerr);
          }
 
          zeroCuda(*W);
@@ -890,7 +890,7 @@ namespace quda {
     {
       Complex tmp = cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(i), b);//<i, b>
 
-      tmp = (fabs(dpar->ritz_values[i]) > 1e-16) ? tmp / dpar->ritz_values[i] : Complex(0.0, 0.0);
+      tmp = tmp * dpar->ritz_values[i];
 
       caxpyCuda(tmp, dpar->cudaRitzVectors->Eigenvec(i), x); //a*i+x
     }    
