@@ -605,11 +605,11 @@ namespace quda {
     virtual void preTune()
     {
       if (dslashParam.kernel_type < 5) { // exterior kernel
-	saveOut = new char[in->Bytes()];
-	cudaMemcpy(saveOut, out->V(), in->Bytes(), cudaMemcpyDeviceToHost);
+	saveOut = new char[out->Bytes()];
+	cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
 	if (out->Precision() == QUDA_HALF_PRECISION) {
-	  saveOutNorm = new char[in->NormBytes()];
-	  cudaMemcpy(saveOutNorm, out->Norm(), in->NormBytes(), cudaMemcpyDeviceToHost);
+	  saveOutNorm = new char[out->NormBytes()];
+	  cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
 	}
       }
     }
@@ -617,10 +617,10 @@ namespace quda {
     virtual void postTune()
     {
       if (dslashParam.kernel_type < 5) { // exterior kernel
-	cudaMemcpy(out->V(), saveOut, in->Bytes(), cudaMemcpyHostToDevice);
+	cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
 	delete[] saveOut;
 	if (out->Precision() == QUDA_HALF_PRECISION) {
-	  cudaMemcpy(out->Norm(), saveOutNorm, in->NormBytes(), cudaMemcpyHostToDevice);
+	  cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
 	  delete[] saveOutNorm;
 	}
       }
