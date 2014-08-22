@@ -359,6 +359,9 @@ namespace quda {
     /** Whether we have initialized communication for this field */
     bool initComms;
 
+    /** Keep track of which pinned-memory buffer we used for creating message handlers */
+    size_t bufferMessageHandler;
+
     /** How many faces we are communicating in this communicator */
     int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 

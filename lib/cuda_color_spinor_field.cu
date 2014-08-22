@@ -35,7 +35,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false), 
-    initComms(false), nFaceComms(0) {
+    initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -59,7 +59,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-    initComms(false), nFaceComms(0) {
+    initComms(false), bufferMessageHandler(0), nFaceComms(0) {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
   }
@@ -68,7 +68,7 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src, 
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-    initComms(false), nFaceComms(0) {  
+    initComms(false), bufferMessageHandler(0), nFaceComms(0) {  
 
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -123,7 +123,7 @@ namespace quda {
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false), 
-      initComms(false), nFaceComms(0) {
+      initComms(false), bufferMessageHandler(0), nFaceComms(0) {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
     clearGhostPointers();
@@ -828,9 +828,7 @@ namespace quda {
 
   void cudaColorSpinorField::createComms(int nFace) {
 
-    if(resetComms) destroyComms();
-
-
+    if(bufferMessageHandler != bufferPinnedResizeCount) destroyComms();
 
     if (!initComms || nFaceComms != nFace) {
 
@@ -1058,7 +1056,7 @@ namespace quda {
 	} // loop over dimension
       }
      
-      resetComms = false; // reset communications next time createComms is called? 
+      bufferMessageHandler = bufferPinnedResizeCount;
       initComms = true;
       nFaceComms = nFace;
     }

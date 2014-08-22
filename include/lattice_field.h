@@ -98,8 +98,8 @@ namespace quda {
     /** Resize the pinned-memory buffer */
     void resizeBufferPinned(size_t bytes, const int index=0) const;
 
-
-    static bool resetComms;
+    /** Keep track of resizes to the pinned memory buffers */
+    static size_t bufferPinnedResizeCount;
 
     /** Device-memory buffer that is used by all derived classes */
     static void *bufferDevice; 
