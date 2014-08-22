@@ -42,8 +42,8 @@ namespace quda {
   void initCloverConstants (const cudaCloverField &clover, TimeProfile &profile);
   void initStaggeredConstants(const cudaGaugeField &fatgauge, 
 			      const cudaGaugeField &longgauge, TimeProfile &profile);
-  void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h);
-  void deleteMDWFConstants();
+  void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, 
+			 const double m5h, TimeProfile &profile);
 //!ndeg tm:
   void initTwistedMassConstants(const int flv_stride, TimeProfile &profile);
 
