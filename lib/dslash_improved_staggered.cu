@@ -40,28 +40,23 @@
 
 #include <inline_ptx.h>
 
-enum KernelType {
-  INTERIOR_KERNEL = 5,
-  EXTERIOR_KERNEL_X = 0,
-  EXTERIOR_KERNEL_Y = 1,
-  EXTERIOR_KERNEL_Z = 2,
-  EXTERIOR_KERNEL_T = 3
-};
-
 namespace quda {
 
   namespace improvedstaggered {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
+#include <dslash_index.cuh>
 
     // Enable shared memory dslash for Fermi architecture
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
-#include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #include <dslash_quda.cuh>
-  } // end namespace staggered
+  } // end namespace improvedstaggered
+
+  // declare the dslash events
+#include <dslash_events.cuh>
 
   using namespace improvedstaggered;
 

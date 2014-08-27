@@ -55,6 +55,7 @@ void inline initDslashCommsPattern() {
 
 void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  using namespace dslash;
   profile.Start(QUDA_PROFILE_TOTAL);
 
   dslashParam.parity = parity;
@@ -227,6 +228,7 @@ void* launchInteriorKernel(void* interiorParam)
 
 void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		 const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  using namespace dslash;
 
   profile.Start(QUDA_PROFILE_TOTAL);
 
@@ -440,6 +442,8 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 */
 void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 			const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+  using namespace dslash;
+
   profile.Start(QUDA_PROFILE_TOTAL);
 
   dslashParam.parity = parity;

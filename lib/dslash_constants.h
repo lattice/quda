@@ -1,3 +1,11 @@
+enum KernelType {
+  INTERIOR_KERNEL = 5,
+  EXTERIOR_KERNEL_X = 0,
+  EXTERIOR_KERNEL_Y = 1,
+  EXTERIOR_KERNEL_Z = 2,
+  EXTERIOR_KERNEL_T = 3
+};
+
   struct DslashParam {
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even

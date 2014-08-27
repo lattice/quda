@@ -180,13 +180,13 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMass(param, 4);
         else return new DiracTwistedMass(param, 5);
-      } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
+    } else if (param.type == QUDA_TWISTED_MASSPC_DIRAC) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMassPC operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMassPC(param, 4);
         else return new DiracTwistedMassPC(param, 5);
-    } else {
-      return 0;
     }
+
+    return 0;
   }
 
 } // namespace quda

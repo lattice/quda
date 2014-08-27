@@ -50,39 +50,19 @@
 
 #include <inline_ptx.h>
 
-enum KernelType {
-  INTERIOR_KERNEL = 5,
-  EXTERIOR_KERNEL_X = 0,
-  EXTERIOR_KERNEL_Y = 1,
-  EXTERIOR_KERNEL_Z = 2,
-  EXTERIOR_KERNEL_T = 3
-};
-
 namespace quda {
 
 #include <dslash_constants.h>
 #include <dslash_textures.h>
+#include <dslash_index.cuh>
 
   // Enable shared memory dslash for Fermi architecture
   //#define SHARED_WILSON_DSLASH
   //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
-#include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
-#include <staggered_dslash_def.h> // staggered Dslash kernels
-#include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
-#include <dw_dslash_def.h>        // Domain Wall kernels
-#include <dw_dslash4_def.h>       // Dslash4 Domain Wall kernels
-#include <dw_dslash5_def.h>       // Dslash5 Domain Wall kernels
-#include <dw_dslash5inv_def.h>    // Dslash5inv Domain Wall kernels
-#include <mdw_dslash4_def.h>      // Dslash4, intermediate operator for Mobius Mat_4 kernels
-#include <mdw_dslash4pre_def.h>   // Dslash4pre, intermediate operator for Mobius Mat_4 kernels
-#include <mdw_dslash5_def.h>      // Dslash5 Mobius Domain Wall kernels
-#include <mdw_dslash5inv_def.h>   // Dslash5inv Mobius Domain Wall kernels
-#include <tm_dslash_def.h>        // Twisted Mass kernels
 #include <tm_core.h>              // solo twisted mass kernel
+#include <tmc_core.h>              // solo twisted mass kernel
 #include <clover_def.h>           // kernels for applying the clover term alone
-#include <tm_ndeg_dslash_def.h>   // Non-degenerate twisted Mass
-#include <tmc_dslash_def.h>       // Twisted Clover kernels
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0

@@ -24,19 +24,12 @@
 
 #include <inline_ptx.h>
 
-enum KernelType {
-  INTERIOR_KERNEL = 5,
-  EXTERIOR_KERNEL_X = 0,
-  EXTERIOR_KERNEL_Y = 1,
-  EXTERIOR_KERNEL_Z = 2,
-  EXTERIOR_KERNEL_T = 3
-};
-
 namespace quda {
 
   namespace domainwall4d {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
+#include <dslash_index.cuh>
 
     // Enable shared memory dslash for Fermi architecture
     //#define SHARED_WILSON_DSLASH
@@ -52,6 +45,9 @@ namespace quda {
 
 #include <dslash_quda.cuh>
   }
+
+  // declare the dslash events
+#include <dslash_events.cuh>
 
   using namespace domainwall4d;
 

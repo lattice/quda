@@ -25,26 +25,18 @@
 
 #include <inline_ptx.h>
 
-enum KernelType {
-  INTERIOR_KERNEL = 5,
-  EXTERIOR_KERNEL_X = 0,
-  EXTERIOR_KERNEL_Y = 1,
-  EXTERIOR_KERNEL_Z = 2,
-  EXTERIOR_KERNEL_T = 3
-};
-
 namespace quda {
 
   namespace twisted {
 
 #include <dslash_constants.h>
 #include <dslash_textures.h>
+#include <dslash_index.cuh>
 
     // Enable shared memory dslash for Fermi architecture
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
-#include <pack_face_def.h>        // kernels for packing the ghost zones and general indexing
 #include <tm_dslash_def.h>        // Twisted Mass kernels
 #include <tm_ndeg_dslash_def.h>   // Non-degenerate twisted Mass
 
@@ -60,6 +52,9 @@ namespace quda {
 
   } // end namespace twisted
   
+  // declare the dslash events
+#include <dslash_events.cuh>
+
   using namespace twisted;
 
   template <typename sFloat, typename gFloat>
