@@ -30,6 +30,7 @@ static __inline__ __device__ double2 fetch_double2_old(texture<int4, 1> t, int i
 }
 #endif //__COMPUTE_CAPABILITY__ >= 130
 
+
 #ifndef USE_TEXTURE_OBJECTS
 // Double precision gauge field
 texture<int4, 1> gauge0TexDouble2;
@@ -142,11 +143,11 @@ texture<float2, 1, cudaReadModeElementType> muLink1TexSingle;
 void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, void **gauge1)
 {
   if(oddBit) {
-    *gauge0 = gauge.odd;
-    *gauge1 = gauge.even;
+    *gauge0 = const_cast<void*>(gauge.Odd_p());
+    *gauge1 = const_cast<void*>(gauge.Even_p());
   } else {
-    *gauge0 = gauge.even;
-    *gauge1 = gauge.odd;
+    *gauge0 = const_cast<void*>(gauge.Even_p());
+    *gauge1 = const_cast<void*>(gauge.Odd_p());
   }
   
 #ifdef USE_TEXTURE_OBJECTS
@@ -212,11 +213,11 @@ void unbindGaugeTex(const cudaGaugeField &gauge)
 void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, void **gauge1)
 {
   if(oddBit) {
-    *gauge0 = gauge.odd;
-    *gauge1 = gauge.even;
+    *gauge0 = const_cast<void*>(gauge.Odd_p());
+    *gauge1 = const_cast<void*>(gauge.Even_p());
   } else {
-    *gauge0 = gauge.even;
-    *gauge1 = gauge.odd;
+    *gauge0 = const_cast<void*>(gauge.Even_p());
+    *gauge1 = const_cast<void*>(gauge.Odd_p());
   }
   
 #ifdef USE_TEXTURE_OBJECTS
@@ -256,11 +257,11 @@ void unbindFatGaugeTex(const cudaGaugeField &gauge)
 void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, void **gauge0, void **gauge1)
 {
   if(oddBit) {
-    *gauge0 = gauge.odd;
-    *gauge1 = gauge.even;
+    *gauge0 = const_cast<void*>(gauge.Odd_p());
+    *gauge1 = const_cast<void*>(gauge.Even_p());
   } else {
-    *gauge0 = gauge.even;
-    *gauge1 = gauge.odd;
+    *gauge0 = const_cast<void*>(gauge.Even_p());
+    *gauge1 = const_cast<void*>(gauge.Odd_p());
   }
   
 #ifdef USE_TEXTURE_OBJECTS
@@ -555,3 +556,31 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 	}
 #endif // not defined USE_TEXTURE_OBJECTS
 }
+
+// define some function if we're not using textures (direct access)
+#if defined(DIRECT_ACCESS_LINK) || defined(DIRECT_ACCESS_WILSON_SPINOR) || \
+  defined(DIRECT_ACCESS_WILSON_ACCUM) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
+  defined(DIRECT_ACCESS_WILSON_INTER) || defined(DIRECT_ACCESS_WILSON_PACK_SPINOR) || \
+  defined(DIRECT_ACCESS_CLOVER)
+
+  static inline __device__ float short2float(short a) {
+    return (float)a/MAX_SHORT;
+  }
+
+  static inline __device__ short float2short(float c, float a) {
+    return (short)(a*c*MAX_SHORT);
+  }
+
+  static inline __device__ short4 float42short4(float c, float4 a) {
+    return make_short4(float2short(c, a.x), float2short(c, a.y), float2short(c, a.z), float2short(c, a.w));
+  }
+
+  static inline __device__ float4 short42float4(short4 a) {
+    return make_float4(short2float(a.x), short2float(a.y), short2float(a.z), short2float(a.w));
+  }
+
+  static inline __device__ float2 short22float2(short2 a) {
+    return make_float2(short2float(a.x), short2float(a.y));
+  }
+#endif // DIRECT_ACCESS inclusions
+

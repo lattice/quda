@@ -15,9 +15,6 @@ namespace quda {
       profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
-    initLatticeConstants(gauge, profile);
-    initGaugeConstants(gauge, profile);
-    initDslashConstants(profile);
   }
 
   Dirac::Dirac(const Dirac &dirac) 
@@ -26,9 +23,6 @@ namespace quda {
       profile("Dirac")
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
-    initLatticeConstants(gauge, profile);
-    initGaugeConstants(gauge, profile);
-    initDslashConstants(profile);
   }
 
   Dirac::~Dirac() {   
@@ -82,8 +76,8 @@ namespace quda {
 
   void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
-    if (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || 
-	out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) {
+    if ( (in.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS || out.GammaBasis() != QUDA_UKQCD_GAMMA_BASIS) && 
+	 in.Nspin() == 4) {
       errorQuda("CUDA Dirac operator requires UKQCD basis, out = %d, in = %d", 
 		out.GammaBasis(), in.GammaBasis());
     }
@@ -170,16 +164,18 @@ namespace quda {
       return new DiracImprovedStaggeredPC(param);    
     } else if (param.type == QUDA_TWISTED_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedClover operator (%d flavor(s))\n", param.Ls);
-        if (param.Ls == 1) return new DiracTwistedClover(param, 4);
-        else{ 
-              errorQuda("Cannot create DiracTwistedClover operator for %d flavors\n", param.Ls);
-        }
-      } else if (param.type == QUDA_TWISTED_CLOVERPC_DIRAC) {
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedCloverPC operator (%d flavor(s))\n", param.Ls);
-        if (param.Ls == 1) return new DiracTwistedCloverPC(param, 4);
-        else{ 
-              errorQuda("Cannot create DiracTwistedCloverPC operator for %d flavors\n", param.Ls);
-        }
+      if (param.Ls == 1) {
+	return new DiracTwistedClover(param, 4);
+      } else { 
+	errorQuda("Cannot create DiracTwistedClover operator for %d flavors\n", param.Ls);
+      }
+    } else if (param.type == QUDA_TWISTED_CLOVERPC_DIRAC) {
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedCloverPC operator (%d flavor(s))\n", param.Ls);
+      if (param.Ls == 1) {
+	return new DiracTwistedCloverPC(param, 4);
+      } else {
+	errorQuda("Cannot create DiracTwistedCloverPC operator for %d flavors\n", param.Ls);
+      }
     } else if (param.type == QUDA_TWISTED_MASS_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracTwistedMass operator (%d flavor(s))\n", param.Ls);
         if (param.Ls == 1) return new DiracTwistedMass(param, 4);

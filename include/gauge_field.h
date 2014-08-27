@@ -198,16 +198,6 @@ namespace quda {
 
   class cudaGaugeField : public GaugeField {
 
-    friend void bindGaugeTex(const cudaGaugeField &gauge, const int oddBit, 
-			     void **gauge0, void **gauge1);
-    friend void unbindGaugeTex(const cudaGaugeField &gauge);
-    friend void bindFatGaugeTex(const cudaGaugeField &gauge, const int oddBit, 
-				void **gauge0, void **gauge1);
-    friend void unbindFatGaugeTex(const cudaGaugeField &gauge);
-    friend void bindLongGaugeTex(const cudaGaugeField &gauge, const int oddBit, 
-				 void **gauge0, void **gauge1);
-    friend void unbindLongGaugeTex(const cudaGaugeField &gauge);
-
   private:
     void *gauge;
     void *even;

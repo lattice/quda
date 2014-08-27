@@ -1,3 +1,57 @@
+  struct DslashParam {
+    int threads; // the desired number of active threads
+    int parity;  // Even-Odd or Odd-Even
+    int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+    int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
+    int ghostOffset[QUDA_MAX_DIM+1];
+    int ghostNormOffset[QUDA_MAX_DIM+1];
+    int X[4];
+    KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+    int sp_stride; // spinor stride
+#ifdef GPU_STAGGERED_DIRAC
+    int gauge_stride;
+    int long_gauge_stride;
+    float fat_link_max;
+#endif 
+
+#ifdef USE_TEXTURE_OBJECTS
+    cudaTextureObject_t inTex;
+    cudaTextureObject_t inTexNorm;
+    cudaTextureObject_t xTex;
+    cudaTextureObject_t xTexNorm;
+    cudaTextureObject_t outTex;
+    cudaTextureObject_t outTexNorm;
+    cudaTextureObject_t gauge0Tex; // also applies to fat gauge
+    cudaTextureObject_t gauge1Tex; // also applies to fat gauge
+    cudaTextureObject_t longGauge0Tex;
+    cudaTextureObject_t longGauge1Tex;
+    cudaTextureObject_t longPhase0Tex;
+    cudaTextureObject_t longPhase1Tex;
+    cudaTextureObject_t cloverTex;
+    cudaTextureObject_t cloverNormTex;
+    cudaTextureObject_t cloverInvTex;
+    cudaTextureObject_t cloverInvNormTex;
+#endif
+  };
+
+  DslashParam dslashParam;
+
+
+  // For tuneLaunch() to uniquely identify a suitable set of launch parameters, we need copies of a few of
+  // the constants set by initDslashConstants().
+  static struct {
+    int x[4];
+    int Ls;
+    unsigned long long VolumeCB() { return x[0]*x[1]*x[2]*x[3]/2; }
+    // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
+  } dslashConstants;
+
+#ifdef MULTI_GPU
+  static double twist_a = 0.0;
+  static double twist_b = 0.0;
+#endif
+
+
 #define MAX(a,b) ((a)>(b) ? (a):(b))
 
 typedef struct fat_force_stride_s {
@@ -123,7 +177,7 @@ void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
   int volumeCB = lat.VolumeCB();
   cudaMemcpyToSymbol(Vh, &volumeCB, sizeof(int));  
 
-  Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
+  int Vspatial = lat.X()[0]*lat.X()[1]*lat.X()[2]/2; // FIXME - this should not be called Vs, rather Vsh
   cudaMemcpyToSymbol(Vs, &Vspatial, sizeof(int));
 
   int half_Vspatial = Vspatial;
@@ -383,7 +437,7 @@ void initDslashConstants(TimeProfile &profile)
 
   // temporary additions (?) for checking Ron's T-packing kernel with old multi-gpu kernel
 
-  double tProjScale_h = (kernelPackT ? 1.0 : 2.0);
+  double tProjScale_h = (getKernelPackT() ? 1.0 : 2.0);
   cudaMemcpyToSymbol(tProjScale, &tProjScale_h, sizeof(double));
 
   float tProjScale_fh = (float)tProjScale_h;
@@ -466,4 +520,19 @@ void initTwistedMassConstants(const int fl_stride_h, TimeProfile &profile)
 
   checkCudaError();
   profile.Stop(QUDA_PROFILE_CONSTANT);
+}
+
+void setTwistParam(double &a, double &b, const double &kappa, const double &mu, 
+		   const int dagger, const QudaTwistGamma5Type twist) {
+  if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+    a = 2.0 * kappa * mu;
+    b = 1.0;
+  } else if (twist == QUDA_TWIST_GAMMA5_INVERSE) {
+    a = -2.0 * kappa * mu;
+    b = 1.0 / (1.0 + a*a);
+  } else {
+    errorQuda("Twist type %d not defined\n", twist);
+  }
+  if (dagger) a *= -1.0;
+
 }

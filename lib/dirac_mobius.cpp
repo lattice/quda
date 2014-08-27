@@ -4,6 +4,37 @@
 
 namespace quda {
 
+  namespace mobius {
+#include <dslash_init.cuh>
+  }
+
+// Modification for the 4D preconditioned Mobius domain wall operator
+  DiracMobiusDomainWallPC::DiracMobiusDomainWallPC(const DiracParam &param)
+    : DiracDomainWallPC(param) { 
+    memcpy(b_5, param.b_5, sizeof(double)*param.Ls);
+    memcpy(c_5, param.c_5, sizeof(double)*param.Ls);
+    mobius::initConstants(*param.gauge, profile);
+  }
+
+  DiracMobiusDomainWallPC::DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac) 
+    : DiracDomainWallPC(dirac) {
+    memcpy(b_5, dirac.b_5, Ls);
+    memcpy(c_5, dirac.c_5, Ls);
+    mobius::initConstants(dirac.gauge, profile);
+  }
+
+  DiracMobiusDomainWallPC::~DiracMobiusDomainWallPC()
+  { }
+
+  DiracMobiusDomainWallPC& DiracMobiusDomainWallPC::operator=(const DiracMobiusDomainWallPC &dirac)
+  {
+    if (&dirac != this) {
+      DiracDomainWallPC::operator=(dirac);
+    }
+
+    return *this;
+  }
+
 // Modification for the 4D preconditioned Mobius domain wall operator
   void DiracMobiusDomainWallPC::Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in,
 					const QudaParity parity) const
@@ -12,9 +43,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    initSpinorConstants(in, profile);
+    mobius::initSpinorConstants(in, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
 
     flops += 1320LL*(long long)in.Volume();
@@ -26,10 +57,10 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::initSpinorConstants(in, profile);
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
 
     long long Ls = in.X(4);
@@ -44,10 +75,10 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    mobius::initSpinorConstants(in, profile);
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 2, profile);   
 
     long long Ls = in.X(4);
@@ -63,10 +94,10 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    mobius::initSpinorConstants(in, profile);
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 3, profile);   
 
     long long Ls = in.X(4);
@@ -82,9 +113,9 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    initSpinorConstants(in, profile);
+    mobius::initSpinorConstants(in, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
     
     flops += (1320LL+48LL)*(long long)in.Volume();
@@ -97,40 +128,16 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    mobius::initSpinorConstants(in, profile);
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 2, profile);
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
     long long wall = 2*in.Volume()/Ls;
     flops += (48LL)*(long long)in.Volume() + 144LL*bulk + 72LL*wall;
-  }
-
-// Modification for the 4D preconditioned Mobius domain wall operator
-  DiracMobiusDomainWallPC::DiracMobiusDomainWallPC(const DiracParam &param)
-    : DiracDomainWallPC(param) { 
-    memcpy(b_5, param.b_5, sizeof(double)*param.Ls);
-    memcpy(c_5, param.c_5, sizeof(double)*param.Ls);
-  }
-
-  DiracMobiusDomainWallPC::DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac) 
-    : DiracDomainWallPC(dirac) {
-    memcpy(b_5, dirac.b_5, Ls);
-    memcpy(c_5, dirac.c_5, Ls);
-  }
-
-  DiracMobiusDomainWallPC::~DiracMobiusDomainWallPC()
-  { }
-
-  DiracMobiusDomainWallPC& DiracMobiusDomainWallPC::operator=(const DiracMobiusDomainWallPC &dirac)
-  {
-    if (&dirac != this) {
-      DiracDomainWallPC::operator=(dirac);
-    }
-
-    return *this;
   }
 
   // Apply the even-odd preconditioned mobius DWF operator
