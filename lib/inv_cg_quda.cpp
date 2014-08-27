@@ -204,8 +204,6 @@ namespace quda {
 	static int resIncrease = 0; // number of consecutive residual increases 
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
-	  k++;
-	  rUpdate++;
 	  if (++resIncrease > param.max_res_increase) break; // check if we reached the limit of our tolerance
 	} else {
 	  resIncrease = 0;
