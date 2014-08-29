@@ -630,6 +630,10 @@ namespace quda {
     //
     void CleanResources(); 
 
+    void LoadEigenvectors(DeflationParam *param, int nevs_to_load);
+
+    void ReportEigenvalueAccuracy(DeflationParam *param, int nevs_to_print);
+
   };
 
 } // namespace quda
