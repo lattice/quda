@@ -29,6 +29,7 @@ A. Stathopolous and K. Orginos, arXiv:0707.0131
 namespace quda {
 
    static DeflationParam *defl_param = 0;
+   static double global_stop         = 0.0;
 
    template<typename Float, typename CudaComplex>
    class EigCGArgs{
@@ -294,7 +295,7 @@ namespace quda {
        //
        use_eigcg = true;
        //
-       printfQuda("\nIncEigCG will deploy eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
+       printfQuda("\nInitialize eigCG(m=%d, nev=%d) solver.\n", param.m, param.nev);
     }
     else
     {
@@ -314,7 +315,7 @@ namespace quda {
 
   }
 
-  void IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  int IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
     if (eigcg_precision != x.Precision()) errorQuda("\nInput/output field precision is incorrect (solver precision: %u spinor precision: %u).\n", eigcg_precision, x.Precision());
@@ -330,7 +331,7 @@ namespace quda {
       x=b;
       param.true_res = 0.0;
       param.true_res_hq = 0.0;
-      return;
+      return 0;
     }
 
     cudaColorSpinorField r(b);
@@ -427,7 +428,7 @@ namespace quda {
 
     double sigma = 0.0;
 
-    while ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter) {
+    while ( (!convergence(r2, heavy_quark_res, stop, param.tol_hq) && !convergence(r2, heavy_quark_res, global_stop, param.tol_hq)) && k < param.maxiter) {
 
       if(k > 0)
       {
@@ -556,7 +557,7 @@ namespace quda {
 
     profile.Stop(QUDA_PROFILE_FREE);
 
-    return;
+    return eigvRestart;
   }
 
 //END of eigcg solver.
@@ -945,9 +946,32 @@ namespace quda {
 
   void IncEigCG::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) 
   {
-     const bool use_reduced_vector_set = true; 
+     const bool use_reduced_vector_set = true;
+
+     const bool use_cg_updates         = false; 
+
+     const int eigcg_min_restarts      = 30;
+
+     int eigcg_restarts = 0;
+
+     double tot_time  = 0.0;
  
-     if(defl_param == 0) CreateDeflationSpace(*in, defl_param);
+     if(defl_param == 0)
+     {
+       CreateDeflationSpace(*in, defl_param);
+     }
+     else if(defl_param->cur_dim == defl_param->tot_dim)
+     {
+       use_eigcg = false;
+
+       printfQuda("\nWarning: IncEigCG will deploy initCG solver.\n");
+
+       if(eigcg_alloc) delete Vm;
+  
+       eigcg_alloc = false;
+
+     }
+   
 
      //if this operator applied during the first stage of the incremental eigCG (to construct deflation space):
      //then: call eigCG inverter 
@@ -985,14 +1009,33 @@ namespace quda {
            inSloppy  = in;
         }
 
-        EigCG(*outSloppy, *inSloppy);
+        eigcg_restarts = EigCG(*outSloppy, *inSloppy);
 
-        if(use_mixed_prec)
+        //too messy ...
+        bool cg_updates   = (use_mixed_prec && use_cg_updates) &&  (eigcg_restarts < eigcg_min_restarts);
+
+        bool eigcg_updates = use_mixed_prec && !cg_updates;
+
+
+        tot_time  += param.secs;
+
+        //store computed Ritz vectors: 
+        SaveEigCGRitzVecs(defl_param);
+        
+        //Construct(extend) projection matrix:
+        ExpandDeflationSpace(defl_param, param.nev);
+        //
+
+        if(cg_updates)
         {
            double b2   = norm2(*in);
+
            double stop = b2*ext_tol*ext_tol;
-      
-           param.tol   = 5e-3;//initcg sloppy precision tolerance
+/*
+ * L24T48 : 5e-3
+ * L48T96 : 5e-2, works but not perfect, 1e-1 seems to be better...
+ */     
+           param.tol   = 1e-1;//initcg sloppy precision tolerance
 
            cudaColorSpinorField y(*in);//full precision accumulator
            cudaColorSpinorField r(*in);//full precision residual
@@ -1003,9 +1046,8 @@ namespace quda {
            initCGparam.precision = eigcg_precision;//the same as eigcg
            //
            initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
-           initCGparam.use_sloppy_partial_accumulator=false;   //more stable single-half solver
+           initCGparam.use_sloppy_partial_accumulator=0;   //more stable single-half solver
      
-           //no reliable updates?
 
            initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
 
@@ -1036,7 +1078,7 @@ namespace quda {
               //
               r2 = xmyNormCuda(*in, r);//new residual (and RHS)
               //
-              param.secs   += initCGparam.secs;
+              tot_time   += initCGparam.secs;
 
            }
 
@@ -1048,17 +1090,63 @@ namespace quda {
            //
            delete inSloppy;
         }
+        else if(eigcg_updates)
+        {
+           double stop = norm2(*in)*ext_tol*ext_tol;
+           //
+           cudaColorSpinorField y(*in);//full precision accumulator
+           cudaColorSpinorField r(*in);//full precision residual
 
-	//store computed Ritz vectors:
-        SaveEigCGRitzVecs(defl_param);
+           //launch again eigcg:
+           copyCuda(*out, *outSloppy);
+           //
+           mat(r, *out, y);  //here we can use y as tmp
+           //
+           double r2 = xmyNormCuda(*in, r);//new residual (and RHS)
+           //
+           global_stop = stop;
+           
+           while(r2 > stop)
+           {
+              zeroCuda(y);
+              //deflate initial guess:
+              DeflateSpinor(y, r, defl_param);
+              //
+              copyCuda(*inSloppy, r);
+              //
+              copyCuda(*outSloppy, y);
+              // 
+              eigcg_restarts = EigCG(*outSloppy, *inSloppy);
+              //
+              copyCuda(y, *outSloppy);
+              //
+              xpyCuda(y, *out);
+              //
+              mat(r, *out, y);
+              //
+              r2 = xmyNormCuda(*in, r);
+              //
+              if((eigcg_restarts >= eigcg_min_restarts) && (defl_param->cur_dim < defl_param->tot_dim))
+              {
+                 SaveEigCGRitzVecs(defl_param);//accumulate
+                 //
+                 ExpandDeflationSpace(defl_param, param.nev);
+                 //
+                 //param.rhs_idx = +1;
+              }
 
-        //Construct(extend) projection matrix:
-        ExpandDeflationSpace(defl_param, param.nev);
+              tot_time  += param.secs;
+
+           }
+           
+        }
 
         //copy solver statistics:
         param.iter   += initCGparam.iter;
         //
         param.gflops += initCGparam.gflops;
+        //
+        param.secs   = tot_time;
 
         if(getVerbosity() >= QUDA_VERBOSE)
         {
@@ -1110,6 +1198,10 @@ namespace quda {
         int restart_idx  = 0;
 
         double inc_tol = 1e-2; 
+
+        //initCGparam.use_sloppy_partial_accumulator=1;   //no need for full precision accumulator? it depends...
+ 
+        initCGparam.delta = 1e-2; // might be better then default 1e-1
 
         //launch initCG:
         while((restart_tol > full_tol) && (restart_idx < max_restart_num))//currently just one restart, think about better algorithm for the restarts. 
@@ -1168,9 +1260,9 @@ namespace quda {
         delete W;
      } 
 
-     if( (defl_param->tot_dim == defl_param->cur_dim) && (use_eigcg) && (use_reduced_vector_set) )
+     if( (defl_param->cur_dim == defl_param->tot_dim) && (use_eigcg) && (use_reduced_vector_set) )
      {
-        const int max_nev = param.m;
+        const int max_nev = defl_param->cur_dim;//param.m;
 
         if(eigcg_alloc){
 
@@ -1181,7 +1273,7 @@ namespace quda {
             eigcg_alloc = false;
         }
 
-        double eigenval_tol = 1e-3;
+        double eigenval_tol = 1e-1;
 
         LoadEigenvectors(defl_param, max_nev, eigenval_tol);
 

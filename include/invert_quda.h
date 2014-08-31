@@ -640,7 +640,7 @@ namespace quda {
     virtual ~IncEigCG();
 
     //EigCG solver
-    void EigCG(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    int EigCG(cudaColorSpinorField &out, cudaColorSpinorField &in);
 
     //Incremental eigCG solver (for eigcg and initcg calls)
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
