@@ -950,7 +950,7 @@ namespace quda {
 
      const bool use_cg_updates         = false; 
 
-     const int eigcg_min_restarts      = 30;
+     const int eigcg_min_restarts      = 3;
 
      int eigcg_restarts = 0;
 
@@ -960,15 +960,21 @@ namespace quda {
      {
        CreateDeflationSpace(*in, defl_param);
      }
-     else if(defl_param->cur_dim == defl_param->tot_dim)
+     else if(use_eigcg && defl_param->cur_dim == defl_param->tot_dim)
      {
        use_eigcg = false;
 
        printfQuda("\nWarning: IncEigCG will deploy initCG solver.\n");
 
-       if(eigcg_alloc) delete Vm;
+       if(eigcg_alloc){ 
+         delete Vm;
   
-       eigcg_alloc = false;
+         eigcg_alloc = false;
+       }
+
+       //temporary solution!
+       initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
+       initCGparam.use_sloppy_partial_accumulator=0;
 
      }
    
@@ -1012,7 +1018,7 @@ namespace quda {
         eigcg_restarts = EigCG(*outSloppy, *inSloppy);
 
         //too messy ...
-        bool cg_updates   = (use_mixed_prec && use_cg_updates) &&  (eigcg_restarts < eigcg_min_restarts);
+        bool cg_updates    = use_mixed_prec && (use_cg_updates || (eigcg_restarts < eigcg_min_restarts));
 
         bool eigcg_updates = use_mixed_prec && !cg_updates;
 
