@@ -14,16 +14,12 @@ namespace quda {
     : DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), clover(*(param.clover)), cloverInv(*(param.cloverInv))
   {
     twistedclover::initConstants(*param.gauge,profile);
-    twistedclover::initCloverConstants(clover, profile);
-    twistedclover::initCloverConstants(cloverInv, profile);
   }
 
   DiracTwistedClover::DiracTwistedClover(const DiracTwistedClover &dirac) 
     : DiracWilson(dirac), mu(dirac.mu), epsilon(dirac.epsilon), clover(dirac.clover), cloverInv(dirac.cloverInv)
   {
     twistedclover::initConstants(dirac.gauge,profile);
-    twistedclover::initCloverConstants(clover, profile);
-    twistedclover::initCloverConstants(cloverInv, profile);
   }
 
   DiracTwistedClover::~DiracTwistedClover() { }
@@ -45,14 +41,12 @@ namespace quda {
     if (a.SiteSubset() == QUDA_PARITY_SITE_SUBSET && initTMCFlag != 1)
       {
 	int flavor_stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/2 : a.VolumeCB();
-	twistedclover::initSpinorConstants(a, profile);
 	twistedclover::initTwistedMassConstants(flavor_stride, profile);
 	initTMCFlag = 1;
       }
     else if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET && initTMCFlag != 2)
       {
 	int flavor_stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/4 : a.VolumeCB()/2;
-	twistedclover::initSpinorConstants(a, profile);
 	twistedclover::initTwistedMassConstants(flavor_stride, profile);
 	initTMCFlag = 2;
       }

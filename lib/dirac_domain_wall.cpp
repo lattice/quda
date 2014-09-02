@@ -40,7 +40,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    domainwall::initSpinorConstants(in, profile);
     domainwall::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, profile);   
 
@@ -61,7 +60,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    domainwall::initSpinorConstants(in, profile);
     domainwall::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, profile);
 

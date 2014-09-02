@@ -44,7 +44,6 @@ namespace quda {
   void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			   const QudaParity parity) const
   {
-    wilson::initSpinorConstants(in, profile);
     wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     checkParitySpinor(in, out);
@@ -59,7 +58,6 @@ namespace quda {
 			       const QudaParity parity, const cudaColorSpinorField &x,
 			       const double &k) const
   {
-    wilson::initSpinorConstants(in, profile);
     wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     checkParitySpinor(in, out);

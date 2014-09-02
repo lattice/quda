@@ -356,7 +356,7 @@ int sp_norm_idx;
         prolog_str += (
 """
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*Ls) return;
+if (sid >= param.threads*param.Ls) return;
 
 int boundaryCrossing;
 """)
@@ -442,7 +442,7 @@ X += aux1;
 } else { // exterior kernel
 
 const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads*Ls >> 1); // volume of one face
+const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 
@@ -618,7 +618,7 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = Ls*ghostFace[static_cast<int>(kernel_type)];\n"
+        load_half += "const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];\n"
     else :
         load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n" 
     #load_half += "#if (DD_PREC==2) // half precision\n"
@@ -756,8 +756,8 @@ def gen(dir, pack_only=False):
 # end def gen
 
 def gen_dw():
-    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='Ls-1'
-    else: lsign='+'; ledge = 'Ls-1'; rsign='-'; redge='0'
+    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='param.Ls-1'
+    else: lsign='+'; ledge = 'param.Ls-1'; rsign='-'; redge='0'
 
     str = "\n\n"
     str += "// 5th dimension -- NB: not partitionable!\n"
@@ -765,7 +765,7 @@ def gen_dw():
       str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n"
     str += "{\n// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
-    str += "     int sp_idx = ( xs == %s ? X%s(Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
+    str += "     int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -808,7 +808,7 @@ def gen_dw():
     str += "  } // end P_L\n\n"
     str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
     str += "  {\n"
-    str += "    int sp_idx = ( xs == %s ? X%s(Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
+    str += "    int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -928,15 +928,15 @@ def gen_dw_inv():
     str += "// s' = input vector index and\n"
     str += "// 'a'= kappa5\n"
     str += "\n"
-    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,Ls)*mferm);\n"
+    str += "  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.Ls)*mferm);\n"
     str += "  spinorFloat factorR;\n"
     str += "  spinorFloat factorL;\n"
     str += "\n"
-    str += "  for(int s = 0; s < Ls; s++)\n  {\n"
+    str += "  for(int s = 0; s < param.Ls; s++)\n  {\n"
     if dagger == True :  
-        str += "    factorR = ( xs > s ? -inv_d_n*pow(kappa,Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorR = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
     else : 
-        str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
     str += "    sp_idx = base_idx + s*Vh;\n"
     str += "    // read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
@@ -966,9 +966,9 @@ def gen_dw_inv():
     str += "    o32_im += factorR*(i12_im + i32_im);\n\n"
     
     if dagger == True :  
-        str += "    factorL = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
+        str += "    factorL = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
     else : 
-        str += "    factorL = ( xs > s ? -inv_d_n*pow(kappa,Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
+        str += "    factorL = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;\n\n"
 
     str += "    o00_re += factorL*(i00_re - i20_re);\n"
     str += "    o00_im += factorL*(i00_im - i20_im);\n"

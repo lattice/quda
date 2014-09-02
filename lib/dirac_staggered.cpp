@@ -54,7 +54,6 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    staggered::initSpinorConstants(in, profile);
     staggered::setFace(face1, face2); // FIXME: temporary hack maintain C linkage for dslashCuda
     staggeredDslashCuda(&out, gauge, &in, parity, dagger, 0, 0, commDim, profile);
   
@@ -67,7 +66,6 @@ namespace quda {
   {    
     checkParitySpinor(in, out);
 
-    staggered::initSpinorConstants(in, profile);
     staggered::setFace(face1, face2); // FIXME: temporary hack maintain C linkage for dslashCuda
     staggeredDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim, profile);
   

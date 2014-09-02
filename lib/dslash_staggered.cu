@@ -130,15 +130,12 @@ namespace quda {
     dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
     // in the solver for the improved staggered action
 
-
     for(int i=0;i<4;i++){
-      dslashParam.X[i] = in->X()[i];
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
       dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
-    dslashParam.X[0] *= 2; // because color spinor fields are defined on a half lattice
     void *gauge0, *gauge1;
     bindFatGaugeTex(gauge, parity, &gauge0, &gauge1);
 

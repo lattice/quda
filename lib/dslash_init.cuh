@@ -2,9 +2,7 @@
 
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
 void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile);
-void initSpinorConstants(const cudaColorSpinorField &spinor, TimeProfile &profile);
 void initDslashConstants(TimeProfile &profile);
-void initCloverConstants (const cudaCloverField &clover, TimeProfile &profile);
 void initStaggeredConstants(const cudaGaugeField &fatgauge, 
 			    const cudaGaugeField &longgauge, TimeProfile &profile);
 void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, 

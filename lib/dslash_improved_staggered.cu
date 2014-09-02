@@ -139,20 +139,17 @@ namespace quda {
 
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
-    dslashParam.sp_stride = in->Stride();
     dslashParam.parity = parity;
     dslashParam.gauge_stride = fatGauge.Stride();
     dslashParam.long_gauge_stride = longGauge.Stride();
     dslashParam.fat_link_max = fatGauge.LinkMax();
 
     for(int i=0;i<4;i++){
-      dslashParam.X[i] = in->X()[i];
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
       dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
-    dslashParam.X[0] *= 2;
 
     void *fatGauge0, *fatGauge1;
     void* longGauge0, *longGauge1;

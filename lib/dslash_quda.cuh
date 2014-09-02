@@ -339,6 +339,18 @@
 
       // this sets the communications pattern for the packing kernel
       setPackComms(dslashParam.commDim);
+
+      for (int i=0; i<4; i++) {
+	dslashParam.X[i] = in->X(i);
+	dslashConstants.x[i] = in->X(i);       // needed by tuneLaunch()
+      }
+      dslashParam.Ls = in->X(4); // needed by tuneLaunch()
+
+      // this is a c/b field so double the x dimension
+      dslashParam.X[0] *= 2;
+      dslashConstants.x[0] *= 2; 
+
+      dslashConstants.Ls = in->X(4); // needed by tuneLaunch()
     }
 
     virtual ~DslashCuda() { }

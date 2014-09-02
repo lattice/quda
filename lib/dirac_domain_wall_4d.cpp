@@ -43,7 +43,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    domainwall4d::initSpinorConstants(in, profile);
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
@@ -58,7 +57,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    domainwall4d::initSpinorConstants(in, profile);
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
@@ -77,7 +75,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    domainwall4d::initSpinorConstants(in, profile);
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 2, profile);   
@@ -96,7 +93,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    domainwall4d::initSpinorConstants(in, profile);
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
@@ -112,7 +108,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    domainwall4d::initSpinorConstants(in, profile);
     domainwall4d::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     domainWallDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 1, profile);

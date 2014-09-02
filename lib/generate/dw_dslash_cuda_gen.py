@@ -350,7 +350,7 @@ int sp_norm_idx;
 #endif // MULTI_GPU half precision
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*Ls) return;
+if (sid >= param.threads*param.Ls) return;
 
 int X, x1, x2, x3, x4, xs;
 
@@ -406,7 +406,7 @@ X += aux1;
 } else { // exterior kernel
 
 const int dim = static_cast<int>(kernel_type);
-const int face_volume = (param.threads*Ls >> 1); // volume of one face
+const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
 const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 
@@ -596,7 +596,7 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     if domain_wall : 
-        load_half += "const int sp_stride_pad = Ls*ghostFace[static_cast<int>(kernel_type)];\n"
+        load_half += "const int sp_stride_pad = param.Ls*ghostFace[static_cast<int>(kernel_type)];\n"
     else :
         load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n" 
     #load_half += "#if (DD_PREC==2) // half precision\n"
@@ -739,15 +739,15 @@ def gen(dir, pack_only=False):
 
 
 def gen_dw():
-    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='Ls-1'
-    else: lsign='+'; ledge = 'Ls-1'; rsign='-'; redge='0'
+    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='param.Ls-1'
+    else: lsign='+'; ledge = 'param.Ls-1'; rsign='-'; redge='0'
 
     str = "\n\n"
     str += "// 5th dimension -- NB: not partitionable!\n"
     str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n{\n"
     str += "// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
     str += "  {\n"
-    str += "     int sp_idx = ( xs == %s ? X%s(Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
+    str += "     int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
@@ -790,7 +790,7 @@ def gen_dw():
     str += "  } // end P_L\n\n"
     str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
     str += "  {\n"
-    str += "    int sp_idx = ( xs == %s ? X%s(Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
+    str += "    int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
     str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"

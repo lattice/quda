@@ -12,14 +12,12 @@ namespace quda {
     : DiracWilson(param), clover(*(param.clover))
   {
     clover::initConstants(*param.gauge, profile);
-    clover::initCloverConstants(clover, profile);
   }
 
   DiracClover::DiracClover(const DiracClover &dirac) 
     : DiracWilson(dirac), clover(dirac.clover)
   {
     clover::initConstants(dirac.gauge, profile);
-    clover::initCloverConstants(clover, profile);
   }
 
   DiracClover::~DiracClover() { }
@@ -48,7 +46,6 @@ namespace quda {
 			       const QudaParity parity, const cudaColorSpinorField &x,
 			       const double &k) const
   {
-    clover::initSpinorConstants(in, profile);
     clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     checkParitySpinor(in, out);
@@ -63,7 +60,6 @@ namespace quda {
   // Public method to apply the clover term only
   void DiracClover::Clover(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
   {
-    clover::initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
 
     // regular clover term
@@ -134,7 +130,6 @@ namespace quda {
   void DiracCloverPC::CloverInv(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 				const QudaParity parity) const
   {
-    clover::initSpinorConstants(in, profile);
     checkParitySpinor(in, out);
 
     // needs to be cloverinv
@@ -150,7 +145,6 @@ namespace quda {
   void DiracCloverPC::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			     const QudaParity parity) const
   {
-    clover::initSpinorConstants(in, profile);
     clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     checkParitySpinor(in, out);
@@ -167,7 +161,6 @@ namespace quda {
 				 const QudaParity parity, const cudaColorSpinorField &x,
 				 const double &k) const
   {
-    clover::initSpinorConstants(in, profile);
     clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     checkParitySpinor(in, out);

@@ -43,7 +43,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    mobius::initSpinorConstants(in, profile);
     mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
@@ -57,7 +56,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    mobius::initSpinorConstants(in, profile);
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
     mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
@@ -75,7 +73,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    mobius::initSpinorConstants(in, profile);
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
     mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
     
@@ -94,7 +91,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
  
-    mobius::initSpinorConstants(in, profile);
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
     mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
@@ -113,8 +109,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius::initSpinorConstants(in, profile);
-    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+     mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
     MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
     
@@ -128,7 +123,6 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    mobius::initSpinorConstants(in, profile);
     mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
     mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
 
