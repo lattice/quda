@@ -958,6 +958,7 @@ namespace quda {
           param.cloverInv = (FloatN*)clovInv->odd;
           param.cloverInvNorm = (float*)clovInv->oddNorm;
 	}	
+	param.cl_stride = clov->stride;
       }
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -980,7 +981,6 @@ namespace quda {
 
       param.threads = threads();
       param.sp_stride = in->Stride();
-      param.cl_stride = clov->stride;
 
       int prev = -1; // previous dimension that was partitioned
       for (int i=0; i<4; i++) {
