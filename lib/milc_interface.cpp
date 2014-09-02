@@ -408,6 +408,13 @@ void qudaGaugeForce( int precision,
 
 #endif // GPU_GAUGE_FORCE
 
+static int getFatLinkPadding(const int dim[4])
+{
+  int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
+  padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
+  padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
+  return padding;
+}
 
 
 #ifdef GPU_STAGGERED_DIRAC
@@ -520,13 +527,6 @@ static void setInvertParams(const int dim[4],
   return;
 }
 
-static int getFatLinkPadding(const int dim[4])
-{
-  int padding = MAX(dim[1]*dim[2]*dim[3]/2, dim[0]*dim[2]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[3]/2);
-  padding = MAX(padding, dim[0]*dim[1]*dim[2]/2);
-  return padding;
-}
 
 static void setGaugeParams(const int dim[4],
     QudaPrecision cpu_prec,

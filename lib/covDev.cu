@@ -2,6 +2,10 @@ namespace quda
 {
 	#include	"covDev.h"	//Covariant derivative definitions
 
+	/**
+	  This macros try to mimic dslash definitions, because of the similarities between the covariant derivative and the dslash
+	*/
+
 	#define MORE_GENERIC_COVDEV(FUNC, dir, DAG, kernel_type, gridDim, blockDim, shared, stream, param,  ...)			\
 		if		(reconstruct == QUDA_RECONSTRUCT_NO) {									\
 			switch	(dir) {													\
@@ -77,6 +81,10 @@ namespace quda
 			GENERIC_COVDEV(FUNC, nMu, Dagger, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
 		}
 
+	/**
+	  This is a simpler version of the dslashCuda function to call the right kernels
+	*/
+
 	void covDevCuda(DslashCuda &dslash, const size_t regSize, const int mu, TimeProfile &profile)
 	{
 		profile.Start(QUDA_PROFILE_TOTAL);
@@ -109,23 +117,26 @@ namespace quda
 		profile.Stop(QUDA_PROFILE_TOTAL);
 	}
 
+	/**
+	  Class for covariant derivative, is based on SharedDslashCuda
+	*/
+
 	template <typename Float, typename Float2>
-	class CovDevCuda : public SharedDslashCuda//public SharedDslashCuda
+	class CovDevCuda : public SharedDslashCuda
 	{
 		private:
 			const cudaGaugeField *gauge;
-//			const QudaReconstructType reconstruct;
 			const int dagger;
-			const int mu;
-			const int dir;
-			const int parity;
+			const int mu;			// Direction to apply the covariant derivative. Anything beyond 3 is understood as dagger and moving backwards (from x to x-(mu%4))
+			const int dir;			// This is the real direction xyzt, that is, mu%4
+			const int parity;		// The current implementation works on parity spinors
 
 			void *gauge0, *gauge1;
 
 			bool binded;
 			
 			#ifdef MULTI_GPU
-				Float	*ghostBuffer;
+				Float	*ghostBuffer;	// For the ghosts, I did my own implementation, jsut because the number of functions to overload was absurd
 				int	ghostVolume;
 				int	ghostBytes;
 				int	offset;
@@ -140,12 +151,9 @@ namespace quda
 		protected:
 			unsigned int minThreads			() const { if (dslashParam.kernel_type == INTERIOR_KERNEL) { return in->Volume(); } else { return ghostVolume; } }
 
-			unsigned int sharedBytesPerThread	() const
-			{
-				return	0;
-			}
+			unsigned int sharedBytesPerThread	() const { return 0; }
 
-			dim3 createGrid		(const dim3 &block) const
+			dim3 createGrid		(const dim3 &block) const	// Tuning is supported in a one-dimensional grid, because other grids gave me wrong results
 			{
 				unsigned int	gx	= (dslashParam.threads + block.x - 1) / block.x;
 				unsigned int	gy	= 1;
@@ -153,7 +161,10 @@ namespace quda
 				return	dim3(gx, gy, gz);
 			}
 
-			/** Advance 1-d block size, accounting for the differences of the covariant derivative (I could not make the 3-d block work reliably) */
+			/**
+			  Advance 1-d block size, accounting for the differences of the covariant derivative (I could not make the 3-d block work reliably)
+			*/
+
 			bool advanceBlockDim	(TuneParam &param) const
 			{
 //				if	(dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::advanceBlockDim(param);
@@ -171,6 +182,10 @@ namespace quda
 					return	false;
 			}
 
+			/**
+			  Allocates ghosts for multi-GPU
+			*/
+
 			void allocateGhosts	()
 			{
 				if	(cudaMalloc(&ghostBuffer, ghostBytes) != cudaSuccess)
@@ -179,6 +194,12 @@ namespace quda
 					exit	(-1);
 				}
 			}
+
+			/**
+			  Sends the ghosts, I only checked it for two gpus and partitioning in one dimension. The current implementation works for zt-splitting, but
+			  for z-splitting is not very efficient. I tried to make something that worked for xy-splitting as well, but it didn't and I never understood
+			  why. You're welcome to improve this piece of code.
+			*/
 
 			void exchangeGhosts	()
 			{
@@ -206,7 +227,7 @@ namespace quda
 					default:
 					break;
 
-					case 0:
+					case 0:		// x	from point p to p + x
 					{
 						void	*sendFacePtr	= (char*) in->V();
 						size_t	len		= Nvec*sizeof(Float);
@@ -214,7 +235,7 @@ namespace quda
 						size_t	dpitch		= ghostVolume*Nvec*sizeof(Float);
 						size_t	spitch		= in->Stride()*Nvec*sizeof(Float);
 
-						for	(int t=0;t<ghostVolume;t++)
+						for	(int t=0;t<ghostVolume;t++)	// I know this is a crime...
 						{
 							cudaMemcpy2DAsync((void*) (((char*)send)+len*t), dpitch, (void*) (((char*)sendFacePtr)+skip*t),
 									  spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
@@ -222,7 +243,7 @@ namespace quda
 						}
 					}
 
-					case 1:
+					case 1:		// y	from point p to p + y
 					{
 						void	*sendFacePtr	= (char*)in->V();
 						size_t	len		= in->X(0)*Nvec*sizeof(Float);
@@ -230,7 +251,7 @@ namespace quda
 						size_t	dpitch		= ghostVolume*Nvec*sizeof(Float);
 						size_t	spitch		= in->Stride()*Nvec*sizeof(Float);
 
-						for	(int tz=0;tz<(in->X(2)*in->X(3));tz++)
+						for	(int tz=0;tz<(in->X(2)*in->X(3));tz++)	//Although is terribly inefficient, it should work. The problem is that it doesn't
 						{
 							cudaMemcpy2DAsync((void*) (((char*)send)+len*tz), dpitch, (void*) (((char*)sendFacePtr)+skip*tz),
 									  spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
@@ -238,7 +259,7 @@ namespace quda
 						}
 					}
 
-					case 2:
+					case 2:		// z	from point p to p + z
 					{
 						void	*sendFacePtr	= (char*) in->V();
 						size_t	len		= ghostVolume*Nvec*sizeof(Float)/in->X(3);
@@ -246,7 +267,7 @@ namespace quda
 						size_t	dpitch		= ghostVolume*Nvec*sizeof(Float);
 						size_t	spitch		= in->Stride()*Nvec*sizeof(Float);
 
-						for	(int t=0;t<in->X(3);t++)
+						for	(int t=0;t<in->X(3);t++)	// I'm sure this can be improved
 						{
 							cudaMemcpy2DAsync((void*) (((char*)send)+len*t), dpitch, (void*) (((char*)sendFacePtr)+skip*t),
 									   spitch, len, Npad, cudaMemcpyDeviceToHost, streams[0]);
@@ -255,7 +276,7 @@ namespace quda
 					}
 					break;
 
-					case 3:
+					case 3:		// t	from point p to p + t
 					{
 						void	*sendFacePtr	= (char*)in->V();
 						size_t	len		= ghostVolume*Nvec*sizeof(Float);
@@ -265,7 +286,9 @@ namespace quda
 					}
 					break;
 
-					case 4:
+					// Dagger versions (mu >= 4) follow
+
+					case 4:		// x dagger	from point p to p - x
 					{
 						void	*sendFacePtr	= (char*) in->V() + offset*Nvec*sizeof(Float);
 						size_t	len		= Nvec*sizeof(Float);
@@ -281,7 +304,7 @@ namespace quda
 						}
 					}
 
-					case 5:
+					case 5:		// y dagger	from point p to p - y
 					{
 						void	*sendFacePtr	= ((char*) in->V()) + offset*Nvec*sizeof(Float);
 						size_t	len		= in->X(0)*Nvec*sizeof(Float);
@@ -298,7 +321,7 @@ namespace quda
 					}
 					break;
 
-					case 6:
+					case 6:		// z dagger from point p to p - z
 					{
 						void	*sendFacePtr	= (((char*)in->V()) + offset*Nvec*sizeof(Float));
 						size_t	len		= ghostVolume*Nvec*sizeof(Float)/in->X(3);
@@ -315,7 +338,7 @@ namespace quda
 					}
 					break;
 
-					case 7:
+					case 7:		// t dagger from point p to p - t
 					{
 						void	*sendFacePtr	= (char*)in->V() + offset*Nvec*sizeof(Float);
 						size_t	len		= ghostVolume*Nvec*sizeof(Float);
@@ -402,18 +425,19 @@ namespace quda
 					binded	= true;
 				}
 			}
+
 			void unbindGhosts	()
 			{
 				if	(binded == true)
 				{
 					#ifdef USE_TEXTURE_OBJECTS
 						cudaDestroyTextureObject(tex);
-/*					#else
+					#else
 						if	(in->Precision() == QUDA_DOUBLE_PRECISION)
 							cudaUnbindTexture	(spinorTexDouble);
 						else
 							cudaUnbindTexture	(spinorTexSingle);
-*/
+
 					#endif
 					checkCudaError		();
 					binded	= false;
@@ -480,17 +504,8 @@ namespace quda
 					}
 				#endif
 				unbindGauge();
-			 }
-/*	
-			TuneKey tuneKey() const
-			{
-				TuneKey key = DslashCuda::tuneKey();
-				std::stringstream recon;
-				recon << reconstruct;
-				key.aux += ",reconstruct=" + recon.str();
-				return key;
 			}
-*/	
+
 			void	apply(const cudaStream_t &stream)
 			{
 				#ifdef SHARED_WILSON_DSLASH
@@ -512,20 +527,33 @@ namespace quda
 
 				if	(dslashParam.kernel_type != INTERIOR_KERNEL)
 				{
-					dslashParam.threads			= ghostVolume;
-					exchangeGhosts	();
-					bindGhosts	();
-					TuneParam tp				= tuneLaunch(*this, getTuning(), getVerbosity());
+					dslashParam.threads	= ghostVolume;
+					exchangeGhosts	();				// We must exchange ghosts here because the covDevCuda function requires a Dslash class as parameter
+					bindGhosts	();				// and the dslash class doesn't have these specific functions to exchange ghosts
+
+					// Maybe I should rebind the spinors for the INTERIOR kernels after this???
+
+					TuneParam tp		= tuneLaunch(*this, getTuning(), getVerbosity());
 					COVDEV		(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (Float2*)out->V(), (Float2*)gauge0, (Float2*)gauge1, (Float2*)in->V());
 				} else {
-					dslashParam.threads			= in->Volume();
-					TuneParam tp				= tuneLaunch(*this, getTuning(), getVerbosity());
+					dslashParam.threads	= in->Volume();
+					TuneParam tp		= tuneLaunch(*this, getTuning(), getVerbosity());
 					COVDEV		(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (Float2*)out->V(), (Float2*)gauge0, (Float2*)gauge1, (Float2*)in->V());
 				}
 			}
 
-			long long flops() const { return 144 * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
+			long long flops() const { return 144 * dslashConstants.VolumeCB(); } // Correct me if I'm wrong
 	};
+
+
+	/**
+	  The function applies the color matrices of a gauge configuration to a spinor, so it is not exactly a covariant derivative, although a combination of calls to
+	  this function will give you a covariant derivative. The output is the new spinor (out), and the inputs are the input spinor (in), the parity of the spinor (at
+	  this moment, the function works for parity spinors only), the direction of the color matrices (mu) and a profiler for timing. The value mu ranges from 0 to 7,
+	  being anything higher than 3 understood as direction (mu - 4) backwards, and therefore applying the dagger version of the color matrices
+
+	  Again a half precision implementation was straightforwad, but I don't think it will be useful
+	*/
 
 	void	covDev		(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, const int parity, const int mu, TimeProfile &profile)
 	{

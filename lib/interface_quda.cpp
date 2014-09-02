@@ -1011,7 +1011,8 @@ void endQuda(void)
 
   if (!initialized) return;
 
-  LatticeField::freeBuffer();
+  LatticeField::freeBuffer(0);
+  LatticeField::freeBuffer(1);
   cudaColorSpinorField::freeBuffer(0);
   cudaColorSpinorField::freeBuffer(1);
   cudaColorSpinorField::freeGhostBuffer();
@@ -1675,7 +1676,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 }
 
 
-void lanczosQuda(int &k0, int &m, void *hp_Apsi, void *hp_r, void *hp_V, 
+void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V, 
                  void *hp_alpha, void *hp_beta, QudaEigParam *eig_param)
 {
   QudaInvertParam *param;
@@ -2527,6 +2528,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       }
 
       SolverParam solverParam(*param);
+      solverParam.iter = 0;
       solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
       solverParam.tol = param->tol_offset[i]; // set L2 tolerance
       solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance

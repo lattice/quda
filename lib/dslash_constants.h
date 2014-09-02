@@ -433,30 +433,29 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
 }
 
 //For initializing the coefficients used in MDWF
-__constant__ double *mdwf_b5;
-__constant__ double *mdwf_c5;
-double *Tmp_b5;
-double *Tmp_c5;
-void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h)
+__constant__ double mdwf_b5[QUDA_MAX_DWF_LS];
+__constant__ double mdwf_c5[QUDA_MAX_DWF_LS];
+
+void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h, TimeProfile &profile)
 {
-  Tmp_b5 = (double*)device_malloc(sizeof(double)*dim_s);
-  Tmp_c5 = (double*)device_malloc(sizeof(double)*dim_s);
+  profile.Start(QUDA_PROFILE_CONSTANT);
 
-  cudaMemcpy(Tmp_b5, b_5, sizeof(double)*dim_s, cudaMemcpyHostToDevice);
-  cudaMemcpy(Tmp_c5, c_5, sizeof(double)*dim_s, cudaMemcpyHostToDevice);
+  static int last_Ls = -1;
+  if (dim_s != last_Ls) {
+    cudaMemcpyToSymbol(mdwf_b5, b_5, dim_s*sizeof(double));  
+    cudaMemcpyToSymbol(mdwf_c5, c_5, dim_s*sizeof(double));  
+    checkCudaError();
+    last_Ls = dim_s;
+  }
 
-  cudaMemcpyToSymbol(mdwf_b5, &Tmp_b5, sizeof(Tmp_b5));
-  cudaMemcpyToSymbol(mdwf_c5, &Tmp_c5, sizeof(Tmp_c5));
- 
-  cudaMemcpyToSymbol(m5, &m5h, sizeof(double));
+  static double last_m5 = 99999;
+  if (m5h != last_m5) {
+    cudaMemcpyToSymbol(m5, &m5h, sizeof(double));
+    checkCudaError();
+    last_m5 = m5h;
+  }
 
-  checkCudaError();
-}
-
-void deleteMDWFConstants()
-{
-  device_free(Tmp_b5);
-  device_free(Tmp_c5);
+  profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 
 //!ndeg tm: 

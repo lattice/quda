@@ -26,11 +26,11 @@ namespace quda {
 
   }
 
-  void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
     profile.Start(QUDA_PROFILE_INIT);
 
-    // Check to see that we're not trying to invert on a zero-field source    
+    // Check to see that we're not trying to invert on a zero-field source
     const double b2 = norm2(b);
     if(b2 == 0){
       profile.Stop(QUDA_PROFILE_INIT);
@@ -46,19 +46,19 @@ namespace quda {
 
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    cudaColorSpinorField y(b, csParam); 
-  
+    cudaColorSpinorField y(b, csParam);
+
     mat(r, x, y);
 
     double r2 = xmyNormCuda(b, r);
-  
+
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField Ap(x, csParam);
     cudaColorSpinorField tmp(x, csParam);
 
     cudaColorSpinorField *tmp2_p = &tmp;
     // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
+    if (mat.Type() != typeid(DiracStaggeredPC).name() &&
 	mat.Type() != typeid(DiracStaggered).name()) {
       tmp2_p = new cudaColorSpinorField(x, csParam);
     }
@@ -91,11 +91,11 @@ namespace quda {
     } else {
       zeroCuda(y);
     }
-    
-    const bool use_heavy_quark_res = 
+
+    const bool use_heavy_quark_res =
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     bool heavy_quark_restart = false;
-    
+
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
 
@@ -142,7 +142,7 @@ namespace quda {
     blas_flops = 0;
 
     int k=0;
-    
+
     PrintStats("CG", k, r2, b2, heavy_quark_res);
 
     int steps_since_reliable = 1;
@@ -151,7 +151,7 @@ namespace quda {
 
     while (!converged && k < param.maxiter) {
       matSloppy(Ap, p, tmp, tmp2); // tmp as tmp
-    
+
       double sigma;
 
       bool breakdown = false;
@@ -161,7 +161,7 @@ namespace quda {
 	r2 = triplet.x; double Ap2 = triplet.y; pAp = triplet.z;
 	r2_old = r2;
 
-	alpha = r2 / pAp;        
+	alpha = r2 / pAp;
 	sigma = alpha*(alpha * Ap2 - pAp);
 	if (sigma < 0.0 || steps_since_reliable==0) { // sigma condition has broken down
 	  r2 = axpyNormCuda(-alpha, Ap, rSloppy);
@@ -173,9 +173,9 @@ namespace quda {
       } else {
 	r2_old = r2;
 	pAp = reDotProductCuda(p, Ap);
-	alpha = r2 / pAp;        
+	alpha = r2 / pAp;
 
-	// here we are deploying the alternative beta computation 
+	// here we are deploying the alternative beta computation
 	Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy);
 	r2 = real(cg_norm); // (r_new, r_new)
 	sigma = imag(cg_norm) >= 0.0 ? imag(cg_norm) : r2; // use r2 if (r_k+1, r_k+1-r_k) breaks
@@ -187,11 +187,11 @@ namespace quda {
       if (rNorm > maxrr) maxrr = rNorm;
       int updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
       int updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
-    
+
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
       if (convergence(r2, heavy_quark_res, stop, param.tol_hq) && param.delta >= param.tol) updateX = 1;
-      
-      // For heavy-quark inversion force a reliable update if we continue after 
+
+      // For heavy-quark inversion force a reliable update if we continue after
       if (use_heavy_quark_res and L2breakdown and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) and param.delta >= param.tol) {
         updateX = 1;
       }
@@ -204,13 +204,13 @@ namespace quda {
 	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
 
-	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
+	if (use_heavy_quark_res && k%heavy_quark_check==0) {
 	  if (&x != &xSloppy) {
 	    copyCuda(tmp,y);
 	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
 	  } else {
 	    copyCuda(r, rSloppy);
-	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);	  
+	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);
 	  }
 	}
 
@@ -219,7 +219,7 @@ namespace quda {
 
 	axpyCuda(alpha, p, xSloppy);
 	copyCuda(x, xSloppy); // nop when these pointers alias
-      
+
 	xpyCuda(x, y); // swap these around?
 	mat(r, y, x); // here we can use x as tmp
 	r2 = xmyNormCuda(b, r);
@@ -229,13 +229,12 @@ namespace quda {
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
 
-        // break-out check if we have reached the limit of the precision
+	// break-out check if we have reached the limit of the precision
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
           resIncrease++;
-          warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
+	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
 
-	  k++;
-	  rUpdate++;
+
 
         if (resIncrease > maxResIncrease)
             if (use_heavy_quark_res) L2breakdown = true;
@@ -261,7 +260,7 @@ namespace quda {
 	rNorm = sqrt(r2);
 	maxrr = rNorm;
 	maxrx = rNorm;
-	r0Norm = rNorm;      
+	r0Norm = rNorm;
 	rUpdate++;
 
     if (use_heavy_quark_res and heavy_quark_restart) {
@@ -270,15 +269,15 @@ namespace quda {
         heavy_quark_restart = false;
     }
     else {
-	   // explicitly restore the orthogonality of the gradient vector
-	   double rp = reDotProductCuda(rSloppy, p) / (r2);
-	   axpyCuda(-rp, rSloppy, p);
+	// explicitly restore the orthogonality of the gradient vector
+	double rp = reDotProductCuda(rSloppy, p) / (r2);
+	axpyCuda(-rp, rSloppy, p);
 
-	   beta = r2 / r2_old; 
-	   xpayCuda(rSloppy, beta, p);
+	beta = r2 / r2_old;
+	xpayCuda(rSloppy, beta, p);
     }
 
-	
+
 	steps_since_reliable = 0;
         heavy_quark_res_old = heavy_quark_res;
       }
@@ -313,7 +312,7 @@ namespace quda {
       param.gflops = gflops;
     param.iter += k;
 
-    if (k==param.maxiter) 
+    if (k==param.maxiter)
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE)
@@ -326,7 +325,7 @@ namespace quda {
     param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
 #else
     param.true_res_hq = 0.0;
-#endif      
+#endif
 
     PrintSummary("CG", k, r2, b2);
 

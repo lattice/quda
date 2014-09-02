@@ -13,15 +13,19 @@
 
 namespace quda {
 
+  /**
+   Ritz matrix is targeted matrix object what we want to calculate its eigen values and eigen vectors.
+   In lattice QCD application, this is normally Dirac operator
+   */
   class RitzMat {
 
     friend class DiracMatrix;
 
     protected:
     const DiracMatrix &dirac_mat; 
-    int N_Poly;
-    double shift;
-    double *cheby_param;
+    int N_Poly;  // Chebychev polynomial order
+    double shift;   // eigen shift offset 
+    double *cheby_param;  // Chebychev polynomial coefficients values
 
     mutable cudaColorSpinorField *tmp1; // temporary hack
     mutable cudaColorSpinorField *tmp2; // temporary hack

@@ -50,6 +50,7 @@
     public:
       BlasMagmaArgs(const int prec);
       BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec);
+      BlasMagmaArgs(const int m, const int ldm, const int prec);
 
       ~BlasMagmaArgs();
 
@@ -59,7 +60,7 @@
       static void CloseMagma();
 
       //Collection of methods for EigCG solver:
-      void MagmaHEEVD(void *dTvecm, void *hTvalm, const int problem_size);
+      void MagmaHEEVD(void *dTvecm, void *hTvalm, const int problem_size, bool host = false);
       //
       int  MagmaORTH_2nev(void *dTvecm, void *dTm);
       //

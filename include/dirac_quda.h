@@ -347,7 +347,7 @@ namespace quda {
 
     void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
     void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-    void Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    //void Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
     void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol, cudaColorSpinorField &x, 
 		 cudaColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b, const QudaSolutionType) const;
