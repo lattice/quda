@@ -931,31 +931,31 @@ namespace quda {
         mh_send_back[b] = new MsgHandle**[maxNface];
         mh_recv_fwd[b] = new MsgHandle**[maxNface];
         mh_recv_back[b] = new MsgHandle**[maxNface];
-      }
 #ifdef GPU_COMMS
-      if(precision == QUDA_HALF_PRECISION){
-      	mh_send_norm_fwd  = new MsgHandle**[maxNface];
-      	mh_send_norm_back = new MsgHandle**[maxNface];
-     	mh_recv_norm_fwd  = new MsgHandle**[maxNface];
-      	mh_recv_norm_back = new MsgHandle**[maxNface]; 
-      }
+        if(precision == QUDA_HALF_PRECISION){
+      	  mh_send_norm_fwd[b]  = new MsgHandle**[maxNface];
+      	  mh_send_norm_back[b] = new MsgHandle**[maxNface];
+     	  mh_recv_norm_fwd[b]  = new MsgHandle**[maxNface];
+      	  mh_recv_norm_back[b] = new MsgHandle**[maxNface]; 
+        }
 #endif
+      } // loop over b
       for (int j=0; j<maxNface; j++) {
 	for(int b=0; b<2; ++b){
 	  mh_send_fwd[b][j] = new MsgHandle*[2*nDimComms];
 	  mh_send_back[b][j] = new MsgHandle*[2*nDimComms];
 	  mh_recv_fwd[b][j] = new MsgHandle*[nDimComms];
 	  mh_recv_back[b][j] = new MsgHandle*[nDimComms];
-	}
 		
 #ifdef GPU_COMMS
-	if(precision == QUDA_HALF_PRECISION){
-	  mh_send_norm_fwd[j] = new MsgHandle*[2*nDimComms];
-	  mh_send_norm_back[j] = new MsgHandle*[2*nDimComms];
-	  mh_recv_norm_fwd[j] = new MsgHandle*[nDimComms];
-	  mh_recv_norm_back[j] = new MsgHandle*[nDimComms];
-	}
+	  if(precision == QUDA_HALF_PRECISION){
+	    mh_send_norm_fwd[b][j] = new MsgHandle*[2*nDimComms];
+	    mh_send_norm_back[b][j] = new MsgHandle*[2*nDimComms];
+	    mh_recv_norm_fwd[b][j] = new MsgHandle*[nDimComms];
+	    mh_recv_norm_back[b][j] = new MsgHandle*[nDimComms];
+	  }
 #endif	
+	} // loop over b
 
 
 	for (int i=0; i<nDimComms; i++) {
@@ -974,10 +974,12 @@ namespace quda {
 	  }
 #ifdef GPU_COMMS
 	    if(precision == QUDA_HALF_PRECISION){
-	      mh_send_norm_fwd[j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[i], i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
-	      mh_send_norm_back[j][2*i+0] = comm_declare_send_relative(my_back_norm_face[i], i, -1, surfaceCB[i]*(j+1)*sizeof(float));
-	      mh_send_norm_fwd[j][2*i+1] = mh_send_norm_fwd[j][2*i];
-	      mh_send_norm_back[j][2*i+1] = mh_send_norm_back[j][2*i]; 	
+              for(int b=0; b<2; ++b){
+	        mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
+	        mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(my_back_norm_face[b][i], i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+	        mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
+	        mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i]; 	
+              }
 	    }
 
 
@@ -1025,24 +1027,31 @@ namespace quda {
 	    //printf("\n%d strided sends with Nface=%d Nblocks=%d blksize=%d Stride=%d,
 	    //	   i, j+1, Nblocks, blksize, Stride);
 
-	    mh_send_fwd[j][2*i+0] = comm_declare_strided_send_relative(base[2], i, +1, 
+            for(int b=0; b<2; ++b){
+	      mh_send_fwd[b][j][2*i+0] = comm_declare_strided_send_relative(base[2], i, +1, 
 								       blksize, Nblocks, Stride);
-	    mh_send_back[j][2*i+0] = comm_declare_strided_send_relative(base[0], i, -1, 
+	      mh_send_back[b][j][2*i+0] = comm_declare_strided_send_relative(base[0], i, -1, 
 									blksize, Nblocks, Stride);
-	    if (nSpin ==4) { // dagger communicators
-	      mh_send_fwd[j][2*i+1] = comm_declare_strided_send_relative(base[3], i, +1, 
+	      if (nSpin ==4) { // dagger communicators
+	        mh_send_fwd[b][j][2*i+1] = comm_declare_strided_send_relative(base[3], i, +1, 
 									 blksize, Nblocks, Stride);
-	      mh_send_back[j][2*i+1] = comm_declare_strided_send_relative(base[1], i, -1, 
+	        mh_send_back[b][j][2*i+1] = comm_declare_strided_send_relative(base[1], i, -1, 
 									  blksize, Nblocks, Stride);
-	    } else {
-	      mh_send_fwd[j][2*i+1] = mh_send_fwd[j][2*i+0];
-	      mh_send_back[j][2*i+1] = mh_send_back[j][2*i+0];
-	    }
+	      } else {
+	        mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i+0];
+	        mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i+0];
+	      }
+
+            } // loop over b
+
+          
 	  }
 
 	  if(precision == QUDA_HALF_PRECISION){
-	    mh_recv_norm_fwd[j][i] = comm_declare_receive_relative(from_fwd_norm_face[i], i, +1, surfaceCB[i]*sizeof(float)*(j+1));
-	    mh_recv_norm_back[j][i] = comm_declare_receive_relative(from_back_norm_face[i], i, -1, surfaceCB[i]*sizeof(float)*(j+1));
+            for(int b=0; b<2; ++b){
+	      mh_recv_norm_fwd[b][j][i] = comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, surfaceCB[i]*sizeof(float)*(j+1));
+	      mh_recv_norm_back[b][j][i] = comm_declare_receive_relative(from_back_norm_face[b][i], i, -1, surfaceCB[i]*sizeof(float)*(j+1));
+            }
 	  }
 #endif // GPU_COMMS
 
@@ -1312,13 +1321,13 @@ namespace quda {
 
     if (dir%2 == 0) { // sending backwards
       // Prepost receive
-      comm_start(mh_recv_norm_fwd[nFace-1][dim]);
-      comm_start(mh_send_norm_back[nFace-1][2*dim+dagger]);
+      comm_start(mh_recv_norm_fwd[bufferIndex][nFace-1][dim]);
+      comm_start(mh_send_norm_back[bufferIndex][nFace-1][2*dim+dagger]);
     } else { //sending forwards
       // Prepost receive
-      comm_start(mh_recv_norm_back[nFace-1][dim]);
+      comm_start(mh_recv_norm_back[bufferIndex][nFace-1][dim]);
       // Begin forward send
-      comm_start(mh_send_norm_fwd[nFace-1][2*dim+dagger]);
+      comm_start(mh_send_norm_fwd[bufferIndex][nFace-1][2*dim+dagger]);
     }
 #endif
   }
@@ -1340,15 +1349,15 @@ namespace quda {
 #ifdef GPU_COMMS
    }else{ // half precision
     if(dir%2==0) {
-      if (comm_query(mh_recv_fwd[nFace-1][dim]) && 
-	  comm_query(mh_send_back[nFace-1][2*dim+dagger]) &&
-	  comm_query(mh_recv_norm_fwd[nFace-1][dim]) &&
-	  comm_query(mh_send_norm_back[nFace-1][2*dim+dagger])) return 1;
+      if (comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]) && 
+	  comm_query(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]) &&
+	  comm_query(mh_recv_norm_fwd[bufferIndex][nFace-1][dim]) &&
+	  comm_query(mh_send_norm_back[bufferIndex][nFace-1][2*dim+dagger])) return 1;
     } else {
-      if (comm_query(mh_recv_back[nFace-1][dim]) && 
-	  comm_query(mh_send_fwd[nFace-1][2*dim+dagger]) &&
-	  comm_query(mh_recv_norm_back[nFace-1][dim]) && 
-	  comm_query(mh_send_norm_fwd[nFace-1][2*dim+dagger])) return 1;
+      if (comm_query(mh_recv_back[bufferIndex][nFace-1][dim]) && 
+	  comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]) &&
+	  comm_query(mh_recv_norm_back[bufferIndex][nFace-1][dim]) && 
+	  comm_query(mh_send_norm_fwd[bufferIndex][nFace-1][2*dim+dagger])) return 1;
     }
    } // half precision
 #endif
