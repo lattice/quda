@@ -26,10 +26,15 @@ namespace quda {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 
-    int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
   } // end namespace pack
 
   using namespace pack;
+
+  static int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+  void setPackComms(const int *comm_dim) {
+    for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = comm_dim[i];
+  }
+
 
 #include <dslash_index.cuh>
 

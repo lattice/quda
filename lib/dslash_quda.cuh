@@ -265,9 +265,6 @@
   }
   //end of tm dslash macro
 
-namespace pack {
-  extern int commDim[QUDA_MAX_DIM];
-}
 
   // Use an abstract class interface to drive the different CUDA dslash
   // kernels. All parameters are curried into the derived classes to
@@ -341,7 +338,7 @@ namespace pack {
       dslashParam.sp_stride = in->Stride();
 
       // this sets the communications pattern for the packing kernel
-      for (int i=0; i<QUDA_MAX_DIM; i++) pack::commDim[i] = dslashParam.commDim[i];
+      setPackComms(dslashParam.commDim);
     }
 
     virtual ~DslashCuda() { }

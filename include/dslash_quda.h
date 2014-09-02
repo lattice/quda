@@ -28,7 +28,10 @@ namespace quda {
     */
   bool getTwistPack();
 
-  //void setFace(const FaceBuffer& face1, const FaceBuffer& face2);
+  /**
+     Sets commDim array used in dslash_pack.cu
+   */
+  void setPackComms(const int *commDim);
 
   bool getDslashLaunch();
 
