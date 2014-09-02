@@ -79,12 +79,13 @@ namespace quda {
   public:
     CloverDslashCuda(cudaColorSpinorField *out,  const gFloat *gauge0, const gFloat *gauge1, 
 		     const QudaReconstructType reconstruct, const cFloat *clover, 
-		     const float *cloverNorm, const cudaColorSpinorField *in, 
+		     const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in, 
 		     const cudaColorSpinorField *x, const double a, const int dagger)
       : SharedDslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), clover(clover),
 	cloverNorm(cloverNorm), dagger(dagger), a(a)
     { 
-      bindSpinorTex<sFloat>(in, out, x); 
+      bindSpinorTex<sFloat>(in, out, x);
+      dslashParam.cl_stride = cl_stride;
     }
     virtual ~CloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
@@ -138,21 +139,21 @@ namespace quda {
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-      dslash = new CloverDslashCuda<double2, double2, double2>(out, (double2*)gauge0, (double2*)gauge1, 
-							       gauge.Reconstruct(), (double2*)cloverP, 
-							       (float*)cloverNormP, in, x, a, dagger);
+      dslash = new CloverDslashCuda<double2, double2, double2>
+	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), 
+	 (double2*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
       regSize = sizeof(double);
 #else
       errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new CloverDslashCuda<float4, float4, float4>(out, (float4*)gauge0, (float4*)gauge1,
-							    gauge.Reconstruct(), (float4*)cloverP,
-							    (float*)cloverNormP, in, x, a, dagger);
+      dslash = new CloverDslashCuda<float4, float4, float4>
+	(out, (float4*)gauge0, (float4*)gauge1, gauge.Reconstruct(), 
+	 (float4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new CloverDslashCuda<short4, short4, short4>(out, (short4*)gauge0, (short4*)gauge1,
-							    gauge.Reconstruct(), (short4*)cloverP,
-							    (float*)cloverNormP, in, x, a, dagger);
+      dslash = new CloverDslashCuda<short4, short4, short4>
+	(out, (short4*)gauge0, (short4*)gauge1, gauge.Reconstruct(), 
+	 (short4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
     }
 
     dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);

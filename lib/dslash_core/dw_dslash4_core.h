@@ -227,13 +227,14 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
 #endif
 
-coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity);
+const int dims[] = {X1, X2, X3, X4};
+coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
 
-READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
+READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
  o00_re = i00_re; o00_im = i00_im;
  o01_re = i01_re; o01_im = i01_im;
  o02_re = i02_re; o02_im = i02_im;
@@ -317,7 +318,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
 #endif
 
   // read spinor from device memory
-  READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
   // project spinor into half spinors
   a0_re = +i00_re+i30_im;
@@ -511,7 +512,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 #endif
 
   // read spinor from device memory
-  READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
   // project spinor into half spinors
   a0_re = +i00_re-i30_im;
@@ -701,7 +702,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
 #endif
 
   // read spinor from device memory
-  READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
   // project spinor into half spinors
   a0_re = +i00_re-i30_re;
@@ -895,7 +896,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 #endif
 
   // read spinor from device memory
-  READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
   // project spinor into half spinors
   a0_re = +i00_re+i30_re;
@@ -1085,7 +1086,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
 #endif
 
   // read spinor from device memory
-  READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
   // project spinor into half spinors
   a0_re = +i00_re+i20_im;
@@ -1279,7 +1280,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 #endif
 
   // read spinor from device memory
-  READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
   // project spinor into half spinors
   a0_re = +i00_re-i20_im;
@@ -1468,7 +1469,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
 
    // read spinor from device memory
-   READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
+   READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
    // project spinor into half spinors
    a0_re = +2*i20_re;
@@ -1541,7 +1542,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
 
    // read spinor from device memory
-   READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
+   READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
    // project spinor into half spinors
    a0_re = +2*i20_re;
@@ -1724,7 +1725,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
 
    // read spinor from device memory
-   READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
+   READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
    // project spinor into half spinors
    a0_re = +2*i00_re;
@@ -1797,7 +1798,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
 
    // read spinor from device memory
-   READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
+   READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
 
    // project spinor into half spinors
    a0_re = +2*i00_re;
@@ -1962,7 +1963,7 @@ if (!incomplete)
 {
 
 #ifdef DSLASH_XPAY
- READ_ACCUM(ACCUMTEX, sp_stride)
+ READ_ACCUM(ACCUMTEX, param.sp_stride)
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
@@ -2026,7 +2027,7 @@ if (!incomplete)
 }
 
 // write spinor field back to device memory
-WRITE_SPINOR(sp_stride);
+WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

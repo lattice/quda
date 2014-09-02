@@ -42,7 +42,7 @@
 #endif
 #endif // GPU_STAGGERED_DIRAC
 
-#include <quda_internal.h>
+#include <quda_internal.h>h
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
@@ -173,10 +173,11 @@ class CloverCuda : public Tunable {
 
   public:
     CloverCuda(cudaColorSpinorField *out, const cFloat *clover, const float *cloverNorm, 
-        const cudaColorSpinorField *in)
+	       int cl_stride, const cudaColorSpinorField *in)
       : out(out), clover(clover), cloverNorm(cloverNorm), in(in)
     {
       bindSpinorTex<sFloat>(in);
+      dslashParam.cl_stride = cl_stride;
     }
     virtual ~CloverCuda() { unbindSpinorTex<sFloat>(in); }
     void apply(const cudaStream_t &stream)
@@ -226,7 +227,7 @@ class CloverCuda : public Tunable {
 
 
 void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover clover, 
-    const cudaColorSpinorField *in, const int parity) {
+		const cudaColorSpinorField *in, const int parity) {
 
   dslashParam.parity = parity;
   dslashParam.threads = in->Volume();
@@ -241,14 +242,14 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-    clov = new CloverCuda<double2, double2>(out, (double2*)cloverP, (float*)cloverNormP, in);
+    clov = new CloverCuda<double2, double2>(out, (double2*)cloverP, (float*)cloverNormP, clover.stride, in);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    clov = new CloverCuda<float4, float4>(out, (float4*)cloverP, (float*)cloverNormP, in);
+    clov = new CloverCuda<float4, float4>(out, (float4*)cloverP, (float*)cloverNormP, clover.stride, in);
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    clov = new CloverCuda<short4, short4>(out, (short4*)cloverP, (float*)cloverNormP, in);
+    clov = new CloverCuda<short4, short4>(out, (short4*)cloverP, (float*)cloverNormP, clover.stride, in);
   }
   clov->apply(0);
 
@@ -285,6 +286,7 @@ class TwistGamma5Cuda : public Tunable {
       out(out), in(in) 
   {
     bindSpinorTex<sFloat>(in);
+    dslashParam.sp_stride = in->Stride();
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
       setTwistParam(a, b, kappa, mu, dagger, twist);
     else{//twist doublet
@@ -404,10 +406,12 @@ class TwistCloverGamma5Cuda : public Tunable {
   public:
     TwistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
         double kappa, double mu, double epsilon, const int dagger, QudaTwistGamma5Type tw,
-        cFloat *clov, const float *cN, cFloat *clovInv, const float *cN2) :
+			  cFloat *clov, const float *cN, cFloat *clovInv, const float *cN2, int cl_stride) :
       out(out), in(in)
   {
     bindSpinorTex<sFloat>(in);
+    dslashParam.sp_stride = in->Stride();
+    dslashParam.cl_stride = cl_stride;
     twist = tw;
     clover = clov;
     cNorm = cN;
@@ -498,16 +502,23 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
   if (in->Precision() != clover_prec)
     errorQuda("ERROR: Clover precision and spinor precision do not match\n");
 
+  if (clov->stride != clovInv->stride) 
+    errorQuda("clover and cloverInv must have matching strides (%d != %d)", clov->stride, clovInv->stride);
+    
+
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-    tmClovGamma5 = new TwistCloverGamma5Cuda<double2,double2>(out, in, kappa, mu, epsilon, dagger, twist, (double2 *) clover, (float *) cNorm, (double2 *) cloverInv, (float *) cNorm2);
+    tmClovGamma5 = new TwistCloverGamma5Cuda<double2,double2>
+      (out, in, kappa, mu, epsilon, dagger, twist, (double2 *) clover, (float *) cNorm, (double2 *) cloverInv, (float *) cNorm2, clov->stride);
 #else
     errorQuda("Double precision not supported on this GPU");
 #endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-    tmClovGamma5 = new TwistCloverGamma5Cuda<float4,float4>(out, in, kappa, mu, epsilon, dagger, twist, (float4 *) clover, (float *) cNorm, (float4 *) cloverInv, (float *) cNorm2);
+    tmClovGamma5 = new TwistCloverGamma5Cuda<float4,float4>
+      (out, in, kappa, mu, epsilon, dagger, twist, (float4 *) clover, (float *) cNorm, (float4 *) cloverInv, (float *) cNorm2, clov->stride);
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
-    tmClovGamma5 = new TwistCloverGamma5Cuda<short4,short4>(out, in, kappa, mu, epsilon, dagger, twist, (short4 *) clover, (float *) cNorm, (short4 *) cloverInv, (float *) cNorm2);
+    tmClovGamma5 = new TwistCloverGamma5Cuda<short4,short4>
+      (out, in, kappa, mu, epsilon, dagger, twist, (short4 *) clover, (float *) cNorm, (short4 *) cloverInv, (float *) cNorm2, clov->stride);
   }
 
   tmClovGamma5->apply(streams[Nstream-1]);

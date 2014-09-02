@@ -454,13 +454,14 @@ face_idx = sid - face_num*face_volume; // index into the respective face
 sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
 #endif
 
-coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity);
+const int dims[] = {X1, X2, X3, X4};
+coordsFromDW4DFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
 
 boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
 
 X = 2*sid + (boundaryCrossing + param.parity) % 2;
 
-READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
+READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 """)
           out = ""
           for s in range(0,4):
@@ -519,7 +520,7 @@ int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
 // read spinor from device memory
-READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
+READ_SPINOR(SPINORTEX, param.sp_stride, sid, sid);
 
 """)
     return prolog_str
@@ -608,11 +609,11 @@ def gen(dir, pack_only=False):
 
     load_spinor = "// read spinor from device memory\n"
     if row_cnt[0] == 0:
-        load_spinor += "READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     elif row_cnt[2] == 0:
-        load_spinor += "READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     else:
-        load_spinor += "READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     load_spinor += "\n"
 
     load_half = ""
@@ -767,7 +768,7 @@ def gen_dw():
     str += "     int sp_idx = ( xs == %s ? X%s(Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
     str += "\n"
     str += "// read spinor from device memory\n"
-    str += "     READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );\n"
+    str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
     str += "\n"
     str += "     if ( xs != %s )\n" % ledge
     str += "     {\n"
@@ -810,7 +811,7 @@ def gen_dw():
     str += "    int sp_idx = ( xs == %s ? X%s(Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
     str += "\n"
     str += "// read spinor from device memory\n"
-    str += "    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );\n"
+    str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
     str += "\n"
     str += "    if ( xs != %s )\n" % redge
     str += "    {\n"
@@ -845,7 +846,7 @@ def gen_dw():
       str += "  VOLATILE spinorFloat B_5;\n"
       str += "  C_5 = (spinorFloat)mdwf_c5[xs]*0.5;\n"
       str += "  B_5 = (spinorFloat)mdwf_b5[xs];\n\n"
-      str += "  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );\n"
+      str += "  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );\n"
       str += "  o00_re = C_5*o00_re + B_5*i00_re;\n" 
       str += "  o00_im = C_5*o00_im + B_5*i00_im;\n"
       str += "  o01_re = C_5*o01_re + B_5*i01_re;\n"
@@ -873,7 +874,7 @@ def gen_dw():
       str += "#elif (MDWF_mode==2)\n"
       str += "  VOLATILE spinorFloat C_5;\n"
       str += "  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));\n\n"
-      str += "  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );\n"
+      str += "  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );\n"
       str += "  o00_re = C_5*o00_re + i00_re;\n"
       str += "  o00_im = C_5*o00_im + i00_im;\n"
       str += "  o01_re = C_5*o01_re + i01_re;\n"
@@ -938,7 +939,7 @@ def gen_dw_inv():
         str += "    factorR = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;\n\n"
     str += "    sp_idx = base_idx + s*Vh;\n"
     str += "    // read spinor from device memory\n"
-    str += "    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );\n\n"
+    str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n\n"
     str += "    o00_re += factorR*(i00_re + i20_re);\n" 
     str += "    o00_im += factorR*(i00_im + i20_im);\n"
     str += "    o20_re += factorR*(i00_re + i20_re);\n" 
@@ -1194,7 +1195,7 @@ def ypax():
 def xpay():
     str = ""
     str += "#ifdef DSLASH_XPAY\n"
-    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n"
+    str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n"
     if dslash4:
       str += "VOLATILE spinorFloat coeff;\n\n"
       str += "#ifdef MDWF_mode\n"
@@ -1282,7 +1283,7 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
-    str += "WRITE_SPINOR(sp_stride);\n\n"
+    str += "WRITE_SPINOR(param.sp_stride);\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"

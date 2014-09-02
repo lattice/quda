@@ -141,7 +141,7 @@ xs = X/(X1*X2*X3*X4);
      int sp_idx = ( xs == Ls-1 ? X-(Ls-1)*2*Vh : X+2*Vh ) / 2;
 
 // read spinor from device memory
-     READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
+     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
      if ( xs != Ls-1 )
      {
@@ -186,7 +186,7 @@ xs = X/(X1*X2*X3*X4);
     int sp_idx = ( xs == 0 ? X+(Ls-1)*2*Vh : X-2*Vh ) / 2;
 
 // read spinor from device memory
-    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
+    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
     if ( xs != 0 )
     {
@@ -243,7 +243,7 @@ xs = X/(X1*X2*X3*X4);
   C_5 = (spinorFloat)mdwf_c5[xs]*0.5;
   B_5 = (spinorFloat)mdwf_b5[xs];
 
-  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );
+  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + B_5*i00_re;
   o00_im = C_5*o00_im + B_5*i00_im;
   o01_re = C_5*o01_re + B_5*i01_re;
@@ -272,7 +272,7 @@ xs = X/(X1*X2*X3*X4);
   VOLATILE spinorFloat C_5;
   C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));
 
-  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );
+  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + i00_re;
   o00_im = C_5*o00_im + i00_im;
   o01_re = C_5*o01_re + i01_re;
@@ -304,7 +304,7 @@ xs = X/(X1*X2*X3*X4);
 {
 
 #ifdef DSLASH_XPAY
- READ_ACCUM(ACCUMTEX, sp_stride)
+ READ_ACCUM(ACCUMTEX, param.sp_stride)
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
@@ -423,7 +423,7 @@ xs = X/(X1*X2*X3*X4);
 }
 
 // write spinor field back to device memory
-WRITE_SPINOR(sp_stride);
+WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

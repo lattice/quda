@@ -126,7 +126,6 @@ namespace quda {
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     dslashParam.parity = parity;
-    dslashParam.sp_stride = in->Stride();
     dslashParam.gauge_stride = gauge.Stride();
     dslashParam.fat_link_max = gauge.LinkMax(); // May need to use this in the preconditioning step 
     // in the solver for the improved staggered action

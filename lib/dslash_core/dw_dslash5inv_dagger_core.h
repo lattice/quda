@@ -167,7 +167,7 @@ VOLATILE spinorFloat kappa;
 
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
-    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
+    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
     o00_re += factorR*(i00_re + i20_re);
     o00_im += factorR*(i00_im + i20_im);
@@ -226,7 +226,7 @@ VOLATILE spinorFloat kappa;
 {
 
 #ifdef DSLASH_XPAY
- READ_ACCUM(ACCUMTEX, sp_stride)
+ READ_ACCUM(ACCUMTEX, param.sp_stride)
 #ifdef SPINOR_DOUBLE
  o00_re = a*o00_re + accum0.x;
  o00_im = a*o00_im + accum0.y;
@@ -282,7 +282,7 @@ VOLATILE spinorFloat kappa;
 }
 
 // write spinor field back to device memory
-WRITE_SPINOR(sp_stride);
+WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

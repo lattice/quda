@@ -83,7 +83,7 @@ namespace quda {
   public:
     TwistedCloverDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
 			    const QudaReconstructType reconstruct, const cFloat *clover, const float *cNorm,
-			    const cFloat *cloverInv, const float *cNrm2, const cudaColorSpinorField *in,
+			    const cFloat *cloverInv, const float *cNrm2, int cl_stride, const cudaColorSpinorField *in,
 			    const cudaColorSpinorField *x, const QudaTwistCloverDslashType dslashType, const double kappa,
 			    const double mu, const double epsilon, const double k, const int dagger)
       : SharedDslashCuda(out, in, x, reconstruct),gauge0(gauge0), gauge1(gauge1), clover(clover),
@@ -91,6 +91,7 @@ namespace quda {
 	dslashType(dslashType), dagger(dagger)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
+      dslashParam.cl_stride = cl_stride;
       a = kappa;
       b = mu;
       c = epsilon;
@@ -197,25 +198,28 @@ namespace quda {
     if (in->Precision() != gauge.Precision())
       errorQuda("Mixing gauge and spinor precision not supported");
 	
+    if (clover->stride != cloverInv->stride) 
+      errorQuda("clover and cloverInv must have matching strides (%d != %d)", clover->stride, cloverInv->stride);
+
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);
 	
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-      dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, (float*)cloverNormP,
-								    (double2*)cloverInvP, (float*)cloverInvNormP, in, x, type, kappa, mu, epsilon, k, dagger);
+    dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, (float*)cloverNormP,
+								  (double2*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
 	  
-      regSize = sizeof(double);
+    regSize = sizeof(double);
 #else
-      errorQuda("Double precision not supported on this GPU");
+    errorQuda("Double precision not supported on this GPU");
 #endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new TwistedCloverDslashCuda<float4,float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), (float4*)cloverP, (float*)cloverNormP,
-								 (float4*)cloverInvP, (float*)cloverInvNormP, in, x, type, kappa, mu, epsilon, k, dagger);
+								 (float4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
 
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new TwistedCloverDslashCuda<short4,short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), (short4*)cloverP, (float*)cloverNormP,
-								 (short4*)cloverInvP, (float*)cloverInvNormP, in, x, type, kappa, mu, epsilon, k, dagger);
+								 (short4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
     }
 
     //    dslashCuda(*dslash, regSize, parity, dagger, bulk_threads, ghost_threads, profile);

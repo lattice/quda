@@ -16,6 +16,7 @@ enum KernelType {
     int X[4];
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int sp_stride; // spinor stride
+    int cl_stride; // clover stride
 #ifdef GPU_STAGGERED_DIRAC
     int gauge_stride;
     int long_gauge_stride;
@@ -123,9 +124,9 @@ __constant__ int X3X2X1_3;
 __constant__ int Vh;
 __constant__ int Vs;
 __constant__ int Vsh;
-__constant__ int sp_stride;
+//__constant__ int sp_stride;
 __constant__ int ga_stride;
-__constant__ int cl_stride;
+//__constant__ int cl_stride;
 __constant__ int ghostFace[QUDA_MAX_DIM+1];
 
 __constant__ int fat_ga_stride;
@@ -411,14 +412,14 @@ void initSpinorConstants(const cudaColorSpinorField &spinor, TimeProfile &profil
   static int last_sp_stride = -1;
   static int last_Ls = -1;
 
-  int sp_stride_h = spinor.Stride();
+  /*int sp_stride_h = spinor.Stride();
   if (sp_stride_h != last_sp_stride) {
     profile.Start(QUDA_PROFILE_CONSTANT);
     cudaMemcpyToSymbol(sp_stride, &sp_stride_h, sizeof(int));
     checkCudaError();
     last_sp_stride = sp_stride_h;
     profile.Stop(QUDA_PROFILE_CONSTANT);
-  }
+    }*/
   
   // for domain wall:
   if (spinor.Ndim() == 5) {
@@ -461,10 +462,10 @@ void initCloverConstants (const cudaCloverField &clover, TimeProfile &profile)
 {
   profile.Start(QUDA_PROFILE_CONSTANT);
 
-  int cl_stride_h = clover.Stride();
+  /*int cl_stride_h = clover.Stride();
   cudaMemcpyToSymbol(cl_stride, &cl_stride_h, sizeof(int));  
 
-  checkCudaError();
+  checkCudaError();*/
 
   profile.Stop(QUDA_PROFILE_CONSTANT);
 }

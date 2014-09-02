@@ -75,7 +75,11 @@ QUDA_CORE = clover_core.h staggered_dslash_core.h			\
 	wilson_dslash_g80_core.h wilson_dslash_dagger_g80_core.h 	\
 	tm_dslash_g80_core.h tm_dslash_dagger_g80_core.h		\
 	wilson_pack_face_core.h wilson_pack_face_dagger_core.h		\
-	tm_ndeg_dslash_core.h tm_ndeg_dslash_dagger_core.h	
+	tm_ndeg_dslash_core.h tm_ndeg_dslash_dagger_core.h		\
+	tmc_dslash_fermi_core.h tmc_dslash_dagger_fermi_core.h		\
+	tmc_dslash_gt200_core.h tmc_dslash_dagger_gt200_core.h		\
+	tmc_dslash_gt200_core.h tmc_dslash_dagger_g80_core.h		\
+	tmc_gamma_core.h
 
 INC += -I../include -Idslash_core -I.
 
