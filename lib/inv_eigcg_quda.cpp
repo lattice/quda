@@ -950,7 +950,7 @@ namespace quda {
 
      const bool use_cg_updates         = false; 
 
-     const int eigcg_min_restarts      = 3;
+     const int eigcg_min_restarts      = 10;
 
      int eigcg_restarts = 0;
 
@@ -960,7 +960,7 @@ namespace quda {
      {
        CreateDeflationSpace(*in, defl_param);
      }
-     else if(use_eigcg && defl_param->cur_dim == defl_param->tot_dim)
+     else if(use_eigcg && (defl_param->cur_dim == defl_param->tot_dim || defl_param->rtz_dim != 0) )//think about ritz_dim:temporary solution..
      {
        use_eigcg = false;
 
@@ -974,7 +974,10 @@ namespace quda {
 
        //temporary solution!
        initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
+       //
        initCGparam.use_sloppy_partial_accumulator=0;
+
+       fillInitCGSolveParam(initCGparam);
 
      }
    
@@ -1017,12 +1020,6 @@ namespace quda {
 
         eigcg_restarts = EigCG(*outSloppy, *inSloppy);
 
-        //too messy ...
-        bool cg_updates    = use_mixed_prec && (use_cg_updates || (eigcg_restarts < eigcg_min_restarts));
-
-        bool eigcg_updates = use_mixed_prec && !cg_updates;
-
-
         tot_time  += param.secs;
 
         //store computed Ritz vectors: 
@@ -1031,6 +1028,11 @@ namespace quda {
         //Construct(extend) projection matrix:
         ExpandDeflationSpace(defl_param, param.nev);
         //
+
+        //too messy..
+        bool cg_updates    = use_mixed_prec && (use_cg_updates || (eigcg_restarts < eigcg_min_restarts) || (defl_param->cur_dim == defl_param->tot_dim));
+
+        bool eigcg_updates = use_mixed_prec && !cg_updates;
 
         if(cg_updates)
         {
@@ -1041,7 +1043,7 @@ namespace quda {
  * L24T48 : 5e-3
  * L48T96 : 5e-2, works but not perfect, 1e-1 seems to be better...
  */     
-           param.tol   = 1e-1;//initcg sloppy precision tolerance
+           param.tol   = 5e-3;//initcg sloppy precision tolerance
 
            cudaColorSpinorField y(*in);//full precision accumulator
            cudaColorSpinorField r(*in);//full precision residual
@@ -1053,7 +1055,8 @@ namespace quda {
            //
            initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
            initCGparam.use_sloppy_partial_accumulator=0;   //more stable single-half solver
-     
+
+           fillInitCGSolveParam(initCGparam);
 
            initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
 
@@ -1092,9 +1095,6 @@ namespace quda {
            //
            delete initCG;
            //
-           delete outSloppy;
-           //
-           delete inSloppy;
         }
         else if(eigcg_updates)
         {
@@ -1169,6 +1169,11 @@ namespace quda {
               }
 
               ReportEigenvalueAccuracy(defl_param, param.nev);
+        }
+
+        if(use_mixed_prec){
+           delete outSloppy;
+           delete inSloppy;
         }
 
      }
@@ -1268,7 +1273,7 @@ namespace quda {
 
      if( (defl_param->cur_dim == defl_param->tot_dim) && (use_eigcg) && (use_reduced_vector_set) )
      {
-        const int max_nev = defl_param->cur_dim;//param.m;
+        const int max_nev = param.m;////defl_param->cur_dim;//param.m;
 
         if(eigcg_alloc){
 

@@ -2965,6 +2965,10 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   setDiracParam(diracParam, param, pc_solve);
   setDiracSloppyParam(diracSloppyParam, param, pc_solve);
 
+  if(param->cuda_prec_precondition != QUDA_HALF_PRECISION)
+  {
+     errorQuda("\nInitCG requires sloppy gauge field in half precision. It seems that the half precision field is not loaded,\n please check you cuda_prec_precondition parameter.\n");
+  }
 
 //!half precision Dirac field (for the initCG)
   setDiracParam(diracHalfPrecParam, param, pc_solve);
