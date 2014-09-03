@@ -97,7 +97,7 @@ namespace quda {
    * face_idx so that is relative to a given dimension.
    */
   template <typename Param>
-    __device__ inline int dimFromFaceIndex (int &face_idx, const Param param) {
+    __device__ inline int dimFromFaceIndex (int &face_idx, const Param &param) {
     if (face_idx < param.threadDimMapUpper[0]) {
       return 0;
     } else if (face_idx < param.threadDimMapUpper[1]) {
