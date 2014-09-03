@@ -43,6 +43,7 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern QudaInverterType  inv_type;
 extern int multishift; // whether to test multi-shift or standard solver
+extern double mass; // mass of Dirac operator
 
 extern char latfile[];
 
@@ -146,7 +147,6 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.585;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -166,8 +166,6 @@ int main(int argc, char **argv)
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;
-    inv_param.b_5 = (double*)malloc(Lsdim*sizeof(double));
-    inv_param.c_5 = (double*)malloc(Lsdim*sizeof(double));
     for(int k = 0; k < Lsdim; k++)
     {
       // b5[k], c[k] values are chosen for arbitrary values,
@@ -226,10 +224,12 @@ int main(int argc, char **argv)
   }
   inv_param.maxiter = 10000;
   inv_param.reliable_delta = 1e-2;
+  inv_param.use_sloppy_partial_accumulator = 0;
+  inv_param.max_res_increase = 1;
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = 
-    inv_param.inv_type == QUDA_GCR_INVERTER ? QUDA_MR_INVERTER : QUDA_INVALID_INVERTER;
+  inv_param.inv_type == QUDA_GCR_INVERTER ? QUDA_MR_INVERTER : QUDA_INVALID_INVERTER;
     
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;

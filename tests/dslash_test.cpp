@@ -123,8 +123,6 @@ void init(int argc, char **argv) {
     inv_param.mass = 0.01;
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
-    inv_param.b_5 = (double*)malloc(Lsdim*sizeof(double));
-    inv_param.c_5 = (double*)malloc(Lsdim*sizeof(double));
     for(int k = 0; k < Lsdim; k++)
     {
       // b5[k], c[k] values are chosen for arbitrary values,

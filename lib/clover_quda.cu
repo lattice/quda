@@ -556,7 +556,8 @@ namespace quda {
             computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float, 18, 2, 18>(gauge), *Fmunu, cloverCoeff, location);  
           }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
             computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float, 18, 2, 12>(gauge),  *Fmunu, cloverCoeff, location);
-
+          }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_8){
+            computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float, 18, 2, 8>(gauge),  *Fmunu, cloverCoeff, location);
           }else{
             errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
           }

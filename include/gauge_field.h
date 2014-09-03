@@ -234,7 +234,7 @@ namespace quda {
 
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
-       region in non-partitioned dimenions
+       region in non-partitioned dimensions
      */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 

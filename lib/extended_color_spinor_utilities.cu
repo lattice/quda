@@ -331,6 +331,7 @@ namespace quda {
         FloatNOrder<FloatOut, Ns, Nc, 2> outOrder(out, Out, outNorm);
         copySpinorEx<FloatOut,FloatIn,Ns,Nc>
           (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, location);
+#if 0
       }else if(out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER){
         SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
         copySpinorEx<FloatOut,FloatIn,Ns,Nc>
@@ -346,6 +347,7 @@ namespace quda {
           (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, location);
 #else
         errorQuda("QDPJIT interface has not been built\n");
+#endif
 #endif
       }else{
         errorQuda("Order not defined");
@@ -381,6 +383,7 @@ namespace quda {
       }else if(in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER){
         FloatNOrder<FloatIn,Ns,Nc,2> inOrder(in, In, inNorm);
         extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
+#if 0
       }else if(in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER){
         SpaceSpinorColorOrder<FloatIn,Ns,Nc> inOrder(in, In);
         extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
@@ -393,6 +396,7 @@ namespace quda {
         extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend,location, Out, outNorm);
 #else
         errorQuda("QDPJIT interface has not been built\n");
+#endif
 #endif
       }else{
         errorQuda("Order not defined");
@@ -481,9 +485,17 @@ namespace quda {
         errorQuda("source and destination spins must match");
 
       if(dst.Nspin() == 4){
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
         copyExtendedColorSpinor<4>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
+#else
+	errorQuda("Extended copy has not been built for Nspin=%d fields",dst.Nspin());
+#endif
       }else if(dst.Nspin() == 1){
+#ifdef GPU_STAGGERED_DIRAC
         copyExtendedColorSpinor<1>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
+#else
+	errorQuda("Extended copy has not been built for Nspin=%d fields", dst.Nspin());
+#endif
       }else{
         errorQuda("Nspin=%d unsupported", dst.Nspin());
       }

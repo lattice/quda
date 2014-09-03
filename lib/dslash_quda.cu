@@ -605,11 +605,11 @@ namespace quda {
     virtual void preTune()
     {
       if (dslashParam.kernel_type < 5) { // exterior kernel
-	saveOut = new char[in->Bytes()];
-	cudaMemcpy(saveOut, out->V(), in->Bytes(), cudaMemcpyDeviceToHost);
+	saveOut = new char[out->Bytes()];
+	cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
 	if (out->Precision() == QUDA_HALF_PRECISION) {
-	  saveOutNorm = new char[in->NormBytes()];
-	  cudaMemcpy(saveOutNorm, out->Norm(), in->NormBytes(), cudaMemcpyDeviceToHost);
+	  saveOutNorm = new char[out->NormBytes()];
+	  cudaMemcpy(saveOutNorm, out->Norm(), out->NormBytes(), cudaMemcpyDeviceToHost);
 	}
       }
     }
@@ -617,10 +617,10 @@ namespace quda {
     virtual void postTune()
     {
       if (dslashParam.kernel_type < 5) { // exterior kernel
-	cudaMemcpy(out->V(), saveOut, in->Bytes(), cudaMemcpyHostToDevice);
+	cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
 	delete[] saveOut;
 	if (out->Precision() == QUDA_HALF_PRECISION) {
-	  cudaMemcpy(out->Norm(), saveOutNorm, in->NormBytes(), cudaMemcpyHostToDevice);
+	  cudaMemcpy(out->Norm(), saveOutNorm, out->NormBytes(), cudaMemcpyHostToDevice);
 	  delete[] saveOutNorm;
 	}
       }
@@ -1677,7 +1677,7 @@ namespace quda {
         // Initialize pack from source spinor
 
         if (inCloverInv == NULL) {
-          PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, twist_a, twist_b), 
+          PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, false, twist_a, twist_b), 
               profile, QUDA_PROFILE_PACK_KERNEL);
         } else {
           PROFILE(face[it]->pack(*inSpinor, *inClover, *inCloverInv, 1-parity, dagger,
@@ -1868,7 +1868,6 @@ namespace quda {
         }
 #else // single CPU thread per MPI process
         const int packIndex = Nstream-1;
-        
         for(int i=3; i>=0; i--){
           if(!dslashParam.commDim[i]) continue;
           for(int dir=1; dir>=0; dir--){
@@ -1890,7 +1889,7 @@ namespace quda {
 
         // Initialize pack from source spinor
         if (inCloverInv == NULL) {
-          PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a, twist_b),
+          PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
               profile, QUDA_PROFILE_PACK_KERNEL);
         } else {
           PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
@@ -2023,7 +2022,8 @@ namespace quda {
           }
 
         }
-	inSpinor->switchBufferPinned(); // Use a different pinned memory buffer for the next application
+	inSpinor->bufferIndex = (1 - inSpinor->bufferIndex);
+//	inSpinor->switchBufferPinned(); // Use a different pinned memory buffer for the next application
 #endif // MULTI_GPU
         profile.Stop(QUDA_PROFILE_TOTAL);
       }
@@ -3248,3 +3248,7 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
 #include "fermion_force_quda.cu"
 #endif
 
+#ifdef GPU_CONTRACT
+#include "covDev.cu"
+#include "contract.cu"
+#endif

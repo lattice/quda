@@ -68,6 +68,7 @@ extern int gridsize_from_cmdline[];
 extern QudaDslashType dslash_type;
 
 extern QudaInverterType inv_type;
+extern double mass; // the mass of the Dirac operator
 
 static void end();
 
@@ -181,8 +182,6 @@ invert_test(void)
 {
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
-
-  double mass = 0.5;
 
   set_params(&gaugeParam, &inv_param,
       xdim, ydim, zdim, tdim,

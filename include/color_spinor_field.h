@@ -322,23 +322,23 @@ namespace quda {
 #ifdef GPU_COMMS  // This is a hack for half precision.
    // Since the ghost data and ghost norm data are not contiguous, 
    // separate MPI calls are needed when using GPUDirect RDMA.
-   void *my_fwd_norm_face[QUDA_MAX_DIM];
-   void *my_back_norm_face[QUDA_MAX_DIM];
-   void *from_fwd_norm_face[QUDA_MAX_DIM];
-   void *from_back_norm_face[QUDA_MAX_DIM];
+   void *my_fwd_norm_face[2][QUDA_MAX_DIM];
+   void *my_back_norm_face[2][QUDA_MAX_DIM];
+   void *from_fwd_norm_face[2][QUDA_MAX_DIM];
+   void *from_back_norm_face[2][QUDA_MAX_DIM];
 
-   MsgHandle ***mh_recv_norm_fwd;
-   MsgHandle ***mh_recv_norm_back;
-   MsgHandle ***mh_send_norm_fwd;
-   MsgHandle ***mh_send_norm_back;
+   MsgHandle ***mh_recv_norm_fwd[2];
+   MsgHandle ***mh_recv_norm_back[2];
+   MsgHandle ***mh_send_norm_fwd[2];
+   MsgHandle ***mh_send_norm_back[2];
 #endif
 
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
-    static void* ghostFaceBuffer; // gpu memory
-    static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    static void* backGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static void* ghostFaceBuffer[2]; // gpu memory
+    static void* fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static int initGhostFaceBuffer;
 
     void create(const QudaFieldCreate);
@@ -359,13 +359,17 @@ namespace quda {
     /** Whether we have initialized communication for this field */
     bool initComms;
 
+    /** Keep track of which pinned-memory buffer we used for creating message handlers */
+    size_t bufferMessageHandler;
+
     /** How many faces we are communicating in this communicator */
     int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
-    static int bufferIndex;
-
 
     public:
+
+    static int bufferIndex;
+	
     //cudaColorSpinorField();
     cudaColorSpinorField(const cudaColorSpinorField&);
     cudaColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);

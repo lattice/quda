@@ -302,6 +302,10 @@ namespace quda {
     } else { //Twist doublet
         errorQuda("Non-degenrate DiracTwistedCloverPC is not implemented \n");
     }
+
+    delete cs;
+    delete cI;
+
     deleteTmp(&tmp1, reset);
   }
 

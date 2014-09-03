@@ -10,6 +10,9 @@
 
 namespace quda {
 
+  /**
+   New object class for solving an eigen problems, currently Lanczos operator is implemented 
+   */
   class Eig_Solver {
 
   protected:
@@ -26,11 +29,14 @@ namespace quda {
     // solver factory
     static Eig_Solver* create(QudaEigParam &param, RitzMat &ritz_mat, TimeProfile &profile);
 
+    /**
+     Not implemented yet!!!, Checkthe eig solver convergence
+     */
     bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
 		     const double &hq_tol);
  
     /**
-       Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
+     Not implemented yet!!!, Prints out the running statistics of the solver 
      */
     void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
 
@@ -42,9 +48,15 @@ namespace quda {
     */
     void PrintSummary(const char *name, int k, const double &r2, const double &b2);
 
+    /**
+    Do the GrandSchmit orthogonalization and check the orthogonality of eigen vectors
+    */
     void GrandSchm_test(cudaColorSpinorField &psi, cudaColorSpinorField **Eig_Vec, int Nvec, double *delta);
   };
 
+  /**
+  Basic Lanczos algorithm 
+  */
   class Lanczos : public Eig_Solver {
 
   private:
@@ -57,6 +69,10 @@ namespace quda {
     void operator()(double *alpha, double *beta, cudaColorSpinorField **Eig_Vec, 
                     cudaColorSpinorField &r, cudaColorSpinorField &Apsi, int k0, int m);
   };
+    
+  /**
+  Not implemented yet!!!, Implicitely restarted Lanczos algoritm can rapidly approach the solution than normal Lanczos, Chebychev acceleration and implicite restart processes are needed. At this moment external program call can do this.
+  */
 
   class ImpRstLanczos : public Eig_Solver {
 
