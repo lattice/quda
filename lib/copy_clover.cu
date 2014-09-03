@@ -3,6 +3,8 @@
 
 namespace quda {
 
+#ifdef GPU_CLOVER_DIRAC
+
   /** 
       Kernel argument struct
   */
@@ -174,9 +176,13 @@ namespace quda {
 
   }
 
+#endif
+
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			void *Out, void *In, void *outNorm, void *inNorm) {
+
+#ifdef GPU_CLOVER_DIRAC
     if (out.Precision() == QUDA_HALF_PRECISION && out.Order() > 4) 
       errorQuda("Half precision not supported for order %d", out.Order());
     if (in.Precision() == QUDA_HALF_PRECISION && in.Order() > 4) 
@@ -207,6 +213,10 @@ namespace quda {
 	copyClover<short,short,72>(out, in, inverse, location, (short*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
       }
     } 
+#else
+    errorQuda("Clover has not been built");
+#endif
+
   }
 
 
