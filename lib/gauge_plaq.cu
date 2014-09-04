@@ -8,6 +8,8 @@
 
 namespace quda {
 
+#ifdef GPU_GAUGE_TOOLS
+
 //  template <typename Float, typename Gauge>
   template <typename Gauge>
   struct GaugePlaqArg {
@@ -235,9 +237,11 @@ namespace quda {
 
       return res;
     }
+#endif
 
   double plaquette(const GaugeField& data, QudaFieldLocation location) {
 
+#ifdef GPU_GAUGE_TOOLS
     if(data.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported\n");
     }
@@ -248,5 +252,9 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", data.Precision());
     }
+#else
+  errorQuda("Gauge tools are not build");
+#endif
+
   }
 }
