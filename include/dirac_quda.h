@@ -141,6 +141,7 @@ namespace quda {
   class DiracWilson : public Dirac {
 
   protected:
+    void initConstants();
     FaceBuffer face1, face2; // multi-gpu communication buffers
 
   public:
@@ -190,8 +191,9 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField &clover;
+    void initConstants();
     void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
+    cudaCloverField &clover;
 
   public:
     DiracClover(const DiracParam &param);

@@ -4724,9 +4724,8 @@ void computeStaggeredOprodQuda(void** oprod,
   cudaGaugeField cudaOprod0(oParam);
   cudaGaugeField cudaOprod1(oParam);
   profileStaggeredOprod.Stop(QUDA_PROFILE_INIT); 
-  initLatticeConstants(cudaOprod0, profileStaggeredOprod);
 
-
+  //initLatticeConstants(cudaOprod0, profileStaggeredOprod);
 
   profileStaggeredOprod.Start(QUDA_PROFILE_H2D);
   cudaOprod0.loadCPUField(cpuOprod0,QUDA_CPU_FIELD_LOCATION);
