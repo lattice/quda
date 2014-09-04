@@ -195,40 +195,45 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 #ifdef PTHREADS
 #include <pthread.h>
 
-struct ReceiveParam 
-{
-  TimeProfile* profile;
-  int nFace;
-  int dagger;
-};
 
-void *issueMPIReceive(void* receiveParam)
-{
-  ReceiveParam* param = static_cast<ReceiveParam*>(receiveParam);
-  for(int i=3; i>=0; i--){
-    if(!dslashParam.commDim[i]) continue;
-    for(int dir=1; dir>=0; dir--){
-      PROFILE(inSpinor->recvStart(param->nFace, 2*i+dir, param->dagger), (*(param->profile)), QUDA_PROFILE_COMMS_START);
+namespace {
+
+  struct ReceiveParam 
+  {
+    TimeProfile* profile;
+    int nFace;
+    int dagger;
+  };
+
+  void *issueMPIReceive(void* receiveParam)
+  {
+    ReceiveParam* param = static_cast<ReceiveParam*>(receiveParam);
+    for(int i=3; i>=0; i--){
+      if(!dslashParam.commDim[i]) continue;
+      for(int dir=1; dir>=0; dir--){
+        PROFILE(inSpinor->recvStart(param->nFace, 2*i+dir, param->dagger), (*(param->profile)), QUDA_PROFILE_COMMS_START);
+      }
     }
+    return NULL;
   }
-  return NULL;
-}
 
-struct InteriorParam 
-{
-  TimeProfile* profile;
-  DslashCuda* dslash;
-  int current_device;
-};
+  struct InteriorParam 
+  {
+    TimeProfile* profile;
+    DslashCuda* dslash;
+    int current_device;
+  };
 
 
-void* launchInteriorKernel(void* interiorParam)
-{
-  InteriorParam* param = static_cast<InteriorParam*>(interiorParam);
-  cudaSetDevice(param->current_device); // set device in the new thread
-  PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
-  return NULL;
-}
+ void* launchInteriorKernel(void* interiorParam)
+  {
+    InteriorParam* param = static_cast<InteriorParam*>(interiorParam);
+    cudaSetDevice(param->current_device); // set device in the new thread
+    PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
+    return NULL;
+  }
+
+} // anonymous namespace
 #endif
 
 void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
