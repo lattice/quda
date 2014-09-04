@@ -944,8 +944,10 @@ namespace quda {
     const int dim;
     const int face_num;
 
-    // compute how many threads we need in total for the face packing
+    // used for tuneKey auxillary data
+    char aux[256];
 
+    // compute how many threads we need in total for the face packing
     unsigned int threads() const {
       unsigned int threads = 0;
       if(dim < 0){ // if dim is negative, pack all dimensions
@@ -1057,20 +1059,30 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return threads(); }
 
+    void fillAux() {
+      strcpy(aux, in->AuxString());
+      char comm[5];
+      comm[0] = (commDim[0] ? '1' : '0');
+      comm[1] = (commDim[1] ? '1' : '0');
+      comm[2] = (commDim[2] ? '1' : '0');
+      comm[3] = (commDim[3] ? '1' : '0');
+      comm[4] = '\0'; strcat(aux,",comm=");
+      strcat(aux,comm);
+    }
+
   public:
   PackFace(FloatN *faces, const cudaColorSpinorField *in, 
 	   const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
-    : faces(faces), in(in), clov(NULL), clovInv(NULL), dagger(dagger), parity(parity), nFace(nFace), dim(dim), face_num(face_num) { }
+    : faces(faces), in(in), clov(NULL), clovInv(NULL), dagger(dagger), parity(parity), nFace(nFace), dim(dim), face_num(face_num) { fillAux(); }
   PackFace(FloatN *faces, const cudaColorSpinorField *in, const FullClover *clov, const FullClover *clovInv,
 	   const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
-    : faces(faces), in(in), clov(clov), clovInv(clovInv), dagger(dagger), parity(parity), nFace(nFace), dim(dim), face_num(face_num) { }
+    : faces(faces), in(in), clov(clov), clovInv(clovInv), dagger(dagger), parity(parity), nFace(nFace), dim(dim), face_num(face_num) { fillAux(); }
     virtual ~PackFace() { }
 
     virtual int tuningIter() const { return 100; }
 
     virtual TuneKey tuneKey() const {
-      // do we need to specify the number of threads used or not? (e.g., packing T versus not packing in T?)
-      return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString());
+      return TuneKey(in->VolString(), typeid(*this).name(), aux);
     }  
 
     virtual void apply(const cudaStream_t &stream) = 0;
