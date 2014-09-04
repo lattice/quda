@@ -106,7 +106,7 @@ VOLATILE spinorFloat o32_im;
 #include "io_spinor.h"
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*Ls) return;
+if (sid >= param.threads*param.Ls) return;
 
 int boundaryCrossing;
 
@@ -157,17 +157,17 @@ VOLATILE spinorFloat kappa;
 // s' = input vector index and
 // 'a'= kappa5
 
-  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,Ls)*mferm);
+  spinorFloat inv_d_n = 1.0 / ( 1.0 + pow(kappa,param.Ls)*mferm);
   spinorFloat factorR;
   spinorFloat factorL;
 
-  for(int s = 0; s < Ls; s++)
+  for(int s = 0; s < param.Ls; s++)
   {
-    factorR = ( xs < s ? -inv_d_n*pow(kappa,Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;
+    factorR = ( xs < s ? -inv_d_n*pow(kappa,param.Ls-s+xs)*mferm : inv_d_n*pow(kappa,xs-s))/2.0;
 
     sp_idx = base_idx + s*Vh;
     // read spinor from device memory
-    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
+    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
     o00_re += factorR*(i00_re + i20_re);
     o00_im += factorR*(i00_im + i20_im);
@@ -194,7 +194,7 @@ VOLATILE spinorFloat kappa;
     o32_re += factorR*(i12_re + i32_re);
     o32_im += factorR*(i12_im + i32_im);
 
-    factorL = ( xs > s ? -inv_d_n*pow(kappa,Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;
+    factorL = ( xs > s ? -inv_d_n*pow(kappa,param.Ls-xs+s)*mferm : inv_d_n*pow(kappa,s-xs))/2.0;
 
     o00_re += factorL*(i00_re - i20_re);
     o00_im += factorL*(i00_im - i20_im);
@@ -226,7 +226,7 @@ VOLATILE spinorFloat kappa;
 {
 
 #ifdef DSLASH_XPAY
- READ_ACCUM(ACCUMTEX, sp_stride)
+ READ_ACCUM(ACCUMTEX, param.sp_stride)
 #ifdef SPINOR_DOUBLE
  o00_re = a*o00_re + accum0.x;
  o00_im = a*o00_im + accum0.y;
@@ -282,7 +282,7 @@ VOLATILE spinorFloat kappa;
 }
 
 // write spinor field back to device memory
-WRITE_SPINOR(sp_stride);
+WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

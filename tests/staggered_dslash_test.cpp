@@ -124,6 +124,11 @@ void init()
   inv_param.dslash_type = dslash_type;
 >>>>>>> quda-0.7
 
+  // ensure that the default is improved staggered
+  if (inv_param.dslash_type != QUDA_STAGGERED_DSLASH &&
+      inv_param.dslash_type != QUDA_ASQTAD_DSLASH)
+    inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
+
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 

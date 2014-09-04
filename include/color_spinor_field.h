@@ -336,9 +336,9 @@ namespace quda {
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
-    static void* ghostFaceBuffer; // gpu memory
-    static void* fwdGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
-    static void* backGhostFaceBuffer[QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static void* ghostFaceBuffer[2]; // gpu memory
+    static void* fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static int initGhostFaceBuffer;
 
     void create(const QudaFieldCreate);
@@ -358,6 +358,9 @@ namespace quda {
 
     /** Whether we have initialized communication for this field */
     bool initComms;
+
+    /** Keep track of which pinned-memory buffer we used for creating message handlers */
+    size_t bufferMessageHandler;
 
     /** How many faces we are communicating in this communicator */
     int nFaceComms; //FIXME - currently can only support one nFace in a field at once

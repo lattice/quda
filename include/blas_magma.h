@@ -50,6 +50,7 @@
     public:
       BlasMagmaArgs(const int prec);
       BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec);
+      BlasMagmaArgs(const int m, const int ldm, const int prec);
 
       ~BlasMagmaArgs();
 

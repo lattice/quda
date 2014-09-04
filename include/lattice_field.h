@@ -98,8 +98,8 @@ namespace quda {
     /** Resize the pinned-memory buffer */
     void resizeBufferPinned(size_t bytes, const int index=0) const;
 
-
-    static bool resetComms;
+    /** Keep track of resizes to the pinned memory buffers */
+    static size_t bufferPinnedResizeCount;
 
     /** Device-memory buffer that is used by all derived classes */
     static void *bufferDevice; 
@@ -180,7 +180,7 @@ namespace quda {
 		      double a=0, double b=0)
     { errorQuda("Not implemented"); }
 
-    virtual void gather(int nFace, int dagger, int dir)
+    virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 
     virtual void commsStart(int nFace, int dir, int dagger=0)

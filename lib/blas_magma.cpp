@@ -90,6 +90,45 @@ void BlasMagmaArgs::CloseMagma(){
 }
 
 
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec) 
+  : m(m), nev(0),  prec(prec), ldm(ldm), info(-1), sideLR(0), htsize(0), dtsize(0), 
+  W(0), hTau(0), dTau(0)
+{
+
+#ifdef MAGMA_LIB
+
+    magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+
+    if(dev_info == 0)  exit(-1);
+
+    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+
+    const int complex_prec = 2*prec;
+
+    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(m) : magma_get_zhetrd_nb(m);//ldm
+
+    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm 
+    lrwork = 1 + 5*m + 2*m*m;//ldm
+    liwork = 3 + 5*m;//ldm
+
+    magma_malloc_pinned((void**)&W2,   ldm*m*complex_prec);
+    magma_malloc_pinned((void**)&lwork, llwork*complex_prec);
+    magma_malloc_cpu((void**)&rwork,    lrwork*prec);
+    magma_malloc_cpu((void**)&iwork,    liwork*sizeof(magma_int_t));
+
+    init  = true;
+    alloc = true;
+
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
+
+    return;
+}
+
+
+
 BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec) 
   : m(m), nev(nev),  prec(prec), ldm(ldm), info(-1)
 {
@@ -142,10 +181,10 @@ BlasMagmaArgs::~BlasMagmaArgs()
 
    if(alloc == true)
    {
-     magma_free(dTau);
-     magma_free_pinned(hTau);
+     if(dTau) magma_free(dTau);
+     if(hTau) magma_free_pinned(hTau);
 
-     magma_free_pinned(W);
+     if(W) magma_free_pinned(W);
      magma_free_pinned(W2);
      magma_free_pinned(lwork);
 

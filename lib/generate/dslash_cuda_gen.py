@@ -387,7 +387,8 @@ if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
   // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
 
   // only need to check Y and Z dims currently since X and T set to match exactly
   if (x2 >= X2) return;
@@ -406,7 +407,8 @@ if (kernel_type == INTERIOR_KERNEL) {
   if (sid >= param.threads) return;
 
   // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
 
 """)
 
@@ -438,9 +440,10 @@ if (kernel_type == INTERIOR_KERNEL) {
   sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
 #endif
 
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
 
-  READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
+  READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 
 """)
 
@@ -462,7 +465,7 @@ int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
 // read spinor from device memory
-READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
+READ_SPINOR(SPINORTEX, param.sp_stride, sid, sid);
 """)            
     return prolog_str
 # end def prolog
@@ -547,11 +550,11 @@ def gen(dir, pack_only=False):
 
     load_spinor = "// read spinor from device memory\n"
     if row_cnt[0] == 0:
-        load_spinor += "READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     elif row_cnt[2] == 0:
-        load_spinor += "READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     else:
-        load_spinor += "READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     load_spinor += "\n"
 
     load_half = ""
@@ -949,7 +952,7 @@ def twisted():
 def clover_xpay():
     str = ""
     str += "#ifdef DSLASH_CLOVER_XPAY\n\n"
-    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
+    str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
 
     str += apply_clover("acc","acc")
 
@@ -967,7 +970,7 @@ def clover_xpay():
 def xpay():
     str = ""
     str += "#ifdef DSLASH_XPAY\n\n"
-    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
+    str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
 
     for s in range(0,4):
         for c in range(0,3):
@@ -1023,7 +1026,7 @@ case EXTERIOR_KERNEL_Y:
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
-    str += "WRITE_SPINOR(sp_stride);\n\n"
+    str += "WRITE_SPINOR(param.sp_stride);\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"

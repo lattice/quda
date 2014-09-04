@@ -4,115 +4,8 @@
 
 namespace quda {
 
-// Modification for the 4D preconditioned Mobius domain wall operator
-  void DiracMobiusDomainWallPC::Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in,
-                                const QudaParity parity) const
-  {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
- 
-    initSpinorConstants(in, profile);
-
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
-
-    flops += 1320LL*(long long)in.Volume();
-  }
-  
-  void DiracMobiusDomainWallPC::Dslash4pre(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
-  {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
- 
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5);
-
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += 72LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
-    
-    deleteMDWFConstants();
-  }
-
-  void DiracMobiusDomainWallPC::Dslash5(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
-  {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
- 
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5);
-
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 2, profile);   
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += 72LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
-    
-    deleteMDWFConstants();
-  }
-
-  void DiracMobiusDomainWallPC::Dslash5inv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity, const double &k) const
-  {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
- 
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5);
-    
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 3, profile);   
-
-    long long Ls = in.X(4);
-    flops += 144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
-    
-    deleteMDWFConstants();
-  }
-
-  // Modification for the 4D preconditioned Mobius domain wall operator
-  void DiracMobiusDomainWallPC::Dslash4Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				   const QudaParity parity, const cudaColorSpinorField &x, const double &k) const
-  {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    initSpinorConstants(in, profile);
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
-    
-    flops += (1320LL+48LL)*(long long)in.Volume();
-  }
-  
-  void DiracMobiusDomainWallPC::Dslash5Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-				   const QudaParity parity, const cudaColorSpinorField &x, const double &k) const
-  {
-    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    initSpinorConstants(in, profile);
-    initMDWFConstants(b_5, c_5, in.X(4), m5);
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
-    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 2, profile);
-
-    long long Ls = in.X(4);
-    long long bulk = (Ls-2)*(in.Volume()/Ls);
-    long long wall = 2*in.Volume()/Ls;
-    flops += (48LL)*(long long)in.Volume() + 144LL*bulk + 72LL*wall;
-    
-    deleteMDWFConstants();
+  namespace mobius {
+#include <dslash_init.cuh>
   }
 
 // Modification for the 4D preconditioned Mobius domain wall operator
@@ -120,12 +13,14 @@ namespace quda {
     : DiracDomainWallPC(param) { 
     memcpy(b_5, param.b_5, sizeof(double)*param.Ls);
     memcpy(c_5, param.c_5, sizeof(double)*param.Ls);
+    mobius::initConstants(*param.gauge, profile);
   }
 
   DiracMobiusDomainWallPC::DiracMobiusDomainWallPC(const DiracMobiusDomainWallPC &dirac) 
     : DiracDomainWallPC(dirac) {
     memcpy(b_5, dirac.b_5, Ls);
     memcpy(c_5, dirac.c_5, Ls);
+    mobius::initConstants(dirac.gauge, profile);
   }
 
   DiracMobiusDomainWallPC::~DiracMobiusDomainWallPC()
@@ -138,6 +33,105 @@ namespace quda {
     }
 
     return *this;
+  }
+
+// Modification for the 4D preconditioned Mobius domain wall operator
+  void DiracMobiusDomainWallPC::Dslash4(cudaColorSpinorField &out, const cudaColorSpinorField &in,
+					const QudaParity parity) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+ 
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 0, profile);   
+
+    flops += 1320LL*(long long)in.Volume();
+  }
+  
+  void DiracMobiusDomainWallPC::Dslash4pre(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+ 
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 1, profile);   
+
+    long long Ls = in.X(4);
+    long long bulk = (Ls-2)*(in.Volume()/Ls);
+    long long wall = 2*in.Volume()/Ls;
+    flops += 72LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
+  }
+
+  void DiracMobiusDomainWallPC::Dslash5(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+ 
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+    
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, 0, commDim, 2, profile);   
+
+    long long Ls = in.X(4);
+    long long bulk = (Ls-2)*(in.Volume()/Ls);
+    long long wall = 2*in.Volume()/Ls;
+    flops += 72LL*(long long)in.Volume() + 96LL*bulk + 120LL*wall;
+  }
+
+  void DiracMobiusDomainWallPC::Dslash5inv(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity, const double &k) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+ 
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, 0, mass, k, commDim, 3, profile);   
+
+    long long Ls = in.X(4);
+    flops += 144LL*(long long)in.Volume()*Ls + 3LL*Ls*(Ls-1LL);
+  }
+
+  // Modification for the 4D preconditioned Mobius domain wall operator
+  void DiracMobiusDomainWallPC::Dslash4Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+					    const QudaParity parity, const cudaColorSpinorField &x, const double &k) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+     mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 0, profile);
+    
+    flops += (1320LL+48LL)*(long long)in.Volume();
+  }
+  
+  void DiracMobiusDomainWallPC::Dslash5Xpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+				   const QudaParity parity, const cudaColorSpinorField &x, const double &k) const
+  {
+    if ( in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    mobius::initMDWFConstants(b_5, c_5, in.X(4), m5, profile);
+    mobius::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
+
+    MDWFDslashCuda(&out, gauge, &in, parity, dagger, &x, mass, k, commDim, 2, profile);
+
+    long long Ls = in.X(4);
+    long long bulk = (Ls-2)*(in.Volume()/Ls);
+    long long wall = 2*in.Volume()/Ls;
+    flops += (48LL)*(long long)in.Volume() + 144LL*bulk + 72LL*wall;
   }
 
   // Apply the even-odd preconditioned mobius DWF operator

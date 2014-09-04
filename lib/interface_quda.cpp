@@ -1677,7 +1677,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 }
 
 
-void lanczosQuda(int &k0, int &m, void *hp_Apsi, void *hp_r, void *hp_V, 
+void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V, 
                  void *hp_alpha, void *hp_beta, QudaEigParam *eig_param)
 {
   QudaInvertParam *param;
@@ -2966,6 +2966,10 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   setDiracParam(diracParam, param, pc_solve);
   setDiracSloppyParam(diracSloppyParam, param, pc_solve);
 
+  if(param->cuda_prec_precondition != QUDA_HALF_PRECISION)
+  {
+     errorQuda("\nInitCG requires sloppy gauge field in half precision. It seems that the half precision field is not loaded,\n please check you cuda_prec_precondition parameter.\n");
+  }
 
 //!half precision Dirac field (for the initCG)
   setDiracParam(diracHalfPrecParam, param, pc_solve);
@@ -4721,9 +4725,8 @@ void computeStaggeredOprodQuda(void** oprod,
   cudaGaugeField cudaOprod0(oParam);
   cudaGaugeField cudaOprod1(oParam);
   profileStaggeredOprod.Stop(QUDA_PROFILE_INIT); 
-  initLatticeConstants(cudaOprod0, profileStaggeredOprod);
 
-
+  //initLatticeConstants(cudaOprod0, profileStaggeredOprod);
 
   profileStaggeredOprod.Start(QUDA_PROFILE_H2D);
   cudaOprod0.loadCPUField(cpuOprod0,QUDA_CPU_FIELD_LOCATION);
