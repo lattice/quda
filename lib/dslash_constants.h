@@ -44,7 +44,7 @@ enum KernelType {
 #endif
   };
 
-  DslashParam dslashParam;
+  static DslashParam dslashParam;
 
 
   // For tuneLaunch() to uniquely identify a suitable set of launch parameters, we need copies of a few of

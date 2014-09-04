@@ -2,51 +2,56 @@ static cudaColorSpinorField *inSpinor;
 static FullClover *inClover = NULL;
 static FullClover *inCloverInv = NULL;
 
-static int gatherCompleted[Nstream];
-static int previousDir[Nstream];
-static int commsCompleted[Nstream];
-static int dslashCompleted[Nstream];
-static int commDimTotal;
-
 /**
- * Initialize the arrays used for the dynamic scheduling.
+ * Arrays used for the dynamic scheduling.
  */
-void inline initDslashCommsPattern() {
-  for (int i=0; i<Nstream-1; i++) {
-#ifndef GPU_COMMS
-    gatherCompleted[i] = 0;
-#else
-    gatherCompleted[i] = 1;      
-#endif
-    commsCompleted[i] = 0;
-    dslashCompleted[i] = 0;
-  }
-  gatherCompleted[Nstream-1] = 1;
-  commsCompleted[Nstream-1] = 1;
+struct DslashCommsPattern {
+  int gatherCompleted[Nstream];
+  int previousDir[Nstream];
+  int commsCompleted[Nstream];
+  int dslashCompleted[Nstream];
+  int commDimTotal;
 
-  //   We need to know which was the previous direction in which
-  //   communication was issued, since we only query a given event /
-  //   comms call after the previous the one has successfully
-  //   completed.
-  for (int i=3; i>=0; i--) {
-    if (dslashParam.commDim[i]) {
-      int prev = Nstream-1;
-      for (int j=3; j>i; j--) if (dslashParam.commDim[j]) prev = 2*j;
-      previousDir[2*i + 1] = prev;
-      previousDir[2*i + 0] = 2*i + 1; // always valid
+  DslashCommsPattern(const int commDim[]) {
+
+    for (int i=0; i<Nstream-1; i++) {
+#ifndef GPU_COMMS
+      gatherCompleted[i] = 0;
+#else
+      gatherCompleted[i] = 1;      
+#endif
+      commsCompleted[i] = 0;
+      dslashCompleted[i] = 0;
     }
-  }
+    gatherCompleted[Nstream-1] = 1;
+    commsCompleted[Nstream-1] = 1;
 
-  // this tells us how many events / comms occurances there are in
-  // total.  Used for exiting the while loop
-  commDimTotal = 0;
-  for (int i=3; i>=0; i--) commDimTotal += dslashParam.commDim[i];
+    //   We need to know which was the previous direction in which
+    //   communication was issued, since we only query a given event /
+    //   comms call after the previous the one has successfully
+    //   completed.
+    for (int i=3; i>=0; i--) {
+      if (commDim[i]) {
+	int prev = Nstream-1;
+	for (int j=3; j>i; j--) if (commDim[j]) prev = 2*j;
+	previousDir[2*i + 1] = prev;
+	previousDir[2*i + 0] = 2*i + 1; // always valid
+      }
+    }
+    
+    // this tells us how many events / comms occurances there are in
+    // total.  Used for exiting the while loop
+    commDimTotal = 0;
+    for (int i=3; i>=0; i--) {
+      commDimTotal += commDim[i];
+    }
 #ifndef GPU_COMMS
-  commDimTotal *= 4; // 2 from pipe length, 2 from direction
+    commDimTotal *= 4; // 2 from pipe length, 2 from direction
 #else
-  commDimTotal *= 2; // 2 from pipe length, 2 from direction
+    commDimTotal *= 2; // 2 from pipe length, 2 from direction
 #endif
-}
+  }
+};
 
 #define PROFILE(f, profile, idx)		\
   profile.Start(idx);				\
@@ -63,7 +68,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-  initDslashCommsPattern();
+  DslashCommsPattern pattern(dslashParam.commDim);
   // Record the start of the dslash
   PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
 	  profile, QUDA_PROFILE_EVENT_RECORD);
@@ -121,33 +126,33 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 #ifdef MULTI_GPU
 
   int completeSum = 0;
-  while (completeSum < commDimTotal) {
+  while (completeSum < pattern.commDimTotal) {
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) {
 
 	// Query if gather has completed
-	if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
+	if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) { 
 	  //CUresult event_test;
 	  //event_test = cuEventQuery(gatherEnd[2*i+dir]);
 	  PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
 		  profile, QUDA_PROFILE_EVENT_QUERY);
 
 	  if (cudaSuccess == event_test) {
-	    gatherCompleted[2*i+dir] = 1;
+	    pattern.gatherCompleted[2*i+dir] = 1;
 	    completeSum++;
 	    PROFILE(face[it]->sendStart(2*i+dir), profile, QUDA_PROFILE_COMMS_START);
 	  }
 	}
 
 	// Query if comms has finished
-	if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
-	    gatherCompleted[2*i+dir]) {
+	if (!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]] &&
+	    pattern.gatherCompleted[2*i+dir]) {
 	  PROFILE(int comms_test = face[it]->commsQuery(2*i+dir), 
 		  profile, QUDA_PROFILE_COMMS_QUERY);
 	  if (comms_test) { 
-	    commsCompleted[2*i+dir] = 1;
+	    pattern.commsCompleted[2*i+dir] = 1;
 	    completeSum++;
 
 	    // Scatter into the end zone
@@ -160,7 +165,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
       }
 
       // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-      if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
+      if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	// Record the end of the scattering
 	PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
 		profile, QUDA_PROFILE_EVENT_RECORD);
@@ -175,7 +180,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 	// all faces use this stream
 	PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
-	dslashCompleted[2*i] = 1;
+	pattern.dslashCompleted[2*i] = 1;
       }
 
     }
@@ -228,14 +233,15 @@ void* launchInteriorKernel(void* interiorParam)
 
 void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		 const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+
   using namespace dslash;
 
   profile.Start(QUDA_PROFILE_TOTAL);
 
+  
   dslashParam.parity = parity;
   dslashParam.kernel_type = INTERIOR_KERNEL;
   dslashParam.threads = volume;
-
 
 #ifdef MULTI_GPU
   // Record the start of the dslash if doing communication in T and not kernel packing
@@ -249,7 +255,7 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 		
   inSpinor->allocateGhostBuffer(dslash.Nface()/2);
   inSpinor->createComms(dslash.Nface()/2);	
-  initDslashCommsPattern();
+  DslashCommsPattern pattern(dslashParam.commDim);
   inSpinor->streamInit(streams);
 #ifdef PTHREADS // create two new threads to issue MPI receives 
                 // and launch the interior dslash kernel
@@ -361,7 +367,7 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 #endif
   bool interiorLaunched = false;
   int completeSum = 0;
-  while (completeSum < commDimTotal) {
+  while (completeSum < pattern.commDimTotal) {
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
 
@@ -369,12 +375,12 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 
 #ifndef GPU_COMMS
 	// Query if gather has completed
-	if (!gatherCompleted[2*i+dir] && gatherCompleted[previousDir[2*i+dir]]) { 
+	if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) { 
 	  PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
 		  profile, QUDA_PROFILE_EVENT_QUERY);
 
 	  if (cudaSuccess == event_test) {
-	    gatherCompleted[2*i+dir] = 1;
+	    pattern.gatherCompleted[2*i+dir] = 1;
 	    completeSum++;
 	    PROFILE(inSpinor->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
 	  }
@@ -382,12 +388,12 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 #endif
 
 	// Query if comms has finished
-	if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]] &&
-	    gatherCompleted[2*i+dir]) {
+	if (!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]] &&
+	    pattern.gatherCompleted[2*i+dir]) {
 	  PROFILE(int comms_test = inSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger), 
 		  profile, QUDA_PROFILE_COMMS_QUERY);
 	  if (comms_test) { 
-	    commsCompleted[2*i+dir] = 1;
+	    pattern.commsCompleted[2*i+dir] = 1;
 	    completeSum++;
 
 	    // Scatter into the end zone
@@ -402,7 +408,7 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
       } // dir=0,1
 
       // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-      if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
+      if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	// Record the end of the scattering
 #ifndef GPU_COMMS
 	PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
@@ -424,7 +430,7 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 	// all faces use this stream
 	PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
-	dslashCompleted[2*i] = 1;
+	pattern.dslashCompleted[2*i] = 1;
       }
 
     }
@@ -451,7 +457,7 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
   dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-  initDslashCommsPattern();
+  DslashCommsPattern pattern(dslashParam.commDim);
   for(int i=3; i>=0; i--){
     if(!dslashParam.commDim[i]) continue;
     for(int dir=1; dir>=0; dir--){
@@ -498,9 +504,9 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
 
 
   int completeSum = 0;
-  commDimTotal /= 2; // pipe is shorter for zero-variant
+  pattern.commDimTotal /= 2; // pipe is shorter for zero-variant
 
-  while (completeSum < commDimTotal) {
+  while (completeSum < pattern.commDimTotal) {
 
     for (int i=3; i>=0; i--) {
       if (!dslashParam.commDim[i]) continue;
@@ -508,11 +514,11 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
       for (int dir=1; dir>=0; dir--) {
 
 	// Query if comms have finished
-	if (!commsCompleted[2*i+dir] && commsCompleted[previousDir[2*i+dir]]) {
+	if (!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]]) {
 	  PROFILE(int comms_test = face[it]->commsQuery(2*i+dir), 
 		  profile, QUDA_PROFILE_COMMS_QUERY);
 	  if (comms_test) { 
-	    commsCompleted[2*i+dir] = 1;
+	    pattern.commsCompleted[2*i+dir] = 1;
 	    completeSum++;
 
 	    // Scatter into the end zone
@@ -525,7 +531,7 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
       }
 
       // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
-      if (!dslashCompleted[2*i] && commsCompleted[2*i] && commsCompleted[2*i+1] ) {
+      if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
 	// Record the end of the scattering
 	PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
 		profile, QUDA_PROFILE_EVENT_RECORD);
@@ -540,7 +546,7 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
 	// all faces use this stream
 	PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
-	dslashCompleted[2*i] = 1;
+	pattern.dslashCompleted[2*i] = 1;
       }
 
     }

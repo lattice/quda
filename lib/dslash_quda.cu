@@ -76,8 +76,6 @@ namespace quda {
 #define NDEGTM_SHARED_FLOATS_PER_THREAD 0
 #endif
 
-#include <dslash_quda.cuh>
-
   // these should not be namespaced!!
   // determines whether the temporal ghost zones are packed with a gather kernel,
   // as opposed to multiple calls to cudaMemcpy()
