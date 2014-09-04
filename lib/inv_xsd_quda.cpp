@@ -52,18 +52,22 @@ namespace quda {
     int parity = mat.getMatPCType();
 
     printfQuda("XSD: before copyExtendedColorSpinor!\n");
+    fflush(stdout);
 
     copyExtendedColorSpinor(*bx, b, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
 
     printfQuda("XSD: before copyExtendedGhost!\n");
+    fflush(stdout);
 
     exchangeExtendedGhost(bx, R, parity, streams);
 
     printfQuda("XSD: before SD solver!\n");
+    fflush(stdout);
 
     sd->operator()(*xx,*bx); // actuall run SD
 
     printfQuda("XSD: before copying solution!\n");
+    fflush(stdout);
 
     // copy the interior region of the solution back
     copyExtendedColorSpinor(x, *xx, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
