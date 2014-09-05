@@ -108,7 +108,7 @@ namespace quda {
   // Wilson wrappers
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
 			const int parity, const int dagger, const cudaColorSpinorField *x, const double &k, 
-			const int *commOverride, TimeProfile &profile)
+			const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -145,7 +145,14 @@ namespace quda {
       dslash = new WilsonDslashCuda<short4, short4>(out, (short4*)gauge0, (short4*)gauge1,
 						    gauge.Reconstruct(), in, x, k, dagger);
     }
-    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+//    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+#ifndef GPU_COMMS
+    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+#else
+    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+    (*dslashImp)(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    delete dslashImp;
 
     delete dslash;
     unbindGaugeTex(gauge);

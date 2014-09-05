@@ -165,7 +165,7 @@ namespace quda {
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			    const cudaColorSpinorField *in, const int parity, const int dagger, 
 			    const cudaColorSpinorField *x, const double &m_f, const double &k2, 
-			    const int *commOverride, TimeProfile &profile)
+			    const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 

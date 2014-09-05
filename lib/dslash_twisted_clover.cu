@@ -154,7 +154,7 @@ namespace quda {
 			       const cudaColorSpinorField *in, const int parity, const int dagger, 
 			       const cudaColorSpinorField *x, const QudaTwistCloverDslashType type, const double &kappa, const double &mu, 
 			       const double &epsilon, const double &k,  const int *commOverride,
-			       TimeProfile &profile)
+			       TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
     inClover = (FullClover*) clover;

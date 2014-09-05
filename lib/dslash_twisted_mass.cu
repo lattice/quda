@@ -161,7 +161,7 @@ namespace quda {
 			     const cudaColorSpinorField *in, const int parity, const int dagger, 
 			     const cudaColorSpinorField *x, const QudaTwistDslashType type, const double &kappa, const double &mu, 
 			     const double &epsilon, const double &k,  const int *commOverride,
-			     TimeProfile &profile)
+			     TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 #ifdef GPU_TWISTED_MASS_DIRAC

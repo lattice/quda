@@ -113,7 +113,7 @@ namespace quda {
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			   const cudaColorSpinorField *in, const int parity, 
 			   const int dagger, const cudaColorSpinorField *x,
-			   const double &k, const int *commOverride, TimeProfile &profile)
+			   const double &k, const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
