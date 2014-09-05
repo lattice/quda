@@ -54,9 +54,11 @@ namespace quda {
     printfQuda("XSD: before copyExtendedColorSpinor!\n");
     fflush(stdout);
 
+    printfQuda("bx->Precision() %d\n", bx->Precision());
+    fflush(stdout);
     copyExtendedColorSpinor(*bx, b, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
 
-    printfQuda("XSD: before copyExtendedGhost!\n");
+    printfQuda("XSD: before exchangeExtendedGhost!\n");
     fflush(stdout);
 
     exchangeExtendedGhost(bx, R, parity, streams);

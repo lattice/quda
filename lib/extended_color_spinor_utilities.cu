@@ -517,6 +517,14 @@ namespace quda {
       void *dstNorm, void *srcNorm){
 
     printfQuda("Inside copyExtendedColorSpinor (gateway)!\n");
+    fflush(stdout);
+    printfQuda("Hi!\n");
+    fflush(stdout);
+    //printfQuda("dst %d\n
+    printfQuda("dst.Precision() = %d\n", dst.Precision());
+    fflush(stdout);
+    printfQuda("Hi2!\n");
+    fflush(stdout);
     if(dst.Precision() == QUDA_DOUBLE_PRECISION){
       printfQuda("dst is of double precision!\n");
       if(src.Precision() == QUDA_DOUBLE_PRECISION){
@@ -546,6 +554,7 @@ namespace quda {
       }else if(src.Precision() == QUDA_SINGLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
       }else if(src.Precision() == QUDA_HALF_PRECISION){
+       printfQuda("src is of half precision!\n");
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
       }else{
         errorQuda("Unsupported Precision %d", src.Precision());
