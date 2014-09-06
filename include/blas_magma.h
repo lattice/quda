@@ -49,10 +49,7 @@
 
     public:
 
-      /*BlasMagmaArgs(const int prec) : m(0), nev(0), prec(sizeof(double)), ldm(0), info(-1), init(true), alloc(false),
-	llwork(0), lrwork(0), liwork(0), sideLR(0), htsize(0), dtsize(0), lwork_max(0),
-                                      W(0), W2(0), hTau(0), dTau(0), lwork(0), rwork(0), iwork(0) 
-                                      {  }*/
+      BlasMagmaArgs() : prec(8), info(-1), init(true), alloc(false) {  }
 
       BlasMagmaArgs(const int prec);
 
