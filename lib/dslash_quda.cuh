@@ -94,6 +94,9 @@
     case EXTERIOR_KERNEL_T:						\
                                                                         MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
     break;								\
+    case EXTERIOR_KERNEL_ALL:						\
+                                                                        MORE_GENERIC_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								\
   }
 
 #define GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, gridDim, blockDim, shared, stream, param,  ...) \
@@ -113,6 +116,9 @@
     case EXTERIOR_KERNEL_T:						\
                                                                         MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
     break;								\
+    case EXTERIOR_KERNEL_ALL:						\
+                                                                        MORE_GENERIC_STAGGERED_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;                                                              \
   }
 
 
@@ -171,6 +177,9 @@
     break;								\
     case EXTERIOR_KERNEL_T:						\
                                                                         MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								\
+    case EXTERIOR_KERNEL_ALL:						\
+                                                                        MORE_GENERIC_ASYM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
     break;								\
   }
 
@@ -253,6 +262,9 @@
     case EXTERIOR_KERNEL_T:						\
                                                                         MORE_GENERIC_NDEG_TM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_T, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
     break;								\
+    case EXTERIOR_KERNEL_ALL:						\
+                                                                        MORE_GENERIC_NDEG_TM_DSLASH(FUNC, DAG, X, EXTERIOR_KERNEL_ALL, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
+    break;								\
   }
 
 #endif
@@ -327,6 +339,7 @@
 
 #ifdef MULTI_GPU 
       fillAux(INTERIOR_KERNEL, "type=interior");
+      fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all");
       fillAux(EXTERIOR_KERNEL_X, "type=exterior_x");
       fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y");
       fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z");
