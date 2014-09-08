@@ -24,6 +24,10 @@ enum KernelType {
     int long_gauge_stride;
     float fat_link_max;
 #endif 
+#ifdef MULTI_GPU
+    int threadDimMapLower[QUDA_MAX_DIM];
+    int threadDimMapUpper[QUDA_MAX_DIM];
+#endif
 
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;

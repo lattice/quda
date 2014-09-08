@@ -1130,3 +1130,81 @@ static inline __device__ int indexFromNdegTMFaceIndex(int face_idx, const int &f
 
   return idx >> 1;
 }
+
+
+
+template <int dim>
+static inline __device__ bool inBoundary(const int width, const int coord[], const int X[]){
+  return ((coord[dim] >= X[dim] - width) || (coord[dim] < width));
+}
+
+
+static inline __device__ bool isActive(const int threadDim, int offsetDim, int offset, const int y[],  const int partitioned[], const int X[])
+{
+
+  // Threads with threadDim = t can handle t,z,y,x offsets
+  // Threads with threadDim = z can handle z,y,x offsets
+  // Threads with threadDim = y can handle y,x offsets
+  // Threads with threadDim = x can handle x offsets 
+  if(!partitioned[offsetDim]) return false;
+  
+  if(threadDim < offsetDim) return false;
+  int width = (offset > 0) ? offset : -offset;
+ 
+  switch(threadDim){
+    case 3: // threadDim = T
+      break;
+
+    case 2: // threadDim = Z
+      if(!partitioned[3]) break;
+      if(partitioned[3] && inBoundary<3>(width, y, X)) return false;
+      break;
+
+    case 1: // threadDim = Y
+      if((!partitioned[3]) && (!partitioned[2])) break;
+      if(partitioned[3] && inBoundary<3>(width, y, X)) return false;
+      if(partitioned[2] && inBoundary<2>(width, y, X)) return false;
+      break;
+
+    case 0: // threadDim = X
+      if((!partitioned[3]) && (!partitioned[2]) && (!partitioned[1])) break;
+      if(partitioned[3] && inBoundary<3>(width, y, X)) return false;
+      if(partitioned[2] && inBoundary<2>(width, y, X)) return false;
+      if(partitioned[1] && inBoundary<1>(width, y, X)) return false;
+      break;
+
+    default:
+      break;
+  }
+  return true;
+}
+
+static inline __device__ bool isActive(const int threadDim, int offsetDim, int offset, int x1, int x2, int x3, int x4,
+                                       const int partitioned[], const int X[])
+{
+  int y[4] = {x1, x2, x3, x4};
+  return isActive(threadDim, offsetDim, offset, y, partitioned, X);
+}
+
+/**
+ *  * Determines which face a given thread is computing.  Also rescale
+ *   * face_idx so that is relative to a given dimension.
+ *    */
+/*
+template <typename Param>
+static __device__ inline int dimFromFaceIndex (int &face_idx, const Param &param) {
+  if (face_idx < param.threadDimMapUpper[0]) {
+    return 0;
+  } else if (face_idx < param.threadDimMapUpper[1]) {
+    face_idx -= param.threadDimMapLower[1];
+    return 1;
+  } else if (face_idx < param.threadDimMapUpper[2]) {
+    face_idx -= param.threadDimMapLower[2];
+    return 2;
+  } else { // this is only called if we use T kernel packing 
+    face_idx -= param.threadDimMapLower[3];
+    return 3;
+  }
+}
+*/
+ 

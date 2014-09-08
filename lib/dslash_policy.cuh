@@ -54,6 +54,21 @@ struct DslashCommsPattern {
 };
 
 
+#ifdef MULTI_GPU
+      void setThreadDimMap(DslashParam& param, DslashCuda &dslash, const int* faceVolumeCB){
+        int prev = -1;
+
+        for(int i=0; i<4; ++i){
+          param.threadDimMapLower[i] = 0;
+          param.threadDimMapUpper[i] = 0;
+          if (!dslashParam.commDim[i]) continue;
+          param.threadDimMapLower[i] = (prev >= 0 ? param.threadDimMapUpper[prev] : 0);
+          param.threadDimMapUpper[i] = param.threadDimMapLower[i] + dslash.Nface()*faceVolumeCB[i];
+          prev=i;
+        }
+      }
+#endif
+
 
 
 #define PROFILE(f, profile, idx)		\
