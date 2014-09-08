@@ -838,6 +838,170 @@ struct DslashFaceBuffer : DslashPolicyImp {
 
 };
 
+struct DslashFusedExterior : DslashPolicyImp {
+
+  void operator()(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
+		   const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+
+    using namespace dslash;
+
+    profile.Start(QUDA_PROFILE_TOTAL);
+
+  
+    dslashParam.parity = parity;
+    dslashParam.kernel_type = INTERIOR_KERNEL;
+    dslashParam.threads = volume;
+
+    int scatterIndex = 0;
+#ifdef MULTI_GPU
+    // Record the start of the dslash if doing communication in T and not kernel packing
+    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
+    {
+      PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
+              profile, QUDA_PROFILE_EVENT_RECORD);
+    }
+		
+    inSpinor->allocateGhostBuffer(dslash.Nface()/2);
+    inSpinor->createComms(dslash.Nface()/2);	
+    DslashCommsPattern pattern(dslashParam.commDim);
+    inSpinor->streamInit(streams);
+    const int packIndex = Nstream-1;
+    for(int i=3; i>=0; i--){
+      if(!dslashParam.commDim[i]) continue;
+      for(int dir=1; dir>=0; dir--){
+        PROFILE(inSpinor->recvStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+      }
+    }
+    bool pack = false;
+    for (int i=3; i>=0; i--) 
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
+        { pack = true; break; }
+
+
+    // Initialize pack from source spinor
+    if (inCloverInv == NULL) {
+      PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
+	      profile, QUDA_PROFILE_PACK_KERNEL);
+    } else {
+      PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+	      profile, QUDA_PROFILE_PACK_KERNEL);
+    }
+
+
+    if (pack) {
+      // Record the end of the packing
+      PROFILE(cudaEventRecord(packEnd[0], streams[packIndex]), 
+	    profile, QUDA_PROFILE_EVENT_RECORD);
+    }
+    
+    setThreadDimMap(dslashParam,dslash,faceVolumeCB);
+
+
+    for(int i = 3; i >=0; i--){
+      if (!dslashParam.commDim[i]) continue;
+
+      if(!scatterIndex) scatterIndex = 2*i+1;
+
+      for (int dir=1; dir>=0; dir--) {
+        cudaEvent_t &event = (i!=3 || getKernelPackT() || getTwistPack()) ? packEnd[0] : dslashStart;
+
+        PROFILE(cudaStreamWaitEvent(streams[2*i+dir], event, 0), 
+	        profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+
+        // Initialize host transfer from source spinor
+        PROFILE(inSpinor->gather(dslash.Nface()/2, dagger, 2*i+dir), profile, QUDA_PROFILE_GATHER);
+
+        // Record the end of the gathering
+        PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), 
+	        profile, QUDA_PROFILE_EVENT_RECORD);
+      }
+    }
+
+#endif // MULTI_GPU
+
+    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+#ifdef MULTI_GPU 
+
+    int completeSum = 0;
+    while (completeSum < pattern.commDimTotal) {
+      for (int i=3; i>=0; i--) {
+        if (!dslashParam.commDim[i]) continue;
+
+        for (int dir=1; dir>=0; dir--) {
+
+	  // Query if gather has completed
+	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) { 
+	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
+		    profile, QUDA_PROFILE_EVENT_QUERY);
+
+	    if (cudaSuccess == event_test) {
+	      pattern.gatherCompleted[2*i+dir] = 1;
+	      completeSum++;
+	      PROFILE(inSpinor->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+	    }
+	  }
+
+	  // Query if comms has finished
+	  if (!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]] &&
+	      pattern.gatherCompleted[2*i+dir]) {
+	    PROFILE(int comms_test = inSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger), 
+		    profile, QUDA_PROFILE_COMMS_QUERY);
+	    if (comms_test) { 
+	      pattern.commsCompleted[2*i+dir] = 1;
+	      completeSum++;
+
+	      // Scatter into the end zone
+	      // Both directions use the same stream
+	      PROFILE(inSpinor->scatter(dslash.Nface()/2, dagger, 2*i+dir, streams+scatterIndex), 
+		      profile, QUDA_PROFILE_SCATTER);
+	    }
+	  }
+        } // dir=0,1
+/*
+        // enqueue the boundary dslash kernel as soon as the scatters have been enqueued
+        if (!pattern.dslashCompleted[2*i] && pattern.commsCompleted[2*i] && pattern.commsCompleted[2*i+1] ) {
+	  // Record the end of the scattering
+	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
+		  profile, QUDA_PROFILE_EVENT_RECORD);
+	  // wait for scattering to finish and then launch dslash
+	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
+		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+
+	  dslashParam.kernel_type = static_cast<KernelType>(i);
+	  dslashParam.threads = dslash.Nface()*faceVolumeCB[i]; // updating 2 or 6 faces
+	  // all faces use this stream
+	  PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+	  pattern.dslashCompleted[2*i] = 1;
+        }
+    */
+      } // i
+    } // while(completeSum < commDimTotal) 
+
+
+    dslashParam.kernel_type = EXTERIOR_KERNEL_ALL;
+    dslashParam.threads = 0;
+
+    for(int i=0; i<4; ++i){
+      if(!dslashParam.commDim[i]) continue;
+      dslashParam.threads = dslashParam.threadDimMapUpper[i];
+    }
+
+    PROFILE(cudaEventRecord(scatterEnd[0], streams[scatterIndex]), 
+      profile, QUDA_PROFILE_EVENT_RECORD);
+
+    PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0),
+      profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+
+    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+    inSpinor->bufferIndex = (1 - inSpinor->bufferIndex);
+#endif // MULTI_GPU
+    profile.Stop(QUDA_PROFILE_TOTAL);
+  }
+};
+
 struct DslashFactory {
 
   static DslashPolicyImp* create(const QudaDslashPolicy &dslashPolicy)

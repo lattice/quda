@@ -96,6 +96,7 @@ namespace quda {
    * Determines which face a given thread is computing.  Also rescale
    * face_idx so that is relative to a given dimension.
    */
+/*
   template <typename Param>
     __device__ inline int dimFromFaceIndex (int &face_idx, const Param &param) {
     if (face_idx < param.threadDimMapUpper[0]) {
@@ -111,7 +112,7 @@ namespace quda {
       return 3;
     }
   }
-
+*/
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 
   // double precision
