@@ -48,8 +48,13 @@
       int  *iwork;
 
     public:
+
+      BlasMagmaArgs() : prec(8), info(-1), init(true), alloc(false) {  }
+
       BlasMagmaArgs(const int prec);
+
       BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec);
+
       BlasMagmaArgs(const int m, const int ldm, const int prec);
 
       ~BlasMagmaArgs();
