@@ -833,7 +833,6 @@ namespace quda {
 
   void cudaColorSpinorField::createComms(int nFace) {
 
-
     if(bufferMessageHandler != bufferPinnedResizeCount) destroyComms();
 
     if (!initComms || nFaceComms != nFace) {
@@ -868,7 +867,6 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	nbytes[i] = maxNface*surfaceCB[i]*Ndof*precision;
 	if (precision == QUDA_HALF_PRECISION) nbytes[i] += maxNface*surfaceCB[i]*sizeof(float);
-	if (siteSubset == QUDA_PARITY_SITE_SUBSET && i==0) nbytes[i] /= 2;
 	if (!commDimPartitioned(i)) continue;
 	faceBytes += 2*nbytes[i];
       }
