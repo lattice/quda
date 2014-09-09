@@ -1381,9 +1381,9 @@ namespace quda {
 
     // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
-      unpackGhost(from_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, stream_p);
+      unpackGhost(from_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, stream_p);
     } else { // receive from backwards
-      unpackGhost(from_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, stream_p);
+      unpackGhost(from_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, stream_p);
     }
   }
 

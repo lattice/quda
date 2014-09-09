@@ -293,7 +293,7 @@
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
-    char aux[6][256];
+    char aux[7][256];
 
     void fillAux(KernelType kernel_type, const char *kernel_str) {
       strcpy(aux[kernel_type],kernel_str);

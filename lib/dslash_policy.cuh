@@ -1002,27 +1002,39 @@ struct DslashFusedExterior : DslashPolicyImp {
   }
 };
 
+
+namespace {
+
 struct DslashFactory {
 
   static DslashPolicyImp* create(const QudaDslashPolicy &dslashPolicy)
   {
+
+    DslashPolicyImp* result = NULL;    
+
     switch(dslashPolicy){
       case QUDA_DSLASH:
-        return new DslashFaceBuffer;
+        result = new DslashFaceBuffer;
+        break;
       case QUDA_DSLASH2:
-        return new DslashCuda2;
+        result = new DslashCuda2;
+        break;
       case QUDA_PTHREADS_DSLASH:
-        return new DslashPthreads;
+        result = new DslashPthreads;
+        break;
       case QUDA_GPU_COMMS_DSLASH:
-        return new DslashGPUComms;
+        result = new DslashGPUComms;
+        break;
       default:
         errorQuda("Dslash policy %d not recognized",dslashPolicy);
+        result = new DslashFaceBuffer;
         break;
     }
-    return new DslashFaceBuffer; // default 
+    return result; // default 
   }
-
 };
+
+} // anonymous namespace
 
 void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		 const int volume, const int *faceVolumeCB, TimeProfile &profile) {
