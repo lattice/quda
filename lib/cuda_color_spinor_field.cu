@@ -118,7 +118,6 @@ namespace quda {
       errorQuda("CreateType %d not implemented", param.create);
     }
 
-    clearGhostPointers();
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
@@ -126,7 +125,6 @@ namespace quda {
       initComms(false), bufferMessageHandler(0), nFaceComms(0) {
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
-    clearGhostPointers();
   }
 
   ColorSpinorField& cudaColorSpinorField::operator=(const ColorSpinorField &src) {
@@ -277,6 +275,16 @@ namespace quda {
        createTexObject();
 #endif
 
+    // initialize the ghost pointers 
+    if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      for(int i=0; i<dims; ++i){
+        if(commDimPartitioned(i)){
+          ghost[i] = (char*)v + (stride + ghostOffset[i])*nColor*nSpin*2*precision;
+          if(precision == QUDA_HALF_PRECISION)
+            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
+        }
+      }
+    }
     checkCudaError();
   }
 
@@ -837,7 +845,6 @@ namespace quda {
 
     if (!initComms || nFaceComms != nFace) {
 
-
       // if we are requesting a new number of faces destroy and start over
       if(nFace != nFaceComms) destroyComms();
 
@@ -887,15 +894,13 @@ namespace quda {
 	if (!commDimPartitioned(i)) continue;
 	
 #ifdef GPU_COMMS
-	size_t offset2 = precision*(length + ghostOffset[i]*nColor*nSpin*2);
 	for(int b=0; b<2; ++b){
 	  my_back_face[b][i] = backGhostFaceBuffer[b][i];
-	  from_back_face[b][i] = static_cast<char*>(v) + offset2;
+	  from_back_face[b][i] = ghost[i];
 	
 	  if(precision == QUDA_HALF_PRECISION){
-	    int norm_offset = stride + ghostNormOffset[i];
 	    my_back_norm_face[b][i]  = static_cast<char*>(backGhostFaceBuffer[b][i]) + nFace*ghostFace[i]*Ndof*precision;
-	    from_back_norm_face[b][i] = static_cast<char*>(norm) + norm_offset*sizeof(float); 
+	    from_back_norm_face[b][i] = ghostNorm[i];
 	  }
 	} // loop over b
 
@@ -908,15 +913,13 @@ namespace quda {
 #endif
 	
 #ifdef GPU_COMMS
-	offset2 += nFace*ghostFace[i]*Ndof*precision;
 	for(int b=0; b<2; ++b){
 	  my_fwd_face[b][i] = fwdGhostFaceBuffer[b][i];	
-	  from_fwd_face[b][i] = /*static_cast<char*>(ghost[i]) + nFace*ghostFace[i]*Ndof*precision;*/static_cast<char*>(v) + offset2;
+	  from_fwd_face[b][i] = ghost[i] + nFace*ghostFace[i]*Ndof*precision;
 
 	  if(precision == QUDA_HALF_PRECISION){
-	    int norm_offset = stride + ghostNormOffset[i] + nFace*ghostFace[i];
 	    my_fwd_norm_face[b][i] = static_cast<char*>(fwdGhostFaceBuffer[b][i]) + nFace*ghostFace[i]*Ndof*precision;
-	    from_fwd_norm_face[b][i] = static_cast<char*>(norm) + norm_offset*sizeof(float);
+	    from_fwd_norm_face[b][i] = static_cast<char*>(ghostNorm[i]) + nFace*ghostFace[i]*sizeof(float);
 	  }
 	} // loop over b
 #else
@@ -965,29 +968,27 @@ namespace quda {
 	for (int i=0; i<nDimComms; i++) {
 	  if (!commDimPartitioned(i)) continue;
 #ifdef GPU_COMMS
-	  size_t nbytes_Nface = surfaceCB[i]*Ndof*precision * (j+1);
+	  size_t nbytes_Nface = surfaceCB[i]*Ndof*precision*(j+1);
 	  if (i != 3 || getKernelPackT()) {
 #else 
-	  size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
+	    size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 #endif
-	  for(int b=0; b<2; ++b){
-	    mh_send_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_face[b][i], i, +1, nbytes_Nface);
-	    mh_send_back[b][j][2*i+0] = comm_declare_send_relative(my_back_face[b][i], i, -1, nbytes_Nface);
-	    mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i]; // alias pointers
-	    mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i]; // alias pointers
-	  }
+	    for(int b=0; b<2; ++b){
+	      mh_send_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_face[b][i], i, +1, nbytes_Nface);
+	      mh_send_back[b][j][2*i+0] = comm_declare_send_relative(my_back_face[b][i], i, -1, nbytes_Nface);
+	      mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i]; // alias pointers
+	      mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i]; // alias pointers
+	    }
 #ifdef GPU_COMMS
 
 	    if(precision == QUDA_HALF_PRECISION){
-              for(int b=0; b<2; ++b){
-	        mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
-	        mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(my_back_norm_face[b][i], i, -1, surfaceCB[i]*(j+1)*sizeof(float));
-	        mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
-	        mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i]; 	
-              }
+	      for(int b=0; b<2; ++b){
+		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
+		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(my_back_norm_face[b][i], i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+		mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
+		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i]; 	
+	      }
 	    }
-
-
 
 	  } else { 
 	    /* 
@@ -1030,19 +1031,14 @@ namespace quda {
 	    if (blksize * Nblocks != nbytes_Nface) 
 	      errorQuda("Total strided message size does not match expected size");
 
-	    //printf("\n%d strided sends with Nface=%d Nblocks=%d blksize=%d Stride=%d,
-	    //	   i, j+1, Nblocks, blksize, Stride);
+	    //printf("%d strided sends with Nface=%d Nblocks=%d blksize=%d Stride=%d\n", i, j+1, Nblocks, blksize, Stride);
 
             for(int b=0; b<2; ++b){
-	      mh_send_fwd[b][j][2*i+0] = comm_declare_strided_send_relative(base[2], i, +1, 
-								       blksize, Nblocks, Stride);
-	      mh_send_back[b][j][2*i+0] = comm_declare_strided_send_relative(base[0], i, -1, 
-									blksize, Nblocks, Stride);
+	      mh_send_fwd[b][j][2*i+0] = comm_declare_strided_send_relative(base[2], i, +1, blksize, Nblocks, Stride);
+	      mh_send_back[b][j][2*i+0] = comm_declare_strided_send_relative(base[0], i, -1, blksize, Nblocks, Stride);
 	      if (nSpin ==4) { // dagger communicators
-	        mh_send_fwd[b][j][2*i+1] = comm_declare_strided_send_relative(base[3], i, +1, 
-									 blksize, Nblocks, Stride);
-	        mh_send_back[b][j][2*i+1] = comm_declare_strided_send_relative(base[1], i, -1, 
-									  blksize, Nblocks, Stride);
+	        mh_send_fwd[b][j][2*i+1] = comm_declare_strided_send_relative(base[3], i, +1, blksize, Nblocks, Stride);
+	        mh_send_back[b][j][2*i+1] = comm_declare_strided_send_relative(base[1], i, -1, blksize, Nblocks, Stride);
 	      } else {
 	        mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i+0];
 	        mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i+0];
@@ -1051,6 +1047,18 @@ namespace quda {
             } // loop over b
 
           
+	    if(precision == QUDA_HALF_PRECISION){
+	      int Nt_minus1_offset = (volume - nFace*ghostFace[3]); // The space-time coordinate of the start of the last time slice
+	      void *norm_fwd = static_cast<float*>(norm) + Nt_minus1_offset;
+	      void *norm_back = norm; // the first time slice has zero offset
+	      for(int b=0; b<2; ++b){
+		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(norm_fwd, i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
+		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(norm_back, i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+		mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
+		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i];  
+	      }
+	    }
+
 	  }
 
 	  if(precision == QUDA_HALF_PRECISION){
