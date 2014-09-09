@@ -36,8 +36,9 @@ namespace quda {
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     stride = volumeCB + pad;
   
+    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
     for (int i=0; i<nDim; i++) 
-      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET) ? surface[i] / 2 : surface[i];
+      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
 
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
