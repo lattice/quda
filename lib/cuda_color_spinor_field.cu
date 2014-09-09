@@ -277,7 +277,7 @@ namespace quda {
 
     // initialize the ghost pointers 
     if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
-      for(int i=0; i<dims; ++i){
+      for(int i=0; i<nDim; ++i){
         if(commDimPartitioned(i)){
           ghost[i] = (char*)v + (stride + ghostOffset[i])*nColor*nSpin*2*precision;
           if(precision == QUDA_HALF_PRECISION)
