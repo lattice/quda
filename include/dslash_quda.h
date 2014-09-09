@@ -38,7 +38,6 @@ namespace quda {
   void createDslashEvents();
   void destroyDslashEvents();
 
-  struct DslashPolicyImp;
 
   // plain Wilson Dslash  
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,

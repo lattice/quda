@@ -163,7 +163,7 @@ namespace quda {
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
 #endif
-    (*dslashImp)(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
     delete dslashImp;
 
 
