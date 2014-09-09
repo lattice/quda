@@ -156,8 +156,6 @@ namespace quda {
 	 (short4*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
     }
 
-    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
-
 #ifndef GPU_COMMS
     DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
 #else
