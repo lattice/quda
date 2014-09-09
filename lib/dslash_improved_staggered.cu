@@ -196,8 +196,6 @@ namespace quda {
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
     delete dslashImp;
 
-
-
     delete dslash;
     unbindFatGaugeTex(fatGauge);
     unbindLongGaugeTex(longGauge);

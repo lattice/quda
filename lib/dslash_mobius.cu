@@ -267,10 +267,19 @@ namespace quda {
     // faces because Ls is added as the y-dimension in thread space
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
-    if(DS_type !=0)
-      dslashCudaNC(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
-    else
-      dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
+
+    DslashPolicyImp* dslashImp = NULL;
+    if (DS_type != 0) {
+      dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+    } else {
+#ifndef GPU_COMMS
+      dslashImp = DslashFactory::create(dslashPolicy);
+#else
+      dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+    }
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+    delete dslashImp;
 
     delete dslash;
     unbindGaugeTex(gauge);

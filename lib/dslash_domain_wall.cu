@@ -213,6 +213,14 @@ namespace quda {
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
     dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
 
+#ifndef GPU_COMMS
+    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+#else
+    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+    delete dslashImp;
+
     delete dslash;
     unbindGaugeTex(gauge);
 

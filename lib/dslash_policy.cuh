@@ -986,7 +986,23 @@ struct DslashFusedExterior : DslashPolicyImp {
   }
 };
 
+struct DslashNC : DslashPolicyImp {
 
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* inputSpinor, const size_t regSize, const int parity, const int dagger, 
+		    const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+
+    profile.Start(QUDA_PROFILE_TOTAL);
+    
+    dslashParam.parity = parity;
+    dslashParam.kernel_type = INTERIOR_KERNEL;
+    dslashParam.threads = volume;
+
+    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+    profile.Stop(QUDA_PROFILE_TOTAL);
+  }
+
+};
 
 struct DslashFactory {
 
@@ -996,25 +1012,28 @@ struct DslashFactory {
     DslashPolicyImp* result = NULL;    
 
     switch(dslashPolicy){
-      case QUDA_DSLASH:
-        result = new DslashFaceBuffer;
-        break;
-      case QUDA_DSLASH2:
-        result = new DslashCuda2;
-        break;
-      case QUDA_PTHREADS_DSLASH:
-        result = new DslashPthreads;
-        break;
-      case QUDA_FUSED_DSLASH:
-        result = new DslashFusedExterior;
-        break;
-      case QUDA_GPU_COMMS_DSLASH:
-        result = new DslashGPUComms;
-        break;
-      default:
-        errorQuda("Dslash policy %d not recognized",dslashPolicy);
-        result = new DslashFaceBuffer;
-        break;
+    case QUDA_DSLASH:
+      result = new DslashFaceBuffer;
+      break;
+    case QUDA_DSLASH2:
+      result = new DslashCuda2;
+      break;
+    case QUDA_PTHREADS_DSLASH:
+      result = new DslashPthreads;
+      break;
+    case QUDA_FUSED_DSLASH:
+      result = new DslashFusedExterior;
+      break;
+    case QUDA_GPU_COMMS_DSLASH:
+      result = new DslashGPUComms;
+      break;
+    case QUDA_DSLASH_NC:
+      result = new DslashNC;
+      break;
+    default:
+      errorQuda("Dslash policy %d not recognized",dslashPolicy);
+      result = new DslashFaceBuffer;
+      break;
     }
     return result; // default 
   }
