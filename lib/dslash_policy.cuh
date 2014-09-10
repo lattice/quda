@@ -982,6 +982,9 @@ struct DslashFusedExterior : DslashPolicyImp {
 
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
+
+
+    printfQuda("End of call to DslashFuseExterior()\n");
     profile.Stop(QUDA_PROFILE_TOTAL);
   }
 };
