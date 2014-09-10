@@ -103,7 +103,7 @@ namespace quda {
 
     long long flops() const { 
       long long flops;
-      flops = (x ? 666ll : 654ll) * dslashConstants.VolumeCB();
+      flops = (x ? 666ll : 654ll) * in->VolumeCB();
       return flops;
     } 
   };
