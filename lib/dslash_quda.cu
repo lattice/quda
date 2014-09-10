@@ -167,7 +167,7 @@ class CloverCuda : public Tunable {
     }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
+    unsigned int minThreads() const { return in->VolumeCB(); }
 
   public:
     CloverCuda(cudaColorSpinorField *out, const cFloat *clover, const float *cloverNorm, 
@@ -220,7 +220,7 @@ class CloverCuda : public Tunable {
       return ps.str();
     }
 
-    long long flops() const { return 504ll * dslashConstants.VolumeCB(); }
+    long long flops() const { return 504ll * in->VolumeCB(); }
 };
 
 
@@ -274,7 +274,7 @@ class TwistGamma5Cuda : public Tunable {
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
+    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
 
     char *saveOut, *saveOutNorm;
 
@@ -340,7 +340,7 @@ class TwistGamma5Cuda : public Tunable {
       return ps.str();
     }
 
-    long long flops() const { return 24ll * dslashConstants.VolumeCB(); }
+    long long flops() const { return 24ll * in->VolumeCB(); }
     long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
 };
 
@@ -397,8 +397,7 @@ class TwistCloverGamma5Cuda : public Tunable {
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
-
+    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
     char *saveOut, *saveOutNorm;
 
   public:
@@ -479,7 +478,7 @@ class TwistCloverGamma5Cuda : public Tunable {
       return ps.str();
     }
 
-    long long flops() const { return 24ll * dslashConstants.VolumeCB(); }	//TODO FIX THIS NUMBER!!!
+    long long flops() const { return 24ll * in->VolumeCB(); }	//TODO FIX THIS NUMBER!!!
     long long bytes() const { return in->Bytes() + in->NormBytes() + out->Bytes() + out->NormBytes(); }
 };
 
