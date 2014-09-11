@@ -497,8 +497,7 @@ def gen(dir, pack_only=False):
 
     str += "#ifdef MULTI_GPU\n"
     str += " faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
-    str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
-    str += "  face_idx + param.ghostOffset[" + `dir/2` + "];\n"
+    str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "];\n"
    
     str += "#if (DD_PREC==2)\n"
     str += "  sp_norm_idx = face_idx + "
@@ -648,60 +647,7 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 
     prep_half = ""
     prep_half += "#ifdef MULTI_GPU\n"
-    prep_half += "if (kernel_type == INTERIOR_KERNEL) {\n"
-    prep_half += "#endif\n"
-    prep_half += "\n"
-
-    if sharedDslash:
-        if dir == 0:
-            prep_half += indent(load_spinor)
-            prep_half += indent(write_shared)            
-            prep_half += indent(project)
-        elif dir == 1:
-            prep_half += indent(load_shared_1)
-            prep_half += indent(project)
-        elif dir == 2:
-            prep_half += indent("if (threadIdx.y == blockDim.y-1 && blockDim.y < X2 ) {\n")
-            prep_half += indent(load_spinor)
-            prep_half += indent(project)            
-            prep_half += indent("} else {")
-            prep_half += indent(load_shared_2)
-            prep_half += indent(project)
-            prep_half += indent("}")
-        elif dir == 3:
-            prep_half += indent("if (threadIdx.y == 0 && blockDim.y < X2) {\n")
-            prep_half += indent(load_spinor)
-            prep_half += indent(project)            
-            prep_half += indent("} else {")
-            prep_half += indent(load_shared_3)
-            prep_half += indent(project)
-            prep_half += indent("}")
-        elif dir == 4:
-            prep_half += indent("if (threadIdx.z == blockDim.z-1 && blockDim.z < X3) {\n")
-            prep_half += indent(load_spinor)
-            prep_half += indent(project)            
-            prep_half += indent("} else {")
-            prep_half += indent(load_shared_4)
-            prep_half += indent(project)
-            prep_half += indent("}")
-        elif dir == 5:
-            prep_half += indent("if (threadIdx.z == 0 && blockDim.z < X3) {\n")
-            prep_half += indent(load_spinor)
-            prep_half += indent(project)            
-            prep_half += indent("} else {")
-            prep_half += indent(load_shared_5)
-            prep_half += indent(project)
-            prep_half += indent("}")
-        else:
-            prep_half += indent(load_spinor)
-            prep_half += indent(project)
-    else:
-        prep_half += indent(load_spinor)
-        prep_half += indent(project)
-
-    prep_half += "\n"
-    prep_half += "#ifdef MULTI_GPU\n"
-    prep_half += "} else {\n"
+    prep_half += "{\n"
     prep_half += "\n"
     prep_half += indent(load_half)
     prep_half += indent(copy_half)
@@ -986,21 +932,6 @@ def epilog():
             str += "#ifdef MULTI_GPU\n"
         else:
             str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
-        str += (
-"""
-
-
-int incomplete = 0; // Have all 8 contributions been computed for this site?
-
-if(kernel_type == INTERIOR_KERNEL) {
-  incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-  incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-  incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-  incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-}
-
-""")    
-        str += "if (!incomplete)\n"
         str += "#endif // MULTI_GPU\n"
 
     if not asymClover:
