@@ -8,6 +8,10 @@ namespace quda {
 #include <dslash_init.cuh>
   }
 
+  namespace asym_clover {
+#include <dslash_init.cuh>
+  }
+
   DiracClover::DiracClover(const DiracParam &param)
     : DiracWilson(param), clover(*(param.clover))
   {
