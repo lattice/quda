@@ -304,7 +304,6 @@ def prolog():
     else:
         print "Undefined prolog"
         exit
-    prolog_str+=("KernelType kernel_type = EXTERIOR_KERNEL_ALL; \n\n")
     prolog_str+= (
 """
 #if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
@@ -371,9 +370,9 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
 int x1, x2, x3, x4;
 int X;
 
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
+#if (DD_PREC==2) // half precision
 int sp_norm_idx;
-#endif // MULTI_GPU half precision
+#endif // half precision
 
 int sid;
 """)
@@ -481,11 +480,7 @@ def gen(dir, pack_only=False):
                    "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
 
     cond = ""
-    cond += "#ifdef MULTI_GPU\n"
     cond += "if ( isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " +boundary[dir]+" )\n"
-  #  cond += "     (kernel_type == EXTERIOR_KERNEL &&  (dim == " + `dir/2` + ") && " +boundary[dir]+") )\n"
-   # cond += "     (kernel_type != INTERIOR_KERNEL_"+dim[dir/2]+" && "+boundary[dir]+") )\n"
-    cond += "#endif\n"
 
     str = ""
     
@@ -495,8 +490,7 @@ def gen(dir, pack_only=False):
         str += "// "+l+"\n"
     str += "\n"
 
-    str += "#ifdef MULTI_GPU\n"
-    str += " faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
+    str += "faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
     str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "];\n"
    
     str += "#if (DD_PREC==2)\n"
@@ -506,19 +500,12 @@ def gen(dir, pack_only=False):
     str += "param.ghostNormOffset[" + `dir/2` + "];\n"
     str += "#endif\n" 
     
-#    str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
-    str += "#endif\n"
 
     str += "\n"
     if dir % 2 == 0:
         str += "const int ga_idx = sid;\n"
     else:
-        str += "#ifdef MULTI_GPU\n"
         str += "const int ga_idx = Vh+face_idx;\n"
-#        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
-#        str += "#else\n"
-#        str += "const int ga_idx = sp_idx;\n"
-        str += "#endif\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -646,13 +633,9 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
     copy_half += "\n"
 
     prep_half = ""
-    prep_half += "#ifdef MULTI_GPU\n"
-    prep_half += "{\n"
     prep_half += "\n"
-    prep_half += indent(load_half)
-    prep_half += indent(copy_half)
-    prep_half += "}\n"
-    prep_half += "#endif // MULTI_GPU\n"
+    prep_half += load_half
+    prep_half += copy_half
     prep_half += "\n"
     
     ident = "// identity gauge matrix\n"
@@ -927,12 +910,12 @@ def xpay():
 
 def epilog():
     str = ""
-    if dslash and not asymClover:
-        if twist:
-            str += "#ifdef MULTI_GPU\n"
-        else:
-            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
-        str += "#endif // MULTI_GPU\n"
+#    if dslash and not asymClover:
+#        if twist:
+#            str += "#ifdef MULTI_GPU\n"
+#        else:
+#            str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"        
+#        str += "#endif // MULTI_GPU\n"
 
     if not asymClover:
         block_str = ""
