@@ -402,30 +402,10 @@ faceVolume[1] = (X1*X3*X4)>>1;
 faceVolume[2] = (X1*X2*X4)>>1;
 faceVolume[3] = (X1*X2*X3)>>1;
 
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
 
-  sid = blockIdx.x*blockDim.x + threadIdx.x;
-  if (sid >= param.threads) return;
 
-  // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity,Y);
 
-  o00_re = 0;  o00_im = 0;
-  o01_re = 0;  o01_im = 0;
-  o02_re = 0;  o02_im = 0;
-  o10_re = 0;  o10_im = 0;
-  o11_re = 0;  o11_im = 0;
-  o12_re = 0;  o12_im = 0;
-  o20_re = 0;  o20_im = 0;
-  o21_re = 0;  o21_im = 0;
-  o22_re = 0;  o22_im = 0;
-  o30_re = 0;  o30_im = 0;
-  o31_re = 0;  o31_im = 0;
-  o32_re = 0;  o32_im = 0;
-
-#ifdef MULTI_GPU
-} else { // exterior kernel
+{ // exterior kernel
 
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;

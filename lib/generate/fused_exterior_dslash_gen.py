@@ -378,25 +378,7 @@ int sp_norm_idx;
 int sid;
 """)
 
-        if sharedDslash:
-            prolog_str += (
-"""
-
-#ifdef MULTI_GPU
-int face_idx;
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
-
-  // only need to check Y and Z dims currently since X and T set to match exactly
-  if (x2 >= X2) return;
-  if (x3 >= X3) return;
-
-""")
-        else:
-            prolog_str += (
+        prolog_str += (
 """
 #ifdef MULTI_GPU
 int dim;
@@ -409,28 +391,10 @@ faceVolume[1] = (X1*X3*X4)>>1;
 faceVolume[2] = (X1*X2*X4)>>1;
 faceVolume[3] = (X1*X2*X3)>>1;
 
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
 
-  sid = blockIdx.x*blockDim.x + threadIdx.x;
-  if (sid >= param.threads) return;
 
-  // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity,Y);
 
-""")
-
-        out = ""
-        for s in range(0,4):
-            for c in range(0,3):
-                out += out_re(s,c)+" = 0;  "+out_im(s,c)+" = 0;\n"
-        prolog_str+= indent(out)
-        if asymClover: prolog_str += indent(clover_xpay())
-
-        prolog_str+= (
-"""
-#ifdef MULTI_GPU
-} else { // exterior kernel
+{ // exterior kernel
 
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
