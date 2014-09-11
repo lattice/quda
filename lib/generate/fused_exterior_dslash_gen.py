@@ -403,6 +403,12 @@ int dim;
 int face_num;
 int face_idx;
 int Y[4] = {X1,X2,X3,X4};
+int faceVolume[4];
+faceVolume[0] = (X2*X3*X4)>>1;
+faceVolume[1] = (X1*X3*X4)>>1;
+faceVolume[2] = (X1*X2*X4)>>1;
+faceVolume[3] = (X1*X2*X3)>>1;
+
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
@@ -440,9 +446,6 @@ if (kernel_type == INTERIOR_KERNEL) {
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
   //sp_idx = face_idx + param.ghostOffset[dim];
 
-#if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[dim];
-#endif
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity,Y);
   
@@ -535,6 +538,14 @@ def gen(dir, pack_only=False):
     str +=  "}\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
     str += "  face_idx + param.ghostOffset[" + `dir/2` + "];\n"
+   
+    str += "#if (DD_PREC==2)\n"
+    str += "  sp_norm_idx = face_idx + "
+    if dir%2 == 0:
+      str += "faceVolume[" + `dir/2` + "] + "
+    str += "param.ghostNormOffset[" + `dir/2` + "];\n"
+    str += "#endif\n" 
+    
     str += "#else\n"
     str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"

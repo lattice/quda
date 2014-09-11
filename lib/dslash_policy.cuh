@@ -984,7 +984,6 @@ struct DslashFusedExterior : DslashPolicyImp {
 #endif // MULTI_GPU
 
 
-    printfQuda("End of call to DslashFuseExterior()\n");
     profile.Stop(QUDA_PROFILE_TOTAL);
   }
 };

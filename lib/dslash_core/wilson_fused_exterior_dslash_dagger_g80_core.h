@@ -407,6 +407,12 @@ int dim;
 int face_num;
 int face_idx;
 int Y[4] = {X1,X2,X3,X4};
+int faceVolume[4];
+faceVolume[0] = (X2*X3*X4)>>1;
+faceVolume[1] = (X1*X3*X4)>>1;
+faceVolume[2] = (X1*X2*X4)>>1;
+faceVolume[3] = (X1*X2*X3)>>1;
+
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
@@ -446,9 +452,6 @@ if (kernel_type == INTERIOR_KERNEL) {
   // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
   //sp_idx = face_idx + param.ghostOffset[dim];
 
-#if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[dim];
-#endif
 
   coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity,Y);
   
@@ -497,6 +500,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==X1m1 ? X-X1m1 : X+1) >> 1 :
     face_idx + param.ghostOffset[0];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + faceVolume[0] + param.ghostNormOffset[0];
+#endif
 #else
   const int sp_idx = (x1==X1m1 ? X-X1m1 : X+1) >> 1;
 #endif
@@ -691,6 +697,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==0 ? X+X1m1 : X-1) >> 1 :
     face_idx + param.ghostOffset[0];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + param.ghostNormOffset[0];
+#endif
 #else
   const int sp_idx = (x1==0 ? X+X1m1 : X-1) >> 1;
 #endif
@@ -889,6 +898,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1 :
     face_idx + param.ghostOffset[1];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + faceVolume[1] + param.ghostNormOffset[1];
+#endif
 #else
   const int sp_idx = (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1;
 #endif
@@ -1083,6 +1095,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==0 ? X+X2X1mX1 : X-X1) >> 1 :
     face_idx + param.ghostOffset[1];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + param.ghostNormOffset[1];
+#endif
 #else
   const int sp_idx = (x2==0 ? X+X2X1mX1 : X-X1) >> 1;
 #endif
@@ -1281,6 +1296,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1 :
     face_idx + param.ghostOffset[2];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + faceVolume[2] + param.ghostNormOffset[2];
+#endif
 #else
   const int sp_idx = (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
 #endif
@@ -1475,6 +1493,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1 :
     face_idx + param.ghostOffset[2];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + param.ghostNormOffset[2];
+#endif
 #else
   const int sp_idx = (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
 #endif
@@ -1673,6 +1694,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1 :
     face_idx + param.ghostOffset[3];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + faceVolume[3] + param.ghostNormOffset[3];
+#endif
 #else
   const int sp_idx = (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
 #endif
@@ -1930,6 +1954,9 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
   }
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1 :
     face_idx + param.ghostOffset[3];
+#if (DD_PREC==2)
+    sp_norm_idx = face_idx + param.ghostNormOffset[3];
+#endif
 #else
   const int sp_idx = (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
 #endif

@@ -146,12 +146,14 @@ namespace quda {
 						    gauge.Reconstruct(), in, x, k, dagger);
     }
 
+/*
 #ifndef GPU_COMMS
     DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
 #endif
-
+*/
+    DslashPolicyImp* dslashImp = new DslashFusedExterior;
 
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
     delete dslashImp;
