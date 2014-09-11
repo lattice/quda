@@ -482,8 +482,7 @@ def gen(dir, pack_only=False):
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
-    cond += "if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim["+`dir/2`+"] || "+interior[dir]+")) ||\n"
-    cond += "     (kernel_type != INTERIOR_KERNEL && isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " +boundary[dir]+") )\n"
+    cond += "if ( isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " +boundary[dir]+" )\n"
   #  cond += "     (kernel_type == EXTERIOR_KERNEL &&  (dim == " + `dir/2` + ") && " +boundary[dir]+") )\n"
    # cond += "     (kernel_type != INTERIOR_KERNEL_"+dim[dir/2]+" && "+boundary[dir]+") )\n"
     cond += "#endif\n"
@@ -497,9 +496,7 @@ def gen(dir, pack_only=False):
     str += "\n"
 
     str += "#ifdef MULTI_GPU\n"
-    str += "if(kernel_type == EXTERIOR_KERNEL_ALL){\n";
-    str +=  " faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
-    str +=  "}\n"
+    str += " faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
     str += "  face_idx + param.ghostOffset[" + `dir/2` + "];\n"
    
@@ -510,8 +507,7 @@ def gen(dir, pack_only=False):
     str += "param.ghostNormOffset[" + `dir/2` + "];\n"
     str += "#endif\n" 
     
-    str += "#else\n"
-    str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
+#    str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
 
     str += "\n"
@@ -519,9 +515,10 @@ def gen(dir, pack_only=False):
         str += "const int ga_idx = sid;\n"
     else:
         str += "#ifdef MULTI_GPU\n"
-        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
-        str += "#else\n"
-        str += "const int ga_idx = sp_idx;\n"
+        str += "const int ga_idx = Vh+face_idx;\n"
+#        str += "const int ga_idx = ((kernel_type == INTERIOR_KERNEL) ? sp_idx : Vh+face_idx);\n"
+#        str += "#else\n"
+#        str += "const int ga_idx = sp_idx;\n"
         str += "#endif\n"
     str += "\n"
 
