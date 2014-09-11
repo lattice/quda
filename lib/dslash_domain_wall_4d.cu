@@ -174,19 +174,20 @@ namespace quda {
     }
 
     long long flops() const { // FIXME for multi-GPU
-      long long bulk = (dslashConstants.Ls-2)*(dslashConstants.VolumeCB()/dslashConstants.Ls);
-      long long wall = 2*dslashConstants.VolumeCB()/dslashConstants.Ls;
+      long long Ls = in->X(4);
+      long long vol4d = in->VolumeCB() / Ls;
+      long long bulk = (Ls-2)*vol4d;
+      long long wall = 2*vol4d;
       long long flops_Tmp; 
       switch(DS_type){
         case 0:
-          flops_Tmp = (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB();
+          flops_Tmp = (x ? 1368ll : 1320ll)*in->VolumeCB();
           break;
         case 1:
           flops_Tmp = 96ll*bulk + 120ll*wall;
           break;
         case 2:
-          flops_Tmp = 144ll*dslashConstants.VolumeCB()*dslashConstants.Ls
-                    + 3ll*dslashConstants.Ls*(dslashConstants.Ls-1ll);
+          flops_Tmp = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
           break;
         default:
           errorQuda("invalid Dslash type");

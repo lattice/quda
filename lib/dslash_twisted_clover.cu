@@ -145,7 +145,7 @@ namespace quda {
       }
     }
 
-    long long flops() const { return (x ? 1416ll : 1392ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
 
 #include <dslash_policy.cuh>

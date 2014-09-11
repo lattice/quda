@@ -51,16 +51,6 @@ enum KernelType {
 
   static DslashParam dslashParam;
 
-
-  // For tuneLaunch() to uniquely identify a suitable set of launch parameters, we need copies of a few of
-  // the constants set by initDslashConstants().
-  static struct {
-    int x[4];
-    int Ls;
-    unsigned long long VolumeCB() { return x[0]*x[1]*x[2]*x[3]/2; }
-    // In the future, we may also want to add gauge_fixed, sp_stride, ga_stride, cl_stride, etc.
-  } dslashConstants;
-
 #ifdef MULTI_GPU
   static double twist_a = 0.0;
   static double twist_b = 0.0;

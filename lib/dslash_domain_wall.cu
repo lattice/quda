@@ -154,9 +154,11 @@ namespace quda {
     }
 
     long long flops() const { // FIXME for multi-GPU
-      long long bulk = (dslashConstants.Ls-2)*(dslashConstants.VolumeCB()/dslashConstants.Ls);
-      long long wall = 2*dslashConstants.VolumeCB()/dslashConstants.Ls;
-      return (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB()*dslashConstants.Ls + 96ll*bulk + 120ll*wall;
+      long long Ls = in->X(4);
+      long long vol4d = in->VolumeCB()/Ls;
+      long long bulk = (Ls-2)*vol4d;
+      long long wall = 2*vol4d;
+      return (x ? 1368ll : 1320ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
     }
   };
 

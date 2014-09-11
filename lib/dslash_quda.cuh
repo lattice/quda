@@ -292,7 +292,8 @@
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return dslashConstants.VolumeCB(); }
+    // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
+    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); } 
     char aux[7][256];
 
     void fillAux(KernelType kernel_type, const char *kernel_str) {
@@ -353,17 +354,10 @@
       // this sets the communications pattern for the packing kernel
       setPackComms(dslashParam.commDim);
 
-      for (int i=0; i<4; i++) {
-	dslashParam.X[i] = in->X(i);
-	dslashConstants.x[i] = in->X(i);       // needed by tuneLaunch()
-      }
+      for (int i=0; i<4; i++) dslashParam.X[i] = in->X(i);
       dslashParam.Ls = in->X(4); // needed by tuneLaunch()
-
       // this is a c/b field so double the x dimension
       dslashParam.X[0] *= 2;
-      dslashConstants.x[0] *= 2; 
-
-      dslashConstants.Ls = in->X(4); // needed by tuneLaunch()
     }
 
     virtual ~DslashCuda() { }
@@ -427,9 +421,9 @@
 
       /** Helper function to set the 3-d grid size from the 3-d block size */
       dim3 createGrid(const dim3 &block) const {
-        unsigned int gx = ((dslashConstants.x[0]/2)*dslashConstants.x[3] + block.x - 1) / block.x;
-        unsigned int gy = (dslashConstants.x[1] + block.y - 1 ) / block.y;	
-        unsigned int gz = (dslashConstants.x[2] + block.z - 1) / block.z;
+        unsigned int gx = (in->X(0)*in->X(3) + block.x - 1) / block.x;
+        unsigned int gy = (in->X(1) + block.y - 1 ) / block.y;	
+        unsigned int gz = (in->X(2) + block.z - 1) / block.z;
         return dim3(gx, gy, gz);
       }
 
@@ -444,22 +438,22 @@
         bool set = false;
         dim3 blockInit = param.block;
         blockInit.z++;
-        for (unsigned bx=blockInit.x; bx<=dslashConstants.x[0]/2; bx++) {
-          //unsigned int gx = (dslashConstants.x[0]*dslashConstants.x[3] + bx - 1) / bx;
-          for (unsigned by=blockInit.y; by<=dslashConstants.x[1]; by++) {
-            unsigned int gy = (dslashConstants.x[1] + by - 1 ) / by;	
+        for (unsigned bx=blockInit.x; bx<=in->X(0); bx++) {
+          //unsigned int gx = (in->X(0)*in->x(3) + bx - 1) / bx;
+          for (unsigned by=blockInit.y; by<=in->X(1); by++) {
+            unsigned int gy = (in->X(1) + by - 1 ) / by;	
 
             if (by > 1 && (by%2) != 0) continue; // can't handle odd blocks yet except by=1
 
-            for (unsigned bz=blockInit.z; bz<=dslashConstants.x[2]; bz++) {
-              unsigned int gz = (dslashConstants.x[2] + bz - 1) / bz;
+            for (unsigned bz=blockInit.z; bz<=in->X(2); bz++) {
+              unsigned int gz = (in->X(2) + bz - 1) / bz;
 
               if (bz > 1 && (bz%2) != 0) continue; // can't handle odd blocks yet except bz=1
               if (bx*by*bz > max_threads) continue;
               if (bx*by*bz < min_threads) continue;
               // can't yet handle the last block properly in shared memory addressing
-              if (by*gy != dslashConstants.x[1]) continue;
-              if (bz*gz != dslashConstants.x[2]) continue;
+              if (by*gy != in->X(1)) continue;
+              if (bz*gz != in->X(2)) continue;
               if (sharedBytes(dim3(bx, by, bz)) > max_shared) continue;
 
               param.block = dim3(bx, by, bz);	  
@@ -472,10 +466,9 @@
           blockInit.y = 1;
         }
 
-        if (param.block.x > dslashConstants.x[0]/2 && param.block.y > dslashConstants.x[1] &&
-            param.block.z > dslashConstants.x[2] || !set) {
+        if (param.block.x > in->X(0) && param.block.y > in->X(1) && param.block.z > in->X(2) || !set) {
           //||sharedBytesPerThread()*param.block.x > max_shared) {
-          param.block = dim3(dslashConstants.x[0]/2, 1, 1);
+          param.block = dim3(in->X(0), 1, 1);
           return false;
         } else { 
           param.grid = createGrid(param.block);
@@ -502,7 +495,7 @@
       {
 	if (dslashParam.kernel_type != INTERIOR_KERNEL) return DslashCuda::initTuneParam(param);
 
-	param.block = dim3(dslashConstants.x[0]/2, 1, 1);
+	param.block = dim3(in->X(0), 1, 1);
 	param.grid = createGrid(param.block);
 	param.shared_bytes = sharedBytes(param.block);
       }

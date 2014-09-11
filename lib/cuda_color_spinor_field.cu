@@ -969,7 +969,7 @@ namespace quda {
 	  if (!commDimPartitioned(i)) continue;
 #ifdef GPU_COMMS
 	  size_t nbytes_Nface = surfaceCB[i]*Ndof*precision*(j+1);
-	  if (i != 3 || getKernelPackT()) {
+	  if (i != 3 || getKernelPackT() || getTwistPack()) {
 #else 
 	    size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 #endif
@@ -990,7 +990,9 @@ namespace quda {
 	      }
 	    }
 
-	  } else { 
+	  } else if (this->TwistFlavor() == QUDA_TWIST_NONDEG_DOUBLET) {
+	    errorQuda("GPU_COMMS for non-degenerate doublet only supported with time-dimension kernel packing enabled.");
+	  } else {
 	    /* 
 	       use a strided communicator, here we can't really use
 	       the previously declared my_fwd_face and my_back_face
