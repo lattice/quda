@@ -3,6 +3,8 @@
 #define DSLASH_SHARED_FLOATS_PER_THREAD 24
 
 
+#ifdef MULTI_GPU
+
 #if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
 #define VOLATILE
 #else // Open64 compiler
@@ -223,7 +225,6 @@ int sp_norm_idx;
 
 int sid;
 
-#ifdef MULTI_GPU
 int dim;
 int face_num;
 int face_idx;
@@ -237,7 +238,6 @@ faceVolume[3] = (X1*X2*X3)>>1;
 
 
 
-{ // exterior kernel
 
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
@@ -280,8 +280,6 @@ faceVolume[3] = (X1*X2*X3)>>1;
   o30_re = i30_re;  o30_im = i30_im;
   o31_re = i31_re;  o31_im = i31_im;
   o32_re = i32_re;  o32_im = i32_im;
-}
-#endif // MULTI_GPU
 
 
 if ( isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
@@ -1878,3 +1876,5 @@ WRITE_SPINOR(param.sp_stride);
 #undef o32_im
 
 #undef VOLATILE
+
+#endif // MULTI_GPU

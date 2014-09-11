@@ -22,9 +22,9 @@ Calculating reference implementation...done.
 Executing 10 kernel loops...
 done.
 
-204.396807us per kernel call
-GFLOPS = 39.678115
-GB/s = 21.161661
+204.755203us per kernel call
+GFLOPS = 39.608664
+GB/s = 21.124621
 
 Results: CPU = 1214982.705467, CUDA=1214746.017084, CPU-CUDA = 1214746.017170
 [==========] Running 1 test from 1 test case.
@@ -71,24 +71,24 @@ Results: CPU = 1214982.705467, CUDA=1214746.017084, CPU-CUDA = 1214746.017170
 1.000000e-14 Failures: 147456 / 147456  = 1.000000e+00
 1.000000e-15 Failures: 147456 / 147456  = 1.000000e+00
 1.000000e-16 Failures: 147456 / 147456  = 1.000000e+00
-[       OK ] dslash.verify (116 ms)
-[----------] 1 test from dslash (116 ms total)
+[       OK ] dslash.verify (115 ms)
+[----------] 1 test from dslash (115 ms total)
 
 [----------] Global test environment tear-down
-[==========] 1 test from 1 test case ran. (116 ms total)
+[==========] 1 test from 1 test case ran. (115 ms total)
 [  PASSED  ] 1 test.
 
-               initQuda Total time = 0.216066 secs
+               initQuda Total time = 0.216089 secs
 
-          loadGaugeQuda Total time = 0.004063 secs
-              download     = 0.002277 secs (    56%), with        1 calls at 2.277000e+03 us per call
-                  init     = 0.001776 secs (  43.7%), with        1 calls at 1.776000e+03 us per call
-               compute     = 0.000000 secs (     0%), with        1 calls at 0.000000e+00 us per call
-                  free     = 0.000007 secs ( 0.172%), with        1 calls at 7.000000e+00 us per call
-     total accounted       = 0.004060 secs (  99.9%)
-     total missing         = 0.000003 secs (0.0738%)
+          loadGaugeQuda Total time = 0.00408 secs
+              download     = 0.002289 secs (  56.1%), with        1 calls at 2.289000e+03 us per call
+                  init     = 0.001782 secs (  43.7%), with        1 calls at 1.782000e+03 us per call
+               compute     = 0.000001 secs (0.0245%), with        1 calls at 1.000000e+00 us per call
+                  free     = 0.000006 secs ( 0.147%), with        1 calls at 6.000000e+00 us per call
+     total accounted       = 0.004078 secs (   100%)
+     total missing         = 0.000002 secs ( 0.049%)
 
-                endQuda Total time = 0.050588 secs
+                endQuda Total time = 0.051343 secs
 
 Device memory used = 5.4 MB
 Page-locked host memory used = 7.6 MB

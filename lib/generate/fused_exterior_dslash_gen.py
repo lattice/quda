@@ -306,6 +306,8 @@ def prolog():
         exit
     prolog_str+= (
 """
+#ifdef MULTI_GPU
+
 #if ((CUDA_VERSION >= 4010) && (__COMPUTE_CAPABILITY__ >= 200)) // NVVM compiler
 #define VOLATILE
 #else // Open64 compiler
@@ -379,7 +381,6 @@ int sid;
 
         prolog_str += (
 """
-#ifdef MULTI_GPU
 int dim;
 int face_num;
 int face_idx;
@@ -393,7 +394,6 @@ faceVolume[3] = (X1*X2*X3)>>1;
 
 
 
-{ // exterior kernel
 
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
@@ -431,9 +431,8 @@ faceVolume[3] = (X1*X2*X3)>>1;
             for c in range(0,3):
                 out += out_re(s,c)+" = "+in_re(s,c)+";  "+out_im(s,c)+" = "+in_im(s,c)+";\n"
         prolog_str+= indent(out)
-        prolog_str+= "}\n"
-        prolog_str+= "#endif // MULTI_GPU\n\n\n"
-
+        prolog_str+=("\n\n")
+    
     else:
         prolog_str+=(
 """
@@ -987,6 +986,8 @@ def epilog():
 
     str += "#undef VOLATILE\n" 
 
+    str += "\n"
+    str += "#endif // MULTI_GPU"
     return str
 # end def epilog
 
