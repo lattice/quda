@@ -393,6 +393,23 @@ namespace quda {
 
       printf("UV2[%d] = %e\n", d, UV.norm2());
       printf("Y2[%d] = %e\n", d, Y.norm2(d));
+
+#if 0
+      for(int parity=0; parity<=1; parity++) {//Parity
+      for(int x_cb = 0; x_cb < Y.Volume()/2; x_cb++) {
+      for(int s = 0; s < Y.NspinCoarse(); s++) {  //Fine Spin row
+      for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
+          for(int ic = 0; ic < Y.NcolorCoarse(); ic++) { //Fine Color rows of gauge field
+            for(int jc = 0; jc < Y.NcolorCoarse(); jc++) {  //Fine Color columns of gauge field
+              printfQuda("Y(%d,%d,%d,%d,%d,%d,%d)= %e %e\n",d,parity,x_cb,ic,jc,s,s_col,Y(d,parity,x_cb,ic,jc,s,s_col).real(),Y(d,parity,x_cb,ic,jc,s,s_col).imag());
+	      }
+	    }
+	  }
+	}
+      }
+      }
+#endif
+
     }
 
     printf("X2 = %e\n", X.norm2(0));

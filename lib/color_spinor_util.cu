@@ -273,6 +273,10 @@ namespace quda {
       FieldOrder<Float,4,3,1,order> A(a);
       print_vector(A, x);
     }
+    else if (a.Ncolor() == 2 && a.Nspin() == 2) {
+      FieldOrder<Float,2,2,1,order> A(a);
+      print_vector(A, x);
+    }
     else if (a.Ncolor() == 24 && a.Nspin() == 2) {
       FieldOrder<Float,2,24,1,order> A(a);
       print_vector(A, x);

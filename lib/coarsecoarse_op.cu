@@ -23,16 +23,28 @@ namespace quda {
 
               //Shift the V field w/respect to G (must be on full field coords)
               int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
-              if (dir==0) coord[0] = 2*coord[0] + oddBit;
+              //if (dir==0) coord[0] = 2*coord[0] + oddBit;
+              coord[0] = 2*coord[0] + oddBit;
+	      int offset_index = 0;	
+	      UV.OffsetIndex(offset_index,coord);
+              //printfQuda("parity = %d x_cb = %d UV.OffsetIndex = %d\n",parity, x_cb, offset_index);
               coord[dir] = (coord[dir]+1)%x_size[dir];
-              if (dir==0) coord[0] /= 2;
+              V.OffsetIndex(offset_index,coord);
+              //if (dir==0) coord[0] /= 2;
+              coord[0] /= 2;
               int y_cb = ((coord[3]*x_size[2]+coord[2])*x_size[1]+coord[1])*(x_size[0]/2) + coord[0];
+              //printfQuda("parity = %d y_cb = %d V.OffsetIndex = %d\n",(parity+1)&1, y_cb,offset_index);
+
 
                 for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin row
                     for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
-                      for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
-                        for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
-                          UV(parity, x_cb, s, ic, ic_c) += G(dir, parity, x_cb, ic, jc, s, s_col) * V((parity+1)&1, y_cb, s_col, jc, ic_c);
+                      for(int ic = 0; ic < G.NcolorCoarse(); ic++) { //Fine Color rows of gauge field
+                        for(int jc = 0; jc < G.NcolorCoarse(); jc++) {  //Fine Color columns of gauge field
+			 //printfQuda("UV(%d,%d,%d,%d,%d)= %e %e\n",parity, x_cb, s, ic, ic_c, UV(parity, x_cb, s, ic, ic_c).real(), UV(parity, x_cb, s, ic, ic_c).imag());
+                         //printfQuda("V(%d,%d,%d,%d,%d)= %e %e\n",(parity+1)&1, y_cb, s_col, jc, ic_c, V((parity+1)&1, y_cb, s, jc, ic_c).real(), V((parity+1)&1, y_cb, s, jc, ic_c).imag());
+			 //printfQuda("G(%d,%d,%d,%d,%d,%d,%d)= %e %e\n",dir,parity,x_cb,ic,jc,s,s_col,G(dir,parity,x_cb,ic,jc,s,s_col).real(),G(dir,parity,x_cb,ic,jc,s,s_col).imag());
+                          UV(parity, x_cb, s, ic, ic_c) += G(dir, parity, x_cb, s, s_col, ic, jc) * V((parity+1)&1, y_cb, s_col, jc, ic_c);
+                         //printfQuda("UV(%d,%d,%d,%d,%d)= %e %e\n",parity, x_cb, s, ic, ic_c, UV(parity, x_cb, s, ic, ic_c).real(), UV(parity, x_cb, s, ic, ic_c).imag());
                         }  //Fine color columns
                       }  //Fine color rows
                     }  //Coarse color
@@ -220,17 +232,17 @@ namespace quda {
               //If Nspin != 4, then spin structure is a dense matrix
               //N.B. assumes that no further spin blocking is done in this case.
               else {
-
+	        //printf("C.Ncolor() = %d C.NcolorCoarse() = %d\n",C.Ncolor(), C.NcolorCoarse());
                 for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin row
-                  for(int s_col; s_col < V.Nspin(); s_col++) { //Loop over fine spin column
+                  for(int s_col = 0; s_col < V.Nspin(); s_col++) { //Loop over fine spin column
 
                     for(int ic_c = 0; ic_c < X.NcolorCoarse(); ic_c++) { //Coarse Color row
                       for(int jc_c = 0; jc_c < X.NcolorCoarse(); jc_c++) { //Coarse Color column
-
-                        for(int ic = 0; ic < C.Ncolor(); ic++) { //Sum over fine color row
-                          for(int jc = 0; jc < C.Ncolor(); jc++) {  //Sum over fine color column
-                          X(0,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c) +=
-                            conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col, ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
+		      
+                        for(int ic = 0; ic < C.NcolorCoarse(); ic++) { //Sum over fine color row
+                          for(int jc = 0; jc < C.NcolorCoarse(); jc++) {  //Sum over fine color column
+			  //printfQuda("coord[0] = %d, coord[1] = %d, coord[2] = %d, coord[3] = %d, x_size[0] = %d, x_size[1] = %d, x_size[2] = %d, x_size[3] = %d, coarse_parity=%d, coarse_x_cb = %d, s=%d, s_col=%d, ic_c = %d, jc_c = %d, parity = %d, x_cb = %d, ic = %d, jc = %d, V.Nspin() = %d\n",coord[0], coord[1], coord[2], coord[3], x_size[0], x_size[1], x_size[2], x_size[3], coarse_parity, coarse_x_cb, s, s_col, ic_c, jc_c, parity, x_cb, ic, jc, V.Nspin());
+                          X(0,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c) += conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col, ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
                           } //Fine color column
                         }  //Fine color row
                       } //Coarse Color column
@@ -287,29 +299,49 @@ namespace quda {
       printf("Y2[%d] = %e\n", d, Y.norm2(d));
     }
 
-    printf("X2 = %e\n", X.norm2(0));
     printfQuda("Computing coarse diagonal\n");
     coarseDiagonal<Float>(X, nDim, xc_size);
+   #if 0
+    for(int parity = 0; parity <= 1; parity++) {
+    for(int i = 0; i < X.Volume()/2; i++) {
+      for(int s = 0; s < X.NspinCoarse(); s++) {
+        for(int s_col = 0; s_col < X.NspinCoarse(); s_col++) {
+          for(int c = 0; c < X.NcolorCoarse(); c++) {
+            for(int c_col = 0; c_col < X.NcolorCoarse(); c_col++) {
+              printf("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
+                     X(0,parity,i,s,s_col,c,c_col).real(),
+                     X(0,parity,i,s,s_col,c,c_col).imag());
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
     createCoarseClover<Float>(X, V, C, nDim, x_size, xc_size, geo_bs, spin_bs);
     printf("X2 = %e\n", X.norm2(0));
 
-#if 0
+    #if 0
      for(int d = 0; d < 4; d++) {
-      for(int i = 0; i < Y.Volume(); i++) {
+     for(int parity = 0; parity <= 1; parity++) {
+      for(int i = 0; i < Y.Volume()/2; i++) {
         for(int s = 0; s < Y.NspinCoarse(); s++) {
           for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
             for(int c = 0; c < Y.NcolorCoarse(); c++) {
               for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
-                printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(d) = %e %e\n",d,i,s,s_col,c,c_col,Y(d,i%2,i/2,s,s_col,c,c_col).real(),Y(d,i%2,i/2,s,s_col,c,c_col).imag());
-              }}}}}
-    for(int i = 0; i < Y.Volume(); i++) {
-      for(int s = 0; s < Y.NspinCoarse(); s++) {
-        for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
-          for(int c = 0; c < Y.NcolorCoarse(); c++) {
-            for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
-              printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,i,s,s_col,c,c_col,
-                     X(0,i%2,i/2,s,s_col,c,c_col).real(),
-                     X(0,i%2,i/2,s,s_col,c,c_col).imag());
+                printf("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(d) = %e %e\n",d,parity,i,s,s_col,c,c_col,Y(d,parity,i,s,s_col,c,c_col).real(),Y(d,parity,i,s,s_col,c,c_col).imag());
+              }}}}}}}
+    #endif
+    #if 0
+    for(int parity = 0; parity <= 1; parity++) {
+    for(int i = 0; i < X.Volume()/2; i++) {
+      for(int s = 0; s < X.NspinCoarse(); s++) {
+        for(int s_col = 0; s_col < X.NspinCoarse(); s_col++) {
+          for(int c = 0; c < X.NcolorCoarse(); c++) {
+            for(int c_col = 0; c_col < X.NcolorCoarse(); c_col++) {
+              printf("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
+                     X(0,parity,i,s,s_col,c,c_col).real(),
+                     X(0,parity,i,s,s_col,c,c_col).imag());
             }
           }
         }

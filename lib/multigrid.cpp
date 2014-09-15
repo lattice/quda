@@ -94,6 +94,7 @@ namespace quda {
       diracParam.transfer = transfer;
       diracParam.dirac = const_cast<Dirac*>(param.matResidual.Expose());
       diracParam.kappa = param.matResidual.Expose()->Kappa();
+      std::cout << "Kappa = " << diracParam.kappa << std::endl;
       diracCoarse = new DiracCoarse(diracParam);
       matCoarse = new DiracM(*diracCoarse);
 
@@ -107,12 +108,24 @@ namespace quda {
 
       for (int i=0; i<param.Nvec; i++) {
 	(*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
+	blas::zero(*(*B_coarse)[i]);
 	transfer->R(*(*B_coarse)[i], *(param.B[i]));
 	#if 0
-	if (param.level== 2) {
-          //(*B_coarse)[i]->Source(QUDA_RANDOM_SOURCE);                                                                                      
+	if (param.level != 99) {
+	  ColorSpinorParam csParam2(*(*B_coarse)[i]);
+	  csParam2.create = QUDA_ZERO_FIELD_CREATE;
+	  ColorSpinorField *tmp = ColorSpinorField::Create(csParam2);
+	  for (int s=i; s<(*B_coarse)[i]->Nspin(); s+=2) {
+	    for (int c=0; c<(*B_coarse)[i]->Ncolor(); c++) {
+	      tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
+	      //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, 2);                                                                                       
+	      //blas::xpy(*tmp,*(*B_coarse)[i]);
+	    }
+	  }
+	  delete tmp;
+          (*B_coarse)[i]->Source(QUDA_RANDOM_SOURCE);                                                                                      
           printfQuda("B_coarse[%d]\n", i);
-          for (int x=0; x<(*B_coarse)[i]->Volume(); x++) static_cast<cpuColorSpinorField*>((*B_coarse)[i])->PrintVector(x);
+          //for (int x=0; x<(*B_coarse)[i]->Volume(); x++) static_cast<cpuColorSpinorField*>((*B_coarse)[i])->PrintVector(x);
 	}
 	#endif
 
@@ -207,7 +220,8 @@ namespace quda {
     printfQuda("\nComparing native coarse operator to emulated operator\n");
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
     blas::zero(*tmp_coarse);
-    #if 0
+    blas::zero(*r_coarse);
+    #if 1
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     #else
     tmp_coarse->Source(QUDA_POINT_SOURCE,0,0,0);
@@ -216,12 +230,14 @@ namespace quda {
     param.matResidual(*tmp2,*tmp1);	
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
+    #if 0
     if(param.level == 2) {
-    //printfQuda("x_coarse\n");
-    //for (int x=0; x<x_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
-    //printfQuda("r_coarse\n");
-    //for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
+      printfQuda("x_coarse\n");
+      for (int x=0; x<x_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
+      printfQuda("r_coarse\n");
+      for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
     }
+    #endif
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     printfQuda("deviation = %e\n\n", blas::xmyNorm(*x_coarse, *r_coarse));
 
@@ -343,6 +359,8 @@ namespace quda {
 	printfQuda("Using random source for nullvector = %d\n",i);
 	B[i]->Source(QUDA_RANDOM_SOURCE);
 #endif
+	//printfQuda("B[%d]\n",i);
+	//for (int x=0; x<B[i]->Volume(); x++) static_cast<cpuColorSpinorField*>(B[i])->PrintVector(x);
       }
 
       for (int i=2; i<nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
