@@ -210,9 +210,9 @@ void printQudaInvertParam(QudaInvertParam *param) {
 
   P(maxiter, INVALID_INT);
   P(reliable_delta, INVALID_DOUBLE);
-#ifdef INIT_PARAM /**< Default is to use a sloppy accumulator */
-  P(use_sloppy_partial_accumulator, 1);
-  P(max_res_increase, 0);
+#ifdef INIT_PARAM 
+  P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
+  P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
 #else
   P(use_sloppy_partial_accumulator, INVALID_INT);
   P(max_res_increase, INVALID_INT);

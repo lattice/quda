@@ -13,12 +13,16 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	cpu_gauge_field.o cuda_gauge_field.o extract_gauge_ghost.o	\
 	max_gauge.o gauge_update_quda.o dirac_clover.o dirac_wilson.o	\
 	dirac_staggered.o dirac_improved_staggered.o			\
-	dirac_domain_wall.o dirac_mobius.o dirac_twisted_clover.o	\
-	dirac_twisted_mass.o tune.o fat_force_quda.o llfat_quda_itf.o	\
-	clover_quda.o dslash_quda.o blas_quda.o copy_quda.o		\
-	reduce_quda.o face_buffer.o face_gauge.o comm_common.o		\
-	${COMM_OBJS} ${NUMA_AFFINITY_OBJS} clover_deriv_quda.o		\
-	clover_invert.o copy_gauge_extended.o				\
+	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
+	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
+	fat_force_quda.o llfat_quda_itf.o clover_quda.o dslash_quda.o	\
+	dslash_wilson.o dslash_clover.o dslash_clover_asym.o		\
+	dslash_twisted_mass.o dslash_twisted_clover.o			\
+	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
+	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
+	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
+	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
+	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
 	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
@@ -48,13 +52,12 @@ REDUCE_INLN = reduce_core.h reduce_mixed_core.h
 CSF_INLN = 
 
 # These are only inlined into dslash_quda.cu
-DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h		\
-	io_spinor.h staggered_dslash_def.h wilson_dslash_def.h		\
-	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h		\
-	pack_face_def.h hisq_force_macros.h llfat_quda.cu		\
-	fermion_force_quda.cu gauge_force_quda.cu gauge_force_core.h	\
-	llfat_core.h svd_quda.h read_clover.h read_gauge.h		\
-	misc_helpers.cu
+DSLASH_INLN = clover_def.h dslash_constants.h dslash_textures.h	\
+	io_spinor.h staggered_dslash_def.h wilson_dslash_def.h	\
+	dw_dslash_def.h tm_dslash_def.h tm_ndeg_dslash_def.h	\
+	hisq_force_macros.h llfat_quda.cu fermion_force_quda.cu	\
+	gauge_force_quda.cu gauge_force_core.h llfat_core.h	\
+	svd_quda.h read_clover.h read_gauge.h misc_helpers.cu
 
 
 # files containing complex macros and other code fragments to be inlined,
@@ -72,7 +75,11 @@ QUDA_CORE = clover_core.h staggered_dslash_core.h			\
 	wilson_dslash_g80_core.h wilson_dslash_dagger_g80_core.h 	\
 	tm_dslash_g80_core.h tm_dslash_dagger_g80_core.h		\
 	wilson_pack_face_core.h wilson_pack_face_dagger_core.h		\
-	tm_ndeg_dslash_core.h tm_ndeg_dslash_dagger_core.h	
+	tm_ndeg_dslash_core.h tm_ndeg_dslash_dagger_core.h		\
+	tmc_dslash_fermi_core.h tmc_dslash_dagger_fermi_core.h		\
+	tmc_dslash_gt200_core.h tmc_dslash_dagger_gt200_core.h		\
+	tmc_dslash_gt200_core.h tmc_dslash_dagger_g80_core.h		\
+	tmc_gamma_core.h
 
 INC += -I../include -Idslash_core -I.
 

@@ -17,9 +17,9 @@
 
 #include <blas_magma.h>
 
-#define DEBUG_MODE
-
 #define MAX_EIGENVEC_WINDOW 16
+
+#define SINGLE_PRECISION_EPSILON 1e-7
 
 /*
 Based on  eigCG(nev, m) algorithm:
@@ -950,7 +950,7 @@ namespace quda {
 
      const bool use_cg_updates         = false; 
 
-     const int eigcg_min_restarts      = 3;
+     const int eigcg_min_restarts      = 3;//5???
 
      int eigcg_restarts = 0;
 
@@ -960,24 +960,29 @@ namespace quda {
      {
        CreateDeflationSpace(*in, defl_param);
      }
-     else if(use_eigcg && defl_param->cur_dim == defl_param->tot_dim)
+     else if(use_eigcg && !defl_param->in_incremental_stage)
      {
        use_eigcg = false;
 
        printfQuda("\nWarning: IncEigCG will deploy initCG solver.\n");
 
        if(eigcg_alloc){ 
+
          delete Vm;
+
+         Vm = 0;
   
          eigcg_alloc = false;
        }
 
        //temporary solution!
        initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
+       //
        initCGparam.use_sloppy_partial_accumulator=0;
 
+       fillInitCGSolveParam(initCGparam);
+
      }
-   
 
      //if this operator applied during the first stage of the incremental eigCG (to construct deflation space):
      //then: call eigCG inverter 
@@ -1007,21 +1012,16 @@ namespace quda {
            copyCuda(*inSloppy, *in);//input is outer residual
            copyCuda(*outSloppy, *out);
 
-           param.tol = 1e-7;//single precision eigcg tolerance
+           if (ext_tol < SINGLE_PRECISION_EPSILON) param.tol = SINGLE_PRECISION_EPSILON;//single precision eigcg tolerance
         }
         else//full precision solver:
         {
            outSloppy = out;
+
            inSloppy  = in;
         }
 
         eigcg_restarts = EigCG(*outSloppy, *inSloppy);
-
-        //too messy ...
-        bool cg_updates    = use_mixed_prec && (use_cg_updates || (eigcg_restarts < eigcg_min_restarts));
-
-        bool eigcg_updates = use_mixed_prec && !cg_updates;
-
 
         tot_time  += param.secs;
 
@@ -1032,6 +1032,11 @@ namespace quda {
         ExpandDeflationSpace(defl_param, param.nev);
         //
 
+        //too messy..
+        bool cg_updates    = use_mixed_prec && (use_cg_updates || (eigcg_restarts < eigcg_min_restarts) || (defl_param->cur_dim == defl_param->tot_dim));
+
+        bool eigcg_updates = use_mixed_prec && !cg_updates;
+
         if(cg_updates)
         {
            double b2   = norm2(*in);
@@ -1041,7 +1046,7 @@ namespace quda {
  * L24T48 : 5e-3
  * L48T96 : 5e-2, works but not perfect, 1e-1 seems to be better...
  */     
-           param.tol   = 1e-1;//initcg sloppy precision tolerance
+           param.tol   = 5e-2;//initcg sloppy precision tolerance
 
            cudaColorSpinorField y(*in);//full precision accumulator
            cudaColorSpinorField r(*in);//full precision residual
@@ -1053,7 +1058,8 @@ namespace quda {
            //
            initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
            initCGparam.use_sloppy_partial_accumulator=0;   //more stable single-half solver
-     
+
+           fillInitCGSolveParam(initCGparam);
 
            initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
 
@@ -1092,9 +1098,6 @@ namespace quda {
            //
            delete initCG;
            //
-           delete outSloppy;
-           //
-           delete inSloppy;
         }
         else if(eigcg_updates)
         {
@@ -1171,6 +1174,13 @@ namespace quda {
               ReportEigenvalueAccuracy(defl_param, param.nev);
         }
 
+        if(use_mixed_prec){
+
+           delete outSloppy;
+
+           delete inSloppy;
+        }
+
      }
      //else: use deflated CG solver with proper restarting. 
      else{
@@ -1225,8 +1235,10 @@ namespace quda {
           xpayCuda(*in, -1, *W); 
 
           if(use_reduced_vector_set)
+
           	DeflateSpinorReduced(*out, *W, defl_param, false);                
           else
+
 		DeflateSpinor(*out, *W, defl_param, false);                
 
           if(getVerbosity() >= QUDA_VERBOSE)
@@ -1266,24 +1278,29 @@ namespace quda {
         delete W;
      } 
 
-     if( (defl_param->cur_dim == defl_param->tot_dim) && (use_eigcg) && (use_reduced_vector_set) )
+     if( (defl_param->cur_dim == defl_param->tot_dim) && use_eigcg )
      {
-        const int max_nev = defl_param->cur_dim;//param.m;
+        defl_param->in_incremental_stage = false;//stop the incremental stage now.
 
         if(eigcg_alloc){
 
-            delete Vm;
+          delete Vm;
 
-            Vm = 0;
+          Vm = 0;
 
-            eigcg_alloc = false;
+          eigcg_alloc = false;
         }
 
-        double eigenval_tol = 1e-1;
+        if(use_reduced_vector_set){
 
-        LoadEigenvectors(defl_param, max_nev, eigenval_tol);
+          const int max_nev = defl_param->cur_dim;//param.m;
 
-        printfQuda("\n...done. \n");
+          double eigenval_tol = 1e-1;
+
+          LoadEigenvectors(defl_param, max_nev, eigenval_tol);
+
+          printfQuda("\n...done. \n");
+        }
      }
 
      //compute true residual: 

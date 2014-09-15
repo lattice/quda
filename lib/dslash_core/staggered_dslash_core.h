@@ -1102,7 +1102,7 @@ int sign = 1;
 #ifdef DSLASH_AXPY
 #ifdef MULTI_GPU
 if (kernel_type == INTERIOR_KERNEL){
-  READ_ACCUM(ACCUMTEX);
+  READ_ACCUM(ACCUMTEX,sid);
   o00_re = -o00_re + a*accum0.x;
   o00_im = -o00_im + a*accum0.y;
   o01_re = -o01_re + a*accum1.x;
@@ -1118,7 +1118,7 @@ if (kernel_type == INTERIOR_KERNEL){
   o02_im = -o02_im;
 }
 #else
-READ_ACCUM(ACCUMTEX);
+READ_ACCUM(ACCUMTEX,sid);
 o00_re = -o00_re + a*accum0.x;
 o00_im = -o00_im + a*accum0.y;
 o01_re = -o01_re + a*accum1.x;
@@ -1131,13 +1131,13 @@ o02_im = -o02_im + a*accum2.y;
 #ifdef MULTI_GPU
 //if (kernel_type == EXTERIOR_KERNEL_T){
 if (kernel_type != INTERIOR_KERNEL){
-  READ_AND_SUM_SPINOR(INTERTEX);
+  READ_AND_SUM_SPINOR(INTERTEX, sid);
 }
 #endif
 
 
 // write spinor field back to device memory
-WRITE_SPINOR(out, param.sp_stride);
+WRITE_SPINOR(out, sid, param.sp_stride);
 
 
 // undefine to prevent warning when precision is changed

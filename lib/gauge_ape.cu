@@ -9,6 +9,8 @@
 
 namespace quda {
 
+#ifdef GPU_GAUGE_TOOLS
+
   template <typename Float, typename GaugeOr, typename GaugeDs>
   struct GaugeAPEArg {
     int threads; // number of active threads required
@@ -486,9 +488,12 @@ namespace quda {
       } else {
         errorQuda("Invalid Gauge Order destination field\n");
       }
-    }
+  }
+#endif
 
   void APEStep(GaugeField &dataDs, const GaugeField& dataOr, double alpha, QudaFieldLocation location) {
+
+#ifdef GPU_GAUGE_TOOLS
 
     if(dataOr.Precision() != dataDs.Precision()) {
       errorQuda("Oriign and destination fields must have the same precision\n");
@@ -506,6 +511,10 @@ namespace quda {
       errorQuda("Precision %d not supported", dataDs.Precision());
     }
     return;
+#else
+  errorQuda("Gauge tools are not build");
+#endif
   }
+
 
 }

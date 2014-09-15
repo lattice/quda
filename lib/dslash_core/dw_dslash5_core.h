@@ -106,7 +106,7 @@ VOLATILE spinorFloat o32_im;
 #include "io_spinor.h"
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
-if (sid >= param.threads*Ls) return;
+if (sid >= param.threads*param.Ls) return;
 
 int boundaryCrossing;
 
@@ -138,12 +138,12 @@ xs = X/(X1*X2*X3*X4);
 {
 // 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
   {
-     int sp_idx = ( xs == Ls-1 ? X-(Ls-1)*2*Vh : X+2*Vh ) / 2;
+     int sp_idx = ( xs == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
 
 // read spinor from device memory
-     READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
+     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
-     if ( xs != Ls-1 )
+     if ( xs != param.Ls-1 )
      {
    o00_re += +i00_re-i20_re;   o00_im += +i00_im-i20_im;
    o01_re += +i01_re-i21_re;   o01_im += +i01_im-i21_im;
@@ -178,15 +178,15 @@ xs = X/(X1*X2*X3*X4);
    o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
    o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
    o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
-    } // end if ( xs != Ls-1 )
+    } // end if ( xs != param.Ls-1 )
   } // end P_L
 
  // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
   {
-    int sp_idx = ( xs == 0 ? X+(Ls-1)*2*Vh : X-2*Vh ) / 2;
+    int sp_idx = ( xs == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
 
 // read spinor from device memory
-    READ_SPINOR( SPINORTEX, sp_stride, sp_idx, sp_idx );
+    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
 
     if ( xs != 0 )
     {
@@ -243,7 +243,7 @@ xs = X/(X1*X2*X3*X4);
   C_5 = (spinorFloat)mdwf_c5[xs]*0.5;
   B_5 = (spinorFloat)mdwf_b5[xs];
 
-  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );
+  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + B_5*i00_re;
   o00_im = C_5*o00_im + B_5*i00_im;
   o01_re = C_5*o01_re + B_5*i01_re;
@@ -272,7 +272,7 @@ xs = X/(X1*X2*X3*X4);
   VOLATILE spinorFloat C_5;
   C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));
 
-  READ_SPINOR( SPINORTEX, sp_stride, X/2, X/2 );
+  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
   o00_re = C_5*o00_re + i00_re;
   o00_im = C_5*o00_im + i00_im;
   o01_re = C_5*o01_re + i01_re;
@@ -304,7 +304,7 @@ xs = X/(X1*X2*X3*X4);
 {
 
 #ifdef DSLASH_XPAY
- READ_ACCUM(ACCUMTEX, sp_stride)
+ READ_ACCUM(ACCUMTEX, param.sp_stride)
  VOLATILE spinorFloat coeff;
 
 #ifdef MDWF_mode
@@ -423,7 +423,7 @@ xs = X/(X1*X2*X3*X4);
 }
 
 // write spinor field back to device memory
-WRITE_SPINOR(sp_stride);
+WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

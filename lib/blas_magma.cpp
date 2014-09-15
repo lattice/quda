@@ -5,7 +5,7 @@
 #define MAX(a, b) (a > b) ? a : b;
 #endif
 
-#define MAGMA_14 //version of the MAGMA library
+#define MAGMA_15 //version of the MAGMA library
 
 #ifdef MAGMA_LIB
 #include <magma.h>

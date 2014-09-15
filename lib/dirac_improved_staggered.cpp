@@ -3,19 +3,25 @@
 
 namespace quda {
 
+  namespace improvedstaggered {
+#include <dslash_init.cuh>
+  }
+
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) : 
     Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
     face1(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()),
     face2(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
-    initStaggeredConstants(fatGauge, longGauge, profile);
+    improvedstaggered::initConstants(*param.gauge, profile);    
+    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac) 
   : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face1(dirac.face1), face2(dirac.face2)
   {
-    initStaggeredConstants(fatGauge, longGauge, profile);
+    improvedstaggered::initConstants(dirac.gauge, profile);
+    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracImprovedStaggered::~DiracImprovedStaggered() { }
@@ -59,8 +65,7 @@ namespace quda {
   {
     checkParitySpinor(in, out);
 
-    initSpinorConstants(in, profile);
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+    improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
     improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, profile);
   
     flops += 1146ll*in.Volume();
@@ -72,8 +77,7 @@ namespace quda {
   {    
     checkParitySpinor(in, out);
 
-    initSpinorConstants(in, profile);
-    setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+    improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
     improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, profile);
   
     flops += 1158ll*in.Volume();
