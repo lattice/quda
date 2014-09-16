@@ -3,12 +3,21 @@
 #include <cuda.h>
 
 #include <quda_internal.h>
+#include <gauge_field.h>
+#include <clover_field.h>
 #include <llfat_quda.h>
 #include <read_gauge.h>
-#include "gauge_field.h"
 #include <force_common.h>
+#include <dslash_quda.h>
 
 namespace quda {
+
+  namespace fatlink {
+#include <dslash_constants.h>
+#include <dslash_textures.h>
+  } // namespace fatlink
+
+  using namespace fatlink;
 
 #if (__COMPUTE_CAPABILITY__ >= 200)
 #define SITE_MATRIX_LOAD_TEX 1

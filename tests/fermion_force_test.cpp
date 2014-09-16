@@ -149,6 +149,11 @@ fermion_force_end()
   endQuda();
 }
 
+namespace quda {
+  namespace fermionforce {
+    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
+  }
+}
 
 static int 
 fermion_force_test(void) 
@@ -156,7 +161,7 @@ fermion_force_test(void)
  
   fermion_force_init();
   TimeProfile profile("dummy");
-  initLatticeConstants(*cudaGauge, profile);
+  fermionforce::initLatticeConstants(*cudaGauge, profile);
   fermion_force_init_cuda(&gaugeParam);
 
     
