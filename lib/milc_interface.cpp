@@ -684,7 +684,7 @@ void qudaMultishiftInvert(int external_precision,
   QudaParity local_parity = inv_args.evenodd;
   {
     // need to set this to zero until issue #146 is fixed
-    const double reliable_delta = 1e-1;
+    const double reliable_delta = 0;
     setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
         num_offsets, offset, target_residual, target_fermilab_residual, 
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
