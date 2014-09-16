@@ -8,7 +8,10 @@
 #include <force_common.h>
 #include <hw_quda.h>
 
+#ifndef MULTI_GPU
+
 namespace quda {
+
 
   namespace fermionforce {
 #include <dslash_constants.h>
@@ -410,10 +413,6 @@ namespace quda {
   void fermion_force_init_cuda(QudaGaugeParam* param)
   {
   
-#ifdef MULTI_GPU
-#error "multi gpu is not supported for fermion force computation"  
-#endif
-
     static int fermion_force_init_cuda_flag = 0; 
   
     if (fermion_force_init_cuda_flag) return;
@@ -1434,3 +1433,5 @@ namespace quda {
 #undef FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE
 
 } // namespace quda
+
+#endif // !MULTI_GPU
