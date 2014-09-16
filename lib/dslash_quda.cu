@@ -530,25 +530,6 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
 
 } // namespace quda
 
-#include "misc_helpers.cu"
-
-
-#if defined(GPU_FATLINK) || defined(GPU_GAUGE_FORCE) || defined(GPU_FERMION_FORCE) // || defined(GPU_UNITARIZE)
-#include <force_common.h>
-#endif
-
-#ifdef GPU_FATLINK
-#include "llfat_quda.cu"
-#endif
-
-#ifdef GPU_GAUGE_FORCE
-#include "gauge_force_quda.cu"
-#endif
-
-#ifdef GPU_FERMION_FORCE
-#include "fermion_force_quda.cu"
-#endif
-
 #ifdef GPU_CONTRACT
 #include "covDev.cu"
 #include "contract.cu"

@@ -47,9 +47,25 @@ enum KernelType {
     cudaTextureObject_t cloverInvTex;
     cudaTextureObject_t cloverInvNormTex;
 #endif
+
+    void print() {
+      printfQuda("threads = %d\n", threads);
+      printfQuda("parity = %d\n", parity);
+      printfQuda("X = {%d, %d, %d, %d}\n", X[0], X[1], X[2], X[3]);
+      printfQuda("Ls = %d\n", Ls);
+      printfQuda("commDim = {%d, %d, %d, %d}\n", commDim[0], commDim[1], commDim[2], commDim[3]);
+      printfQuda("ghostDim = {%d, %d, %d, %d}\n", ghostDim[0], ghostDim[1], ghostDim[2], ghostDim[3]);
+      printfQuda("ghostOffset = {%d, %d, %d, %d}\n", ghostOffset[0], ghostOffset[1], ghostOffset[2], ghostOffset[3]);
+      printfQuda("ghostNormOffset = {%d, %d, %d, %d}\n", ghostNormOffset[0], ghostNormOffset[1], ghostNormOffset[2], ghostNormOffset[3]);
+      printfQuda("kernel_type = %d\n", kernel_type);
+      printfQuda("sp_stride = %d\n", sp_stride);
+      printfQuda("cl_stride = %d\n", cl_stride);
+    }
   };
 
   static DslashParam dslashParam;
+
+
 
 #ifdef MULTI_GPU
   static double twist_a = 0.0;
