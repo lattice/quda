@@ -125,7 +125,7 @@ namespace quda {
     // this parameter determines how many consective reliable update
     // reisudal increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncrease = (use_heavy_quark_res ? 0 : param.max_res_increase); // check if we reached the limit of our tolerance
     // 0 means we have no tolerance
     // maybe we should expose this as a parameter
     const int hqmaxresIncrease = maxResIncrease + 1;

@@ -619,13 +619,18 @@ void qudaMultishiftInvert(int external_precision,
     int *num_iters)
 {
 
-  for(int i=0; i<num_offsets; ++i){
-    if(target_residual[i] == 0){
+  // for(int i=0; i<num_offsets; ++i){
+  //   if(target_residual[i] == 0){
+  //     errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
+  //     exit(1);
+  //   }
+  // }
+  // for(int i=0; i<num_offsets; ++i){
+    if(target_residual[0] == 0){
       errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
       exit(1);
     }
-  }
-
+  // }
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -684,7 +689,7 @@ void qudaMultishiftInvert(int external_precision,
   QudaParity local_parity = inv_args.evenodd;
   {
     // need to set this to zero until issue #146 is fixed
-    const double reliable_delta = 0;
+    const double reliable_delta = (use_mixed_precision ? 1e-1 :0.0);//1e-1;
     setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
         num_offsets, offset, target_residual, target_fermilab_residual, 
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
