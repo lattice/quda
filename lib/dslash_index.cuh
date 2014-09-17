@@ -1205,4 +1205,29 @@ __device__ inline int dimFromFaceIndex (int &face_idx, const Param &param) {
     return 3;
   }
 }
+
+template<int nLayers>
+static inline __device__ void faceIndexFromCoords(int &face_idx, int x, int y, int z, int t, int face_dim, const int X[4])
+{
+  int D[4] = {X[0], X[1], X[2], X[3]};
+
+  switch(face_dim){
+    case 0:
+      x = (x < nLayers) ? x : x - (X[0] - nLayers);
+      break;
+    case 1:
+      y = (y < nLayers) ? y : y - (X[1] - nLayers);
+      break;
+    case 2:
+      z = (z < nLayers) ? z : z - (X[2] - nLayers);
+      break;
+    case 3:
+      t = (t < nLayers) ? t : t - (X[3] - nLayers);
+      break;
+  }
+  D[face_dim] = nLayers;
+
+  face_idx = ((((D[2]*t + z)*D[1] + y)*D[0] + x) >> 1);
+}
+
  

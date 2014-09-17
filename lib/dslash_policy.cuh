@@ -702,6 +702,132 @@ struct DslashGPUComms : DslashPolicyImp {
   }
 };
 
+
+struct DslashFusedGPUComms : DslashPolicyImp {
+  void operator()(DslashCuda &dslash, cudaColorSpinorField* inputSpinor, const size_t regSize, const int parity, const int dagger, 
+		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
+
+#ifdef GPU_COMMS
+    using namespace dslash;
+
+    profile.Start(QUDA_PROFILE_TOTAL);
+
+  
+    dslashParam.parity = parity;
+    dslashParam.kernel_type = INTERIOR_KERNEL;
+    dslashParam.threads = volume;
+
+#ifdef MULTI_GPU
+    // Record the start of the dslash if doing communication in T and not kernel packing
+    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
+      {
+        PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
+                profile, QUDA_PROFILE_EVENT_RECORD);
+      }
+		
+    inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
+    inputSpinor->createComms(dslash.Nface()/2);	
+    DslashCommsPattern pattern(dslashParam.commDim);
+    inputSpinor->streamInit(streams);
+    const int packIndex = Nstream-1;
+    for(int i=3; i>=0; i--){
+    if(!dslashParam.commDim[i]) continue;
+      for(int dir=1; dir>=0; dir--){
+        PROFILE(inputSpinor->recvStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+      }
+    }
+    bool pack = false;
+    for (int i=3; i>=0; i--) 
+      if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
+        { pack = true; break; }
+
+    // Initialize pack from source spinor
+    if (inCloverInv == NULL) {
+      PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
+	      profile, QUDA_PROFILE_PACK_KERNEL);
+    } else {
+      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+	      profile, QUDA_PROFILE_PACK_KERNEL);
+    }
+
+
+    if (pack) {
+      // Record the end of the packing
+      PROFILE(cudaEventRecord(packEnd[0], streams[packIndex]), 
+	      profile, QUDA_PROFILE_EVENT_RECORD);
+    }
+
+#endif // MULTI_GPU
+
+    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+#ifdef MULTI_GPU 
+
+    bool pack_event = false;
+    for (int i=3; i>=0; i--) {
+      if (!dslashParam.commDim[i]) continue;
+
+      if ((i!=3 || getKernelPackT() || getTwistPack()) && !pack_event) {
+        cudaEventSynchronize(packEnd[0]);
+        pack_event = true;
+      } else {
+        cudaEventSynchronize(dslashStart);
+      }
+
+      for (int dir=1; dir>=0; dir--) {	
+        PROFILE(inputSpinor->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
+        inputSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger); // do a comms query to ensure MPI has begun
+      }
+    }
+
+   
+    // setup for exterior kernel 
+    setThreadDimMap(dslashParam,dslash,faceVolumeCB);
+    dslashParam.kernel_type = EXTERIOR_KERNEL_ALL;
+    dslashParam.threads = 0;
+
+    for(int i=0; i<4; ++i){
+      if(!dslashParam.commDim[i]) continue;
+      dslashParam.threads = dslashParam.threadDimMapUpper[i];
+    }
+
+
+    int completeSum = 0;
+    while (completeSum < pattern.commDimTotal) {
+      for (int i=3; i>=0; i--) {
+        if (!dslashParam.commDim[i]) continue;
+
+        for (int dir=1; dir>=0; dir--) {
+
+	  // Query if comms has finished
+	  if (!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]] &&
+	      pattern.gatherCompleted[2*i+dir]) {
+	    PROFILE(int comms_test = inputSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger), 
+		    profile, QUDA_PROFILE_COMMS_QUERY);
+	    if (comms_test) { 
+	      pattern.commsCompleted[2*i+dir] = 1;
+	      completeSum++;
+	    }
+	  }
+        } // dir=0,1
+      } // i
+    } // completeSum < pattern.CommDimTotal
+
+
+    // Launch exterior kernel
+    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+    
+
+    inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
+#endif // MULTI_GPU
+    profile.Stop(QUDA_PROFILE_TOTAL);
+#else 
+    errorQuda("GPU_COMMS has not been built\n");
+#endif // GPU_COMMS
+  }
+};
+
 struct DslashFaceBuffer : DslashPolicyImp {
 
   void operator()(DslashCuda &dslash, cudaColorSpinorField* inputSpinor, const size_t regSize, const int parity, const int dagger, 
@@ -982,6 +1108,8 @@ struct DslashFusedExterior : DslashPolicyImp {
 
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
+
+
     profile.Stop(QUDA_PROFILE_TOTAL);
   }
 };

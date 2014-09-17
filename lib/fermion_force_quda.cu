@@ -8,7 +8,9 @@
 #include <force_common.h>
 #include <hw_quda.h>
 
+#if defined(GPU_FERMION_FORCE)
 namespace quda {
+
 
   namespace fermionforce {
 #include <dslash_constants.h>
@@ -1434,3 +1436,5 @@ namespace quda {
 #undef FF_COMPUTE_NEW_FULL_IDX_MINUS_UPDATE
 
 } // namespace quda
+
+#endif // defined(GPU_FERMION_FORCE)
