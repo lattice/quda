@@ -3269,6 +3269,12 @@ namespace quda {
 } // namespace quda
 
 
+namespace quda {
+  namespace fatlink {
+#include <dslash_init.cuh>
+  }
+}
+
 void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method)
 {
   profileFatLink.Start(QUDA_PROFILE_TOTAL);
@@ -3349,14 +3355,9 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     cudaInLinkEx = new cudaGaugeField(gParam);
   }
 
-#define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
-#if (QUDA_VER > 400)
   profileFatLink.Stop(QUDA_PROFILE_INIT);
-  initLatticeConstants(*cudaFatLink, profileFatLink);
+  fatlink::initLatticeConstants(*cudaFatLink, profileFatLink);
   profileFatLink.Start(QUDA_PROFILE_INIT);
-#else
-  initCommonConstants(*cudaFatLink);
-#endif
 
   cudaGaugeField* inlinkPtr;
   if(method == QUDA_COMPUTE_FAT_STANDARD){
@@ -3375,9 +3376,9 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 
   if(method != QUDA_COMPUTE_FAT_STANDARD){
     profileFatLink.Start(QUDA_PROFILE_COMMS);
-    int R[4] = {2, 2, 2, 2}; 
     copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
 #ifdef MULTI_GPU
+    int R[4] = {2, 2, 2, 2}; 
     cudaInLinkEx->exchangeExtendedGhost(R,true); // instead of exchange_cpu_sitelink_ex 
 #endif
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
@@ -3442,6 +3443,12 @@ int getGaugePadding(GaugeFieldParam& param){
 #endif
 
   return pad;
+}
+
+namespace quda {
+  namespace gaugeforce {
+#include <dslash_init.cuh>
+  }
 }
 
 #if 0 
@@ -3548,7 +3555,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   profileGaugeForce.Stop(QUDA_PROFILE_INIT);
 
-  initLatticeConstants(*cudaMom, profileGaugeForce);
+  gaugeforce::initLatticeConstants(*cudaMom, profileGaugeForce);
 
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
@@ -3709,7 +3716,7 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
     profileGaugeForce.Stop(QUDA_PROFILE_H2D);
   }
 
-  initLatticeConstants(*cudaMom, profileGaugeForce);
+  gaugeforce::initLatticeConstants(*cudaMom, profileGaugeForce);
 
   profileGaugeForce.Start(QUDA_PROFILE_CONSTANT);
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to set this (until we use order classes)
