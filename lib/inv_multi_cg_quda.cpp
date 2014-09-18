@@ -278,20 +278,22 @@ void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
             rUpdate++;
         }
 
-        // now we can check if any of the shifts have converged and remove them
-        for (int j = 1; j < num_offset_now; j++) {
-            if (zeta[j]==0.0) {
-                num_offset_now--;
-            }
-            else{
-            r2[j] = zeta[j] * zeta[j] * r2[0];
-	if (r2[j] < stop[j]) {
-                if (getVerbosity() >= QUDA_VERBOSE)
-                    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
-                num_offset_now--;
-            }
+      // now we can check if any of the shifts have converged and remove them
+      for (int j = 1; j < num_offset_now; j++) {
+        if (zeta[j] == 0.0) {
+          num_offset_now--;
+          if (getVerbosity() >= QUDA_VERBOSE)
+              printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
         }
+        else {
+          r2[j] = zeta[j] * zeta[j] * r2[0];
+          if (r2[j] < stop[j]) {
+            num_offset_now--;
+            if (getVerbosity() >= QUDA_VERBOSE)
+              printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
+          }
         }
+      }
 
         k++;
 
