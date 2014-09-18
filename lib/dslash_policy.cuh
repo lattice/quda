@@ -971,6 +971,7 @@ struct DslashFusedExterior : DslashPolicyImp {
   void operator()(DslashCuda &dslash, cudaColorSpinorField* inputSpinor, const size_t regSize, const int parity, const int dagger, 
 		   const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
+
     using namespace dslash;
 
     profile.Start(QUDA_PROFILE_TOTAL);

@@ -112,8 +112,8 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.01;
     inv_param.epsilon = 0.01; 
-//!    inv_param.twist_flavor = QUDA_TWIST_MINUS;
-    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
+    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+//!    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     inv_param.mass = 0.01;
