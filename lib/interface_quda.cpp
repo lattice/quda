@@ -1418,6 +1418,161 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
+void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
+{
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH )
+    setKernelPackT(true);
+  else
+    errorQuda("This type of dslashQuda operator is defined for QUDA_DOMAIN_WALL_$D_DSLASH and QUDA_MOBIUS_DWF_DSLASH only");
+    
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1);
+
+  ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*in_h);
+    double gpu = norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
+    axCuda(gaugePrecise->Anisotropy(), in);
+  }
+  bool pc = true;
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+  
+  DiracDomainWall4DPC dirac(diracParam); // create the Dirac operator
+  printfQuda("kappa for QUDA input : %e\n",inv_param->kappa);
+  switch (test_type) {
+    case 0:
+      dirac.Dslash4(out, in, parity);
+      break;
+    case 1:
+      dirac.Dslash5(out, in, parity);
+      break;
+    case 2:
+      dirac.Dslash5inv(out, in, parity, inv_param->kappa);
+      break;
+  }
+  
+  cpuParam.v = h_out;
+
+  ColorSpinorField *out_h = (inv_param->output_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*out_h);
+    double gpu = norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
+
+  popVerbosity();
+}
+
+void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
+{
+  if ( inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) 
+    setKernelPackT(true);
+  else
+    errorQuda("This type of dslashQuda operator is defined for QUDA_DOMAIN_WALL_$D_DSLASH and QUDA_MOBIUS_DWF_DSLASH only");
+    
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1);
+
+  ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*in_h);
+    double gpu = norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
+    axCuda(gaugePrecise->Anisotropy(), in);
+  }
+  bool pc = true;
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+  
+  DiracMobiusDomainWallPC dirac(diracParam); // create the Dirac operator
+  double kappa5 = 0.0;  // Kappa5 is dummy argument
+  switch (test_type) {
+    case 0:
+      dirac.Dslash4(out, in, parity);
+      break;
+    case 1:
+      dirac.Dslash5(out, in, parity);
+      break;
+    case 2:
+      dirac.Dslash4pre(out, in, parity);
+      break;
+    case 3:
+      dirac.Dslash5inv(out, in, parity, kappa5);
+      break;
+  }
+
+  cpuParam.v = h_out;
+
+  ColorSpinorField *out_h = (inv_param->output_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*out_h);
+    double gpu = norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
+
+  popVerbosity();
+}
+
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {

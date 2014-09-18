@@ -652,6 +652,11 @@ int fullLatticeIndex_5d(int i, int oddBit) {
   return 2*i + (boundaryCrossings + oddBit) % 2;
 }
 
+int fullLatticeIndex_5d_4dpc(int i, int oddBit) {
+  int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2);
+  return 2*i + (boundaryCrossings + oddBit) % 2;
+}
+
 int 
 x4_from_full_index(int i)
 {
