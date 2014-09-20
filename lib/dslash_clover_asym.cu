@@ -36,7 +36,9 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#define DD_CLOVER 2
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
+#undef DD_CLOVER
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
