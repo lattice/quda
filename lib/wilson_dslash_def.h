@@ -33,7 +33,6 @@
 #define DD_XPAY 0
 #define DD_RECON 0
 #define DD_PREC 0
-#define DD_CLOVER 0
 #endif
 
 // set options for current iteration
@@ -560,7 +559,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #else
 
 #if DD_DAG
-#include "wilson_fused_exterior_dslash_dagger_gt200_core.h"
+  //#include "wilson_fused_exterior_dslash_dagger_gt200_core.h"
 #else
 #include "wilson_fused_exterior_dslash_gt200_core.h"
 #endif
@@ -668,26 +667,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #undef DD_PREC
 #define DD_PREC 2
 #else
-#undef DD_PREC
-#define DD_PREC 0
-
-#if (DD_CLOVER==0)
-#undef DD_CLOVER
-#define DD_CLOVER 1
-#elif (DD_CLOVER==1)
-#undef DD_CLOVER
-#define DD_CLOVER 2
-
-#else
 
 #undef DD_LOOP
 #undef DD_DAG
 #undef DD_XPAY
 #undef DD_RECON
 #undef DD_PREC
-#undef DD_CLOVER
 
-#endif // DD_CLOVER
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_XPAY
