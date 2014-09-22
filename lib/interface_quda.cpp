@@ -2660,10 +2660,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     double tol_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
       param->tol_hq_offset[i] : 0;
 
-    // refine if either L2 or heavy quark residual tolerances have not been met
-#define NOREFINE 1
-#ifndef NOREFINE      
-    if (param->true_res_offset[i] > param->tol_offset[i] || rsd_hq > tol_hq) {
+    // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0    
+    if (param->tol_offset[i] > 0 && (param->true_res_offset[i] > param->tol_offset[i] || rsd_hq > tol_hq)) {
       if (getVerbosity() >= QUDA_VERBOSE) 
         printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
             i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
@@ -2703,7 +2701,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
       }
     }
-#endif
   }
 
   // restore shifts -- avoid side effects
