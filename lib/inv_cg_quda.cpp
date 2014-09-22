@@ -203,39 +203,36 @@ namespace quda {
 	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
 
+	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
+	  if (&x != &xSloppy) {
+	    copyCuda(tmp,y);
+	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	  } else {
+	    copyCuda(r, rSloppy);
+	    heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);	  
+	  }
+	}
 
-    if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-      if (&x != &xSloppy) {
-        copyCuda(tmp,y);
-        heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(xSloppy, tmp, rSloppy).z);
+	steps_since_reliable++;
       } else {
-        copyCuda(r, rSloppy);
-        heavy_quark_res = sqrt(xpyHeavyQuarkResidualNormCuda(x, y, r).z);     
-      }
-    }
 
-    steps_since_reliable++;
-      } else {
-
-    axpyCuda(alpha, p, xSloppy);
-    copyCuda(x, xSloppy); // nop when these pointers alias
+	axpyCuda(alpha, p, xSloppy);
+	copyCuda(x, xSloppy); // nop when these pointers alias
       
-    xpyCuda(x, y); // swap these around?
-    mat(r, y, x); // here we can use x as tmp
-    r2 = xmyNormCuda(b, r);
+	xpyCuda(x, y); // swap these around?
+	mat(r, y, x); // here we can use x as tmp
+	r2 = xmyNormCuda(b, r);
 
-    copyCuda(rSloppy, r); //nop when these pointers alias
-    zeroCuda(xSloppy);
-            // calculate new reliable HQ resididual
-        if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
+	copyCuda(rSloppy, r); //nop when these pointers alias
+	zeroCuda(xSloppy);
+
+    // calculate new reliable HQ resididual
+    if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
 
 	// break-out check if we have reached the limit of the precision
             if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
                 resIncrease++;
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
-
-
-
         if (resIncrease > maxResIncrease)
             if (use_heavy_quark_res) L2breakdown = true;
             else break;
@@ -256,47 +253,46 @@ namespace quda {
                 }
             }
 
-
-            rNorm = sqrt(r2);
-            maxrr = rNorm;
-            maxrx = rNorm;
-            r0Norm = rNorm;
-            rUpdate++;
+	rNorm = sqrt(r2);
+	maxrr = rNorm;
+	maxrx = rNorm;
+	r0Norm = rNorm;      
+	rUpdate++;
 
     if (use_heavy_quark_res and heavy_quark_restart) {
-          // perform a restart
-        copyCuda(p, rSloppy);
-        heavy_quark_restart = false;
+      // perform a restart
+      copyCuda(p, rSloppy);
+      heavy_quark_restart = false;
     }
     else {
-            // explicitly restore the orthogonality of the gradient vector
-            double rp = reDotProductCuda(rSloppy, p) / (r2);
-            axpyCuda(-rp, rSloppy, p);
+      // explicitly restore the orthogonality of the gradient vector
+      double rp = reDotProductCuda(rSloppy, p) / (r2);
+      axpyCuda(-rp, rSloppy, p);
+          
+      beta = r2 / r2_old;
+      xpayCuda(rSloppy, beta, p);
+    }
 
-            beta = r2 / r2_old;
-            xpayCuda(rSloppy, beta, p);
-            }
 
+        steps_since_reliable = 0;
+        heavy_quark_res_old = heavy_quark_res;
+      }
 
-            steps_since_reliable = 0;
-            heavy_quark_res_old = heavy_quark_res;
-        }
+      breakdown = false;
+      k++;
 
-        breakdown = false;
-        k++;
-
-        PrintStats("CG", k, r2, b2, heavy_quark_res);
-        // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
-        converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
-
-        // check for recent enough relibale updates of the HQ residual if we use it
-        if (use_heavy_quark_res) {
-            // L2 is concverged or precision maxed out for L2
-            bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
-            // HQ is converged and if we do reliable update the HQ residual has been caclculated using a reliable update
-            bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
-            converged = L2done and HQdone;
-        }
+      PrintStats("CG", k, r2, b2, heavy_quark_res);
+      // check convergence, if convergence is satisfied we only need to check that we had a reliable update for the heavy quarks recently
+      converged = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+      
+      // check for recent enough relibale updates of the HQ residual if we use it
+      if (use_heavy_quark_res) {
+        // L2 is concverged or precision maxed out for L2
+        bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
+        // HQ is converged and if we do reliable update the HQ residual has been caclculated using a reliable update
+        bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
+        converged = L2done and HQdone;
+      }
 
     }
 
