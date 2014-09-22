@@ -33,7 +33,6 @@
 #define DD_XPAY 0
 #define DD_RECON 0
 #define DD_PREC 0
-#define DD_CLOVER 0
 #endif
 
 // set options for current iteration
@@ -519,6 +518,81 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 }
 
+
+template <>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+  (DD_PARAM_OUT DD_PARAM_GAUGE DD_PARAM_CLOVER DD_PARAM_IN DD_PARAM_XPAY const DslashParam param) {
+
+  // build Wilson or clover as appropriate
+#if ((DD_CLOVER==0 && defined(GPU_WILSON_DIRAC)) || ((DD_CLOVER==1 || DD_CLOVER==2) && defined(GPU_CLOVER_DIRAC)))
+
+#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_fused_exterior_dslash_dagger_fermi_core.h"
+#else
+#include "asym_wilson_clover_fused_exterior_dslash_fermi_core.h"
+#endif
+
+#else
+
+#if DD_DAG
+#include "wilson_fused_exterior_dslash_dagger_fermi_core.h"
+#else
+#include "wilson_fused_exterior_dslash_fermi_core.h"
+#endif
+
+#endif
+
+#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "asym_wilson_clover_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#else
+
+#if DD_DAG
+  //#include "wilson_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "wilson_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#endif
+
+#else  // fall-back is original G80 
+
+#ifdef DSLASH_CLOVER_XPAY
+
+#if DD_DAG
+#include "asym_wilson_clover_fused_exterior_dslash_dagger_g80_core.h"
+#else
+#include "asym_wilson_clover_fused_exterior_dslash_g80_core.h"
+#endif
+
+#else
+
+#if DD_DAG
+#include "wilson_fused_exterior_dslash_dagger_g80_core.h"
+#else
+#include "wilson_fused_exterior_dslash_g80_core.h"
+#endif
+
+#endif // DSLASH_CLOVER_XPAY
+
+
+#endif // __COMPUTE_CAPABILITY
+
+
+#endif // DD_CLOVER
+
+}
 #endif
 
 // clean up
@@ -593,26 +667,13 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #undef DD_PREC
 #define DD_PREC 2
 #else
-#undef DD_PREC
-#define DD_PREC 0
-
-#if (DD_CLOVER==0)
-#undef DD_CLOVER
-#define DD_CLOVER 1
-#elif (DD_CLOVER==1)
-#undef DD_CLOVER
-#define DD_CLOVER 2
-
-#else
 
 #undef DD_LOOP
 #undef DD_DAG
 #undef DD_XPAY
 #undef DD_RECON
 #undef DD_PREC
-#undef DD_CLOVER
 
-#endif // DD_CLOVER
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_XPAY

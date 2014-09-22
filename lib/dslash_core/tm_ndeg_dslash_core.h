@@ -200,7 +200,8 @@ if (kernel_type == INTERIOR_KERNEL) {
   if (sid >= param.threads) return;
 
   // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
 
   o1_00_re = 0;  o1_00_im = 0;
   o1_01_re = 0;  o1_01_im = 0;
@@ -247,11 +248,12 @@ if (kernel_type == INTERIOR_KERNEL) {
   sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)] + face_num*ghostFace[static_cast<int>(kernel_type)];
 #endif
 
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
 
 
   {
-     READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
+     READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
      o1_00_re = i00_re;  o1_00_im = i00_im;
      o1_01_re = i01_re;  o1_01_im = i01_im;
      o1_02_re = i02_re;  o1_02_im = i02_im;
@@ -268,7 +270,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 
   }
   {
-     READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid+fl_stride, sid+fl_stride);
+     READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid+fl_stride, sid+fl_stride);
      o2_00_re = i00_re;  o2_00_im = i00_im;
      o2_01_re = i01_re;  o2_01_im = i01_im;
      o2_02_re = i02_re;  o2_02_im = i02_im;
@@ -327,7 +329,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
 #endif
   
     // read flavor 1 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_im;
@@ -485,7 +487,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_im;
@@ -683,7 +685,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 #endif
   
     // read flavor 1 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_im;
@@ -841,7 +843,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_im;
@@ -1035,7 +1037,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
 #endif
   
     // read flavor 1 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_re;
@@ -1193,7 +1195,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_re;
@@ -1391,7 +1393,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 #endif
   
     // read flavor 1 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_re;
@@ -1549,7 +1551,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_re;
@@ -1743,7 +1745,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
 #endif
   
     // read flavor 1 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
     a0_re = +i00_re+i20_im;
@@ -1901,7 +1903,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re+i20_im;
@@ -2099,7 +2101,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 #endif
   
     // read flavor 1 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
     
     // project spinor into half spinors
     a0_re = +i00_re-i20_im;
@@ -2257,7 +2259,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re-i20_im;
@@ -2447,7 +2449,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read flavor 1 from device memory
-      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -2511,7 +2513,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -2583,7 +2585,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read flavor 1 from device memory
-      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -2729,7 +2731,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -2912,7 +2914,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read flavor 1 from device memory
-      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -2976,7 +2978,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -3048,7 +3050,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read flavor 1 from device memory
-      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -3194,7 +3196,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -3664,7 +3666,7 @@ if (!incomplete)
 #endif // SPINOR_DOUBLE
   
   {
-    READ_ACCUM(ACCUMTEX, sp_stride)
+    READ_ACCUM(ACCUMTEX, param.sp_stride)
   
     o1_00_re = c*o1_00_re + acc_00_re;
     o1_00_im = c*o1_00_im + acc_00_im;
@@ -3691,7 +3693,7 @@ if (!incomplete)
     o1_32_re = c*o1_32_re + acc_32_re;
     o1_32_im = c*o1_32_im + acc_32_im;
   
-    ASSN_ACCUM(ACCUMTEX, sp_stride, fl_stride)
+    ASSN_ACCUM(ACCUMTEX, param.sp_stride, fl_stride)
   
     o2_00_re = c*o2_00_re + acc_00_re;
     o2_00_im = c*o2_00_im + acc_00_im;
@@ -3853,7 +3855,7 @@ if (!incomplete)
 #endif // SPINOR_DOUBLE
   
   {
-    READ_ACCUM_FLAVOR(ACCUMTEX, sp_stride, fl_stride)
+    READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, fl_stride)
   
     //Perform twist rotation:
   //(1 - i*a*gamma_5 * tau_3 + b * tau_1)

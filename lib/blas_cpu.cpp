@@ -344,6 +344,8 @@ namespace quda {
 #else
     rtn.z /= x.Volume();
 #endif
+    reduceDoubleArray((double*)&rtn, 3);
+
     return rtn;
   }
   

@@ -538,8 +538,7 @@ namespace quda {
   }
 
 //!!!!
-//copy EigCG ritz vectors.
-  void GmresDR::SaveEigCGRitzVecs(DeflationParam *dpar, bool cleanEigCGResources)
+  void GmresDR::SaveRitzVecs(DeflationParam *dpar, bool cleanEigCGResources)
   {
      const int first_idx = dpar->cur_dim; 
 

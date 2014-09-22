@@ -1011,7 +1011,8 @@ void endQuda(void)
 
   if (!initialized) return;
 
-  LatticeField::freeBuffer();
+  LatticeField::freeBuffer(0);
+  LatticeField::freeBuffer(1);
   cudaColorSpinorField::freeBuffer(0);
   cudaColorSpinorField::freeBuffer(1);
   cudaColorSpinorField::freeGhostBuffer();
@@ -1417,6 +1418,161 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
+void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
+{
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH )
+    setKernelPackT(true);
+  else
+    errorQuda("This type of dslashQuda operator is defined for QUDA_DOMAIN_WALL_$D_DSLASH and QUDA_MOBIUS_DWF_DSLASH only");
+    
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1);
+
+  ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*in_h);
+    double gpu = norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
+    axCuda(gaugePrecise->Anisotropy(), in);
+  }
+  bool pc = true;
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+  
+  DiracDomainWall4DPC dirac(diracParam); // create the Dirac operator
+  printfQuda("kappa for QUDA input : %e\n",inv_param->kappa);
+  switch (test_type) {
+    case 0:
+      dirac.Dslash4(out, in, parity);
+      break;
+    case 1:
+      dirac.Dslash5(out, in, parity);
+      break;
+    case 2:
+      dirac.Dslash5inv(out, in, parity, inv_param->kappa);
+      break;
+  }
+  
+  cpuParam.v = h_out;
+
+  ColorSpinorField *out_h = (inv_param->output_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*out_h);
+    double gpu = norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
+
+  popVerbosity();
+}
+
+void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
+{
+  if ( inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) 
+    setKernelPackT(true);
+  else
+    errorQuda("This type of dslashQuda operator is defined for QUDA_DOMAIN_WALL_$D_DSLASH and QUDA_MOBIUS_DWF_DSLASH only");
+    
+  if (gaugePrecise == NULL) errorQuda("Gauge field not allocated");
+
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), 1);
+
+  ColorSpinorField *in_h = (inv_param->input_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*in_h);
+    double gpu = norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
+    if (parity == QUDA_EVEN_PARITY) {
+      parity = QUDA_ODD_PARITY;
+    } else {
+      parity = QUDA_EVEN_PARITY;
+    }
+    axCuda(gaugePrecise->Anisotropy(), in);
+  }
+  bool pc = true;
+
+  DiracParam diracParam;
+  setDiracParam(diracParam, inv_param, pc);
+  
+  DiracMobiusDomainWallPC dirac(diracParam); // create the Dirac operator
+  double kappa5 = 0.0;  // Kappa5 is dummy argument
+  switch (test_type) {
+    case 0:
+      dirac.Dslash4(out, in, parity);
+      break;
+    case 1:
+      dirac.Dslash5(out, in, parity);
+      break;
+    case 2:
+      dirac.Dslash4pre(out, in, parity);
+      break;
+    case 3:
+      dirac.Dslash5inv(out, in, parity, kappa5);
+      break;
+  }
+
+  cpuParam.v = h_out;
+
+  ColorSpinorField *out_h = (inv_param->output_location == QUDA_CPU_FIELD_LOCATION) ?
+    static_cast<ColorSpinorField*>(new cpuColorSpinorField(cpuParam)) : 
+    static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    double cpu = norm2(*out_h);
+    double gpu = norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  delete out_h;
+  delete in_h;
+
+  popVerbosity();
+}
+
 
 void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
@@ -1521,7 +1677,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE){
     double cpu = norm2(*in_h);
     double gpu = norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
@@ -1561,7 +1717,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
     static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
   *out_h = out;
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE){
     double cpu = norm2(*out_h);
     double gpu = norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
@@ -1675,7 +1831,7 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 }
 
 
-void lanczosQuda(int &k0, int &m, void *hp_Apsi, void *hp_r, void *hp_V, 
+void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V, 
                  void *hp_alpha, void *hp_beta, QudaEigParam *eig_param)
 {
   QudaInvertParam *param;
@@ -2527,6 +2683,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       }
 
       SolverParam solverParam(*param);
+      solverParam.iter = 0;
       solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
       solverParam.tol = param->tol_offset[i]; // set L2 tolerance
       solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
@@ -2963,6 +3120,10 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   setDiracParam(diracParam, param, pc_solve);
   setDiracSloppyParam(diracSloppyParam, param, pc_solve);
 
+  if(param->cuda_prec_precondition != QUDA_HALF_PRECISION)
+  {
+     errorQuda("\nInitCG requires sloppy gauge field in half precision. It seems that the half precision field is not loaded,\n please check you cuda_prec_precondition parameter.\n");
+  }
 
 //!half precision Dirac field (for the initCG)
   setDiracParam(diracHalfPrecParam, param, pc_solve);
@@ -3260,6 +3421,12 @@ namespace quda {
 } // namespace quda
 
 
+namespace quda {
+  namespace fatlink {
+#include <dslash_init.cuh>
+  }
+}
+
 void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink, double *path_coeff, QudaGaugeParam *param, QudaComputeFatMethod method)
 {
   profileFatLink.Start(QUDA_PROFILE_TOTAL);
@@ -3340,14 +3507,9 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     cudaInLinkEx = new cudaGaugeField(gParam);
   }
 
-#define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
-#if (QUDA_VER > 400)
   profileFatLink.Stop(QUDA_PROFILE_INIT);
-  initLatticeConstants(*cudaFatLink, profileFatLink);
+  fatlink::initLatticeConstants(*cudaFatLink, profileFatLink);
   profileFatLink.Start(QUDA_PROFILE_INIT);
-#else
-  initCommonConstants(*cudaFatLink);
-#endif
 
   cudaGaugeField* inlinkPtr;
   if(method == QUDA_COMPUTE_FAT_STANDARD){
@@ -3366,9 +3528,9 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 
   if(method != QUDA_COMPUTE_FAT_STANDARD){
     profileFatLink.Start(QUDA_PROFILE_COMMS);
-    int R[4] = {2, 2, 2, 2}; 
     copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
 #ifdef MULTI_GPU
+    int R[4] = {2, 2, 2, 2}; 
     cudaInLinkEx->exchangeExtendedGhost(R,true); // instead of exchange_cpu_sitelink_ex 
 #endif
     profileFatLink.Stop(QUDA_PROFILE_COMMS);
@@ -3433,6 +3595,12 @@ int getGaugePadding(GaugeFieldParam& param){
 #endif
 
   return pad;
+}
+
+namespace quda {
+  namespace gaugeforce {
+#include <dslash_init.cuh>
+  }
 }
 
 #if 0 
@@ -3539,7 +3707,7 @@ computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* pa
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to record this value
   profileGaugeForce.Stop(QUDA_PROFILE_INIT);
 
-  initLatticeConstants(*cudaMom, profileGaugeForce);
+  gaugeforce::initLatticeConstants(*cudaMom, profileGaugeForce);
 
   gauge_force_init_cuda(qudaGaugeParam, max_length); 
 
@@ -3700,7 +3868,7 @@ computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* pa
     profileGaugeForce.Stop(QUDA_PROFILE_H2D);
   }
 
-  initLatticeConstants(*cudaMom, profileGaugeForce);
+  gaugeforce::initLatticeConstants(*cudaMom, profileGaugeForce);
 
   profileGaugeForce.Start(QUDA_PROFILE_CONSTANT);
   qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to set this (until we use order classes)
@@ -4718,9 +4886,8 @@ void computeStaggeredOprodQuda(void** oprod,
   cudaGaugeField cudaOprod0(oParam);
   cudaGaugeField cudaOprod1(oParam);
   profileStaggeredOprod.Stop(QUDA_PROFILE_INIT); 
-  initLatticeConstants(cudaOprod0, profileStaggeredOprod);
 
-
+  //initLatticeConstants(cudaOprod0, profileStaggeredOprod);
 
   profileStaggeredOprod.Start(QUDA_PROFILE_H2D);
   cudaOprod0.loadCPUField(cpuOprod0,QUDA_CPU_FIELD_LOCATION);

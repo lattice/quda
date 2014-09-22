@@ -5,7 +5,7 @@
 #define MAX(a, b) (a > b) ? a : b;
 #endif
 
-#define MAGMA_14 //version of the MAGMA library
+#define MAGMA_15 //version of the MAGMA library
 
 #ifdef MAGMA_LIB
 #include <magma.h>
@@ -90,6 +90,45 @@ void BlasMagmaArgs::CloseMagma(){
 }
 
 
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec) 
+  : m(m), nev(0),  prec(prec), ldm(ldm), info(-1), sideLR(0), htsize(0), dtsize(0), 
+  W(0), hTau(0), dTau(0)
+{
+
+#ifdef MAGMA_LIB
+
+    magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+
+    if(dev_info == 0)  exit(-1);
+
+    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+
+    const int complex_prec = 2*prec;
+
+    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(m) : magma_get_zhetrd_nb(m);//ldm
+
+    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm 
+    lrwork = 1 + 5*m + 2*m*m;//ldm
+    liwork = 3 + 5*m;//ldm
+
+    magma_malloc_pinned((void**)&W2,   ldm*m*complex_prec);
+    magma_malloc_pinned((void**)&lwork, llwork*complex_prec);
+    magma_malloc_cpu((void**)&rwork,    lrwork*prec);
+    magma_malloc_cpu((void**)&iwork,    liwork*sizeof(magma_int_t));
+
+    init  = true;
+    alloc = true;
+
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
+
+    return;
+}
+
+
+
 BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec) 
   : m(m), nev(nev),  prec(prec), ldm(ldm), info(-1)
 {
@@ -142,10 +181,10 @@ BlasMagmaArgs::~BlasMagmaArgs()
 
    if(alloc == true)
    {
-     magma_free(dTau);
-     magma_free_pinned(hTau);
+     if(dTau) magma_free(dTau);
+     if(hTau) magma_free_pinned(hTau);
 
-     magma_free_pinned(W);
+     if(W) magma_free_pinned(W);
      magma_free_pinned(W2);
      magma_free_pinned(lwork);
 
@@ -161,20 +200,49 @@ BlasMagmaArgs::~BlasMagmaArgs()
    return;
 }
 
-void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size)
+void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, bool host)
 {
      if(prob_size > m) printf("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m), exit(-1);
+   
 #ifdef MAGMA_LIB
-     if(prec == 4)
+     cudaPointerAttributes ptr_attr;
+
+     if(!host)
      {
-        magma_cheevd_gpu(_cV, _cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)W2, ldm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
-        if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
+       //check if dTvecm is a device pointer..
+       cudaPointerGetAttributes(&ptr_attr, dTvecm);
+
+       if(ptr_attr.memoryType != cudaMemoryTypeDevice || ptr_attr.devicePointer == NULL ) printf("Error in MagmaHEEVD, no device pointer found."), exit(-1);
+
+       if(prec == 4)
+       {
+         magma_cheevd_gpu(_cV, _cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)W2, ldm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
+       }
+       else
+       {
+         magma_zheevd_gpu(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)W2, ldm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
+       }
      }
      else
      {
-        magma_zheevd_gpu(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)W2, ldm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
-        if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
-     } 
+       //check if dTvecm is a device pointer..
+       cudaPointerGetAttributes(&ptr_attr, dTvecm);
+
+       if(ptr_attr.memoryType != cudaMemoryTypeHost || ptr_attr.hostPointer == NULL ) printf("Error in MagmaHEEVD, no host pointer found."), exit(-1);
+
+       if(prec == 4)
+       {
+         magma_cheevd(_cV, _cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
+       }
+       else
+       {
+         magma_zheevd(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
+       }
+     }   
 #endif
   return;
 }  

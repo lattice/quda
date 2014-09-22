@@ -1,12 +1,22 @@
 #include <read_gauge.h>
 #include <gauge_field.h>
-
-#include "gauge_force_quda.h"
+#include <clover_field.h>
+#include <dslash_quda.h>
+#include <force_common.h>
+#include <gauge_force_quda.h>
 #ifdef MULTI_GPU
 #include "face_quda.h"
 #endif
 
 namespace quda {
+
+  namespace gaugeforce {
+#include <dslash_constants.h>
+#include <dslash_textures.h>
+  } // namespace gaugeforce
+
+  using namespace gaugeforce;
+
 
 #define GF_SITE_MATRIX_LOAD_TEX 1
 

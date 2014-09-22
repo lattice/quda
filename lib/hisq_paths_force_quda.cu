@@ -1426,7 +1426,7 @@ namespace quda {
         private:
           const cudaGaugeField &link;
           const cudaGaugeField &naikOprod;
-          const typename RealTypeId<RealA>::Type &naik_coeff;
+          const typename RealTypeId<RealA>::Type naik_coeff;
           cudaGaugeField &output;
           int X[4];
           const hisq_kernel_param_t &kparam;
