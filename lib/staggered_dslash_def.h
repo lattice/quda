@@ -617,6 +617,14 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #endif
 }
 
+template <>
+__global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
+  (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
+#ifdef GPU_STAGGERED_DIRAC
+  #include "staggered_fused_exterior_dslash_core.h"
+#endif
+}
+
 #else // naive staggered kernel
 
 #undef READ_LONG_MATRIX
@@ -632,6 +640,15 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
   #include "staggered_dslash_core.h"
 #endif
 }
+
+template <>
+__global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
+  (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
+#ifdef GPU_STAGGERED_DIRAC
+  #include "staggered_fused_exterior_dslash_core.h"
+#endif
+}
+
 
 #endif
 

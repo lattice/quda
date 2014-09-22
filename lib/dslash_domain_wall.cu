@@ -154,9 +154,11 @@ namespace quda {
     }
 
     long long flops() const { // FIXME for multi-GPU
-      long long bulk = (dslashConstants.Ls-2)*(dslashConstants.VolumeCB()/dslashConstants.Ls);
-      long long wall = 2*dslashConstants.VolumeCB()/dslashConstants.Ls;
-      return (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB()*dslashConstants.Ls + 96ll*bulk + 120ll*wall;
+      long long Ls = in->X(4);
+      long long vol4d = in->VolumeCB()/Ls;
+      long long bulk = (Ls-2)*vol4d;
+      long long wall = 2*vol4d;
+      return (x ? 1368ll : 1320ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
     }
   };
 
@@ -165,7 +167,7 @@ namespace quda {
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
 			    const cudaColorSpinorField *in, const int parity, const int dagger, 
 			    const cudaColorSpinorField *x, const double &m_f, const double &k2, 
-			    const int *commOverride, TimeProfile &profile)
+			    const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -212,6 +214,14 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
     dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
+
+#ifndef GPU_COMMS
+    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+#else
+    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+    delete dslashImp;
 
     delete dslash;
     unbindGaugeTex(gauge);

@@ -109,7 +109,7 @@ namespace quda {
 
     long long flops() const { 
       long long flops;
-      flops = (x ? 1158ll : 1146ll) * dslashConstants.VolumeCB(); 
+      flops = (x ? 1158ll : 1146ll) * in->VolumeCB();
       return flops;
     } 
   };
@@ -119,7 +119,7 @@ namespace quda {
   void improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, 
 				   const cudaGaugeField &longGauge, const cudaColorSpinorField *in,
 				   const int parity, const int dagger, const cudaColorSpinorField *x,
-				   const double &k, const int *commOverride, TimeProfile &profile)
+				   const double &k, const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -188,7 +188,13 @@ namespace quda {
 	 longGauge.Reconstruct(), in, x, k, dagger);
     }
 
-    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+#ifndef GPU_COMMS
+    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+#else
+    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    delete dslashImp;
 
     delete dslash;
     unbindFatGaugeTex(fatGauge);

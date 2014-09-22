@@ -26,6 +26,19 @@ template <typename Float>
 static inline void xpay(Float *x, Float a, Float *y, int len) {
   for (int i=0; i<len; i++) y[i] = x[i] + a*y[i];
 }
+
+// performs the operation y[i] = a*x[i] + y[i]
+template <typename Float>
+static inline void axpy(Float a, Float *x, Float *y, int len) {
+  for (int i=0; i<len; i++) y[i] = a*x[i] + y[i];
+}
+
+// performs the operation y[i] = a*x[i] + b*y[i]
+template <typename Float>
+static inline void axpby(Float a, Float *x, Float b, Float *y, int len) {
+  for (int i=0; i<len; i++) y[i] = a*x[i] + b*y[i];
+}
+
 // performs the operation y[i] = a*x[i] - y[i]
 template <typename Float>
 static inline void axmy(Float *x, Float a, Float *y, int len) {

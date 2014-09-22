@@ -141,17 +141,6 @@ namespace quda {
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
 
-    // initialize the ghost pointers 
-    if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
-      for(int i=0; i<dims; ++i){
-        if(commDimPartitioned(i)){
-          ghost[i] = (char*)v + (stride + ghostOffset[i])*nColor*nSpin*2*precision;
-          if(precision == QUDA_HALF_PRECISION)
-            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
-        }
-      }
-    }
-
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 

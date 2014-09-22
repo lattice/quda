@@ -84,6 +84,16 @@ extern "C" {
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
 
+  typedef enum QudaDslashPolicy_s {
+    QUDA_DSLASH,
+    QUDA_DSLASH2,
+    QUDA_PTHREADS_DSLASH,
+    QUDA_GPU_COMMS_DSLASH,
+    QUDA_FUSED_DSLASH,
+    QUDA_FUSED_GPU_COMMS_DSLASH,
+    QUDA_DSLASH_NC
+  } QudaDslashPolicy;
+
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
     QUDA_BICGSTAB_INVERTER,

@@ -88,6 +88,7 @@
   // additions for dw (quickly hacked on)
   int fullLatticeIndex_4d(int i, int oddBit);
   int fullLatticeIndex_5d(int i, int oddBit);
+  int fullLatticeIndex_5d_4dpc(int i, int oddBit);
   int process_command_line_option(int argc, char** argv, int* idx);
 
   // use for some profiling

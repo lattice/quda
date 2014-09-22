@@ -174,19 +174,20 @@ namespace quda {
     }
 
     long long flops() const { // FIXME for multi-GPU
-      long long bulk = (dslashConstants.Ls-2)*(dslashConstants.VolumeCB()/dslashConstants.Ls);
-      long long wall = 2*dslashConstants.VolumeCB()/dslashConstants.Ls;
+      long long Ls = in->X(4);
+      long long vol4d = in->VolumeCB() / Ls;
+      long long bulk = (Ls-2)*vol4d;
+      long long wall = 2*vol4d;
       long long flops_Tmp; 
       switch(DS_type){
         case 0:
-          flops_Tmp = (x ? 1368ll : 1320ll)*dslashConstants.VolumeCB();
+          flops_Tmp = (x ? 1368ll : 1320ll)*in->VolumeCB();
           break;
         case 1:
-          flops_Tmp = 96ll*bulk + 120ll*wall;
+          flops_Tmp = (x ? 48ll : 0 ) * in->VolumeCB() + 96ll*bulk + 120ll*wall;
           break;
         case 2:
-          flops_Tmp = 144ll*dslashConstants.VolumeCB()*dslashConstants.Ls
-                    + 3ll*dslashConstants.Ls*(dslashConstants.Ls-1ll);
+          flops_Tmp = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
           break;
         default:
           errorQuda("invalid Dslash type");
@@ -211,7 +212,7 @@ namespace quda {
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
           const cudaColorSpinorField *in, const int parity, const int dagger, 
           const cudaColorSpinorField *x, const double &m_f, const double &k2, 
-          const int *commOverride, const int DS_type, TimeProfile &profile)
+          const int *commOverride, const int DS_type, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -257,10 +258,19 @@ namespace quda {
     // faces because Ls is added as the y-dimension in thread space
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
-    if(DS_type != 0)
-      dslashCudaNC(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
-    else
-      dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
+
+    DslashPolicyImp* dslashImp = NULL;
+    if (DS_type != 0) {
+      dslashImp = DslashFactory::create(QUDA_DSLASH_NC);
+    } else {
+#ifndef GPU_COMMS
+      dslashImp = DslashFactory::create(dslashPolicy);
+#else
+      dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+    }
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
+    delete dslashImp;
 
     delete dslash;
     unbindGaugeTex(gauge);

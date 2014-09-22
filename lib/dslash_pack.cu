@@ -96,6 +96,7 @@ namespace quda {
    * Determines which face a given thread is computing.  Also rescale
    * face_idx so that is relative to a given dimension.
    */
+/*
   template <typename Param>
     __device__ inline int dimFromFaceIndex (int &face_idx, const Param &param) {
     if (face_idx < param.threadDimMapUpper[0]) {
@@ -111,7 +112,7 @@ namespace quda {
       return 3;
     }
   }
-
+*/
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 
   // double precision
@@ -1071,13 +1072,26 @@ namespace quda {
     }
 
   public:
-  PackFace(FloatN *faces, const cudaColorSpinorField *in, 
-	   const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
-    : faces(faces), in(in), clov(NULL), clovInv(NULL), dagger(dagger), parity(parity), nFace(nFace), dim(dim), face_num(face_num) { fillAux(); }
-  PackFace(FloatN *faces, const cudaColorSpinorField *in, const FullClover *clov, const FullClover *clovInv,
-	   const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
-    : faces(faces), in(in), clov(clov), clovInv(clovInv), dagger(dagger), parity(parity), nFace(nFace), dim(dim), face_num(face_num) { fillAux(); }
-    virtual ~PackFace() { }
+    PackFace(FloatN *faces, const cudaColorSpinorField *in, 
+	     const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
+      : faces(faces), in(in), clov(NULL), clovInv(NULL), dagger(dagger), 
+	parity(parity), nFace(nFace), dim(dim), face_num(face_num) 
+    { 
+      fillAux(); 
+      bindSpinorTex<FloatN>(in);
+    }
+    PackFace(FloatN *faces, const cudaColorSpinorField *in, const FullClover *clov, const FullClover *clovInv,
+	     const int dagger, const int parity, const int nFace, const int dim=-1, const int face_num=2)
+      : faces(faces), in(in), clov(clov), clovInv(clovInv), dagger(dagger), 
+	parity(parity), nFace(nFace), dim(dim), face_num(face_num) 
+    { 
+      fillAux(); 
+      bindSpinorTex<FloatN>(in);
+    }
+    
+    virtual ~PackFace() { 
+      unbindSpinorTex<FloatN>(in);
+    }
 
     virtual int tuningIter() const { return 100; }
 
