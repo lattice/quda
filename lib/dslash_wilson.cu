@@ -37,7 +37,9 @@ namespace quda {
   //#define SHARED_WILSON_DSLASH
   //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#define DD_CLOVER 0
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
+#undef DD_CLOVER
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -100,7 +102,7 @@ namespace quda {
 	     (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
     }
 
-    long long flops() const { return (x ? 1368ll : 1320ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const { return (x ? 1368ll : 1320ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
 
 #include <dslash_policy.cuh>
@@ -108,7 +110,7 @@ namespace quda {
   // Wilson wrappers
   void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
 			const int parity, const int dagger, const cudaColorSpinorField *x, const double &k, 
-			const int *commOverride, TimeProfile &profile)
+			const int *commOverride, TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 
@@ -145,7 +147,15 @@ namespace quda {
       dslash = new WilsonDslashCuda<short4, short4>(out, (short4*)gauge0, (short4*)gauge1,
 						    gauge.Reconstruct(), in, x, k, dagger);
     }
-    dslashCuda2(*dslash, regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+
+#ifndef GPU_COMMS
+    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+#else
+    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    delete dslashImp;
 
     delete dslash;
     unbindGaugeTex(gauge);

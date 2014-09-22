@@ -178,7 +178,8 @@ namespace quda {
   
     void checkField(const GaugeField &);
 
-    const size_t& Bytes() const { return bytes; }
+    size_t Bytes() const { return bytes; }
+    size_t PhaseBytes() const { return phase_bytes; }
     size_t PhaseOffset() const { return phase_offset; }
 
     virtual void* Gauge_p() { errorQuda("Not implemented"); return (void*)0;}

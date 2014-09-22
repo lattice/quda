@@ -152,7 +152,7 @@ namespace quda {
       }
     }
 
-    long long flops() const { return (x ? 1416ll : 1392ll) * dslashConstants.VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
 
 #include <dslash_policy.cuh> 
@@ -161,7 +161,7 @@ namespace quda {
 			     const cudaColorSpinorField *in, const int parity, const int dagger, 
 			     const cudaColorSpinorField *x, const QudaTwistDslashType type, const double &kappa, const double &mu, 
 			     const double &epsilon, const double &k,  const int *commOverride,
-			     TimeProfile &profile)
+			     TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 #ifdef GPU_TWISTED_MASS_DIRAC
@@ -209,7 +209,13 @@ namespace quda {
       dslash = new TwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
     }
 
-    dslashCuda(*dslash, regSize, parity, dagger, bulk_threads, ghost_threads, profile);
+#ifndef GPU_COMMS
+    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
+#else
+    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
+#endif
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    delete dslashImp;
 
     delete dslash;
 #ifdef MULTI_GPU

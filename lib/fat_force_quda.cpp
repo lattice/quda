@@ -210,7 +210,7 @@ namespace quda {
   }
 
   void
-  packGhostStaple(int* X, void* even, void* odd, int volume, QudaPrecision prec,
+  packGhostStaple(int* X, void* even, void* odd, int volumeCB, QudaPrecision prec,
 		  int stride, 
 		  int dir, int whichway,
 		  void** fwd_nbr_buf_gpu, void** back_nbr_buf_gpu,
@@ -231,15 +231,15 @@ namespace quda {
       int i =dir;
       if (whichway ==  QUDA_BACKWARDS){
 	gpu_buf = back_nbr_buf_gpu[i];
-	collectGhostStaple(X, even, odd, volume, prec, gpu_buf, i, whichway, stream);
+	collectGhostStaple(X, even, odd, volumeCB, stride, prec, gpu_buf, i, whichway, stream);
 	cudaMemcpyAsync(back_nbr_buf[i], gpu_buf, Vs[i]*gaugeSiteSize*prec, cudaMemcpyDeviceToHost, *stream);
       }else{//whichway is  QUDA_FORWARDS;
 	gpu_buf = fwd_nbr_buf_gpu[i];
-	collectGhostStaple(X, even, odd, volume, prec,  gpu_buf, i, whichway, stream);
+	collectGhostStaple(X, even, odd, volumeCB, stride, prec, gpu_buf, i, whichway, stream);
 	cudaMemcpyAsync(fwd_nbr_buf[i], gpu_buf, Vs[i]*gaugeSiteSize*prec, cudaMemcpyDeviceToHost, *stream);        
       }
     }else{ //special case for dir=3 since no gather kernel is required
-      int Vh = volume;
+      int Vh = volumeCB;
       int Vsh = X[0]*X[1]*X[2]/2;
       int sizeOfFloatN = 2*prec;
       int len = Vsh*sizeOfFloatN;

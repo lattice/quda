@@ -8,16 +8,22 @@ namespace quda {
 #include <dslash_init.cuh>
   }
 
+  namespace asym_clover {
+#include <dslash_init.cuh>
+  }
+
   DiracClover::DiracClover(const DiracParam &param)
     : DiracWilson(param), clover(*(param.clover))
   {
     clover::initConstants(*param.gauge, profile);
+    asym_clover::initConstants(*param.gauge, profile);
   }
 
   DiracClover::DiracClover(const DiracClover &dirac) 
     : DiracWilson(dirac), clover(dirac.clover)
   {
     clover::initConstants(dirac.gauge, profile);
+    asym_clover::initConstants(dirac.gauge, profile);
   }
 
   DiracClover::~DiracClover() { }
@@ -46,7 +52,7 @@ namespace quda {
 			       const QudaParity parity, const cudaColorSpinorField &x,
 			       const double &k) const
   {
-    clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+    asym_clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
