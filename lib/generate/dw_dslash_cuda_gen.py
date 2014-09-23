@@ -1007,6 +1007,64 @@ def xpay():
     return str
 # end def xpay
 
+def xpay_lmem_pre():
+    str = ""
+    str += "#if defined MULTI_GPU && defined DSLASH_XPAY\n"
+    str += "if (kernel_type == INTERIOR_KERNEL)\n"
+    str += "#endif\n"
+    str += "{\n"
+    str += "#ifdef DSLASH_XPAY\n"
+    str += "  READ_ACCUM(ACCUMTEX, param.sp_stride)\n"
+    str += "  VOLATILE spinorFloat a_inv = 1.0/a;\n\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str +=" "+ out_re(s,c) +" = "+out_re(s,c)+" + a_inv*accum"+nthFloat2(2*i+0)+";\n"
+            str +=" "+ out_im(s,c) +" = "+out_im(s,c)+" + a_inv*accum"+nthFloat2(2*i+1)+";\n"
+
+    str += "#else\n"
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str +=" "+ out_re(s,c) +" = "+out_re(s,c)+" + a_inv*accum"+nthFloat4(2*i+0)+";\n"
+            str +=" "+ out_im(s,c) +" = "+out_im(s,c)+" + a_inv*accum"+nthFloat4(2*i+1)+";\n"
+
+    str += "#endif // SPINOR_DOUBLE\n\n"
+    str += "#endif // DSLASH_XPAY\n"
+    str += "}\n\n"
+
+    return str
+# end def xpay_lmem_pre
+
+
+def xpay_lmem():
+    str = ""
+    str += "#ifdef DSLASH_XPAY\n"
+    str += "#ifdef SPINOR_DOUBLE\n"
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str +=" "+ out_re(s,c) +" = a*"+out_re(s,c)+";\n"
+            str +=" "+ out_im(s,c) +" = a*"+out_im(s,c)+";\n"
+
+    str += "#else\n"
+
+    for s in range(0,4):
+        for c in range(0,3):
+            i = 3*s+c
+            str +=" "+ out_re(s,c) +" = a*"+out_re(s,c)+";\n"
+            str +=" "+ out_im(s,c) +" = a*"+out_im(s,c)+";\n"
+
+    str += "#endif // SPINOR_DOUBLE\n\n"
+    str += "#endif // DSLASH_XPAY\n"
+
+    return str
+# end def xpay_lmem
+
 
 def epilog():
     str = ""
@@ -1015,6 +1073,7 @@ def epilog():
             str += "#ifdef MULTI_GPU\n"
         else:
             if domain_wall:
+                str += xpay_lmem_pre()
                 str += "#if defined MULTI_GPU && defined DSLASH_XPAY\n"
             else:
                 str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"
@@ -1037,7 +1096,7 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
         str += "if (!incomplete)\n"
         str += "#endif // MULTI_GPU\n"
     
-    str += block( "\n" + (twisted() if twist else apply_clover()) + xpay() )
+    str += block( "\n" + (twisted() if twist else apply_clover()) + xpay_lmem() )
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"

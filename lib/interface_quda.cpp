@@ -1677,7 +1677,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE){
     double cpu = norm2(*in_h);
     double gpu = norm2(in);
     printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
@@ -1717,7 +1717,7 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
     static_cast<ColorSpinorField*>(new cudaColorSpinorField(cpuParam));
   *out_h = out;
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
+  if (getVerbosity() >= QUDA_VERBOSE){
     double cpu = norm2(*out_h);
     double gpu = norm2(out);
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
