@@ -56,8 +56,10 @@ namespace quda {
 
     if( bx == NULL )
       printfQuda("bx a NULL pointer!\n");
-    else
+    else {
+      printfQuda("Before accesssing bx!\n");
       printfQuda("bx->Precision() %d\n", bx->Precision());
+    }
     fflush(stdout);
     copyExtendedColorSpinor(*bx, b, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
 
