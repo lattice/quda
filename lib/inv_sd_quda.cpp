@@ -52,8 +52,11 @@ namespace quda {
     double alpha=0.; 
     double2 rAr;
 
+    printfQuda("inner solver tolerance: %e\n", param.tol);
+    printfQuda("initial: |r|/|b| = %e\n", sqrt(r2/b2));
+
     int k=0;
-    while(k < param.maxiter-1){
+    while(k < param.maxiter-1 && sqrt(r2/b2) > param.tol){
 
       mat(*Ar, *r, *y);
       rAr = reDotProductNormACuda(*r, *Ar);
@@ -61,6 +64,7 @@ namespace quda {
       axpyCuda(alpha, *r, x);
       axpyCuda(-alpha, *Ar, *r);
 
+      r2 = norm2(*r);
       if(getVerbosity() >= QUDA_VERBOSE){
         r2 = norm2(*r);
         printfQuda("Steepest Descent: %d iterations, |r| = %e, |r|/|b| = %e\n", k, sqrt(r2), sqrt(r2/b2));

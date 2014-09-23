@@ -414,7 +414,7 @@ namespace quda {
         float *dstNorm, float *srcNorm) {
 
 
-      printfQuda("In copyExtendedColorSpinor!\n");
+      //printfQuda("In copyExtendedColorSpinor!\n");
 
       if(dst.Ndim() != src.Ndim())
         errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());
@@ -446,7 +446,7 @@ namespace quda {
           errorQuda("QDPJIT field ordering not supported for full site fields");
         }
         
-        printfQuda("BEFORE SOURCE ORDERING!\n"); 
+        //printfQuda("BEFORE SOURCE ORDERING!\n"); 
         // set for the source subset ordering
         srcFloat *srcEven = Src ? Src : (srcFloat*)src.V();
         srcFloat* srcOdd = (srcFloat*)((char*)srcEven + src.Bytes()/2);
@@ -457,7 +457,7 @@ namespace quda {
           std::swap<float*>(srcNormEven, srcNormOdd);
         }
 
-	printfQuda("BEFORE DEST ORDERING!\n");
+	//printfQuda("BEFORE DEST ORDERING!\n");
         // set for the destination subset ordering
         dstFloat *dstEven = Dst ? Dst : (dstFloat*)dst.V();
         dstFloat *dstOdd = (dstFloat*)((char*)dstEven + dst.Bytes()/2);
@@ -469,14 +469,14 @@ namespace quda {
         }
 
         // should be able to apply to select either even or odd parity at this point as well.
-	printfQuda("BEFORE extendedCopyColorSpinor on even!\n");
+	//printfQuda("BEFORE extendedCopyColorSpinor on even!\n");
         extendedCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>
           (dst, src, 0, location, dstEven, srcEven, dstNormEven, srcNormEven);
-	printfQuda("BEFORE extendedCopyColorSpinor on odd!\n");
+	//printfQuda("BEFORE extendedCopyColorSpinor on odd!\n");
         extendedCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>
           (dst, src, 1, location, dstOdd, srcOdd, dstNormOdd, srcNormOdd); 
       }else{
-        printf("BEFORE extendedCopyColorSpinor on all!\n");
+        //printf("BEFORE extendedCopyColorSpinor on all!\n");
         extendedCopyColorSpinor<dstFloat, srcFloat, Ns, Nc>
           (dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
       } // N.B. Need to update this to account for differences in parity
@@ -488,7 +488,7 @@ namespace quda {
         const int parity, const QudaFieldLocation location, dstFloat *Dst, srcFloat *Src,
         float *dstNorm=0, float *srcNorm=0)
     {
-      printfQuda("Inside copyExtendedColorSpinor (2)!\n");
+      //printfQuda("Inside copyExtendedColorSpinor (2)!\n");
       if(dst.Nspin() != src.Nspin())
         errorQuda("source and destination spins must match");
 
@@ -507,7 +507,7 @@ namespace quda {
       }else{
         errorQuda("Nspin=%d unsupported", dst.Nspin());
       }
-      printfQuda("Leaving copyExtendedColorSpinor (2)!\n");
+      //printfQuda("Leaving copyExtendedColorSpinor (2)!\n");
     }
 
 
@@ -516,17 +516,17 @@ namespace quda {
       QudaFieldLocation location, const int parity, void *Dst, void *Src, 
       void *dstNorm, void *srcNorm){
 
-    printfQuda("Inside copyExtendedColorSpinor (gateway)!\n");
-    fflush(stdout);
-    printfQuda("Hi!\n");
-    fflush(stdout);
+    //printfQuda("Inside copyExtendedColorSpinor (gateway)!\n");
+    //fflush(stdout);
+    //printfQuda("Hi!\n");
+    //fflush(stdout);
     //printfQuda("dst %d\n
-    printfQuda("dst.Precision() = %d\n", dst.Precision());
-    fflush(stdout);
-    printfQuda("Hi2!\n");
-    fflush(stdout);
+    //printfQuda("dst.Precision() = %d\n", dst.Precision());
+    //fflush(stdout);
+    //printfQuda("Hi2!\n");
+    //fflush(stdout);
     if(dst.Precision() == QUDA_DOUBLE_PRECISION){
-      printfQuda("dst is of double precision!\n");
+      //printfQuda("dst is of double precision!\n");
       if(src.Precision() == QUDA_DOUBLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<double*>(Dst), static_cast<double*>(Src));
       }else if(src.Precision() == QUDA_SINGLE_PRECISION){
@@ -537,7 +537,7 @@ namespace quda {
         errorQuda("Unsupported Precision %d", src.Precision());
       }
     } else if (dst.Precision() == QUDA_SINGLE_PRECISION){
-      printfQuda("dst is of single precision!\n");
+      //printfQuda("dst is of single precision!\n");
       if(src.Precision() == QUDA_DOUBLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<float*>(Dst), static_cast<double*>(Src));
       }else if(src.Precision() == QUDA_SINGLE_PRECISION){
@@ -548,13 +548,13 @@ namespace quda {
         errorQuda("Unsupported Precision %d", src.Precision());
       }
     } else if (dst.Precision() == QUDA_HALF_PRECISION){
-      printfQuda("dst is of half precision!\n");
+      //printfQuda("dst is of half precision!\n");
       if(src.Precision() == QUDA_DOUBLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<double*>(Src), static_cast<float*>(dstNorm), 0);
       }else if(src.Precision() == QUDA_SINGLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<float*>(Src), static_cast<float*>(dstNorm), 0);
       }else if(src.Precision() == QUDA_HALF_PRECISION){
-       printfQuda("src is of half precision!\n");
+       //printfQuda("src is of half precision!\n");
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<short*>(Dst), static_cast<short*>(Src), static_cast<float*>(dstNorm), static_cast<float*>(srcNorm));
       }else{
         errorQuda("Unsupported Precision %d", src.Precision());
@@ -562,6 +562,6 @@ namespace quda {
     }else{
       errorQuda("Unsupported Precision %d", dst.Precision());
     }
-    printfQuda("Leaving copyExtendedColorSpinor (gateway)!\n");
+    //printfQuda("Leaving copyExtendedColorSpinor (gateway)!\n");
   }
 } // quda

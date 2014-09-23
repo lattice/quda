@@ -18,7 +18,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
   XSD::XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param,profile), mat(mat)
+    Solver(param,profile), mat(mat), init(false)
   {
     sd = new SD(mat,param,profile);
     for(int i=0; i<4; ++i) { 
@@ -42,6 +42,7 @@ namespace quda {
   void XSD::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
   {
     if(!init){
+     //printfQuda("allocating bx and xx!\n");
      ColorSpinorParam csParam(b);
      for(int i=0; i<4; ++i) csParam.x[i] += 2*R[i];
      xx = new cudaColorSpinorField(csParam);
@@ -51,30 +52,30 @@ namespace quda {
 
     int parity = mat.getMatPCType();
 
-    printfQuda("XSD: before copyExtendedColorSpinor!\n");
+    //printfQuda("XSD: before copyExtendedColorSpinor!\n");
     fflush(stdout);
 
-    if( bx == NULL )
+    /*if( bx == NULL )
       printfQuda("bx a NULL pointer!\n");
     else {
       printfQuda("Before accesssing bx!\n");
       printfQuda("bx->Precision() %d\n", bx->Precision());
     }
-    fflush(stdout);
+    fflush(stdout);*/
     copyExtendedColorSpinor(*bx, b, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
 
-    printfQuda("XSD: before exchangeExtendedGhost!\n");
-    fflush(stdout);
+    /*printfQuda("XSD: before exchangeExtendedGhost!\n");
+      fflush(stdout);*/
 
     exchangeExtendedGhost(bx, R, parity, streams);
 
-    printfQuda("XSD: before SD solver!\n");
-    fflush(stdout);
+    /*printfQuda("XSD: before SD solver!\n");
+      fflush(stdout);*/
 
     sd->operator()(*xx,*bx); // actuall run SD
 
-    printfQuda("XSD: before copying solution!\n");
-    fflush(stdout);
+    /*printfQuda("XSD: before copying solution!\n");
+      fflush(stdout);*/
 
     // copy the interior region of the solution back
     copyExtendedColorSpinor(x, *xx, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
