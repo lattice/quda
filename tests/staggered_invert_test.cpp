@@ -147,6 +147,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   // domain decomposition preconditioner parameters
   //inv_param->inv_type_precondition = QUDA_SD_INVERTER;
   inv_param->inv_type_precondition = QUDA_XSD_INVERTER;
+
   inv_param->overlap = 2;
   inv_param->tol_precondition = 1e-4;
   inv_param->maxiter_precondition = 10;
