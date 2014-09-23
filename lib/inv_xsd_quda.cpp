@@ -54,7 +54,10 @@ namespace quda {
     printfQuda("XSD: before copyExtendedColorSpinor!\n");
     fflush(stdout);
 
-    printfQuda("bx->Precision() %d\n", bx->Precision());
+    if( bx == NULL )
+      printfQuda("bx a NULL pointer!\n");
+    else
+      printfQuda("bx->Precision() %d\n", bx->Precision());
     fflush(stdout);
     copyExtendedColorSpinor(*bx, b, QUDA_CUDA_FIELD_LOCATION, parity, NULL, NULL, NULL, NULL);
 
