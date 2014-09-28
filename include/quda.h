@@ -12,32 +12,7 @@
 
 #include <enum_quda.h>
 #include <stdio.h> /* for FILE */
-
-#define QUDA_VERSION_MAJOR     0
-#define QUDA_VERSION_MINOR     7
-#define QUDA_VERSION_SUBMINOR  0
-
-/**
- * @def   QUDA_VERSION
- * @brief This macro is deprecated.  Use QUDA_VERSION_MAJOR, etc., instead.
- */
-#define QUDA_VERSION ((QUDA_VERSION_MAJOR<<16) | (QUDA_VERSION_MINOR<<8) | QUDA_VERSION_SUBMINOR)
-
-
-/**
- * @def   QUDA_MAX_DIM
- * @brief Maximum number of dimensions supported by QUDA.  In practice, no
- *        routines make use of more than 5.
- */
-#define QUDA_MAX_DIM 5
-
-/**
- * @def QUDA_MAX_MULTI_SHIFT
- * @brief Maximum number of shifts supported by the multi-shift solver.
- *        This number may be changed if need be.
- */
-#define QUDA_MAX_MULTI_SHIFT 32
-
+#include <quda_constants.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,8 +91,8 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
-    double *b_5;  /**< MDWF coefficients */
-    double *c_5;  /**< will be used only for the mobius type of Fermion */
+    double b_5[QUDA_MAX_DWF_LS];  /**< MDWF coefficients */
+    double c_5[QUDA_MAX_DWF_LS];  /**< will be used only for the mobius type of Fermion */
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
@@ -132,6 +107,11 @@ extern "C" {
     int maxiter; /**< Maximum number of iterations in the linear solver */
     double reliable_delta; /**< Reliable update tolerance */
     int use_sloppy_partial_accumulator; /**< Whether to keep the partial solution accumuator in sloppy precision */
+
+    /**< This parameter determines how many consective reliable update
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_res_increase;
 
     int pipeline; /**< Whether to use a pipelined solver with less global sums */
 
@@ -541,6 +521,30 @@ extern "C" {
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
       QudaParity parity);
+  
+  /**
+   * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   * @param parity The destination parity of the field
+   * @param test_type Choose a type of dslash operators 
+   */
+  void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param,
+      QudaParity parity, int test_type);
+  
+  /**
+   * Apply the Dslash operator (D_{eo} or D_{oe}) for Mobius DWF.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage
+   * @param parity The destination parity of the field
+   * @param test_type Choose a type of dslash operators 
+   */
+  void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param,
+      QudaParity parity, int test_type);
 
   /**
    * Apply the clover operator or its inverse.
@@ -718,6 +722,8 @@ extern "C" {
                       const void* const u_link,
                       const QudaGaugeParam* param);
 
+  void performAPEnStep(unsigned int nSteps, double alpha);
+  double plaqCuda();
   /**
   * Open/Close MAGMA library
   *

@@ -415,7 +415,7 @@ if (face_num) {
   case 0:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;
@@ -446,7 +446,7 @@ if (face_num) {
   case 1:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;
@@ -477,7 +477,7 @@ if (face_num) {
   case 2:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;
@@ -508,7 +508,7 @@ if (face_num) {
   case 3:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;
@@ -544,7 +544,7 @@ if (face_num) {
   case 0:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;
@@ -575,7 +575,7 @@ if (face_num) {
   case 1:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;
@@ -606,7 +606,7 @@ if (face_num) {
   case 2:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;
@@ -637,7 +637,7 @@ if (face_num) {
   case 3:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
       
       spinorFloat a0_re, a0_im;

@@ -84,26 +84,21 @@ public:
     blasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
   }
 
+#define BYTES(X) ( arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride() )
+#define NORM_BYTES(X) ( (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0 )
+
   void preTune() {
-    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
-    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    size_t ybytes = arg.Y.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.Y.Stride();
-    size_t ynorm_bytes = (arg.Y.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    arg.X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
-    arg.Y.save(&Y_h, &Ynorm_h, ybytes, ynorm_bytes);
-    arg.Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
-    arg.W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.X.save(&X_h, &Xnorm_h, BYTES(X), NORM_BYTES(X));
+    arg.Y.save(&Y_h, &Ynorm_h, BYTES(Y), NORM_BYTES(Y));
+    arg.Z.save(&Z_h, &Znorm_h, BYTES(Z), NORM_BYTES(Z));
+    arg.W.save(&W_h, &Wnorm_h, BYTES(W), NORM_BYTES(W));
   }
 
   void postTune() {
-    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
-    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    size_t ybytes = arg.Y.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.Y.Stride();
-    size_t ynorm_bytes = (arg.Y.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    arg.X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
-    arg.Y.load(&Y_h, &Ynorm_h, ybytes, ynorm_bytes);
-    arg.Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
-    arg.W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.X.load(&X_h, &Xnorm_h, BYTES(X), NORM_BYTES(X));
+    arg.Y.load(&Y_h, &Ynorm_h, BYTES(Y), NORM_BYTES(Y));
+    arg.Z.load(&Z_h, &Znorm_h, BYTES(Z), NORM_BYTES(Z));
+    arg.W.load(&W_h, &Wnorm_h, BYTES(W), NORM_BYTES(W));
   }
 
   long long flops() const { return arg.f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
@@ -129,6 +124,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
     warningQuda("Blas on non-native fields is not supported\n");
     return;
   }
+
+  blasStrings.vol_str = x.VolString();
+  blasStrings.aux_str = x.AuxString();
 
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>

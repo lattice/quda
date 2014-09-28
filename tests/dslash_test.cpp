@@ -42,7 +42,9 @@ cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
 
 void *hostGauge[4], *hostClover, *hostCloverInv;
 
-Dirac *dirac;
+Dirac *dirac = NULL;
+DiracMobiusDomainWallPC *dirac_mdwf = NULL; // create the MDWF Dirac operator
+DiracDomainWall4DPC *dirac_4dpc = NULL; // create the 4d preconditioned DWF Dirac operator
 
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat, 3 = MatPCDagMatPC, 4 = MatDagMat)
 extern int test_type;
@@ -123,14 +125,12 @@ void init(int argc, char **argv) {
     inv_param.mass = 0.01;
     inv_param.m5 = -1.5;
     kappa5 = 0.5/(5 + inv_param.m5);
-    inv_param.b_5 = (double*)malloc(Lsdim*sizeof(double));
-    inv_param.c_5 = (double*)malloc(Lsdim*sizeof(double));
     for(int k = 0; k < Lsdim; k++)
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 1.452;
-      inv_param.c_5[k] = 0.452;
+      inv_param.b_5[k] = 1.50;
+      inv_param.c_5[k] = 0.50;
     }
   }
 
@@ -174,22 +174,55 @@ void init(int argc, char **argv) {
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // test code only supports DeGrand-Rossi Basis
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  switch(test_type) {
-  case 0:
-  case 1:
-    inv_param.solution_type = QUDA_MATPC_SOLUTION;
-    break;
-  case 2:
-    inv_param.solution_type = QUDA_MAT_SOLUTION;
-    break;
-  case 3:
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-    break;
-  case 4:
-    inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
-    break;
-  default:
-    errorQuda("Test type %d not defined\n", test_type);
+  if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
+    switch(test_type) {
+      case 0:
+      case 1:
+      case 2:
+      case 3:
+        inv_param.solution_type = QUDA_MATPC_SOLUTION;
+        break;
+      case 4:
+        inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+        break;
+      default:
+        errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", test_type);
+    }
+  } else if(dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+    switch(test_type) {
+      case 0:
+      case 1:
+      case 2:
+      case 3:
+      case 4:
+        inv_param.solution_type = QUDA_MATPC_SOLUTION;
+        break;
+      case 5:
+        inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+        break;
+      default:
+        errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", test_type);
+    }
+  }
+  else
+  {
+    switch(test_type) {
+      case 0:
+      case 1:
+        inv_param.solution_type = QUDA_MATPC_SOLUTION;
+        break;
+      case 2:
+        inv_param.solution_type = QUDA_MAT_SOLUTION;
+        break;
+      case 3:
+        inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+        break;
+      case 4:
+        inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION;
+        break;
+      default:
+        errorQuda("Test type %d not defined\n", test_type);
+    }
   }
 
   inv_param.dslash_type = dslash_type;
@@ -231,6 +264,12 @@ void init(int argc, char **argv) {
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
+  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+    csParam.PCtype = QUDA_4D_PC;
+  } else {
+    csParam.PCtype = QUDA_5D_PC;
+  }
 
 //ndeg_tm    
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -242,12 +281,23 @@ void init(int argc, char **argv) {
 
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
-  if (test_type < 2 || test_type ==3) {
+
+  if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH)
+  {
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] /= 2;
-  } else {
-    csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  }    
+
+  } else
+  {
+    if (test_type < 2 || test_type ==3) {
+      csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      csParam.x[0] /= 2;
+    } else {
+      csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    }
+  }
+
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
@@ -309,9 +359,17 @@ void init(int argc, char **argv) {
       csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
     }
  
-    if (test_type < 2 || test_type == 3) {
+    if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+        dslash_type == QUDA_MOBIUS_DWF_DSLASH)
+    {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
       csParam.x[0] /= 2;
+    } else
+    {
+      if (test_type < 2 || test_type == 3) {
+        csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+        csParam.x[0] /= 2;
+      }
     }
 
     printfQuda("Creating cudaSpinor\n");
@@ -321,7 +379,9 @@ void init(int argc, char **argv) {
 
     tmp1 = new cudaColorSpinorField(csParam);
 
-    if (test_type == 2 || test_type == 4) csParam.x[0] /= 2;
+    if(dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH && 
+        dslash_type != QUDA_MOBIUS_DWF_DSLASH)
+      if (test_type == 2 || test_type == 4) csParam.x[0] /= 2;
 
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     tmp2 = new cudaColorSpinorField(csParam);
@@ -333,13 +393,28 @@ void init(int argc, char **argv) {
     double cuda_norm = norm2(*cudaSpinor);
     printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
 
-    bool pc = (test_type != 2 && test_type != 4);
+    bool pc;
+    if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+       dslash_type == QUDA_MOBIUS_DWF_DSLASH)
+      pc = true;
+    else
+      pc = (test_type != 2 && test_type != 4);
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
-    
-    dirac = Dirac::create(diracParam);
+   
+    if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
+      dirac_4dpc = new DiracDomainWall4DPC(diracParam);
+      dirac = (Dirac*)dirac_4dpc;
+    }
+    else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
+      dirac_mdwf = new DiracMobiusDomainWallPC(diracParam);
+      dirac = (Dirac*)dirac_mdwf;
+    }
+    else {
+      dirac = Dirac::create(diracParam);
+    }
   } else {
     double cpu_norm = norm2(*spinor);
     printfQuda("Source: CPU = %e\n", cpu_norm);
@@ -349,7 +424,11 @@ void init(int argc, char **argv) {
 
 void end() {
   if (!transfer) {
-    delete dirac;
+    if(dirac != NULL)
+    {
+      delete dirac;
+      dirac = NULL;
+    }
     delete cudaSpinor;
     delete cudaSpinorOut;
     delete tmp1;
@@ -380,42 +459,128 @@ double dslashCUDA(int niter) {
   cudaEventRecord(start, 0);
 
   for (int i = 0; i < niter; i++) {
-    switch (test_type) {
-    case 0:
-      if (transfer) {
-	dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
-      } else {
-	dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+    if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
+      switch (test_type) {
+        case 0:
+          if (transfer) {
+            dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
+          } else {
+            dirac_4dpc->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
+          }
+          break;
+        case 1:
+          if (transfer) {
+            dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
+          } else {
+            dirac_4dpc->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+          }
+          break;
+        case 2:
+          if (transfer) {
+            dslashQuda_4dpc(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
+          } else {
+            dirac_4dpc->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+          }
+          break;
+        case 3:
+          if (transfer) {
+            MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac_4dpc->M(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
+        case 4:
+          if (transfer) {
+            MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac_4dpc->MdagM(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
       }
-      break;
-    case 1:
-      if (transfer) {
-	MatQuda(spinorOut->V(), spinor->V(), &inv_param);
-      } else {
-	dirac->M(*cudaSpinorOut, *cudaSpinor);
+    }
+    else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
+      switch (test_type) {
+        case 0:
+          if (transfer) {
+            dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
+          } else {
+            dirac_mdwf->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
+          }
+          break;
+        case 1:
+          if (transfer) {
+            dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
+          } else {
+            dirac_mdwf->Dslash5(*cudaSpinorOut, *cudaSpinor, parity);
+          }
+          break;
+        case 2:
+          if (transfer) {
+            dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
+          } else {
+            dirac_mdwf->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+          }
+          break;
+        case 3:
+          if (transfer) {
+            dslashQuda_mdwf(spinorOut->V(), spinor->V(), &inv_param, parity, test_type);
+          } else {
+            dirac_mdwf->Dslash5inv(*cudaSpinorOut, *cudaSpinor, parity, kappa5);
+          }
+          break;
+        case 4:
+          if (transfer) {
+            MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac_mdwf->M(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
+        case 5:
+          if (transfer) {
+            MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac_mdwf->MdagM(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
       }
-      break;
-    case 2:
-      if (transfer) {
-	MatQuda(spinorOut->V(), spinor->V(), &inv_param);
-      } else {
-	dirac->M(*cudaSpinorOut, *cudaSpinor);
+    } else {
+      switch (test_type) {
+        case 0:
+          if (transfer) {
+            dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
+          } else {
+            dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+          }
+          break;
+        case 1:
+          if (transfer) {
+            MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac->M(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
+        case 2:
+          if (transfer) {
+            MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac->M(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
+        case 3:
+          if (transfer) {
+            MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
+        case 4:
+          if (transfer) {
+            MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+          } else {
+            dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+          }
+          break;
       }
-      break;
-    case 3:
-      if (transfer) {
-	MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
-      } else {
-	dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
-      }
-      break;
-    case 4:
-      if (transfer) {
-	MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
-      } else {
-	dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
-      }
-      break;
     }
   }
     
@@ -548,9 +713,7 @@ void dslashRef() {
       printfQuda("Test type not defined\n");
       exit(-1);
     }
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-             dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ){
     switch (test_type) {
     case 0:
       dw_dslash(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
@@ -572,6 +735,75 @@ void dslashRef() {
       printf("Test type not supported for domain wall\n");
       exit(-1);
     }
+  } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
+    double *kappa_5 = (double*)malloc(Ls*sizeof(double));
+    for(int xs = 0; xs < Ls ; xs++)
+      kappa_5[xs] = kappa5;
+    switch (test_type) {
+    case 0:
+      dslash_4_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 1:    
+      dw_dslash_5_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 2:    
+      dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_5);
+      break;
+    case 3:
+      dw_4d_matpc(spinorRef->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 4:    
+      dw_4d_matpc(spinorTmp->V(), hostGauge, spinor->V(), kappa5, inv_param.matpc_type, QUDA_DAG_NO, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      dw_4d_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), kappa5, inv_param.matpc_type, QUDA_DAG_YES, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    break; 
+    default:
+      printf("Test type not supported for domain wall\n");
+      exit(-1);
+    }
+    free(kappa_5);
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH){
+    double *kappa_b, *kappa_c, *kappa_5, *kappa_mdwf;
+    kappa_b = (double*)malloc(Lsdim*sizeof(double));
+    kappa_c = (double*)malloc(Lsdim*sizeof(double));
+    kappa_5 = (double*)malloc(Lsdim*sizeof(double));
+    kappa_mdwf = (double*)malloc(Lsdim*sizeof(double));
+    for(int xs = 0 ; xs < Lsdim ; xs++)
+    {
+      kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
+      kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
+      kappa_5[xs] = 0.5*kappa_b[xs]/kappa_c[xs];
+      kappa_mdwf[xs] = -kappa_5[xs];
+    }
+    switch (test_type) {
+    case 0:
+      dslash_4_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass);
+      break;
+    case 1:
+      mdw_dslash_5(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_5);
+      break;
+    case 2:
+      mdw_dslash_4_pre(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5 );
+      break;
+    case 3:
+      dslash_5_inv(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, kappa_mdwf);
+      break;
+    case 4:    
+      mdw_matpc(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      break;
+    case 5:    
+      mdw_matpc(spinorTmp->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, QUDA_DAG_NO, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      mdw_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), kappa_b, kappa_c, inv_param.matpc_type, QUDA_DAG_YES, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      break;
+    break; 
+    default:
+      printf("Test type not supported for domain wall\n");
+      exit(-1);
+    }
+    free(kappa_b);
+    free(kappa_c);
+    free(kappa_5);
+    free(kappa_mdwf);
   } else {
     printfQuda("Unsupported dslash_type\n");
     exit(-1);

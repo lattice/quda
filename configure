@@ -613,6 +613,8 @@ POSIX_THREADS
 BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
+BUILD_CONTRACT
+BUILD_GAUGE_TOOLS
 BUILD_HISQ_FORCE
 BUILD_FERMION_FORCE
 BUILD_GAUGE_FORCE
@@ -637,6 +639,7 @@ QDPXX_LIBS
 QDPXX_LDFLAGS
 QDPXX_CXXFLAGS
 QDPXX_CONFIG
+NVCCFLAGS
 ac_ct_CXX
 CXXFLAGS
 CXX
@@ -714,6 +717,8 @@ enable_hisq_fatlink
 enable_gauge_force
 enable_staggered_force
 enable_hisq_force
+enable_gauge_tools
+enable_contract
 enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
@@ -739,7 +744,8 @@ LIBS
 CPPFLAGS
 CXX
 CXXFLAGS
-CCC'
+CCC
+NVCCFLAGS'
 
 
 # Initialize some variables set by options.
@@ -1388,6 +1394,10 @@ Optional Features:
   --enable-staggered-force
                           Build asqtad fermion force (default: disabled)
   --enable-hisq-force     Build HISQ fermion force (default: disabled)
+  --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
+                          evolver, APE, extended gauge routines (default:
+                          disabled)
+  --enable-contract       Build bilinear contraction code (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
@@ -1428,6 +1438,7 @@ Some influential environment variables:
               you have headers in a nonstandard directory <include dir>
   CXX         C++ compiler command
   CXXFLAGS    C++ compiler flags
+  NVCCFLAGS   Extra flags for NVCC
 
 Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -2172,6 +2183,25 @@ else
    build_hisq_force="no"
 
 fi
+
+
+# Check whether --enable-gauge-tools was given.
+if test "${enable_gauge_tools+set}" = set; then :
+  enableval=$enable_gauge_tools;  build_gauge_tools=${enableval}
+else
+   build_gauge_tools="no"
+
+fi
+
+
+# Check whether --enable-contract was given.
+if test "${enable_contract+set}" = set; then :
+  enableval=$enable_contract;  build_contract=${enableval}
+else
+   build_contract="no"
+
+fi
+
 
 
 # Check whether --enable-multi-gpu was given.
@@ -3744,6 +3774,10 @@ else
 fi
 
 
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: User supplied NVCCFLAGS: ${NVCCFLAGS} " >&5
+$as_echo "$as_me: User supplied NVCCFLAGS: ${NVCCFLAGS} " >&6;}
 if test "X${build_qdpjit}X" = "XyesX" ; then
   if test "X${qdp_home}X" = "XX" ; then
     # Extract the first word of "qdp++-config", so it can be a program name with args.
@@ -4044,6 +4078,20 @@ yes|no);;
   ;;
 esac
 
+case ${build_gauge_tools} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-gauge-tools " "$LINENO" 5
+  ;;
+esac
+
+case ${build_contract} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-contract " "$LINENO" 5
+  ;;
+esac
+
 case ${multi_gpu} in
 yes|no);;
 *)
@@ -4231,6 +4279,16 @@ BUILD_FERMION_FORCE=${build_staggered_force}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_HISQ_FORCE = ${build_hisq_force}  " >&5
 $as_echo "$as_me: Setting BUILD_HISQ_FORCE = ${build_hisq_force}  " >&6;}
 BUILD_HISQ_FORCE=${build_hisq_force}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&5
+$as_echo "$as_me: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&6;}
+BUILD_GAUGE_TOOLS=${build_gauge_tools}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CONTRACT = ${build_contract}  " >&5
+$as_echo "$as_me: Setting BUILD_CONTRACT = ${build_contract}  " >&6;}
+BUILD_CONTRACT=${build_contract}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MULTI_GPU = ${multi_gpu}  " >&5

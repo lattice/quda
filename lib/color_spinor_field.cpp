@@ -141,17 +141,6 @@ namespace quda {
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
 
-    // initialize the ghost pointers 
-    if(siteSubset == QUDA_PARITY_SITE_SUBSET) {
-      for(int i=0; i<dims; ++i){
-        if(commDimPartitioned(i)){
-          ghost[i] = (char*)v + (stride + ghostOffset[i])*nColor*nSpin*2*precision;
-          if(precision == QUDA_HALF_PRECISION)
-            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
-        }
-      }
-    }
-
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
@@ -262,11 +251,11 @@ namespace quda {
   }
 
   void ColorSpinorField::setTuningString() {
-    for (int d=0; d<nDim-1; d++) sprintf(vol_string, "%dx", x[d]);
-    sprintf(vol_string, "%d", x[nDim-1]);
+    sprintf(vol_string, "%d", x[0]);
+    for (int d=1; d<nDim; d++) sprintf(vol_string, "%sx%d", vol_string, x[d]);
     sprintf(aux_string, "vol=%d,stride=%d,precision=%d", volume, stride, precision);
     if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
-      sprintf(aux_string, ",TwistFlavour=%d", twistFlavor);
+      sprintf(aux_string, "%s,TwistFlavour=%d", aux_string, twistFlavor);
   }
 
   void ColorSpinorField::destroy() {

@@ -49,7 +49,6 @@ namespace quda {
     cudaColorSpinorField y(b, csParam); 
   
     mat(r, x, y);
-//    zeroCuda(y);
 
     double r2 = xmyNormCuda(b, r);
   
@@ -117,11 +116,6 @@ namespace quda {
     double maxrr = rNorm;
     double delta = param.delta;
 
-    // this parameter determines how many consective reliable update
-    // reisudal increases we tolerate before terminating the solver,
-    // i.e., how long do we want to keep trying to converge
-    int maxResIncrease = 0; // 0 means we have no tolerance 
-
     profile.Stop(QUDA_PROFILE_PREAMBLE);
     profile.Start(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
@@ -182,6 +176,7 @@ namespace quda {
 	if (param.pipeline && !breakdown) tripleCGUpdateCuda(alpha, beta, Ap, xSloppy, rSloppy, p);
 	else axpyZpbxCuda(alpha, p, xSloppy, rSloppy, beta);
 
+
 	if (use_heavy_quark_res && k%heavy_quark_check==0) { 
 	  if (&x != &xSloppy) {
 	    copyCuda(tmp,y);
@@ -194,6 +189,7 @@ namespace quda {
 
 	steps_since_reliable++;
       } else {
+
 	axpyCuda(alpha, p, xSloppy);
 	copyCuda(x, xSloppy); // nop when these pointers alias
       
@@ -205,12 +201,10 @@ namespace quda {
 	zeroCuda(xSloppy);
 
 	// break-out check if we have reached the limit of the precision
-	static int resIncrease = 0;
+	static int resIncrease = 0; // number of consecutive residual increases 
 	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
 	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
-	  k++;
-	  rUpdate++;
-	  if (++resIncrease > maxResIncrease) break; 
+	  if (++resIncrease > param.max_res_increase) break; // check if we reached the limit of our tolerance
 	} else {
 	  resIncrease = 0;
 	}

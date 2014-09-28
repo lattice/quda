@@ -159,6 +159,19 @@ AC_ARG_ENABLE(hisq-force,
   [ build_hisq_force=${enableval} ],
   [ build_hisq_force="no" ]
 )
+
+AC_ARG_ENABLE(gauge-tools,
+  AC_HELP_STRING([--enable-gauge-tools], [ Build auxilary gauge tools: plaquette, gauge evolver, APE, extended gauge routines (default: disabled)]),
+  [ build_gauge_tools=${enableval} ],
+  [ build_gauge_tools="no" ]
+)
+
+AC_ARG_ENABLE(contract,
+  AC_HELP_STRING([--enable-contract], [ Build bilinear contraction code (default: disabled)]),
+  [ build_contract=${enableval} ],
+  [ build_contract="no" ]
+)
+
 dnl Multi-GPU options
 dnl ==================
 
@@ -239,6 +252,9 @@ AC_ARG_WITH(magma,
   [ magma_home="" ; build_magma="no" ]
 )
 
+
+AC_ARG_VAR(NVCCFLAGS, [ Extra flags for NVCC ])
+AC_MSG_NOTICE([User supplied NVCCFLAGS: ${NVCCFLAGS} ])
 if test "X${build_qdpjit}X" = "XyesX" ; then
   if test "X${qdp_home}X" = "XX" ; then
     AC_PATH_PROG(QDPXX_CONFIG, [qdp++-config], [])
@@ -473,6 +489,22 @@ yes|no);;
   ;;
 esac
 
+dnl Build Hisq force
+case ${build_gauge_tools} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-gauge-tools ])
+  ;;
+esac
+
+dnl Build Hisq force
+case ${build_contract} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-contract ])
+  ;;
+esac
+
 dnl Multi GPU
 case ${multi_gpu} in
 yes|no);;
@@ -633,6 +665,12 @@ AC_SUBST( BUILD_FERMION_FORCE, [${build_staggered_force}])
 
 AC_MSG_NOTICE([Setting BUILD_HISQ_FORCE = ${build_hisq_force} ] )
 AC_SUBST( BUILD_HISQ_FORCE, [${build_hisq_force}])
+
+AC_MSG_NOTICE([Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools} ] )
+AC_SUBST( BUILD_GAUGE_TOOLS, [${build_gauge_tools}])
+
+AC_MSG_NOTICE([Setting BUILD_CONTRACT = ${build_contract} ] )
+AC_SUBST( BUILD_CONTRACT, [${build_contract}])
 
 AC_MSG_NOTICE([Setting BUILD_MULTI_GPU = ${multi_gpu} ] )
 AC_SUBST( BUILD_MULTI_GPU, [${multi_gpu}])

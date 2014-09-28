@@ -221,7 +221,7 @@ matdagmat(void *out, void **fatlink, void** longlink, void *in, double mass, int
 // Apply the even-odd preconditioned Dirac operator
 template <typename sFloat, typename gFloat>
 static void MatPC(sFloat *outEven, gFloat **fatlink, gFloat** longlink, sFloat *inEven, sFloat kappa, 
-		  int daggerBit, MatPCType matpc_type) {
+		  int daggerBit, QudaMatPCType matpc_type) {
     
   sFloat *tmp = (sFloat*)malloc(Vh*mySpinorSiteSize*sizeof(sFloat));
     
@@ -247,7 +247,7 @@ static void MatPC(sFloat *outEven, gFloat **fatlink, gFloat** longlink, sFloat *
 
 void
 staggered_matpc(void *outEven, void **fatlink, void**longlink, void *inEven, double kappa, 
-		MatPCType matpc_type, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision) 
+		QudaMatPCType matpc_type, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision) 
 {
     
   if (sPrecision == QUDA_DOUBLE_PRECISION)
