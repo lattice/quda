@@ -30,6 +30,8 @@ namespace quda {
   double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
   double normCuda(const cudaColorSpinorField &b);
   double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
+  void reDotProductCuda(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
+
   double xmyNormCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
 
   double2 reDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);

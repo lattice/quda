@@ -271,6 +271,34 @@ namespace quda {
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
+  class CG3 : public Solver {
+    private:
+      const DiracMatrix &mat; 
+
+    public:
+      CG3(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+      virtual ~CG3();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };  
+
+
+
+  class MPCG : public Solver {
+    private:
+      const DiracMatrix &mat;
+      void computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec);
+      void computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps);
+
+
+    public:
+      MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+      virtual ~MPCG();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  }; 
+
+
 
   class PreconCG : public Solver {
     private: 
@@ -308,6 +336,41 @@ namespace quda {
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
+
+  class SimpleBiCGstab : public Solver {
+
+  private:
+    DiracMatrix &mat;
+
+    // pointers to fields to avoid multiple creation overhead
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    bool init;
+
+  public:
+    SimpleBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~SimpleBiCGstab();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+  
+  class MPBiCGstab : public Solver {
+
+  private:
+    DiracMatrix &mat;
+
+    // pointers to fields to avoid multiple creation overhead
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    bool init;
+    void computeMatrixPowers(std::vector<cudaColorSpinorField>& pr, cudaColorSpinorField& p, cudaColorSpinorField& r, int nsteps);
+
+  public:
+    MPBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~MPBiCGstab();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
+
 
   class GCR : public Solver {
 

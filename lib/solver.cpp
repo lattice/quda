@@ -47,6 +47,22 @@ namespace quda {
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
       break;
+    case QUDA_CG3_INVERTER:
+      report("CG3");
+      solver = new CG3(mat, param, profile);
+      break;
+    case QUDA_MPCG_INVERTER:
+      report("MPCG");
+      solver = new MPCG(mat, param, profile);
+      break;
+    case QUDA_SBICGSTAB_INVERTER:
+      report("SBICGSTAB");
+      solver = new SimpleBiCGstab(mat, param, profile);
+      break;
+    case QUDA_MPBICGSTAB_INVERTER:
+      report("MPBICGSTAB");
+      solver = new MPBiCGstab(mat, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type");
     }

@@ -408,6 +408,9 @@ if (kernel_type == INTERIOR_KERNEL) {
   sid = blockIdx.x*blockDim.x + threadIdx.x;
   if (sid >= param.threads) return;
 
+
+  
+
   // Inline by hand for the moment and assume even dimensions
   const int dims[] = {X1, X2, X3, X4};
   coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
