@@ -863,12 +863,8 @@ get_solver_type(char* s)
     ret = QUDA_GCR_INVERTER;
   }else if (strcmp(s, "pcg") == 0){
     ret = QUDA_PCG_INVERTER;
-  }else if (strcmp(s, "cg3") == 0){
-    ret = QUDA_CG3_INVERTER; 
   }else if (strcmp(s, "mpcg") == 0){
     ret = QUDA_MPCG_INVERTER; 
-  }else if (strcmp(s, "sbicgstab") == 0){
-    ret = QUDA_SBICGSTAB_INVERTER;
   }else if (strcmp(s, "mpbicgstab") == 0){
     ret = QUDA_MPBICGSTAB_INVERTER;
   }else{

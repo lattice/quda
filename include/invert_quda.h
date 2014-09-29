@@ -272,17 +272,6 @@ namespace quda {
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
 
-  class CG3 : public Solver {
-    private:
-      const DiracMatrix &mat; 
-
-    public:
-      CG3(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-      virtual ~CG3();
-
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-  };  
-
 
 
   class MPCG : public Solver {
