@@ -158,7 +158,7 @@ else
   MAGMA_FLAGS   = 
 endif
 
-ifeq ($(strip $(BUILD_SSTEP)),yes)
+ifeq ($(strip $(BUILD_SSTEP)), yes)
   NVCCOPT += -DSSTEP
   COPT += -DSSTEP
 endif

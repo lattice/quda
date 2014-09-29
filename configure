@@ -1398,6 +1398,7 @@ Optional Features:
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
                           evolver, APE, extended gauge routines (default:
                           disabled)
+  --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:

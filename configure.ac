@@ -503,6 +503,7 @@ yes|no);;
   ;;
 esac
 
+dnl Build sstep
 case ${build_sstep} in
 yes|no);;
 *) 
