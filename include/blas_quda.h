@@ -53,6 +53,7 @@ namespace quda {
   void caxpbypzYmbwCuda(const Complex &, cudaColorSpinorField &, const Complex &, cudaColorSpinorField &, cudaColorSpinorField &, cudaColorSpinorField &);
 
   Complex cDotProductCuda(cudaColorSpinorField &, cudaColorSpinorField &);
+  void cDotProductCuda(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
   Complex xpaycDotzyCuda(cudaColorSpinorField &x, const double &a, cudaColorSpinorField &y, cudaColorSpinorField &z);
 
   double3 cDotProductNormACuda(cudaColorSpinorField &a, cudaColorSpinorField &b);

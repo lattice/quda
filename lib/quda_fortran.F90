@@ -160,7 +160,10 @@ module quda_fortran
      
      ! Enable auto-tuning? 
      QudaTune :: tune
-     
+    
+     ! Number of steps in s-step algorithms
+     integer(4) :: nsteps
+   
      ! Maximum size of Krylov space used by solver 
      integer(4) :: gcr_nkrylov
      

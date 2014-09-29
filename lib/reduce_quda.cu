@@ -467,6 +467,43 @@ namespace quda {
     return Complex(cdot.x, cdot.y);
   }
 
+  void cDotProductCuda(Complex* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
+    double2* cdot = new double2[x.size()];
+
+    switch(x.size()){
+      case 1:
+        reduce::multiReduceCuda<1,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 6:
+        reduce::multiReduceCuda<6,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 10:
+        reduce::multiReduceCuda<10,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 14:
+        reduce::multiReduceCuda<14,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 18:
+        reduce::multiReduceCuda<18,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 22:
+        reduce::multiReduceCuda<22,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      default:
+        errorQuda("Unsupported vector size\n");
+        break;
+    }
+
+    for(int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
+    delete[] cdot;
+  }
+
   /**
      double2 xpaycDotzyCuda(float2 *x, float a, float2 *y, float2 *z, int n) {}
    

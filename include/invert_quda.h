@@ -108,7 +108,8 @@ namespace quda {
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
 
-    
+    /** Number of steps in s-step algorithms */
+    int Nsteps; 
 
     /** Maximum size of Krylov space used by solver */
     int Nkrylov;
@@ -160,7 +161,7 @@ namespace quda {
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
       precision_precondition(param.cuda_prec_precondition), 
       preserve_source(param.preserve_source), num_offset(param.num_offset), 
-      Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
+      Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0) 

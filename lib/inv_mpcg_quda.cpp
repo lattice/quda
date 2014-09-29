@@ -225,9 +225,7 @@ namespace quda {
     cudaColorSpinorField x_new(x,csParam);
 
 
-    const int s = 3;
-
-    printf("Nstep = %d\n", s);
+    const int s = 2;
 
     // create the residual array and the matrix powers array
     std::vector<cudaColorSpinorField> R(s+1,cudaColorSpinorField(b,csParam));

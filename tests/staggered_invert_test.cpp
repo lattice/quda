@@ -138,7 +138,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
 
-  
+ 
+  inv_param->Nsteps = 2; 
 
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;

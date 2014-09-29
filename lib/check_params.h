@@ -274,6 +274,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(tune, QUDA_TUNE_INVALID);
 
 #if defined INIT_PARAM
+  P(Nsteps, INVALID_INT);
+#else
+  if(param->inv_type == QUDA_MPCG_INVERTER || param->inv_type == QUDA_MPBICGSTAB_INVERTER){
+    P(Nsteps, INVALID_INT);
+  }
+#endif
+
+#if defined INIT_PARAM
   P(gcrNkrylov, INVALID_INT);
 #else
   if (param->inv_type == QUDA_GCR_INVERTER) {

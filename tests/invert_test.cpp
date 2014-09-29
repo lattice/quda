@@ -206,6 +206,7 @@ int main(int argc, char **argv)
 
   inv_param.pipeline = 0;
 
+  inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
