@@ -132,7 +132,9 @@ namespace quda {
 
   void MPBiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
-
+#ifndef SSTEP
+    errorQuda("S-step solvers not built\n");
+#else
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
     if(b2 == 0){
@@ -308,7 +310,7 @@ namespace quda {
     delete[] c;
     delete[] c_new;
     delete[] e;
-
+#endif
     return;
   }
 

@@ -32,12 +32,14 @@ BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@				# build code for (1-loop Symanzik) ga
 BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@			# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
+BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
 
 # Multi-GPU options
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
+
 
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
@@ -156,6 +158,10 @@ else
   MAGMA_FLAGS   = 
 endif
 
+ifeq ($(strip $(BUILD_SSTEP)),yes)
+  NVCCOPT += -DSSTEP
+  COPT += -DSSTEP
+endif
 
 ifeq ($(strip $(POSIX_THREADS)), yes)
   NVCCOPT += -DPTHREADS

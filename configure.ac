@@ -166,6 +166,12 @@ AC_ARG_ENABLE(gauge-tools,
   [ build_gauge_tools="no" ]
 )
 
+AC_ARG_ENABLE(sstep,
+  AC_HELP_STRING([--enable-sstep], [ Build s-step linear solvers (default: disabled)]),
+  [ build_sstep=${enableval} ],
+  [ build_sstep="no" ]
+)
+
 AC_ARG_ENABLE(contract,
   AC_HELP_STRING([--enable-contract], [ Build bilinear contraction code (default: disabled)]),
   [ build_contract=${enableval} ],
@@ -497,6 +503,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_sstep} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-sstep ])
+  ;;
+esac
+
 dnl Build Hisq force
 case ${build_contract} in
 yes|no);;
@@ -668,6 +681,9 @@ AC_SUBST( BUILD_HISQ_FORCE, [${build_hisq_force}])
 
 AC_MSG_NOTICE([Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools} ] )
 AC_SUBST( BUILD_GAUGE_TOOLS, [${build_gauge_tools}])
+
+AC_MSG_NOTICE([Setting BUILD_SSTEP = ${build_sstep} ] )
+AC_SUBST( BUILD_SSTEP, [${build_sstep}])
 
 AC_MSG_NOTICE([Setting BUILD_CONTRACT = ${build_contract} ] )
 AC_SUBST( BUILD_CONTRACT, [${build_contract}])

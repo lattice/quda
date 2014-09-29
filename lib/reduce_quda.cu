@@ -173,7 +173,9 @@ namespace quda {
 
  
   void reDotProductCuda(double* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
-  
+#ifndef SSTEP
+    errorQuda("S-step code not built\n");
+#else 
     switch(x.size()){
       case 1:
         reduce::multiReduceCuda<1,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
@@ -259,6 +261,7 @@ namespace quda {
         errorQuda("Unsupported vector size");
         break;
     }
+#endif // SSTEP
   } 
 
 
@@ -468,6 +471,9 @@ namespace quda {
   }
 
   void cDotProductCuda(Complex* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
+#ifndef SSTEP
+    errorQuda("S-step code not built\n");
+#else
     double2* cdot = new double2[x.size()];
 
     switch(x.size()){
@@ -502,6 +508,7 @@ namespace quda {
 
     for(int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
     delete[] cdot;
+#endif
   }
 
   /**
