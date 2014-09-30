@@ -140,7 +140,7 @@ namespace quda {
   private:
     cudaGaugeField &mom;
     const int dir;
-    const double &eb3;
+    const double eb3;
     const cudaGaugeField &link;
     const int *input_path;
     const int *length;
