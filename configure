@@ -614,6 +614,7 @@ BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
 BUILD_CONTRACT
+BUILD_SSTEP
 BUILD_GAUGE_TOOLS
 BUILD_HISQ_FORCE
 BUILD_FERMION_FORCE
@@ -2194,6 +2195,7 @@ else
    build_gauge_tools="no"
 
 fi
+
 
 # Check whether --enable-sstep was given.
 if test "${enable_sstep+set}" = set; then :
@@ -4302,9 +4304,11 @@ BUILD_HISQ_FORCE=${build_hisq_force}
 $as_echo "$as_me: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&6;}
 BUILD_GAUGE_TOOLS=${build_gauge_tools}
 
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_SSTEP = ${build_sstep}  " >&5
 $as_echo "$as_me: Setting BUILD_SSTEP = ${build_sstep}  " >&6;}
 BUILD_SSTEP=${build_sstep}
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CONTRACT = ${build_contract}  " >&5
 $as_echo "$as_me: Setting BUILD_CONTRACT = ${build_contract}  " >&6;}
