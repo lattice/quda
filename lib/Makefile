@@ -112,6 +112,7 @@ $(QUDA): $(QUDA_OBJS) ../make.inc
 
 gen:
 	$(PYTHON) generate/dslash_cuda_gen.py
+	$(PYTHON) generate/fused_exterior_dslash_gen.py
 	$(PYTHON) generate/dw_dslash_cuda_gen.py
 	$(PYTHON) generate/ndeg_tm_dslash_cuda_gen.py
 	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
