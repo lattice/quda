@@ -125,6 +125,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
 
+
+  
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param->residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
@@ -136,6 +138,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
 
+ 
+  inv_param->Nsteps = 2; 
 
 
   //inv_param->inv_type = QUDA_GCR_INVERTER;
@@ -618,6 +622,9 @@ int main(int argc, char** argv)
   initRand();
 
   display_test_info();
+
+  
+  printfQuda("dslash_type = %d\n", dslash_type);
 
   int ret = invert_test();
 

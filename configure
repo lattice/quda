@@ -718,6 +718,7 @@ enable_gauge_force
 enable_staggered_force
 enable_hisq_force
 enable_gauge_tools
+enable_sstep
 enable_contract
 enable_multi_gpu
 enable_gpu_direct
@@ -1397,6 +1398,7 @@ Optional Features:
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
                           evolver, APE, extended gauge routines (default:
                           disabled)
+  --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
@@ -2190,6 +2192,14 @@ if test "${enable_gauge_tools+set}" = set; then :
   enableval=$enable_gauge_tools;  build_gauge_tools=${enableval}
 else
    build_gauge_tools="no"
+
+fi
+
+# Check whether --enable-sstep was given.
+if test "${enable_sstep+set}" = set; then :
+  enableval=$enable_sstep;  build_sstep=${enableval}
+else
+   build_sstep="no"
 
 fi
 
@@ -4085,6 +4095,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_sstep} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-sstep " "$LINENO" 5
+  ;;
+esac
+
 case ${build_contract} in
 yes|no);;
 *)
@@ -4285,6 +4302,9 @@ BUILD_HISQ_FORCE=${build_hisq_force}
 $as_echo "$as_me: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&6;}
 BUILD_GAUGE_TOOLS=${build_gauge_tools}
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_SSTEP = ${build_sstep}  " >&5
+$as_echo "$as_me: Setting BUILD_SSTEP = ${build_sstep}  " >&6;}
+BUILD_SSTEP=${build_sstep}
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CONTRACT = ${build_contract}  " >&5
 $as_echo "$as_me: Setting BUILD_CONTRACT = ${build_contract}  " >&6;}

@@ -329,6 +329,19 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       return *this;
     }
 
+    void set(const cudaColorSpinorField &x){
+      spinor = (StoreType*)x.V();
+#ifdef USE_TEXTURE_OBJECTS 
+      tex = Texture<InterType, StoreType>(&x);
+#else
+      tex = Texture<InterType, StoreType, tex_id>(&x);
+#endif      
+      norm = (float*)x.Norm();
+      stride = x.Length()/(N*REG_LENGTH);
+    
+      checkTypes<RegType,InterType,StoreType>();
+    }
+
     ~Spinor() { } /* on g80 / gt200 this must not be virtual */
 
     __device__ inline void load(RegType x[], const int i) {
