@@ -248,9 +248,8 @@ namespace quda {
 		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift]);
 	  k++;
 	  rUpdate++;
-	  if (reliable_shift == j_low) 
-	    if (++resIncrease > param.max_res_increase) break; // check if we reached the limit of our tolerancebreak;
-	} else if (reliable_shift == j_low) {
+	  if (++resIncrease > param.max_res_increase) break; // check if we reached the limit of our tolerancebreak;
+	} else {
 	  resIncrease = 0;
 	}
 

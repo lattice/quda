@@ -179,6 +179,10 @@ extern "C" {
 
     QudaTune tune;                          /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
+
+    /** Number of steps in s-step algorithms */
+    int Nsteps; 
+
     /** Maximum size of Krylov space used by solver */
     int gcrNkrylov;
 

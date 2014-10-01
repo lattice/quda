@@ -108,7 +108,8 @@ namespace quda {
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
 
-    
+    /** Number of steps in s-step algorithms */
+    int Nsteps; 
 
     /** Maximum size of Krylov space used by solver */
     int Nkrylov;
@@ -160,7 +161,7 @@ namespace quda {
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
       precision_precondition(param.cuda_prec_precondition), 
       preserve_source(param.preserve_source), num_offset(param.num_offset), 
-      Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
+      Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0) 
@@ -292,6 +293,23 @@ namespace quda {
   };
 
 
+
+  class MPCG : public Solver {
+    private:
+      const DiracMatrix &mat;
+      void computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec);
+      void computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps);
+
+
+    public:
+      MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+      virtual ~MPCG();
+
+      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  }; 
+
+
+
   class PreconCG : public Solver {
     private: 
       const DiracMatrix &mat;
@@ -328,6 +346,41 @@ namespace quda {
 
     void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
   };
+
+  class SimpleBiCGstab : public Solver {
+
+  private:
+    DiracMatrix &mat;
+
+    // pointers to fields to avoid multiple creation overhead
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    bool init;
+
+  public:
+    SimpleBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~SimpleBiCGstab();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+  
+  class MPBiCGstab : public Solver {
+
+  private:
+    DiracMatrix &mat;
+
+    // pointers to fields to avoid multiple creation overhead
+    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    bool init;
+    void computeMatrixPowers(std::vector<cudaColorSpinorField>& pr, cudaColorSpinorField& p, cudaColorSpinorField& r, int nsteps);
+
+  public:
+    MPBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
+    virtual ~MPBiCGstab();
+
+    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+  };
+
+
 
   class GCR : public Solver {
 
