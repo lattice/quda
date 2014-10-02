@@ -95,6 +95,30 @@ namespace quda {
     return true;
   }
 
+// 
+  bool Solver::convergenceHQ(const double &r2, const double &hq2, const double &r2_tol, 
+         const double &hq_tol) {
+    //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
+
+    // check the heavy quark residual norm if necessary
+    if ( (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) && (hq2 > hq_tol) ) 
+      return false;
+
+    return true;
+  }
+
+  bool Solver::convergenceL2(const double &r2, const double &hq2, const double &r2_tol, 
+         const double &hq_tol) {
+    //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
+
+    // check the L2 relative residual norm if necessary
+    if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
+    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) ) 
+      return false;
+
+    return true;
+  }
+
   void Solver::PrintStats(const char* name, int k, const double &r2, 
 			  const double &b2, const double &hq2) {
     if (getVerbosity() >= QUDA_VERBOSE) {

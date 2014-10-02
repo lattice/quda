@@ -245,6 +245,26 @@ namespace quda {
 		     const double &hq_tol);
  
     /**
+       Test for HQ solver convergence -- ignore L2 residual
+       @param r2 L2 norm squared of the residual 
+       @param hq2 Heavy quark residual
+       @param r2_tol Solver L2 tolerance
+       @param hq_tol Solver heavy-quark tolerance
+     */
+    bool convergenceHQ(const double &r2, const double &hq2, const double &r2_tol, 
+         const double &hq_tol);
+
+    /**
+       Test for L2 solver convergence -- ignore HQ residual
+       @param r2 L2 norm squared of the residual 
+       @param hq2 Heavy quark residual
+       @param r2_tol Solver L2 tolerance
+       @param hq_tol Solver heavy-quark tolerance
+     */
+    bool convergenceL2(const double &r2, const double &hq2, const double &r2_tol, 
+         const double &hq_tol);
+
+    /**
        Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
      */
     void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);

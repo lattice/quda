@@ -425,7 +425,8 @@ static void setInvertParams(const int dim[4],
     QudaPrecision cuda_prec_sloppy,
     QudaPrecision cuda_prec_precondition,
     double mass,
-    double target_residual, 
+    double target_residual,
+    double target_residual_hq,
     int maxiter,
     double reliable_delta,
     QudaParity parity,
@@ -437,6 +438,7 @@ static void setInvertParams(const int dim[4],
   invertParam->verbosity = verbosity;
   invertParam->mass = mass;
   invertParam->tol = target_residual;
+  invertParam->tol_hq =target_residual_hq;
   invertParam->num_offset = 0;
 
   invertParam->inv_type = inverter;
@@ -512,15 +514,15 @@ static void setInvertParams(const int dim[4],
 
 
   setInvertParams(dim, cpu_prec, cuda_prec, cuda_prec_sloppy, cuda_prec_precondition,
-      null_mass, null_residual, maxiter, reliable_delta, parity, verbosity, inverter, invertParam);
+      null_mass, null_residual, null_residual, maxiter, reliable_delta, parity, verbosity, inverter, invertParam);
 
   invertParam->num_offset = num_offset;
   for(int i=0; i<num_offset; ++i){
     invertParam->offset[i] = offset[i];
     invertParam->tol_offset[i] = target_residual_offset[i];
-    if(invertParam->residual_type == QUDA_HEAVY_QUARK_RESIDUAL){
+    //if(invertParam->residual_type & QUDA_HEAVY_QUARK_RESIDUAL){
       invertParam->tol_hq_offset[i] = target_residual_hq_offset[i];
-    }
+    //}
   }
   return;
 }
@@ -617,13 +619,18 @@ void qudaMultishiftInvert(int external_precision,
     int *num_iters)
 {
 
-  for(int i=0; i<num_offsets; ++i){
-    if(target_residual[i] == 0){
+  // for(int i=0; i<num_offsets; ++i){
+  //   if(target_residual[i] == 0){
+  //     errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
+  //     exit(1);
+  //   }
+  // }
+  // for(int i=0; i<num_offsets; ++i){
+    if(target_residual[0] == 0){
       errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
       exit(1);
     }
-  }
-
+  // }
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -661,7 +668,19 @@ void qudaMultishiftInvert(int external_precision,
   setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
 
   QudaInvertParam invertParam = newQudaInvertParam();
-  invertParam.residual_type = (target_fermilab_residual[0] != 0) ? QUDA_HEAVY_QUARK_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+
+  invertParam.residual_type = static_cast<QudaResidualType_s>(0);
+  invertParam.residual_type = (target_residual[0] != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
+  invertParam.residual_type = (target_fermilab_residual[0] != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
+  if (invertParam.residual_type ==QUDA_L2_RELATIVE_RESIDUAL) 
+    printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL only");
+  else{
+    if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+      printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL");      
+     if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+      printfQuda("Using QUDA_HEAVY_QUARK_RESIDUAL"); 
+  }
+
   invertParam.use_sloppy_partial_accumulator = 0;
 
 
@@ -669,7 +688,8 @@ void qudaMultishiftInvert(int external_precision,
 
   QudaParity local_parity = inv_args.evenodd;
   {
-    const double reliable_delta = 1e-1;
+    // need to set this to zero until issue #146 is fixed
+    const double reliable_delta = (use_mixed_precision ? 1e-1 :0.0);//1e-1;
     setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
         num_offsets, offset, target_residual, target_fermilab_residual, 
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
@@ -735,10 +755,8 @@ void qudaInvert(int external_precision,
     int* num_iters)
 {
 
-  if(target_fermilab_residual && target_residual){
-    errorQuda("qudaInvert: conflicting residuals requested\n");
-    exit(1);
-  }else if(target_fermilab_residual == 0 && target_residual == 0){
+
+  if(target_fermilab_residual == 0 && target_residual == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
   }
@@ -766,11 +784,20 @@ void qudaInvert(int external_precision,
   // a basic set routine for the gauge parameters
   setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
   QudaInvertParam invertParam = newQudaInvertParam();
-  invertParam.residual_type = (target_residual != 0) ? QUDA_L2_RELATIVE_RESIDUAL : QUDA_HEAVY_QUARK_RESIDUAL;
+
+  invertParam.residual_type = static_cast<QudaResidualType_s>(0);
+  invertParam.residual_type = (target_residual != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
+  invertParam.residual_type = (target_fermilab_residual != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
+  
+
   QudaParity local_parity = inv_args.evenodd;
-  double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
+  //double& target_res = (invertParam.residual_type == QUDA_L2_RELATIVE_RESIDUAL) ? target_residual : target_fermilab_residual;
+  double& target_res = target_residual;
+  double& target_res_hq = target_fermilab_residual;
+  const double reliable_delta = 1e-1;
+
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
-      mass, target_res, inv_args.max_iter, 1e-1, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
+      mass, target_res, target_res_hq, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   invertParam.use_sloppy_partial_accumulator = 0;
 
   ColorSpinorParam csParam;
