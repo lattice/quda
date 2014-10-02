@@ -123,7 +123,7 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_CFLAGS =
   MPI_LDFLAGS =
   MPI_LIBS =
-  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
+  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
   COMM_OBJS = comm_mpi.o
 endif
