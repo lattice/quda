@@ -674,48 +674,36 @@ namespace quda {
 
   };
 
+ //GMRES-DR/GMRES-Proj solver
+
  class GmresDR : public DeflatedSolver {
 
   private:
+
     DiracMatrix &mat;
 
     DiracMatrix &matSloppy;
-    DiracMatrix &matSloppy2;
 
     const DiracMatrix &matDefl;
 
-    QudaPrecision search_space_prec;
-    cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
+    QudaPrecision gmres_space_prec;
+
+    cudaColorSpinorField *Vm; 
+
+    TimeProfile &profile;    //time profile for initCG solver
+
+    bool gmres_alloc;
 
   public:
 
-    GmresDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matSloppy2, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
+    GmresDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
 
-    virtual ~IncEigCG();
+    virtual ~GmresDR();
 
     //GMRES-DR solver
     void GmresDRFirstCycle(cudaColorSpinorField &out, cudaColorSpinorField &in);
-
     //GMRES-DR solver 
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
-
-    //Compute  u dH^{-1} u^{dagger}b: 
-    void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
-
-    //Deflation space management
-    void CreateDeflationSpace(cudaColorSpinorField &eigcgSpinor, DeflationParam *&param);
-
-    //extend projection matrix:
-    //compute Q' = DiracM Q, (here U = [V, Q] - total Ritz set)
-    //construct H-matrix components with Q'^{dag} Q', V^{dag} Q' and Q'^{dag} V
-    //extend H-matrix with the components
-    void ExpandDeflationSpace(DeflationParam *param, const int new_nev);
-    //
-    void DeleteDeflationSpace(DeflationParam *&param);
-    //
-    void SaveRitzVecs(DeflationParam *param, bool cleanResources = false);
-    //
-    void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) {};//extrenal method
     //
     void CleanResources(); 
 

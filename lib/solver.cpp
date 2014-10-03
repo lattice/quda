@@ -122,7 +122,11 @@ namespace quda {
     if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
       report("Incremental EIGCG");
       solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
-    }else{
+    }else if (param.inv_type == QUDA_GMRESDR_INVERTER){
+      report("Incremental GMRESDR");
+      solver = new GmresDR(mat, matSloppy, matDeflate, param, profile);
+    }
+    else{
       errorQuda("Invalid solver type");
     }
     
