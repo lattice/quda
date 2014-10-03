@@ -735,6 +735,8 @@ namespace quda {
     //
     void DeleteDeflationSpace(DeflationParam *&param);
     //
+    void DeleteEigCGSearchSpace();
+    //
     void SaveEigCGRitzVecs(DeflationParam *param, bool cleanResources = false);
     //
     void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) {};//extrenal method
