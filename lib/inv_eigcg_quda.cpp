@@ -1190,9 +1190,13 @@ namespace quda {
 
         const double inc_tol = 1e-2;//must be external for the end-user tuning 
 
-        //initCGparam.use_sloppy_partial_accumulator=1;   //no need for full precision accumulator? it depends...
+        //In many cases, there is no need to use full precision accumulator, since low-mode deflation stabilizes 
+        //the mixed precision solver. Moreover, full precision acummulation results in worse performance of the deflated solver, upto 15% in my experiments
+        //However, this parameter should be exposed to the enduser for the performance tuning, just in some rare cases when low-mode deflation will be insufficient 
+        //for stable double-half mixed precision CG.
+        initCGparam.use_sloppy_partial_accumulator = 1;   
  
-        initCGparam.delta = 1e-2; // might be better then default 1e-1
+        initCGparam.delta = 1e-2; // might be a bit better than the default value 1e-1 (think about this)
 
         //launch initCG:
         while((restart_tol > full_tol) && (restart_idx < max_restart_num))//currently just one restart, think about better algorithm for the restarts. 
