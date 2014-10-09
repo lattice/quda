@@ -50,8 +50,11 @@ namespace quda {
     
   void initReduce()
   { 
+
+    const int MaxReduce = 12;
     // reduction buffer size
-    size_t bytes = 3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat);
+    size_t bytes = MaxReduce*3*REDUCE_MAX_BLOCKS*sizeof(QudaSumFloat); // Factor of N for composite reductions
+
 
     if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
     
@@ -167,6 +170,99 @@ namespace quda {
     return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
       (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
   }
+
+ 
+  void reDotProductCuda(double* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
+#ifndef SSTEP
+    errorQuda("S-step code not built\n");
+#else 
+    switch(x.size()){
+      case 1:
+        reduce::multiReduceCuda<1,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 2:
+        reduce::multiReduceCuda<2,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break; 
+      case 3:
+        reduce::multiReduceCuda<3,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 4:
+        reduce::multiReduceCuda<4,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 5:
+        reduce::multiReduceCuda<5,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 6:
+        reduce::multiReduceCuda<6,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 7:
+        reduce::multiReduceCuda<7,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 8:
+        reduce::multiReduceCuda<8,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 9:
+        reduce::multiReduceCuda<9,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 10:
+        reduce::multiReduceCuda<10,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 11:
+        reduce::multiReduceCuda<11,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 12:
+        reduce::multiReduceCuda<12,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 13:
+        reduce::multiReduceCuda<13,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 14:
+        reduce::multiReduceCuda<14,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 15:
+        reduce::multiReduceCuda<15,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 16:
+        reduce::multiReduceCuda<16,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 17:
+        reduce::multiReduceCuda<17,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 18:
+        reduce::multiReduceCuda<18,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 19:
+        reduce::multiReduceCuda<19,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 20:
+        reduce::multiReduceCuda<20,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
+        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      default:
+        errorQuda("Unsupported vector size");
+        break;
+    }
+#endif // SSTEP
+  } 
 
 
     /* 
@@ -372,6 +468,47 @@ namespace quda {
     double2 cdot = reduce::reduceCuda<double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
       (make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
     return Complex(cdot.x, cdot.y);
+  }
+
+  void cDotProductCuda(Complex* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
+#ifndef SSTEP
+    errorQuda("S-step code not built\n");
+#else
+    double2* cdot = new double2[x.size()];
+
+    switch(x.size()){
+      case 1:
+        reduce::multiReduceCuda<1,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 6:
+        reduce::multiReduceCuda<6,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 10:
+        reduce::multiReduceCuda<10,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 14:
+        reduce::multiReduceCuda<14,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 18:
+        reduce::multiReduceCuda<18,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 22:
+        reduce::multiReduceCuda<22,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      default:
+        errorQuda("Unsupported vector size\n");
+        break;
+    }
+
+    for(int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
+    delete[] cdot;
+#endif
   }
 
   /**

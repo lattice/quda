@@ -191,10 +191,10 @@ namespace quda {
 	flops_Tmp = (x ? 1368ll : 1320ll)*in->VolumeCB();
 	break;
       case 1:
-	flops_Tmp = 168ll*bulk + 72ll*wall;
+	flops_Tmp = 72ll*in->VolumeCB() + 96ll*bulk + 120ll*wall;
 	break;
       case 2:
-	flops_Tmp = 144ll*bulk + 72ll*wall;
+	flops_Tmp = (x ? 96ll : 48ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
 	break;
       case 3:
 	flops_Tmp = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);

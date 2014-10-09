@@ -206,6 +206,7 @@ int main(int argc, char **argv)
 
   inv_param.pipeline = 0;
 
+  inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
@@ -462,12 +463,18 @@ int main(int argc, char **argv)
         wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
+//      } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+//        dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
+//      } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+//        mdw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else {
         printfQuda("Unsupported dslash_type\n");
         exit(-1);
       }
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+            dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+            dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
           ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
         } else {
           ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
@@ -486,6 +493,20 @@ int main(int argc, char **argv)
                   inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+      } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+        dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+      } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+        double *kappa_b, *kappa_c;
+        kappa_b = (double*)malloc(Lsdim*sizeof(double));
+        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        for(int xs = 0 ; xs < Lsdim ; xs++)
+        {
+          kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
+          kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
+        }
+        mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+        free(kappa_b);
+        free(kappa_c);
       } else {
         printfQuda("Unsupported dslash_type\n");
         exit(-1);

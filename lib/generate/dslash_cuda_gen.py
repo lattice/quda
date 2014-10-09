@@ -1199,24 +1199,24 @@ def generate_dslash_kernels(arch):
     
     asymClover = False
 
-    twist = True
-    clover = False
-    dagger = False
-    filename = 'dslash_core/tm_dslash_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename;
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
+#    twist = True
+#    clover = False
+#    dagger = False
+#    filename = 'dslash_core/tm_dslash_' + name + '_core.h'
+#    print sys.argv[0] + ": generating " + filename;
+#    f = open(filename, 'w')
+#    f.write(generate_dslash())
+#    f.close()
 
-    dagger = True
-    filename = 'dslash_core/tm_dslash_dagger_' + name + '_core.h'
-    print sys.argv[0] + ": generating " + filename + "\n";
-    f = open(filename, 'w')
-    f.write(generate_dslash())
-    f.close()
-
-    twist = False
-    dslash = False
+#    dagger = True
+#    filename = 'dslash_core/tm_dslash_dagger_' + name + '_core.h'
+#    print sys.argv[0] + ": generating " + filename + "\n";
+#    f = open(filename, 'w')
+#    f.write(generate_dslash())
+#    f.close()
+#
+#    twist = False
+#    dslash = False
 
 
 
