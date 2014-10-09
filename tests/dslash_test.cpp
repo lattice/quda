@@ -134,7 +134,7 @@ void init(int argc, char **argv) {
     }
   }
 
-  inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 1;
+  inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 2;
   
   if(dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
@@ -275,7 +275,7 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     csParam.twistFlavor = inv_param.twist_flavor;
     csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_PLUS || inv_param.twist_flavor == QUDA_TWIST_MINUS) ? 4 : 5;
-    csParam.x[4] = Ls;    
+    csParam.x[4] = inv_param.Ls;    
   }
 
 
