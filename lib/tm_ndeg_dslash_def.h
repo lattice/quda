@@ -413,6 +413,22 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_TWIST_F, DD_XPAY_F)
 
 }
 
+
+template <>
+__global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_TWIST_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
+#if DD_DAG
+#include "tm_ndeg_fused_exterior_dslash_dagger_core.h"
+#else
+#include "tm_ndeg_fused_exterior_dslash_core.h"
+#endif
+#endif
+
+}
+
+
 #endif
 
 // clean up
