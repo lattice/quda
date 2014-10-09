@@ -2,6 +2,9 @@
 #include <gauge_field_order.h>
 
 namespace quda {
+
+#ifdef GPU_GAUGE_TOOLS
+
   template <typename Order, int nDim>
   struct ExtractGhostExArg {
     Order order;
@@ -423,9 +426,12 @@ namespace quda {
     }
 
   }
+#endif
 
   void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R, 
 				 void **ghost, bool extract) {
+
+#ifdef GPU_GAUGE_TOOLS
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       extractGhostEx(u, dim, R, (double**)ghost, extract);
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
@@ -435,6 +441,10 @@ namespace quda {
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }
+#else
+  errorQuda("Gauge tools are not build");
+#endif
+
   }
 
 } // namespace quda

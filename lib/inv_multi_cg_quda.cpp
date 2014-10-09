@@ -49,9 +49,19 @@ namespace quda {
       double c2 = zeta_old[j] * alpha_old[j_low] * (1.0+(offset[j]-offset[0])*alpha[j_low]);
       
       zeta_old[j] = zeta[j];
-      zeta[j] = c0 / (c1 + c2); 
-      alpha[j] = alpha[j_low] * zeta[j] / zeta_old[j];
-    }	
+      if (c1+c2 != 0.0){
+        zeta[j] = c0 / (c1 + c2);
+      }
+      else {
+        zeta[j] = 0.0;
+      }
+      if (zeta[j] != 0.0){
+        alpha[j] = alpha[j_low] * zeta[j] / zeta_old[j];
+      }
+      else {
+        alpha[j] = 0.0;    
+      }
+    }  
   }
 
   void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
@@ -232,12 +242,15 @@ namespace quda {
 	copyCuda(*r_sloppy, *r);            
 
 	// break-out check if we have reached the limit of the precision
+	static int resIncrease = 0; // number of consecutive residual increases 
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
 	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e", 
 		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift]);
 	  k++;
 	  rUpdate++;
-	  if (reliable_shift == j_low) break;
+	  if (++resIncrease > param.max_res_increase) break; // check if we reached the limit of our tolerancebreak;
+	} else {
+	  resIncrease = 0;
 	}
 
 	// explicitly restore the orthogonality of the gradient vector
@@ -265,11 +278,18 @@ namespace quda {
 
       // now we can check if any of the shifts have converged and remove them
       for (int j=1; j<num_offset_now; j++) {
+        if (zeta[j] == 0.0) {
+          num_offset_now--;
+          if (getVerbosity() >= QUDA_VERBOSE)
+              printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
+        }
+        else {
 	r2[j] = zeta[j] * zeta[j] * r2[0];
 	if (r2[j] < stop[j]) {
+            num_offset_now--;
 	  if (getVerbosity() >= QUDA_VERBOSE)
 	    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
-	  num_offset_now--;
+          }
 	}
       }
 

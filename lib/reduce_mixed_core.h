@@ -401,6 +401,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
     return value;
   }
 
+  blasStrings.vol_str = x.VolString();
+  blasStrings.aux_str = x.AuxString();
+
   doubleN value;
 
   // FIXME: use traits to encapsulate register type for shorts -
@@ -428,6 +431,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
     } else if (x.Nspin() == 1) { //staggered
 #ifdef GPU_STAGGERED_DIRAC
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+      const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
       Spinor<double2,double2,float2,M,writeX> X(x);
       Spinor<double2,double2,float2,M,writeY> Y(y);
       Spinor<double2,double2,double2,M,writeZ> Z(z);
@@ -438,7 +442,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,float2,M,writeX>, Spinor<double2,double2,float2,M,writeY>,
 	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,float2,M,writeW>,
 	Spinor<double2,double2,float2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -466,6 +470,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
     } else if (x.Nspin() == 1){ //staggered
 #ifdef GPU_STAGGERED_DIRAC
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+      const int reduce_length = siteUnroll ? x.RealLength() : x.Length();
       Spinor<double2,double2,float2,M,writeX> X(x);
       Spinor<double2,double2,float2,M,writeY> Y(y);
       Spinor<double2,double2,double2,M,writeZ> Z(z);
@@ -476,7 +481,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,float2,M,writeX>, Spinor<double2,double2,float2,M,writeY>,
 	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,float2,M,writeW>,
 	Spinor<double2,double2,float2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());

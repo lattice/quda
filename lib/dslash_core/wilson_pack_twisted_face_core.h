@@ -61,7 +61,7 @@ if (face_num) {
   case 0:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;
@@ -92,7 +92,7 @@ if (face_num) {
   case 1:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;
@@ -123,7 +123,7 @@ if (face_num) {
   case 2:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;
@@ -154,7 +154,7 @@ if (face_num) {
   case 3:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;
@@ -190,7 +190,7 @@ if (face_num) {
   case 0:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;
@@ -221,7 +221,7 @@ if (face_num) {
   case 1:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;
@@ -252,7 +252,7 @@ if (face_num) {
   case 2:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;
@@ -283,7 +283,7 @@ if (face_num) {
   case 3:
     {
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, idx, idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, idx, idx);
       APPLY_TWIST_INV( a, b, i);
       
       spinorFloat a0_re, a0_im;

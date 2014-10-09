@@ -212,7 +212,8 @@ namespace quda {
       if (!commDimPartitioned(d)) continue;
       total_bytes += 4*bytes[d];
     }
-    resizeBufferPinned(total_bytes);
+    resizeBufferPinned(total_bytes,0);
+
 
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
@@ -347,7 +348,7 @@ namespace quda {
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
           static_cast<const cudaGaugeField&>(src).gauge);
     } else if (typeid(src) == typeid(cpuGaugeField)) {
-      LatticeField::resizeBufferPinned(bytes);
+      LatticeField::resizeBufferPinned(bytes,0);
 
       // copy field and ghost zone into bufferPinned
       copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned[0], 
@@ -373,7 +374,7 @@ namespace quda {
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
       if (cpu.Order() == QUDA_MILC_GAUGE_ORDER ||
 	  cpu.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
-	resizeBufferPinned(cpu.Bytes());
+	resizeBufferPinned(cpu.Bytes(),0);
 	memcpy(bufferPinned[0], cpu.Gauge_p(), cpu.Bytes());
 
 	// run kernel directly using host-mapped input data
@@ -458,7 +459,7 @@ namespace quda {
       }
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
-      resizeBufferPinned(bytes);
+      resizeBufferPinned(bytes,0);
 
       // this copies over both even and odd
       cudaMemcpy(bufferPinned[0], gauge, bytes, cudaMemcpyDeviceToHost);

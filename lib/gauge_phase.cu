@@ -2,6 +2,9 @@
 #include <comm_quda.h>
 
 namespace quda {
+
+#ifdef GPU_GAUGE_TOOLS
+
   template <typename Float, typename Order>
   struct GaugePhaseArg {
     Order order;
@@ -255,7 +258,11 @@ namespace quda {
 
   }
 
+#endif
+
   void applyGaugePhase(GaugeField &u) {
+
+#ifdef GPU_GAUGE_TOOLS
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       gaugePhase<double>(u);
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
@@ -263,6 +270,10 @@ namespace quda {
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }
+#else
+    errorQuda("Gauge tools are not build");
+#endif
+
   }
 
 } // namespace quda

@@ -23,8 +23,8 @@ namespace quda {
     double mass;
     double m5; // used by domain wall only
     int Ls;    //!NEW: used by domain wall and twisted mass
-    double *b_5;    //!NEW: used by mobius domain wall only  
-    double *c_5;    //!NEW: used by mobius domain wall only
+    double b_5[QUDA_MAX_DWF_LS];    //!NEW: used by mobius domain wall only  
+    double c_5[QUDA_MAX_DWF_LS];    //!NEW: used by mobius domain wall only
     QudaMatPCType matpcType;
     QudaDagType dagger;
     cudaGaugeField *gauge;
@@ -141,6 +141,7 @@ namespace quda {
   class DiracWilson : public Dirac {
 
   protected:
+    void initConstants();
     FaceBuffer face1, face2; // multi-gpu communication buffers
 
   public:
@@ -190,8 +191,9 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField &clover;
+    void initConstants();
     void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
+    cudaCloverField &clover;
 
   public:
     DiracClover(const DiracParam &param);
@@ -245,6 +247,7 @@ namespace quda {
   protected:
     double m5;
     double kappa5;
+    int Ls; // length of the fifth dimension
 
   public:
     DiracDomainWall(const DiracParam &param);
@@ -323,8 +326,8 @@ namespace quda {
     
   protected:
     //Mobius coefficients
-    double *b_5;
-    double *c_5;
+    double b_5[QUDA_MAX_DWF_LS];
+    double c_5[QUDA_MAX_DWF_LS];
 
   private:
 
@@ -346,7 +349,7 @@ namespace quda {
 
     void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
     void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
-    void Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    //void Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
     void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol, cudaColorSpinorField &x, 
 		 cudaColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b, const QudaSolutionType) const;

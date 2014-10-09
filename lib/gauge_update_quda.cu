@@ -11,6 +11,8 @@
 
 namespace quda {
 
+#ifdef GPU_GAUGE_TOOLS
+
   template <typename Complex, typename Gauge, typename Mom>
   struct UpdateGaugeArg {
     typedef typename RealTypeId<Complex>::Type real;
@@ -342,10 +344,12 @@ namespace quda {
     }
 
   }
+#endif
 
   void updateGaugeField(GaugeField &out, double dt, const GaugeField& in, 
 			const GaugeField& mom, bool conj_mom, bool exact)
   {
+#ifdef GPU_GAUGE_TOOLS
     if (out.Precision() != in.Precision() || out.Precision() != mom.Precision())
       errorQuda("Gauge and momentum fields must have matching precision");
 
@@ -359,6 +363,9 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", out.Precision());
     }
+#else
+  errorQuda("Gauge tools are not build");
+#endif
 
   }
 
