@@ -1206,6 +1206,32 @@ __device__ inline int dimFromFaceIndex (int &face_idx, const Param &param) {
   }
 }
 
+template <typename Param> 
+__device__ inline int dimFromDWFaceIndex(int &face_idx, const Param &param){
+
+  // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
+  const int s = face_idx/param.threads;
+
+  face_idx = face_idx - s*param.threads; // face_idx = face_idx % param.threads
+
+  if (face_idx < param.threadDimMapUpper[0]){
+    face_idx += s*param.threadDimMapUpper[0];
+    return 0;
+  } else if (face_idx < param.threadDimMapUpper[1]){
+    face_idx -= param.threadDimMapLower[1];
+    face_idx += s*(param.threadDimMapUpper[1] - param.threadDimMapLower[1]);
+    return 1;
+  } else if (face_idx < param.threadDimMapUpper[2]){
+    face_idx -= param.threadDimMapLower[2];
+    face_idx += s*(param.threadDimMapUpper[2] - param.threadDimMapLower[2]);
+    return 2;
+  } else  { 
+    face_idx -= param.threadDimMapLower[3];
+    face_idx += s*(param.threadDimMapUpper[3] - param.threadDimMapLower[3]);
+    return 3;
+  }
+}
+
 template<int nLayers>
 static inline __device__ void faceIndexFromCoords(int &face_idx, int x, int y, int z, int t, int face_dim, const int X[4])
 {
@@ -1228,6 +1254,35 @@ static inline __device__ void faceIndexFromCoords(int &face_idx, int x, int y, i
   D[face_dim] = nLayers;
 
   face_idx = ((((D[2]*t + z)*D[1] + y)*D[0] + x) >> 1);
+
+  return;
 }
+
+template<int nLayers> 
+static inline __device__ void faceIndexFromDWCoords(int &face_idx, int x, int y, int z, int t, int s, int face_dim, const int X[4])
+{
+  int D[4] = {X[0], X[1], X[2], X[3]};
+  
+  switch(face_dim){
+    case 0:
+      x = (x < nLayers) ? x : x - (X[0] - nLayers);
+      break;
+    case 1:
+      y = (y < nLayers) ? y : y - (X[1] - nLayers);
+      break;
+    case 2:
+      z = (z < nLayers) ? z : z - (X[2] - nLayers);
+      break;
+    case 3:
+      t = (t < nLayers) ? t : t - (X[3] - nLayers);
+      break;
+  }
+  D[face_dim] = nLayers;
+
+  face_idx = (((((D[3]*s + t)*D[2] + z)*D[1] + y)*D[0] + x) >> 1);
+
+  return;
+}
+
 
  
