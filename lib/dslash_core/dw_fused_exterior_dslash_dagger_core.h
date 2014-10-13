@@ -317,7 +317,7 @@ if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,0,Y);
  const int sp_idx = face_idx + param.ghostOffset[0];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[0];
+   sp_norm_idx = face_idx + param.Ls*ghostFace[0] + param.ghostNormOffset[0];
 #endif
 
 
@@ -507,7 +507,7 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,0,Y);
  const int sp_idx = face_idx + param.ghostOffset[0];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[0];
+   sp_norm_idx = face_idx + param.ghostNormOffset[0];
 #endif
 
 
@@ -701,7 +701,7 @@ if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,1,Y);
  const int sp_idx = face_idx + param.ghostOffset[1];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[1];
+   sp_norm_idx = face_idx + param.Ls*ghostFace[1] + param.ghostNormOffset[1];
 #endif
 
 
@@ -891,7 +891,7 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,1,Y);
  const int sp_idx = face_idx + param.ghostOffset[1];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[1];
+   sp_norm_idx = face_idx + param.ghostNormOffset[1];
 #endif
 
 
@@ -1085,7 +1085,7 @@ if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,2,Y);
  const int sp_idx = face_idx + param.ghostOffset[2];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[2];
+   sp_norm_idx = face_idx + param.Ls*ghostFace[2] + param.ghostNormOffset[2];
 #endif
 
 
@@ -1275,7 +1275,7 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,2,Y);
  const int sp_idx = face_idx + param.ghostOffset[2];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[2];
+   sp_norm_idx = face_idx + param.ghostNormOffset[2];
 #endif
 
 
@@ -1469,7 +1469,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,3,Y);
  const int sp_idx = face_idx + param.ghostOffset[3];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[3];
+   sp_norm_idx = face_idx + param.Ls*ghostFace[3] + param.ghostNormOffset[3];
 #endif
 
 
@@ -1721,7 +1721,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
  faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs,3,Y);
  const int sp_idx = face_idx + param.ghostOffset[3];
 #if (DD_PREC==2) // half precision
- sp_norm_idx = face_idx + param.ghostNormOffset[3];
+   sp_norm_idx = face_idx + param.ghostNormOffset[3];
 #endif
 
 

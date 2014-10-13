@@ -572,7 +572,10 @@ def gen(dir, pack_only=False):
     str += "faceIndexFromDWCoords<1>(face_idx,x1,x2,x3,x4,xs," + `dir/2` + ",Y);\n"
     str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "];\n"
     str += "#if (DD_PREC==2) // half precision\n"
-    str += "sp_norm_idx = face_idx + param.ghostNormOffset[" + `dir/2` + "];\n"
+    str += "  sp_norm_idx = face_idx + "
+    if dir%2 == 0:
+      str += "param.Ls*ghostFace[" + `dir/2` + "] + "
+    str += "param.ghostNormOffset[" + `dir/2` + "];\n"
     str += "#endif\n\n"
     str += "\n"
     if dir % 2 == 0:
