@@ -289,7 +289,6 @@ def prolog():
 
     prolog_str+= (
 """
-  KernelType kernel_type = EXTERIOR_KERNEL_ALL;
 #if (CUDA_VERSION >= 4010)
 #define VOLATILE
 #else
@@ -371,22 +370,7 @@ int s_parity, boundaryCrossing;
 
 
 """)
-        if domain_wall:
-          prolog_str+=(
-"""
 
-""")
-        else:
-          prolog_str+=(
-"""
-
-""")
-
-#        out = ""
-#        for s in range(0,4):
-#            for c in range(0,3):
-#                out += out_re(s,c)+" = 0; "+out_im(s,c)+" = 0;\n"
-#        prolog_str+= indent(out)
 
         prolog_str+= (
 """
@@ -530,8 +514,6 @@ def gen(dir, pack_only=False):
 
     cond = ""
     cond += "#ifdef MULTI_GPU\n"
-#    cond += "if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim["+`dir/2`+"] || "+interior[dir]+")) ||\n"
-#    cond += " (kernel_type == EXTERIOR_KERNEL_"+dim[dir/2]+" && "+boundary[dir]+") )\n"
     cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " + boundary[dir] + " )\n"
 
     cond += "#endif\n"
@@ -598,9 +580,6 @@ def gen(dir, pack_only=False):
         load_half += "const int sp_stride_pad = param.Ls*ghostFace[" + `dir/2` + "];\n"
     else :
         load_half += "const int sp_stride_pad = ghostFace[" + `dir/2` + "];\n" 
-    #load_half += "#if (DD_PREC==2) // half precision\n"
-    #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
-    #load_half += "#endif\n"
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"
@@ -728,82 +707,6 @@ def gen(dir, pack_only=False):
 # end def gen
 
 
-def gen_dw():
-    if dagger: lsign='-'; ledge = '0'; rsign='+'; redge='param.Ls-1'
-    else: lsign='+'; ledge = 'param.Ls-1'; rsign='-'; redge='0'
-
-    str = "\n\n"
-    str += "// 5th dimension -- NB: not partitionable!\n"
-    str += "#ifdef MULTI_GPU\nif(kernel_type == INTERIOR_KERNEL)\n#endif\n{\n"
-    str += "// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )\n"
-    str += "  {\n"
-    str += "     int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (ledge, rsign, lsign)
-    str += "\n"
-    str += "// read spinor from device memory\n"
-    str += "     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
-    str += "\n"
-    str += "     if ( xs != %s )\n" % ledge
-    str += "     {\n"
-    
-    def proj(i,j):
-        return two_P_L[4*i+j]
-    
-    # xs != 0:
-    out_L = ""
-    for s1 in range(0,4):
-    #{
-        for c in range(0,3):
-            re_rhs, im_rhs = "", ""
-            for s2 in range(0,4):
-                re, im = proj(s1,s2).real, proj(s1,s2).imag
-                if re != 0 :
-                    re_rhs += sign(re) + in_re(s2,c)
-                    im_rhs += sign(re) + in_im(s2,c)
-                if im != 0 :
-                    re_rhs += sign(-im) + in_im(s2,c)
-                    im_rhs += sign(im) + in_re(s2,c)
-            out_L += 3*" " + out_re(s1,c) + " += " + re_rhs + ";"
-            out_L += 3*" " + out_im(s1,c) + " += " + im_rhs + ";\n"
-        if s1 < 3 : out_L += "\n"
-    #}
-    
-    str += out_L
-
-    str += "    }\n"
-    str += "    else\n"
-    str += "    {\n"
-    
-    # xs == 0:
-    str += out_L.replace(" += "," += -mferm*(").replace(";",");")
-
-    str += "    } // end if ( xs != %s )\n" % ledge
-    str += "  } // end P_L\n\n"
-    str += " // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )\n"
-    str += "  {\n"
-    str += "    int sp_idx = ( xs == %s ? X%s(param.Ls-1)*2*Vh : X%s2*Vh ) / 2;\n" % (redge, lsign, rsign)
-    str += "\n"
-    str += "// read spinor from device memory\n"
-    str += "    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );\n"
-    str += "\n"
-    str += "    if ( xs != %s )\n" % redge
-    str += "    {\n"
-    
-    # xs != Ls-1
-    str += out_L.replace("-","+")
-
-    str += "    }\n"
-    str += "    else\n"
-    str += "    {\n"
-
-    # xs == Ls-1
-    str += out_L.replace("-","+").replace(" += "," += -mferm*(").replace(";",");")
-
-    str += "    } // end if ( xs != %s )\n" % redge
-    str += "  } // end P_R\n"
-    str += "} // end 5th dimension\n\n\n"
-
-    return str
-# end def gen_dw
 
 
 def input_spinor(s,c,z):
@@ -997,37 +900,6 @@ def xpay():
     return str
 # end def xpay
 
-#def xpay_lmem_pre():
-#    str = ""
-#    str += "#if defined MULTI_GPU && defined DSLASH_XPAY\n"
-#    str += "if (kernel_type == INTERIOR_KERNEL)\n"
-#    str += "#endif\n"
-#    str += "{\n"
-#    str += "#ifdef DSLASH_XPAY\n"
-#    str += "  READ_ACCUM(ACCUMTEX, param.sp_stride)\n"
-#    str += "  VOLATILE spinorFloat a_inv = 1.0/a;\n\n"
-#    str += "#ifdef SPINOR_DOUBLE\n"
-#
-#    for s in range(0,4):
-#        for c in range(0,3):
-#            i = 3*s+c
-#            str +=" "+ out_re(s,c) +" = "+out_re(s,c)+" + a_inv*accum"+nthFloat2(2*i+0)+";\n"
-#            str +=" "+ out_im(s,c) +" = "+out_im(s,c)+" + a_inv*accum"+nthFloat2(2*i+1)+";\n"
-#
-#    str += "#else\n"
-#
-#    for s in range(0,4):
-#        for c in range(0,3):
-#            i = 3*s+c
-#            str +=" "+ out_re(s,c) +" = "+out_re(s,c)+" + a_inv*accum"+nthFloat4(2*i+0)+";\n"
-#            str +=" "+ out_im(s,c) +" = "+out_im(s,c)+" + a_inv*accum"+nthFloat4(2*i+1)+";\n"
-
-#    str += "#endif // SPINOR_DOUBLE\n\n"
-#    str += "#endif // DSLASH_XPAY\n"
-#    str += "}\n\n"
-
-#    return str
-# end def xpay_lmem_pre
 
 
 def xpay_lmem():
@@ -1058,33 +930,6 @@ def xpay_lmem():
 
 def epilog():
     str = ""
-    if dslash:
-        if twist:
-            str += "#ifdef MULTI_GPU\n"
-        else:
-            if domain_wall:
-                str += "#if defined MULTI_GPU && defined DSLASH_XPAY\n"
-            else:
-                str += "#if defined MULTI_GPU && (defined DSLASH_XPAY || defined DSLASH_CLOVER)\n"
-#        str += (
-#"""
-#int incomplete = 0; // Have all 8 contributions been computed for this site?
-#
-#switch(kernel_type) { // intentional fall-through
-#case INTERIOR_KERNEL:
-#incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-#case EXTERIOR_KERNEL_T:
-#incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-#case EXTERIOR_KERNEL_Z:
-#incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-#case EXTERIOR_KERNEL_Y:
-#incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-#}
-
-#""")
-#        str += "if (!incomplete)\n"
-        str += "#endif // MULTI_GPU\n"
-    
     str += block( "\n" + (twisted() if twist else apply_clover()) + xpay_lmem() )
     
     str += "\n\n"
@@ -1185,8 +1030,6 @@ def generate_dslash():
     r = prolog()
     for i in range(0,8) :
       r += gen( i )
-    if domain_wall:
-      r += gen_dw()
     r += epilog()
     return r
 

@@ -4,7 +4,6 @@
 
 // NB! Don't trust any MULTI_GPU code
 
-  KernelType kernel_type = EXTERIOR_KERNEL_ALL;
 #if (CUDA_VERSION >= 4010)
 #define VOLATILE
 #else
@@ -193,8 +192,6 @@ faceVolume[3] = (X1*X2*X3)>>1;
 int X, x1, x2, x3, x4, xs;
 
 int s_parity, boundaryCrossing;
-
-
 
 
 
@@ -1708,107 +1705,6 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
  }
 }
 
-
-
-// 5th dimension -- NB: not partitionable!
-#ifdef MULTI_GPU
-if(kernel_type == INTERIOR_KERNEL)
-#endif
-{
-// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
-  {
-     int sp_idx = ( xs == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
-
-// read spinor from device memory
-     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
-
-     if ( xs != param.Ls-1 )
-     {
-   o00_re += +i00_re-i20_re;   o00_im += +i00_im-i20_im;
-   o01_re += +i01_re-i21_re;   o01_im += +i01_im-i21_im;
-   o02_re += +i02_re-i22_re;   o02_im += +i02_im-i22_im;
-
-   o10_re += +i10_re-i30_re;   o10_im += +i10_im-i30_im;
-   o11_re += +i11_re-i31_re;   o11_im += +i11_im-i31_im;
-   o12_re += +i12_re-i32_re;   o12_im += +i12_im-i32_im;
-
-   o20_re += -i00_re+i20_re;   o20_im += -i00_im+i20_im;
-   o21_re += -i01_re+i21_re;   o21_im += -i01_im+i21_im;
-   o22_re += -i02_re+i22_re;   o22_im += -i02_im+i22_im;
-
-   o30_re += -i10_re+i30_re;   o30_im += -i10_im+i30_im;
-   o31_re += -i11_re+i31_re;   o31_im += -i11_im+i31_im;
-   o32_re += -i12_re+i32_re;   o32_im += -i12_im+i32_im;
-    }
-    else
-    {
-   o00_re += -mferm*(+i00_re-i20_re);   o00_im += -mferm*(+i00_im-i20_im);
-   o01_re += -mferm*(+i01_re-i21_re);   o01_im += -mferm*(+i01_im-i21_im);
-   o02_re += -mferm*(+i02_re-i22_re);   o02_im += -mferm*(+i02_im-i22_im);
-
-   o10_re += -mferm*(+i10_re-i30_re);   o10_im += -mferm*(+i10_im-i30_im);
-   o11_re += -mferm*(+i11_re-i31_re);   o11_im += -mferm*(+i11_im-i31_im);
-   o12_re += -mferm*(+i12_re-i32_re);   o12_im += -mferm*(+i12_im-i32_im);
-
-   o20_re += -mferm*(-i00_re+i20_re);   o20_im += -mferm*(-i00_im+i20_im);
-   o21_re += -mferm*(-i01_re+i21_re);   o21_im += -mferm*(-i01_im+i21_im);
-   o22_re += -mferm*(-i02_re+i22_re);   o22_im += -mferm*(-i02_im+i22_im);
-
-   o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
-   o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
-   o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
-    } // end if ( xs != param.Ls-1 )
-  } // end P_L
-
- // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
-  {
-    int sp_idx = ( xs == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
-
-// read spinor from device memory
-    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
-
-    if ( xs != 0 )
-    {
-   o00_re += +i00_re+i20_re;   o00_im += +i00_im+i20_im;
-   o01_re += +i01_re+i21_re;   o01_im += +i01_im+i21_im;
-   o02_re += +i02_re+i22_re;   o02_im += +i02_im+i22_im;
-
-   o10_re += +i10_re+i30_re;   o10_im += +i10_im+i30_im;
-   o11_re += +i11_re+i31_re;   o11_im += +i11_im+i31_im;
-   o12_re += +i12_re+i32_re;   o12_im += +i12_im+i32_im;
-
-   o20_re += +i00_re+i20_re;   o20_im += +i00_im+i20_im;
-   o21_re += +i01_re+i21_re;   o21_im += +i01_im+i21_im;
-   o22_re += +i02_re+i22_re;   o22_im += +i02_im+i22_im;
-
-   o30_re += +i10_re+i30_re;   o30_im += +i10_im+i30_im;
-   o31_re += +i11_re+i31_re;   o31_im += +i11_im+i31_im;
-   o32_re += +i12_re+i32_re;   o32_im += +i12_im+i32_im;
-    }
-    else
-    {
-   o00_re += -mferm*(+i00_re+i20_re);   o00_im += -mferm*(+i00_im+i20_im);
-   o01_re += -mferm*(+i01_re+i21_re);   o01_im += -mferm*(+i01_im+i21_im);
-   o02_re += -mferm*(+i02_re+i22_re);   o02_im += -mferm*(+i02_im+i22_im);
-
-   o10_re += -mferm*(+i10_re+i30_re);   o10_im += -mferm*(+i10_im+i30_im);
-   o11_re += -mferm*(+i11_re+i31_re);   o11_im += -mferm*(+i11_im+i31_im);
-   o12_re += -mferm*(+i12_re+i32_re);   o12_im += -mferm*(+i12_im+i32_im);
-
-   o20_re += -mferm*(+i00_re+i20_re);   o20_im += -mferm*(+i00_im+i20_im);
-   o21_re += -mferm*(+i01_re+i21_re);   o21_im += -mferm*(+i01_im+i21_im);
-   o22_re += -mferm*(+i02_re+i22_re);   o22_im += -mferm*(+i02_im+i22_im);
-
-   o30_re += -mferm*(+i10_re+i30_re);   o30_im += -mferm*(+i10_im+i30_im);
-   o31_re += -mferm*(+i11_re+i31_re);   o31_im += -mferm*(+i11_im+i31_im);
-   o32_re += -mferm*(+i12_re+i32_re);   o32_im += -mferm*(+i12_im+i32_im);
-    } // end if ( xs != 0 )
-  } // end P_R
-} // end 5th dimension
-
-
-#if defined MULTI_GPU && defined DSLASH_XPAY
-#endif // MULTI_GPU
 {
 
 #ifdef DSLASH_XPAY
