@@ -194,38 +194,12 @@ int X, x1, x2, x3, x4, xs;
 
 int s_parity, boundaryCrossing;
 
-#ifdef MULTI_GPU
-if (kernel_type == INTERIOR_KERNEL) {
-#endif
 
-// Inline by hand for the moment and assume even dimensions
-//coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
 
-s_parity = ( sid/(X4*X3*X2*X1h) ) % 2;
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h) + sid/(X4*X3*X2*X1h);
 
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-x1 = X % X1;
-x2 = (X/X1) % X2;
-x3 = (X/(X1*X2)) % X3;
-x4 = (X/(X1*X2*X3)) % X4;
-xs = X/(X1*X2*X3*X4);
-
- o00_re = 0; o00_im = 0;
- o01_re = 0; o01_im = 0;
- o02_re = 0; o02_im = 0;
- o10_re = 0; o10_im = 0;
- o11_re = 0; o11_im = 0;
- o12_re = 0; o12_im = 0;
- o20_re = 0; o20_im = 0;
- o21_re = 0; o21_im = 0;
- o22_re = 0; o22_im = 0;
- o30_re = 0; o30_im = 0;
- o31_re = 0; o31_im = 0;
- o32_re = 0; o32_im = 0;
 
 #ifdef MULTI_GPU
-} else { // exterior kernel
+{ // exterior kernel
 
 dim = dimFromDWFaceIndex(sid, param); // sid is also modified
 
@@ -334,29 +308,7 @@ if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
  spinorFloat b1_re, b1_im;
  spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
- if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // read spinor from device memory
-  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-  // project spinor into half spinors
-  a0_re = +i00_re-i30_im;
-  a0_im = +i00_im+i30_re;
-  a1_re = +i01_re-i31_im;
-  a1_im = +i01_im+i31_re;
-  a2_re = +i02_re-i32_im;
-  a2_im = +i02_im+i32_re;
-  b0_re = +i10_re-i20_im;
-  b0_im = +i10_im+i20_re;
-  b1_re = +i11_re-i21_im;
-  b1_im = +i11_im+i21_re;
-  b2_re = +i12_re-i22_im;
-  b2_im = +i12_im+i22_re;
-
-#ifdef MULTI_GPU
- } else {
+ {
 
   const int sp_stride_pad = param.Ls*ghostFace[0];
 
@@ -371,7 +323,6 @@ if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
   b2_re = i12_re; b2_im = i12_im;
 
  }
-#endif // MULTI_GPU
 
  // reconstruct gauge matrix
  RECONSTRUCT_GAUGE_MATRIX(0);
@@ -528,29 +479,7 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
  spinorFloat b1_re, b1_im;
  spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
- if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // read spinor from device memory
-  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-  // project spinor into half spinors
-  a0_re = +i00_re+i30_im;
-  a0_im = +i00_im-i30_re;
-  a1_re = +i01_re+i31_im;
-  a1_im = +i01_im-i31_re;
-  a2_re = +i02_re+i32_im;
-  a2_im = +i02_im-i32_re;
-  b0_re = +i10_re+i20_im;
-  b0_im = +i10_im-i20_re;
-  b1_re = +i11_re+i21_im;
-  b1_im = +i11_im-i21_re;
-  b2_re = +i12_re+i22_im;
-  b2_im = +i12_im-i22_re;
-
-#ifdef MULTI_GPU
- } else {
+ {
 
   const int sp_stride_pad = param.Ls*ghostFace[0];
 
@@ -565,7 +494,6 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
   b2_re = i12_re; b2_im = i12_im;
 
  }
-#endif // MULTI_GPU
 
  // reconstruct gauge matrix
  RECONSTRUCT_GAUGE_MATRIX(1);
@@ -718,29 +646,7 @@ if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
  spinorFloat b1_re, b1_im;
  spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
- if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // read spinor from device memory
-  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-  // project spinor into half spinors
-  a0_re = +i00_re+i30_re;
-  a0_im = +i00_im+i30_im;
-  a1_re = +i01_re+i31_re;
-  a1_im = +i01_im+i31_im;
-  a2_re = +i02_re+i32_re;
-  a2_im = +i02_im+i32_im;
-  b0_re = +i10_re-i20_re;
-  b0_im = +i10_im-i20_im;
-  b1_re = +i11_re-i21_re;
-  b1_im = +i11_im-i21_im;
-  b2_re = +i12_re-i22_re;
-  b2_im = +i12_im-i22_im;
-
-#ifdef MULTI_GPU
- } else {
+ {
 
   const int sp_stride_pad = param.Ls*ghostFace[1];
 
@@ -755,7 +661,6 @@ if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
   b2_re = i12_re; b2_im = i12_im;
 
  }
-#endif // MULTI_GPU
 
  // reconstruct gauge matrix
  RECONSTRUCT_GAUGE_MATRIX(2);
@@ -912,29 +817,7 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
  spinorFloat b1_re, b1_im;
  spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
- if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // read spinor from device memory
-  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-  // project spinor into half spinors
-  a0_re = +i00_re-i30_re;
-  a0_im = +i00_im-i30_im;
-  a1_re = +i01_re-i31_re;
-  a1_im = +i01_im-i31_im;
-  a2_re = +i02_re-i32_re;
-  a2_im = +i02_im-i32_im;
-  b0_re = +i10_re+i20_re;
-  b0_im = +i10_im+i20_im;
-  b1_re = +i11_re+i21_re;
-  b1_im = +i11_im+i21_im;
-  b2_re = +i12_re+i22_re;
-  b2_im = +i12_im+i22_im;
-
-#ifdef MULTI_GPU
- } else {
+ {
 
   const int sp_stride_pad = param.Ls*ghostFace[1];
 
@@ -949,7 +832,6 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
   b2_re = i12_re; b2_im = i12_im;
 
  }
-#endif // MULTI_GPU
 
  // reconstruct gauge matrix
  RECONSTRUCT_GAUGE_MATRIX(3);
@@ -1102,29 +984,7 @@ if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
  spinorFloat b1_re, b1_im;
  spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
- if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // read spinor from device memory
-  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-  // project spinor into half spinors
-  a0_re = +i00_re-i20_im;
-  a0_im = +i00_im+i20_re;
-  a1_re = +i01_re-i21_im;
-  a1_im = +i01_im+i21_re;
-  a2_re = +i02_re-i22_im;
-  a2_im = +i02_im+i22_re;
-  b0_re = +i10_re+i30_im;
-  b0_im = +i10_im-i30_re;
-  b1_re = +i11_re+i31_im;
-  b1_im = +i11_im-i31_re;
-  b2_re = +i12_re+i32_im;
-  b2_im = +i12_im-i32_re;
-
-#ifdef MULTI_GPU
- } else {
+ {
 
   const int sp_stride_pad = param.Ls*ghostFace[2];
 
@@ -1139,7 +999,6 @@ if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
   b2_re = i12_re; b2_im = i12_im;
 
  }
-#endif // MULTI_GPU
 
  // reconstruct gauge matrix
  RECONSTRUCT_GAUGE_MATRIX(4);
@@ -1296,29 +1155,7 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
  spinorFloat b1_re, b1_im;
  spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
- if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-  // read spinor from device memory
-  READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-  // project spinor into half spinors
-  a0_re = +i00_re+i20_im;
-  a0_im = +i00_im-i20_re;
-  a1_re = +i01_re+i21_im;
-  a1_im = +i01_im-i21_re;
-  a2_re = +i02_re+i22_im;
-  a2_im = +i02_im-i22_re;
-  b0_re = +i10_re-i30_im;
-  b0_im = +i10_im+i30_re;
-  b1_re = +i11_re-i31_im;
-  b1_im = +i11_im+i31_re;
-  b2_re = +i12_re-i32_im;
-  b2_im = +i12_im+i32_re;
-
-#ifdef MULTI_GPU
- } else {
+ {
 
   const int sp_stride_pad = param.Ls*ghostFace[2];
 
@@ -1333,7 +1170,6 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
   b2_re = i12_re; b2_im = i12_im;
 
  }
-#endif // MULTI_GPU
 
  // reconstruct gauge matrix
  RECONSTRUCT_GAUGE_MATRIX(5);
@@ -1484,29 +1320,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
   spinorFloat b1_re, b1_im;
   spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
-  if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-   // read spinor from device memory
-   READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-   // project spinor into half spinors
-   a0_re = +2*i00_re;
-   a0_im = +2*i00_im;
-   a1_re = +2*i01_re;
-   a1_im = +2*i01_im;
-   a2_re = +2*i02_re;
-   a2_im = +2*i02_im;
-   b0_re = +2*i10_re;
-   b0_im = +2*i10_im;
-   b1_re = +2*i11_re;
-   b1_im = +2*i11_im;
-   b2_re = +2*i12_re;
-   b2_im = +2*i12_im;
-
-#ifdef MULTI_GPU
-  } else {
+  {
 
    const int sp_stride_pad = param.Ls*ghostFace[3];
    const int t_proj_scale = TPROJSCALE;
@@ -1522,7 +1336,6 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
    b2_re = t_proj_scale*i12_re; b2_im = t_proj_scale*i12_im;
 
   }
-#endif // MULTI_GPU
 
   // identity gauge matrix
   spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
@@ -1558,29 +1371,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
   spinorFloat b1_re, b1_im;
   spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
-  if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-   // read spinor from device memory
-   READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-   // project spinor into half spinors
-   a0_re = +2*i00_re;
-   a0_im = +2*i00_im;
-   a1_re = +2*i01_re;
-   a1_im = +2*i01_im;
-   a2_re = +2*i02_re;
-   a2_im = +2*i02_im;
-   b0_re = +2*i10_re;
-   b0_im = +2*i10_im;
-   b1_re = +2*i11_re;
-   b1_im = +2*i11_im;
-   b2_re = +2*i12_re;
-   b2_im = +2*i12_im;
-
-#ifdef MULTI_GPU
-  } else {
+  {
 
    const int sp_stride_pad = param.Ls*ghostFace[3];
    const int t_proj_scale = TPROJSCALE;
@@ -1596,7 +1387,6 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
    b2_re = t_proj_scale*i12_re; b2_im = t_proj_scale*i12_im;
 
   }
-#endif // MULTI_GPU
 
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(6);
@@ -1740,29 +1530,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
   spinorFloat b1_re, b1_im;
   spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
-  if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-   // read spinor from device memory
-   READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-   // project spinor into half spinors
-   a0_re = +2*i20_re;
-   a0_im = +2*i20_im;
-   a1_re = +2*i21_re;
-   a1_im = +2*i21_im;
-   a2_re = +2*i22_re;
-   a2_im = +2*i22_im;
-   b0_re = +2*i30_re;
-   b0_im = +2*i30_im;
-   b1_re = +2*i31_re;
-   b1_im = +2*i31_im;
-   b2_re = +2*i32_re;
-   b2_im = +2*i32_im;
-
-#ifdef MULTI_GPU
-  } else {
+  {
 
    const int sp_stride_pad = param.Ls*ghostFace[3];
    const int t_proj_scale = TPROJSCALE;
@@ -1778,7 +1546,6 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
    b2_re = t_proj_scale*i12_re; b2_im = t_proj_scale*i12_im;
 
   }
-#endif // MULTI_GPU
 
   // identity gauge matrix
   spinorFloat A0_re = a0_re; spinorFloat A0_im = a0_im;
@@ -1814,29 +1581,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
   spinorFloat b1_re, b1_im;
   spinorFloat b2_re, b2_im;
 
-#ifdef MULTI_GPU
-  if (kernel_type == INTERIOR_KERNEL) {
-#endif
-
-   // read spinor from device memory
-   READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-
-   // project spinor into half spinors
-   a0_re = +2*i20_re;
-   a0_im = +2*i20_im;
-   a1_re = +2*i21_re;
-   a1_im = +2*i21_im;
-   a2_re = +2*i22_re;
-   a2_im = +2*i22_im;
-   b0_re = +2*i30_re;
-   b0_im = +2*i30_im;
-   b1_re = +2*i31_re;
-   b1_im = +2*i31_im;
-   b2_re = +2*i32_re;
-   b2_im = +2*i32_im;
-
-#ifdef MULTI_GPU
-  } else {
+  {
 
    const int sp_stride_pad = param.Ls*ghostFace[3];
    const int t_proj_scale = TPROJSCALE;
@@ -1852,7 +1597,6 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
    b2_re = t_proj_scale*i12_re; b2_im = t_proj_scale*i12_im;
 
   }
-#endif // MULTI_GPU
 
   // reconstruct gauge matrix
   RECONSTRUCT_GAUGE_MATRIX(7);
@@ -2064,84 +1808,6 @@ if(kernel_type == INTERIOR_KERNEL)
 
 
 #if defined MULTI_GPU && defined DSLASH_XPAY
-if (kernel_type == INTERIOR_KERNEL)
-#endif
-{
-#ifdef DSLASH_XPAY
-  READ_ACCUM(ACCUMTEX, param.sp_stride)
-  VOLATILE spinorFloat a_inv = 1.0/a;
-
-#ifdef SPINOR_DOUBLE
- o00_re = o00_re + a_inv*accum0.x;
- o00_im = o00_im + a_inv*accum0.y;
- o01_re = o01_re + a_inv*accum1.x;
- o01_im = o01_im + a_inv*accum1.y;
- o02_re = o02_re + a_inv*accum2.x;
- o02_im = o02_im + a_inv*accum2.y;
- o10_re = o10_re + a_inv*accum3.x;
- o10_im = o10_im + a_inv*accum3.y;
- o11_re = o11_re + a_inv*accum4.x;
- o11_im = o11_im + a_inv*accum4.y;
- o12_re = o12_re + a_inv*accum5.x;
- o12_im = o12_im + a_inv*accum5.y;
- o20_re = o20_re + a_inv*accum6.x;
- o20_im = o20_im + a_inv*accum6.y;
- o21_re = o21_re + a_inv*accum7.x;
- o21_im = o21_im + a_inv*accum7.y;
- o22_re = o22_re + a_inv*accum8.x;
- o22_im = o22_im + a_inv*accum8.y;
- o30_re = o30_re + a_inv*accum9.x;
- o30_im = o30_im + a_inv*accum9.y;
- o31_re = o31_re + a_inv*accum10.x;
- o31_im = o31_im + a_inv*accum10.y;
- o32_re = o32_re + a_inv*accum11.x;
- o32_im = o32_im + a_inv*accum11.y;
-#else
- o00_re = o00_re + a_inv*accum0.x;
- o00_im = o00_im + a_inv*accum0.y;
- o01_re = o01_re + a_inv*accum0.z;
- o01_im = o01_im + a_inv*accum0.w;
- o02_re = o02_re + a_inv*accum1.x;
- o02_im = o02_im + a_inv*accum1.y;
- o10_re = o10_re + a_inv*accum1.z;
- o10_im = o10_im + a_inv*accum1.w;
- o11_re = o11_re + a_inv*accum2.x;
- o11_im = o11_im + a_inv*accum2.y;
- o12_re = o12_re + a_inv*accum2.z;
- o12_im = o12_im + a_inv*accum2.w;
- o20_re = o20_re + a_inv*accum3.x;
- o20_im = o20_im + a_inv*accum3.y;
- o21_re = o21_re + a_inv*accum3.z;
- o21_im = o21_im + a_inv*accum3.w;
- o22_re = o22_re + a_inv*accum4.x;
- o22_im = o22_im + a_inv*accum4.y;
- o30_re = o30_re + a_inv*accum4.z;
- o30_im = o30_im + a_inv*accum4.w;
- o31_re = o31_re + a_inv*accum5.x;
- o31_im = o31_im + a_inv*accum5.y;
- o32_re = o32_re + a_inv*accum5.z;
- o32_im = o32_im + a_inv*accum5.w;
-#endif // SPINOR_DOUBLE
-
-#endif // DSLASH_XPAY
-}
-
-#if defined MULTI_GPU && defined DSLASH_XPAY
-
-int incomplete = 0; // Have all 8 contributions been computed for this site?
-
-switch(kernel_type) { // intentional fall-through
-case INTERIOR_KERNEL:
-incomplete = incomplete || (param.commDim[3] && (x4==0 || x4==X4m1));
-case EXTERIOR_KERNEL_T:
-incomplete = incomplete || (param.commDim[2] && (x3==0 || x3==X3m1));
-case EXTERIOR_KERNEL_Z:
-incomplete = incomplete || (param.commDim[1] && (x2==0 || x2==X2m1));
-case EXTERIOR_KERNEL_Y:
-incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
-}
-
-if (!incomplete)
 #endif // MULTI_GPU
 {
 
