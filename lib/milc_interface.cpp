@@ -48,17 +48,20 @@ void inline qudamilc_called(const char * func){
 
 void qudaInit(QudaInitArgs_t input)
 {
-
+  qudamilc_called<true>(__func__);
   if(initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
   qudaSetLayout(input.layout);
   initialized = true;
+    qudamilc_called<false>(__func__);
 
 }
 
 void qudaFinalize()
 {
+  qudamilc_called<true>(__func__);
   endQuda();
+    qudamilc_called<false>(__func__);
 }
 
 /**
@@ -116,7 +119,7 @@ void qudaHisqParamsInit(QudaHisqParams_t params)
   static bool initialized = false;
 
   if(initialized) return;
-
+  qudamilc_called<true>(__func__);
 
   const bool reunit_allow_svd = (params.reunit_allow_svd) ? true : false;
   const bool reunit_svd_only  = (params.reunit_svd_only) ? true : false;
@@ -145,7 +148,7 @@ void qudaHisqParamsInit(QudaHisqParams_t params)
 #endif // UNITARIZE_GPU                            
 
   initialized = true;
-
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -153,6 +156,7 @@ void qudaHisqParamsInit(QudaHisqParams_t params)
 
 static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, QudaLinkType link_type)
 {
+  qudamilc_called<true>(__func__);
   QudaGaugeParam gParam = newQudaGaugeParam();
   for(int dir=0; dir<4; ++dir) gParam.X[dir] = dim[dir];
   gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = prec;
@@ -170,7 +174,7 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
   gParam.site_ga_pad   = 0;
   gParam.mom_ga_pad    = 0;
   gParam.llfat_ga_pad  = 0;
-
+  qudamilc_called<false>(__func__);
   return gParam;
 }
 
@@ -187,7 +191,7 @@ static  void invalidateGaugeQuda() {
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
     const double act_path_coeff[6], void* inlink, void* fatlink, void* longlink)
 {
-
+  qudamilc_called<true>(__func__);
  // create_quda_gauge = true;
 
 #ifdef MULTI_GPU  
@@ -201,7 +205,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
       QUDA_GENERAL_LINKS);
 
   computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
-
+  qudamilc_called<false>(__func__);
   // require loadGaugeQuda to be called in subsequent solve
 //  invalidateGaugeQuda(); 
 }
@@ -211,7 +215,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
     const double act_path_coeff[6], void* inlink, void* fatlink, void* ulink)
 {
-
+  qudamilc_called<true>(__func__);
 #ifdef MULTI_GPU  
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
 #else
@@ -223,6 +227,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
       QUDA_GENERAL_LINKS);
 
   computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param, method);
+    qudamilc_called<false>(__func__);
   return;
 }
 
@@ -274,12 +279,13 @@ void qudaAsqtadForce(int prec, const double act_path_coeff[6],
 void qudaComputeOprod(int prec, int num_terms, double** coeff,
     void** quark_field, void* oprod[2])
 {
+    qudamilc_called<true>(__func__);
   QudaGaugeParam oprodParam = newMILCGaugeParam(localDim,
       (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
   computeStaggeredOprodQuda(oprod, quark_field, num_terms, coeff, &oprodParam);
-
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -288,14 +294,14 @@ void qudaComputeOprod(int prec, int num_terms, double** coeff,
 #ifdef GPU_GAUGE_FORCE
 void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
 {
-
+  qudamilc_called<true>(__func__);
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
 
   updateGaugeFieldQuda(link, momentum, eps, 0, 0, &gaugeParam);
-
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -385,7 +391,7 @@ void qudaGaugeForce( int precision,
     void* milc_momentum
     )
 {
-
+  qudamilc_called<true>(__func__);
   const int numPaths = 48;
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
@@ -427,7 +433,7 @@ void qudaGaugeForce( int precision,
     }
     delete[] input_path_buf[dir];
   }
-
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -876,7 +882,7 @@ void qudaInvert(int external_precision,
 
 void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
 {
-
+  qudamilc_called<true>(__func__);
   QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION; 
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
       (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
@@ -887,7 +893,7 @@ void* qudaCreateExtendedGaugeField(void* gauge, int geometry, int precision)
 
 void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
 {
-
+  qudamilc_called<true>(__func__);
   QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
       (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
@@ -898,16 +904,20 @@ void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
 
 void qudaSaveGaugeField(void* gauge, void* inGauge)
 {
+  qudamilc_called<true>(__func__);
   cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, cudaGauge->Precision(), QUDA_GENERAL_LINKS);
   saveGaugeField(gauge, inGauge, &gaugeParam);
+  qudamilc_called<false>(__func__);
   return;
 }
 
 
 void qudaDestroyGaugeField(void* gauge)
 {
+  qudamilc_called<true>(__func__);
   destroyQudaGaugeField(gauge);
+    qudamilc_called<false>(__func__);
   return;
 }
 
@@ -1032,16 +1042,19 @@ void qudaLoadGaugeField(int external_precision,
     int quda_precision,
     QudaInvertArgs_t inv_args,
     const void* milc_link) {
-
+  qudamilc_called<true>(__func__);
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   setGaugeParams(gaugeParam, localDim,  inv_args, external_precision, quda_precision);
 
   loadGaugeQuda(const_cast<void*>(milc_link), &gaugeParam);
+    qudamilc_called<false>(__func__);
 } // qudaLoadGaugeField
 
 
 void qudaFreeGaugeField() {
+    qudamilc_called<true>(__func__);
   freeGaugeQuda();
+    qudamilc_called<false>(__func__);
 } // qudaFreeGaugeField
 
 
