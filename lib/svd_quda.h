@@ -613,6 +613,7 @@ void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
       }
 
     } // end if b(1,2) == 0
+    it++;
   } while( (b(0,1) != 0.0 || b(1,2) != 0.0) && it < max_it);
 
 
