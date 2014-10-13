@@ -285,10 +285,11 @@ def prolog():
         print "Undefined prolog"
         exit
 
-    if domain_wall: prolog_str += "// NB! Don't trust any MULTI_GPU code\n"
 
     prolog_str+= (
 """
+#ifdef MULTI_GPU
+
 #if (CUDA_VERSION >= 4010)
 #define VOLATILE
 #else
@@ -345,9 +346,9 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
         prolog_str += "#include \"io_spinor.h\"\n"
         prolog_str += (
 """
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
+#if (DD_PREC==2) // half precision
 int sp_norm_idx;
-#endif // MULTI_GPU half precision
+#endif // half precision
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
@@ -374,7 +375,6 @@ int s_parity, boundaryCrossing;
 
         prolog_str+= (
 """
-#ifdef MULTI_GPU
 { // exterior kernel
 
 dim = dimFromDWFaceIndex(sid, param); // sid is also modified
@@ -414,7 +414,6 @@ READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
                 out += out_re(s,c)+" = "+in_re(s,c)+"; "+out_im(s,c)+" = "+in_im(s,c)+";\n"
         prolog_str+= indent(out)
         prolog_str+= "}\n"
-        prolog_str+= "#endif // MULTI_GPU\n"
 
         if domain_wall:
           prolog_str += (
@@ -513,10 +512,7 @@ def gen(dir, pack_only=False):
                    "X-X4X3X2X1mX3X2X1", "X+X4X3X2X1mX3X2X1"]
 
     cond = ""
-    cond += "#ifdef MULTI_GPU\n"
     cond += "if (isActive(dim," + `dir/2` + "," + offset[dir] + ",x1,x2,x3,x4,param.commDim,param.X) && " + boundary[dir] + " )\n"
-
-    cond += "#endif\n"
 
 
     str = ""
@@ -540,13 +536,8 @@ def gen(dir, pack_only=False):
         if domain_wall: str += "const int ga_idx = sid % Vh;\n"
         else: str += "const int ga_idx = sid;\n"
     else:
-        str += "#ifdef MULTI_GPU\n"
         if domain_wall: str += "const int ga_idx = Vh+(face_idx % ghostFace[" + `dir/2` + "]);\n"
         else: str += "const int ga_idx = Vh+face_idx;\n"
-        str += "#else\n"
-        if domain_wall: str += "const int ga_idx = sp_idx % Vh;\n"
-        else: str += "const int ga_idx = sp_idx;\n"
-        str += "#endif\n"
     str += "\n"
 
     # scan the projector to determine which loads are required
@@ -981,6 +972,8 @@ def epilog():
 
     str += "#undef VOLATILE\n"
 
+    str += "\n"
+    str += "#endif // MULTI_GPU\n"
     return str
 # end def epilog
 

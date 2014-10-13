@@ -2,7 +2,8 @@
 
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
 
-// NB! Don't trust any MULTI_GPU code
+
+#ifdef MULTI_GPU
 
 #if (CUDA_VERSION >= 4010)
 #define VOLATILE
@@ -170,9 +171,9 @@ VOLATILE spinorFloat o32_im;
 #include "read_gauge.h"
 #include "io_spinor.h"
 
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
+#if (DD_PREC==2) // half precision
 int sp_norm_idx;
-#endif // MULTI_GPU half precision
+#endif // half precision
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
@@ -195,7 +196,6 @@ int s_parity, boundaryCrossing;
 
 
 
-#ifdef MULTI_GPU
 { // exterior kernel
 
 dim = dimFromDWFaceIndex(sid, param); // sid is also modified
@@ -240,7 +240,6 @@ READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
  o31_re = i31_re; o31_im = i31_im;
  o32_re = i32_re; o32_im = i32_im;
 }
-#endif // MULTI_GPU
 
 // declare G## here and use ASSN below instead of READ
 #ifdef GAUGE_FLOAT2
@@ -275,9 +274,7 @@ float4 G4;
 
 
 
-#ifdef MULTI_GPU
 if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
-#endif
 {
  // Projector P0+
  //  1  0  0  i
@@ -442,9 +439,7 @@ if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
  o32_im -= A2_re;
 }
 
-#ifdef MULTI_GPU
 if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
-#endif
 {
  // Projector P0-
  //  1  0  0 -i
@@ -459,11 +454,7 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
 #endif
 
 
-#ifdef MULTI_GPU
  const int ga_idx = Vh+(face_idx % ghostFace[0]);
-#else
- const int ga_idx = sp_idx % Vh;
-#endif
 
  // read gauge matrix from device memory
  if ( ! s_parity ) { ASSN_GAUGE_MATRIX(G, GAUGE1TEX, 1, ga_idx, ga_stride); }
@@ -613,9 +604,7 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
  o32_im += A2_re;
 }
 
-#ifdef MULTI_GPU
 if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
-#endif
 {
  // Projector P1+
  //  1  0  0  1
@@ -780,9 +769,7 @@ if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
  o32_im += A2_im;
 }
 
-#ifdef MULTI_GPU
 if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
-#endif
 {
  // Projector P1-
  //  1  0  0 -1
@@ -797,11 +784,7 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
 #endif
 
 
-#ifdef MULTI_GPU
  const int ga_idx = Vh+(face_idx % ghostFace[1]);
-#else
- const int ga_idx = sp_idx % Vh;
-#endif
 
  // read gauge matrix from device memory
  if ( ! s_parity ) { ASSN_GAUGE_MATRIX(G, GAUGE1TEX, 3, ga_idx, ga_stride); }
@@ -951,9 +934,7 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
  o32_im -= A2_im;
 }
 
-#ifdef MULTI_GPU
 if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
-#endif
 {
  // Projector P2+
  //  1  0  i  0
@@ -1118,9 +1099,7 @@ if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
  o32_im += B2_re;
 }
 
-#ifdef MULTI_GPU
 if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
-#endif
 {
  // Projector P2-
  //  1  0 -i  0
@@ -1135,11 +1114,7 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
 #endif
 
 
-#ifdef MULTI_GPU
  const int ga_idx = Vh+(face_idx % ghostFace[2]);
-#else
- const int ga_idx = sp_idx % Vh;
-#endif
 
  // read gauge matrix from device memory
  if ( ! s_parity ) { ASSN_GAUGE_MATRIX(G, GAUGE1TEX, 5, ga_idx, ga_stride); }
@@ -1289,9 +1264,7 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
  o32_im -= B2_re;
 }
 
-#ifdef MULTI_GPU
 if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
-#endif
 {
  // Projector P3+
  //  2  0  0  0
@@ -1495,9 +1468,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
  }
 }
 
-#ifdef MULTI_GPU
 if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
-#endif
 {
  // Projector P3-
  //  0  0  0  0
@@ -1512,11 +1483,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
 #endif
 
 
-#ifdef MULTI_GPU
  const int ga_idx = Vh+(face_idx % ghostFace[3]);
-#else
- const int ga_idx = sp_idx % Vh;
-#endif
 
  if (gauge_fixed && ga_idx < X4X3X2X1hmX3X2X1h)
  {
@@ -1817,3 +1784,5 @@ WRITE_SPINOR(param.sp_stride);
 
 
 #undef VOLATILE
+
+#endif // MULTI_GPU
