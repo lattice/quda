@@ -101,7 +101,7 @@ namespace quda {
 	ghostOffset[i] = 0;
 	ghostNormOffset[i] = 0;
       }else{
-	ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1];
+	ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
 	ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
       }
 
