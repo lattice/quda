@@ -1,10 +1,10 @@
+#ifdef MULTI_GPU
+
 // *** CUDA DSLASH ***
 
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
 
-// NB! Don't trust any MULTI_GPU code
 
-KernelType kernel_type = EXTERIOR_KERNEL_ALL;
 #if (CUDA_VERSION >= 4010)
 #define VOLATILE
 #else
@@ -125,196 +125,6 @@ faceVolume[3] = (X1*X2*X3)>>1;
 int boundaryCrossing;
 
 int X, xs;
-
-// Inline by hand for the moment and assume even dimensions
-//coordsFromIndex(X, x1, x2, x3, x4, sid, param.parity);
-
-boundaryCrossing = sid/X1h + sid/(X2*X1h) + sid/(X3*X2*X1h);
-
-X = 2*sid + (boundaryCrossing + param.parity) % 2;
-xs = X/(X1*X2*X3*X4);
-
- o00_re = 0; o00_im = 0;
- o01_re = 0; o01_im = 0;
- o02_re = 0; o02_im = 0;
- o10_re = 0; o10_im = 0;
- o11_re = 0; o11_im = 0;
- o12_re = 0; o12_im = 0;
- o20_re = 0; o20_im = 0;
- o21_re = 0; o21_im = 0;
- o22_re = 0; o22_im = 0;
- o30_re = 0; o30_im = 0;
- o31_re = 0; o31_im = 0;
- o32_re = 0; o32_im = 0;
-
-
-// 5th dimension -- NB: not partitionable!
-{
-// 2 P_L = 2 P_- = ( ( +1, -1 ), ( -1, +1 ) )
-  {
-     int sp_idx = ( xs == param.Ls-1 ? X-(param.Ls-1)*2*Vh : X+2*Vh ) / 2;
-
-// read spinor from device memory
-     READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
-
-     if ( xs != param.Ls-1 )
-     {
-   o00_re += +i00_re-i20_re;   o00_im += +i00_im-i20_im;
-   o01_re += +i01_re-i21_re;   o01_im += +i01_im-i21_im;
-   o02_re += +i02_re-i22_re;   o02_im += +i02_im-i22_im;
-
-   o10_re += +i10_re-i30_re;   o10_im += +i10_im-i30_im;
-   o11_re += +i11_re-i31_re;   o11_im += +i11_im-i31_im;
-   o12_re += +i12_re-i32_re;   o12_im += +i12_im-i32_im;
-
-   o20_re += -i00_re+i20_re;   o20_im += -i00_im+i20_im;
-   o21_re += -i01_re+i21_re;   o21_im += -i01_im+i21_im;
-   o22_re += -i02_re+i22_re;   o22_im += -i02_im+i22_im;
-
-   o30_re += -i10_re+i30_re;   o30_im += -i10_im+i30_im;
-   o31_re += -i11_re+i31_re;   o31_im += -i11_im+i31_im;
-   o32_re += -i12_re+i32_re;   o32_im += -i12_im+i32_im;
-    }
-    else
-    {
-   o00_re += -mferm*(+i00_re-i20_re);   o00_im += -mferm*(+i00_im-i20_im);
-   o01_re += -mferm*(+i01_re-i21_re);   o01_im += -mferm*(+i01_im-i21_im);
-   o02_re += -mferm*(+i02_re-i22_re);   o02_im += -mferm*(+i02_im-i22_im);
-
-   o10_re += -mferm*(+i10_re-i30_re);   o10_im += -mferm*(+i10_im-i30_im);
-   o11_re += -mferm*(+i11_re-i31_re);   o11_im += -mferm*(+i11_im-i31_im);
-   o12_re += -mferm*(+i12_re-i32_re);   o12_im += -mferm*(+i12_im-i32_im);
-
-   o20_re += -mferm*(-i00_re+i20_re);   o20_im += -mferm*(-i00_im+i20_im);
-   o21_re += -mferm*(-i01_re+i21_re);   o21_im += -mferm*(-i01_im+i21_im);
-   o22_re += -mferm*(-i02_re+i22_re);   o22_im += -mferm*(-i02_im+i22_im);
-
-   o30_re += -mferm*(-i10_re+i30_re);   o30_im += -mferm*(-i10_im+i30_im);
-   o31_re += -mferm*(-i11_re+i31_re);   o31_im += -mferm*(-i11_im+i31_im);
-   o32_re += -mferm*(-i12_re+i32_re);   o32_im += -mferm*(-i12_im+i32_im);
-    } // end if ( xs != param.Ls-1 )
-  } // end P_L
-
- // 2 P_R = 2 P_+ = ( ( +1, +1 ), ( +1, +1 ) )
-  {
-    int sp_idx = ( xs == 0 ? X+(param.Ls-1)*2*Vh : X-2*Vh ) / 2;
-
-// read spinor from device memory
-    READ_SPINOR( SPINORTEX, param.sp_stride, sp_idx, sp_idx );
-
-    if ( xs != 0 )
-    {
-   o00_re += +i00_re+i20_re;   o00_im += +i00_im+i20_im;
-   o01_re += +i01_re+i21_re;   o01_im += +i01_im+i21_im;
-   o02_re += +i02_re+i22_re;   o02_im += +i02_im+i22_im;
-
-   o10_re += +i10_re+i30_re;   o10_im += +i10_im+i30_im;
-   o11_re += +i11_re+i31_re;   o11_im += +i11_im+i31_im;
-   o12_re += +i12_re+i32_re;   o12_im += +i12_im+i32_im;
-
-   o20_re += +i00_re+i20_re;   o20_im += +i00_im+i20_im;
-   o21_re += +i01_re+i21_re;   o21_im += +i01_im+i21_im;
-   o22_re += +i02_re+i22_re;   o22_im += +i02_im+i22_im;
-
-   o30_re += +i10_re+i30_re;   o30_im += +i10_im+i30_im;
-   o31_re += +i11_re+i31_re;   o31_im += +i11_im+i31_im;
-   o32_re += +i12_re+i32_re;   o32_im += +i12_im+i32_im;
-    }
-    else
-    {
-   o00_re += -mferm*(+i00_re+i20_re);   o00_im += -mferm*(+i00_im+i20_im);
-   o01_re += -mferm*(+i01_re+i21_re);   o01_im += -mferm*(+i01_im+i21_im);
-   o02_re += -mferm*(+i02_re+i22_re);   o02_im += -mferm*(+i02_im+i22_im);
-
-   o10_re += -mferm*(+i10_re+i30_re);   o10_im += -mferm*(+i10_im+i30_im);
-   o11_re += -mferm*(+i11_re+i31_re);   o11_im += -mferm*(+i11_im+i31_im);
-   o12_re += -mferm*(+i12_re+i32_re);   o12_im += -mferm*(+i12_im+i32_im);
-
-   o20_re += -mferm*(+i00_re+i20_re);   o20_im += -mferm*(+i00_im+i20_im);
-   o21_re += -mferm*(+i01_re+i21_re);   o21_im += -mferm*(+i01_im+i21_im);
-   o22_re += -mferm*(+i02_re+i22_re);   o22_im += -mferm*(+i02_im+i22_im);
-
-   o30_re += -mferm*(+i10_re+i30_re);   o30_im += -mferm*(+i10_im+i30_im);
-   o31_re += -mferm*(+i11_re+i31_re);   o31_im += -mferm*(+i11_im+i31_im);
-   o32_re += -mferm*(+i12_re+i32_re);   o32_im += -mferm*(+i12_im+i32_im);
-    } // end if ( xs != 0 )
-  } // end P_R
-
-  // MDWF Dslash_5 operator is given as follow
-  // Dslash4pre = [c_5(s)(P_+\delta_{s,s`+1} - mP_+\delta_{s,0}\delta_{s`,L_s-1}
-  //         + P_-\delta_{s,s`-1}-mP_-\delta_{s,L_s-1}\delta_{s`,0})
-  //         + b_5(s)\delta_{s,s`}]\delta_{x,x`}
-  // For Dslash4pre
-  // C_5 \equiv c_5(s)*0.5
-  // B_5 \equiv b_5(s)
-  // For Dslash5
-  // C_5 \equiv 0.5*{c_5(s)(4+M_5)-1}/{b_5(s)(4+M_5)+1}
-  // B_5 \equiv 1.0
-#ifdef MDWF_mode   // Check whether MDWF option is enabled
-#if (MDWF_mode==1)
-  VOLATILE spinorFloat C_5;
-  VOLATILE spinorFloat B_5;
-  C_5 = (spinorFloat)mdwf_c5[xs]*0.5;
-  B_5 = (spinorFloat)mdwf_b5[xs];
-
-  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
-  o00_re = C_5*o00_re + B_5*i00_re;
-  o00_im = C_5*o00_im + B_5*i00_im;
-  o01_re = C_5*o01_re + B_5*i01_re;
-  o01_im = C_5*o01_im + B_5*i01_im;
-  o02_re = C_5*o02_re + B_5*i02_re;
-  o02_im = C_5*o02_im + B_5*i02_im;
-  o10_re = C_5*o10_re + B_5*i10_re;
-  o10_im = C_5*o10_im + B_5*i10_im;
-  o11_re = C_5*o11_re + B_5*i11_re;
-  o11_im = C_5*o11_im + B_5*i11_im;
-  o12_re = C_5*o12_re + B_5*i12_re;
-  o12_im = C_5*o12_im + B_5*i12_im;
-  o20_re = C_5*o20_re + B_5*i20_re;
-  o20_im = C_5*o20_im + B_5*i20_im;
-  o21_re = C_5*o21_re + B_5*i21_re;
-  o21_im = C_5*o21_im + B_5*i21_im;
-  o22_re = C_5*o22_re + B_5*i22_re;
-  o22_im = C_5*o22_im + B_5*i22_im;
-  o30_re = C_5*o30_re + B_5*i30_re;
-  o30_im = C_5*o30_im + B_5*i30_im;
-  o31_re = C_5*o31_re + B_5*i31_re;
-  o31_im = C_5*o31_im + B_5*i31_im;
-  o32_re = C_5*o32_re + B_5*i32_re;
-  o32_im = C_5*o32_im + B_5*i32_im;
-#elif (MDWF_mode==2)
-  VOLATILE spinorFloat C_5;
-  C_5 = (spinorFloat)(0.5*(mdwf_c5[xs]*(m5+4.0) - 1.0)/(mdwf_b5[xs]*(m5+4.0) + 1.0));
-
-  READ_SPINOR( SPINORTEX, param.sp_stride, X/2, X/2 );
-  o00_re = C_5*o00_re + i00_re;
-  o00_im = C_5*o00_im + i00_im;
-  o01_re = C_5*o01_re + i01_re;
-  o01_im = C_5*o01_im + i01_im;
-  o02_re = C_5*o02_re + i02_re;
-  o02_im = C_5*o02_im + i02_im;
-  o10_re = C_5*o10_re + i10_re;
-  o10_im = C_5*o10_im + i10_im;
-  o11_re = C_5*o11_re + i11_re;
-  o11_im = C_5*o11_im + i11_im;
-  o12_re = C_5*o12_re + i12_re;
-  o12_im = C_5*o12_im + i12_im;
-  o20_re = C_5*o20_re + i20_re;
-  o20_im = C_5*o20_im + i20_im;
-  o21_re = C_5*o21_re + i21_re;
-  o21_im = C_5*o21_im + i21_im;
-  o22_re = C_5*o22_re + i22_re;
-  o22_im = C_5*o22_im + i22_im;
-  o30_re = C_5*o30_re + i30_re;
-  o30_im = C_5*o30_im + i30_im;
-  o31_re = C_5*o31_re + i31_re;
-  o31_im = C_5*o31_im + i31_im;
-  o32_re = C_5*o32_re + i32_re;
-  o32_im = C_5*o32_im + i32_im;
-#endif  // select MDWF mode
-#endif  // check MDWF on/off
-} // end 5th dimension
-
 {
 
 #ifdef DSLASH_XPAY
@@ -471,3 +281,4 @@ WRITE_SPINOR(param.sp_stride);
 
 
 #undef VOLATILE
+#endif // MULTI_GPU
