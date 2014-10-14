@@ -113,6 +113,11 @@ extern "C" {
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
 
+    /**< This parameter determines how many total reliable update
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_res_increase_total;
+
     int pipeline; /**< Whether to use a pipelined solver with less global sums */
 
     int num_offset; /**< Number of offsets in the multi-shift solver */

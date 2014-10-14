@@ -48,6 +48,11 @@ namespace quda {
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
 
+    /**< This parameter determines how many total reliable update
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_res_increase_total;
+
     /**< Enable pipeline solver */
     int pipeline;
 
@@ -155,7 +160,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), 
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
-      max_res_increase(param.max_res_increase), pipeline(param.pipeline), tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq), 
+      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), pipeline(param.pipeline), tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 

@@ -185,8 +185,12 @@ namespace quda {
 
     quda::blas_flops = 0;
 
-    const int maxResIncrease = 0;
-
+    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
+    
+    int resIncrease = 0;
+    int resIncreaseTotal = 0;
+    
     while(!convergence(r2, heavy_quark_res, stop, param.tol_hq) && k < param.maxiter){
 
       matSloppy(Ap, *p, tmpSloppy);
@@ -249,13 +253,16 @@ namespace quda {
 
 
         // break-out check if we have reached the limit of the precision
-        static int resIncrease = 0;
-        if(sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this 
-          warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
+        if(sqrt(r2) > r0Norm && updateX) { 
+        resIncrease++;
+        resIncreaseTotal++;
+        // reuse r0Norm for this 
+        warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
 
+        
           k++;
           rUpdate++;
-          if(++resIncrease > maxResIncrease) break;
+          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal)break;
         }else{
           resIncrease = 0;
         }
