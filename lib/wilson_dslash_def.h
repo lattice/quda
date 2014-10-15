@@ -205,6 +205,7 @@
 #define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #if (defined DIRECT_ACCESS_WILSON_INTER) || (defined FERMI_NO_DBLE_TEX)
@@ -297,6 +298,7 @@
 #define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle
+#define GHOSTSPINORTEX ghostSpinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER
@@ -384,6 +386,7 @@
 #define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
+#define GHOSTSPINORTEX ghostSpinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
 #endif
 #ifdef DIRECT_ACCESS_WILSON_INTER

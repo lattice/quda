@@ -261,6 +261,9 @@ namespace quda {
       int Pad() const { return pad; }
       size_t Bytes() const { return bytes; }
       size_t NormBytes() const { return norm_bytes; }
+      size_t GhostBytes() const { return bytes; } // replace with ghost_bytes
+      size_t GhostNormBytes() const { return norm_bytes; } // replace with ghost_norm_bytes
+
       void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
       const char *VolString() const { return vol_string; }
@@ -270,6 +273,9 @@ namespace quda {
       const void* V() const {return v;}
       void* Norm(){return norm;}
       const void* Norm() const {return norm;}
+      void* Ghost() { return v; } 
+      const void* Ghost() const { return v; } // v will eventually be replaced by ghost_field
+      const void* GhostNorm() const { return norm; } // will eventually remove this
 
       //! for eigcg only:
       int EigvDim() const { return eigv_dim; }
