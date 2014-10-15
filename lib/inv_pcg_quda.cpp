@@ -260,8 +260,7 @@ namespace quda {
         warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
 
         
-          k++;
-          rUpdate++;
+
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal)break;
         }else{
           resIncrease = 0;

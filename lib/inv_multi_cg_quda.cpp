@@ -261,8 +261,7 @@ namespace quda {
     resIncreaseTotal[reliable_shift]++;
 	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)", 
 		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
-	  k++;
-	  rUpdate++;
+
 
 	  if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) break; // check if we reached the limit of our tolerancebreak;
 	} else {
