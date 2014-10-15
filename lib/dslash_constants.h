@@ -32,6 +32,8 @@ enum KernelType {
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;
     cudaTextureObject_t inTexNorm;
+    cudaTextureObject_t ghostTex;
+    cudaTextureObject_t ghostTexNorm;
     cudaTextureObject_t xTex;
     cudaTextureObject_t xTexNorm;
     cudaTextureObject_t outTex;

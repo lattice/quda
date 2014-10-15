@@ -28,6 +28,7 @@ namespace quda {
 
       void *v; // pointer to field
       void *norm;
+      void *ghost_field;
 
       //! for eigcg:
       int eigv_dim;    //number of eigenvectors
@@ -171,6 +172,8 @@ namespace quda {
 
       void *v; // the field elements
       void *norm; // the normalization field
+      void *ghost_field; // used to hold halo data
+
       //! used for eigcg:
       int eigv_dim;
       int eigv_id;
@@ -194,6 +197,8 @@ namespace quda {
 
       size_t bytes; // size in bytes of spinor field
       size_t norm_bytes; // size in bytes of norm field
+      size_t ghost_bytes; // size in bytes of the ghost field
+
 
       /*Warning: we need copies of the above params for eigenvectors*/
       //multi_GPU parameters:
@@ -315,6 +320,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
+    cudaTextureObject_t ghostTex;
+    cudaTextureObject_t ghostTexNorm;
     void createTexObject();
     void destroyTexObject();
 #endif
@@ -485,6 +492,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
+    const cudaTextureObject_t& GhostTex() const { return ghostTex; }
+    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm; }
 #endif
 
     cudaColorSpinorField& Even() const;

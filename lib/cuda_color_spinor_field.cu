@@ -328,6 +328,9 @@ namespace quda {
       
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
+
+      cudaCreateTextureObject(&ghostTex, &resDesc, &texDesc, NULL);
+      checkCudaError();
       
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION) {
@@ -349,6 +352,10 @@ namespace quda {
 	
 	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();
+
+	cudaCreateTextureObject(&ghostTexNorm, &resDesc, &texDesc, NULL);
+	checkCudaError();
+
       }
       
       texInit = true;
@@ -358,7 +365,11 @@ namespace quda {
   void cudaColorSpinorField::destroyTexObject() {
     if (isNative() && texInit) {
       cudaDestroyTextureObject(tex);
-      if (precision == QUDA_HALF_PRECISION) cudaDestroyTextureObject(texNorm);
+      cudaDestroyTextureObject(ghostTex);
+      if (precision == QUDA_HALF_PRECISION){ 
+        cudaDestroyTextureObject(texNorm);
+        cudaDestroyTextureObject(ghostTexNorm);
+      }
       texInit = false;
       checkCudaError();
     }

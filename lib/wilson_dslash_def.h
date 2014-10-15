@@ -202,6 +202,7 @@
 #define READ_SPINOR_DOWN READ_SPINOR_DOUBLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
@@ -293,6 +294,7 @@
 #define READ_SPINOR_DOWN READ_SPINOR_SINGLE_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle
 #endif // USE_TEXTURE_OBJECTS
@@ -379,6 +381,7 @@
 #define READ_SPINOR_DOWN READ_SPINOR_HALF_DOWN_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf
 #endif // USE_TEXTURE_OBJECTS
