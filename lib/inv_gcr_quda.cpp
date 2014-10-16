@@ -253,8 +253,18 @@ namespace quda {
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+
+    // this parameter determines how many consective reliable update
+    // reisudal increases we tolerate before terminating the solver,
+    // i.e., how long do we want to keep trying to converge
+    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
+
     double heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+
+    int resIncrease = 0;
+    int resIncreaseTotal = 0;
 
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
@@ -345,6 +355,17 @@ namespace quda {
 
 	if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
 
+	// break-out check if we have reached the limit of the precision
+	if (r2 > r2_old) {
+	  resIncrease++;
+	  resIncreaseTotal++;
+	  warningQuda("GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
+	} else {
+	  resIncrease = 0;
+	}
+
 	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
@@ -359,6 +380,8 @@ namespace quda {
 	  // prevent ending the Krylov space prematurely if other convergence criteria not met 
 	  if (r2 < stop) l2_converge = true; 
 	}
+
+	r2_old = r2;
 
       }
 

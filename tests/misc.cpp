@@ -867,6 +867,8 @@ get_solver_type(char* s)
     ret = QUDA_MPCG_INVERTER; 
   }else if (strcmp(s, "mpbicgstab") == 0){
     ret = QUDA_MPBICGSTAB_INVERTER;
+  }else if (strcmp(s, "mr") == 0){
+    ret = QUDA_MR_INVERTER;
   }else{
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);

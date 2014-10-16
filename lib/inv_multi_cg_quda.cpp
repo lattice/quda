@@ -105,6 +105,7 @@ namespace quda {
     for (int j=0; j<num_offset; j++) 
       if (param.tol_offset[j] < param.delta) reliable = true;
 
+
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
     cudaColorSpinorField **y = reliable ? new cudaColorSpinorField*[num_offset] : NULL;
   
@@ -174,7 +175,19 @@ namespace quda {
       maxrr[i] = rNorm[i];
     }
     double delta = param.delta;
+
+    // this parameter determines how many consective reliable update
+    // reisudal increases we tolerate before terminating the solver,
+    // i.e., how long do we want to keep trying to converge
+    const int maxResIncrease =  param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
     
+    int resIncrease = 0;
+    int resIncreaseTotal[QUDA_MAX_MULTI_SHIFT];
+    for (int i=0; i<num_offset; i++) {
+      resIncreaseTotal[i]=0;
+    }
+
     int k = 0;
     int rUpdate = 0;
     quda::blas_flops = 0;
@@ -242,13 +255,15 @@ namespace quda {
 	copyCuda(*r_sloppy, *r);            
 
 	// break-out check if we have reached the limit of the precision
-	static int resIncrease = 0; // number of consecutive residual increases 
+
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
-	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e", 
-		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift]);
-	  k++;
-	  rUpdate++;
-	  if (++resIncrease > param.max_res_increase) break; // check if we reached the limit of our tolerancebreak;
+    resIncrease++;
+    resIncreaseTotal[reliable_shift]++;
+	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)", 
+		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
+
+
+	  if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) break; // check if we reached the limit of our tolerancebreak;
 	} else {
 	  resIncrease = 0;
 	}

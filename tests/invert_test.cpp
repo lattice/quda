@@ -42,6 +42,7 @@ extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern QudaInverterType  inv_type;
+extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
 
@@ -229,8 +230,7 @@ int main(int argc, char **argv)
   inv_param.max_res_increase = 1;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = 
-  inv_param.inv_type == QUDA_GCR_INVERTER ? QUDA_MR_INVERTER : QUDA_INVALID_INVERTER;
+  inv_param.inv_type_precondition = precon_type;
     
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;

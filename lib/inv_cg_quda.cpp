@@ -107,8 +107,8 @@ namespace quda {
     double heavy_quark_res_old = 0.0; // heavy quark residual
 
     if (use_heavy_quark_res) {
-        heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x, r).z);
-        heavy_quark_res_old = heavy_quark_res; // heavy quark residual
+      heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x, r).z);
+      heavy_quark_res_old = heavy_quark_res; // heavy quark residual
     }
     const int heavy_quark_check = 1; // how often to check the heavy quark residual
 
@@ -126,11 +126,13 @@ namespace quda {
     // reisudal increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
     const int maxResIncrease = (use_heavy_quark_res ? 0 : param.max_res_increase); // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
     // 0 means we have no tolerance
     // maybe we should expose this as a parameter
     const int hqmaxresIncrease = maxResIncrease + 1;
 
     int resIncrease = 0;
+    int resIncreaseTotal = 0;
     int hqresIncrease = 0;
 
     // set this to true if maxResIncrease has been exceeded but when we use heavy quark residual we still want to continue the CG
@@ -192,8 +194,8 @@ namespace quda {
 
       // For heavy-quark inversion force a reliable update if we continue after
       if (use_heavy_quark_res and L2breakdown and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq) and param.delta >= param.tol) {
-            updateX = 1;
-        }
+	updateX = 1;
+      }
 
       if ( !(updateR || updateX)) {
 	//beta = r2 / r2_old;
@@ -226,32 +228,33 @@ namespace quda {
 	copyCuda(rSloppy, r); //nop when these pointers alias
 	zeroCuda(xSloppy);
 
-    // calculate new reliable HQ resididual
-    if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
+	// calculate new reliable HQ resididual
+	if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
 
 	// break-out check if we have reached the limit of the precision
-            if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
-                resIncrease++;
-	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e", sqrt(r2), r0Norm);
-        if (resIncrease > maxResIncrease)
+	if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
+	  resIncrease++;
+	  resIncreaseTotal++;
+	  warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+		      sqrt(r2), r0Norm, resIncreaseTotal);
+	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal)
             if (use_heavy_quark_res) L2breakdown = true;
             else break;
-            }
-        else {
+	} else {
 	  resIncrease = 0;
 	}
-            // if L2 broke down already we turn off reliable updates and restart the CG
-            if (use_heavy_quark_res and L2breakdown) {
-                delta = 0;
-                warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
-                heavy_quark_restart = true;
-                if (heavy_quark_res > heavy_quark_res_old) {
-                    hqresIncrease++;
-                    warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
-                    // break out if we do not improve here anymore
-                    if (hqresIncrease > hqmaxresIncrease) break;
-                }
-            }
+	// if L2 broke down already we turn off reliable updates and restart the CG
+	if (use_heavy_quark_res and L2breakdown) {
+	  delta = 0;
+	  warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
+	  heavy_quark_restart = true;
+	  if (heavy_quark_res > heavy_quark_res_old) {
+	    hqresIncrease++;
+	    warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+	    // break out if we do not improve here anymore
+	    if (hqresIncrease > hqmaxresIncrease) break;
+	  }
+	}
 
 	rNorm = sqrt(r2);
 	maxrr = rNorm;
@@ -259,19 +262,19 @@ namespace quda {
 	r0Norm = rNorm;      
 	rUpdate++;
 
-    if (use_heavy_quark_res and heavy_quark_restart) {
-      // perform a restart
-      copyCuda(p, rSloppy);
-      heavy_quark_restart = false;
-    }
-    else {
-      // explicitly restore the orthogonality of the gradient vector
-      double rp = reDotProductCuda(rSloppy, p) / (r2);
-      axpyCuda(-rp, rSloppy, p);
+	if (use_heavy_quark_res and heavy_quark_restart) {
+	  // perform a restart
+	  copyCuda(p, rSloppy);
+	  heavy_quark_restart = false;
+	}
+	else {
+	  // explicitly restore the orthogonality of the gradient vector
+	  double rp = reDotProductCuda(rSloppy, p) / (r2);
+	  axpyCuda(-rp, rSloppy, p);
           
-      beta = r2 / r2_old;
-      xpayCuda(rSloppy, beta, p);
-    }
+	  beta = r2 / r2_old;
+	  xpayCuda(rSloppy, beta, p);
+	}
 
 
         steps_since_reliable = 0;
@@ -305,7 +308,7 @@ namespace quda {
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
     reduceDouble(gflops);
-      param.gflops = gflops;
+    param.gflops = gflops;
     param.iter += k;
 
     if (k==param.maxiter) 
