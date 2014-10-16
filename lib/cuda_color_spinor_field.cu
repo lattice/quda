@@ -785,7 +785,7 @@ namespace quda {
     const void *src = ghost_spinor;
 
 
-    cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
+    //cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
   
     // temporary code to copy data to the ghost arrays 
     // eventually this will replace the code above. 

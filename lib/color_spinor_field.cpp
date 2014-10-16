@@ -103,8 +103,19 @@ namespace quda {
 	ghostNormOffset[i] = 0;
       }else{
 	ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
+        if(precision == QUDA_HALF_PRECISION){
+          ghostOffset[i] += num_norm_faces*ghostFace[i-1]*sizeof(float)/sizeof(short); // assumes that sizeof(float) is a multiple of sizeof(short)
+        }
 	ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
       }
+
+      
+
+
+
+      
+
+
 
 #ifdef MULTI_GPU
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
@@ -129,8 +140,9 @@ namespace quda {
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       ghost_length *= 2;
+      ghost_norm_length *= 2;
       total_length = length + ghost_length; // 2 ghost zones in a full field
-      total_norm_length = 2*(stride + ghost_norm_length); // norm length = 2*stride
+      total_norm_length = 2*stride + ghost_norm_length; // norm length = 2*stride
     } else {
       total_length = length + ghost_length;
       total_norm_length = (precision == QUDA_HALF_PRECISION) ? stride + ghost_norm_length : 0; // norm length = stride
@@ -199,8 +211,12 @@ namespace quda {
     norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
 
     ghost_bytes = ghost_length*precision; // need to change this to include half-precision norms
+    if(precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
+    
+  
     ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
 
+  
 
 
     init = true;
