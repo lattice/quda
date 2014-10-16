@@ -187,8 +187,8 @@ namespace quda {
       void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
       int ghostFace[QUDA_MAX_DIM];// the size of each face
-      int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
-      int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
+      int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
+      int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
       int ghost_length; // length of ghost zone
       int ghost_norm_length; // length of ghost zone for norm
@@ -300,8 +300,11 @@ namespace quda {
 
       int GhostLength() const { return ghost_length; }
       const int *GhostFace() const { return ghostFace; }  
-      int GhostOffset(const int i) const { return ghostOffset[i]; }  
-      int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
+      int GhostOffset(const int i) const { return ghostOffset[i][0]; }  
+      int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
+      int GhostNormOffset(const int i ) const { return ghostNormOffset[i][0]; }  
+      int GhostNormOffset(const int i, const int j) const { return ghostNormOffset[i][j]; }
+
       void* Ghost(const int i);
       const void* Ghost(const int i) const;
       void* GhostNorm(const int i);

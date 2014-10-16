@@ -99,29 +99,26 @@ namespace quda {
 	ghostVolume += ghostFace[i];
       }
       if(i==0){
-	ghostOffset[i] = 0;
-//	ghostNormOffset[i] = 0;
+	ghostOffset[i][0] = 0;
       }else{
-	ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
+	ghostOffset[i][0] = ghostOffset[i-1][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
         if(precision == QUDA_HALF_PRECISION){
-          ghostOffset[i] += num_norm_faces*ghostFace[i-1]*sizeof(float)/sizeof(short); // assumes that sizeof(float) is a multiple of sizeof(short)
+          ghostOffset[i][0] += num_norm_faces*ghostFace[i-1]*sizeof(float)/sizeof(short); \
+          // assumes that sizeof(float) is a multiple of sizeof(short)
         }
-//	ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
       }
-      ghostNormOffset[i] = (ghostOffset[i] + num_faces*ghostFace[i]*nSpin*nColor*2)*sizeof(short)/sizeof(float); // assumes that sizeof(float) is a multiple of sizeof(short)
+      ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2/2;
 
+
+      ghostNormOffset[i][0] = (ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2)*sizeof(short)/sizeof(float); 
+      // assumes that sizeof(float) is a multiple of sizeof(short)
+      ghostNormOffset[i][1] = ghostNormOffset[i][0] + (num_norm_faces*ghostFace[i]/2);
       
-
-
-
-      
-
-
 
 #ifdef MULTI_GPU
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
-	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d\n", 
-		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i]);
+	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d, %6d\n", 
+		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i][0], ghostNormOffset[i][1]);
 #endif
     }//end of outmost for loop
     int ghostNormVolume = num_norm_faces * ghostVolume;
