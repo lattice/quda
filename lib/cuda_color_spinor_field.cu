@@ -790,37 +790,18 @@ namespace quda {
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
     int len = nFace*ghostFace[dim]*Nint;
-    int offset = length + ghostOffset[dim][0];
-    offset += (dir == QUDA_BACKWARDS) ? 0 : len;
-
-    void *dst = (char*)v + precision*offset;
     const void *src = ghost_spinor;
-
-
-    //cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
   
-    // temporary code to copy data to the ghost arrays 
-    // eventually this will replace the code above. 
-    int ghost_offset = ghostOffset[dim][0]; 
-    ghost_offset += (dir == QUDA_BACKWARDS) ? 0 : len;
+    int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
+
     void *ghost_dst = (char*)ghost_field + precision*ghost_offset;
-
-
 
     cudaMemcpyAsync(ghost_dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
 
  
     if (precision == QUDA_HALF_PRECISION) {
-      // norm region of host ghost zone is at the end of the ghost_spinor
-
       int normlen = nFace*ghostFace[dim];
-      int norm_offset = stride + ghostNormOffset[dim][0];
-      norm_offset += (dir == QUDA_BACKWARDS) ? 0 : normlen;
-
-  //    void *dst = static_cast<char*>(norm) + norm_offset*sizeof(float);
-
-      int ghost_offset = ghostNormOffset[dim][0];
-      ghost_offset += (dir == QUDA_BACKWARDS) ? 0 : normlen;
+      int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostNormOffset[dim][0] : ghostNormOffset[dim][1];
       void *ghost_dst = static_cast<char*>(ghost_field) + ghost_offset*sizeof(float);
 
       const void *src = static_cast<const char*>(ghost_spinor)+nFace*Nint*ghostFace[dim]*precision; 
