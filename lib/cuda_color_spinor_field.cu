@@ -283,7 +283,8 @@ namespace quda {
           //ghost[i] = (char*)v + (stride*nColor*nSpin*2 + ghostOffset[i])*precision;
           ghost[i] = (char*)ghost_field + ghostOffset[i]*precision;
           if(precision == QUDA_HALF_PRECISION)
-            ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
+            //ghostNorm[i] = (char*)norm + (stride + ghostNormOffset[i])*QUDA_SINGLE_PRECISION;
+            ghostNorm[i] = (char*)ghost_field + ghostNormOffset[i]*QUDA_SINGLE_PRECISION;
         }
       }
     }
@@ -364,9 +365,19 @@ namespace quda {
 	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();
 
-	cudaCreateTextureObject(&ghostTexNorm, &resDesc, &texDesc, NULL);
-	checkCudaError();
+        // Assign ghostTexNorm
+        { 
+          cudaResourceDesc resDesc;
+          memset(&resDesc, 0, sizeof(resDesc));
+          resDesc.resType = cudaResourceTypeLinear;
+          resDesc.res.linear.devPtr = ghost_field;
+          resDesc.res.linear.desc = desc;
+          resDesc.res.linear.sizeInBytes = ghost_bytes;                    
+      
 
+	  cudaCreateTextureObject(&ghostTexNorm, &resDesc, &texDesc, NULL);
+	  checkCudaError();
+        }
       }
       
       texInit = true;
@@ -792,8 +803,9 @@ namespace quda {
     // eventually this will replace the code above. 
     int ghost_offset = ghostOffset[dim]; 
     ghost_offset += (dir == QUDA_BACKWARDS) ? 0 : len;
-  
     void *ghost_dst = (char*)ghost_field + precision*ghost_offset;
+
+
 
     cudaMemcpyAsync(ghost_dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
 
@@ -805,9 +817,14 @@ namespace quda {
       int norm_offset = stride + ghostNormOffset[dim];
       norm_offset += (dir == QUDA_BACKWARDS) ? 0 : normlen;
 
-      void *dst = static_cast<char*>(norm) + norm_offset*sizeof(float);
+  //    void *dst = static_cast<char*>(norm) + norm_offset*sizeof(float);
+
+      int ghost_offset = ghostNormOffset[dim];
+      ghost_offset += (dir == QUDA_BACKWARDS) ? 0 : normlen;
+      void *ghost_dst = static_cast<char*>(ghost_field) + ghost_offset*sizeof(float);
+
       const void *src = static_cast<const char*>(ghost_spinor)+nFace*Nint*ghostFace[dim]*precision; 
-      cudaMemcpyAsync(dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
+      cudaMemcpyAsync(ghost_dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
     }
   }
 

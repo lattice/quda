@@ -100,14 +100,15 @@ namespace quda {
       }
       if(i==0){
 	ghostOffset[i] = 0;
-	ghostNormOffset[i] = 0;
+//	ghostNormOffset[i] = 0;
       }else{
 	ghostOffset[i] = ghostOffset[i-1] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
         if(precision == QUDA_HALF_PRECISION){
           ghostOffset[i] += num_norm_faces*ghostFace[i-1]*sizeof(float)/sizeof(short); // assumes that sizeof(float) is a multiple of sizeof(short)
         }
-	ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
+//	ghostNormOffset[i] = ghostNormOffset[i-1] + num_norm_faces*ghostFace[i-1];
       }
+      ghostNormOffset[i] = (ghostOffset[i] + num_faces*ghostFace[i]*nSpin*nColor*2)*sizeof(short)/sizeof(float); // assumes that sizeof(float) is a multiple of sizeof(short)
 
       
 

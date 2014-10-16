@@ -120,7 +120,8 @@ namespace quda {
       dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
       //dslashParam.ghostOffset[i] = in->GhostOffset(i)/in->FieldOrder() + Npad*in->Stride();
       dslashParam.ghostOffset[i] = in->GhostOffset(i)/in->FieldOrder();
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      //dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
+      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i);
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
 
