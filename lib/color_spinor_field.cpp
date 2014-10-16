@@ -46,6 +46,7 @@ namespace quda {
     if (!createSpinorGhost) {
       total_length = length;
       total_norm_length = 2*stride;
+      ghost_length = 0;
       return;
     }
 
@@ -127,7 +128,8 @@ namespace quda {
 #endif
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      total_length = length + 2*ghost_length; // 2 ghost zones in a full field
+      ghost_length *= 2;
+      total_length = length + ghost_length; // 2 ghost zones in a full field
       total_norm_length = 2*(stride + ghost_norm_length); // norm length = 2*stride
     } else {
       total_length = length + ghost_length;
@@ -187,13 +189,19 @@ namespace quda {
 
     real_length = volume*nColor*nSpin*2; // physical length
 
-    createGhostZone();
+    createGhostZone(); // total_length is calculated here
 
     bytes = total_length * precision; // includes pads and ghost zones
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
-
     norm_bytes = total_norm_length * sizeof(float);
+    if(precision == QUDA_HALF_PRECISION) bytes += norm_bytes; // bytes includes the space for norm_bytes    
+
+    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
     norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
+
+    ghost_bytes = ghost_length*precision; // need to change this to include half-precision norms
+    ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
+
+
 
     init = true;
 

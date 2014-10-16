@@ -197,6 +197,7 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
+      ghost_field = device_malloc(ghost_bytes);
       if (precision == QUDA_HALF_PRECISION) {
 	norm = device_malloc(norm_bytes);
       }
@@ -329,9 +330,18 @@ namespace quda {
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
 
-      cudaCreateTextureObject(&ghostTex, &resDesc, &texDesc, NULL);
-      checkCudaError();
-      
+      // create the ghost texture object
+      {
+        cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypeLinear;
+        resDesc.res.linear.devPtr = ghost_field;
+        resDesc.res.linear.desc = desc;
+        resDesc.res.linear.sizeInBytes = ghost_bytes;
+
+        cudaCreateTextureObject(&ghostTex, &resDesc, &texDesc, NULL);
+        checkCudaError();
+      }
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION) {
 	cudaChannelFormatDesc desc;
@@ -379,6 +389,7 @@ namespace quda {
   void cudaColorSpinorField::destroy() {
     if (alloc) {
       device_free(v);
+      device_free(ghost_field);
       if (precision == QUDA_HALF_PRECISION) device_free(norm);
       if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 	delete even;
@@ -773,8 +784,19 @@ namespace quda {
     void *dst = (char*)v + precision*offset;
     const void *src = ghost_spinor;
 
+
     cudaMemcpyAsync(dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
-    
+  
+    // temporary code to copy data to the ghost arrays 
+    // eventually this will replace the code above. 
+    int ghost_offset = ghostOffset[dim]; 
+    ghost_offset += (dir == QUDA_BACKWARDS) ? 0 : len;
+  
+    void *ghost_dst = (char*)ghost_field + precision*ghost_offset;
+
+    cudaMemcpyAsync(ghost_dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
+
+ 
     if (precision == QUDA_HALF_PRECISION) {
       // norm region of host ghost zone is at the end of the ghost_spinor
 
