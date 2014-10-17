@@ -102,27 +102,30 @@ namespace quda {
 	ghostOffset[i][0] = 0;
         ghost_bytes = 0;
       }else{
-	ghostOffset[i][0] = ghostOffset[i-1][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
         if(precision == QUDA_HALF_PRECISION){
-          ghostOffset[i][0] += num_norm_faces*ghostFace[i-1]*sizeof(float)/sizeof(short); \
-          // assumes that sizeof(float) is a multiple of sizeof(short)
+          ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/sizeof(short);
+          // Adjust so that the offsets are multiples of 4 shorts
+          // This ensures that the dslash kernel can read the ghost field data as an array of short4's
+          ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
+
+        }else{
+	  ghostOffset[i][0] = ghostOffset[i-1][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
         }
       }
-      ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
 
       if(precision == QUDA_HALF_PRECISION){
+        ghostNormOffset[i][0] = (ghostOffset[i][0] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
+        ghostOffset[i][1] = (ghostNormOffset[i][0] + num_norm_faces*ghostFace[i]/2)*sizeof(float)/sizeof(short);
         // Adjust so that the offsets are multiples of 4 shorts
         // This ensures that the dslash kernel can read the ghost field data as an array of short4's
-        ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
         ghostOffset[i][1] = 4*((ghostOffset[i][1] + 3)/4);
+        ghostNormOffset[i][1] = (ghostOffset[i][1] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
+       
+        ghost_bytes = (ghostNormOffset[i][1] + num_norm_faces*ghostFace[i]/2)*QUDA_SINGLE_PRECISION;
+      }else{
+        ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
+        ghost_bytes = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2*precision;
       }
-      ghost_bytes = (ghostOffset[i][1] + num_faces*ghostFace[i]*nSpin*nColor*2/2)*precision;
-
-
-      ghostNormOffset[i][0] = (ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2)*sizeof(short)/sizeof(float); 
-      ghostNormOffset[i][1] = ghostNormOffset[i][0] + (num_norm_faces*ghostFace[i]/2);
-      if(precision == QUDA_HALF_PRECISION) ghost_bytes += num_norm_faces*ghostFace[i]*QUDA_SINGLE_PRECISION;
-
 
 #ifdef MULTI_GPU
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) 

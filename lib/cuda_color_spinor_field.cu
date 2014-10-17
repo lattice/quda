@@ -789,24 +789,15 @@ namespace quda {
   {
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
-    int len = nFace*ghostFace[dim]*Nint;
+    int len = nFace*ghostFace[dim]*Nint*precision;
     const void *src = ghost_spinor;
   
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
-
     void *ghost_dst = (char*)ghost_field + precision*ghost_offset;
 
-    cudaMemcpyAsync(ghost_dst, src, len*precision, cudaMemcpyHostToDevice, *stream);
+    if(precision == QUDA_HALF_PRECISION) len += nFace*ghostFace[dim]*sizeof(float);
 
- 
-    if (precision == QUDA_HALF_PRECISION) {
-      int normlen = nFace*ghostFace[dim];
-      int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostNormOffset[dim][0] : ghostNormOffset[dim][1];
-      void *ghost_dst = static_cast<char*>(ghost_field) + ghost_offset*sizeof(float);
-
-      const void *src = static_cast<const char*>(ghost_spinor)+nFace*Nint*ghostFace[dim]*precision; 
-      cudaMemcpyAsync(ghost_dst, src, normlen*sizeof(float), cudaMemcpyHostToDevice, *stream);
-    }
+    cudaMemcpyAsync(ghost_dst, src, len, cudaMemcpyHostToDevice, *stream);
   }
 
 
