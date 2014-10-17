@@ -100,6 +100,7 @@ namespace quda {
       }
       if(i==0){
 	ghostOffset[i][0] = 0;
+        ghost_bytes = 0;
       }else{
 	ghostOffset[i][0] = ghostOffset[i-1][0] + num_faces*ghostFace[i-1]*nSpin*nColor*2;
         if(precision == QUDA_HALF_PRECISION){
@@ -109,17 +110,28 @@ namespace quda {
       }
       ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
 
+      if(precision == QUDA_HALF_PRECISION){
+        // Adjust so that the offsets are multiples of 4 shorts
+        // This ensures that the dslash kernel can read the ghost field data as an array of short4's
+        ghostOffset[i][0] = 4*((ghostOffset[i][0] + 3)/4);
+        ghostOffset[i][1] = 4*((ghostOffset[i][1] + 3)/4);
+      }
+      ghost_bytes = (ghostOffset[i][1] + num_faces*ghostFace[i]*nSpin*nColor*2/2)*precision;
+
 
       ghostNormOffset[i][0] = (ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2)*sizeof(short)/sizeof(float); 
-      // assumes that sizeof(float) is a multiple of sizeof(short)
       ghostNormOffset[i][1] = ghostNormOffset[i][0] + (num_norm_faces*ghostFace[i]/2);
-        
+      if(precision == QUDA_HALF_PRECISION) ghost_bytes += num_norm_faces*ghostFace[i]*QUDA_SINGLE_PRECISION;
+
+
 #ifdef MULTI_GPU
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
 	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d, %6d\n", 
 		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i][0], ghostNormOffset[i][1]);
 #endif
-    }//end of outmost for loop
+    }//end of outmost for loop (index i)
+
+    ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
