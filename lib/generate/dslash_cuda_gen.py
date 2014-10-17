@@ -438,7 +438,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 #if (DD_PREC==2) // half precision
   //sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-  sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)];
+  sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][0];
 #endif
 
   const int dims[] = {X1, X2, X3, X4};
@@ -516,7 +516,7 @@ def gen(dir, pack_only=False):
 
     str += "#ifdef MULTI_GPU\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
-    str += "  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];\n"
+    str += "  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];\n"
     str += "#else\n"
     str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
@@ -560,9 +560,6 @@ def gen(dir, pack_only=False):
 
     load_half = ""
     load_half += "const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];\n"
-    #load_half += "#if (DD_PREC==2) // half precision\n"
-    #load_half += "const int sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];\n"
-    #load_half += "#endif\n"
 
     if dir >= 6: load_half += "const int t_proj_scale = TPROJSCALE;\n"
     load_half += "\n"

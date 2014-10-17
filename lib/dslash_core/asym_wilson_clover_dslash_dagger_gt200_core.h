@@ -879,7 +879,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 
 #if (DD_PREC==2) // half precision
   //sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-  sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)];
+  sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][0];
 #endif
 
   const int dims[] = {X1, X2, X3, X4};
@@ -916,7 +916,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==X1m1 ? X-X1m1 : X+1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x1==X1m1 ? X-X1m1 : X+1) >> 1;
 #endif
@@ -1107,7 +1107,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x1==0 ? X+X1m1 : X-1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x1==0 ? X+X1m1 : X-1) >> 1;
 #endif
@@ -1302,7 +1302,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x2==X2m1 ? X-X2X1mX1 : X+X1) >> 1;
 #endif
@@ -1493,7 +1493,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x2==0 ? X+X2X1mX1 : X-X1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x2==0 ? X+X2X1mX1 : X-X1) >> 1;
 #endif
@@ -1688,7 +1688,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x3==X3m1 ? X-X3X2X1mX2X1 : X+X2X1) >> 1;
 #endif
@@ -1879,7 +1879,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x3==0 ? X+X3X2X1mX2X1 : X-X2X1) >> 1;
 #endif
@@ -2074,7 +2074,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x4==X4m1 ? X-X4X3X2X1mX3X2X1 : X+X3X2X1) >> 1;
 #endif
@@ -2328,7 +2328,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
   
 #ifdef MULTI_GPU
   const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1 :
-    face_idx + param.ghostOffset[static_cast<int>(kernel_type)];
+    face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];
 #else
   const int sp_idx = (x4==0 ? X+X4X3X2X1mX3X2X1 : X-X3X2X1) >> 1;
 #endif

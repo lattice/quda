@@ -12,8 +12,8 @@ enum KernelType {
     int parity;  // Even-Odd or Odd-Even
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
-    int ghostOffset[QUDA_MAX_DIM+1];
-    int ghostNormOffset[QUDA_MAX_DIM+1];
+    int ghostOffset[QUDA_MAX_DIM+1][2];
+    int ghostNormOffset[QUDA_MAX_DIM+1][2];
     int X[4];
     int Ls;
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
@@ -57,8 +57,14 @@ enum KernelType {
       printfQuda("Ls = %d\n", Ls);
       printfQuda("commDim = {%d, %d, %d, %d}\n", commDim[0], commDim[1], commDim[2], commDim[3]);
       printfQuda("ghostDim = {%d, %d, %d, %d}\n", ghostDim[0], ghostDim[1], ghostDim[2], ghostDim[3]);
-      printfQuda("ghostOffset = {%d, %d, %d, %d}\n", ghostOffset[0], ghostOffset[1], ghostOffset[2], ghostOffset[3]);
-      printfQuda("ghostNormOffset = {%d, %d, %d, %d}\n", ghostNormOffset[0], ghostNormOffset[1], ghostNormOffset[2], ghostNormOffset[3]);
+      printfQuda("ghostOffset = {{%d, %d}, {%d, %d}, {%d, %d}, {%d, %d}}\n", ghostOffset[0][0], ghostOffset[0][1], 
+                                                                              ghostOffset[1][0], ghostOffset[1][1],
+                                                                              ghostOffset[2][0], ghostOffset[2][1],
+                                                                              ghostOffset[3][0], ghostOffset[3][1]);
+      printfQuda("ghostNormOffset = {{%d, %d}, {%d, %d}, {%d, %d}, {%d, %d}}\n", ghostNormOffset[0][0], ghostNormOffset[0][1], 
+                                                                                 ghostNormOffset[1][0], ghostNormOffset[1][1],
+                                                                                 ghostNormOffset[2][0], ghostNormOffset[2][1],
+                                                                                 ghostNormOffset[3][0], ghostNormOffset[3][1]);
       printfQuda("kernel_type = %d\n", kernel_type);
       printfQuda("sp_stride = %d\n", sp_stride);
       printfQuda("cl_stride = %d\n", cl_stride);
