@@ -468,9 +468,9 @@ if ( isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
   // i 0 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,0,Y);
-  const int sp_idx = face_idx + param.ghostOffset[0][0];
+  const int sp_idx = face_idx + param.ghostOffset[0][1];
 #if (DD_PREC==2)
-    sp_norm_idx = face_idx + faceVolume[0] + param.ghostNormOffset[0][0];
+    sp_norm_idx = face_idx + param.ghostNormOffset[0][1];
 #endif
   
   const int ga_idx = sid;
@@ -486,7 +486,7 @@ if ( isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
   const int sp_stride_pad = ghostFace[0];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -792,9 +792,9 @@ if ( isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
   // -1 0 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,1,Y);
-  const int sp_idx = face_idx + param.ghostOffset[1][0];
+  const int sp_idx = face_idx + param.ghostOffset[1][1];
 #if (DD_PREC==2)
-    sp_norm_idx = face_idx + faceVolume[1] + param.ghostNormOffset[1][0];
+    sp_norm_idx = face_idx + param.ghostNormOffset[1][1];
 #endif
   
   const int ga_idx = sid;
@@ -810,7 +810,7 @@ if ( isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
   const int sp_stride_pad = ghostFace[1];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -1116,9 +1116,9 @@ if ( isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
   // 0 -i 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,2,Y);
-  const int sp_idx = face_idx + param.ghostOffset[2][0];
+  const int sp_idx = face_idx + param.ghostOffset[2][1];
 #if (DD_PREC==2)
-    sp_norm_idx = face_idx + faceVolume[2] + param.ghostNormOffset[2][0];
+    sp_norm_idx = face_idx + param.ghostNormOffset[2][1];
 #endif
   
   const int ga_idx = sid;
@@ -1134,7 +1134,7 @@ if ( isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
   const int sp_stride_pad = ghostFace[2];
   
   // read half spinor from device memory
-  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+  READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
   
   a0_re = i00_re;  a0_im = i00_im;
   a1_re = i01_re;  a1_im = i01_im;
@@ -1440,9 +1440,9 @@ if ( isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
   // 0 0 0 2 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,3,Y);
-  const int sp_idx = face_idx + param.ghostOffset[3][0];
+  const int sp_idx = face_idx + param.ghostOffset[3][1];
 #if (DD_PREC==2)
-    sp_norm_idx = face_idx + faceVolume[3] + param.ghostNormOffset[3][0];
+    sp_norm_idx = face_idx + param.ghostNormOffset[3][1];
 #endif
   
   const int ga_idx = sid;
@@ -1461,7 +1461,7 @@ if ( isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
     const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
     a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
     a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
@@ -1507,7 +1507,7 @@ if ( isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
     const int t_proj_scale = TPROJSCALE;
     
     // read half spinor from device memory
-    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
+    READ_HALF_SPINOR(GHOSTSPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
     
     a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
     a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
