@@ -632,7 +632,9 @@ namespace quda {
 
   // At the moment, I pass an instance of FaceBuffer in. 
   // Soon, faceBuffer will be subsumed into cudaColorSpinorField.
-  void computeStaggeredOprod(cudaGaugeField& outA, cudaGaugeField& outB, cudaColorSpinorField& in,  
+  void computeStaggeredOprod(cudaGaugeField& outA, cudaGaugeField& outB, 
+      cudaColorSpinorField& inEven,  
+      cudaColorSpinorField& inOdd,
       FaceBuffer& faceBuffer,
       const unsigned int parity, const double coeff[2])
   {
@@ -653,19 +655,19 @@ namespace quda {
     }
 #endif
 
-    if(in.Precision() != outA.Precision()) errorQuda("Mixed precision not supported: %d %d\n", in.Precision(), outA.Precision());
+    if(inEven.Precision() != outA.Precision()) errorQuda("Mixed precision not supported: %d %d\n", inEven.Precision(), outA.Precision());
 
-    cudaColorSpinorField& inA = (parity&1) ? in.Odd() : in.Even();
-    cudaColorSpinorField& inB = (parity&1) ? in.Even() : in.Odd();
+    cudaColorSpinorField& inA = (parity&1) ? inOdd : inEven;
+    cudaColorSpinorField& inB = (parity&1) ? inEven : inOdd;
 
-    if(in.Precision() == QUDA_DOUBLE_PRECISION){
+    if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
 
       Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA);
       Spinor<double2, double2, double2, 3, 0, 0> spinorB(inB);
       computeStaggeredOprodCuda<double2>(FloatNOrder<double, 18, 2, 18>(outA), FloatNOrder<double, 18, 2, 18>(outB), 
           outA, outB, 
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
-    }else if(in.Precision() == QUDA_SINGLE_PRECISION){
+    }else if(inEven.Precision() == QUDA_SINGLE_PRECISION){
 
       Spinor<float2, float2, float2, 3, 0, 0> spinorA(inA);
       Spinor<float2, float2, float2, 3, 0, 0> spinorB(inB);
@@ -673,7 +675,7 @@ namespace quda {
           outA, outB,
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
     }else{
-      errorQuda("Unsupported precision: %d\n", in.Precision());
+      errorQuda("Unsupported precision: %d\n", inEven.Precision());
     }
 #else // GPU_STAGGERED_OPROD not defined
    errorQuda("Staggered Outer Product has not been built!"); 
