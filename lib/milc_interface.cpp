@@ -156,7 +156,6 @@ void qudaHisqParamsInit(QudaHisqParams_t params)
 
 static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, QudaLinkType link_type)
 {
-  qudamilc_called<true>(__func__);
   QudaGaugeParam gParam = newQudaGaugeParam();
   for(int dir=0; dir<4; ++dir) gParam.X[dir] = dim[dir];
   gParam.cuda_prec_sloppy = gParam.cpu_prec = gParam.cuda_prec = prec;
@@ -174,7 +173,6 @@ static QudaGaugeParam newMILCGaugeParam(const int* dim, QudaPrecision prec, Quda
   gParam.site_ga_pad   = 0;
   gParam.mom_ga_pad    = 0;
   gParam.llfat_ga_pad  = 0;
-  qudamilc_called<false>(__func__);
   return gParam;
 }
 
