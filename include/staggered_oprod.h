@@ -14,7 +14,9 @@ namespace quda {
                               FaceBuffer& facebuffer, const unsigned int parity, const double coeff, const unsigned int displacement);
 
 
-  void computeStaggeredOprod(cudaGaugeField& outA, cudaGaugeField& outB, cudaColorSpinorField& in, 
+  void computeStaggeredOprod(cudaGaugeField& outA, cudaGaugeField& outB, 
+                             cudaColorSpinorField& inEven, 
+                             cudaColorSpinorField& inOdd,
                              FaceBuffer& faceBuffer, const unsigned int parity, const double coeff[2]);
 
 } // namespace quda

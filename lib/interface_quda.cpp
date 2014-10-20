@@ -4304,6 +4304,7 @@ void computeKSOprodQuda(void* oprod,
     QudaPrecision prec)
 
 {
+/*
   using namespace quda;       
 
   cudaGaugeField* cudaOprod;
@@ -4328,9 +4329,9 @@ void computeKSOprodQuda(void* oprod,
   // Operator on odd-parity sites
   computeStaggeredOprod(*cudaOprod, *cudaOprod, *cudaQuark, fB, 1, new_coeff);
 
+*/
   return;
 }
-
 
 void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
 {
@@ -4902,18 +4903,19 @@ void computeStaggeredOprodQuda(void** oprod,
   ColorSpinorParam qParam;
   qParam.nColor = 3;
   qParam.nSpin = 1;
-  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   qParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
   qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   qParam.nDim = 4;
   qParam.precision = oParam.precision;
   qParam.pad = 0;
-  for(int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir];
+  for(int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir]; qParam.x[0] /= 2; 
 
   // create the device quark field
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  cudaColorSpinorField cudaQuark(qParam); 
+  cudaColorSpinorField cudaQuarkEven(qParam); 
+  cudaColorSpinorField cudaQuarkOdd(qParam);
 
   // create the host quark field
   qParam.create = QUDA_REFERENCE_FIELD_CREATE;
@@ -4928,21 +4930,26 @@ void computeStaggeredOprodQuda(void** oprod,
   // loop over different quark fields
   for(int i=0; i<num_terms; ++i){
 
+    // Wrap the even-parity MILC quark field 
     profileStaggeredOprod.Start(QUDA_PROFILE_INIT);
     qParam.v = fermion[i];
-    cpuColorSpinorField cpuQuark(qParam); // create host quark field
+    cpuColorSpinorField cpuQuarkEven(qParam); // create host quark field
+    qParam.v = (char*)fermion[i] + cpuQuarkEven.RealLength()*cpuQuarkEven.Precision();
+    cpuColorSpinorField cpuQuarkOdd(qParam); // create host field
     profileStaggeredOprod.Stop(QUDA_PROFILE_INIT);
 
     profileStaggeredOprod.Start(QUDA_PROFILE_H2D);
-    cudaQuark = cpuQuark;
-    profileStaggeredOprod.Stop(QUDA_PROFILE_H2D);
+    cudaQuarkEven = cpuQuarkEven;
+    cudaQuarkOdd = cpuQuarkOdd;
+    profileStaggeredOprod.Stop(QUDA_PROFILE_H2D); 
+
 
     profileStaggeredOprod.Start(QUDA_PROFILE_COMPUTE);
     // Operate on even-parity sites
-    computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuark, faceBuffer1, 0, coeff[i]);
+    computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuarkEven, cudaQuarkOdd, faceBuffer1, 0, coeff[i]);
 
     // Operate on odd-parity sites
-    computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuark, faceBuffer2, 1, coeff[i]);
+    computeStaggeredOprod(cudaOprod0, cudaOprod1, cudaQuarkEven, cudaQuarkOdd, faceBuffer2, 1, coeff[i]);
     profileStaggeredOprod.Stop(QUDA_PROFILE_COMPUTE);
   }
 
