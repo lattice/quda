@@ -534,14 +534,6 @@ hisq_force_end()
   return;
 }
 
-
-namespace quda {
-  namespace fatlink {
-    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
-  }
-}
-
-
   static int 
 hisq_force_test(void)
 {
@@ -550,11 +542,6 @@ hisq_force_test(void)
   setVerbosity(QUDA_VERBOSE);
 
   hisq_force_init();
-
-  TimeProfile profile("dummy");
-  quda::fatlink::initLatticeConstants(*cpuMom, profile);
-
-
 
   //float weight = 1.0;
   float act_path_coeff[6];
