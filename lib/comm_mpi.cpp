@@ -245,6 +245,5 @@ void comm_barrier(void)
 
 void comm_abort(int status)
 {
-  MPI_CHECK( MPI_Finalize() );
-  exit(status);
+  MPI_Abort(MPI_COMM_WORLD, status) ;
 }
