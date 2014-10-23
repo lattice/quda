@@ -740,7 +740,7 @@ void dslashReference_4d_4dpc_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spino
     // are 4-dim'l.
     gaugeOdd[dir]  = gaugeFull[dir]+Vh*gaugeSiteSize;
   }
-  int sp_idx,oddBit_gge;
+  int sp_idx;//oddBit_gge;
   for (int xs=0;xs<Ls;xs++) {
     for (int gge_idx = 0; gge_idx < Vh; gge_idx++) {
       for (int dir = 0; dir < 8; dir++) {

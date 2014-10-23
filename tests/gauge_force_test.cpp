@@ -416,7 +416,7 @@ gauge_force_test(void)
   }else if (qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER) {
     sitelink = (void**)sitelink_2d;
   } else {
-    errorQuda("Unsupported gauge order %d", qudaGaugePaxram.gauge_order);
+    errorQuda("Unsupported gauge order %d", qudaGaugeParam.gauge_order);
   }
   
 #ifdef MULTI_GPU
