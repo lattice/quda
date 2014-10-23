@@ -3657,6 +3657,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
 #ifndef MULTI_GPU
   cudaGaugeField *cudaGauge = cudaSiteLink;
+  qudaGaugeParam->site_ga_pad = gParam.pad; //need to set this value
 #else
 
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
@@ -3664,7 +3665,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   gParamEx.order = (qudaGaugeParam->reconstruct == QUDA_RECONSTRUCT_NO || 
       qudaGaugeParam->cuda_prec == QUDA_DOUBLE_PRECISION) ? 
     QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
-  qudaGaugeParam->site_ga_pad = gParamEx.pad;//need to record this value
+  qudaGaugeParam->site_ga_pad = gParamEx.pad;//need to set this value
 
   cudaGaugeField *cudaGauge = new cudaGaugeField(gParamEx);
 
