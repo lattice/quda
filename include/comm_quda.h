@@ -25,6 +25,9 @@ extern "C" {
   int comm_rank_displaced(const Topology *topo, const int displacement[]);
   void comm_set_default_topology(Topology *topo);
   Topology *comm_default_topology(void);
+  void comm_set_dslash_neighbor_ranks(Topology *topo=NULL);
+  int comm_dslash_neighbor_rank(int dir, int dim);
+  void comm_dslash_peer2peer_init();
   int comm_dim(int dim);
   int comm_coord(int dim);
 
