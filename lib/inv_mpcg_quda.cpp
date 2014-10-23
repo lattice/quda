@@ -125,6 +125,7 @@ namespace quda {
     return;
   }
 
+#ifdef SSTEP
   static void computeGramMatrix(double** G, std::vector<cudaColorSpinorField>& v, double* mu){
 
     const int dim = v.size();
@@ -200,6 +201,7 @@ namespace quda {
 
     return;
   }
+#endif // SSTEP
 
   void MPCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
