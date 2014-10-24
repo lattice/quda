@@ -39,6 +39,7 @@ namespace quda {
     }
   }
 
+#ifdef SSTEP
   static void print(const double d[], int n){
     for(int i=0; i<n; ++i){
       std::cout << d[i] << " ";
@@ -128,7 +129,7 @@ namespace quda {
     }
     return result;
   } 
-
+#endif
 
   void MPBiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {

@@ -144,23 +144,10 @@ hisq_force_end()
   return;
 }
 
-namespace quda {
-  namespace fatlink {
-    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
-    void initGaugeConstants(const cudaGaugeField &gauge, TimeProfile &profile);
-  }
-}
-
-
 static void 
 hisq_force_test()
 {
   hisq_force_init();
-
-  TimeProfile profile("dummy");
-  quda::fatlink::initLatticeConstants(*cudaFatLink, profile);
-  quda::fatlink::initGaugeConstants(*cudaFatLink, profile);
-
 
   double unitarize_eps = 1e-5;
   const double hisq_force_filter = 5e-5;

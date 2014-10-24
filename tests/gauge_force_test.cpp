@@ -413,9 +413,11 @@ gauge_force_test(void)
   }
   if (qudaGaugeParam.gauge_order ==  QUDA_MILC_GAUGE_ORDER){ 
     sitelink =  sitelink_1d;    
-  }else{ //QUDA_QDP_GAUGE_ORDER
+  }else if (qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER) {
     sitelink = (void**)sitelink_2d;
-  }  
+  } else {
+    errorQuda("Unsupported gauge order %d", qudaGaugeParam.gauge_order);
+  }
   
 #ifdef MULTI_GPU
   void* sitelink_ex_2d[4];

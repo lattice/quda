@@ -649,9 +649,13 @@ namespace quda {
 
     unsigned int ghostOffset[4] = {0,0,0,0};
 #ifdef MULTI_GPU
-    const unsigned int Npad = in.Ncolor()*in.Nspin()*2/in.FieldOrder();
+    const unsigned int Npad = inEven.Ncolor()*inEven.Nspin()*2/inEven.FieldOrder();
     for(int dir=0; dir<4; ++dir){
+<<<<<<< HEAD
       ghostOffset[i] = in->GhostOffset(i)/in->FieldOrder() + Npad*in->Stride();
+=======
+      ghostOffset[dir] = Npad*(inEven.GhostOffset(dir) + inEven.Stride()); 
+>>>>>>> origin/quda-0.7
     }
 #endif
 
