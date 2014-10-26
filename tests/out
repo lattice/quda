@@ -1,2 +1,0 @@
-mpicxx			 -Wall -O3 -D__COMPUTE_CAPABILITY__=350 -DMULTI_GPU -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_DIRECT -DBUILD_QDP_INTERFACE -DBUILD_MILC_INTERFACE -DNUMA_AFFINITY -I/usr/local/cuda/include -DMPI_COMMS  -I/usr/lib64/openmpi/include -I../include -I.  dslash_test.cpp -c -o dslash_test.o
-mpicxx			 -fPIC -L/usr/local/cuda/lib64 -lcudart   dslash_test.o test_util.o gtest-all.o wilson_dslash_reference.o domain_wall_dslash_reference.o misc.o ../lib/libquda.a -o dslash_test -fPIC -L/usr/local/cuda/lib64 -lcudart  
