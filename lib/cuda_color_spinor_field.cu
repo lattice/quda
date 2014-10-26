@@ -197,7 +197,7 @@ namespace quda {
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       v = device_malloc(bytes);
-      ghost_field = device_malloc(ghost_bytes);
+      if(ghost_bytes) ghost_field = device_malloc(ghost_bytes);
       if (precision == QUDA_HALF_PRECISION) {
 	norm = device_malloc(norm_bytes);
       }
@@ -333,7 +333,8 @@ namespace quda {
       checkCudaError();
 
       // create the ghost texture object
-      {
+     if(ghost_bytes){
+
         cudaResourceDesc resDesc;
         memset(&resDesc, 0, sizeof(resDesc));
         resDesc.resType = cudaResourceTypeLinear;
@@ -366,7 +367,7 @@ namespace quda {
 	checkCudaError();
 
         // Assign ghostTexNorm
-        { 
+        if(ghost_bytes){ 
           cudaResourceDesc resDesc;
           memset(&resDesc, 0, sizeof(resDesc));
           resDesc.resType = cudaResourceTypeLinear;
@@ -387,10 +388,10 @@ namespace quda {
   void cudaColorSpinorField::destroyTexObject() {
     if (isNative() && texInit) {
       cudaDestroyTextureObject(tex);
-      cudaDestroyTextureObject(ghostTex);
+      if(ghost_bytes)cudaDestroyTextureObject(ghostTex);
       if (precision == QUDA_HALF_PRECISION){ 
         cudaDestroyTextureObject(texNorm);
-        cudaDestroyTextureObject(ghostTexNorm);
+        if(ghost_bytes)cudaDestroyTextureObject(ghostTexNorm);
       }
       texInit = false;
       checkCudaError();
@@ -401,7 +402,7 @@ namespace quda {
   void cudaColorSpinorField::destroy() {
     if (alloc) {
       device_free(v);
-      device_free(ghost_field);
+      if(ghost_bytes) device_free(ghost_field);
       if (precision == QUDA_HALF_PRECISION) device_free(norm);
       if (siteSubset == QUDA_FULL_SITE_SUBSET) {
 	delete even;
