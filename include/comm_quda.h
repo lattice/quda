@@ -30,6 +30,7 @@ extern "C" {
   void comm_dslash_peer2peer_init();
   int comm_dim(int dim);
   int comm_coord(int dim);
+  bool comm_dslash_peer2peer_enabled(int dir, int dim);
 
   /**
      Create a persistent message handler for a relative send
@@ -85,6 +86,8 @@ extern "C" {
   int comm_size(void);
   int comm_gpuid(void);
 
+  void comm_exchange(int dest_rank, void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes);
+  void comm_exchange_displaced(const int displacement[], void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes);
   /**
      Create a persistent message handler for a relative send
      @param buffer Buffer from which message will be sent

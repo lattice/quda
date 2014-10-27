@@ -30,6 +30,7 @@ static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
 
+
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
   int initialized;
@@ -78,6 +79,31 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   }
 }
 
+
+void comm_exchange(int dest_rank, void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes){
+  MPI_Status status;
+  int rank = comm_rank();
+  int tag = rank;
+
+  // Have to be careful how we use this in order to avoid deadlock
+  MPI_Sendrecv(send_buffer, send_bytes, MPI_BYTE, dest_rank, tag, 
+               recv_buffer, recv_bytes, MPI_BYTE, dest_rank, tag, MPI_COMM_WORLD, &status);
+
+  return;
+}
+
+void comm_exchange_displaced(const int displacement[], void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes){
+  
+  Topology* topo = comm_default_topology();
+  int rank = comm_rank_displaced(topo,displacement);
+
+  comm_exchange(rank, send_buffer, send_bytes, recv_buffer, recv_bytes);
+  
+  return;
+}
+
+
+
 void comm_dslash_peer2peer_init()
 {
   // first check that the local GPU supports UVA
@@ -116,12 +142,18 @@ void comm_dslash_peer2peer_init()
       } // on the same node
     } // different dimensions - x, y, z, t
   } // different directions - forward/backward
-  
+
+
   host_free(hostname_recv_buf);
   host_free(gpuid_recv_buf);
  
   return;
 }
+
+bool comm_dslash_peer2peer_enabled(int dir, int dim){
+  return peer2peer_enabled[dir][dim];
+}
+
 
 int comm_rank(void)
 {

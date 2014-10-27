@@ -27,11 +27,79 @@ namespace quda {
   void* cudaColorSpinorField::fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
+  
+
+  // Need events to coordinate IPC memory copies
+  cudaEvent_t cudaColorSpinorField::ipcLocalEvent[2][2][QUDA_MAX_DIM];
+  cudaEvent_t cudaColorSpinorField::ipcRemoteEvent[2][2][QUDA_MAX_DIM];
+  cudaIpcEventHandle_t cudaColorSpinorField::ipcLocalEventHandle[2][2][QUDA_MAX_DIM];
+  cudaIpcEventHandle_t cudaColorSpinorField::ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
+
+  // Pointers to ghost buffers on the local process and remote processes
+  cudaIpcMemHandle_t cudaColorSpinorField::ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
+  cudaIpcMemHandle_t cudaColorSpinorField::ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
+
+  void* cudaColorSpinorField::fwdGhostFaceDestBuffer[2][QUDA_MAX_DIM];
+  void* cudaColorSpinorField::backGhostFaceDestBuffer[2][QUDA_MAX_DIM];
+
 
   /*cudaColorSpinorField::cudaColorSpinorField() : 
     ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
 
     }*/
+
+  void cudaColorSpinorField::createIPCDslashComms(){
+
+//#ifndef GPU_COMMS
+//    errorQUDA("GPU_COMMS must be enabled");
+//#else
+    if(!initComms) errorQuda("Can only be called after create comms\n");
+      
+    comm_dslash_peer2peer_init();
+
+
+    for(int dir=0; dir<2; ++dir){
+      for(int dim=0; dim<4; ++dim){
+        if(comm_dslash_peer2peer_enabled(dir,dim)){
+          int displacement[4] = {0,0,0,0};
+          displacement[dim] = (dir==0) ? -1 : +1; // dir==0/1 corresponds to -ve/+ve displacement
+          for(int b=0; b<2; ++b){ // 2 buffers 
+            // create events and event handles
+            cudaEventCreate(&ipcLocalEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
+            cudaIpcGetEventHandle(&ipcLocalEventHandle[b][dir][dim], ipcLocalEvent[b][dir][dim]);
+
+            // ipcLocalEventHandle[dir][dim] from the neighboring process is copied into 
+            // ipcRemoteEventHandle[dir][dim]
+
+            comm_exchange_displaced(displacement, &ipcLocalEventHandle[b][dir][dim], sizeof(ipcLocalEventHandle[b][dir][dim]),
+                  &ipcRemoteEventHandle[b][1-dir][dim], sizeof(ipcRemoteEventHandle[b][1-dir][dim]) );
+
+            cudaEventCreate(&ipcRemoteEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
+            cudaIpcGetEventHandle(&ipcRemoteEventHandle[b][dir][dim], ipcRemoteEvent[b][dir][dim]);
+
+            void* ghost_buffer = (dir==0) ?  from_back_face[b][dim] : from_fwd_face[b][dim];
+
+            // create local memory handle
+            cudaIpcGetMemHandle(&ipcLocalGhostBufferHandle[b][dir][dim], ghost_buffer);
+            // communicate memory handle
+            comm_exchange_displaced(displacement, &ipcLocalGhostBufferHandle[b][dir][dim], 
+                                                  sizeof(ipcLocalGhostBufferHandle[b][dir][dim]),
+                                                  &ipcRemoteGhostBufferHandle[b][1-dir][dim], 
+                                                  sizeof(ipcRemoteGhostBufferHandle[b][1-dir][dim]));
+
+            // Need to check the logic here 
+            void** remoteGhostDestBuffer = ((1-dir)==0) ? &(fwdGhostFaceDestBuffer[b][dim]) : &(backGhostFaceDestBuffer[b][dim]);
+
+            cudaIpcOpenMemHandle(remoteGhostDestBuffer, ipcRemoteGhostBufferHandle[b][1-dir][dim], cudaIpcMemLazyEnablePeerAccess); 
+ 
+          }
+        }
+      }
+    }
+//#endif
+  }
+
+
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false), 

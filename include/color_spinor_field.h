@@ -357,6 +357,21 @@ namespace quda {
     static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static int initGhostFaceBuffer;
 
+
+    // Static variables needed for peer-to-peer comms
+    static cudaEvent_t ipcLocalEvent[2][2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcRemoteEvent[2][2][QUDA_MAX_DIM];
+    static cudaIpcEventHandle_t ipcLocalEventHandle[2][2][QUDA_MAX_DIM];
+    static cudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
+
+    static cudaIpcMemHandle_t ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
+    static cudaIpcMemHandle_t ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
+  
+    static void* fwdGhostFaceDestBuffer[2][QUDA_MAX_DIM];
+    static void* backGhostFaceDestBuffer[2][QUDA_MAX_DIM];
+
+
+
     void create(const QudaFieldCreate);
     void destroy();
     void copy(const cudaColorSpinorField &);
@@ -401,6 +416,7 @@ namespace quda {
 
     /** Create the communication handlers and buffers */
     void createComms(int nFace);
+    void createIPCDslashComms();
     /** Destroy the communication handlers and buffers */
     void destroyComms();
     void allocateGhostBuffer(int nFace);
