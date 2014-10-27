@@ -483,7 +483,7 @@ namespace quda {
   }
 
   std::ostream& operator<<(std::ostream &out, const ColorSpinorField &a) {
-    out << "typdid = " << typeid(a).name() << std::endl;
+    out << "typedid = " << typeid(a).name() << std::endl;
     out << "nColor = " << a.nColor << std::endl;
     out << "nSpin = " << a.nSpin << std::endl;
     out << "twistFlavor = " << a.twistFlavor << std::endl;
