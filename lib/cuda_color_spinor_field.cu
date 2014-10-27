@@ -1007,11 +1007,13 @@ namespace quda {
 #ifdef GPU_COMMS
 	for(int b=0; b<2; ++b){
 	  my_fwd_face[b][i] = fwdGhostFaceBuffer[b][i];	
-	  from_fwd_face[b][i] = ghost[i] + nFace*ghostFace[i]*Ndof*precision;
+	  //from_fwd_face[b][i] = ghost[i] + nFace*ghostFace[i]*Ndof*precision;
+	  from_fwd_face[b][i] = ghost_field + ghostOffset[i][1]*precision;
 
 	  if(precision == QUDA_HALF_PRECISION){
 	    my_fwd_norm_face[b][i] = static_cast<char*>(fwdGhostFaceBuffer[b][i]) + nFace*ghostFace[i]*Ndof*precision;
-	    from_fwd_norm_face[b][i] = static_cast<char*>(ghostNorm[i]) + nFace*ghostFace[i]*sizeof(float);
+	   // from_fwd_norm_face[b][i] = static_cast<char*>(ghostNorm[i]) + nFace*ghostFace[i]*sizeof(float);
+            from_fwd_norm_face[b][i] = static_cast<char*>(ghost_field) + ghostNormOffset[i][1]*sizeof(float);
 	  }
 	} // loop over b
 #else
