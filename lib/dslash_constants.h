@@ -8,15 +8,16 @@ enum KernelType {
 };
 
   struct DslashParam {
+    char do_not_delete; // work around for bug in CUDA 6.5
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
+    int X[4];
+    int Ls;
+    KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM+1];
     int ghostNormOffset[QUDA_MAX_DIM+1];
-    int X[4];
-    int Ls;
-    KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int sp_stride; // spinor stride
     int cl_stride; // clover stride
 #ifdef GPU_STAGGERED_DIRAC
