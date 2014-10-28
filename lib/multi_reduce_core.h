@@ -266,9 +266,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
         size_t bytes = N*arg.X[0].Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
         if (arg.X[0].Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
         return arg.r.streams()*bytes*arg.length; }
-      int tuningIter() const { return 10; }
-
-
+      int tuningIter() const { return 3; }
   };
 // NB - need to change d_reduce and hd_reduce
 
