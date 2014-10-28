@@ -101,6 +101,12 @@ namespace quda {
       const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile, 
       const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH);
 
+  // twisted mass Dslash  
+  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
+      const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
+      const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile, 
+      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH);
+
   // twisted clover Dslash  
   void twistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
       const FullClover *clover, const FullClover *cloverInv, const   cudaColorSpinorField *in, 
