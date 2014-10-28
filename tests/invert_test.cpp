@@ -29,6 +29,10 @@
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
+
+// Twisted mass flavor type
+extern QudaTwistFlavorType twist_flavor;
+
 extern bool tune;
 extern int device;
 extern int xdim;
@@ -153,8 +157,7 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.12;
     inv_param.epsilon = 0.1385;
-    //inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
-    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+    inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {

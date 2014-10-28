@@ -1567,6 +1567,7 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
+QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1604,6 +1605,7 @@ void usage(char** argv )
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
          "                                                  /asqtad/domain_wall/domain_wall_4dpc/mobius_Dwf\n");
+  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, degen, nondeg)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
@@ -1930,6 +1932,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }     
     dslash_type =  get_dslash_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--flavor") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    twist_flavor =  get_flavor_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

@@ -850,6 +850,29 @@ get_dslash_type_str(QudaDslashType type)
     
 }
 
+QudaTwistFlavorType
+get_flavor_type(char* s)
+{
+  QudaTwistFlavorType ret =  QUDA_TWIST_MINUS;
+  
+  if (strcmp(s, "minus") == 0){
+    ret = QUDA_TWIST_MINUS;
+  }else if (strcmp(s, "plus") == 0){
+    ret = QUDA_TWIST_PLUS;
+  }else if (strcmp(s, "nondeg") == 0){
+    ret = QUDA_TWIST_NONDEG_DOUBLET;
+  }else if (strcmp(s, "deg") == 0){
+    ret = QUDA_TWIST_DEG_DOUBLET;
+  }else if (strcmp(s, "no") == 0){
+    ret =  QUDA_TWIST_NO;
+  }else{
+    fprintf(stderr, "Error: invalid flavor type\n");	
+    exit(1);
+  }
+  
+  return ret;
+}
+
 QudaInverterType
 get_solver_type(char* s)
 {

@@ -52,6 +52,9 @@ extern int test_type;
 // Dirac operator type
 extern QudaDslashType dslash_type;
 
+// Twisted mass flavor type
+extern QudaTwistFlavorType twist_flavor;
+
 extern bool tune;
 
 extern int device;
@@ -114,8 +117,7 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.01;
     inv_param.epsilon = 0.01; 
-//!    inv_param.twist_flavor = QUDA_TWIST_MINUS;
-    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
+    inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     inv_param.mass = 0.01;
