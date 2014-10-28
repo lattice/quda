@@ -255,7 +255,7 @@ void init(int argc, char **argv) {
   
   csParam.nColor = 3;
   csParam.nSpin = 4;
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     csParam.twistFlavor = inv_param.twist_flavor;
   }
   csParam.nDim = 4;
