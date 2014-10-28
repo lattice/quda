@@ -3808,13 +3808,17 @@ void createCloverQuda(QudaInvertParam* invertParam)
   int y[4];
   for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2*R[dir];
   int pad = 0;
-  GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
-      pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+  // clover creation not supported from 8-reconstruct presently so convert to 12
+  QudaReconstructType recon = (gaugePrecise->Reconstruct() == QUDA_RECONSTRUCT_8) ? 
+    QUDA_RECONSTRUCT_12 : gaugePrecise->Reconstruct();
+  GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), recon, pad, 
+			   QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.order = gaugePrecise->Order();
   gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParamEx.t_boundary = gaugePrecise->TBoundary();
   gParamEx.nFace = 1;
+
 
   cudaGaugeField *cudaGaugeExtended = NULL;
   if (extendedGaugeResident) {
