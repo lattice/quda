@@ -127,6 +127,23 @@ namespace quda {
     }
     virtual ~DomainWallDslash4DPCCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
+    TuneKey tuneKey() const
+    {
+      TuneKey key = DslashCuda::tuneKey();
+      switch(DS_type){
+      case 0:
+	strcat(key.aux,",Dslash4");
+	break;
+      case 1:
+	strcat(key.aux,",Dslash5");
+	break;
+      case 2:
+	strcat(key.aux,",Dslash5inv");
+	break;
+      }
+      return key;
+    }
+
     virtual void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
