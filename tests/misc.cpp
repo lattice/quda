@@ -798,9 +798,9 @@ get_dslash_type(char* s)
     ret =  QUDA_ASQTAD_DSLASH;
   }else if (strcmp(s, "domain_wall") == 0){
     ret =  QUDA_DOMAIN_WALL_DSLASH;
-  }else if (strcmp(s, "domain_wall_4dpc") == 0){
+  }else if (strcmp(s, "domain_wall_4d") == 0){
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
-  }else if (strcmp(s, "mobius_Dwf") == 0){
+  }else if (strcmp(s, "mobius") == 0){
     ret =  QUDA_MOBIUS_DWF_DSLASH;
   }else{
     fprintf(stderr, "Error: invalid dslash type\n");	
@@ -835,10 +835,10 @@ get_dslash_type_str(QudaDslashType type)
     ret = "domain_wall";
       break;
   case QUDA_DOMAIN_WALL_4D_DSLASH:
-    ret = "domain_wall_4dpc";
+    ret = "domain_wall_4d";
       break;
   case QUDA_MOBIUS_DWF_DSLASH:
-    ret = "mobius_Dwf";
+    ret = "mobius";
       break;
   default:
     ret = "unknown";	
@@ -859,10 +859,10 @@ get_flavor_type(char* s)
     ret = QUDA_TWIST_MINUS;
   }else if (strcmp(s, "plus") == 0){
     ret = QUDA_TWIST_PLUS;
-  }else if (strcmp(s, "nondeg") == 0){
-    ret = QUDA_TWIST_NONDEG_DOUBLET;
-  }else if (strcmp(s, "deg") == 0){
+  }else if (strcmp(s, "deg_doublet") == 0){
     ret = QUDA_TWIST_DEG_DOUBLET;
+  }else if (strcmp(s, "nondeg_doublet") == 0){
+    ret = QUDA_TWIST_NONDEG_DOUBLET;
   }else if (strcmp(s, "no") == 0){
     ret =  QUDA_TWIST_NO;
   }else{
@@ -870,6 +870,35 @@ get_flavor_type(char* s)
     exit(1);
   }
   
+  return ret;
+}
+
+const char*
+get_flavor_type_str(QudaTwistFlavorType type)
+{
+  const char* ret;
+  
+  switch(type) {
+  case QUDA_TWIST_MINUS:
+    ret = "minus";
+    break;
+  case QUDA_TWIST_PLUS:
+    ret = "plus";
+    break;
+  case QUDA_TWIST_DEG_DOUBLET:
+    ret = "deg_doublet";
+    break;
+  case QUDA_TWIST_NONDEG_DOUBLET:
+    ret = "nondeg_doublet";
+    break;
+  case QUDA_TWIST_NO:
+    ret = "no";
+    break;
+  default:
+    ret = "unknown";
+    break;
+  }
+
   return ret;
 }
 

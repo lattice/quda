@@ -1605,12 +1605,12 @@ void usage(char** argv )
   printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
-         "                                                  /asqtad/domain_wall/domain_wall_4dpc/mobius_Dwf\n");
-  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, degen, nondeg)\n");
+         "                                                  /asqtad/domain_wall/domain_wall_4d/mobius\n");
+  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, degen_doublet, nondegen_doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
-  printf("    --precon_type <mr/ (unspecified)>                   # The type of solver to use (default none (=unspecified))\n");
+  printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified))\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
