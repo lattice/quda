@@ -138,7 +138,8 @@ void init(int argc, char **argv) {
   
   if(dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-     dslash_type == QUDA_MOBIUS_DWF_DSLASH )
+     dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
+     dslash_type == QUDA_WILSON_DSLASH)
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   else
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
