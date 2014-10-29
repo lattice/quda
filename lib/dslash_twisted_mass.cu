@@ -198,11 +198,13 @@ namespace quda {
       dslash = new TwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
     }
 
+
 #ifndef GPU_COMMS
     DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
 #endif
+
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
     delete dslashImp;
 

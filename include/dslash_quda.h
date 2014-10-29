@@ -73,13 +73,13 @@ namespace quda {
   void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
       const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k, 
       const int *commDim, const int DS_type, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH);	  
+      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
 
   // Added for 4d EO preconditioning in Mobius DWF
   void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in, 
       const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k, 
       const int *commDim, const int DS_type, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH); 		  
+      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
 
   // staggered Dslash    
   void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
@@ -99,7 +99,7 @@ namespace quda {
   void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
       const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
       const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim, TimeProfile &profile, 
-      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH);
+      const QudaDslashPolicy &dslashPolicy=QUDA_DSLASH2);
 
   // twisted mass Dslash  
   void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const   cudaColorSpinorField *in, 
