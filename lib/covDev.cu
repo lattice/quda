@@ -195,7 +195,7 @@ namespace quda
     unsigned int minThreads			() const
     {
       #ifdef MULTI_GPU
-	if (dslashParam.kernel_type == INTERIOR_KERNEL) { return in->Volume(); } else { return ghostVolume; } }
+	if (dslashParam.kernel_type == INTERIOR_KERNEL) { return in->Volume(); } else { return ghostVolume; }
       #else
 	return in->Volume();
       #endif
