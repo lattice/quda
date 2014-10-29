@@ -1568,6 +1568,7 @@ int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
+bool kernel_pack_t = false;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1601,7 +1602,7 @@ void usage(char** argv )
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
-  printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
+  printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
          "                                                  /asqtad/domain_wall/domain_wall_4dpc/mobius_Dwf\n");
@@ -1826,8 +1827,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--kernel_pack_t") == 0){
-    quda::setKernelPackT(true);
+  if( strcmp(argv[i], "--kernel-pack-t") == 0){
+    kernel_pack_t = true;
     ret= 0;
     goto out;
   }
