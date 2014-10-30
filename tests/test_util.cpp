@@ -1984,7 +1984,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    mass= get_mass_normalization_type(argv[i+1]);
+    normalization= get_mass_normalization_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

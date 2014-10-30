@@ -2099,6 +2099,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
+  massRescale(param->dslash_type, param->kappa, param->mass, 
+	      param->solution_type, param->mass_normalization, *b);
+
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -2106,9 +2109,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
-
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-      param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -2324,6 +2324,9 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
+  massRescale(param->dslash_type, param->kappa, param->mass, 
+      param->solution_type, param->mass_normalization, *b);
+
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -2331,9 +2334,6 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
-
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-      param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -3212,6 +3212,8 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   setTuning(param->tune);
 
+  massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *b);
+
   dirac.prepare(in, out, *x, *b, param->solution_type);
 //here...
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -3220,9 +3222,6 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
-
-//  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
-    massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
