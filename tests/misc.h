@@ -20,6 +20,7 @@ extern "C" {
   const char* get_test_type(int t);
   const char* get_unitarization_str(bool svd_only);
   QudaDslashType get_dslash_type(char* s);
+  QudaMassNormalization get_mass_normalization_type(char* s);
   QudaTwistFlavorType get_flavor_type(char* s);
   const char* get_dslash_type_str(QudaDslashType type);
   QudaInverterType get_solver_type(char* s);

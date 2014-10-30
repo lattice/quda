@@ -1569,6 +1569,7 @@ bool verify_results = true;
 double mass = 0.1;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
+QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1613,6 +1614,7 @@ void usage(char** argv )
   printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified))\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
+  printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
@@ -1973,6 +1975,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mass-normalization") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mass= get_mass_normalization_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;

@@ -49,6 +49,7 @@ extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 
 extern char latfile[];
 
@@ -194,7 +195,7 @@ int main(int argc, char **argv)
   }
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  inv_param.mass_normalization = normalization;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 

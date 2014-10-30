@@ -850,6 +850,25 @@ get_dslash_type_str(QudaDslashType type)
     
 }
 
+QudaMassNormalization
+get_mass_normalization_type(char* s)
+{
+  QudaMassNormalization ret =  QUDA_INVALID_NORMALIZATION;
+
+  if (strcmp(s, "kappa") == 0){
+    ret = QUDA_KAPPA_NORMALIZATION;
+  }else if (strcmp(s, "mass") == 0){
+    ret = QUDA_MASS_NORMALIZATION;
+  }else if (strcmp(s, "asymmetric_mass") == 0){
+    ret = QUDA_ASYMMETRIC_MASS_NORMALIZATION;
+  }else{
+    fprintf(stderr, "Error: invalid mass normalization\n");
+    exit(1);
+  }
+
+  return ret;
+}
+
 QudaTwistFlavorType
 get_flavor_type(char* s)
 {
