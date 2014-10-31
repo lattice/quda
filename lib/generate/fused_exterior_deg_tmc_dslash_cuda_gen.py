@@ -907,13 +907,13 @@ def clover_twisted_xpay():
 	str += "#endif\n"
 	str += "#endif\n"
     return str
-# end def twisted_xpay
+# end def clover_twisted_xpay
 
 
 def epilog():
     str = ""
     block_str = ""
-    block_str += twisted_xpay()
+    block_str += clover_twisted_xpay()
     str += block( block_str )
     
     str += "\n\n"
