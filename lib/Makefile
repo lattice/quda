@@ -120,6 +120,8 @@ gen:
 	$(PYTHON) generate/fused_exterior_ndeg_tm_dslash_cuda_gen.py
 	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
 	$(PYTHON) generate/fused_exterior_deg_tm_dslash_cuda_gen.py
+	$(PYTHON) generate/deg_tmc_dslash_cuda_gen.py
+	$(PYTHON) generate/fused_exterior_deg_tmc_dslash_cuda_gen.py
 	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
 	$(PYTHON) generate/fused_exterior_dw_dslash_4D_cuda_gen.py
 
