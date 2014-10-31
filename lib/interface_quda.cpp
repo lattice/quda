@@ -5179,7 +5179,7 @@ double plaqCuda ()
       int y[4];
       for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
       int pad = 0;
-      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
           pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
       gParamEx.create = QUDA_ZERO_FIELD_CREATE;
       gParamEx.order = gaugePrecise->Order();
@@ -5214,13 +5214,15 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     int y[4];
     for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
     int pad = 0;
-    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
     gParamEx.order = gaugePrecise->Order();
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gaugePrecise->TBoundary();
     gParamEx.nFace = 1;
+
+    extendedGaugeResident = new cudaGaugeField(gParamEx);
 
     copyExtendedGauge(*extendedGaugeResident, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
     int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
@@ -5238,7 +5240,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
 #endif
 
-  GaugeFieldParam gParam(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_8,
+  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
       pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.order = gaugePrecise->Order();
