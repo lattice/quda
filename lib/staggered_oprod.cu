@@ -663,14 +663,14 @@ namespace quda {
     if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
 
       Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA);
-      Spinor<double2, double2, double2, 3, 0, 0> spinorB(inB);
+      Spinor<double2, double2, double2, 3, 0, 1> spinorB(inB);
       computeStaggeredOprodCuda<double2>(FloatNOrder<double, 18, 2, 18>(outA), FloatNOrder<double, 18, 2, 18>(outB), 
           outA, outB, 
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
     }else if(inEven.Precision() == QUDA_SINGLE_PRECISION){
 
       Spinor<float2, float2, float2, 3, 0, 0> spinorA(inA);
-      Spinor<float2, float2, float2, 3, 0, 0> spinorB(inB);
+      Spinor<float2, float2, float2, 3, 0, 1> spinorB(inB);
       computeStaggeredOprodCuda<float2>(FloatNOrder<float, 18, 2, 18>(outA), FloatNOrder<float, 18, 2, 18>(outB), 
           outA, outB,
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
