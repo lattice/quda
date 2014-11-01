@@ -9,6 +9,11 @@
 
 //namespace quda {
 
+enum UseGhost {
+  useGhost
+};
+
+
 #ifdef USE_TEXTURE_OBJECTS
 
 template<typename OutputType, typename InputType>
@@ -27,12 +32,18 @@ public:
   Texture() : spinor(0) { }   
 #ifndef DIRECT_ACCESS_BLAS
   Texture(const cudaColorSpinorField *x) : spinor(x->Tex()) { }
+  Texture(const cudaColorSpinorField *x, UseGhost use_ghost) : spinor(x->GhostTex()) { }
 #else
   Texture(const cudaColorSpinorField *x) : spinor((InputType*)(x->V())) { }
+  Texture(const cudaColorSpinorField *x, UseGhost use_ghost) : spinor((InputType*)(x->Ghost())) { }
 #endif
   Texture(const Texture &tex) : spinor(tex.spinor) { }
   ~Texture() { }
+
   
+  
+
+
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
     return *this;
@@ -312,24 +323,27 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 
   private:
     StoreType *spinor;
+    StoreType *ghost_spinor;
 #ifdef USE_TEXTURE_OBJECTS // texture objects
     Texture<InterType, StoreType> tex;
+    Texture<InterType, StoreType> ghostTex;
 #else
     Texture<InterType, StoreType, tex_id> tex;
+    Texture<InterType, StoreType, tex_id> ghostTex;
 #endif
     float *norm; // direct reads for norm
     int stride;
 
   public:
     Spinor() 
-      : spinor(0), tex(), norm(0), stride(0) { } // default constructor
+      : spinor(0), ghost_spinor(0), tex(), ghostTex(), norm(0), stride(0) { } // default constructor
 
     Spinor(const cudaColorSpinorField &x) 
-      : spinor((StoreType*)x.V()), tex(&x), norm((float*)x.Norm()),
+      : spinor((StoreType*)x.V()), ghost_spinor((StoreType*)x.Ghost()), tex(&x), ghostTex(&x,useGhost), norm((float*)x.Norm()),
       stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
 
     Spinor(const Spinor &st) 
-      : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
+      : spinor(st.spinor), ghost_spinor(st.ghost_spinor), tex(st.tex), ghostTex(st.ghostTex), norm(st.norm), stride(st.stride) { }
 
     Spinor(StoreType* spinor, float* norm, int stride) 
       : spinor(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
@@ -337,7 +351,9 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor& operator=(const Spinor &src) {
       if (&src != this) {
 	spinor = src.spinor;
+        ghost_spinor = src.ghost_spinor;
 	tex = src.tex;
+        ghostTex = src.ghostTex;
 	norm = src.norm;
 	stride = src.stride;
       }
@@ -346,10 +362,13 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 
     void set(const cudaColorSpinorField &x){
       spinor = (StoreType*)x.V();
+      ghost_spinor = (StoreType*)x.Ghost();
 #ifdef USE_TEXTURE_OBJECTS 
       tex = Texture<InterType, StoreType>(&x);
+      ghostTex = Texture<InterType, StoreType>(&x,useGhost);
 #else
       tex = Texture<InterType, StoreType, tex_id>(&x);
+      ghostTex = Texture<InterType, StoreType, tex_id>(&x,useGhost);
 #endif      
       norm = (float*)x.Norm();
       stride = x.Length()/(N*REG_LENGTH);
@@ -394,6 +413,28 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       }
 #endif
 
+      // now convert into desired register order
+      convert<RegType, InterType>(x, y, N);
+    }
+
+    __device__ inline void ghostLoad(RegType x[], const int i) {
+      // load data into registers first using the storage order
+      const int M = (N * sizeof(RegType)) / sizeof(InterType);
+      InterType y[M];
+
+      // If we are using tex references, then we can only use the predeclared texture ids
+#ifndef USE_TEXTURE_OBJECTS
+      if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
+#endif
+	// half precision types
+#pragma unroll 
+	for (int j=0; j<M; j++) copyFloatN(y[j], ghostTex[i + j*stride]);
+#ifndef USE_TEXTURE_OBJECTS
+      } else { // default load when out of tex_id range
+#pragma unroll
+	for (int j=0; j<M; j++) copyFloatN(y[j],ghost_spinor[i + j*stride]);
+      }
+#endif
       // now convert into desired register order
       convert<RegType, InterType>(x, y, N);
     }

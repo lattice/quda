@@ -380,7 +380,7 @@ namespace quda {
         arg.inA.load(a, bulk_cb_idx);
 
         const unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<3,3>(x, arg.X, arg.dir, arg.displacement);
-        arg.inB.load(b, ghost_idx);
+        arg.inB.ghostLoad(b, ghost_idx);
 
         outerProd(b,a,&result);
         result = inmatrix + result*coeff; 
@@ -649,9 +649,8 @@ namespace quda {
 
     unsigned int ghostOffset[4] = {0,0,0,0};
 #ifdef MULTI_GPU
-    const unsigned int Npad = inEven.Ncolor()*inEven.Nspin()*2/inEven.FieldOrder();
     for(int dir=0; dir<4; ++dir){
-      ghostOffset[dir] = Npad*(inEven.GhostOffset(dir) + inEven.Stride()); 
+      ghostOffset[dir] = inEven.GhostOffset(dir)/inEven.FieldOrder();; 
     }
 #endif
 

@@ -275,7 +275,6 @@ namespace quda {
       const void* Norm() const {return norm;}
       void* Ghost() { return ghost_field; } 
       const void* Ghost() const { return ghost_field; } // v will eventually be replaced by ghost_field
-      const void* GhostNorm() const { return ghost_field; } // will eventually remove this
 
       //! for eigcg only:
       int EigvDim() const { return eigv_dim; }
