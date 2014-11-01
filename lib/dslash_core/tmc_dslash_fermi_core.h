@@ -1,4 +1,5 @@
 // *** CUDA DSLASH ***
+
 #define DSLASH_SHARED_FLOATS_PER_THREAD 24
 
 
@@ -353,7 +354,8 @@
 #define c31_32_im c11_12_im
 #define c32_32_re c12_12_re
 
-// first chiral block of inverted clover term (reuses C0,...,C9)
+
+// first chiral block of inverted clover term
 #ifdef CLOVER_DOUBLE
 #define cinv00_00_re C0.x
 #define cinv01_01_re C0.y
@@ -529,6 +531,44 @@
 #define cinv31_32_im cinv11_12_im
 #define cinv32_32_re cinv12_12_re
 
+
+
+// declare C## here and use ASSN below instead of READ
+#ifdef CLOVER_DOUBLE
+double2 C0;
+double2 C1;
+double2 C2;
+double2 C3;
+double2 C4;
+double2 C5;
+double2 C6;
+double2 C7;
+double2 C8;
+double2 C9;
+double2 C10;
+double2 C11;
+double2 C12;
+double2 C13;
+double2 C14;
+double2 C15;
+double2 C16;
+double2 C17;
+#else
+float4 C0;
+float4 C1;
+float4 C2;
+float4 C3;
+float4 C4;
+float4 C5;
+float4 C6;
+float4 C7;
+float4 C8;
+
+#if (DD_PREC==2)
+float K;
+#endif
+
+#endif	// CLOVER_DOUBLE
 // output spinor
 VOLATILE spinorFloat o00_re;
 VOLATILE spinorFloat o00_im;
@@ -640,44 +680,6 @@ if (kernel_type == INTERIOR_KERNEL) {
 }
 #endif // MULTI_GPU
 
-
-
-// declare C## here and use ASSN below instead of READ
-#ifdef CLOVER_DOUBLE
-double2 C0;
-double2 C1;
-double2 C2;
-double2 C3;
-double2 C4;
-double2 C5;
-double2 C6;
-double2 C7;
-double2 C8;
-double2 C9;
-double2 C10;
-double2 C11;
-double2 C12;
-double2 C13;
-double2 C14;
-double2 C15;
-double2 C16;
-double2 C17;
-#else
-float4 C0;
-float4 C1;
-float4 C2;
-float4 C3;
-float4 C4;
-float4 C5;
-float4 C6;
-float4 C7;
-float4 C8;
-
-#if (DD_PREC==2)
-float K;
-#endif
-
-#endif
 
 #ifdef MULTI_GPU
 if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
@@ -2529,70 +2531,66 @@ if (!incomplete)
 {
 #ifdef DSLASH_XPAY
   READ_ACCUM(ACCUMTEX, param.sp_stride)
-
+  
 #ifndef CLOVER_TWIST_XPAY
 #ifndef CLOVER_TWIST_INV_DSLASH
   //perform invert twist first:
   APPLY_CLOVER_TWIST_INV(c, cinv, a, o);
 #endif
-
-  o00_re = b*o00_re+acc00_re;
-  o00_im = b*o00_im+acc00_im;
-  o01_re = b*o01_re+acc01_re;
-  o01_im = b*o01_im+acc01_im;
-  o02_re = b*o02_re+acc02_re;
-  o02_im = b*o02_im+acc02_im;
-  o10_re = b*o10_re+acc10_re;
-  o10_im = b*o10_im+acc10_im;
-  o11_re = b*o11_re+acc11_re;
-  o11_im = b*o11_im+acc11_im;
-  o12_re = b*o12_re+acc12_re;
-  o12_im = b*o12_im+acc12_im;
-  o20_re = b*o20_re+acc20_re;
-  o20_im = b*o20_im+acc20_im;
-  o21_re = b*o21_re+acc21_re;
-  o21_im = b*o21_im+acc21_im;
-  o22_re = b*o22_re+acc22_re;
-  o22_im = b*o22_im+acc22_im;
-  o30_re = b*o30_re+acc30_re;
-  o30_im = b*o30_im+acc30_im;
-  o31_re = b*o31_re+acc31_re;
-  o31_im = b*o31_im+acc31_im;
-  o32_re = b*o32_re+acc32_re;
-  o32_im = b*o32_im+acc32_im;
+  o00_re = b*o00_re + acc00_re;
+  o00_im = b*o00_im + acc00_im;
+  o01_re = b*o01_re + acc01_re;
+  o01_im = b*o01_im + acc01_im;
+  o02_re = b*o02_re + acc02_re;
+  o02_im = b*o02_im + acc02_im;
+  o10_re = b*o10_re + acc10_re;
+  o10_im = b*o10_im + acc10_im;
+  o11_re = b*o11_re + acc11_re;
+  o11_im = b*o11_im + acc11_im;
+  o12_re = b*o12_re + acc12_re;
+  o12_im = b*o12_im + acc12_im;
+  o20_re = b*o20_re + acc20_re;
+  o20_im = b*o20_im + acc20_im;
+  o21_re = b*o21_re + acc21_re;
+  o21_im = b*o21_im + acc21_im;
+  o22_re = b*o22_re + acc22_re;
+  o22_im = b*o22_im + acc22_im;
+  o30_re = b*o30_re + acc30_re;
+  o30_im = b*o30_im + acc30_im;
+  o31_re = b*o31_re + acc31_re;
+  o31_im = b*o31_im + acc31_im;
+  o32_re = b*o32_re + acc32_re;
+  o32_im = b*o32_im + acc32_im;
 #else
   APPLY_CLOVER_TWIST(c, a, acc);
-  //warning! b is unrelated to the twisted mass parameter in this case!
-
-  o00_re = b*o00_re+acc00_re;
-  o00_im = b*o00_im+acc00_im;
-  o01_re = b*o01_re+acc01_re;
-  o01_im = b*o01_im+acc01_im;
-  o02_re = b*o02_re+acc02_re;
-  o02_im = b*o02_im+acc02_im;
-  o10_re = b*o10_re+acc10_re;
-  o10_im = b*o10_im+acc10_im;
-  o11_re = b*o11_re+acc11_re;
-  o11_im = b*o11_im+acc11_im;
-  o12_re = b*o12_re+acc12_re;
-  o12_im = b*o12_im+acc12_im;
-  o20_re = b*o20_re+acc20_re;
-  o20_im = b*o20_im+acc20_im;
-  o21_re = b*o21_re+acc21_re;
-  o21_im = b*o21_im+acc21_im;
-  o22_re = b*o22_re+acc22_re;
-  o22_im = b*o22_im+acc22_im;
-  o30_re = b*o30_re+acc30_re;
-  o30_im = b*o30_im+acc30_im;
-  o31_re = b*o31_re+acc31_re;
-  o31_im = b*o31_im+acc31_im;
-  o32_re = b*o32_re+acc32_re;
-  o32_im = b*o32_im+acc32_im;
-
+  o00_re = b*o00_re + acc00_re;
+  o00_im = b*o00_im + acc00_im;
+  o01_re = b*o01_re + acc01_re;
+  o01_im = b*o01_im + acc01_im;
+  o02_re = b*o02_re + acc02_re;
+  o02_im = b*o02_im + acc02_im;
+  o10_re = b*o10_re + acc10_re;
+  o10_im = b*o10_im + acc10_im;
+  o11_re = b*o11_re + acc11_re;
+  o11_im = b*o11_im + acc11_im;
+  o12_re = b*o12_re + acc12_re;
+  o12_im = b*o12_im + acc12_im;
+  o20_re = b*o20_re + acc20_re;
+  o20_im = b*o20_im + acc20_im;
+  o21_re = b*o21_re + acc21_re;
+  o21_im = b*o21_im + acc21_im;
+  o22_re = b*o22_re + acc22_re;
+  o22_im = b*o22_im + acc22_im;
+  o30_re = b*o30_re + acc30_re;
+  o30_im = b*o30_im + acc30_im;
+  o31_re = b*o31_re + acc31_re;
+  o31_im = b*o31_im + acc31_im;
+  o32_re = b*o32_re + acc32_re;
+  o32_im = b*o32_im + acc32_im;
 #endif//CLOVER_TWIST_XPAY
 #else //no XPAY
 #ifndef CLOVER_TWIST_INV_DSLASH
-     APPLY_CLOVER_TWIST_INV(c, cinv, a, o);
+  APPLY_CLOVER_TWIST_INV(c, cinv, a, o);
 #endif
 #endif
 }
@@ -2687,43 +2685,6 @@ WRITE_SPINOR(param.sp_stride);
 #undef c12_11_re
 #undef c12_11_im
 
-#undef c20_20_re
-#undef c21_21_re
-#undef c22_22_re
-#undef c30_30_re
-#undef c31_31_re
-#undef c32_32_re
-#undef c21_20_re
-#undef c21_20_im
-#undef c22_20_re
-#undef c22_20_im
-#undef c30_20_re
-#undef c30_20_im
-#undef c31_20_re
-#undef c31_20_im
-#undef c32_20_re
-#undef c32_20_im
-#undef c22_21_re
-#undef c22_21_im
-#undef c30_21_re
-#undef c30_21_im
-#undef c31_21_re
-#undef c31_21_im
-#undef c32_21_re
-#undef c32_21_im
-#undef c30_22_re
-#undef c30_22_im
-#undef c31_22_re
-#undef c31_22_im
-#undef c32_22_re
-#undef c32_22_im
-#undef c31_30_re
-#undef c31_30_im
-#undef c32_30_re
-#undef c32_30_im
-#undef c32_31_re
-#undef c32_31_im
-
 #undef cinv00_00_re
 #undef cinv01_01_re
 #undef cinv02_02_re
@@ -2760,43 +2721,6 @@ WRITE_SPINOR(param.sp_stride);
 #undef cinv12_10_im
 #undef cinv12_11_re
 #undef cinv12_11_im
-
-#undef cinv20_20_re
-#undef cinv21_21_re
-#undef cinv22_22_re
-#undef cinv30_30_re
-#undef cinv31_31_re
-#undef cinv32_32_re
-#undef cinv21_20_re
-#undef cinv21_20_im
-#undef cinv22_20_re
-#undef cinv22_20_im
-#undef cinv30_20_re
-#undef cinv30_20_im
-#undef cinv31_20_re
-#undef cinv31_20_im
-#undef cinv32_20_re
-#undef cinv32_20_im
-#undef cinv22_21_re
-#undef cinv22_21_im
-#undef cinv30_21_re
-#undef cinv30_21_im
-#undef cinv31_21_re
-#undef cinv31_21_im
-#undef cinv32_21_re
-#undef cinv32_21_im
-#undef cinv30_22_re
-#undef cinv30_22_im
-#undef cinv31_22_re
-#undef cinv31_22_im
-#undef cinv32_22_re
-#undef cinv32_22_im
-#undef cinv31_30_re
-#undef cinv31_30_im
-#undef cinv32_30_re
-#undef cinv32_30_im
-#undef cinv32_31_re
-#undef cinv32_31_im
 
 #undef acc00_re
 #undef acc00_im

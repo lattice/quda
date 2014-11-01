@@ -488,6 +488,43 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 }
 
+template <>
+__global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_CLOVER_MASS_DIRAC
+
+#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+
+#if DD_DAG
+#include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "tmc_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+
+#if DD_DAG
+#include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "tmc_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#else  // fall-back is original G80 
+
+#if DD_DAG
+#include "tmc_fused_exterior_dslash_dagger_g80_core.h"
+#else
+#include "tmc_fused_exterior_dslash_g80_core.h"
+#endif
+
+#endif
+
+#endif
+
+}
+
+
 //NEW
 #if (DD_XPAY==1) && (DD_TWIST==1)
 #define CLOVER_TWIST_XPAY
@@ -531,6 +568,43 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #endif
 
 }
+
+template <>
+__global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+
+#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+
+#if DD_DAG
+#include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "tmc_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+
+#if DD_DAG
+#include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
+#else
+#include "tmc_fused_exterior_dslash_gt200_core.h"
+#endif
+
+#else  // fall-back is original G80 
+
+#if DD_DAG
+#include "tmc_fused_exterior_dslash_dagger_g80_core.h"
+#else
+#include "tmc_fused_exterior_dslash_g80_core.h"
+#endif
+
+#endif
+
+#endif
+
+}
+
 #undef CLOVER_TWIST_XPAY
 #endif //(DD_XPAY==0) && (DD_TWIST==1)
 

@@ -2099,6 +2099,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
+  massRescale(param->dslash_type, param->kappa, param->mass, 
+	      param->solution_type, param->mass_normalization, *b);
+
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -2106,9 +2109,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
-
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-      param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -2324,6 +2324,9 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
+  massRescale(param->dslash_type, param->kappa, param->mass, 
+      param->solution_type, param->mass_normalization, *b);
+
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -2331,9 +2334,6 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
-
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-      param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -3212,6 +3212,8 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   setTuning(param->tune);
 
+  massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *b);
+
   dirac.prepare(in, out, *x, *b, param->solution_type);
 //here...
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -3220,9 +3222,6 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
-
-//  massRescale(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, *in);
-    massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *in);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = norm2(*in);
@@ -3808,13 +3807,17 @@ void createCloverQuda(QudaInvertParam* invertParam)
   int y[4];
   for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2*R[dir];
   int pad = 0;
-  GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
-      pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+  // clover creation not supported from 8-reconstruct presently so convert to 12
+  QudaReconstructType recon = (gaugePrecise->Reconstruct() == QUDA_RECONSTRUCT_8) ? 
+    QUDA_RECONSTRUCT_12 : gaugePrecise->Reconstruct();
+  GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), recon, pad, 
+			   QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.order = gaugePrecise->Order();
   gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParamEx.t_boundary = gaugePrecise->TBoundary();
   gParamEx.nFace = 1;
+
 
   cudaGaugeField *cudaGaugeExtended = NULL;
   if (extendedGaugeResident) {
@@ -5176,7 +5179,7 @@ double plaqCuda ()
       int y[4];
       for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
       int pad = 0;
-      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
           pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
       gParamEx.create = QUDA_ZERO_FIELD_CREATE;
       gParamEx.order = gaugePrecise->Order();
@@ -5211,13 +5214,15 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     int y[4];
     for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
     int pad = 0;
-    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_NO,
+    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
     gParamEx.order = gaugePrecise->Order();
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gaugePrecise->TBoundary();
     gParamEx.nFace = 1;
+
+    extendedGaugeResident = new cudaGaugeField(gParamEx);
 
     copyExtendedGauge(*extendedGaugeResident, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
     int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
@@ -5235,7 +5240,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
 #endif
 
-  GaugeFieldParam gParam(y, gaugePrecise->Precision(), QUDA_RECONSTRUCT_8,
+  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
       pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.order = gaugePrecise->Order();

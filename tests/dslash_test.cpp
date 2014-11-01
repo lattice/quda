@@ -52,6 +52,9 @@ extern int test_type;
 // Dirac operator type
 extern QudaDslashType dslash_type;
 
+// Twisted mass flavor type
+extern QudaTwistFlavorType twist_flavor;
+
 extern bool tune;
 
 extern int device;
@@ -69,6 +72,8 @@ extern bool verify_results;
 extern int niter;
 extern char latfile[];
 
+extern bool kernel_pack_t;
+
 void init(int argc, char **argv) {
 
   cuda_prec = prec;
@@ -81,16 +86,17 @@ void init(int argc, char **argv) {
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
 
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+  if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
              dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
+    // for these we always use kernel packing
     dw_setDims(gauge_param.X, Lsdim);
     setKernelPackT(true);
   } else {
     setDims(gauge_param.X);
-    setKernelPackT(false);
+    setKernelPackT(kernel_pack_t);
     Ls = 1;
   }
 
@@ -114,8 +120,7 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.01;
     inv_param.epsilon = 0.01; 
-//!    inv_param.twist_flavor = QUDA_TWIST_MINUS;
-    inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
+    inv_param.twist_flavor = twist_flavor;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     inv_param.mass = 0.01;
@@ -138,7 +143,8 @@ void init(int argc, char **argv) {
   
   if(dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-     dslash_type == QUDA_MOBIUS_DWF_DSLASH )
+     dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
+     dslash_type == QUDA_WILSON_DSLASH)
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   else
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
@@ -253,7 +259,7 @@ void init(int argc, char **argv) {
   
   csParam.nColor = 3;
   csParam.nSpin = 4;
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     csParam.twistFlavor = inv_param.twist_flavor;
   }
   csParam.nDim = 4;

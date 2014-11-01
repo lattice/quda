@@ -62,7 +62,7 @@ unitarize_link_test()
 
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
-  initQuda(0);
+  initQuda(device);
 
   cpu_prec = prec;
   gSize = cpu_prec;  

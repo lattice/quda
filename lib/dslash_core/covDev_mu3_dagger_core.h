@@ -232,7 +232,8 @@ if (kernel_type == INTERIOR_KERNEL) {
   sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
 #endif
 
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
 
   o00_re = 0.;  o00_im = 0.;
   o01_re = 0.;  o01_im = 0.;
@@ -284,7 +285,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read spinor from device memory
-      READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);
+      READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
       
       // Do nothing useful with the spinors
     // reconstruct gauge matrix
@@ -612,7 +613,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 
 
 // write spinor field back to device memory
-WRITE_SPINOR(sp_stride);
+WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

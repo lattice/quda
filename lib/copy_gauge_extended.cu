@@ -2,7 +2,6 @@
 
 namespace quda {
 
-#ifdef GPU_GAUGE_TOOLS
   /**
      Kernel argument struct
    */
@@ -342,12 +341,9 @@ namespace quda {
     }
   }
 
-#endif
-
   void copyExtendedGauge(GaugeField &out, const GaugeField &in,
 			 QudaFieldLocation location, void *Out, void *In) {
 
-#ifdef GPU_GAUGE_TOOLS
     for (int d=0; d<in.Ndim(); d++) {
       if ( (out.X()[d] - in.X()[d]) % 2 != 0)
 	errorQuda("Cannot copy into an asymmetrically extended gauge field");
@@ -366,9 +362,6 @@ namespace quda {
 	copyGaugeEx(out, in, location, (float*)Out, (float*)In);
       }
     }
-#else
-  errorQuda("Gauge tools are not build");
-#endif
 
   }
 

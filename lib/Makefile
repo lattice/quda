@@ -18,11 +18,12 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	fat_force_quda.o llfat_quda_itf.o llfat_quda.o			\
 	gauge_force_quda.o clover_quda.o dslash_quda.o			\
 	dslash_wilson.o dslash_clover.o dslash_clover_asym.o		\
-	dslash_twisted_mass.o dslash_twisted_clover.o			\
-	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
-	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
-	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
-	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
+	dslash_twisted_mass.o dslash_ndeg_twisted_mass.o		\
+	dslash_twisted_clover.o dslash_domain_wall.o			\
+	dslash_domain_wall_4d.o dslash_mobius.o dslash_staggered.o	\
+	dslash_improved_staggered.o dslash_pack.o blas_quda.o		\
+	copy_quda.o reduce_quda.o face_buffer.o face_gauge.o		\
+	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
@@ -31,7 +32,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	unitarize_links_quda.o milc_interface.o				\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
- 	inv_mpcg_quda.o inv_mpbicgstab_quda.o
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o
 
 
 # header files, found in include/
@@ -119,6 +120,8 @@ gen:
 	$(PYTHON) generate/fused_exterior_ndeg_tm_dslash_cuda_gen.py
 	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
 	$(PYTHON) generate/fused_exterior_deg_tm_dslash_cuda_gen.py
+	$(PYTHON) generate/deg_tmc_dslash_cuda_gen.py
+	$(PYTHON) generate/fused_exterior_deg_tmc_dslash_cuda_gen.py
 	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
 	$(PYTHON) generate/fused_exterior_dw_dslash_4D_cuda_gen.py
 

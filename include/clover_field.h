@@ -27,6 +27,8 @@ namespace quda {
     }
   };
 
+  std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param);
+
   class CloverField : public LatticeField {
 
   protected:

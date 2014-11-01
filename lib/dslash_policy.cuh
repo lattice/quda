@@ -815,9 +815,10 @@ struct DslashFusedGPUComms : DslashPolicyImp {
 
 
     // Launch exterior kernel
-    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    if (pattern.commDimTotal) {
+      PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    }
 
-    
 
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
@@ -1105,7 +1106,9 @@ struct DslashFusedExterior : DslashPolicyImp {
     PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[0], 0),
       profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
-    PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    if (pattern.commDimTotal) {
+      PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    }
 
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU

@@ -29,6 +29,10 @@
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
+
+// Twisted mass flavor type
+extern QudaTwistFlavorType twist_flavor;
+
 extern bool tune;
 extern int device;
 extern int xdim;
@@ -45,6 +49,7 @@ extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 
 extern char latfile[];
 
@@ -153,8 +158,7 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.12;
     inv_param.epsilon = 0.1385;
-    //inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
-    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+    inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
@@ -191,7 +195,7 @@ int main(int argc, char **argv)
   }
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  inv_param.mass_normalization = normalization;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 

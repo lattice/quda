@@ -156,6 +156,9 @@ namespace quda {
 			       const double &epsilon, const double &k,  const int *commOverride,
 			       TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
+    if (dslashPolicy ==  QUDA_FUSED_DSLASH || dslashPolicy == QUDA_FUSED_GPU_COMMS_DSLASH)
+      errorQuda("Twisted-clover dslash does not yet support a fused exterior dslash kernel");
+
     inSpinor = (cudaColorSpinorField*)in; // EVIL
     inClover = (FullClover*) clover;
     inCloverInv = (FullClover*) cloverInv;

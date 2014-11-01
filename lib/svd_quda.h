@@ -307,7 +307,7 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
     if(mat(0,0).x > 0.0){ beta = -beta; }
 
     w.x = mat(0,0).x - beta; // work around for LLVM
-    w.y = mat(0,0).y - beta; 
+    w.y = mat(0,0).y;
     norm1 = cabs(w);
     w = Conj(w)/norm1; 
 
@@ -335,14 +335,14 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
 
     if( p(0,1).x > 0.0 ){ beta = -beta; }
     w.x = p(0,1).x-beta; // work around for LLVM
-    w.y = p(0,1).y-beta;
+    w.y = p(0,1).y;
     norm1 = cabs(w);
     w = Conj(w)/norm1; 
     z = Conj(p(0,2))/norm1;
     vec[2] = z*Conj(w);
 
     tau.x = (beta - p(0,1).x)/beta; // work around for LLVM
-    tau.y = (beta - p(0,1).y)/beta;
+    tau.y = (- p(0,1).y)/beta;
     // construct the Householder matrix
     constructHHMat(tau, vec, temp);
     p = p*temp;
@@ -361,7 +361,7 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
 
     if( p(1,1).x > 0 ){ beta = -beta; }
     w.x = p(1,1).x - beta; // work around for LLVM
-    w.y = p(1,1).y - beta;
+    w.y = p(1,1).y;
     norm1 = cabs(w);
     w = Conj(w)/norm1;
     z = p(2,1)/norm1;

@@ -1214,21 +1214,22 @@ f.close()
 dslash4 = False
 dslash5 = True
 
-print sys.argv[0] + ": generating dw_fused_exterior_dslash5_core.h";
-dslash = True
-dagger = False
-f = open('dslash_core/dw_fused_exterior_dslash5_core.h', 'w')
-f.write(generate_dslash5D())
-f.close()
+# these are not needed since these kernels are all local
+#print sys.argv[0] + ": generating dw_fused_exterior_dslash5_core.h";
+#dslash = True
+#dagger = False
+#f = open('dslash_core/dw_fused_exterior_dslash5_core.h', 'w')
+#f.write(generate_dslash5D())
+#f.close()
 
-print sys.argv[0] + ": generating dw_fused_exterior_dslash5_dagger_core.h";
-dslash = True
-dagger = True
-f = open('dslash_core/dw_fused_exterior_dslash5_dagger_core.h', 'w')
-f.write(generate_dslash5D())
-f.close()
+#print sys.argv[0] + ": generating dw_fused_exterior_dslash5_dagger_core.h";
+#dslash = True
+#dagger = True
+#f = open('dslash_core/dw_fused_exterior_dslash5_dagger_core.h', 'w')
+#f.write(generate_dslash5D())
+#f.close()
 
-dslash5 = False
+#dslash5 = False
 
 #print sys.argv[0] + ": generating dw_fused_exterior_dslash5inv_core.h";
 #dslash = True

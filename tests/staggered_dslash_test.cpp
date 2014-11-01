@@ -70,6 +70,8 @@ extern QudaPrecision prec;
 extern int device;
 extern bool verify_results;
 
+extern bool kernel_pack_t;
+
 int X[4];
 
 Dirac* dirac;
@@ -79,9 +81,7 @@ void init()
 
   initQuda(device);
 
-#ifdef GPU_COMMS
-  setKernelPackT(true);
-#endif
+  setKernelPackT(kernel_pack_t);
 
   setVerbosity(QUDA_VERBOSE);
 
