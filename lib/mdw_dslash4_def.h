@@ -188,6 +188,7 @@
 #define SPINORTEX param.inTex
 #define GHOSTSPINORTEX param.ghostTex
 #else
+#define SPINORTEX spinorTexDouble
 #define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #endif
