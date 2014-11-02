@@ -1607,7 +1607,7 @@ void usage(char** argv )
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
 	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
          "                                                  /asqtad/domain_wall/domain_wall_4d/mobius\n");
-  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, degen_doublet, nondegen_doublet)\n");
+  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, deg_doublet, nondeg_doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
