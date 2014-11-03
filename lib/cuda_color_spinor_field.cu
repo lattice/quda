@@ -39,9 +39,8 @@ namespace quda {
   cudaIpcMemHandle_t cudaColorSpinorField::ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
   cudaIpcMemHandle_t cudaColorSpinorField::ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
 
-  void* cudaColorSpinorField::fwdGhostFaceDestBuffer[2][QUDA_MAX_DIM];
-  void* cudaColorSpinorField::backGhostFaceDestBuffer[2][QUDA_MAX_DIM];
-
+  void* cudaColorSpinorField::fwdGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
+  void* cudaColorSpinorField::backGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
 
   /*cudaColorSpinorField::cudaColorSpinorField() : 
     ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
@@ -77,7 +76,8 @@ namespace quda {
             cudaEventCreate(&ipcRemoteEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
             cudaIpcGetEventHandle(&ipcRemoteEventHandle[b][dir][dim], ipcRemoteEvent[b][dir][dim]);
 
-            void* ghost_buffer = (dir==0) ?  from_back_face[b][dim] : from_fwd_face[b][dim];
+
+            void* ghost_buffer = (dir==0) ? backGhostFaceBuffer[b][dim] : fwdGhostFaceBuffer[b][dim];
 
             // create local memory handle
             cudaIpcGetMemHandle(&ipcLocalGhostBufferHandle[b][dir][dim], ghost_buffer);
@@ -87,10 +87,9 @@ namespace quda {
                                                   &ipcRemoteGhostBufferHandle[b][1-dir][dim], 
                                                   sizeof(ipcRemoteGhostBufferHandle[b][1-dir][dim]));
 
-            // Need to check the logic here 
-            void** remoteGhostDestBuffer = ((1-dir)==0) ? &(fwdGhostFaceDestBuffer[b][dim]) : &(backGhostFaceDestBuffer[b][dim]);
+            void** remoteGhostSrcBuffer = (dir==1) ? &(fwdGhostFaceSrcBuffer[b][dim]) : &(backGhostFaceSrcBuffer[b][dim]);
 
-            cudaIpcOpenMemHandle(remoteGhostDestBuffer, ipcRemoteGhostBufferHandle[b][1-dir][dim], cudaIpcMemLazyEnablePeerAccess); 
+            cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][1-dir][dim], cudaIpcMemLazyEnablePeerAccess); 
  
           }
         }
