@@ -198,6 +198,7 @@ namespace quda {
       size_t bytes; // size in bytes of spinor field
       size_t norm_bytes; // size in bytes of norm field
       size_t ghost_bytes; // size in bytes of the ghost field
+      size_t ghost_face_bytes[QUDA_MAX_DIM];
 
 
       /*Warning: we need copies of the above params for eigenvectors*/

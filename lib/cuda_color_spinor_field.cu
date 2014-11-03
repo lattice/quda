@@ -647,8 +647,12 @@ namespace quda {
     for (int i=0; i<4; i++) {
       if(!commDimPartitioned(i)) continue;
       faceBytes += 2*nFace*ghostFace[i]*Nint*precision;
+      ghost_face_bytes[i] = nFace*ghostFace[i]*Nint*precision;
       // add extra space for the norms for half precision
-      if (precision == QUDA_HALF_PRECISION) faceBytes += 2*nFace*ghostFace[i]*sizeof(float);
+      if (precision == QUDA_HALF_PRECISION){ 
+        faceBytes += 2*nFace*ghostFace[i]*sizeof(float);
+        ghost_face_bytes[i] = nFace*ghostFace[i]*sizeof(float);
+      }
     }
 
     // only allocate if not already allocated or buffer required is bigger than previously
@@ -1413,7 +1417,9 @@ namespace quda {
  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return;
-    
+#ifdef GPU_COMMS
+    if(!comm_dslash_peer2peer_enabled(dir%2,dim)){
+#endif
     if (dir%2 == 0) { // sending backwards
       // Prepost receive
       comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
@@ -1425,7 +1431,25 @@ namespace quda {
       comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
     }
 #ifdef GPU_COMMS
+   }else{ // if(comms_dslash_peer2peer_enabled(dir%2,dim) 
+     // indicates that the remote process in the dir direction is free to initiate an inter-device copy
+     cudaEventRecord(ipcLocalEvent[bufferIndex][dir%2][dim]);
 
+     // wait for the process in the 1-dir direction to get to the same point
+     cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1-(dir%2)][dim], 0);
+     // copy from the 1-dir process
+     if(dir%2 == 0){ // remote process sends backwards
+      cudaMemcpyAsync(from_back_face[bufferIndex][dim], 
+                      backGhostFaceSrcBuffer[bufferIndex][dim], 
+                      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice, *stream_p);
+     } else { // remote process sends forwards
+      cudaMemcpyAsync(from_fwd_face[bufferIndex][dim], 
+                      fwdGhostFaceSrcBuffer[bufferIndex][dim], 
+                      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice, *stream_p);
+     }
+   }  
+
+  // The code below should be deleted once we've confirmed that contiguous ghost and ghosNorm array code is working
     if(precision != QUDA_HALF_PRECISION) return;		
 
     if (dir%2 == 0) { // sending backwards
