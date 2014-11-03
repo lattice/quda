@@ -1364,7 +1364,7 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger) {
+  void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir/2;
     if(!commDimPartitioned(dim)) return;
 
@@ -1388,7 +1388,7 @@ namespace quda {
 #endif
   }
 
-  void cudaColorSpinorField::sendStart(int nFace, int dir, int dagger) {
+  void cudaColorSpinorField::sendStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return;
 
@@ -1410,7 +1410,7 @@ namespace quda {
 
 
 
- void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger) {
+ void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return;
     
@@ -1442,7 +1442,7 @@ namespace quda {
 #endif
   }
 
-  int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger) {
+  int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return 0;
 
