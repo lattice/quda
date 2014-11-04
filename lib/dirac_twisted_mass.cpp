@@ -182,7 +182,7 @@ namespace quda {
   }
 
   // apply hopping term, then inverse twist: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
-  // and likewise for dagger: (D^dagger_eo D_ee^-1) or (D^dagger_oe A_oo^-1)
+  // and likewise for dagger: (D^dagger_eo A_ee^-1) or (D^dagger_oe A_oo^-1)
   void DiracTwistedMassPC::Dslash
   (cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
   {

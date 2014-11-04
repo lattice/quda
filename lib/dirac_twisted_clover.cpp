@@ -224,7 +224,7 @@ namespace quda {
         flops += 1320ll*in.Volume();
       }
     } else {//TWIST doublet :
-      errorQuda("Non-degenrate DiracTwistedCloverPC is not implemented \n");
+      errorQuda("Non-degenerate DiracTwistedCloverPC is not implemented \n");
     }
     delete cs;
     delete cI;
@@ -259,7 +259,7 @@ namespace quda {
         flops += 1344ll*in.Volume();
       }
     } else {//TWIST_DOUBLET:
-      errorQuda("Non-degenrate DiracTwistedCloverPC is not implemented \n");
+      errorQuda("Non-degenerate DiracTwistedCloverPC is not implemented \n");
     }
     delete cs;
     delete cI;
