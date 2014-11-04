@@ -91,6 +91,7 @@ namespace quda {
       c = epsilon;
       d = k;
       if (dslashType == QUDA_NONDEG_DSLASH) errorQuda("Invalid dslashType for twisted-mass Dslash");
+      dslashParam.fl_stride = in->VolumeCB();
     }
     virtual ~TwistedDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 

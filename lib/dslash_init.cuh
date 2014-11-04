@@ -7,8 +7,6 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge,
 			    const cudaGaugeField &longgauge, TimeProfile &profile);
 void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, 
 		       const double m5h, TimeProfile &profile);
-//!ndeg tm:
-void initTwistedMassConstants(const int flv_stride, TimeProfile &profile);
 
 // this needs to be called for each dslash that has its own namespace
 static void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {

@@ -12,8 +12,6 @@ namespace quda {
 #include <dslash_init.cuh>
   }
 
-  int DiracTwistedClover::initTMCFlag = 0;//set to 1 for parity spinors, and 2 for full spinors 
-
   DiracTwistedClover::DiracTwistedClover(const DiracParam &param, const int nDim) 
     : DiracWilson(param, nDim), mu(param.mu), epsilon(param.epsilon), clover(*(param.clover)), cloverInv(*(param.cloverInv))
   {
@@ -42,24 +40,6 @@ namespace quda {
     return *this;
   }
 
-  void DiracTwistedClover::initConstants(const cudaColorSpinorField &a) const
-  {
-    if (a.SiteSubset() == QUDA_PARITY_SITE_SUBSET && initTMCFlag != 1)
-      {
-	int flavor_stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/2 : a.VolumeCB();
-	twistedclover::initTwistedMassConstants(flavor_stride, profile);
-	dslash_aux::initTwistedMassConstants(flavor_stride, profile);
-	initTMCFlag = 1;
-      }
-    else if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET && initTMCFlag != 2)
-      {
-	int flavor_stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/4 : a.VolumeCB()/2;
-	twistedclover::initTwistedMassConstants(flavor_stride, profile);
-	dslash_aux::initTwistedMassConstants(flavor_stride, profile);
-	initTMCFlag = 2;
-      }
-  }
-
   void DiracTwistedClover::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
     Dirac::checkParitySpinor(out, in);
@@ -73,7 +53,6 @@ namespace quda {
   void DiracTwistedClover::twistedCloverApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaTwistGamma5Type twistType, const int parity) const
   {
     checkParitySpinor(out, in);
-    initConstants(in);
 
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
@@ -123,7 +102,6 @@ namespace quda {
     bool reset = newTmp(&tmp, in.Even());
 
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda      
-    initConstants(in);
 
     FullClover *cs = new FullClover(clover);
     FullClover *cI = new FullClover(cloverInv, false);
@@ -208,7 +186,6 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    initConstants(in);
   
     FullClover *cs = new FullClover(clover);
     FullClover *cI = new FullClover(cloverInv, false);
@@ -242,7 +219,6 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
 
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    initConstants(in);  
   
     FullClover *cs = new FullClover(clover);
     FullClover *cI = new FullClover(cloverInv, false);
@@ -310,7 +286,7 @@ namespace quda {
         }
       }
     } else { //Twist doublet
-      errorQuda("Non-degenrate DiracTwistedCloverPC is not implemented \n");
+      errorQuda("Non-degenerate DiracTwistedCloverPC is not implemented \n");
     }
 
     delete cs;

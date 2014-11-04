@@ -364,9 +364,6 @@ namespace quda {
     void twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 		      const QudaTwistGamma5Type twistType) const;
 
-    static int initTMFlag;
-    void initConstants(const cudaColorSpinorField &in) const;
-
   public:
     DiracTwistedMass(const DiracTwistedMass &dirac);
     DiracTwistedMass(const DiracParam &param, const int nDim);
@@ -422,9 +419,6 @@ namespace quda {
     void checkParitySpinor(const cudaColorSpinorField &, const cudaColorSpinorField &) const;
     void twistedCloverApply(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
           const QudaTwistGamma5Type twistType, const int parity) const;
-
-    static int initTMCFlag;
-    void initConstants(const cudaColorSpinorField &in) const;
 
   public:
     DiracTwistedClover(const DiracTwistedClover &dirac);

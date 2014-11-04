@@ -285,10 +285,12 @@ class TwistGamma5Cuda : public Tunable {
   {
     bindSpinorTex<sFloat>(in);
     dslashParam.sp_stride = in->Stride();
-    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
+    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
       setTwistParam(a, b, kappa, mu, dagger, twist);
-    else{//twist doublet
+      dslashParam.fl_stride = in->VolumeCB();
+    } else {//twist doublet
       a = kappa, b = mu, c = epsilon;
+      dslashParam.fl_stride = in->VolumeCB()/2;
     } 
   }
 
@@ -408,6 +410,7 @@ class TwistCloverGamma5Cuda : public Tunable {
     bindSpinorTex<sFloat>(in);
     dslashParam.sp_stride = in->Stride();
     dslashParam.cl_stride = cl_stride;
+    dslashParam.fl_stride = in->VolumeCB();
     twist = tw;
     clover = clov;
     cNorm = cN;
