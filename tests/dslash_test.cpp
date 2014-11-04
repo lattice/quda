@@ -697,7 +697,19 @@ void dslashRef() {
       }
       else
       {
-	errorQuda("Twisted mass solution type not supported");
+	int tm_offset = 12*spinorRef->Volume();
+
+	void *ref1 = spinorRef->V();
+	void *ref2 = cpu_prec == sizeof(double) ? (void*)((double*)ref1 + tm_offset): (void*)((float*)ref1 + tm_offset);
+
+	void *flv1 = spinor->V();
+	void *flv2 = cpu_prec == sizeof(double) ? (void*)((double*)flv1 + tm_offset): (void*)((float*)flv1 + tm_offset);
+
+	void *tmp1 = spinorTmp->V();
+	void *tmp2 = cpu_prec == sizeof(double) ? (void*)((double*)tmp1 + tm_offset): (void*)((float*)tmp1 + tm_offset);
+
+	tm_ndeg_matpc(tmp1, tmp2, hostGauge, flv1, flv2, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+	tm_ndeg_matpc(ref1, ref2, hostGauge, tmp1, tmp2, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
       }
       break;
     case 4:
@@ -709,7 +721,19 @@ void dslashRef() {
       }
       else
       {
-	errorQuda("Twisted mass solution type not supported");
+	int tm_offset = 12*spinorRef->Volume();
+
+	void *evenOut = spinorRef->V();
+	void *oddOut  = cpu_prec == sizeof(double) ? (void*)((double*)evenOut + tm_offset): (void*)((float*)evenOut + tm_offset);
+
+	void *evenIn = spinor->V();
+	void *oddIn  = cpu_prec == sizeof(double) ? (void*)((double*)evenIn + tm_offset): (void*)((float*)evenIn + tm_offset);
+
+	void *evenTmp = spinorTmp->V();
+	void *oddTmp = cpu_prec == sizeof(double) ? (void*)((double*)evenTmp + tm_offset): (void*)((float*)evenTmp + tm_offset);
+
+	tm_ndeg_mat(evenTmp, oddTmp, hostGauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, dagger, inv_param.cpu_prec, gauge_param);
+	tm_ndeg_mat(evenOut, oddOut, hostGauge, evenTmp, oddTmp, inv_param.kappa, inv_param.mu, inv_param.epsilon, not_dagger, inv_param.cpu_prec, gauge_param);
       }
       break;
     default:
