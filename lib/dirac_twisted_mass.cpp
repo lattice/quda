@@ -12,6 +12,9 @@ namespace quda {
 #include <dslash_init.cuh>
   }
 
+  namespace dslash_aux {
+#include <dslash_init.cuh>
+  }
 
   int DiracTwistedMass::initTMFlag = 0;//set to 1 for parity spinors, and 2 for full spinors 
 
@@ -20,6 +23,7 @@ namespace quda {
   { 
     twisted::initConstants(*param.gauge,profile);
     ndegtwisted::initConstants(*param.gauge,profile);
+    dslash_aux::initConstants(*param.gauge,profile);
   }
 
   DiracTwistedMass::DiracTwistedMass(const DiracTwistedMass &dirac) 
@@ -27,6 +31,7 @@ namespace quda {
   { 
     twisted::initConstants(dirac.gauge,profile);
     ndegtwisted::initConstants(dirac.gauge,profile);
+    dslash_aux::initConstants(dirac.gauge,profile);
   }
 
   DiracTwistedMass::~DiracTwistedMass() { }
@@ -45,11 +50,13 @@ namespace quda {
       int flavor_stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/2 : a.VolumeCB();
       twisted::initTwistedMassConstants(flavor_stride, profile);
       ndegtwisted::initTwistedMassConstants(flavor_stride, profile);
+      dslash_aux::initTwistedMassConstants(flavor_stride, profile);
       initTMFlag = 1;
     } else if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET && initTMFlag != 2) {
       int flavor_stride = (a.TwistFlavor() != QUDA_TWIST_PLUS || a.TwistFlavor() != QUDA_TWIST_MINUS) ? a.VolumeCB()/4 : a.VolumeCB()/2;
       twisted::initTwistedMassConstants(flavor_stride, profile);
       ndegtwisted::initTwistedMassConstants(flavor_stride, profile);
+      dslash_aux::initTwistedMassConstants(flavor_stride, profile);
       initTMFlag = 2;
     }
 

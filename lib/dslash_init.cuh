@@ -11,7 +11,7 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s,
 void initTwistedMassConstants(const int flv_stride, TimeProfile &profile);
 
 // this needs to be called for each dslash that has its own namespace
-void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {
+static void initConstants(cudaGaugeField &gauge, TimeProfile &profile) {
   initLatticeConstants(gauge, profile);
   initGaugeConstants(gauge, profile);
   initDslashConstants(profile);
