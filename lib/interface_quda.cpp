@@ -2010,11 +2010,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || 
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || 
     (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
@@ -2126,6 +2128,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
   // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
   // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+  // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
   //
   // We generally require that the solution_type and solve_type
   // preconditioning match.  As an exception, the unpreconditioned MAT
@@ -2143,7 +2146,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
   }
 
-  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
+  if (!mat_solution && norm_error_solve) {
+    errorQuda("Normal-error solve requires Mat solution");
+  }
+
+  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
@@ -2163,11 +2170,20 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
     delete solve;
-  } else {
+  } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
+    delete solve;
+  } else { // norm_error_solve
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    cudaColorSpinorField tmp(*out);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    (*solve)(tmp, *in); // y = (M M^\dag) b
+    dirac.Mdag(*out, tmp);  // x = M^dag y
     solverParam.updateInvertParam(*param);
     delete solve;
   }
@@ -2235,11 +2251,13 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || 
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || 
     (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
@@ -2351,6 +2369,7 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
   // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
   // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+  // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
   //
   // We generally require that the solution_type and solve_type
   // preconditioning match.  As an exception, the unpreconditioned MAT
@@ -2368,7 +2387,11 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
   }
 
-  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
+  if (!mat_solution && norm_error_solve) {
+    errorQuda("Normal-error solve requires Mat solution");
+  }
+
+  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
@@ -2388,11 +2411,20 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
     delete solve;
-  } else {
+  } else if (!norm_error_solve){
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
+    delete solve;
+  } else { // norm_error_solve
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    cudaColorSpinorField tmp(*out);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    (*solve)(tmp, *in); // y = (M M^\dag) b
+    dirac.Mdag(*out, tmp);  // x = M^dag y
     solverParam.updateInvertParam(*param);
     delete solve;
   }
@@ -3595,11 +3627,13 @@ int getGaugePadding(GaugeFieldParam& param){
   return pad;
 }
 
+#ifdef GPU_GAUGE_FORCE
 namespace quda {
   namespace gaugeforce {
 #include <dslash_init.cuh>
   }
 }
+#endif
 
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
 			  double* loop_coeff, int num_paths, int max_length, double eb3,
