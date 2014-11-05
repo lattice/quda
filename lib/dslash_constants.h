@@ -20,6 +20,7 @@ enum KernelType {
     int ghostNormOffset[QUDA_MAX_DIM+1][2];
     int sp_stride; // spinor stride
     int cl_stride; // clover stride
+    int fl_stride; // twisted-mass flavor stride
 #ifdef GPU_STAGGERED_DIRAC
     int gauge_stride;
     int long_gauge_stride;
@@ -194,9 +195,6 @@ __constant__ int E3E2E1;
 __constant__ fat_force_const_t fl; //fatlink
 __constant__ fat_force_const_t gf; //gauge force
 __constant__ fat_force_const_t hf; //hisq force
-
-//!ndeg tm:
-__constant__ int fl_stride;
 
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 {
@@ -484,16 +482,6 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const do
     last_m5 = m5h;
   }
 
-  profile.Stop(QUDA_PROFILE_CONSTANT);
-}
-
-//!ndeg tm: 
-void initTwistedMassConstants(const int fl_stride_h, TimeProfile &profile)
-{
-  profile.Start(QUDA_PROFILE_CONSTANT);
-  cudaMemcpyToSymbol(fl_stride, &fl_stride_h, sizeof(int));    
-
-  checkCudaError();
   profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 

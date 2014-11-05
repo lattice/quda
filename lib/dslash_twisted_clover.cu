@@ -92,6 +92,7 @@ namespace quda {
     { 
       bindSpinorTex<sFloat>(in, out, x); 
       dslashParam.cl_stride = cl_stride;
+      dslashParam.fl_stride = in->VolumeCB();
       a = kappa;
       b = mu;
       c = epsilon;

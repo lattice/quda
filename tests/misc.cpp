@@ -811,7 +811,7 @@ get_dslash_type(char* s)
 }
 
 const char* 
-get_dslash_type_str(QudaDslashType type)
+get_dslash_str(QudaDslashType type)
 {
   const char* ret;
   
@@ -824,6 +824,9 @@ get_dslash_type_str(QudaDslashType type)
     break;
   case QUDA_TWISTED_MASS_DSLASH:
     ret= "twisted_mass";
+    break;
+  case QUDA_TWISTED_CLOVER_DSLASH:
+    ret= "twisted_clover";
     break;
   case QUDA_STAGGERED_DSLASH:
     ret = "staggered";
@@ -859,10 +862,80 @@ get_mass_normalization_type(char* s)
     ret = QUDA_KAPPA_NORMALIZATION;
   }else if (strcmp(s, "mass") == 0){
     ret = QUDA_MASS_NORMALIZATION;
-  }else if (strcmp(s, "asymmetric_mass") == 0){
+  }else if (strcmp(s, "asym_mass") == 0){
     ret = QUDA_ASYMMETRIC_MASS_NORMALIZATION;
   }else{
     fprintf(stderr, "Error: invalid mass normalization\n");
+    exit(1);
+  }
+
+  return ret;
+}
+
+const char*
+get_mass_normalization_str(QudaMassNormalization type)
+{
+  const char *s;
+
+  switch (type) {
+  case QUDA_KAPPA_NORMALIZATION:
+    s = "kappa";
+    break;
+  case QUDA_MASS_NORMALIZATION:
+    s = "mass";
+    break;
+  case QUDA_ASYMMETRIC_MASS_NORMALIZATION:
+    s = "asym_mass";
+    break;
+  default:
+    fprintf(stderr, "Error: invalid mass normalization\n");
+    exit(1);
+  }
+
+  return s;
+}
+
+QudaMatPCType
+get_matpc_type(char* s)
+{
+  QudaMatPCType ret =  QUDA_MATPC_INVALID;
+
+  if (strcmp(s, "even_even") == 0){
+    ret = QUDA_MATPC_EVEN_EVEN;
+  }else if (strcmp(s, "odd_odd") == 0){
+    ret = QUDA_MATPC_ODD_ODD;
+  }else if (strcmp(s, "even_even_asym") == 0){
+    ret = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  }else if (strcmp(s, "odd_odd_asym") == 0){
+    ret = QUDA_MATPC_ODD_ODD_ASYMMETRIC;
+  }else{
+    fprintf(stderr, "Error: invalid matpc type\n");
+    exit(1);
+  }
+
+  return ret;
+}
+
+const char *
+get_matpc_str(QudaMatPCType type)
+{
+  const char* ret;
+
+  switch(type) {
+  case QUDA_MATPC_EVEN_EVEN:
+    ret = "even_even";
+    break;
+  case QUDA_MATPC_ODD_ODD:
+    ret = "odd_odd";
+    break;
+  case QUDA_MATPC_EVEN_EVEN_ASYMMETRIC:
+    ret = "even_even_asym";
+    break;
+  case QUDA_MATPC_ODD_ODD_ASYMMETRIC:
+    ret = "odd_odd_asym";
+    break;
+  default:
+    fprintf(stderr, "Error: invalid matpc type\n");
     exit(1);
   }
 
@@ -893,7 +966,7 @@ get_flavor_type(char* s)
 }
 
 const char*
-get_flavor_type_str(QudaTwistFlavorType type)
+get_flavor_str(QudaTwistFlavorType type)
 {
   const char* ret;
   
@@ -949,7 +1022,7 @@ get_solver_type(char* s)
 }
 
 const char* 
-get_solver_type_str(QudaInverterType type)
+get_solver_str(QudaInverterType type)
 {
   const char* ret;
   

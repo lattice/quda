@@ -107,8 +107,13 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
 #define MAX_TEXELS (1<<27)
 
-  template<typename OutputType, typename InputType, int tex_id>
-    class Texture {
+#define MAX_TEX_ID 4
+
+// dynamically keep track of texture references we've already bound to
+bool tex_id_table[MAX_TEX_ID] = { };
+
+template<typename OutputType, typename InputType, int tex_id>
+  class Texture {
 
   private: 
 #ifdef DIRECT_ACCESS_BLAS
@@ -131,7 +136,14 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
   { 
     // only bind if bytes > 0
-    if (x->Bytes()) { bind((const InputType*)x->V(), x->Bytes()); bound = true; } 
+    if (x->Bytes()) { 
+      if (tex_id_table[tex_id] && tex_id > 0 && tex_id <= MAX_TEX_ID) {
+	errorQuda("Already bound to this texture reference");
+      } else {
+	tex_id_table[tex_id] = true;
+      }
+      bind((const InputType*)x->V(), x->Bytes()); bound = true; 
+    } 
     count++;
   }
 
@@ -141,7 +153,9 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
   { count++; }
 
-  ~Texture() { if (bound && !--count) { unbind(); bound = false;} }
+  ~Texture() { if (bound && !--count) { 
+      unbind(); bound = false; tex_id_table[tex_id]=false;
+    } }
 
   Texture& operator=(const Texture &tex) {
 #ifdef DIRECT_ACCESS_BLAS
@@ -245,9 +259,6 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
   DEF_ALL(2)
   DEF_ALL(3)
   DEF_ALL(4)
-
-#define MAX_TEX_ID 4
-
 
 #undef DECL_TEX
 #undef DEF_BIND_UNBIND
