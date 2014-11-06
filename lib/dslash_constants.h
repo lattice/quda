@@ -151,7 +151,8 @@ __constant__ int gauge_fixed;
 
 // domain wall constants
 //__constant__ int Ls;
-__constant__ double m5;
+__constant__ double m5_d;
+__constant__ float m5_f;
 
 // single precision constants
 __constant__ float anisotropy_f;
@@ -452,8 +453,11 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
 }
 
 //For initializing the coefficients used in MDWF
-__constant__ double mdwf_b5[QUDA_MAX_DWF_LS];
-__constant__ double mdwf_c5[QUDA_MAX_DWF_LS];
+__constant__ double mdwf_b5_d[QUDA_MAX_DWF_LS];
+__constant__ double mdwf_c5_d[QUDA_MAX_DWF_LS];
+
+__constant__ float mdwf_b5_f[QUDA_MAX_DWF_LS];
+__constant__ float mdwf_c5_f[QUDA_MAX_DWF_LS];
 
 void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h, TimeProfile &profile)
 {
@@ -461,15 +465,26 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const do
 
   static int last_Ls = -1;
   if (dim_s != last_Ls) {
-    cudaMemcpyToSymbol(mdwf_b5, b_5, dim_s*sizeof(double));  
-    cudaMemcpyToSymbol(mdwf_c5, c_5, dim_s*sizeof(double));  
+    float b_5_f[QUDA_MAX_DWF_LS];
+    float c_5_f[QUDA_MAX_DWF_LS];
+    for (int i=0; i<dim_s; i++) {
+      b_5_f[i] = (float)b_5[i];
+      c_5_f[i] = (float)c_5[i];
+    }
+
+    cudaMemcpyToSymbol(mdwf_b5_d, b_5, dim_s*sizeof(double));
+    cudaMemcpyToSymbol(mdwf_c5_d, c_5, dim_s*sizeof(double));
+    cudaMemcpyToSymbol(mdwf_b5_f, b_5_f, dim_s*sizeof(float));
+    cudaMemcpyToSymbol(mdwf_c5_f, c_5_f, dim_s*sizeof(float));
     checkCudaError();
     last_Ls = dim_s;
   }
 
   static double last_m5 = 99999;
   if (m5h != last_m5) {
-    cudaMemcpyToSymbol(m5, &m5h, sizeof(double));
+    float m5h_f = (float)m5h;
+    cudaMemcpyToSymbol(m5_d, &m5h, sizeof(double));
+    cudaMemcpyToSymbol(m5_f, &m5h_f, sizeof(float));
     checkCudaError();
     last_m5 = m5h;
   }

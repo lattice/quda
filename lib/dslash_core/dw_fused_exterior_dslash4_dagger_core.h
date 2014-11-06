@@ -37,6 +37,9 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
+#define m5 m5_d
+#define mdwf_b5 mdwf_b5_d
+#define mdwf_c5 mdwf_c5_d
 #else
 #define spinorFloat float
 #define i00_re I0.x
@@ -63,6 +66,9 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
+#define m5 m5_f
+#define mdwf_b5 mdwf_b5_f
+#define mdwf_c5 mdwf_c5_f
 #endif // SPINOR_DOUBLE
 
 // gauge link
@@ -1726,6 +1732,9 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
 WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
+#undef m5
+#undef mdwf_b5
+#undef mdwf_c5
 #undef spinorFloat
 #undef SHARED_STRIDE
 
