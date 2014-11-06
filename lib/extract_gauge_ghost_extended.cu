@@ -60,7 +60,8 @@ namespace quda {
     arg.order.load(u, srcIdx, g, parity); 
 
     // need dir dependence in write
-    arg.order.saveGhostEx(u, dstIdx, dir, dim, g, 
+    // srcIdx is used here to determine boundary condition
+    arg.order.saveGhostEx(u, dstIdx, srcIdx, dir, dim, g, 
 			  (parity+arg.localParity[dim])&1, arg.R);
   }
 
@@ -77,7 +78,8 @@ namespace quda {
 		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
     
     // need dir dependence in read
-    arg.order.loadGhostEx(u, srcIdx, dir, dim, g, 
+    // dstIdx is used here to determine boundary condition
+    arg.order.loadGhostEx(u, srcIdx, dstIdx, dir, dim, g, 
 			  (parity+arg.localParity[dim])&1, arg.R);
     
     arg.order.save(u, dstIdx, g, parity); // save the ghost element into the bulk

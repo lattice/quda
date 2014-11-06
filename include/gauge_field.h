@@ -59,6 +59,7 @@ namespace quda {
       pinned(0),
       compute_fat_link_max(false),
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
+
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
       staggeredPhaseApplied(false)
         {
@@ -129,6 +130,9 @@ namespace quda {
     
     QudaFieldCreate create; // used to determine the type of field created
 
+    /** Array storing the length of dimension */
+    int r[QUDA_MAX_DIM];
+
     QudaGhostExchange ghostExchange; // the type of ghost exchange to perform
     mutable void *ghost[QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
 
@@ -160,6 +164,7 @@ namespace quda {
     QudaGaugeFixed GaugeFixed() const { return fixed; }
     QudaGaugeFieldOrder FieldOrder() const { return order; }
     QudaFieldGeometry Geometry() const { return geometry; }
+    const int* R() const { return r; }
     QudaGhostExchange GhostExchange() const { return ghostExchange; }
     QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
 
