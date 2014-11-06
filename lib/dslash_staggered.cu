@@ -68,7 +68,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const int dagger;
     const double a;
 
   protected:
@@ -82,7 +81,7 @@ namespace quda {
     StaggeredDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1,
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), dagger(dagger), a(a)
+      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
