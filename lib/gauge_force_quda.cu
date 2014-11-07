@@ -124,7 +124,7 @@ namespace quda {
     fat_force_const_t gf_h;
     gf_h.path_max_length = path_max_length;  
 #ifdef MULTI_GPU  
-    int Vh_ex = (X[0]+4)*(X[1]+4)*(X[2]+4)*(X[3]+4)/2;
+    int Vh_ex = (X[0]+4)*(X[1]+4)*(X[2]+4)*(X[3]+4)/2; // FIXME - this should not be hardcoded
     gf_h.site_ga_stride = param->site_ga_pad + Vh_ex;
 #else  
     gf_h.site_ga_stride = param->site_ga_pad + Vh;
@@ -140,7 +140,7 @@ namespace quda {
   private:
     cudaGaugeField &mom;
     const int dir;
-    const double &eb3;
+    const double eb3;
     const cudaGaugeField &link;
     const int *input_path;
     const int *length;

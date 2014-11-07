@@ -54,7 +54,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const int dagger;
     const double mferm;
     const double a;
 
@@ -117,8 +116,8 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double mferm, 
 			 const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), mferm(mferm), 
-	dagger(dagger), a(a)
+      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), 
+	gauge1(gauge1), mferm(mferm), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
@@ -215,11 +214,18 @@ namespace quda {
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
     dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
 
+/*
 #ifndef GPU_COMMS
     DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
 #endif
+*/
+    DslashPolicyImp* dslashImp = new DslashFusedExterior;
+
+    printfQuda("Calling the fused exterior dslash operator\n");
+
+
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
     delete dslashImp;
 

@@ -106,6 +106,7 @@ public:
     size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
     if (arg.X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
     return arg.f.streams()*bytes*arg.length; }
+  int tuningIter() const { return 3; }
 };
 
 /**

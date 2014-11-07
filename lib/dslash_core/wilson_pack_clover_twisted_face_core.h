@@ -229,7 +229,8 @@
 #define c31_32_im c11_12_im
 #define c32_32_re c12_12_re
 
-// first chiral block of inverted clover term (reuses C0,...,C9)
+
+// first chiral block of inverted clover term
 #ifdef CLOVER_DOUBLE
 #define cinv00_00_re C0.x
 #define cinv01_01_re C0.y
@@ -405,8 +406,11 @@
 #define cinv31_32_im cinv11_12_im
 #define cinv32_32_re cinv12_12_re
 
+
 #include "io_spinor.h"
+
 #include "read_clover.h"
+
 #include "tmc_core.h"
 
 if (face_num) {
@@ -735,43 +739,6 @@ if (face_num) {
 #undef c12_11_re
 #undef c12_11_im
 
-#undef c20_20_re
-#undef c21_21_re
-#undef c22_22_re
-#undef c30_30_re
-#undef c31_31_re
-#undef c32_32_re
-#undef c21_20_re
-#undef c21_20_im
-#undef c22_20_re
-#undef c22_20_im
-#undef c30_20_re
-#undef c30_20_im
-#undef c31_20_re
-#undef c31_20_im
-#undef c32_20_re
-#undef c32_20_im
-#undef c22_21_re
-#undef c22_21_im
-#undef c30_21_re
-#undef c30_21_im
-#undef c31_21_re
-#undef c31_21_im
-#undef c32_21_re
-#undef c32_21_im
-#undef c30_22_re
-#undef c30_22_im
-#undef c31_22_re
-#undef c31_22_im
-#undef c32_22_re
-#undef c32_22_im
-#undef c31_30_re
-#undef c31_30_im
-#undef c32_30_re
-#undef c32_30_im
-#undef c32_31_re
-#undef c32_31_im
-
 #undef cinv00_00_re
 #undef cinv01_01_re
 #undef cinv02_02_re
@@ -809,39 +776,3 @@ if (face_num) {
 #undef cinv12_11_re
 #undef cinv12_11_im
 
-#undef cinv20_20_re
-#undef cinv21_21_re
-#undef cinv22_22_re
-#undef cinv30_30_re
-#undef cinv31_31_re
-#undef cinv32_32_re
-#undef cinv21_20_re
-#undef cinv21_20_im
-#undef cinv22_20_re
-#undef cinv22_20_im
-#undef cinv30_20_re
-#undef cinv30_20_im
-#undef cinv31_20_re
-#undef cinv31_20_im
-#undef cinv32_20_re
-#undef cinv32_20_im
-#undef cinv22_21_re
-#undef cinv22_21_im
-#undef cinv30_21_re
-#undef cinv30_21_im
-#undef cinv31_21_re
-#undef cinv31_21_im
-#undef cinv32_21_re
-#undef cinv32_21_im
-#undef cinv30_22_re
-#undef cinv30_22_im
-#undef cinv31_22_re
-#undef cinv31_22_im
-#undef cinv32_22_re
-#undef cinv32_22_im
-#undef cinv31_30_re
-#undef cinv31_30_im
-#undef cinv32_30_re
-#undef cinv32_30_im
-#undef cinv32_31_re
-#undef cinv32_31_im

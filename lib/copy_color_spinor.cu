@@ -82,6 +82,46 @@ namespace quda {
       }
     };
 
+  /** Transform from chiral into non-relavisitic basis */
+  template <typename FloatOut, typename FloatIn, int Ns, int Nc>
+    struct ChiralToNonRelBasis {
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+    __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+	int s1[4] = {0, 1, 0, 1};
+	int s2[4] = {2, 3, 2, 3};
+	RegTypeOut K1[4] = {-kP, -kP, kP, kP};
+	RegTypeOut K2[4] = { kP,  kP, kP, kP};
+	for (int s=0; s<Ns; s++) {
+	  for (int c=0; c<Nc; c++) {
+	    for (int z=0; z<2; z++) {
+	      out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
+	    }
+	  }
+	}
+      }
+    };
+
+  /** Transform from non-relativistic into chiral basis */
+  template <typename FloatOut, typename FloatIn, int Ns, int Nc>
+    struct NonRelToChiralBasis {
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+    __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+	int s1[4] = {0, 1, 0, 1};
+	int s2[4] = {2, 3, 2, 3};
+	RegTypeOut K1[4] = {-kU, -kU,  kU,  kU};
+	RegTypeOut K2[4] = { kU,  kU,  kU,  kU};
+	for (int s=0; s<Ns; s++) {
+	  for (int c=0; c<Nc; c++) {
+	    for (int z=0; z<2; z++) {
+	      out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
+	    }
+	  }
+	}
+    }
+  };
+
   /** CPU function to reorder spinor fields.  */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
     void packSpinor(OutOrder &outOrder, const InOrder &inOrder, Basis basis, int volume) {  
@@ -195,7 +235,25 @@ namespace quda {
 	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, RelBasis<FloatOut, FloatIn, Ns, Nc> > pack(outOrder, inOrder, basis, Vh);
 	pack.apply(0);
       } 
-    } else {
+    } else if (dstBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_CHIRAL_GAMMA_BASIS) {
+        if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
+        ChiralToNonRelBasis<FloatOut, FloatIn, Ns, Nc> basis;
+        if (location == QUDA_CPU_FIELD_LOCATION) {
+  	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, Vh);
+        } else {
+  	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, ChiralToNonRelBasis<FloatOut, FloatIn, Ns, Nc> > pack(outOrder, inOrder, basis, Vh);
+  	pack.apply(0);
+        }
+      } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && dstBasis == QUDA_CHIRAL_GAMMA_BASIS) {
+        if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
+        NonRelToChiralBasis<FloatOut, FloatIn, Ns, Nc> basis;
+        if (location == QUDA_CPU_FIELD_LOCATION) {
+  	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, Vh);
+        } else {
+  	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelToChiralBasis<FloatOut, FloatIn, Ns, Nc> > pack(outOrder, inOrder, basis, Vh);
+  	pack.apply(0);
+        }
+      } else {
       errorQuda("Basis change not supported");
     }
   }

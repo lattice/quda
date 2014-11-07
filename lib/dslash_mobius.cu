@@ -58,7 +58,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const int dagger;
     const double mferm, a; 
     double *b5, *c5;
     const int DS_type;
@@ -122,12 +121,32 @@ namespace quda {
 		     const QudaReconstructType reconstruct, const cudaColorSpinorField *in, 
 		     const cudaColorSpinorField *x, const double mferm, 
 		     const double a, const int dagger, const int DS_type)
-      : DslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), mferm(mferm), 
-	dagger(dagger), a(a), DS_type(DS_type)
+      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), 
+	mferm(mferm), a(a), DS_type(DS_type)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
     virtual ~MDWFDslashPCCuda() { unbindSpinorTex<sFloat>(in, out, x); }
+
+    TuneKey tuneKey() const
+    {
+      TuneKey key = DslashCuda::tuneKey();
+      switch(DS_type){
+      case 0:
+	strcat(key.aux,",Dslash4");
+	break;
+      case 1:
+	strcat(key.aux,",Dslash4pre");
+	break;
+      case 2:
+	strcat(key.aux,",Dslash5");
+	break;
+      case 3:
+	strcat(key.aux,",Dslash5inv");
+	break;
+      }
+      return key;
+    }
 
     virtual void initTuneParam(TuneParam &param) const
     {

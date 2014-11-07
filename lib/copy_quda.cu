@@ -82,7 +82,7 @@ namespace quda {
 	if (Y.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
 	return bytes*length; 
       }
-      int tuningIter() const { return 10; }
+      int tuningIter() const { return 3; }
     };
 
     void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {

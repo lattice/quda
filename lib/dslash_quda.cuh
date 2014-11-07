@@ -289,6 +289,7 @@
     const cudaColorSpinorField *x;
     const QudaReconstructType reconstruct;
     char *saveOut, *saveOutNorm;
+    const int dagger;
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -331,12 +332,15 @@
 	strcat(aux[kernel_type],",reconstruct=8");
 
       if (x) strcat(aux[kernel_type],",Xpay");
+      if (dagger) strcat(aux[kernel_type],",dagger");
     }
 
   public:
     DslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-	       const cudaColorSpinorField *x, const QudaReconstructType reconstruct) 
-      : out(out), in(in), x(x), reconstruct(reconstruct), saveOut(0), saveOutNorm(0) { 
+	       const cudaColorSpinorField *x, const QudaReconstructType reconstruct,
+	       const int dagger) 
+      : out(out), in(in), x(x), reconstruct(reconstruct), 
+	dagger(dagger), saveOut(0), saveOutNorm(0) { 
 
 #ifdef MULTI_GPU 
       fillAux(INTERIOR_KERNEL, "type=interior");
@@ -479,8 +483,8 @@
 
   public:
       SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		       const cudaColorSpinorField *x, const QudaReconstructType reconstruct) 
-	: DslashCuda(out, in, x, reconstruct) { ; }
+		       const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
+	: DslashCuda(out, in, x, reconstruct, dagger) { ; }
       virtual ~SharedDslashCuda() { ; }
       std::string paramString(const TuneParam &param) const // override and print out grid as well
       {
@@ -511,8 +515,8 @@
     class SharedDslashCuda : public DslashCuda {
     public:
       SharedDslashCuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
-		       const cudaColorSpinorField *x, QudaReconstructType reconstruct) 
-	: DslashCuda(out, in, x, reconstruct) { }
+		       const cudaColorSpinorField *x, QudaReconstructType reconstruct, int dagger) 
+	: DslashCuda(out, in, x, reconstruct, dagger) { }
       virtual ~SharedDslashCuda() { }
     };
 #endif

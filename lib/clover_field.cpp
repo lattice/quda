@@ -59,6 +59,16 @@ namespace quda {
       oddNorm = (char*)norm + norm_bytes/2;
 
       total_bytes += bytes + norm_bytes;
+
+      // this is a hack to prevent us allocating a texture object for an unallocated inverse field
+      if (!param.inverse) {
+	cloverInv = clover;
+	evenInv = even;
+	oddInv = odd;
+	invNorm = norm;
+	evenInvNorm = evenNorm;
+	oddInvNorm = oddNorm;
+      }
     } 
 
     if (param.inverse) {
@@ -104,7 +114,6 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
   void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
 					void *field, void *norm) {
-
     if (order == QUDA_FLOAT2_CLOVER_ORDER || order == QUDA_FLOAT4_CLOVER_ORDER) {
       // create the texture for the field components
       
@@ -258,6 +267,23 @@ namespace quda {
       if (cloverInv) host_free(cloverInv);
       if (invNorm) host_free(invNorm);      
     }
+  }
+
+  // This doesn't really live here, but is fine for the moment
+  std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param)
+  {
+    output << static_cast<const LatticeFieldParam&>(param);
+    output << "direct = "    << param.direct << std::endl;
+    output << "inverse = "   << param.inverse << std::endl;
+    output << "clover = "    << param.clover << std::endl;
+    output << "norm = "      << param.norm << std::endl;
+    output << "cloverInv = " << param.cloverInv << std::endl;
+    output << "invNorm = "   << param.invNorm << std::endl;
+    output << "twisted = "   << param.twisted << std::endl;
+    output << "mu2 = "       << param.mu2 << std::endl;
+    output << "order = "     << param.order << std::endl;
+    output << "create = "    << param.create << std::endl;
+    return output;  // for multiple << operators.
   }
 
 } // namespace quda

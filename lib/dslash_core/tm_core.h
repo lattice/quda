@@ -180,7 +180,7 @@ __global__ void twistGamma5Kernel(double2 *spinor, float *null, const double a, 
    double2 tmp0,     tmp1;
    
    int flv1_idx = sid;
-   int flv2_idx = sid + fl_stride; //or simply +flavor_length (volume incl. pad)
+   int flv2_idx = sid + param.fl_stride; //or simply +flavor_length (volume incl. pad)
    
    //apply (1 - i*a*gamma_5 * tau_3 + b * tau_1) 
    
@@ -610,7 +610,7 @@ __global__ void twistGamma5Kernel(float4 *spinor, float *null, float a, float b,
    float4 tmp0, tmp1;
 
    int flv1_idx = sid;
-   int flv2_idx = sid + fl_stride; 
+   int flv2_idx = sid + param.fl_stride;
    
    //apply (1 - i*a*gamma_5 * tau_3 + b * tau_1) 
    
@@ -934,7 +934,7 @@ __global__ void twistGamma5Kernel(short4* spinor, float *spinorNorm, float a, fl
    if (sid >= param.threads) return;
    
    int flv1_idx = sid;
-   int flv2_idx = sid + fl_stride; 
+   int flv2_idx = sid + param.fl_stride;
    
    float C1 = TEX1DFETCH(float, SPINORTEXNORM, flv1_idx);
    float C2 = TEX1DFETCH(float, SPINORTEXNORM, flv2_idx);

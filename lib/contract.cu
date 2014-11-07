@@ -176,7 +176,7 @@ namespace quda
     unsigned int sharedBytesPerThread() const { return 16*sizeof(rFloat); }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
+    unsigned int minThreads() const { return x.X(0) * x.X(1) * x.X(2) * x.X(3); }
 
     char *saveOut, *saveOutNorm;
 
@@ -278,7 +278,7 @@ namespace quda
       return ps.str();
     }
 
-    long long flops() const { return 120ll * in->VolumeCB(); }
+    long long flops() const { return 120ll * x.VolumeCB(); }
     long long bytes() const { return x.Bytes() + x.NormBytes() + y.Bytes() + y.NormBytes(); }
   };
 

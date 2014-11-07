@@ -47,6 +47,14 @@ namespace quda {
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
       break;
+    case QUDA_MPCG_INVERTER:
+      report("MPCG");
+      solver = new MPCG(mat, param, profile);
+      break;
+    case QUDA_MPBICGSTAB_INVERTER:
+      report("MPBICGSTAB");
+      solver = new MPBiCGstab(mat, param, profile);
+      break;
     default:
       errorQuda("Invalid solver type");
     }
@@ -82,6 +90,30 @@ namespace quda {
     // check the L2 relative residual norm if necessary
     if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
 	  (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) ) 
+      return false;
+
+    return true;
+  }
+
+// 
+  bool Solver::convergenceHQ(const double &r2, const double &hq2, const double &r2_tol, 
+         const double &hq_tol) {
+    //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
+
+    // check the heavy quark residual norm if necessary
+    if ( (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) && (hq2 > hq_tol) ) 
+      return false;
+
+    return true;
+  }
+
+  bool Solver::convergenceL2(const double &r2, const double &hq2, const double &r2_tol, 
+         const double &hq_tol) {
+    //printf("converge: L2 %e / %e and HQ %e / %e\n", r2, r2_tol, hq2, hq_tol);
+
+    // check the L2 relative residual norm if necessary
+    if ( ((param.residual_type & QUDA_L2_RELATIVE_RESIDUAL) ||
+    (param.residual_type & QUDA_L2_ABSOLUTE_RESIDUAL)) && (r2 > r2_tol) ) 
       return false;
 
     return true;
@@ -123,10 +155,10 @@ namespace quda {
       report("Incremental EIGCG");
       solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
     }else if (param.inv_type == QUDA_GMRESDR_INVERTER){
-      report("Incremental GMRESDR");
+      report("GMRESDR");
       solver = new GmresDR(mat, matSloppy, matDeflate, param, profile);
     }
-    else{
+    }else{
       errorQuda("Invalid solver type");
     }
     

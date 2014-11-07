@@ -12,13 +12,13 @@
 //required for (incremental) EigCG solver
 
    class BlasMagmaArgs{
+    private:
 
-    protected:
       //problem sizes:
       int m;
       int nev;
       int prec;
-      int ldm;//(leading dimension : may include padding)
+      int ldm;//(may include padding)
 
       //general magma library parameters:	
       int info;
@@ -64,12 +64,8 @@
       //
       static void CloseMagma();
 
-      //Collection of methods for EigCG/GMRES-DR solvers:
-      void MagmaHEEVD(void *symM, void *hvals, const int problem_size, bool host = false);
-      //
-      void MagmaGEEVR(void *genM, void *vecr, const int ldv, void *hvals, const int problem_size);//computes right eigenvectors of the matrix M
-      //
-      void MagmaGELS(void *genM, const int ldm, const int m, const int n, void *vecr, const int ldv);//least squares problem
+      //Collection of methods for EigCG solver:
+      void MagmaHEEVD(void *dTvecm, void *hTvalm, const int problem_size, bool host = false);
       //
       int  MagmaORTH_2nev(void *dTvecm, void *dTm);
       //
@@ -77,7 +73,7 @@
 
       //Collection of methods used for the initial guess vector deflation:
 
-      //this accepts host routines, and employ either CPU or GPU, depending on the problem size etc.
+      //this accepts host routines, and employ either CPU or GPU, depending on problem size etc.
       void SolveProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH);
 
       //GPU version of the above

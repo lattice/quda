@@ -1,6 +1,45 @@
+#ifdef GPU_CONTRACT
+
+#include <cstdlib>
+#include <cstdio>
+#include <string>
+#include <iostream>
+
+#include <color_spinor_field.h>
+#include <clover_field.h>
+
+// these control the Wilson-type actions
+
+#include <quda_internal.h>
+#include <dslash_quda.h>
+#include <sys/time.h>
+#include <blas_quda.h>
+#include <face_quda.h>
+
+#include <inline_ptx.h>
+
+
 namespace quda
 {
-#include	"covDev.h"	//Covariant derivative definitions
+    namespace covdev
+    {
+        #include <dslash_constants.h>
+        #include <dslash_textures.h>
+        #include <dslash_index.cuh>
+
+        // Enable shared memory dslash for Fermi architecture
+        //#define SHARED_WILSON_DSLASH
+        //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
+
+        #include <dslash_quda.cuh>
+
+        #include	"covDev.h"	//Covariant derivative definitions
+    } // end namespace wilson
+
+  // declare the dslash events
+#include <dslash_events.cuh>
+
+  using namespace covdev;
 
   /**
      This macros try to mimic dslash definitions, because of the similarities between the covariant derivative and the dslash
@@ -81,6 +120,11 @@ namespace quda
   GENERIC_COVDEV(FUNC, nMu, Dagger, gridDim, blockDim, shared, stream, param, __VA_ARGS__) \
 }
 
+#define PROFILE(f, profile, idx)		\
+  profile.Start(idx);				\
+  f;						\
+  profile.Stop(idx); 
+
   /**
      This is a simpler version of the dslashCuda function to call the right kernels
   */
@@ -148,7 +192,14 @@ namespace quda
     cudaTextureObject_t tex;
 #endif
   protected:
-    unsigned int minThreads			() const { if (dslashParam.kernel_type == INTERIOR_KERNEL) { return in->Volume(); } else { return ghostVolume; } }
+    unsigned int minThreads			() const
+    {
+      #ifdef MULTI_GPU
+	if (dslashParam.kernel_type == INTERIOR_KERNEL) { return in->Volume(); } else { return ghostVolume; }
+      #else
+	return in->Volume();
+      #endif
+    }
 
     unsigned int sharedBytesPerThread	() const { return 0; }
 
@@ -180,6 +231,8 @@ namespace quda
       else
 	return	false;
     }
+
+    #ifdef MULTI_GPU
 
     /**
        Allocates ghosts for multi-GPU
@@ -442,6 +495,7 @@ namespace quda
 	  binded	= false;
 	}
     }
+#endif	/*	MULTI_GPU	*/
 
     void unbindGauge		()
     {
@@ -523,9 +577,9 @@ namespace quda
 	  dslashParam.ghostNormOffset[i]		= 0;
 	  dslashParam.commDim[i]			= 0;
 	}
-
       if	(dslashParam.kernel_type != INTERIOR_KERNEL)
 	{
+#ifdef MULTI_GPU
 	  dslashParam.threads	= ghostVolume;
 	  exchangeGhosts	();				// We must exchange ghosts here because the covDevCuda function requires a Dslash class as parameter
 	  bindGhosts	();				// and the dslash class doesn't have these specific functions to exchange ghosts
@@ -534,6 +588,7 @@ namespace quda
 
 	  TuneParam tp		= tuneLaunch(*this, getTuning(), getVerbosity());
 	  COVDEV		(covDevM, mu, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam, (Float2*)out->V(), (Float2*)gauge0, (Float2*)gauge1, (Float2*)in->V());
+#endif
 	} else {
 	dslashParam.threads	= in->Volume();
 	TuneParam tp		= tuneLaunch(*this, getTuning(), getVerbosity());
@@ -588,3 +643,5 @@ namespace quda
   }
 
 }
+
+#endif

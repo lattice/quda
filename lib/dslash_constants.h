@@ -8,17 +8,19 @@ enum KernelType {
 };
 
   struct DslashParam {
+    char do_not_delete; // work around for bug in CUDA 6.5
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
+    int X[4];
+    int Ls;
+    KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM+1];
     int ghostNormOffset[QUDA_MAX_DIM+1];
-    int X[4];
-    int Ls;
-    KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
     int sp_stride; // spinor stride
     int cl_stride; // clover stride
+    int fl_stride; // twisted-mass flavor stride
 #ifdef GPU_STAGGERED_DIRAC
     int gauge_stride;
     int long_gauge_stride;
@@ -149,7 +151,8 @@ __constant__ int gauge_fixed;
 
 // domain wall constants
 //__constant__ int Ls;
-__constant__ double m5;
+__constant__ double m5_d;
+__constant__ float m5_f;
 
 // single precision constants
 __constant__ float anisotropy_f;
@@ -185,9 +188,6 @@ __constant__ int E3E2E1;
 __constant__ fat_force_const_t fl; //fatlink
 __constant__ fat_force_const_t gf; //gauge force
 __constant__ fat_force_const_t hf; //hisq force
-
-//!ndeg tm:
-__constant__ int fl_stride;
 
 void initLatticeConstants(const LatticeField &lat, TimeProfile &profile)
 {
@@ -453,8 +453,11 @@ void initStaggeredConstants(const cudaGaugeField &fatgauge, const cudaGaugeField
 }
 
 //For initializing the coefficients used in MDWF
-__constant__ double mdwf_b5[QUDA_MAX_DWF_LS];
-__constant__ double mdwf_c5[QUDA_MAX_DWF_LS];
+__constant__ double mdwf_b5_d[QUDA_MAX_DWF_LS];
+__constant__ double mdwf_c5_d[QUDA_MAX_DWF_LS];
+
+__constant__ float mdwf_b5_f[QUDA_MAX_DWF_LS];
+__constant__ float mdwf_c5_f[QUDA_MAX_DWF_LS];
 
 void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const double m5h, TimeProfile &profile)
 {
@@ -462,29 +465,30 @@ void initMDWFConstants(const double *b_5, const double *c_5, int dim_s, const do
 
   static int last_Ls = -1;
   if (dim_s != last_Ls) {
-    cudaMemcpyToSymbol(mdwf_b5, b_5, dim_s*sizeof(double));  
-    cudaMemcpyToSymbol(mdwf_c5, c_5, dim_s*sizeof(double));  
+    float b_5_f[QUDA_MAX_DWF_LS];
+    float c_5_f[QUDA_MAX_DWF_LS];
+    for (int i=0; i<dim_s; i++) {
+      b_5_f[i] = (float)b_5[i];
+      c_5_f[i] = (float)c_5[i];
+    }
+
+    cudaMemcpyToSymbol(mdwf_b5_d, b_5, dim_s*sizeof(double));
+    cudaMemcpyToSymbol(mdwf_c5_d, c_5, dim_s*sizeof(double));
+    cudaMemcpyToSymbol(mdwf_b5_f, b_5_f, dim_s*sizeof(float));
+    cudaMemcpyToSymbol(mdwf_c5_f, c_5_f, dim_s*sizeof(float));
     checkCudaError();
     last_Ls = dim_s;
   }
 
   static double last_m5 = 99999;
   if (m5h != last_m5) {
-    cudaMemcpyToSymbol(m5, &m5h, sizeof(double));
+    float m5h_f = (float)m5h;
+    cudaMemcpyToSymbol(m5_d, &m5h, sizeof(double));
+    cudaMemcpyToSymbol(m5_f, &m5h_f, sizeof(float));
     checkCudaError();
     last_m5 = m5h;
   }
 
-  profile.Stop(QUDA_PROFILE_CONSTANT);
-}
-
-//!ndeg tm: 
-void initTwistedMassConstants(const int fl_stride_h, TimeProfile &profile)
-{
-  profile.Start(QUDA_PROFILE_CONSTANT);
-  cudaMemcpyToSymbol(fl_stride, &fl_stride_h, sizeof(int));    
-
-  checkCudaError();
   profile.Stop(QUDA_PROFILE_CONSTANT);
 }
 

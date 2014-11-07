@@ -57,7 +57,6 @@ namespace quda {
   private:
     const gFloat *gauge0, *gauge1;
     const QudaTwistCloverDslashType dslashType;
-    const int dagger;
     double a, b, c, d;
     const cFloat *clover;
     const float *cNorm;
@@ -86,12 +85,12 @@ namespace quda {
 			    const cFloat *cloverInv, const float *cNrm2, int cl_stride, const cudaColorSpinorField *in,
 			    const cudaColorSpinorField *x, const QudaTwistCloverDslashType dslashType, const double kappa,
 			    const double mu, const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct),gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2),
-	dslashType(dslashType), dagger(dagger)
+      : SharedDslashCuda(out, in, x, reconstruct,dagger),gauge0(gauge0), gauge1(gauge1), clover(clover),
+	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
       dslashParam.cl_stride = cl_stride;
+      dslashParam.fl_stride = in->VolumeCB();
       a = kappa;
       b = mu;
       c = epsilon;
@@ -156,6 +155,9 @@ namespace quda {
 			       const double &epsilon, const double &k,  const int *commOverride,
 			       TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
+    if (dslashPolicy ==  QUDA_FUSED_DSLASH || dslashPolicy == QUDA_FUSED_GPU_COMMS_DSLASH)
+      errorQuda("Twisted-clover dslash does not yet support a fused exterior dslash kernel");
+
     inSpinor = (cudaColorSpinorField*)in; // EVIL
     inClover = (FullClover*) clover;
     inCloverInv = (FullClover*) cloverInv;
@@ -227,7 +229,7 @@ namespace quda {
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
 #endif
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume(), in->GhostFace(), profile);
+    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
     delete dslashImp;
 	
     delete dslash;
