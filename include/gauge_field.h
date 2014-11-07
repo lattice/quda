@@ -33,6 +33,10 @@ namespace quda {
     // always set to false, requires external override
     bool compute_fat_link_max; 
 
+    /** The extended gauge field radius (if applicable) */
+    int r[QUDA_MAX_DIM];
+
+    /** The type of ghost exchange to be done with this field */
     QudaGhostExchange ghostExchange;
 
     /** The staggered phase convention to use */
@@ -67,41 +71,48 @@ namespace quda {
 	  precision = QUDA_INVALID_PRECISION;
 	  nDim = 4;
 	  pad  = 0;
-	  for(int dir=0; dir<nDim; ++dir) x[dir] = 0;
+	  for(int dir=0; dir<nDim; ++dir) {
+	    x[dir] = 0;
+	    r[dir] = 0;
+	  }
 	}
 	
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry, 
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
     : LatticeFieldParam(), nColor(3), nFace(0), reconstruct(reconstruct), 
-      order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
-      link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
-      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
-      pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false)
-      {
-	// variables declared in LatticeFieldParam
-	this->precision = precision;
-	this->nDim = 4;
-	this->pad = pad;
-	for(int dir=0; dir<nDim; ++dir) this->x[dir] = x[dir];
-      }
-  
+	order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
+	link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
+	tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
+	pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
+	staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false)
+	{
+	  // variables declared in LatticeFieldParam
+	  this->precision = precision;
+	  this->nDim = 4;
+	  this->pad = pad;
+	  for(int dir=0; dir<nDim; ++dir) {
+	    this->x[dir] = x[dir];
+	    this->r[dir] = 0;
+	  }
+	}
+      
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
       nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order), 
-      fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
-      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
-      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
-      compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
-      staggeredPhaseType(param.staggered_phase_type), 
-      staggeredPhaseApplied(param.staggered_phase_applied) 
-      {
-	if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
-	else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
-	else errorQuda("Error: invalid link type(%d)\n", link_type);
-      }
+	fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
+	anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
+	create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
+	compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
+	staggeredPhaseType(param.staggered_phase_type), 
+	staggeredPhaseApplied(param.staggered_phase_applied) 
+	  {
+	    if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
+	    else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
+	    else errorQuda("Error: invalid link type(%d)\n", link_type);
+	    for (int d=0; d<nDim; d++) r[d] = 0;
+	  }
   };
-
+  
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
 
   class GaugeField : public LatticeField {

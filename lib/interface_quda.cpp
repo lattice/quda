@@ -3844,15 +3844,14 @@ void createCloverQuda(QudaInvertParam* invertParam)
   // clover creation not supported from 8-reconstruct presently so convert to 12
   QudaReconstructType recon = (gaugePrecise->Reconstruct() == QUDA_RECONSTRUCT_8) ? 
     QUDA_RECONSTRUCT_12 : gaugePrecise->Reconstruct();
-  // set this to QUDA_GHOST_EXCHANGE_EXTENDED and need to pass in R
   GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), recon, pad, 
-			   QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);  
+			   QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);  
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.order = gaugePrecise->Order();
   gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParamEx.t_boundary = gaugePrecise->TBoundary();
   gParamEx.nFace = 1;
-
+  for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
 
   cudaGaugeField *cudaGaugeExtended = NULL;
   if (extendedGaugeResident) {
