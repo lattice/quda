@@ -153,6 +153,9 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat2(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat2(2*i+1)+"\n"
+    str += "#define m5 m5_d\n"
+    str += "#define mdwf_b5 mdwf_b5_d\n"
+    str += "#define mdwf_c5 mdwf_c5_d\n"
     str += "#else\n"
     str += "#define spinorFloat float\n"
     for s in range(0,4):
@@ -160,6 +163,9 @@ def def_input_spinor():
             i = 3*s+c
             str += "#define "+in_re(s,c)+" I"+nthFloat4(2*i+0)+"\n"
             str += "#define "+in_im(s,c)+" I"+nthFloat4(2*i+1)+"\n"
+    str += "#define m5 m5_f\n"
+    str += "#define mdwf_b5 mdwf_b5_f\n"
+    str += "#define mdwf_c5 mdwf_c5_f\n"
     str += "#endif // SPINOR_DOUBLE\n\n"
     return str
 # end def def_input_spinor
@@ -1288,6 +1294,9 @@ incomplete = incomplete || (param.commDim[0] && (x1==0 || x1==X1m1));
     str += "WRITE_SPINOR(param.sp_stride);\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
+    str += "#undef m5\n"
+    str += "#undef mdwf_b5\n"
+    str += "#undef mdwf_c5\n"
     str += "#undef spinorFloat\n"
     str += "#undef SHARED_STRIDE\n\n"
 

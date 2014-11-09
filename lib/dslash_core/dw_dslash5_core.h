@@ -36,6 +36,9 @@
 #define i31_im I10.y
 #define i32_re I11.x
 #define i32_im I11.y
+#define m5 m5_d
+#define mdwf_b5 mdwf_b5_d
+#define mdwf_c5 mdwf_c5_d
 #else
 #define spinorFloat float
 #define i00_re I0.x
@@ -62,6 +65,9 @@
 #define i31_im I5.y
 #define i32_re I5.z
 #define i32_im I5.w
+#define m5 m5_f
+#define mdwf_b5 mdwf_b5_f
+#define mdwf_c5 mdwf_c5_f
 #endif // SPINOR_DOUBLE
 
 // output spinor
@@ -426,6 +432,9 @@ xs = X/(X1*X2*X3*X4);
 WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
+#undef m5
+#undef mdwf_b5
+#undef mdwf_c5
 #undef spinorFloat
 #undef SHARED_STRIDE
 

@@ -57,7 +57,6 @@ namespace quda {
   private:
     const gFloat *gauge0, *gauge1;
     const QudaTwistCloverDslashType dslashType;
-    const int dagger;
     double a, b, c, d;
     const cFloat *clover;
     const float *cNorm;
@@ -86,9 +85,8 @@ namespace quda {
 			    const cFloat *cloverInv, const float *cNrm2, int cl_stride, const cudaColorSpinorField *in,
 			    const cudaColorSpinorField *x, const QudaTwistCloverDslashType dslashType, const double kappa,
 			    const double mu, const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct),gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2),
-	dslashType(dslashType), dagger(dagger)
+      : SharedDslashCuda(out, in, x, reconstruct,dagger),gauge0(gauge0), gauge1(gauge1), clover(clover),
+	cNorm(cNorm), cloverInv(cloverInv), cNrm2(cNrm2), dslashType(dslashType)
     { 
       bindSpinorTex<sFloat>(in, out, x); 
       dslashParam.cl_stride = cl_stride;

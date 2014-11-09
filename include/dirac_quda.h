@@ -72,6 +72,7 @@ namespace quda {
   class DiracMatrix;
   class DiracM;
   class DiracMdagM;
+  class DiracMMdag;
   class DiracMdag;
 
   // Abstract base class
@@ -80,6 +81,7 @@ namespace quda {
     friend class DiracMatrix;
     friend class DiracM;
     friend class DiracMdagM;
+    friend class DiracMMdag;
     friend class DiracMdag;
 
   protected:
@@ -119,6 +121,7 @@ namespace quda {
     virtual void M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const = 0;
     virtual void MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const = 0;
     void Mdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
+    void MMdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const;
 
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
@@ -652,6 +655,42 @@ namespace quda {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
       dirac->MdagM(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
+      dirac->tmp2 = NULL;
+      dirac->tmp1 = NULL;
+    }
+  };
+
+
+  class DiracMMdag : public DiracMatrix {
+
+  public:
+    DiracMMdag(const Dirac &d) : DiracMatrix(d), shift(0.0) { }
+    DiracMMdag(const Dirac *d) : DiracMatrix(d), shift(0.0) { }
+
+    //! Shift term added onto operator (M^dag M + shift)
+    double shift;
+
+    void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+    {
+      dirac->MMdag(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
+    }
+
+    void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, cudaColorSpinorField &tmp) const
+    {
+      dirac->tmp1 = &tmp;
+      dirac->MMdag(out, in);
+      if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
+      dirac->tmp1 = NULL;
+    }
+
+    void operator()(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+		    cudaColorSpinorField &Tmp1, cudaColorSpinorField &Tmp2) const
+    {
+      dirac->tmp1 = &Tmp1;
+      dirac->tmp2 = &Tmp2;
+      dirac->MMdag(out, in);
       if (shift != 0.0) axpyCuda(shift, const_cast<cudaColorSpinorField&>(in), out);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;

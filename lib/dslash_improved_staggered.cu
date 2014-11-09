@@ -70,7 +70,6 @@ namespace quda {
     const fatGFloat *fat0, *fat1;
     const longGFloat *long0, *long1;
     const phaseFloat *phase0, *phase1;
-    const int dagger;
     const double a;
 
   protected:
@@ -86,8 +85,8 @@ namespace quda {
 			const phaseFloat *phase0, const phaseFloat *phase1, 
 			const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			const cudaColorSpinorField *x, const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct), fat0(fat0), fat1(fat1), long0(long0), long1(long1), phase0(phase0), phase1(phase1), 
-	dagger(dagger), a(a)
+      : DslashCuda(out, in, x, reconstruct, dagger), fat0(fat0), fat1(fat1), long0(long0), 
+	long1(long1), phase0(phase0), phase1(phase1), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }

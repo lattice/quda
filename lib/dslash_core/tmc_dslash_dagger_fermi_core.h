@@ -2471,6 +2471,7 @@ if (!incomplete)
 #else
   APPLY_CLOVER_TWIST(c, -a, acc);
 #endif
+#endif
   o00_re = b*o00_re + acc00_re;
   o00_im = b*o00_im + acc00_im;
   o01_re = b*o01_re + acc01_re;
@@ -2495,7 +2496,6 @@ if (!incomplete)
   o31_im = b*o31_im + acc31_im;
   o32_re = b*o32_re + acc32_re;
   o32_im = b*o32_im + acc32_im;
-#endif
 #else //no XPAY
 #ifndef CLOVER_TWIST_INV_DSLASH
   APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);

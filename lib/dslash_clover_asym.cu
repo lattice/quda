@@ -60,7 +60,6 @@ namespace quda {
     const gFloat *gauge0, *gauge1;
     const cFloat *clover;
     const float *cloverNorm;
-    const int dagger;
     const double a;
 
   protected:
@@ -84,8 +83,8 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cFloat *clover, 
 			 const float *cloverNorm, int cl_stride, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double a, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), clover(clover),
-	cloverNorm(cloverNorm), dagger(dagger), a(a)
+      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), clover(clover),
+	cloverNorm(cloverNorm), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
       dslashParam.cl_stride = cl_stride;

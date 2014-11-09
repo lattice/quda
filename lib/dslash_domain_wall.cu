@@ -54,7 +54,6 @@ namespace quda {
 
   private:
     const gFloat *gauge0, *gauge1;
-    const int dagger;
     const double mferm;
     const double a;
 
@@ -117,8 +116,8 @@ namespace quda {
 			 const QudaReconstructType reconstruct, const cudaColorSpinorField *in,
 			 const cudaColorSpinorField *x, const double mferm, 
 			 const double a, const int dagger)
-      : DslashCuda(out, in, x, reconstruct), gauge0(gauge0), gauge1(gauge1), mferm(mferm), 
-	dagger(dagger), a(a)
+      : DslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), 
+	gauge1(gauge1), mferm(mferm), a(a)
     { 
       bindSpinorTex<sFloat>(in, out, x);
     }
