@@ -412,6 +412,9 @@ int main(int argc, char **argv)
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   if (multishift) {
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+      errorQuda("Mass normalization not supported for multi-shift solver in invert_test");
+    }
 
     void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
