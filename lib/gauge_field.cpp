@@ -134,6 +134,9 @@ namespace quda {
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
     output << "ghostExchange = " << param.ghostExchange << std::endl;
+    for (int i=0; i<param.nDim; i++) {
+      output << "r[" << i << "] = " << param.r[i] << std::endl;    
+    }
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
     output << "staggeredPhaseApplied = " << param.staggeredPhaseApplied << std::endl;
 
