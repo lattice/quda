@@ -50,6 +50,7 @@ extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
+extern QudaMatPCType matpc_type; // preconditioning type
 
 extern char latfile[];
 
@@ -60,11 +61,14 @@ display_test_info()
 {
   printfQuda("running the following test:\n");
     
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
-	     get_prec_str(prec),get_prec_str(prec_sloppy),
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
+  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+	     get_prec_str(prec),get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), 
 	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
+	     get_recon_str(link_recon_sloppy),  
+	     xdim, ydim, zdim, tdim, Lsdim, 
+	     get_dslash_str(dslash_type), 
+	     get_mass_normalization_str(normalization));     
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -187,12 +191,11 @@ int main(int argc, char **argv)
 
   inv_param.inv_type = inv_type;
   if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     inv_param.solution_type = multishift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
   }
+  inv_param.matpc_type = matpc_type;
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = normalization;
@@ -409,6 +412,9 @@ int main(int argc, char **argv)
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   if (multishift) {
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+      errorQuda("Mass normalization not supported for multi-shift solver in invert_test");
+    }
 
     void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
@@ -480,7 +486,9 @@ int main(int argc, char **argv)
             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
             dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
           ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-        } else {
+        } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+          ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinorSiteSize, inv_param.cpu_prec);
+	} else {
           ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
         }
       }

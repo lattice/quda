@@ -186,7 +186,7 @@ VOLATILE spinorFloat o2_32_im;
 int x1, x2, x3, x4;
 int X;
 
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
+#if (DD_PREC==2) // half precision
 int sp_norm_idx;
 #endif // MULTI_GPU half precision
 
@@ -285,7 +285,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 
   }
   {
-     READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid+fl_stride, sid+fl_stride);
+     READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid+param.fl_stride, sid+param.fl_stride);
      o2_00_re = i00_re;  o2_00_im = i00_im;
      o2_01_re = i01_re;  o2_01_im = i01_im;
      o2_02_re = i02_re;  o2_02_im = i02_im;
@@ -497,7 +497,7 @@ if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1)
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_im;
@@ -844,7 +844,7 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0)
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_im;
@@ -1191,7 +1191,7 @@ if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1)
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_re;
@@ -1538,7 +1538,7 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0)
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_re;
@@ -1885,7 +1885,7 @@ if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1)
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re+i20_im;
@@ -2232,7 +2232,7 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0)
 #endif
   
     // read flavor 2 from device memory
-    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+    READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
     
     // project spinor into half spinors
     a0_re = +i00_re-i20_im;
@@ -2481,7 +2481,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1)
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -2699,7 +2699,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1)
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -2937,7 +2937,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0)
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -3155,7 +3155,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0)
 #endif
     
       // read flavor 2 from device memory
-      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);
+      READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -3652,7 +3652,7 @@ if (!incomplete)
     o1_32_re = c*o1_32_re + acc_32_re;
     o1_32_im = c*o1_32_im + acc_32_im;
   
-    ASSN_ACCUM(ACCUMTEX, param.sp_stride, fl_stride)
+    ASSN_ACCUM(ACCUMTEX, param.sp_stride, param.fl_stride)
   
     o2_00_re = c*o2_00_re + acc_00_re;
     o2_00_im = c*o2_00_im + acc_00_im;
@@ -3814,7 +3814,7 @@ if (!incomplete)
 #endif // SPINOR_DOUBLE
   
   {
-    READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, fl_stride)
+    READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, param.fl_stride)
   
     //Perform twist rotation:
   //(1 - i*a*gamma_5 * tau_3 + b * tau_1)

@@ -1,6 +1,12 @@
 #include <gauge_field_order.h>
 #include <comm_quda.h>
 
+/**
+   This code has not been checked.  In particular, I suspect it is
+ erroneous in multi-GPU since it looks like the halo ghost region
+ isn't being treated here.
+ */
+
 namespace quda {
 
 #ifdef GPU_GAUGE_TOOLS

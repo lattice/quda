@@ -403,7 +403,7 @@ if (kernel_type == INTERIOR_KERNEL) {
 """
   }
   {
-     READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid+fl_stride, sid+fl_stride);
+     READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid+param.fl_stride, sid+param.fl_stride);
 """)
 
         out2 = "   "
@@ -531,11 +531,11 @@ def gen(dir, pack_only=False):
 #flavor 2:
     load_flv2 = "// read flavor 2 from device memory\n"
     if row_cnt[0] == 0:
-        load_flv2 += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);\n"
+        load_flv2 += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);\n"
     elif row_cnt[2] == 0:
-        load_flv2 += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);\n"
+        load_flv2 += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);\n"
     else:
-        load_flv2 += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+fl_stride, sp_idx+fl_stride);\n"
+        load_flv2 += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx+param.fl_stride, sp_idx+param.fl_stride);\n"
     load_flv2 += "\n"
 
 
@@ -877,7 +877,7 @@ def xpay():
             str += "  " + out1_re(s,c) +" = c*"+out1_re(s,c)+ " + "+ acc_re(s,c)+";\n"
             str += "  " + out1_im(s,c) +" = c*"+out1_im(s,c)+ " + "+ acc_im(s,c)+";\n"
     str += "\n"
-    str += "  ASSN_ACCUM(ACCUMTEX, param.sp_stride, fl_stride)\n\n"
+    str += "  ASSN_ACCUM(ACCUMTEX, param.sp_stride, param.fl_stride)\n\n"
     for s in range(0,4):
         for c in range(0,3):
             i = 3*s+c
@@ -927,7 +927,7 @@ def xpay():
 
     str += "{\n"
 
-    str += "  READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, fl_stride)\n\n"
+    str += "  READ_ACCUM_FLAVOR(ACCUMTEX, param.sp_stride, param.fl_stride)\n\n"
 
 
     str += "  //Perform twist rotation:\n"

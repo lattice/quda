@@ -72,6 +72,13 @@ namespace quda {
     flip(dagger);
   }
 
+  void Dirac::MMdag(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  {
+    flip(dagger);
+    MdagM(out, in);
+    flip(dagger);
+  }
+
 #undef flip
 
   void Dirac::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const

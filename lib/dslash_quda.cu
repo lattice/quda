@@ -52,17 +52,15 @@
 
 namespace quda {
 
+  namespace dslash_aux {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
-  // Enable shared memory dslash for Fermi architecture
-  //#define SHARED_WILSON_DSLASH
-  //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
-
 #include <tm_core.h>              // solo twisted mass kernel
 #include <tmc_core.h>              // solo twisted mass kernel
 #include <clover_def.h>           // kernels for applying the clover term alone
+  }
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -148,6 +146,7 @@ namespace quda {
     checkCudaError();
   }
 
+  using namespace dslash_aux;
 
 template <typename sFloat, typename cFloat>
 class CloverCuda : public Tunable {
@@ -175,6 +174,7 @@ class CloverCuda : public Tunable {
       : out(out), clover(clover), cloverNorm(cloverNorm), in(in)
     {
       bindSpinorTex<sFloat>(in);
+      dslashParam.sp_stride = in->Stride();
       dslashParam.cl_stride = cl_stride;
     }
     virtual ~CloverCuda() { unbindSpinorTex<sFloat>(in); }
@@ -285,10 +285,12 @@ class TwistGamma5Cuda : public Tunable {
   {
     bindSpinorTex<sFloat>(in);
     dslashParam.sp_stride = in->Stride();
-    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
+    if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
       setTwistParam(a, b, kappa, mu, dagger, twist);
-    else{//twist doublet
+      dslashParam.fl_stride = in->VolumeCB();
+    } else {//twist doublet
       a = kappa, b = mu, c = epsilon;
+      dslashParam.fl_stride = in->VolumeCB()/2;
     } 
   }
 
@@ -381,7 +383,6 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 
 template <typename cFloat, typename sFloat>
 class TwistCloverGamma5Cuda : public Tunable {
-
   private:
     const cFloat *clover;
     const float *cNorm;
@@ -409,6 +410,7 @@ class TwistCloverGamma5Cuda : public Tunable {
     bindSpinorTex<sFloat>(in);
     dslashParam.sp_stride = in->Stride();
     dslashParam.cl_stride = cl_stride;
+    dslashParam.fl_stride = in->VolumeCB();
     twist = tw;
     clover = clov;
     cNorm = cN;

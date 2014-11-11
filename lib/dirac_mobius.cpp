@@ -143,17 +143,17 @@ namespace quda {
 
       bool reset1 = newTmp(&tmp1, in);
 
-      //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
-      //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
+      //QUDA_MATPC_EVEN_EVEN_ASYMMETRIC : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
+      //QUDA_MATPC_ODD_ODD_ASYMMETRIC : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
       //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         Dslash4pre(*tmp1, in, QUDA_ODD_PARITY);
         Dslash4(out, *tmp1, QUDA_EVEN_PARITY);
         Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5); //kappa5 is dummy value
         Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
         Dslash4(*tmp1, out, QUDA_ODD_PARITY);
         Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         Dslash4pre(*tmp1, in, QUDA_EVEN_PARITY);
         Dslash4(out, *tmp1, QUDA_ODD_PARITY);
         Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5); //kappa5 is dummy value
@@ -175,7 +175,7 @@ namespace quda {
       //QUDA_MATPC_EVEN_EVEN : M5 - kappa_b^2 * D4_{eo}D4pre_{oe}D5inv_{ee}D4_{eo}D4pre_{oe}
       //QUDA_MATPC_ODD_ODD : M5 - kappa_b^2 * D4_{oe}D4pre_{eo}D5inv_{oo}D4_{oe}D4pre_{eo}
       //Actually, Dslash5 will return M5 operation and M5 = 1 + 0.5*kappa_b/kappa_c * D5
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         Dslash4(*tmp1, in, QUDA_EVEN_PARITY);
         Dslash4pre(out, *tmp1, QUDA_ODD_PARITY);
         Dslash5inv(*tmp1, out, QUDA_EVEN_PARITY, kappa5);
@@ -183,7 +183,7 @@ namespace quda {
         Dslash4pre(*tmp1, out, QUDA_EVEN_PARITY);
         //Dslash5Xpay(out, in, QUDA_EVEN_PARITY, *tmp1, 1.0);
         Dslash5Xpay(out, in, QUDA_ODD_PARITY, *tmp1, 1.0);
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         Dslash4(*tmp1, in, QUDA_ODD_PARITY);
         Dslash4pre(out, *tmp1, QUDA_EVEN_PARITY);
         Dslash5inv(*tmp1, out, QUDA_ODD_PARITY, kappa5);
@@ -218,14 +218,14 @@ namespace quda {
       sol = &x;
     } else {  
       // we desire solution to full system
-      if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+      if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D4_eo*D5inv b_o
         Dslash5inv(x.Odd(), b.Odd(), QUDA_ODD_PARITY, kappa5);//kappa5 is dummy
         Dslash4pre(*tmp1, x.Odd(), QUDA_ODD_PARITY);
         Dslash4Xpay(x.Odd(), *tmp1, QUDA_ODD_PARITY, b.Even(), 1.0);
         src = &(x.Odd());
         sol = &(x.Even());
-      } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+      } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // src = b_o + k D4_oe*D5inv b_e
         Dslash5inv(x.Even(), b.Even(), QUDA_EVEN_PARITY, kappa5);//kappa5 is dummy
         Dslash4pre(*tmp1, x.Even(), QUDA_EVEN_PARITY);
@@ -253,12 +253,12 @@ namespace quda {
 
     // create full solution
     checkFullSpinor(x, b);
-    if (matpcType == QUDA_MATPC_EVEN_EVEN) {
+    if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // psi_e = M5inv in_e - k_b M5inv D4_eo psi_o
       Dslash4pre(x.Even(), x.Odd(), QUDA_ODD_PARITY);
       Dslash4Xpay(*tmp1, x.Even(), QUDA_ODD_PARITY, b.Even(), -1.0); 
       Dslash5inv(x.Even(), *tmp1, QUDA_ODD_PARITY, kappa5); //kappa5 is dummy
-    } else if (matpcType == QUDA_MATPC_ODD_ODD) {
+    } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
       // psi_o = M5inv in_o - k_b M5inv D4_oe psi_e
       Dslash4pre(x.Odd(), x.Even(), QUDA_EVEN_PARITY);
       Dslash4Xpay(*tmp1, x.Odd(), QUDA_EVEN_PARITY, b.Odd(), -1.0); 

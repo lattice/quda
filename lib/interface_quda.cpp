@@ -1225,26 +1225,32 @@ namespace quda {
     dPre = Dirac::create(diracPreParam);
   }
 
-  void massRescale(QudaDslashType dslash_type, double &kappa, double &mass, 
-      QudaSolutionType solution_type, 
-      QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
-  {   
+  static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
+
+  void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
+
+    double kappa5 = (0.5/(5.0 + param.m5));
+    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+		    param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+		    param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) ? kappa5 : param.kappa;
+
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
-      printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
+      printfQuda("Mass rescale: mass normalization: %d\n", param.mass_normalization);
       double nin = norm2(b);
       printfQuda("Mass rescale: norm of source in = %g\n", nin);
     }
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
-      switch (solution_type) {
+    // staggered dslash uses mass normalization internally
+    if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
+      switch (param.solution_type) {
         case QUDA_MAT_SOLUTION:
         case QUDA_MATPC_SOLUTION:
-          if (mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(2.0*mass, b);
+          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(2.0*param.mass, b);
           break;
         case QUDA_MATDAG_MAT_SOLUTION:
         case QUDA_MATPCDAG_MATPC_SOLUTION:
-          if (mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(4.0*mass*mass, b);
+          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(4.0*param.mass*param.mass, b);
           break;
         default:
           errorQuda("Not implemented");
@@ -1252,97 +1258,58 @@ namespace quda {
       return;
     }
 
+    for(int i=0; i<param.num_offset; i++) { 
+      unscaled_shifts[i] = param.offset[i];
+    }
+
     // multiply the source to compensate for normalization of the Dirac operator, if necessary
-    switch (solution_type) {
+    switch (param.solution_type) {
       case QUDA_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
+            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(2.0*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
         }
         break;
       case QUDA_MATDAG_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
+            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(4.0*kappa*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
         }
         break;
       case QUDA_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
           axCuda(4.0*kappa*kappa, b);
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(2.0*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
         }
         break;
       case QUDA_MATPCDAG_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
           axCuda(16.0*pow(kappa,4), b);
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*pow(kappa,4);
+        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(4.0*kappa*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
         }
         break;
       default:
-        errorQuda("Solution type %d not supported", solution_type);
+        errorQuda("Solution type %d not supported", param.solution_type);
     }
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
-      printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
+      printfQuda("Mass rescale: mass normalization: %d\n", param.mass_normalization);
       double nin = norm2(b);
       printfQuda("Mass rescale: norm of source out = %g\n", nin);
     }
 
   }
-
-  void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
-      QudaMassNormalization mass_normalization, double &coeff)
-  {    
-    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
-      if (mass_normalization != QUDA_MASS_NORMALIZATION) {
-        errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
-      }
-      return;
-    }
-
-    // multiply the source to compensate for normalization of the Dirac operator, if necessary
-    switch (solution_type) {
-      case QUDA_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff *= 2.0*kappa;
-        }
-        break;
-      case QUDA_MATDAG_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff *= 4.0*kappa*kappa;
-        }
-        break;
-      case QUDA_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
-          coeff *= 4.0*kappa*kappa;
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff *= 2.0*kappa;
-        }
-        break;
-      case QUDA_MATPCDAG_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
-          coeff*=16.0*pow(kappa,4);
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff*=4.0*kappa*kappa;
-        }
-        break;
-      default:
-        errorQuda("Solution type %d not supported", solution_type);
-    }
-
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
-  }
 }
-
-/*void QUDA_DiracField(QUDA_DiracParam *param) {
-
-  }*/
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
@@ -2010,11 +1977,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || 
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || 
     (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
@@ -2099,8 +2068,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-	      param->solution_type, param->mass_normalization, *b);
+  massRescale(*b, *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -2126,6 +2094,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
   // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
   // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+  // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
   //
   // We generally require that the solution_type and solve_type
   // preconditioning match.  As an exception, the unpreconditioned MAT
@@ -2143,7 +2112,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
   }
 
-  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
+  if (!mat_solution && norm_error_solve) {
+    errorQuda("Normal-error solve requires Mat solution");
+  }
+
+  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
@@ -2163,11 +2136,20 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
     delete solve;
-  } else {
+  } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
+    delete solve;
+  } else { // norm_error_solve
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    cudaColorSpinorField tmp(*out);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    (*solve)(tmp, *in); // y = (M M^\dag) b
+    dirac.Mdag(*out, tmp);  // x = M^dag y
     solverParam.updateInvertParam(*param);
     delete solve;
   }
@@ -2235,11 +2217,13 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || 
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || 
     (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
@@ -2324,8 +2308,7 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-      param->solution_type, param->mass_normalization, *b);
+  massRescale(*b, *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -2351,6 +2334,7 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // MATDAG_MAT       DIRECT        Solve A^dag y = b, followed by Ax=y
   // MAT              NORMOP        Solve (A^dag A) x = (A^dag b)
   // MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
+  // MAT              NORMERR       Solve (A A^dag) y = b, then x = A^dag y
   //
   // We generally require that the solution_type and solve_type
   // preconditioning match.  As an exception, the unpreconditioned MAT
@@ -2368,7 +2352,11 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
   }
 
-  if (mat_solution && !direct_solve) { // prepare source: b' = A^dag b
+  if (!mat_solution && norm_error_solve) {
+    errorQuda("Normal-error solve requires Mat solution");
+  }
+
+  if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
     cudaColorSpinorField tmp(*in);
     dirac.Mdag(*in, tmp);
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
@@ -2388,11 +2376,20 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
     delete solve;
-  } else {
+  } else if (!norm_error_solve){
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
+    solverParam.updateInvertParam(*param);
+    delete solve;
+  } else { // norm_error_solve
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    cudaColorSpinorField tmp(*out);
+    SolverParam solverParam(*param);
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    (*solve)(tmp, *in); // y = (M M^\dag) b
+    dirac.Mdag(*out, tmp);  // x = M^dag y
     solverParam.updateInvertParam(*param);
     delete solve;
   }
@@ -2603,13 +2600,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass,
-      param->solution_type, param->mass_normalization, *b);
-  double *unscaled_shifts = new double [param->num_offset];
-  for(int i=0; i < param->num_offset; i++){ 
-    unscaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, param->offset[i]);
-  }
+  massRescale(*b, *param);
 
   // use multi-shift CG
   {
@@ -2707,8 +2698,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   for(int i=0; i < param->num_offset; i++) { 
     param->offset[i] = unscaled_shifts[i];
   }
-
-  delete [] unscaled_shifts;
 
   profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
@@ -2928,13 +2917,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass,
-      param->solution_type, param->mass_normalization, *b);
-  double *unscaled_shifts = new double [param->num_offset];
-  for(int i=0; i < param->num_offset; i++){ 
-    unscaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, param->offset[i]);
-  }
+  massRescale(*b, *param);
 
   // use multi-shift CG
   {
@@ -3002,8 +2985,6 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   for(int i=0; i < param->num_offset; i++) { 
     param->offset[i] = unscaled_shifts[i];
   }
-
-  delete [] unscaled_shifts;
 
   profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
@@ -3212,7 +3193,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *b);
+  massRescale(*b, *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
 //here...
@@ -3595,11 +3576,13 @@ int getGaugePadding(GaugeFieldParam& param){
   return pad;
 }
 
+#ifdef GPU_GAUGE_FORCE
 namespace quda {
   namespace gaugeforce {
 #include <dslash_init.cuh>
   }
 }
+#endif
 
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
 			  double* loop_coeff, int num_paths, int max_length, double eb3,

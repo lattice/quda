@@ -275,23 +275,22 @@ void twist_gamma5(void *out, void *in,  int daggerBit, double kappa, double mu, 
 
 
 void tm_dslash(void *res, void **gaugeFull, void *spinorField, double kappa, double mu, 
-	       QudaTwistFlavorType flavor, int oddBit, int daggerBit, QudaPrecision precision,
+	       QudaTwistFlavorType flavor, int oddBit, QudaMatPCType matpc_type, int daggerBit, QudaPrecision precision,
 	       QudaGaugeParam &gauge_param)
 {
 
-  if (daggerBit) twist_gamma5(spinorField, spinorField, daggerBit, kappa, mu, 
+  if (daggerBit && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD)) twist_gamma5(spinorField, spinorField, daggerBit, kappa, mu, 
 			      flavor, Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
 
   wil_dslash(res, gaugeFull, spinorField, oddBit, daggerBit, precision, gauge_param);
 
-  if (!daggerBit) {
+  if (!daggerBit || (daggerBit && (matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC))) {
     twist_gamma5(res, res, daggerBit, kappa, mu, flavor,
 		 Vh, QUDA_TWIST_GAMMA5_INVERSE, precision);
   } else {
     twist_gamma5(spinorField, spinorField,  daggerBit, kappa, mu, flavor, 
 		 Vh, QUDA_TWIST_GAMMA5_DIRECT, precision);
   }
-
 }
 
 void wil_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision,

@@ -1570,6 +1570,7 @@ double mass = 0.1;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
+QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1615,6 +1616,7 @@ void usage(char** argv )
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
+  printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
@@ -1954,7 +1956,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }     
-    inv_type =  get_solver_type(argv[i+1]);
+    inv_type = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -1964,7 +1966,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    precon_type =  get_solver_type(argv[i+1]);
+    precon_type = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
@@ -1984,7 +1986,17 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    normalization= get_mass_normalization_type(argv[i+1]);
+    normalization = get_mass_normalization_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--matpc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    matpc_type = get_matpc_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
