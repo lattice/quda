@@ -234,7 +234,7 @@ namespace quda {
 
 
   template<>
-    __device__  int ghostIndexFromCoords<3,3>(
+    __device__  int ghostIndexFromCoords<1,3>(
         const unsigned int x[4],
         const unsigned int X[4], 
         unsigned int dir, 
@@ -379,7 +379,7 @@ namespace quda {
         out.load(reinterpret_cast<real*>(inmatrix.data), bulk_cb_idx, arg.dir, arg.parity); 
         arg.inA.load(a, bulk_cb_idx);
 
-        const unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<3,3>(x, arg.X, arg.dir, arg.displacement);
+        const unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<1,3>(x, arg.X, arg.dir, arg.displacement);
         arg.inB.load(b, ghost_idx);
 
         outerProd(b,a,&result);
