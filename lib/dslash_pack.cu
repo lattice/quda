@@ -1069,6 +1069,7 @@ namespace quda {
       comm[3] = (commDim[3] ? '1' : '0');
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
+      if (getKernelPackT() || getTwistPack()) { strcat(aux,",kernelPackT"); }
     }
 
   public:
