@@ -106,7 +106,7 @@ namespace quda {
 	strcat(key.aux,",CloverTwistInvDslash");
 	break;
       case QUDA_DEG_DSLASH_CLOVER_TWIST_INV:
-	strcat(key.aux,",");
+	strcat(key.aux,",Dslash");
 	break;
       case QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY:
 	strcat(key.aux,",DslashCloverTwist");

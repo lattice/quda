@@ -91,12 +91,40 @@ namespace quda {
   template <typename Float>
     __device__ __host__ inline Float timeBoundary(int idx, const int X[QUDA_MAX_DIM], QudaTboundary tBoundary,
 						  bool isFirstTimeSlice, bool isLastTimeSlice) {
-    if ( idx >= X[3]*X[2]*X[1]*X[0]/2 ) { // halo region on the first time slice
-      return isFirstTimeSlice ? tBoundary : 1.0;
-    } else if ( idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ) { // last link on the last time slice
-      return isLastTimeSlice ? tBoundary : 1.0;
+  }
+
+  /**
+     timeBoundary variant for extended gauge field
+     @param idx extended field linear index
+     @param X the gauge field dimensions
+     @param R the radii dimenions of the extended region
+     @param tBoundary the boundary condition
+     @param isFirstTimeSlice if we're on the first time slice of nodes
+     @param isLastTimeSlide if we're on the last time slice of nodes
+     @param ghostExchange if the field is extended or not (determines indexing type)
+  */
+  template <typename Float>
+    __device__ __host__ inline Float timeBoundary(int idx, const int X[QUDA_MAX_DIM], const int R[QUDA_MAX_DIM], 
+						  QudaTboundary tBoundary, bool isFirstTimeSlice, bool isLastTimeSlice,
+						  QudaGhostExchange ghostExchange) {
+    if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED) {
+      if ( idx >= X[3]*X[2]*X[1]*X[0]/2 ) { // halo region on the first time slice
+	return isFirstTimeSlice ? tBoundary : 1.0;
+      } else if ( idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ) { // last link on the last time slice
+	return isLastTimeSlice ? tBoundary : 1.0;
+      } else {
+	return 1.0;
+      }
     } else {
-      return 1.0;
+      if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
+	// the boundary condition is on the R[3]-1 time slice
+	return isFirstTimeSlice ? tBoundary : 1.0;
+      } else if ( idx >= (X[3]-R[3]-1)*X[0]*X[1]*X[2]/2 && idx < (X[3]-R[3])*X[0]*X[1]*X[2]/2 ) { 
+	// the boundary condition lies on the X[3]-R[3]-1 time slice
+	return isLastTimeSlice ? tBoundary : 1.0;
+      } else {
+	return 1.0;
+      }
     }
   }
 
@@ -104,15 +132,22 @@ namespace quda {
     struct Reconstruct<12,Float> {
     typedef typename mapper<Float>::type RegType;
     int X[QUDA_MAX_DIM];
+    int R[QUDA_MAX_DIM];
     const RegType anisotropy;
     const QudaTboundary tBoundary;
     bool isFirstTimeSlice;
     bool isLastTimeSlice;
+    QudaGhostExchange ghostExchange;
 
   Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
       isFirstTimeSlice(comm_coord(3) == 0 ?true : false),
-      isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false) 
-	{ for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
+      isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false),
+      ghostExchange(u.GhostExchange()) { 
+      for (int i=0; i<QUDA_MAX_DIM; i++) {
+	X[i] = u.X()[i]; 
+	R[i] = u.R()[i];
+      }
+    }
 
     __device__ __host__ inline void Pack(RegType out[12], const RegType in[18], int idx) const {
       for (int i=0; i<12; i++) out[i] = in[i];
@@ -130,7 +165,7 @@ namespace quda {
       accumulateConjugateProduct(&out[16], &out[2], &out[6], -1);
 
       RegType u0 = dir < 3 ? anisotropy : 
-	timeBoundary<RegType>(idx, X, tBoundary,isFirstTimeSlice, isLastTimeSlice);
+	timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
       for (int i=12; i<18; i++) out[i]*=u0;
     }
@@ -239,15 +274,22 @@ namespace quda {
     struct Reconstruct<8,Float> {
     typedef typename mapper<Float>::type RegType;
     int X[QUDA_MAX_DIM];
+    int R[QUDA_MAX_DIM];
     const RegType anisotropy;
     const QudaTboundary tBoundary;
     bool isFirstTimeSlice;
     bool isLastTimeSlice;
+    QudaGhostExchange ghostExchange;
 
   Reconstruct(const GaugeField &u) : anisotropy(u.Anisotropy()), tBoundary(u.TBoundary()),
       isFirstTimeSlice(comm_coord(3) == 0 ? true : false),
-      isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false) 
-	{ for (int i=0; i<QUDA_MAX_DIM; i++) X[i] = u.X()[i]; }
+      isLastTimeSlice(comm_coord(3) == comm_dim(3)-1 ? true : false),
+      ghostExchange(u.GhostExchange()) { 
+      for (int i=0; i<QUDA_MAX_DIM; i++) {
+	X[i] = u.X()[i]; 
+	R[i] = u.R()[i]; 
+      }
+    }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
       out[0] = Trig<isHalf<Float>::value>::Atan2(in[1], in[0]);
@@ -265,7 +307,7 @@ namespace quda {
       }
 
       RegType u0 = dir < 3 ? anisotropy : 
-	timeBoundary<RegType>(idx, X, tBoundary,isFirstTimeSlice, isLastTimeSlice);
+	timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
       RegType diff = 1.0/(u0*u0) - row_sum;
       RegType U00_mag = sqrt(diff >= 0 ? diff : 0.0);
@@ -528,7 +570,7 @@ namespace quda {
         }
       }
 
-      __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dir, 
+      __device__ __host__ inline void loadGhostEx(RegType v[length], int buff_idx, int extended_idx, int dir, 
 						  int dim, int g, int parity, const int R[]) const {
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
@@ -537,34 +579,35 @@ namespace quda {
 	    int intIdx = i*N + j; // internal dof index
 	    int padIdx = intIdx / N;
 	    copy(tmp[i*N+j], ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase) 
-					+ (padIdx*R[dim]*faceVolumeCB[dim]+x)*N + intIdx%N]);
+					+ (padIdx*R[dim]*faceVolumeCB[dim]+buff_idx)*N + intIdx%N]);
 	  }
 	}
 	RegType phase=0.; 
 	if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) 
-					    + R[dim]*faceVolumeCB[dim]*M*N + x]); 
+					    + R[dim]*faceVolumeCB[dim]*M*N + buff_idx]); 
 
-	// this will fail for non-18 reconstruct since it's not doing boundary checking correctly
-	reconstruct.Unpack(v, tmp, x, g, 2.*M_PI*phase); 
+	// use the extended_idx to determine the boundary condition
+	reconstruct.Unpack(v, tmp, extended_idx, g, 2.*M_PI*phase); 
       }
 
-      __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, 
+      __device__ __host__ inline void saveGhostEx(const RegType v[length], int buff_idx, int extended_idx, 
 						  int dir, int dim, int g, int parity, const int R[]) {
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
-	reconstruct.Pack(tmp, v, x);
+	// use the extended_idx to determine the boundary condition
+	reconstruct.Pack(tmp, v, extended_idx);
 	for (int i=0; i<M; i++) {
 	  for (int j=0; j<N; j++) {
 	    int intIdx = i*N + j;
 	    int padIdx = intIdx / N;
 	    copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase) 
-			    + (padIdx*R[dim]*faceVolumeCB[dim]+x)*N + intIdx%N], tmp[i*N+j]);
+			    + (padIdx*R[dim]*faceVolumeCB[dim]+buff_idx)*N + intIdx%N], tmp[i*N+j]);
 	  }
 	}
 	if(hasPhase){
 	  RegType phase=0.;
 	  reconstruct.getPhase(&phase, v); 
-	  copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + R[dim]*faceVolumeCB[dim]*M*N + x], 
+	  copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + R[dim]*faceVolumeCB[dim]*M*N + buff_idx], 
 	       static_cast<RegType>(phase/(2.*M_PI)));
 	}
       }
@@ -612,7 +655,7 @@ namespace quda {
 	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
       }
 
-      __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dir, 
+      __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dir, int dummy,
 						  int dim, int g, int parity, const int R[]) const {
 	for (int i=0; i<length; i++) {
 	  v[i] = ghost[dim]
@@ -620,7 +663,7 @@ namespace quda {
 	}
       }
 
-      __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, 
+      __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
 						  int dir, int dim, int g, int parity, const int R[]) {
         for (int i=0; i<length; i++) {
 	  ghost[dim]
