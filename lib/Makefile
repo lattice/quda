@@ -26,6 +26,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
+	copy_gauge_double.o copy_gauge_single.o copy_gauge_half.o \
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
 	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
 	fermion_force_quda.o unitarize_force_quda.o			\
@@ -151,6 +152,16 @@ milc_interface.o: milc_interface.cpp $(HDRS) $(CORE)
 
 blas_magma.o: blas_magma.cpp $(HDRS)
 	$(CXX) $(MAGMA_INCLUDE) $(CXXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
+
+copy_gauge_double.o: copy_gauge_double.cu copy_gauge_inc.o $(HDRS)
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+
+copy_gauge_single.o: copy_gauge_single.cu copy_gauge_inc.o $(HDRS)
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+
+copy_gauge_half.o: copy_gauge_half.cu copy_gauge_inc.o $(HDRS)
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
+
 
 %.o: %.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $< -c -o $@
