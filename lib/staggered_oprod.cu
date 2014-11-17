@@ -9,7 +9,6 @@
 
 namespace quda {
 
-
 #ifdef GPU_STAGGERED_OPROD
 
   namespace { // anonymous
@@ -494,9 +493,10 @@ namespace quda {
       } // i=3,..,0
 
       // source, dir(+/-1), parity, dagger, stream_ptr
+      // packing is all done in streams[Nstream-1]
+      // always call pack since this also sets the stream pointer even if not packing
+      faceBuffer.pack(src, -1, 1-parity, 0, streams); 
       if(pack){
-        faceBuffer.pack(src, -1, 1-parity, 0, streams); // packing is all done in streams[Nstream-1]
-        //faceBuffer.pack(src, 1-parity, 0, streams); // packing is all done in streams[Nstream-1]
         cudaEventRecord(packEnd, streams[Nstream-1]);
       }
 

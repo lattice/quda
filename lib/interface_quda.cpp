@@ -4703,6 +4703,7 @@ void computeStaggeredOprodQuda(void** oprod,
   oParam.link_type = QUDA_GENERAL_LINKS;
   oParam.reconstruct = QUDA_RECONSTRUCT_NO;
   oParam.order = QUDA_QDP_GAUGE_ORDER;
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   oParam.gauge = oprod[0];
   cpuGaugeField cpuOprod0(oParam);
 
