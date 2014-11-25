@@ -122,10 +122,6 @@ namespace quda {
     {
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
 
-      if(idx==0){ 
-        printf("arg.threads = %d\n", arg.threads);
-      }
-
       if(idx >= arg.threads) return;
       completeKSForceCore<Float,Oprod,Gauge,Mom>(arg,idx);
     }
@@ -168,10 +164,14 @@ namespace quda {
 
       void apply(const cudaStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
           // Fix this
           dim3 blockDim(128, 1, 1);
           dim3 gridDim((arg.threads + blockDim.x - 1) / blockDim.x, 1, 1);
           completeKSForceKernel<Float><<<gridDim,blockDim>>>(arg);
+#else
+	  errorQuda("completeKSForce not supported on pre-Fermi architecture");
+#endif
         }else{
           completeKSForceCPU<Float>(arg);
         }
@@ -385,10 +385,14 @@ class KSLongLinkForce : Tunable {
 
   void apply(const cudaStream_t &stream) {
     if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
       // Fix this
       dim3 blockDim(128, 1, 1);
       dim3 gridDim((arg.threads + blockDim.x - 1) / blockDim.x, 1, 1);
       computeKSLongLinkForceKernel<Float><<<gridDim,blockDim>>>(arg);
+#else
+      errorQuda("computeKSLongLinkForce not supported on pre-Fermi architecture");
+#endif
     }else{
       computeKSLongLinkForceCPU<Float>(arg);
     }

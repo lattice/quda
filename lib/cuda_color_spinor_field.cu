@@ -604,6 +604,7 @@ namespace quda {
 				       const int dagger, cudaStream_t *stream, 
 				       void *buffer, double a) 
   {
+#ifdef MULTI_GPU
     int face_num;
     if(dir == QUDA_BACKWARDS){
       face_num = 0;
@@ -612,7 +613,6 @@ namespace quda {
     }else{
       face_num = 2;
     }
-#ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
     packFace(packBuffer, *this, clov, clovInv, nFace, dagger, parity, dim, face_num, *stream, a); 
 #else
@@ -627,6 +627,7 @@ namespace quda {
 				       const int dagger, cudaStream_t *stream, 
 				       void *buffer, double a, double b) 
   {
+#ifdef MULTI_GPU
     int face_num;
     if(dir == QUDA_BACKWARDS){
       face_num = 0;
@@ -635,7 +636,6 @@ namespace quda {
     }else{
       face_num = 2;
     }
-#ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
     packFace(packBuffer, *this, nFace, dagger, parity, dim, face_num, *stream, a, b); 
 #else
@@ -786,6 +786,7 @@ namespace quda {
                                        const int dagger, cudaStream_t *stream,
                                        void *buffer)
   {
+#ifdef MULTI_GPU
     int face_num;
     if(dir == QUDA_BACKWARDS){
       face_num = 0;
@@ -794,7 +795,6 @@ namespace quda {
     }else{
       face_num = 2;
     }
-#ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
     packFaceExtended(packBuffer, *this, nFace, R, dagger, parity, dim, face_num, *stream);
 #else

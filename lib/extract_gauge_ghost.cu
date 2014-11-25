@@ -137,9 +137,13 @@ namespace quda {
     virtual ~ExtractGhost() { ; }
   
     void apply(const cudaStream_t &stream) {
+#if (__COMPUTE_CAPABILITY__ >= 200)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       extractGhostKernel<Float, length, nDim, Order> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+#else
+      errorQuda("extractGhost not supported on pre-Fermi architecture");
+#endif
     }
 
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }

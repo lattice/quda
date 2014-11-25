@@ -42,7 +42,7 @@
 #endif
 #endif // GPU_STAGGERED_DIRAC
 
-#include <quda_internal.h>h
+#include <quda_internal.h>
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>

@@ -30,11 +30,14 @@ namespace quda {
 
   using namespace pack;
 
+#ifdef MULTI_GPU
   static int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
   void setPackComms(const int *comm_dim) {
     for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = comm_dim[i];
   }
-
+#else
+  void setPackComms(const int *comm_dim) { ; }
+#endif
 
 #include <dslash_index.cuh>
 

@@ -982,8 +982,8 @@ struct DslashFusedExterior : DslashPolicyImp {
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
-    int scatterIndex = 0;
 #ifdef MULTI_GPU
+    int scatterIndex = 0;
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
     {

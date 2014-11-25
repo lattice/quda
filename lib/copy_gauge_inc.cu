@@ -142,6 +142,7 @@ namespace quda {
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+#if (__COMPUTE_CAPABILITY__ >= 200)
       if (!isGhost) {
 	copyGaugeKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -149,6 +150,9 @@ namespace quda {
 	copyGhostKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
+#else
+      errorQuda("Gauge copy not supported on pre-Fermi architecture");
+#endif
     }
 
     TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }

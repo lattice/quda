@@ -36,7 +36,9 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #include <tmc_dslash_def.h>       // Twisted Clover kernels
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -123,6 +125,7 @@ namespace quda {
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
       switch(dslashType){
 
       case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
@@ -142,6 +145,9 @@ namespace quda {
 	break;
       default: errorQuda("Invalid twisted clover dslash type");
       }
+#else
+      errorQuda("Twisted-clover fermions not supported on pre-Fermi architecture");
+#endif
     }
 
     long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU

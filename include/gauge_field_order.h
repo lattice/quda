@@ -437,7 +437,7 @@ namespace quda {
       Reconstruct<reconLen,Float> reconstruct;
       Float *gauge[2];
       Float *ghost[4];
-      int faceVolumeCB[QUDA_MAX_DIM];
+      int faceVolumeCB[4];
       const int volumeCB;
       const int stride;
       const int geometry;
@@ -572,6 +572,9 @@ namespace quda {
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int buff_idx, int extended_idx, int dir, 
 						  int dim, int g, int parity, const int R[]) const {
+#if __COMPUTE_CAPABILITY__ < 200
+	const int hasPhase = 0;
+#endif
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	for (int i=0; i<M; i++) {
@@ -592,6 +595,9 @@ namespace quda {
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int buff_idx, int extended_idx, 
 						  int dir, int dim, int g, int parity, const int R[]) {
+#if __COMPUTE_CAPABILITY__ < 200
+	const int hasPhase = 0;
+#endif
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	// use the extended_idx to determine the boundary condition

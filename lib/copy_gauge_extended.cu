@@ -105,8 +105,12 @@ namespace quda {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	copyGaugeEx<FloatOut, FloatIn, length>(arg);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
+#if (__COMPUTE_CAPABILITY__ >= 200)
 	copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+#else
+	errorQuda("Extended gauge copy not supported on pre-Fermi architecture");
+#endif
       }
     }
 
@@ -124,8 +128,12 @@ namespace quda {
     long long flops() const { return 0; } 
     long long bytes() const { 
       int sites = 4*arg.volume/2;
+#if (__COMPUTE_CAPABILITY__ >= 200)
       return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
                           + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
+#else
+      return 2 * sites * (  arg.in.Bytes() + arg.out.Bytes() );
+#endif
     } 
   };
 
