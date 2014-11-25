@@ -235,7 +235,7 @@ namespace quda {
         unsigned int dir, 
         const int shift)
     {
-      unsigned int ghost_idx;
+      int ghost_idx;
       if(shift > 0){
         if((x[dir] + shift) >= X[dir]){
           switch(dir){
