@@ -639,7 +639,7 @@ namespace quda {
       const unsigned int parity, const double coeff[2])
   {
 
-#ifdef GPU_STAGGERED_OPROD
+#ifdef GPU_STAGGERED_OPROD 
 
     if(outA.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", outA.Order());    
@@ -660,6 +660,7 @@ namespace quda {
     cudaColorSpinorField& inA = (parity&1) ? inOdd : inEven;
     cudaColorSpinorField& inB = (parity&1) ? inEven : inOdd;
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
     if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
 
       Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA);
@@ -674,9 +675,14 @@ namespace quda {
       computeStaggeredOprodCuda<float2>(FloatNOrder<float, 18, 2, 18>(outA), FloatNOrder<float, 18, 2, 18>(outB), 
           outA, outB,
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
-    }else{
+    } else {
       errorQuda("Unsupported precision: %d\n", inEven.Precision());
     }
+#else
+    errorQuda("Staggered Outer Product not supported on pre-Fermi architecture");
+#endif
+
+
 #else // GPU_STAGGERED_OPROD not defined
    errorQuda("Staggered Outer Product has not been built!"); 
 #endif
