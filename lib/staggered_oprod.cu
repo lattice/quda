@@ -495,7 +495,8 @@ namespace quda {
       // source, dir(+/-1), parity, dagger, stream_ptr
       // packing is all done in streams[Nstream-1]
       // always call pack since this also sets the stream pointer even if not packing
-      faceBuffer.pack(src, -1, 1-parity, 0, streams); 
+      //faceBuffer.pack(src, -1, 1-parity, 0, streams); 
+      faceBuffer.pack(src, 1-parity, 0, streams);  // FIXME work around since uni-direction packing is broken
       if(pack){
         cudaEventRecord(packEnd, streams[Nstream-1]);
       }

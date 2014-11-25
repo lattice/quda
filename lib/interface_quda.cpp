@@ -4705,6 +4705,7 @@ void computeStaggeredOprodQuda(void** oprod,
   oParam.order = QUDA_QDP_GAUGE_ORDER;
   oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   oParam.gauge = oprod[0];
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO; // no need for ghost exchange here
   cpuGaugeField cpuOprod0(oParam);
 
   oParam.gauge = oprod[1];
@@ -4738,7 +4739,8 @@ void computeStaggeredOprodQuda(void** oprod,
   qParam.nDim = 4;
   qParam.precision = oParam.precision;
   qParam.pad = 0;
-  for(int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir]; qParam.x[0] /= 2; 
+  for(int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir];
+  qParam.x[0] /= 2;
 
   // create the device quark field
   qParam.create = QUDA_NULL_FIELD_CREATE;

@@ -82,6 +82,22 @@ namespace quda {
     int cl_stride;
   };
 
+  template<typename FloatN>
+  std::ostream& operator<<(std::ostream& output, const PackParam<FloatN>& param) {
+    output << "threads = " << param.threads << std::endl;
+    output << "threadDimMapLower = {" << param.threadDimMapLower[0] << "," <<
+      param.threadDimMapLower[1] << "," << param.threadDimMapLower[2] << "," << param.threadDimMapLower[3] << "}" << std::endl;
+    output << "threadDimMapUpper = {" << param.threadDimMapUpper[0] << "," <<
+      param.threadDimMapUpper[1] << "," << param.threadDimMapUpper[2] << "," << param.threadDimMapUpper[3] << "}" << std::endl;
+    output << "parity = " << param.parity << std::endl;
+    output << "dim = " << param.dim << std::endl;
+    output << "face_num = " << param.face_num << std::endl;
+    output << "X = {" << param.X[0] << ","<< param.X[1] << "," << param.X[2] << "," << param.X[3] << "}" << std::endl;
+    output << "ghostFace = {" << param.ghostFace[0] << ","<< param.ghostFace[1] << "," 
+	   << param.ghostFace[2] << "," << param.ghostFace[3] << "}" << std::endl;
+    output << "sp_stride = " << param.sp_stride << std::endl;
+    output << "cl_stride = " << param.cl_stride << std::endl;
+  }
 
   // Extend the PackParam class to PackExtendedParam
   template<typename Float>
@@ -1040,10 +1056,6 @@ namespace quda {
         param.outNorm[2*i+1] = (float*)((char*)param.outNorm[2*i] + faceBytes);
 
         prev=i;
-
-        //printf("%d: map=%d %d out=%llu %llu outNorm=%llu %llu bytes=%d\n", 
-        //     i,param.threadDimMapLower[i],  param.threadDimMapUpper[i], 
-        //     param.out[2*i], param.out[2*i+1], param.outNorm[2*i], param.outNorm[2*i+1], faceBytes);
       }
 
       param.ghostFace[0] = param.X[1]*param.X[2]*param.X[3]/2;
