@@ -22,13 +22,13 @@ module quda_fortran
   ! This corresponds to the QudaGaugeParam struct in quda.h
   type quda_gauge_param
 
-     QudaFieldLocation :: location; !The location of the gauge field
+     QudaFieldLocation :: location !The location of the gauge field
 
      integer(4), dimension(4) :: x
 
      real(8) :: anisotropy    !Used for Wilson and Wilson-clover
      real(8) :: tadpole_coeff !Used for staggered only
-     real(8) :: scale !Used by staggered long links
+     real(8) :: scale         !Used by staggered long links
 
      QudaLinkType :: link_type
      QudaGaugeFieldOrder :: gauge_order
@@ -53,6 +53,18 @@ module quda_fortran
 
      integer(4) :: preserve_gauge ! Used by link fattening
     
+     ! Set the staggered phase type of the links
+     QudaStaggeredPhase :: staggered_phase_type
+     ! Whether the staggered phase has already been applied to the links
+     integer(4) :: staggered_phase_applied 
+
+     integer(4) :: overlap ! width of domain overlap
+
+     integer(4) :: use_resident_gauge  ! Use the resident gauge field 
+     integer(4) :: use_resident_mom    ! Use the resident mom field
+     integer(4) :: make_resident_gauge ! Make the gauge field resident
+     integer(4) :: make_resident_mom   ! Make the mom field resident
+
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
@@ -70,20 +82,27 @@ module quda_fortran
      real(8) :: m5    ! Domain wall height 
      integer(4) :: Ls       ! Extent of the 5th dimension (for domain wall) 
      
+     real(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients 
+     real(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! will be used only for the mobius type of Fermion
+
      real(8) :: mu    ! Twisted mass parameter 
      real(8) :: epsilon ! Twisted mass parameter
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor 
      
      real(8) :: tol ! Requested L2 residual norm
+     real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG) 
      real(8) :: tol_hq ! Requested heavy quark residual norm
      real(8) :: true_res ! Actual L2 residual norm achieved in solver
      real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance 
-     
+     integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
+     integer(4) :: int max_res_increase ! How many residual increases we tolerate when doing reliable updates
+
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver 
-     
+    
+     integer(4) :: overlap ! width of domain overlaps 
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver 
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset 
      
@@ -94,7 +113,7 @@ module quda_fortran
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_offset
 
      ! Actual heavy quark residual norm achieved in solver for each offset
-     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset; 
+     real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: true_res_hq_offset
 
      QudaSolutionType :: solution_type  ! Type of system to solve 
      QudaSolveType :: solve_type        ! How to solve it 
@@ -123,7 +142,11 @@ module quda_fortran
      
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
-     
+    
+     real(8) :: clover_coeff ! Coefficient of the clover term 
+     integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
+     real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately) 
+
      QudaVerbosity :: verbosity    
      
      integer(4) :: sp_pad
@@ -137,7 +160,10 @@ module quda_fortran
      
      ! Enable auto-tuning? 
      QudaTune :: tune
-     
+    
+     ! Number of steps in s-step algorithms
+     integer(4) :: nsteps
+   
      ! Maximum size of Krylov space used by solver 
      integer(4) :: gcr_nkrylov
      
@@ -146,7 +172,11 @@ module quda_fortran
      ! The inner Krylov solver used in the preconditioner.  Set to
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
-     
+    
+
+     ! Dslash used in the inner Krylov solver
+     QudaDslashType :: dslash_type_precondition
+ 
      ! Verbosity of the inner Krylov solver 
      QudaVerbosity :: verbosity_precondition
      
@@ -168,6 +198,12 @@ module quda_fortran
      ! Whether to use the Fermilab heavy-quark residual or standard residual to gauge convergence
      QudaResidualType ::residual_type
 
+     ! Parameters for deflated solvers
+     QudaPrecision :: cuda_prec_ritz ! The precision of the Ritz vectors
+     integer(4)::nev
+     integer(4)::max_search_dim ! for magma library this parameter must be multiple 16?
+     integer(4)::rhs_idx
+     integer(4)::deflation_grid !total deflation space is nev*deflation_grid
   end type quda_invert_param
    
 end module quda_fortran

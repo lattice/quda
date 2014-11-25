@@ -1,5 +1,5 @@
-#ifndef _HISQ_FORCE_QUDA_H
-#define _HISQ_FORCE_QUDA_H
+#ifndef _KS_IMPROVED_FORCE_H
+#define _KS_IMPROVED_FORCE_H
 
 #include <quda_internal.h>
 #include <quda.h>
@@ -8,26 +8,27 @@
 namespace quda {
   namespace fermion_force {
 
-  void hisqForceInitCuda(QudaGaugeParam* param);
-
   void hisqStaplesForceCuda(const double path_coeff[6], 
                               const QudaGaugeParam& param,
                               const cudaGaugeField& oprod, 
                               const cudaGaugeField& link, 
-                              cudaGaugeField *newOprod);
+                              cudaGaugeField *newOprod,
+			      long long* flops = NULL);
 
 
    void hisqLongLinkForceCuda(double coeff,
                              const QudaGaugeParam& param,
                              const cudaGaugeField &oprod,
                              const cudaGaugeField &link,
-                             cudaGaugeField *newOprod);
+                             cudaGaugeField *newOprod, 
+			     long long* flops = NULL);
 
 
    void hisqCompleteForceCuda(const QudaGaugeParam &param,
 				 const cudaGaugeField &oprod,
                                  const cudaGaugeField &link,
-                                 cudaGaugeField *force);
+                                 cudaGaugeField *force, 
+				 long long* flops = NULL);
 
 
 
@@ -36,19 +37,18 @@ namespace quda {
 				     double svd_rel_error,
 				     double svd_abs_error);
 
-  void unitarizeForceCuda(const QudaGaugeParam &param,
-			    cudaGaugeField &cudaOldForce,
-                            cudaGaugeField &cudaGauge,
-                            cudaGaugeField *cudaNewForce,
-			    int* unitarization_failed);
+  void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
+                          cudaGaugeField &cudaGauge,
+                          cudaGaugeField *cudaNewForce,
+			  int* unitarization_failed, 
+			  long long* flops = NULL);
 
-  void unitarizeForceCPU( const QudaGaugeParam &param,
-			    cpuGaugeField &cpuOldForce,
-                            cpuGaugeField &cpuGauge,
-                            cpuGaugeField *cpuNewForce);
+  void unitarizeForceCPU( cpuGaugeField &cpuOldForce,
+                          cpuGaugeField &cpuGauge,
+                          cpuGaugeField *cpuNewForce);
 
 
  } // namespace fermion_force
 }  // namespace quda
 
-#endif // _HISQ_FORCE_QUDA_H
+#endif // _KS_IMPROVED_FORCE_H

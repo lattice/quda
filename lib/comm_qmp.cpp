@@ -3,19 +3,16 @@
 #include <quda_internal.h>
 #include <comm_quda.h>
 
-
 #define QMP_CHECK(qmp_call) do {                     \
   QMP_status_t status = qmp_call;                    \
   if (status != QMP_SUCCESS)                         \
     errorQuda("(QMP) %s", QMP_error_string(status)); \
 } while (0)
 
-
 struct MsgHandle_s {
   QMP_msgmem_t mem;
   QMP_msghandle_t handle;
 };
-
 
 static int gpuid = -1;
 
@@ -87,7 +84,6 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
   return mh;
 }
 
-
 /**
  * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
  */
@@ -99,6 +95,49 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
 
   mh->mem = QMP_declare_msgmem(buffer, nbytes);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
+}
+
+
+/**
+ * Declare a message handle for strided sending to a node displaced in
+ * (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
+					       size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_strided_msgmem(buffer, blksize, nblocks, stride);
+  if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
+
+  mh->handle = QMP_declare_send_to(mh->mem, rank, 0);
+  if (mh->handle == NULL) errorQuda("Unable to allocate QMP message handle");
+
+  return mh;
+}
+
+/**
+ * Declare a message handle for strided receiving from a node
+ * displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
+						  size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  mh->mem = QMP_declare_strided_msgmem(buffer, blksize, nblocks, stride);
   if (mh->mem == NULL) errorQuda("Unable to allocate QMP message memory");
 
   mh->handle = QMP_declare_receive_from(mh->mem, rank, 0);

@@ -4,14 +4,30 @@
 
 namespace quda {
 
+  namespace wilson {
+#include <dslash_init.cuh>
+  }
+
   DiracWilson::DiracWilson(const DiracParam &param) : 
-    Dirac(param), face(param.gauge->X(), 4, 12, 1, param.gauge->Precision()) { }
+    Dirac(param), face1(param.gauge->X(), 4, 12, 1, param.gauge->Precision()),
+                  face2(param.gauge->X(), 4, 12, 1, param.gauge->Precision()) 
+    { 
+      wilson::initConstants(*param.gauge, profile);
+    }
 
   DiracWilson::DiracWilson(const DiracWilson &dirac) : 
-    Dirac(dirac), face(dirac.face) { }
+    Dirac(dirac), face1(dirac.face1), face2(dirac.face2) 
+    { 
+      wilson::initConstants(dirac.gauge, profile);
+    }
 
   DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : 
-    Dirac(param), face(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) { }//temporal hack (for DW and TM operators) 
+    Dirac(param), face1(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls),
+    face2(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) 
+  { 
+    wilson::initConstants(*param.gauge, profile);
+    
+  }//temporal hack (for DW and TM operators) 
 
   DiracWilson::~DiracWilson() { }
 
@@ -19,7 +35,8 @@ namespace quda {
   {
     if (&dirac != this) {
       Dirac::operator=(dirac);
-      face = dirac.face;
+      face1 = dirac.face1;
+      face2 = dirac.face2;
     }
     return *this;
   }
@@ -27,11 +44,10 @@ namespace quda {
   void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
 			   const QudaParity parity) const
   {
-    initSpinorConstants(in, profile);
+    wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim, profile);
 
@@ -42,11 +58,10 @@ namespace quda {
 			       const QudaParity parity, const cudaColorSpinorField &x,
 			       const double &k) const
   {
-    initSpinorConstants(in, profile);
+    wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
+
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-
-    setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
 
     wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim, profile);
 

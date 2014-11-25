@@ -1,0 +1,1 @@
+./configure --enable-multi-gpu --with-mpi=/usr/local/mvapich2 --disable-wilson-dirac --disable-clover-dirac --disable-domain-wall-dirac --disable-twisted-mass-dirac --disable-qdp-interface --disable-milc-interface --enable-tifr-interface --enable-gpu-comms CC=/usr/local/mvapich2/bin/mpicc CXX=/usr/local/mvapich2/bin/mpicxx F90=gfortran

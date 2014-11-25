@@ -30,6 +30,8 @@ using namespace quda;
 
 extern void usage(char** argv );
 
+extern QudaDslashType dslash_type;
+
 extern int test_type;
 
 extern bool tune;
@@ -68,6 +70,8 @@ extern QudaPrecision prec;
 extern int device;
 extern bool verify_results;
 
+extern bool kernel_pack_t;
+
 int X[4];
 
 Dirac* dirac;
@@ -76,6 +80,8 @@ void init()
 {    
 
   initQuda(device);
+
+  setKernelPackT(kernel_pack_t);
 
   setVerbosity(QUDA_VERBOSE);
 
@@ -110,7 +116,12 @@ void init()
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
+  inv_param.dslash_type = dslash_type;
+
+  // ensure that the default is improved staggered
+  if (inv_param.dslash_type != QUDA_STAGGERED_DSLASH &&
+      inv_param.dslash_type != QUDA_ASQTAD_DSLASH)
+    inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
@@ -166,7 +177,7 @@ void init()
   if (fatlink == NULL || longlink == NULL){
     errorQuda("ERROR: malloc failed for fatlink/longlink");
   }
-  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam);
+  construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam, dslash_type);
 
   if(link_recon == QUDA_RECONSTRUCT_9 || link_recon == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
     const double cos_pi_3 = 0.5; // Cos(pi/3)
@@ -461,7 +472,7 @@ static int dslashTest(int argc, char **argv)
   
     if (verify_results) {
       ::testing::InitGoogleTest(&argc, argv);
-      return RUN_ALL_TESTS();
+      if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
     }
   }
   end();

@@ -79,7 +79,8 @@ void initFields(int prec)
   ColorSpinorParam param;
   param.nColor = 3;
   // set spin according to the type of dslash
-  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH) ? 1 : 4;
+  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || 
+	   dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
   param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
 
@@ -198,139 +199,138 @@ double benchmark(int kernel, const int niter) {
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);
 
-  for (int i=0; i < niter; ++i) {
-
+  {
     switch (kernel) {
 
     case 0:
-      copyCuda(*yD, *hD);
+      for (int i=0; i < niter; ++i) copyCuda(*yD, *hD);
       break;
 
     case 1:
-      copyCuda(*yD, *lD);
+      for (int i=0; i < niter; ++i) copyCuda(*yD, *lD);
       break;
       
     case 2:
-      axpbyCuda(a, *xD, b, *yD);
+      for (int i=0; i < niter; ++i) axpbyCuda(a, *xD, b, *yD);
       break;
 
     case 3:
-      xpyCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) xpyCuda(*xD, *yD);
       break;
 
     case 4:
-      axpyCuda(a, *xD, *yD);
+      for (int i=0; i < niter; ++i) axpyCuda(a, *xD, *yD);
       break;
 
     case 5:
-      xpayCuda(*xD, a, *yD);
+      for (int i=0; i < niter; ++i) xpayCuda(*xD, a, *yD);
       break;
 
     case 6:
-      mxpyCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) mxpyCuda(*xD, *yD);
       break;
 
     case 7:
-      axCuda(a, *xD);
+      for (int i=0; i < niter; ++i) axCuda(a, *xD);
       break;
 
     case 8:
-      caxpyCuda(a2, *xD, *yD);
+      for (int i=0; i < niter; ++i) caxpyCuda(a2, *xD, *yD);
       break;
 
     case 9:
-      caxpbyCuda(a2, *xD, b2, *yD);
+      for (int i=0; i < niter; ++i) caxpbyCuda(a2, *xD, b2, *yD);
       break;
 
     case 10:
-      cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
+      for (int i=0; i < niter; ++i) cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
       break;
 
     case 11:
-      axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
+      for (int i=0; i < niter; ++i) axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
       break;
 
     case 12:
-      axpyZpbxCuda(a, *xD, *yD, *zD, b);
+      for (int i=0; i < niter; ++i) axpyZpbxCuda(a, *xD, *yD, *zD, b);
       break;
 
     case 13:
-      caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
+      for (int i=0; i < niter; ++i) caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
       break;
       
     case 14:
-      cabxpyAxCuda(a, b2, *xD, *yD);
+      for (int i=0; i < niter; ++i) cabxpyAxCuda(a, b2, *xD, *yD);
       break;
 
     case 15:
-      caxpbypzCuda(a2, *xD, b2, *yD, *zD);
+      for (int i=0; i < niter; ++i) caxpbypzCuda(a2, *xD, b2, *yD, *zD);
       break;
 
     case 16:
-      caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
+      for (int i=0; i < niter; ++i) caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
       break;
 
     case 17:
-      caxpyXmazCuda(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) caxpyXmazCuda(a2, *xD, *yD, *zD);
       break;
 
       // double
     case 18:
-      normCuda(*xD);
+      for (int i=0; i < niter; ++i) normCuda(*xD);
       break;
 
     case 19:
-      reDotProductCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) reDotProductCuda(*xD, *yD);
       break;
 
     case 20:
-      axpyNormCuda(a, *xD, *yD);
+      for (int i=0; i < niter; ++i) axpyNormCuda(a, *xD, *yD);
       break;
 
     case 21:
-      xmyNormCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) xmyNormCuda(*xD, *yD);
       break;
       
     case 22:
-      caxpyNormCuda(a2, *xD, *yD);
+      for (int i=0; i < niter; ++i) caxpyNormCuda(a2, *xD, *yD);
       break;
 
     case 23:
-      caxpyXmazNormXCuda(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) caxpyXmazNormXCuda(a2, *xD, *yD, *zD);
       break;
 
     case 24:
-      cabxpyAxNormCuda(a, b2, *xD, *yD);
+      for (int i=0; i < niter; ++i) cabxpyAxNormCuda(a, b2, *xD, *yD);
       break;
 
     // double2
     case 25:
-      cDotProductCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) cDotProductCuda(*xD, *yD);
       break;
 
     case 26:
-      xpaycDotzyCuda(*xD, a, *yD, *zD);
+      for (int i=0; i < niter; ++i) xpaycDotzyCuda(*xD, a, *yD, *zD);
       break;
       
     case 27:
-      caxpyDotzyCuda(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) caxpyDotzyCuda(a2, *xD, *yD, *zD);
       break;
 
     // double3
     case 28:
-      cDotProductNormACuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) cDotProductNormACuda(*xD, *yD);
       break;
 
     case 29:
-      cDotProductNormBCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) cDotProductNormBCuda(*xD, *yD);
       break;
 
     case 30:
-      caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      for (int i=0; i < niter; ++i) caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
     case 31:
-      HeavyQuarkResidualNormCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) HeavyQuarkResidualNormCuda(*xD, *yD);
       break;
 
     default:
@@ -642,7 +642,7 @@ int Nprec = 2;
 
 const char *prec_str[] = {"half", "single", "double"};
 
-char *names[] = {
+const char *names[] = {
   "copyHS",
   "copyLS",
   "axpby",
@@ -728,7 +728,7 @@ int main(int argc, char** argv)
   // lastly check for correctness
   if (verify_results) {
     ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
   }
 
   endQuda();

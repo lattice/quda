@@ -18,6 +18,14 @@ namespace quda {
   template<> struct mapper<float> { typedef float type; };
   template<> struct mapper<short> { typedef float type; };
 
+  template<> struct mapper<double2> { typedef double2 type; };
+  template<> struct mapper<float2> { typedef float2 type; };
+  template<> struct mapper<short2> { typedef float2 type; };
+
+  template<> struct mapper<double4> { typedef double4 type; };
+  template<> struct mapper<float4> { typedef float4 type; };
+  template<> struct mapper<short4> { typedef float4 type; };
+
   /* Traits used to determine if a variable is half precision or not */
   template< typename T > struct isHalf{ static const bool value = false; };
   template<> struct isHalf<short>{ static const bool value = true; };

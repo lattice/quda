@@ -129,7 +129,11 @@ namespace quda {
 	faceMax = (arg.order.faceVolumeCB[d] > faceMax ) 
 	  ? arg.order.faceVolumeCB[d] : faceMax;
       size = 2 * faceMax; // factor of comes from parity
+
+      sprintf(vol, "%d", arg.order.volumeCB);
+      sprintf(aux, "stride=%d", arg.order.stride);
     }
+
     virtual ~ExtractGhost() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -138,12 +142,7 @@ namespace quda {
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.order.volumeCB; 
-      aux << "stride=" << arg.order.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;
@@ -190,7 +189,9 @@ namespace quda {
     //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
     // FIXME - I don't understand this, shouldn't it be commDim(dim) == 0 ?
     int localParity[nDim];
-    for (int dim=0; dim<nDim; dim++) localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
+    for (int dim=0; dim<nDim; dim++) 
+      //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
+      localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
     ExtractGhostArg<Order, nDim> arg(order, nFace, X, A, B, C, f, localParity);
     if (location==QUDA_CPU_FIELD_LOCATION) {
@@ -298,6 +299,15 @@ namespace quda {
 				 u.Nface(), u.SurfaceCB(), u.X(), location);
 #else
       errorQuda("BQCD interface has not been built\n");
+#endif
+
+    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+
+#ifdef BUILD_TIFR_INTERFACE
+      extractGhost<Float,length>(TIFROrder<Float,length>(u, 0, Ghost),
+				 u.Nface(), u.SurfaceCB(), u.X(), location);
+#else
+      errorQuda("TIFR interface has not been built\n");
 #endif
 
     } else {

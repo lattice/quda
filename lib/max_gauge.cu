@@ -16,7 +16,7 @@ namespace quda {
 	for (int x=0; x<volume/2; x++) {
 	  RegType v[Nc*Nc*2];
 	  order.load(v, x, d, parity);
-	  for (int i=0; i<Nc*Nc*2; i++) if (abs(v[i]) > max) { max = v[i]; }
+	  for (int i=0; i<Nc*Nc*2; i++) if (abs(v[i]) > max) { max = abs(v[i]); }
 	}
       }
 
@@ -43,6 +43,8 @@ namespace quda {
       max = maxGauge<Float,Nc>(MILCOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else if (u.Order() == QUDA_BQCD_GAUGE_ORDER) {
       max = maxGauge<Float,Nc>(BQCDOrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
+    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
+      max = maxGauge<Float,Nc>(TIFROrder<Float,2*Nc*Nc>(u, (Float*)u.Gauge_p()),u.Volume(),4);
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }

@@ -3,6 +3,8 @@
 
 namespace quda {
 
+#ifdef GPU_CLOVER_DIRAC
+
   /** 
       Kernel argument struct
   */
@@ -67,7 +69,10 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    CopyClover(CopyCloverArg<Out,In> &arg) : arg(arg) { ; }
+    CopyClover(CopyCloverArg<Out,In> &arg) : arg(arg) { 
+      sprintf(vol, "%d", arg.in.volumeCB);
+      sprintf(aux, "out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
+    }
     virtual ~CopyClover() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -76,12 +81,7 @@ namespace quda {
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.in.volumeCB; 
-      aux << "out_stride=" << arg.out.stride << ",in_stride=" << arg.in.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;
@@ -176,9 +176,13 @@ namespace quda {
 
   }
 
+#endif
+
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			void *Out, void *In, void *outNorm, void *inNorm) {
+
+#ifdef GPU_CLOVER_DIRAC
     if (out.Precision() == QUDA_HALF_PRECISION && out.Order() > 4) 
       errorQuda("Half precision not supported for order %d", out.Order());
     if (in.Precision() == QUDA_HALF_PRECISION && in.Order() > 4) 
@@ -209,6 +213,10 @@ namespace quda {
 	copyClover<short,short,72>(out, in, inverse, location, (short*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
       }
     } 
+#else
+    errorQuda("Clover has not been built");
+#endif
+
   }
 
 

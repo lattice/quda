@@ -272,7 +272,7 @@ int sid = blockIdx.x*blockDim.x + threadIdx.x;
 if (sid >= param.threads) return;
 
 // read spinor from device memory
-READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
+READ_SPINOR(SPINORTEX, param.sp_stride, sid, sid);
 {
   // change to chiral basis
   {
@@ -691,7 +691,7 @@ READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
   
 #ifdef DSLASH_XPAY
   
-  READ_ACCUM(ACCUMTEX, sp_stride)
+  READ_ACCUM(ACCUMTEX, param.sp_stride)
   
   o00_re = a*o00_re+acc00_re;
   o00_im = a*o00_im+acc00_im;
@@ -721,7 +721,7 @@ READ_SPINOR(SPINORTEX, sp_stride, sid, sid);
 }
 
 // write spinor field back to device memory
-WRITE_SPINOR(sp_stride);
+WRITE_SPINOR(param.sp_stride);
 
 // undefine to prevent warning when precision is changed
 #undef spinorFloat

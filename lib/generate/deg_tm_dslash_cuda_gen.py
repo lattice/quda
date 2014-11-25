@@ -313,7 +313,8 @@ if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
   // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromIndex3D<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
 
   // only need to check Y and Z dims currently since X and T set to match exactly
   if (x2 >= X2) return;
@@ -332,7 +333,8 @@ if (kernel_type == INTERIOR_KERNEL) {
   if (sid >= param.threads) return;
 
   // Inline by hand for the moment and assume even dimensions
-  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromIndex<EVEN_X>(X, x1, x2, x3, x4, sid, param.parity, dims);
 
 """)
 
@@ -363,9 +365,10 @@ if (kernel_type == INTERIOR_KERNEL) {
   sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
 #endif
 
-  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity);
+  const int dims[] = {X1, X2, X3, X4};
+  coordsFromFaceIndex<1>(X, sid, x1, x2, x3, x4, face_idx, face_volume, dim, face_num, param.parity, dims);
 
-  READ_INTERMEDIATE_SPINOR(INTERTEX, sp_stride, sid, sid);
+  READ_INTERMEDIATE_SPINOR(INTERTEX, param.sp_stride, sid, sid);
 
 """)
 
@@ -460,9 +463,9 @@ def gen(dir, pack_only=False):
     if row_cnt[0] == 0:
         if not pack_only:
             load_spinor += "#ifndef TWIST_INV_DSLASH\n"
-            load_spinor += "READ_SPINOR_DOWN(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+            load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
             load_spinor += "#else\n"
-        load_spinor += "READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
         if not dagger:
             load_spinor += "APPLY_TWIST_INV( a, b, i);\n"
         else:
@@ -472,9 +475,9 @@ def gen(dir, pack_only=False):
     elif row_cnt[2] == 0:
         if not pack_only:
             load_spinor += "#ifndef TWIST_INV_DSLASH\n"
-            load_spinor += "READ_SPINOR_UP(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+            load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
             load_spinor += "#else\n"
-        load_spinor += "READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
         if not dagger:
            load_spinor += "APPLY_TWIST_INV( a, b, i);\n"
         else:
@@ -482,7 +485,7 @@ def gen(dir, pack_only=False):
         if not pack_only:
            load_spinor += "#endif\n"
     else:
-        load_spinor += "READ_SPINOR(SPINORTEX, sp_stride, sp_idx, sp_idx);\n"
+        load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
         if not pack_only:
            load_spinor += "#ifdef TWIST_INV_DSLASH\n"
         if not dagger:
@@ -743,7 +746,7 @@ def input_spinor(s,c,z):
 def twisted_xpay():
     str = ""
     str += "#ifdef DSLASH_XPAY\n"
-    str += "READ_ACCUM(ACCUMTEX, sp_stride)\n\n"
+    str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
     str += "#ifndef TWIST_XPAY\n"
     str += "#ifndef TWIST_INV_DSLASH\n"
     str += "//perform invert twist first:\n"
@@ -813,7 +816,7 @@ case EXTERIOR_KERNEL_Y:
     
     str += "\n\n"
     str += "// write spinor field back to device memory\n"
-    str += "WRITE_SPINOR(sp_stride);\n\n"
+    str += "WRITE_SPINOR(param.sp_stride);\n\n"
 
     str += "// undefine to prevent warning when precision is changed\n"
     str += "#undef spinorFloat\n"

@@ -1,21 +1,26 @@
 #include <typeinfo>
 #include <quda_internal.h>
 #include <lattice_field.h>
+#include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
+#include <face_quda.h>
 
 namespace quda {
 
-  void* LatticeField::bufferPinned = NULL;
-  bool LatticeField::bufferPinnedInit = false;
-  size_t LatticeField::bufferPinnedBytes = 0;
+  void* LatticeField::bufferPinned[] = {NULL};
+  bool LatticeField::bufferPinnedInit[] = {false};
+  size_t LatticeField::bufferPinnedBytes[] = {0};
+  size_t LatticeField::bufferPinnedResizeCount = 0;
+
 
   void* LatticeField::bufferDevice = NULL;
   bool LatticeField::bufferDeviceInit = false;
   size_t LatticeField::bufferDeviceBytes = 0;
 
   LatticeField::LatticeField(const LatticeFieldParam &param)
-    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision)
+    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim), precision(param.precision),
+      siteSubset(param.siteSubset)
   {
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
@@ -26,10 +31,20 @@ namespace quda {
 	surface[i] *= param.x[j];
       }
     }
-    volumeCB = volume / 2;
+
+    if (siteSubset == QUDA_INVALID_SITE_SUBSET) errorQuda("siteSubset is not set");
+    volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     stride = volumeCB + pad;
   
-    for (int i=0; i<nDim; i++) surfaceCB[i] = surface[i] / 2;
+    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
+    for (int i=0; i<nDim; i++) 
+      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
+
+    // for 5-dimensional fields, we only communicate in the space-time dimensions
+    nDimComms = nDim == 5 ? 4 : nDim;
+  }
+
+  LatticeField::~LatticeField() {
   }
 
   void LatticeField::checkField(const LatticeField &a) {
@@ -57,30 +72,51 @@ namespace quda {
     return location;
   }
 
-  void LatticeField::resizeBufferPinned(size_t bytes) const {
-    if (bytes > bufferPinnedBytes || bufferPinnedInit == 0) {
-      if (bufferPinnedInit) host_free(bufferPinned);
-      bufferPinned = pinned_malloc(bytes);
-      bufferPinnedBytes = bytes;
-      bufferPinnedInit = true;
+  int LatticeField::Nvec() const {
+    if (typeid(*this) == typeid(const cudaColorSpinorField)) {
+      const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
+      if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
+	return static_cast<int>(csField.FieldOrder());
+    } else if (typeid(*this) == typeid(const cudaGaugeField)) {
+      const GaugeField &gField = static_cast<const GaugeField&>(*this);
+      if (gField.Order() == 2 || gField.Order() == 4)
+	return static_cast<int>(gField.Order());
+    } else if (typeid(*this) == typeid(const cudaCloverField)) { 
+      const CloverField &cField = static_cast<const CloverField&>(*this);
+      if (cField.Order() == 2 || cField.Order() == 4)
+	return static_cast<int>(cField.Order());
+    }
+
+    errorQuda("Unsupported field type");
+    return -1;
+  }
+
+  void LatticeField::resizeBufferPinned(size_t bytes, const int idx) const {
+    if ((bytes > bufferPinnedBytes[idx] || bufferPinnedInit[idx] == 0) && bytes > 0) {
+      if (bufferPinnedInit[idx]) host_free(bufferPinned[idx]);
+      bufferPinned[idx] = pinned_malloc(bytes);
+      bufferPinnedBytes[idx] = bytes;
+      bufferPinnedInit[idx] = true;
+      bufferPinnedResizeCount++;
+      if (bufferPinnedResizeCount == 0) bufferPinnedResizeCount = 1; // keep 0 as initialization state
     }
   }
 
   void LatticeField::resizeBufferDevice(size_t bytes) const {
-    if (bytes > bufferDeviceBytes || bufferDeviceInit == 0) {
-      if (bufferDeviceInit) host_free(bufferPinned);
+    if ((bytes > bufferDeviceBytes || bufferDeviceInit == 0) && bytes > 0) {
+      if (bufferDeviceInit) device_free(bufferDevice);
       bufferDevice = device_malloc(bytes);
       bufferDeviceBytes = bytes;
       bufferDeviceInit = true;
     }
   }
 
-  void LatticeField::freeBuffer() {
-    if (bufferPinnedInit) {
-      host_free(bufferPinned);
-      bufferPinned = NULL;
-      bufferPinnedBytes = 0;
-      bufferPinnedInit = false;
+  void LatticeField::freeBuffer(int index) {
+    if (bufferPinnedInit[index]) {
+      host_free(bufferPinned[index]);
+      bufferPinned[index] = NULL;
+      bufferPinnedBytes[index] = 0;
+      bufferPinnedInit[index] = false;
     }
     if (bufferDeviceInit) {
       device_free(bufferDevice);

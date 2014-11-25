@@ -6,4 +6,3 @@
 tests/*_test
 make.inc
 milc_interface/*
-include/quda_milc_interface.h

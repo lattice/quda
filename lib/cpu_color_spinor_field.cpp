@@ -133,11 +133,11 @@ namespace quda {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       // array of 4-d fields
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-	int Ls = x[nDim-1];
-	v = (void**)safe_malloc(Ls * sizeof(void*));
-	for (int i=0; i<Ls; i++) ((void**)v)[i] = safe_malloc(bytes / Ls);
+        int Ls = x[nDim-1];
+        v = (void**)safe_malloc(Ls * sizeof(void*));
+        for (int i=0; i<Ls; i++) ((void**)v)[i] = safe_malloc(bytes / Ls);
       } else {
-	v = safe_malloc(bytes);
+        v = safe_malloc(bytes);
       }
       init = true;
     }
@@ -159,9 +159,10 @@ namespace quda {
     checkField(*this, src);
     if (fieldOrder == src.fieldOrder) {
       if (fieldOrder == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) 
-	for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes);
+	// FIXME (HJ Kim): I think this is a bug, we should copy the data with amount of "bytes/Ls"
+        for (int i=0; i<x[nDim-1]; i++) memcpy(((void**)v)[i], ((void**)src.v)[i], bytes); 
       else 
-	memcpy(v, src.v, bytes);
+        memcpy(v, src.v, bytes);
     } else {
       copyGenericColorSpinor(*this, src, QUDA_CPU_FIELD_LOCATION);
     }
@@ -271,7 +272,18 @@ namespace quda {
       int x3 = zb - zc*X3;
       int x5 = zc / X4; //this->nDim == 5 ? zz / X4 : 0;
       int x4 = zc - x5*X4;
-      int x1odd = (x2 + x3 + x4 + x5 + oddBit) & 1;
+      int x1odd;
+      if(this->DWFPCtype() == QUDA_5D_PC)
+      {
+        x1odd = (x2 + x3 + x4 + x5 + oddBit) & 1;
+      }
+      //else if(this->DWFPCtype() == QUDA_4D_PC)
+      else
+      {
+        x1odd = (x2 + x3 + x4 + oddBit) & 1;
+      }
+      //else
+      //  errorQuda("Preconditioning type is not set(PC type = %d), please check your preconditioning method\n",this->DWFPCtype());
       int x1 = 2*x1h + x1odd;
 
       int ghost_face_idx ;

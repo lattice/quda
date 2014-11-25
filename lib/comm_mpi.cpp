@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
-
 #include <quda_internal.h>
 #include <comm_quda.h>
 
@@ -21,8 +20,8 @@
 
 struct MsgHandle_s {
   MPI_Request request;
+  MPI_Datatype datatype;
 };
-
 
 static int rank = -1;
 static int size = -1;
@@ -54,7 +53,6 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   comm_set_default_topology(topo);
 
   // determine which GPU this MPI rank will use
-
   char *hostname = comm_hostname();
   char *hostname_recv_buf = (char *)safe_malloc(128*size);
   
@@ -129,6 +127,50 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
 }
 
 
+/**
+ * Declare a message handle for sending to a node displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[],
+					       size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  int tag = comm_rank();
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  // create a new strided MPI type
+  MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
+  MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+
+  MPI_CHECK( MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+
+  return mh;
+}
+
+
+/**
+ * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
+ */
+MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
+						  size_t blksize, int nblocks, size_t stride)
+{
+  Topology *topo = comm_default_topology();
+
+  int rank = comm_rank_displaced(topo, displacement);
+  int tag = rank;
+  MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
+
+  // create a new strided MPI type
+  MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
+  MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+
+  MPI_CHECK( MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+
+  return mh;
+}
+
+
 void comm_free(MsgHandle *mh)
 {
   host_free(mh);
@@ -171,12 +213,12 @@ void comm_allreduce_max(double* data)
   *data = recvbuf;
 } 
 
-
 void comm_allreduce_array(double* data, size_t size)
 {
-  double recvbuf[size];
-  MPI_CHECK( MPI_Allreduce(data, &recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
-  memcpy(data, recvbuf, sizeof(recvbuf));
+  double *recvbuf = new double[size];
+  MPI_CHECK( MPI_Allreduce(data, recvbuf, size, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD) );
+  memcpy(data, recvbuf, size*sizeof(double));
+  delete []recvbuf;
 }
 
 
@@ -203,6 +245,5 @@ void comm_barrier(void)
 
 void comm_abort(int status)
 {
-  MPI_CHECK( MPI_Finalize() );
-  exit(status);
+  MPI_Abort(MPI_COMM_WORLD, status) ;
 }

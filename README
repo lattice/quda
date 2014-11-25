@@ -11,6 +11,7 @@ the following fermion actions:
 * Wilson
 * Clover-improved Wilson
 * Twisted mass (including non-degenerate pairs)
+* Twisted mass with a clover term
 * Improved staggered (asqtad or HISQ)
 * Domain wall
 
@@ -196,6 +197,7 @@ Balint Joo (Jefferson Laboratory)
 Claudio Rebbi (Boston University)
 Guochun Shi (NCSA)
 Alexei Strelchenko (Fermi National Accelerator Laboratory)
+Alejandro Vaquero (INFN Sezione Milano Bicocca)
 
 Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications

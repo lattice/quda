@@ -142,6 +142,8 @@ namespace quda {
       K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
       K = new MR(matPrecon, Kparam, profile);
+    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner MR preconditioner
+      K = new SD(matPrecon, Kparam, profile);
     else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
 
@@ -234,6 +236,7 @@ namespace quda {
     } else {
       copyCuda(r, b);
       r2 = b2;
+      zeroCuda(x); // defensive measure in case solution isn't already zero
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -246,12 +249,22 @@ namespace quda {
       return;
     }
 
-    double stop = b2*param.tol*param.tol; // stopping condition of solver
+    double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+
+    // this parameter determines how many consective reliable update
+    // reisudal increases we tolerate before terminating the solver,
+    // i.e., how long do we want to keep trying to converge
+    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
+
     double heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+
+    int resIncrease = 0;
+    int resIncreaseTotal = 0;
 
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
@@ -287,7 +300,7 @@ namespace quda {
 	
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
 	  else copyCuda(pPre, rPre);
-	
+
 	  // relaxation p = omega*p + (1-omega)*r
 	  //if (param.omega!=1.0) axpbyCuda((1.0-param.omega), rPre, param.omega, pPre);
 	
@@ -329,7 +342,7 @@ namespace quda {
    
       // update since Nkrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every Nkrylov steps
-      if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || r2/r2_old < param.delta) { 
+      if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) { 
 
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
@@ -341,6 +354,17 @@ namespace quda {
 	r2 = xmyNormCuda(b, r);  
 
 	if (use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(y, r).z);
+
+	// break-out check if we have reached the limit of the precision
+	if (r2 > r2_old) {
+	  resIncrease++;
+	  resIncreaseTotal++;
+	  warningQuda("GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
+	} else {
+	  resIncrease = 0;
+	}
 
 	k = 0;
 
@@ -356,6 +380,8 @@ namespace quda {
 	  // prevent ending the Krylov space prematurely if other convergence criteria not met 
 	  if (r2 < stop) l2_converge = true; 
 	}
+
+	r2_old = r2;
 
       }
 

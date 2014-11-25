@@ -4,6 +4,8 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <convert.h>
+#include <register_traits.h>
+#include <float_vector.h>
 
 //namespace quda {
 
@@ -11,6 +13,8 @@
 
 template<typename OutputType, typename InputType>
 class Texture {
+
+  typedef typename quda::mapper<InputType>::type RegType;
 
 private: 
 #ifndef DIRECT_ACCESS_BLAS
@@ -36,7 +40,11 @@ public:
   
 #ifndef DIRECT_ACCESS_BLAS
   __device__ inline OutputType fetch(unsigned int idx) 
-  { return tex1Dfetch<OutputType>(spinor, idx); }
+  { 
+    OutputType rtn;
+    copyFloatN(rtn, tex1Dfetch<RegType>(spinor, idx));
+    return rtn;
+  }
 #else
   __device__ inline OutputType fetch(unsigned int idx) 
   { OutputType out; copyFloatN(out, spinor[idx]); return out; } 
@@ -88,8 +96,14 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 
 #define MAX_TEXELS (1<<27)
 
-  template<typename OutputType, typename InputType, int tex_id>
-    class Texture {
+#define MAX_TEX_ID 4
+
+// dynamically keep track of texture references we've already bound to
+bool tex_id_table[MAX_TEX_ID] = { };
+
+template<typename OutputType, typename InputType, int tex_id>
+  class Texture {
+
   private: 
 #ifdef DIRECT_ACCESS_BLAS
   const InputType *spinor; // used when textures are disabled
@@ -111,7 +125,14 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
   { 
     // only bind if bytes > 0
-    if (x->Bytes()) { bind((const InputType*)x->V(), x->Bytes()); bound = true; } 
+    if (x->Bytes()) { 
+      if (tex_id_table[tex_id] && tex_id > 0 && tex_id <= MAX_TEX_ID) {
+	errorQuda("Already bound to this texture reference");
+      } else {
+	tex_id_table[tex_id] = true;
+      }
+      bind((const InputType*)x->V(), x->Bytes()); bound = true; 
+    } 
     count++;
   }
 
@@ -121,7 +142,9 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
 #endif
   { count++; }
 
-  ~Texture() { if (bound && !--count) { unbind(); bound = false;} }
+  ~Texture() { if (bound && !--count) { 
+      unbind(); bound = false; tex_id_table[tex_id]=false;
+    } }
 
   Texture& operator=(const Texture &tex) {
 #ifdef DIRECT_ACCESS_BLAS
@@ -185,24 +208,39 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
     { outtype out; copyFloatN(out, fetch_double2(tex_double2_##id,idx)); return out; }
 #endif
 
+#if defined(DIRECT_ACCESS_BLAS) || defined(FERMI_NO_DBLE_TEX)
+#define DEF_FETCH_DBLE_MIXED DEF_FETCH_DIRECT
+#else
+#define DEF_FETCH_DBLE_MIXED(outtype, intype, id)                      \
+  template<> __device__ inline outtype Texture<outtype,intype,id>::fetch(unsigned int idx) \
+  { outtype out; copyFloatN(out, tex1Dfetch(tex_##intype##_##id,idx)); return out; }
+#endif
+
 
 #define DEF_BIND_UNBIND_FETCH(outtype, intype, id)	\
   DEF_BIND_UNBIND(outtype, intype, id)			\
-    DEF_FETCH(outtype, intype, id)
+  DEF_FETCH(outtype, intype, id)
 
 
 #define DEF_ALL(id)				\
   DECL_TEX(id)					\
-    DEF_BIND_UNBIND_FETCH(float2, short2, id)	\
-    DEF_BIND_UNBIND_FETCH(float4, short4, id)	\
-    DEF_BIND_UNBIND_FETCH(float, float, id)	\
-    DEF_BIND_UNBIND_FETCH(float2, float2, id)	\
-    DEF_BIND_UNBIND_FETCH(float4, float4, id)	\
-    DEF_BIND_UNBIND(double2, double2, id)	\
-    DEF_BIND_UNBIND(float2, double2, id)	\
-    DEF_FETCH_DBLE(double2, double2, id)	\
-    DEF_FETCH_DBLE(float2, double2, id)
-
+  DEF_BIND_UNBIND_FETCH(float2, short2, id)	\
+  DEF_BIND_UNBIND_FETCH(float4, short4, id)	\
+  DEF_BIND_UNBIND_FETCH(float, float, id)	\
+  DEF_BIND_UNBIND_FETCH(float2, float2, id)	\
+  DEF_BIND_UNBIND_FETCH(float4, float4, id)	\
+  DEF_BIND_UNBIND(double2, double2, id)		\
+  DEF_BIND_UNBIND(float2, double2, id)		\
+  DEF_FETCH_DBLE(double2, double2, id)		\
+  DEF_FETCH_DBLE(float2, double2, id)		\
+  DEF_BIND_UNBIND(double2, float2, id)		\
+  DEF_BIND_UNBIND(double4, float4, id)		\
+  DEF_BIND_UNBIND(double2, short2, id)		\
+  DEF_BIND_UNBIND(double4, short4, id)		\
+  DEF_FETCH_DBLE_MIXED(double2, float2, id)	\
+  DEF_FETCH_DBLE_MIXED(double4, float4, id)	\
+  DEF_FETCH_DBLE_MIXED(double2, short2, id)	\
+  DEF_FETCH_DBLE_MIXED(double4, short4, id)
 
   // Declare the textures and define the member functions of the corresponding templated classes.
   DEF_ALL(0)
@@ -210,9 +248,6 @@ template<> __device__ inline float2 Texture<float2,double2>::fetch(unsigned int 
   DEF_ALL(2)
   DEF_ALL(3)
   DEF_ALL(4)
-
-#define MAX_TEX_ID 4
-
 
 #undef DECL_TEX
 #undef DEF_BIND_UNBIND
@@ -320,6 +355,19 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       return *this;
     }
 
+    void set(const cudaColorSpinorField &x){
+      spinor = (StoreType*)x.V();
+#ifdef USE_TEXTURE_OBJECTS 
+      tex = Texture<InterType, StoreType>(&x);
+#else
+      tex = Texture<InterType, StoreType, tex_id>(&x);
+#endif      
+      norm = (float*)x.Norm();
+      stride = x.Length()/(N*REG_LENGTH);
+    
+      checkTypes<RegType,InterType,StoreType>();
+    }
+
     ~Spinor() { } /* on g80 / gt200 this must not be virtual */
 
     __device__ inline void load(RegType x[], const int i) {
@@ -419,7 +467,9 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       return precision;
     }
 
-    int Stride() { return stride; }
+    int Stride() const { return stride; }
+
+    void setStride(int stride_) { stride = stride_; }
   };
 
 //} // namespace quda

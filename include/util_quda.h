@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <enum_quda.h>
 #include <comm_quda.h>
+#include <tune_key.h>
 
 QudaTune getTuning();
 
@@ -44,6 +45,9 @@ char *getPrintBuffer();
   fprintf(getOutputFile(), __VA_ARGS__);                                     \
   fprintf(getOutputFile(), " (rank %d, host %s, " __FILE__ ":%d in %s())\n", \
           comm_rank(), comm_hostname(), __LINE__, __func__);                 \
+  fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
+	  getOutputPrefix(), getLastTuneKey().name,			     \
+	  getLastTuneKey().volume, getLastTuneKey().aux);	             \
   fflush(getOutputFile());                                                   \
   comm_abort(1);                                                             \
 } while (0)
@@ -66,12 +70,15 @@ char *getPrintBuffer();
   fflush(getOutputFile());                           \
 } while (0)
 
-#define errorQuda(...) do {                                 \
-  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix()); \
-  fprintf(getOutputFile(), __VA_ARGS__);                    \
-  fprintf(getOutputFile(), " (" __FILE__ ":%d in %s())\n",  \
-	  __LINE__, __func__);                              \
-  exit(1);                                                  \
+#define errorQuda(...) do {						     \
+  fprintf(getOutputFile(), "%sERROR: ", getOutputPrefix());		     \
+  fprintf(getOutputFile(), __VA_ARGS__);				     \
+  fprintf(getOutputFile(), " (" __FILE__ ":%d in %s())\n",		     \
+	  __LINE__, __func__);						     \
+  fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
+	  getOutputPrefix(), getLastTuneKey().name,			     \
+	  getLastTuneKey().volume, getLastTuneKey().aux);		     \
+  exit(1);								     \
 } while (0)
 
 #define warningQuda(...) do {                                 \
