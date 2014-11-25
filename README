@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.6.1                           10th March 2014
+Release Notes for QUDA v0.7.0                          xxth November 2014
 -----------------------------
 
 Overview:
@@ -12,8 +12,10 @@ the following fermion actions:
 * Clover-improved Wilson
 * Twisted mass (including non-degenerate pairs)
 * Twisted mass with a clover term
+* Staggered fermions
 * Improved staggered (asqtad or HISQ)
-* Domain wall
+* Domain wall (4-d or 5-d preconditioned)
+* Mobius fermion
 
 Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
 GCR are provided, including robust mixed-precision variants supporting
@@ -27,7 +29,7 @@ supported throughout, with communication handled by QMP or MPI.
 Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.8 and Ubuntu 12.04)
-using release 4.0, 4.1, 4.2, 5.0 and 5.5 of the CUDA toolkit.  CUDA 3.x
+using release 5.0, 5.5, 6.0 and 6.5 of the CUDA toolkit.  CUDA 4.x
 and earlier are not supported.  The library also works under Mac OS X
 10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
 Intel-based Macs.  Due to issues with compilation using LLVM, under
@@ -127,17 +129,21 @@ enumerated in include/enum_quda.h.
 
 Known Issues:
 
-* Issues affecting devices with compute capability 1.1, 1.2, or 1.3
-  (i.e., those predating the "Fermi" architecture):
+* Devices with compute capability 1.1, 1.2, or 1.3 only have limited
+  support in QUDA (i.e., those predating the "Fermi" architecture).
+  The following is a list of features that are disabled when targeting
+  these architectures (attempting to use them will result in a
+  run-time error):
 
   1. Computation of the Fermilab heavy-quark residual (and its use as
-     a stopping condition in the solvers) is not supported on these
-     devices.  Selecting it will result in a run-time error.
+     a stopping condition in the solvers).
+  2. Twisted-clover fermions.
+  3. On-device gauge routines that utilize the gauge_field_order.h structs.
 
-  2. It is anticipated that QUDA 0.7.0 will drop support for pre-Fermi
-     cards completely.  QUDA 0.6.x will continue to be maintained as a
-     separate branch (with bug fixes but minimal new features) for
-     those needing this support.
+  It is anticipated that QUDA 0.8.0 will drop support for pre-Fermi
+  cards completely.  QUDA 0.7.x will continue to be maintained as a
+  separate branch (with bug fixes but minimal new features) for those
+  needing this support.
 
 * When used with drivers predating the CUDA 5.0 production release,
   Fermi-based GeForce cards suffer from occasional hangs when reading
