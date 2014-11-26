@@ -95,10 +95,12 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
+#ifdef GPU_STAGGERED_DIRAC
       STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 		       (sFloat*)in->V(), (float*)in->Norm(), 
 		       (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
+#endif
     }
 
     int Nface() { return 2; } 
