@@ -10,7 +10,6 @@
 #define DD_AXPY 0
 #define DD_RECON 8
 #define DD_PREC 0
-#define DD_IMPROVED 0
 #endif
 
 // set options for current iteration
@@ -732,20 +731,11 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
 #undef DD_PREC
 #define DD_PREC 0
 
-#if (DD_IMPROVED==0)
-#undef DD_IMPROVED
-#define DD_IMPROVED 1
-#elif (DD_IMPROVED==1)
-#undef DD_IMPROVED
-#define DD_IMPROVED 0
-
 #undef DD_LOOP
 #undef DD_AXPY
 #undef DD_RECON
 #undef DD_PREC
-#undef DD_IMPROVED
 
-#endif // DD_IMPROVED
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_AXPY

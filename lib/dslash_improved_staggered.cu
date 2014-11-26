@@ -47,7 +47,10 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
+#define DD_IMPROVED 1
 #include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_IMPROVED
+
 #include <dslash_quda.cuh>
   } // end namespace improvedstaggered
 
