@@ -37,7 +37,9 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#if (__COMPUTE_CAPABILITY__) >= 200 && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
 #include <tm_ndeg_dslash_def.h>   // Non-degenerate twisted Mass
+#endif
 
 #ifndef NDEGTM_SHARED_FLOATS_PER_THREAD
 #define NDEGTM_SHARED_FLOATS_PER_THREAD 0
@@ -107,10 +109,14 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       NDEG_TM_DSLASH(twistedNdegMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 		     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 		     (sFloat*)in->V(), (float*)in->Norm(), a, b, c, d, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
+#else
+      errorQuda("Non-degenerate twisted-mass fermions not supported on pre-Fermi architecture");
+#endif
     }
 
     long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU

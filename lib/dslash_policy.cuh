@@ -1307,7 +1307,9 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
     }
   }
 #endif
+#ifdef PTHREADS
   bool interiorLaunched = false;
+#endif
   int completeSum = 0;
   while (completeSum < pattern.commDimTotal) {
     for (int i=3; i>=0; i--) {

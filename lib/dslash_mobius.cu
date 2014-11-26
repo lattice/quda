@@ -35,10 +35,12 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
 #include <mdw_dslash4_def.h>      // Dslash4, intermediate operator for Mobius Mat_4 kernels
 #include <mdw_dslash4pre_def.h>   // Dslash4pre, intermediate operator for Mobius Mat_4 kernels
 #include <mdw_dslash5_def.h>      // Dslash5 Mobius Domain Wall kernels
 #include <mdw_dslash5inv_def.h>   // Dslash5inv Mobius Domain Wall kernels
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -173,6 +175,7 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
+#ifdef GPU_DOMAIN_WALL_DIRAC
       switch(DS_type){
       case 0:
 	DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
@@ -197,6 +200,7 @@ namespace quda {
       default:
 	errorQuda("invalid Dslash type");
       }
+#endif
     }
 
     long long flops() const { // FIXME for multi-GPU

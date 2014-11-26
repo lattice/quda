@@ -36,7 +36,7 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
 #include <tmc_dslash_def.h>       // Twisted Clover kernels
 #endif
 
@@ -123,9 +123,8 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-#if (__COMPUTE_CAPABILITY__ >= 200)
       switch(dslashType){
 
       case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:

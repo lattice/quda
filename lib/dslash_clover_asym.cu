@@ -36,9 +36,11 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#ifdef GPU_CLOVER_DIRAC
 #define DD_CLOVER 2
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #undef DD_CLOVER
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -100,9 +102,11 @@ namespace quda {
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+#ifdef GPU_CLOVER_DIRAC
       ASYM_DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
                   (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cloverNorm, 
                   (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)x, (float*)x->Norm(), a);
+#endif
     }
 
     long long flops() const { return 1872ll * in->VolumeCB(); } // FIXME for multi-GPU

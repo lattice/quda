@@ -37,7 +37,9 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#ifdef GPU_TWISTED_MASS_DIRAC
 #include <tm_dslash_def.h>        // Twisted Mass kernels
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -119,6 +121,7 @@ namespace quda {
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
+#ifdef GPU_TWISTED_MASS
       switch(dslashType){
       case QUDA_DEG_TWIST_INV_DSLASH:
 	DSLASH(twistedMassTwistInvDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
@@ -137,6 +140,7 @@ namespace quda {
 	break;
       default: errorQuda("Invalid twisted mass dslash type");
       }
+#endif
     }
 
     long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
