@@ -23,8 +23,7 @@ namespace quda
     unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
 
     char *saveOut, *saveOutNorm;
-    char auxStr[8];				//I don't know whether this is strictly neccessary
-
+    
   public:
     Gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in) :
       out(out), in(in) { bindSpinorTex<sFloat>(in, out); strcpy(aux,"gamma5");}
@@ -33,7 +32,7 @@ namespace quda
 
     TuneKey tuneKey() const
     {
-      return TuneKey(in->VolString(), typeid(*this).name(), auxStr);
+      return TuneKey(in->VolString(), typeid(*this).name());
     }
 
     void apply(const cudaStream_t &stream)
