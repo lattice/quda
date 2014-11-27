@@ -49,17 +49,19 @@ namespace quda {
   template <typename FloatN>
   struct PackParam {
 
-    FloatN *out[2*QUDA_MAX_DIM];
-    float *outNorm[2*QUDA_MAX_DIM];
+    FloatN *out[2*4];
+    float *outNorm[2*4];
     
     FloatN *in;
     float *inNorm;
     
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
     FloatN *clover;
     FloatN *cloverInv;
     float *cloverNorm;
     float *cloverInvNorm;
-    
+#endif
+
     int threads; // total number of threads
     
     // offsets which determine thread mapping to dimension
@@ -82,7 +84,9 @@ namespace quda {
     int ghostFace[QUDA_MAX_DIM];
 
     int sp_stride;
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
     int cl_stride;
+#endif
   };
 
   template<typename FloatN>
@@ -100,6 +104,7 @@ namespace quda {
 	   << param.ghostFace[2] << "," << param.ghostFace[3] << "}" << std::endl;
     output << "sp_stride = " << param.sp_stride << std::endl;
     output << "cl_stride = " << param.cl_stride << std::endl;
+    return output;
   }
 
   // Extend the PackParam class to PackExtendedParam
@@ -697,7 +702,7 @@ namespace quda {
 
 #endif // GPU_TWISTED_MASS_DIRAC
 
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC)
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
 
   // double precision
 #if (defined DIRECT_ACCESS_WILSON_PACK_SPINOR) || (defined FERMI_NO_DBLE_TEX)
@@ -867,6 +872,7 @@ namespace quda {
 #include "wilson_pack_clover_twisted_face_core.h"
     }
   }
+
 #undef READ_SPINOR
 #undef READ_SPINOR_UP
 #undef READ_SPINOR_DOWN
@@ -999,6 +1005,7 @@ namespace quda {
       for(int d=0; d<QUDA_MAX_DIM; d++) param.X[d] = in->X()[d];
       param.X[0] *= 2;
 
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
       if (clov != NULL && clovInv != NULL) {
         if (param.parity == QUDA_EVEN_PARITY) {
           param.clover = (FloatN*)clov->even;
@@ -1013,6 +1020,7 @@ namespace quda {
 	}	
 	param.cl_stride = clov->stride;
       }
+#endif
 
 #ifdef USE_TEXTURE_OBJECTS
       param.inTex = in->Tex();
@@ -1260,7 +1268,7 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-#ifdef GPU_TWISTED_CLOVER_DIRAC
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
       PackParam<FloatN> param = this->prepareParam();
       if (this->dagger) {
         packCloverTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, param);

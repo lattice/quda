@@ -379,7 +379,9 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 #endif // GPU_TWISTED_MASS_DIRAC
 }
 
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
 #include "dslash_core/tmc_gamma_core.h"
+#endif
 
 template <typename cFloat, typename sFloat>
 class TwistCloverGamma5Cuda : public Tunable {
@@ -434,8 +436,7 @@ class TwistCloverGamma5Cuda : public Tunable {
 
     void apply(const cudaStream_t &stream)
     {
-      //A.S.: should this be GPU_TWISTED_CLOVER_DIRAC instead?
-#if (defined GPU_TWISTED_CLOVER_DIRAC)
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)

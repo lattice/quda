@@ -320,8 +320,12 @@ namespace quda {
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           computeFmunuKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+#else
+	  errorQuda("computeFmunuKernel not supported on pre-Fermi architecture");
+#endif
         }else{
           computeFmunuCPU(arg);
         }
@@ -494,8 +498,12 @@ namespace quda {
 
       void apply(const cudaStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+#else
+	  errorQuda("cloverComputeKernel not supported on pre-Fermi architecture");
+#endif
         }else{ // run the CPU code
           cloverComputeCPU(arg);
         }
