@@ -178,11 +178,11 @@ namespace quda {
 
   public:
   PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, int volume) 
-    : out(out), in(in), basis(basis), volume(volume) { ; }
-    virtual ~PackSpinor() { 
+    : out(out), in(in), basis(basis), volume(volume) {
       sprintf(vol, "%d", in.volumeCB);
       sprintf(aux, "out_stride=%d,in_stride=%d", out.stride, in.stride);
     }
+    virtual ~PackSpinor() { ; }
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
