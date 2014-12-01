@@ -222,7 +222,7 @@ namespace quda {
           dim3 blockDim(128, 1, 1);
           dim3 gridDim((arg.clover1.volumeCB + blockDim.x - 1)/blockDim.x, 1, 1);
           cloverSigmaTraceKernel<Float,Clover1,Clover2,Gauge><<<gridDim,blockDim,0>>>(arg);
-#ekse
+#else
 	  errorQuda("cloverSigmaTrace not supported on pre-Fermi architecture");
 #endif
         }else{
