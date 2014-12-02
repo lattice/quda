@@ -170,7 +170,7 @@ namespace quda
 
     const int nTSlice;			// Time-slice in case of time-dilution
 
-    char aux[16][256];			// For tuning purposes
+    char aux[16][512];			// For tuning purposes
 
     unsigned int sharedBytesPerThread() const { return 16*sizeof(rFloat); }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }

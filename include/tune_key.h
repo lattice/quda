@@ -8,8 +8,8 @@ namespace quda {
   struct TuneKey {
 
     char volume[32];
-    char name[256];
-    char aux[256];
+    char name[512];
+    char aux[512];
 
     TuneKey() { }
     TuneKey(const char v[], const char n[], const char a[]="type=default") {

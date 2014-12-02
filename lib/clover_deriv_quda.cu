@@ -302,48 +302,49 @@ namespace quda {
 
 
   template<typename Complex>
-    class CloverDerivative : public Tunable {
+  class CloverDerivative : public Tunable {
 
-      private:
-        CloverDerivArg<Complex> arg;
+  private:
+    CloverDerivArg<Complex> arg;
+    const GaugeField &meta;
 
-        unsigned int sharedBytesPerThread() const { return 0; }
-        unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
-        unsigned int minThreads() const { return arg.volumeCB; }
-        bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.volumeCB; }
+    bool tuneGridDim() const { return false; }
 
-      public:
-        CloverDerivative(const CloverDerivArg<Complex> &arg)
-          : arg(arg) {
-	  sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	  sprintf(aux,"threads=%d,prec=%lu,stride=%d,geometery=%d",
-		  arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
-	}
-        virtual ~CloverDerivative() {}
+  public:
+    CloverDerivative(const CloverDerivArg<Complex> &arg, const GaugeField &meta)
+      : arg(arg), meta(meta) {
+      sprintf(aux,"threads=%d,prec=%lu,stride=%d,geometery=%d",
+	      arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
+    }
+    virtual ~CloverDerivative() {}
 
-        void apply(const cudaStream_t &stream){
-          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          if(arg.conjugate){
-            cloverDerivativeKernel<Complex,true><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);   
-          }else{
-            cloverDerivativeKernel<Complex,false><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);   
-          }      
-        } // apply
+    void apply(const cudaStream_t &stream){
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      if(arg.conjugate){
+	cloverDerivativeKernel<Complex,true><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      }else{
+	cloverDerivativeKernel<Complex,false><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+      }
+    } // apply
 
-        void preTune(){}
-        void postTune(){}
+    void preTune(){}
+    void postTune(){}
 
-        long long flops() const {
-          return 0;
-        }    
+    long long flops() const {
+      return 0;
+    }
 
-        long long bytes() const { return 0; }
+    long long bytes() const { return 0; }
 
-        TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
-    };
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+  };
 
 
+  // FIXME - the Tunable class isn't used here
   template<typename Float>
     void cloverDerivative(cudaGaugeField &out,
         cudaGaugeField& gauge,

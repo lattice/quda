@@ -201,9 +201,9 @@ namespace quda {
    class UpdateGaugeField : public Tunable {
   private:
     UpdateGaugeArg<Complex,Gauge,Mom> arg;
-    const int *X; // pointer to lattice dimensions
+    const GaugeField &meta; // meta data
     const QudaFieldLocation location; // location of the lattice fields
-    
+
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
 
@@ -212,9 +212,8 @@ namespace quda {
     
   public:
     UpdateGaugeField(const UpdateGaugeArg<Complex,Gauge,Mom> &arg, 
-		     const int *X, QudaFieldLocation location) 
-      : arg(arg), X(X), location(location) {
-      sprintf(vol, "%dx%dx%dx%d", X[0], X[1], X[2], X[3]);
+		     const GaugeField &meta, QudaFieldLocation location)
+      : arg(arg), meta(meta), location(location) {
       sprintf(aux, "threads=%d,prec=%lu,stride=%d", 
 	      2*arg.in.volumeCB, sizeof(Complex)/2, arg.in.stride);
     }
@@ -246,12 +245,12 @@ namespace quda {
     long long bytes() const { return arg.nDim*2*arg.in.volumeCB*
 	(arg.in.Bytes() + arg.out.Bytes() + arg.momentum.Bytes()); }
     
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
   };
   
   template <typename Float, typename Gauge, typename Mom>
   void updateGaugeField(Gauge &out, const Gauge &in, const Mom &mom, 
-			double dt, const int *X, bool conj_mom, bool exact, 
+			double dt, const GaugeField &meta, bool conj_mom, bool exact,
 			QudaFieldLocation location) {
     // degree of exponential expansion
     const int N = 8;
@@ -260,21 +259,21 @@ namespace quda {
     if (conj_mom) {
       if (exact) {
 	UpdateGaugeArg<Complex, Gauge, Mom> arg(out, in, mom, dt, 4);
-	UpdateGaugeField<Complex,Gauge,Mom,N,true,true> updateGauge(arg, X, location);
+	UpdateGaugeField<Complex,Gauge,Mom,N,true,true> updateGauge(arg, meta, location);
 	updateGauge.apply(0); 
       } else {
 	UpdateGaugeArg<Complex, Gauge, Mom> arg(out, in, mom, dt, 4);
-	UpdateGaugeField<Complex,Gauge,Mom,N,true,false> updateGauge(arg, X, location);
+	UpdateGaugeField<Complex,Gauge,Mom,N,true,false> updateGauge(arg, meta, location);
 	updateGauge.apply(0); 
       }
     } else {
       if (exact) {
 	UpdateGaugeArg<Complex, Gauge, Mom> arg(out, in, mom, dt, 4);
-	UpdateGaugeField<Complex,Gauge,Mom,N,false,true> updateGauge(arg, X, location);
+	UpdateGaugeField<Complex,Gauge,Mom,N,false,true> updateGauge(arg, meta, location);
 	updateGauge.apply(0);
       } else {
 	UpdateGaugeArg<Complex, Gauge, Mom> arg(out, in, mom, dt, 4);
-	UpdateGaugeField<Complex,Gauge,Mom,N,false,false> updateGauge(arg, X, location);
+	UpdateGaugeField<Complex,Gauge,Mom,N,false,false> updateGauge(arg, meta, location);
 	updateGauge.apply(0); 
       }
     }
@@ -290,12 +289,12 @@ namespace quda {
     if (mom.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (mom.Reconstruct() == QUDA_RECONSTRUCT_10) {
 	// FIX ME - 11 is a misnomer to avoid confusion in template instantiation
-	updateGaugeField<Float>(out, in, FloatNOrder<Float,18,2,11>(mom), dt, mom.X(), conj_mom, exact, location);
+	updateGaugeField<Float>(out, in, FloatNOrder<Float,18,2,11>(mom), dt, mom, conj_mom, exact, location);
       } else {
 	errorQuda("Reconstruction type not supported");
       }
     } else if (mom.Order() == QUDA_MILC_GAUGE_ORDER) {
-      updateGaugeField<Float>(out, in, MILCOrder<Float,10>(mom), dt, mom.X(), conj_mom, exact, location);
+      updateGaugeField<Float>(out, in, MILCOrder<Float,10>(mom), dt, mom, conj_mom, exact, location);
     } else {
       errorQuda("Gauge Field order %d not supported", mom.Order());
     }

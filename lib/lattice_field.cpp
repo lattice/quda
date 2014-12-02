@@ -42,9 +42,17 @@ namespace quda {
 
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
+
+    setTuningString();
   }
 
   LatticeField::~LatticeField() {
+  }
+
+
+  void LatticeField::setTuningString() {
+    sprintf(vol_string, "%d", x[0]);
+    for (int d=1; d<nDim; d++) sprintf(vol_string, "%sx%d", vol_string, x[d]);
   }
 
   void LatticeField::checkField(const LatticeField &a) {

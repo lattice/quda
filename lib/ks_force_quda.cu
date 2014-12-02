@@ -143,6 +143,7 @@ namespace quda {
     class KSForceComplete : Tunable {
 
       KSForceArg<Oprod, Gauge, Mom> arg;
+      const GaugeField &meta;
       const QudaFieldLocation location;
 
       private:
@@ -154,9 +155,8 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      KSForceComplete(KSForceArg<Oprod,Gauge,Mom> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {
-	sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+      KSForceComplete(KSForceArg<Oprod,Gauge,Mom> &arg, const GaugeField &meta, QudaFieldLocation location)
+        : arg(arg), meta(meta), location(location) {
 	sprintf(aux,"prec=%lu,stride=%d",sizeof(Float),arg.mom.stride);
       }
 
@@ -177,7 +177,7 @@ namespace quda {
         }
       }
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
       std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
         std::stringstream ps;
@@ -192,10 +192,10 @@ namespace quda {
     };
 
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
-    void completeKSForce(Oprod oprod, Gauge gauge, Mom mom, int dim[4], QudaFieldLocation location, long long *flops)
+  void completeKSForce(Oprod oprod, Gauge gauge, Mom mom, int dim[4], const GaugeField &meta, QudaFieldLocation location, long long *flops)
     {
       KSForceArg<Oprod,Gauge,Mom> arg(oprod, gauge, mom, dim);
-      KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,location);
+      KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,meta,location);
       completeForce.apply(0);
       if(flops) *flops = completeForce.flops();	
       cudaDeviceSynchronize();
@@ -213,10 +213,10 @@ namespace quda {
           errorQuda("Reconstruct type not supported");
         }else{
           completeKSForce<Float>(FloatNOrder<Float, 18, 2, 18>(oprod),
-              FloatNOrder<Float, 18, 2, 18>(gauge),
-              FloatNOrder<Float, 10, 2, 10>(mom),
-              const_cast<int*>(mom.X()),
-              location, flops);
+				 FloatNOrder<Float, 18, 2, 18>(gauge),
+				 FloatNOrder<Float, 10, 2, 10>(mom),
+				 const_cast<int*>(mom.X()),
+				 gauge, location, flops);
         }
       }
       return;
@@ -364,6 +364,7 @@ class KSLongLinkForce : Tunable {
 
 
   KSLongLinkArg<Result,Oprod,Gauge> arg;
+  const GaugeField &meta;
   const QudaFieldLocation location;
 
   private:
@@ -375,9 +376,8 @@ class KSLongLinkForce : Tunable {
   unsigned int minThreads() const { return arg.threads; }
 
   public:
-  KSLongLinkForce(KSLongLinkArg<Result,Oprod,Gauge> &arg, QudaFieldLocation location)
-    : arg(arg), location(location) {
-    sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+  KSLongLinkForce(KSLongLinkArg<Result,Oprod,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
+    : arg(arg), meta(meta), location(location) {
     sprintf(aux,"prec=%lu,stride=%d",sizeof(Float),arg.res.stride);
   }
 
@@ -398,7 +398,7 @@ class KSLongLinkForce : Tunable {
     }
   }
 
-  TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+  TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
   std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
     std::stringstream ps;
@@ -417,11 +417,11 @@ class KSLongLinkForce : Tunable {
 
 
 
-  template<typename Float, typename Result, typename Oprod, typename Gauge>
-void computeKSLongLinkForce(Result res, Oprod oprod, Gauge gauge, int dim[4], QudaFieldLocation location)
+template<typename Float, typename Result, typename Oprod, typename Gauge>
+void computeKSLongLinkForce(Result res, Oprod oprod, Gauge gauge, int dim[4], const GaugeField &meta, QudaFieldLocation location)
 {
   KSLongLinkArg<Result,Oprod,Gauge> arg(res, oprod, gauge, dim);
-  KSLongLinkForce<Float,Result,Oprod,Gauge> computeLongLink(arg,location);
+  KSLongLinkForce<Float,Result,Oprod,Gauge> computeLongLink(arg,meta,location);
   computeLongLink.apply(0);
   cudaDeviceSynchronize();
 }
@@ -438,10 +438,10 @@ void computeKSLongLinkForce(GaugeField& result, const GaugeField &oprod, const G
       errorQuda("Reconstruct type not supported");
     }else{
       computeKSLongLinkForce<Float>(FloatNOrder<Float, 18, 2, 18>(result), 
-          FloatNOrder<Float, 18, 2, 18>(oprod),
-          FloatNOrder<Float, 18, 2, 18>(gauge),
-          const_cast<int*>(result.X()),
-          location);
+				    FloatNOrder<Float, 18, 2, 18>(oprod),
+				    FloatNOrder<Float, 18, 2, 18>(gauge),
+				    const_cast<int*>(result.X()),
+				    gauge, location);
     }
   }
   return;

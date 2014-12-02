@@ -132,8 +132,7 @@ namespace quda {
       }
     }
 
-    char vol[32];
-    char aux[1024];
+    char aux[512];
 
   public:
     Tunable() { }

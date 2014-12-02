@@ -231,6 +231,7 @@ namespace quda {
     class CopySpinorEx : Tunable {
 
       CopySpinorExArg<OutOrder,InOrder,Basis> arg;
+      const ColorSpinorField &meta;
       QudaFieldLocation location;
 
       private:
@@ -241,9 +242,8 @@ namespace quda {
       unsigned int minThreads() const { return arg.length; }
 
       public: 
-      CopySpinorEx(CopySpinorExArg<OutOrder,InOrder,Basis> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {
-	sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
+      CopySpinorEx(CopySpinorExArg<OutOrder,InOrder,Basis> &arg, const ColorSpinorField &meta, QudaFieldLocation location)
+        : arg(arg), meta(meta), location(location) {
 	sprintf(aux,"out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
       }
       virtual ~CopySpinorEx() {}
@@ -259,7 +259,7 @@ namespace quda {
         }
       } 
 
-      TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
       std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim
         std::stringstream ps;
@@ -279,14 +279,14 @@ namespace quda {
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
     void copySpinorEx(OutOrder outOrder, const InOrder inOrder, const Basis basis, const int *E, 
-        const int *X, const int parity, const bool extend, QudaFieldLocation location)
+		      const int *X, const int parity, const bool extend, const ColorSpinorField &meta, QudaFieldLocation location)
     {
       CopySpinorExArg<OutOrder,InOrder,Basis> arg(outOrder, inOrder, basis, E, X, parity);
       if(extend){
-        CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, true> copier(arg, location);
+        CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, true> copier(arg, meta, location);
         copier.apply(0);
       }else{
-        CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, false> copier(arg, location);
+        CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, false> copier(arg, meta, location);
         copier.apply(0);
       }
       if(location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
@@ -294,22 +294,23 @@ namespace quda {
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>
     void copySpinorEx(OutOrder outOrder, InOrder inOrder, const QudaGammaBasis outBasis, const QudaGammaBasis inBasis,
-        const int* E, const int* X, const int parity, const bool extend, QudaFieldLocation location)
+		      const int* E, const int* X, const int parity, const bool extend, 
+		      const ColorSpinorField &meta, QudaFieldLocation location)
     {
       if(inBasis == outBasis){
         PreserveBasis<FloatOut,FloatIn,Ns,Nc> basis;
         copySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, PreserveBasis<FloatOut,FloatIn,Ns,Nc> >
-          (outOrder, inOrder, basis, E, X, parity, extend, location);
+          (outOrder, inOrder, basis, E, X, parity, extend, meta, location);
       }else if(outBasis == QUDA_UKQCD_GAMMA_BASIS && inBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS){
         if(Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
         NonRelBasis<FloatOut,FloatIn,Ns,Nc> basis;
         copySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelBasis<FloatOut,FloatIn,Ns,Nc> >
-          (outOrder, inOrder, basis, E, X, parity, extend, location);
+          (outOrder, inOrder, basis, E, X, parity, extend, meta, location);
       }else if(inBasis == QUDA_UKQCD_GAMMA_BASIS && outBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS){
         if(Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
         RelBasis<FloatOut,FloatIn,Ns,Nc> basis;
         copySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, RelBasis<FloatOut,FloatIn,Ns,Nc> >
-          (outOrder, inOrder, basis, E, X, parity, extend, location);
+          (outOrder, inOrder, basis, E, X, parity, extend, meta, location);
       }else{
         errorQuda("Basis change not supported");
       }
@@ -326,25 +327,25 @@ namespace quda {
       if(out.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER){
         FloatNOrder<FloatOut, Ns, Nc, 4> outOrder(out, Out, outNorm);
         copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, location);
+          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
       }else if(out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER){
         FloatNOrder<FloatOut, Ns, Nc, 2> outOrder(out, Out, outNorm);
         copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, location);
+          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
 #if 0
       }else if(out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER){
         SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
         copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, location);
+          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
       }else if(out.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER){
         SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
         copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, location);
+          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
       } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER){
 #ifdef BUILD_QDPJIT_INTERFACE
         QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, Out);
         copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, location);
+          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
 #else
         errorQuda("QDPJIT interface has not been built\n");
 #endif

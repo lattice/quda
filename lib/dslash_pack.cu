@@ -964,9 +964,6 @@ namespace quda {
     const int dim;
     const int face_num;
 
-    // used for tuneKey auxillary data
-    char aux[256];
-
     // compute how many threads we need in total for the face packing
     unsigned int threads() const {
       unsigned int threads = 0;

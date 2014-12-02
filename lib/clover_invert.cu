@@ -219,9 +219,8 @@ namespace quda {
   template <typename Float, typename Clover>
   class CloverInvert : Tunable {
     CloverInvertArg<Clover> arg;
+    const CloverField &meta; // used for meta data only
     const QudaFieldLocation location;
-    mutable char vol_string[32]; // used as a label in the autotuner
-    mutable char aux_string[128]; // used as a label in the autotuner
 
   private:
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -232,8 +231,10 @@ namespace quda {
     unsigned int minThreads() const { return arg.clover.volumeCB; }
 
   public:
-    CloverInvert(CloverInvertArg<Clover> &arg, QudaFieldLocation location) 
-      : arg(arg), location(location) { ; }
+    CloverInvert(CloverInvertArg<Clover> &arg, const CloverField &meta, QudaFieldLocation location) 
+      : arg(arg), meta(meta), location(location) { 
+      sprintf(aux,"stride=%d,prec=%lu",arg.clover.stride,sizeof(Float));
+    }
     virtual ~CloverInvert() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -252,9 +253,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      sprintf(vol_string,"%d",arg.clover.volumeCB);
-      sprintf(aux_string,"stride=%d,prec=%lu",arg.clover.stride,sizeof(Float));
-      return TuneKey(vol_string, typeid(*this).name(), aux_string);
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
@@ -270,9 +269,9 @@ namespace quda {
 
   template <typename Float, typename Clover>
   void cloverInvert(Clover inverse, const Clover clover, bool computeTraceLog, 
-		    double* const trlog, QudaFieldLocation location) {
+		    double* const trlog, const CloverField &meta, QudaFieldLocation location) {
     CloverInvertArg<Clover> arg(inverse, clover, computeTraceLog, trlog);
-    CloverInvert<Float,Clover> invert(arg, location);
+    CloverInvert<Float,Clover> invert(arg, meta, location);
     invert.apply(0);
     cudaDeviceSynchronize();
   }
@@ -282,11 +281,11 @@ namespace quda {
     if (clover.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
       cloverInvert<Float>(FloatNOrder<Float,72,2>(clover, 1), 
 			  FloatNOrder<Float,72,2>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), location);
+			  computeTraceLog, clover.TrLog(), clover, location);
     } else if (clover.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
       cloverInvert<Float>(FloatNOrder<Float,72,4>(clover, 1), 
 			  FloatNOrder<Float,72,4>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), location);
+			  computeTraceLog, clover.TrLog(), clover, location);
     } else {
       errorQuda("Clover field %d order not supported", clover.Order());
     }

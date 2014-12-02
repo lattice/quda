@@ -301,9 +301,8 @@ namespace quda {
   template<typename Float, typename Clover, typename Gauge>
     class FmunuCompute : Tunable {
       CloverArg<Float,Clover,Gauge> arg;
+      const GaugeField &meta;
       const QudaFieldLocation location;
-      mutable char vol_string[32]; // used as a label in the autotuner
-      mutable char aux_string[128]; // used as a label in the autotuner
 
       private: 
       unsigned int sharedBytesPerThread() const { return 0; }
@@ -314,8 +313,10 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      FmunuCompute(CloverArg<Float,Clover,Gauge> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {}
+      FmunuCompute(CloverArg<Float,Clover,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
+        : arg(arg), meta(meta), location(location) {
+	sprintf(aux,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
+      }
       virtual ~FmunuCompute() {}
 
       void apply(const cudaStream_t &stream){
@@ -328,9 +329,7 @@ namespace quda {
       }
 
       TuneKey tuneKey() const {
-	sprintf(vol_string,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	sprintf(aux_string,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
-	return TuneKey(vol_string, typeid(*this).name(), aux_string);
+	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
 
@@ -474,9 +473,8 @@ namespace quda {
   template<typename Float, typename Clover, typename Gauge>
     class CloverCompute : Tunable {
       CloverArg<Float, Clover, Gauge> arg;
+      const GaugeField &meta;
       const QudaFieldLocation location;
-      mutable char vol_string[32]; // used as a label in the autotuner
-      mutable char aux_string[128]; // used as a label in the autotuner
 
       private: 
       unsigned int sharedBytesPerThread() const { return 0; }
@@ -487,8 +485,10 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      CloverCompute(CloverArg<Float,Clover,Gauge> &arg, QudaFieldLocation location) 
-        : arg(arg), location(location) {}
+      CloverCompute(CloverArg<Float,Clover,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location) 
+        : arg(arg), meta(meta), location(location) {
+	sprintf(aux,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
+      }
 
       virtual ~CloverCompute() {}
 
@@ -502,9 +502,7 @@ namespace quda {
       }
 
       TuneKey tuneKey() const {
-	sprintf(vol_string,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	sprintf(aux_string,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
-	return TuneKey(vol_string, typeid(*this).name(), aux_string);
+	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
       std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
@@ -525,9 +523,9 @@ namespace quda {
   template<typename Float,typename Clover,typename Gauge>
     void computeClover(Clover clover, Gauge gauge, GaugeField& Fmunu, Float cloverCoeff, QudaFieldLocation location){
       CloverArg<Float,Clover,Gauge> arg(clover, gauge, Fmunu, cloverCoeff);
-      FmunuCompute<Float,Clover,Gauge> fmunuCompute(arg, location);
+      FmunuCompute<Float,Clover,Gauge> fmunuCompute(arg, Fmunu, location);
       fmunuCompute.apply(0);
-      CloverCompute<Float,Clover,Gauge> cloverCompute(arg, location);
+      CloverCompute<Float,Clover,Gauge> cloverCompute(arg, Fmunu, location);
       cloverCompute.apply(0);
       cudaDeviceSynchronize();
     }

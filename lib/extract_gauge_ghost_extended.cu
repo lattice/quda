@@ -193,6 +193,7 @@ namespace quda {
     ExtractGhostExArg<Order,nDim> arg;
     int size;
     bool extract;
+    const GaugeField &meta;
     QudaFieldLocation location;
 
   private:
@@ -204,12 +205,12 @@ namespace quda {
 
   public:
     ExtractGhostEx(ExtractGhostExArg<Order,nDim> &arg, bool extract, 
-		   QudaFieldLocation location) : arg(arg), extract(extract), location(location) { 
+		   const GaugeField &meta, QudaFieldLocation location)
+      : arg(arg), extract(extract), meta(meta), location(location) {
       int dA = arg.A1[arg.dim]-arg.A0[arg.dim];
       int dB = arg.B1[arg.dim]-arg.B0[arg.dim];
       int dC = arg.C1[arg.dim]-arg.C0[arg.dim];
       size = arg.R[arg.dim]*dA*dB*dC*arg.order.geometry;
-      sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
       sprintf(aux,"prec=%lu,stride=%d,extract=%d,dimension=%d",
 	      sizeof(Float),arg.order.stride, extract, arg.dim);
     }
@@ -248,7 +249,7 @@ namespace quda {
       }
     }
 
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;
@@ -271,7 +272,7 @@ namespace quda {
   */
   template <typename Float, int length, typename Order>
   void extractGhostEx(Order order, const int dim, const int *surfaceCB, const int *E, 
-		      const int *R, bool extract, QudaFieldLocation location) {  
+		      const int *R, bool extract, const GaugeField &u, QudaFieldLocation location) {
     const int nDim = 4;
     //loop variables: a, b, c with a the most signifcant and c the least significant
     //A0, B0, C0 the minimum value
@@ -315,7 +316,7 @@ namespace quda {
 
     ExtractGhostExArg<Order, nDim> arg(order, dim, X, R, surfaceCB, A0, A1, B0, B1, 
 				       C0, C1, fSrc, fBuf, localParity);
-    ExtractGhostEx<Float,length,nDim,Order> extractor(arg, extract, location);
+    ExtractGhostEx<Float,length,nDim,Order> extractor(arg, extract, u, location);
     extractor.apply(0);
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       cudaDeviceSynchronize(); // need to sync before we commence any communication
@@ -336,51 +337,51 @@ namespace quda {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,19>(u, 0, Ghost), 
-				       dim, u.SurfaceCB(), u.X(), R, extract, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	} else {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,18>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,12>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), 
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,13>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,9>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       }
     } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,19>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	} else {
 	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,18>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, location);
+				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,12>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) { 
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,8>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if(u.Reconstruct() == QUDA_RECONSTRUCT_13){
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,13>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if(u.Reconstruct() == QUDA_RECONSTRUCT_9){
 	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,9>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, location);
+				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
 #ifdef BUILD_QDP_INTERFACE
       extractGhostEx<Float,length>(QDPOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, location);
+				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -389,7 +390,7 @@ namespace quda {
 
 #ifdef BUILD_QDPJIT_INTERFACE
       extractGhostEx<Float,length>(QDPJITOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, location);
+				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
@@ -398,7 +399,7 @@ namespace quda {
 
 #ifdef BUILD_CPS_INTERFACE
       extractGhostEx<Float,length>(CPSOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, location);
+				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
       errorQuda("CPS interface has not been built\n");
 #endif
@@ -407,7 +408,7 @@ namespace quda {
 
 #ifdef BUILD_MILC_INTERFACE
       extractGhostEx<Float,length>(MILCOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, location);
+				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
       errorQuda("MILC interface has not been built\n");
 #endif
@@ -416,7 +417,7 @@ namespace quda {
 
 #ifdef BUILD_BQCD_INTERFACE
       extractGhostEx<Float,length>(BQCDOrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, location);
+				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
       errorQuda("BQCD interface has not been built\n");
 #endif
@@ -425,7 +426,7 @@ namespace quda {
 
 #ifdef BUILD_TIFR_INTERFACE
       extractGhostEx<Float,length>(TIFROrder<Float,length>(u, 0, Ghost),
-				   dim, u.SurfaceCB(), u.X(), R, extract, location);
+				   dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif

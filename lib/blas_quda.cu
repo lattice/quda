@@ -44,7 +44,7 @@ namespace quda {
   static struct {
     const char *vol_str;
     const char *aux_str;
-    char aux_tmp[256];
+    char aux_tmp[512];
   } blasStrings;
 
   void initReduce();
