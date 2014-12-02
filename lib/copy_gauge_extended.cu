@@ -92,9 +92,9 @@ namespace quda {
     unsigned int minThreads() const { return arg.volume/2; }
 
   public:
-    CopyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, const GaugeField &meta, QudaFieldLocation location) 
-      : arg(arg), meta(meta), location(location) { 
-      sprintf(aux,"out_stride=%d,in_stride=%d,geometery=%d",arg.out.stride,arg.in.stride,arg.geometry);
+    CopyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, const GaugeField &meta, QudaFieldLocation location)
+      : arg(arg), meta(meta), location(location) {
+      writeAuxString("out_stride=%d,in_stride=%d,geometery=%d",arg.out.stride,arg.in.stride,arg.geometry);
     }
     virtual ~CopyGaugeEx() { ; }
   

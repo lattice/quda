@@ -155,7 +155,7 @@ namespace quda {
   public:
     GaugePhase(Arg &arg, const GaugeField &meta, QudaFieldLocation location) 
       : arg(arg), meta(meta), location(location) { 
-      sprintf(aux,"stride=%d,prec=%lu",arg.order.stride,sizeof(Float));
+      writeAuxString("stride=%d,prec=%lu",arg.order.stride,sizeof(Float));
     }
     virtual ~GaugePhase() { ; }
   

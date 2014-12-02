@@ -211,8 +211,8 @@ namespace quda {
       int dB = arg.B1[arg.dim]-arg.B0[arg.dim];
       int dC = arg.C1[arg.dim]-arg.C0[arg.dim];
       size = arg.R[arg.dim]*dA*dB*dC*arg.order.geometry;
-      sprintf(aux,"prec=%lu,stride=%d,extract=%d,dimension=%d",
-	      sizeof(Float),arg.order.stride, extract, arg.dim);
+      writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d",
+		     sizeof(Float),arg.order.stride, extract, arg.dim);
     }
     virtual ~ExtractGhostEx() { ; }
   

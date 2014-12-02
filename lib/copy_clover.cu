@@ -71,7 +71,7 @@ namespace quda {
 
   public:
     CopyClover(CopyCloverArg<Out,In> &arg, const CloverField &meta) : arg(arg), meta(meta) { 
-      sprintf(aux, "out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
+      writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
     virtual ~CopyClover() { ; }
   

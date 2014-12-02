@@ -212,7 +212,7 @@ namespace quda {
       public: 
       CloverSigmaTrace(CloverTraceArg<Clover1,Clover2,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
         : arg(arg), meta(meta), location(location) {
-	sprintf(aux, "stride=%d", arg.clover1.stride);
+	writeAuxString("stride=%d", arg.clover1.stride);
       }
       virtual ~CloverSigmaTrace() {;}
 

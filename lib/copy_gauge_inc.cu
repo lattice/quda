@@ -135,7 +135,7 @@ namespace quda {
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
       }
       size = isGhost ? faceMax : arg.volume/2;
-      sprintf(aux, "out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
+      writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
 
     virtual ~CopyGauge() { ; }

@@ -148,8 +148,7 @@ namespace quda {
     /** Message handles for sending backwards */
     MsgHandle ***mh_send_back[2];
     
-
-    char vol_string[32]; /** used as a label in the autotuner */
+    char vol_string[TuneKey::volume_n]; /** used as a label in the autotuner */
     virtual void setTuningString(); /** set the vol_string for use in tuning */
 
   public:

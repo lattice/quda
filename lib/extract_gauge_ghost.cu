@@ -131,7 +131,7 @@ namespace quda {
 	  ? arg.order.faceVolumeCB[d] : faceMax;
       size = 2 * faceMax; // factor of comes from parity
 
-      sprintf(aux, "stride=%d", arg.order.stride);
+      writeAuxString("stride=%d", arg.order.stride);
     }
 
     virtual ~ExtractGhost() { ; }

@@ -51,15 +51,20 @@ namespace quda {
     std::string n;
     std::string a;
 
+    int check;
+
     while (in.good()) {
       getline(in, line);
       if (!line.length()) continue; // skip blank lines (e.g., at end of file)
       ls.clear();
       ls.str(line);
       ls >> v >> n >> a >> param.block.x >> param.block.y >> param.block.z;
-      sprintf(key.volume, "%s", v.c_str());
-      sprintf(key.name, "%s", n.c_str());
-      sprintf(key.aux, "%s", a.c_str());
+      check = snprintf(key.volume, key.volume_n, "%s", v.c_str());
+      if (check < 0 || check >= key.volume_n) errorQuda("Error writing volume string");
+      check = snprintf(key.name, key.name_n, "%s", n.c_str());
+      if (check < 0 || check >= key.name_n) errorQuda("Error writing name string");
+      check = snprintf(key.aux, key.aux_n, "%s", a.c_str());
+      if (check < 0 || check >= key.aux_n) errorQuda("Error writing aux string");
       ls >> param.grid.x >> param.grid.y >> param.grid.z >> param.shared_bytes;
       ls.ignore(1); // throw away tab before comment
       getline(ls, param.comment); // assume anything remaining on the line is a comment

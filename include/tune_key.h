@@ -7,9 +7,12 @@ namespace quda {
 
   struct TuneKey {
 
-    char volume[32];
-    char name[512];
-    char aux[512];
+    static const int volume_n = 32;
+    static const int name_n = 256;
+    static const int aux_n = 256;
+    char volume[volume_n];
+    char name[name_n];
+    char aux[aux_n];
 
     TuneKey() { }
     TuneKey(const char v[], const char n[], const char a[]="type=default") {

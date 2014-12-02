@@ -233,7 +233,7 @@ namespace quda {
   public:
     CloverInvert(CloverInvertArg<Clover> &arg, const CloverField &meta, QudaFieldLocation location) 
       : arg(arg), meta(meta), location(location) { 
-      sprintf(aux,"stride=%d,prec=%lu",arg.clover.stride,sizeof(Float));
+      writeAuxString("stride=%d,prec=%lu",arg.clover.stride,sizeof(Float));
     }
     virtual ~CloverInvert() { ; }
   

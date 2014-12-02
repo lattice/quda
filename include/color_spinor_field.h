@@ -227,7 +227,7 @@ namespace quda {
       static void checkField(const ColorSpinorField &, const ColorSpinorField &);
       void clearGhostPointers();
 
-      char aux_string[256]; // used as a label in the autotuner
+      char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
       void setTuningString(); // set the vol_string and aux_string for use in tuning
 
     public:

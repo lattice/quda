@@ -179,7 +179,7 @@ namespace quda {
   public:
     PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, const ColorSpinorField &meta) 
       : out(out), in(in), basis(basis), meta(meta) {
-      sprintf(aux, "out_stride=%d,in_stride=%d", out.stride, in.stride);
+      writeAuxString("out_stride=%d,in_stride=%d", out.stride, in.stride);
     }
     virtual ~PackSpinor() { ; }
   

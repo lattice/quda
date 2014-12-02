@@ -157,7 +157,7 @@ namespace quda {
       public:
       KSForceComplete(KSForceArg<Oprod,Gauge,Mom> &arg, const GaugeField &meta, QudaFieldLocation location)
         : arg(arg), meta(meta), location(location) {
-	sprintf(aux,"prec=%lu,stride=%d",sizeof(Float),arg.mom.stride);
+	writeAuxString("prec=%lu,stride=%d",sizeof(Float),arg.mom.stride);
       }
 
       virtual ~KSForceComplete() {}
@@ -378,7 +378,7 @@ class KSLongLinkForce : Tunable {
   public:
   KSLongLinkForce(KSLongLinkArg<Result,Oprod,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
     : arg(arg), meta(meta), location(location) {
-    sprintf(aux,"prec=%lu,stride=%d",sizeof(Float),arg.res.stride);
+    writeAuxString("prec=%lu,stride=%d",sizeof(Float),arg.res.stride);
   }
 
   virtual ~KSLongLinkForce() {}

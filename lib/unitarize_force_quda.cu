@@ -617,8 +617,8 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       UnitarizeForceCuda(const cudaGaugeField& oldForce, const cudaGaugeField& gauge,  
 			 cudaGaugeField& newForce, int* fails) : 
 	oldForce(oldForce), gauge(gauge), newForce(newForce), fails(fails) { 
-	sprintf(aux, "threads=%d,prec=%lu,stride=%d", 
-		gauge.Volume(), gauge.Precision(), gauge.Stride());
+	writeAuxString("threads=%d,prec=%lu,stride=%d", 
+		       gauge.Volume(), gauge.Precision(), gauge.Stride());
       }
       virtual ~UnitarizeForceCuda() { ; }
 

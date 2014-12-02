@@ -244,7 +244,7 @@ namespace quda {
       public: 
       CopySpinorEx(CopySpinorExArg<OutOrder,InOrder,Basis> &arg, const ColorSpinorField &meta, QudaFieldLocation location)
         : arg(arg), meta(meta), location(location) {
-	sprintf(aux,"out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
+	writeAuxString("out_stride=%d,in_stride=%d",arg.out.stride,arg.in.stride);
       }
       virtual ~CopySpinorEx() {}
 

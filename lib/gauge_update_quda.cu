@@ -214,8 +214,8 @@ namespace quda {
     UpdateGaugeField(const UpdateGaugeArg<Complex,Gauge,Mom> &arg, 
 		     const GaugeField &meta, QudaFieldLocation location)
       : arg(arg), meta(meta), location(location) {
-      sprintf(aux, "threads=%d,prec=%lu,stride=%d", 
-	      2*arg.in.volumeCB, sizeof(Complex)/2, arg.in.stride);
+      writeAuxString("threads=%d,prec=%lu,stride=%d", 
+		     2*arg.in.volumeCB, sizeof(Complex)/2, arg.in.stride);
     }
     virtual ~UpdateGaugeField() { }
     

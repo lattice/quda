@@ -315,7 +315,7 @@ namespace quda {
       public:
       FmunuCompute(CloverArg<Float,Clover,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
         : arg(arg), meta(meta), location(location) {
-	sprintf(aux,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
+	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
       }
       virtual ~FmunuCompute() {}
 
@@ -487,7 +487,7 @@ namespace quda {
       public:
       CloverCompute(CloverArg<Float,Clover,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location) 
         : arg(arg), meta(meta), location(location) {
-	sprintf(aux,"threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
+	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
       }
 
       virtual ~CloverCompute() {}

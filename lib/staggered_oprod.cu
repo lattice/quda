@@ -406,7 +406,7 @@ namespace quda {
       StaggeredOprodField(const StaggeredOprodArg<Complex,Output,InputA,InputB> &arg,
 			  const GaugeField &meta, QudaFieldLocation location)
 	: arg(arg), meta(meta), location(location) {
-	  sprintf(aux,"threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
+   	  writeAuxString("threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
 	  // this sets the communications pattern for the packing kernel
 	  int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
 	  setPackComms(comms);
