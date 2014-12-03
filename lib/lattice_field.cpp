@@ -51,11 +51,13 @@ namespace quda {
 
 
   void LatticeField::setTuningString() {
+    char vol_tmp[TuneKey::volume_n];
     int check;
     check = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
     if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
     for (int d=1; d<nDim; d++) {
-      check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_string, x[d]);
+      strcpy(vol_tmp, vol_string);
+      check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
       if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
     }
   }

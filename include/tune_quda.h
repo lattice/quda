@@ -8,6 +8,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cstring>
+#include <stdarg.h>
 #include <tune_key.h>
 
 namespace quda {
