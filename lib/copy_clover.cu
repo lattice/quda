@@ -60,6 +60,7 @@ namespace quda {
   template <typename FloatOut, typename FloatIn, int length, typename Out, typename In>
     class CopyClover : Tunable {
     CopyCloverArg<Out,In> arg;
+    const CloverField &meta;
 
   private:
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -69,9 +70,8 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    CopyClover(CopyCloverArg<Out,In> &arg) : arg(arg) { 
-      sprintf(vol, "%d", arg.in.volumeCB);
-      sprintf(aux, "out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
+    CopyClover(CopyCloverArg<Out,In> &arg, const CloverField &meta) : arg(arg), meta(meta) { 
+      writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
     virtual ~CopyClover() { ; }
   
@@ -81,7 +81,7 @@ namespace quda {
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
-    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;
@@ -95,37 +95,37 @@ namespace quda {
   };
 
  template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-    void copyClover(OutOrder outOrder, const InOrder inOrder, int volume, QudaFieldLocation location) {
+ void copyClover(OutOrder outOrder, const InOrder inOrder, const CloverField &out, QudaFieldLocation location) {
 
-    CopyCloverArg<OutOrder,InOrder> arg(outOrder, inOrder, volume);
+   CopyCloverArg<OutOrder,InOrder> arg(outOrder, inOrder, out.Volume());
 
-    if (location == QUDA_CPU_FIELD_LOCATION) {
-      copyClover<FloatOut, FloatIn, length, OutOrder, InOrder>(arg);
-    } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-      CopyClover<FloatOut, FloatIn, length, OutOrder, InOrder> cloverCopier(arg);
-      cloverCopier.apply(0);
-    } else {
-      errorQuda("Undefined field location %d for copyClover", location);
-    }
+   if (location == QUDA_CPU_FIELD_LOCATION) {
+     copyClover<FloatOut, FloatIn, length, OutOrder, InOrder>(arg);
+   } else if (location == QUDA_CUDA_FIELD_LOCATION) {
+     CopyClover<FloatOut, FloatIn, length, OutOrder, InOrder> cloverCopier(arg, out);
+     cloverCopier.apply(0);
+   } else {
+     errorQuda("Undefined field location %d for copyClover", location);
+   }
 
-  }
+ }
 
  template <typename FloatOut, typename FloatIn, int length, typename InOrder>
  void copyClover(const InOrder &inOrder, CloverField &out, bool inverse, QudaFieldLocation location, FloatOut *Out, float *outNorm) {
     if (out.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
-	(FloatNOrder<FloatOut,length,2>(out, inverse, Out, outNorm), inOrder, out.Volume(), location);
+	(FloatNOrder<FloatOut,length,2>(out, inverse, Out, outNorm), inOrder, out, location);
     } else if (out.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length> 
-	(FloatNOrder<FloatOut,length,4>(out, inverse, Out, outNorm), inOrder, out.Volume(), location);
+	(FloatNOrder<FloatOut,length,4>(out, inverse, Out, outNorm), inOrder, out, location);
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
-	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
+	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out, location);
     } else if (out.Order() == QUDA_QDPJIT_CLOVER_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
       copyClover<FloatOut,FloatIn,length>
-	(QDPJITOrder<FloatOut,length>(out, inverse, Out), inOrder, out.Volume(), location);
+	(QDPJITOrder<FloatOut,length>(out, inverse, Out), inOrder, out, location);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif

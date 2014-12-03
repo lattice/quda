@@ -36,7 +36,7 @@
 static struct {
   const char *vol_str;
   const char *aux_str;
-  char aux_tmp[256];
+  char aux_tmp[quda::TuneKey::aux_n];
 } blasStrings;
 
 // These are used for reduction kernels

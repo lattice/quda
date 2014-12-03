@@ -393,6 +393,7 @@ namespace quda {
 
       private:
         StaggeredOprodArg<Complex,Output,InputA,InputB> arg;
+        const GaugeField &meta;
         QudaFieldLocation location; // location of the lattice fields
 
         unsigned int sharedBytesPerThread() const { return 0; }
@@ -403,10 +404,9 @@ namespace quda {
 
       public:
       StaggeredOprodField(const StaggeredOprodArg<Complex,Output,InputA,InputB> &arg,
-            QudaFieldLocation location)
-          : arg(arg), location(location) {
-	sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	  sprintf(aux,"threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
+			  const GaugeField &meta, QudaFieldLocation location)
+	: arg(arg), meta(meta), location(location) {
+   	  writeAuxString("threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
 	  // this sets the communications pattern for the packing kernel
 	  int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
 	  setPackComms(comms);
@@ -463,7 +463,7 @@ namespace quda {
 	  return 0; // fix this
         }
 
-        TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux);}
+        TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux);}
   }; // StaggeredOprodField
 
   template<typename Complex, typename Output, typename InputA, typename InputB>
@@ -481,7 +481,7 @@ namespace quda {
 							  outFieldB);
 
 
-      StaggeredOprodField<Complex,Output,InputA,InputB> oprod(arg, QUDA_CUDA_FIELD_LOCATION);
+      StaggeredOprodField<Complex,Output,InputA,InputB> oprod(arg, outFieldA, QUDA_CUDA_FIELD_LOCATION);
 
 #ifdef MULTI_GPU
       bool pack=false;

@@ -1811,6 +1811,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 {
   QudaInvertParam *param;
   param = eig_param->invert_param;
+  setTuning(param->tune);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
@@ -1899,8 +1900,6 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   }
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
-  setTuning(param->tune);
-
   if(eig_param->RitzMat_lanczos == QUDA_MATPC_DAG_SOLUTION)
   {
     DiracMdag mat(dirac);
@@ -1962,6 +1961,8 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
@@ -2073,8 +2074,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     axCuda(1.0/sqrt(nb), *b);
     axCuda(1.0/sqrt(nb), *x);
   }
-
-  setTuning(param->tune);
 
   massRescale(*b, *param);
 
@@ -2204,6 +2203,8 @@ cudaColorSpinorField *solutionResident = NULL;
 
 void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
@@ -2313,8 +2314,6 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     axCuda(1.0/sqrt(nb), *b);
     axCuda(1.0/sqrt(nb), *x);
   }
-
-  setTuning(param->tune);
 
   massRescale(*b, *param);
 
@@ -2460,6 +2459,8 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   profileMulti.Start(QUDA_PROFILE_TOTAL);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
@@ -2605,8 +2606,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     axCuda(1.0/sqrt(nb), *b);
   }
-
-  setTuning(param->tune);
 
   massRescale(*b, *param);
 
@@ -2755,6 +2754,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **_hp_yo, 
     void *_hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   profileMulti.Start(QUDA_PROFILE_TOTAL);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
@@ -2923,8 +2924,6 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
     axCuda(1.0/sqrt(nb), *b);
   }
 
-  setTuning(param->tune);
-
   massRescale(*b, *param);
 
   // use multi-shift CG
@@ -3058,6 +3057,8 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
 
 void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, int last_rhs)
 {
+  setTuning(param->tune);
+
   if(!InitMagma) openMagma();
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
@@ -3198,8 +3199,6 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     axCuda(1.0/sqrt(nb), *b);
     axCuda(1.0/sqrt(nb), *x);
   }
-
-  setTuning(param->tune);
 
   massRescale(*b, *param);
 
