@@ -28,6 +28,7 @@ namespace quda {
 
   namespace asym_clover {
 
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -55,6 +56,7 @@ namespace quda {
 
   using namespace asym_clover;
 
+#ifdef GPU_CLOVER_DIRAC
   template <typename sFloat, typename gFloat, typename cFloat>
   class AsymCloverDslashCuda : public SharedDslashCuda {
 
@@ -102,15 +104,14 @@ namespace quda {
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef GPU_CLOVER_DIRAC
       ASYM_DSLASH(asymCloverDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
                   (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, clover, cloverNorm, 
                   (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)x, (float*)x->Norm(), a);
-#endif
     }
 
     long long flops() const { return 1872ll * in->VolumeCB(); } // FIXME for multi-GPU
   };
+#endif // GPU_CLOVER_DIRAC
 
 #include <dslash_policy.cuh>
 

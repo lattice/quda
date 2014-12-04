@@ -27,6 +27,8 @@
 namespace quda {
 
   namespace domainwall {
+
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -51,6 +53,7 @@ namespace quda {
 
   using namespace domainwall;
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
   template <typename sFloat, typename gFloat>
   class DomainWallDslashCuda : public DslashCuda {
 
@@ -149,11 +152,9 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef GPU_DOMAIN_WALL_DIRAC
       DSLASH(domainWallDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
 	     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 	     (sFloat*)in->V(), (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
-#endif
     }
 
     long long flops() const { // FIXME for multi-GPU
@@ -164,6 +165,7 @@ namespace quda {
       return (x ? 1368ll : 1320ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
     }
   };
+#endif // GPU_DOMAIN_WALL_DIRAC
 
 #include <dslash_policy.cuh>
 

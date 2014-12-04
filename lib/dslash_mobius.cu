@@ -27,6 +27,8 @@
 namespace quda {
 
   namespace mobius {
+
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -54,6 +56,7 @@ namespace quda {
 
   using namespace mobius;
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
   //Dslash class definition for Mobius Domain Wall Fermion
   template <typename sFloat, typename gFloat>
   class MDWFDslashPCCuda : public DslashCuda {
@@ -175,7 +178,6 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
-#ifdef GPU_DOMAIN_WALL_DIRAC
       switch(DS_type){
       case 0:
 	DSLASH(MDWFDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
@@ -200,7 +202,6 @@ namespace quda {
       default:
 	errorQuda("invalid Dslash type");
       }
-#endif
     }
 
     long long flops() const { // FIXME for multi-GPU
@@ -228,6 +229,7 @@ namespace quda {
       return flops_Tmp;
     }
   };
+#endif // GPU_DOMAIN_WALL_DIRAC
 
 #include <dslash_policy.cuh>
 

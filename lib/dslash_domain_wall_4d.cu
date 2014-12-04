@@ -27,6 +27,8 @@
 namespace quda {
 
   namespace domainwall4d {
+
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -53,6 +55,7 @@ namespace quda {
 
   using namespace domainwall4d;
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
   template <typename sFloat, typename gFloat>
   class DomainWallDslash4DPCCuda : public DslashCuda {
 
@@ -170,7 +173,6 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       
-#ifdef GPU_DOMAIN_WALL_DIRAC
       switch(DS_type){
         case 0:
           DSLASH(domainWallDslash4, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
@@ -190,7 +192,6 @@ namespace quda {
         default:
           errorQuda("invalid Dslash type");
       }
-#endif
     }
 
     long long flops() const { // FIXME for multi-GPU
@@ -215,6 +216,7 @@ namespace quda {
       return flops_Tmp;
     }
   };
+#endif // GPU_DOMAIN_WALL_DIRAC
 
 #include <dslash_policy.cuh>
 

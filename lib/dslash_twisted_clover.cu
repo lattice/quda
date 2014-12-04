@@ -53,6 +53,7 @@ namespace quda {
 
   using namespace twistedclover;
 
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
   template <typename sFloat, typename gFloat, typename cFloat>
   class TwistedCloverDslashCuda : public SharedDslashCuda {
 
@@ -123,7 +124,6 @@ namespace quda {
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       switch(dslashType){
 
@@ -144,13 +144,11 @@ namespace quda {
 	break;
       default: errorQuda("Invalid twisted clover dslash type");
       }
-#else
-      errorQuda("Twisted-clover fermions not supported on pre-Fermi architecture");
-#endif
     }
 
     long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
+#endif // GPU_TWISTED_CLOVER_DIRAC
 
 #include <dslash_policy.cuh>
 
@@ -166,7 +164,7 @@ namespace quda {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
     inClover = (FullClover*) clover;
     inCloverInv = (FullClover*) cloverInv;
-#ifdef GPU_TWISTED_CLOVER_DIRAC
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     int ghost_threads[4] = {0};
@@ -184,15 +182,6 @@ namespace quda {
     twist_a	= 2.*mu*kappa;
 #endif
 
-    /*
-      #ifdef MULTI_GPU
-      if(type == QUDA_DEG_CLOVER_TWIST_INV_DSLASH){
-      setTwistPack(true);
-      twist_a = kappa; 
-      twist_b = mu;
-      }
-      #endif
-    */
     void *gauge0, *gauge1;
     bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
@@ -238,21 +227,19 @@ namespace quda {
     delete dslashImp;
 	
     delete dslash;
-    /*
-      #ifdef MULTI_GPU
-      if(type == QUDA_DEG_CLOVER_TWIST_INV_DSLASH){
-      setTwistPack(false);
-      twist_a = 0.0; 
-      twist_b = 0.0;
-      }
-      #endif
-    */
+
     unbindGaugeTex(gauge);
     unbindTwistedCloverTex(*clover);
 	
     checkCudaError();
 #else
-    errorQuda("Twisted clover dslash has not been built");
+
+#if (__COMPUTE_CAPABILITY__ < 200)
+  errorQuda("Twisted-clover fermions not supported on pre-Fermi architecture");
+#else
+  errorQuda("Twisted clover dslash has not been built");
+#endif
+
 #endif
   }
 

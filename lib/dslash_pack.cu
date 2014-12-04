@@ -65,8 +65,8 @@ namespace quda {
     int threads; // total number of threads
     
     // offsets which determine thread mapping to dimension
-    int threadDimMapLower[QUDA_MAX_DIM]; // lowest thread which maps to dim
-    int threadDimMapUpper[QUDA_MAX_DIM]; // greatest thread + 1 which maps to dim
+    int threadDimMapLower[4]; // lowest thread which maps to dim
+    int threadDimMapUpper[4]; // greatest thread + 1 which maps to dim
     
     int parity;
 #ifdef USE_TEXTURE_OBJECTS
@@ -81,7 +81,7 @@ namespace quda {
     int dim;
     int face_num;
     int X[QUDA_MAX_DIM]; // lattice dimensions
-    int ghostFace[QUDA_MAX_DIM];
+    int ghostFace[4];
 
     int sp_stride;
 #if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)

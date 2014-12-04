@@ -29,6 +29,7 @@ namespace quda {
 
   namespace twisted {
 
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -54,6 +55,7 @@ namespace quda {
 
   using namespace twisted;
 
+#ifdef GPU_TWISTED_MASS_DIRAC
   template <typename sFloat, typename gFloat>
   class TwistedDslashCuda : public SharedDslashCuda {
 
@@ -114,14 +116,12 @@ namespace quda {
 
     void apply(const cudaStream_t &stream)
     {
-
 #ifdef SHARED_WILSON_DSLASH
       if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-#ifdef GPU_TWISTED_MASS
       switch(dslashType){
       case QUDA_DEG_TWIST_INV_DSLASH:
 	DSLASH(twistedMassTwistInvDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
@@ -140,11 +140,11 @@ namespace quda {
 	break;
       default: errorQuda("Invalid twisted mass dslash type");
       }
-#endif
     }
 
     long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
+#endif // GPU_TWISTED_MASS_DIRAC
 
 #include <dslash_policy.cuh> 
 

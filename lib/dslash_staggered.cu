@@ -47,6 +47,8 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
+#undef GPU_CLOVER_DIRAC
+#undef GPU_DOMAIN_WALL_DIRAC
 #define DD_IMPROVED 0
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #undef DD_IMPROVED
@@ -66,6 +68,7 @@ namespace quda {
   template<> struct RealType<short2> { typedef short type; };
   template<> struct RealType<short4> { typedef short type; };
 
+#ifdef GPU_STAGGERED_DIRAC
   template <typename sFloat, typename gFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
@@ -95,12 +98,10 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-#ifdef GPU_STAGGERED_DIRAC
       STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 		       (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 		       (sFloat*)in->V(), (float*)in->Norm(), 
 		       (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
-#endif
     }
 
     int Nface() { return 2; } 
@@ -111,6 +112,7 @@ namespace quda {
       return flops;
     } 
   };
+#endif // GPU_STAGGERED_DIRAC
 
 #include <dslash_policy.cuh>
 

@@ -56,6 +56,7 @@ namespace quda {
 
   using namespace wilson;
 
+#ifdef GPU_WILSON_DIRAC
   template <typename sFloat, typename gFloat>
   class WilsonDslashCuda : public SharedDslashCuda {
 
@@ -97,15 +98,14 @@ namespace quda {
 	errorQuda("Shared dslash does not yet support X-dimension partitioning");
 #endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#ifdef GPU_WILSON_DIRAC
       DSLASH(dslash, tp.grid, tp.block, tp.shared_bytes, stream, 
 	     dslashParam, (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 	     (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
-#endif
     }
 
     long long flops() const { return (x ? 1368ll : 1320ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
+#endif // GPU_WILSON_DIRAC
 
 #include <dslash_policy.cuh>
 

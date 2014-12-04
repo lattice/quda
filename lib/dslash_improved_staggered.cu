@@ -47,6 +47,10 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
+#define STAGGERED_TESLA_HACK
+#undef GPU_NDEG_TWISTED_MASS_DIRAC
+#undef GPU_CLOVER_DIRAC
+#undef GPU_DOMAIN_WALL_DIRAC
 #define DD_IMPROVED 1
 #include <staggered_dslash_def.h> // staggered Dslash kernels
 #undef DD_IMPROVED
@@ -66,6 +70,7 @@ namespace quda {
   template<> struct RealType<short2> { typedef short type; };
   template<> struct RealType<short4> { typedef short type; };
 
+#ifdef GPU_STAGGERED_DIRAC
   template <typename sFloat, typename fatGFloat, typename longGFloat, typename phaseFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
@@ -100,10 +105,16 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-#ifdef GPU_STAGGERED_DIRAC
+#if (__COMPUTE_CAPABILITY__ >= 200)
       IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 				(sFloat*)out->V(), (float*)out->Norm(), 
 				fat0, fat1, long0, long1, phase0, phase1, 
+				(sFloat*)in->V(), (float*)in->Norm(), 
+				(sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
+#else
+      IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
+				(sFloat*)out->V(), (float*)out->Norm(), 
+				fat0, fat1, long0, long1,
 				(sFloat*)in->V(), (float*)in->Norm(), 
 				(sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
 #endif
@@ -117,6 +128,7 @@ namespace quda {
       return flops;
     } 
   };
+#endif // GPU_STAGGERED_DIRAC
 
 #include <dslash_policy.cuh>
 
