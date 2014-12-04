@@ -137,13 +137,15 @@ Known Issues:
 
   1. Computation of the Fermilab heavy-quark residual (and its use as
      a stopping condition in the solvers).
-  2. Twisted-clover fermions.
+  2. Non-degenerate twisted mass and twisted-clover fermions.
   3. On-device gauge routines that utilize the gauge_field_order.h structs.
 
-  It is anticipated that QUDA 0.8.0 will drop support for pre-Fermi
-  cards completely.  QUDA 0.7.x will continue to be maintained as a
-  separate branch (with bug fixes but minimal new features) for those
-  needing this support.
+  This essentially means that the pre-Fermi architecture only supports
+  the use of QUDA for linear solvers, with further functionality not
+  supported.  It is anticipated that QUDA 0.8.0 will drop support for
+  pre-Fermi cards completely.  QUDA 0.7.x will continue to be
+  maintained as a separate branch (with bug fixes but minimal new
+  features) for those needing this support.
 
 * When used with drivers predating the CUDA 5.0 production release,
   Fermi-based GeForce cards suffer from occasional hangs when reading
