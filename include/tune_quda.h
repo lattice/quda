@@ -137,7 +137,7 @@ namespace quda {
 
     void writeAuxString(const char *format, ...) {
       va_list arguments;
-      va_start (arguments, format);
+      va_start(arguments, format);
       int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
       //int n = snprintf(aux, QUDA_TUNE_AUX_STR_LENGTH, "threads=%d,prec=%lu,stride=%d,geometery=%d",
       //	       arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
