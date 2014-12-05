@@ -514,6 +514,7 @@ usage_extra(char** argv )
 int main(int argc, char **argv) 
 {
 
+  ::testing::InitGoogleTest(&argc, argv);
   int i;
   for (i =1;i < argc; i++){
 
