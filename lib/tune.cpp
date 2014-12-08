@@ -15,8 +15,12 @@
 
 //#define LAUNCH_TIMER
 
-namespace quda {
+namespace quda { static TuneKey last_key; }
 
+// intentionally leave this outside of the namespace for now
+quda::TuneKey getLastTuneKey() { return quda::last_key; }
+
+namespace quda {
   typedef std::map<TuneKey, TuneParam> map;
   
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
@@ -251,7 +255,6 @@ namespace quda {
 #endif
   }
 
-
   static TimeProfile launchTimer("tuneLaunch");
 
 //  static int tally = 0;
@@ -273,6 +276,7 @@ namespace quda {
 #endif
 
     const TuneKey key = tunable.tuneKey();
+    last_key = key;
     static TuneParam param;
 
 #ifdef LAUNCH_TIMER

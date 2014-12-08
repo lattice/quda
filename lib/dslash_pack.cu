@@ -82,6 +82,22 @@ namespace quda {
     int cl_stride;
   };
 
+  template<typename FloatN>
+  std::ostream& operator<<(std::ostream& output, const PackParam<FloatN>& param) {
+    output << "threads = " << param.threads << std::endl;
+    output << "threadDimMapLower = {" << param.threadDimMapLower[0] << "," <<
+      param.threadDimMapLower[1] << "," << param.threadDimMapLower[2] << "," << param.threadDimMapLower[3] << "}" << std::endl;
+    output << "threadDimMapUpper = {" << param.threadDimMapUpper[0] << "," <<
+      param.threadDimMapUpper[1] << "," << param.threadDimMapUpper[2] << "," << param.threadDimMapUpper[3] << "}" << std::endl;
+    output << "parity = " << param.parity << std::endl;
+    output << "dim = " << param.dim << std::endl;
+    output << "face_num = " << param.face_num << std::endl;
+    output << "X = {" << param.X[0] << ","<< param.X[1] << "," << param.X[2] << "," << param.X[3] << "}" << std::endl;
+    output << "ghostFace = {" << param.ghostFace[0] << ","<< param.ghostFace[1] << "," 
+	   << param.ghostFace[2] << "," << param.ghostFace[3] << "}" << std::endl;
+    output << "sp_stride = " << param.sp_stride << std::endl;
+    output << "cl_stride = " << param.cl_stride << std::endl;
+  }
 
   // Extend the PackParam class to PackExtendedParam
   template<typename Float>
@@ -1040,10 +1056,6 @@ namespace quda {
         param.outNorm[2*i+1] = (float*)((char*)param.outNorm[2*i] + faceBytes);
 
         prev=i;
-
-        //printf("%d: map=%d %d out=%llu %llu outNorm=%llu %llu bytes=%d\n", 
-        //     i,param.threadDimMapLower[i],  param.threadDimMapUpper[i], 
-        //     param.out[2*i], param.out[2*i+1], param.outNorm[2*i], param.outNorm[2*i+1], faceBytes);
       }
 
       param.ghostFace[0] = param.X[1]*param.X[2]*param.X[3]/2;
@@ -1069,6 +1081,7 @@ namespace quda {
       comm[3] = (commDim[3] ? '1' : '0');
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
+      if (getKernelPackT() || getTwistPack()) { strcat(aux,",kernelPackT"); }
     }
 
   public:
@@ -1100,8 +1113,6 @@ namespace quda {
     }  
 
     virtual void apply(const cudaStream_t &stream) = 0;
-    virtual void apply_twisted(Float a, Float b, const cudaStream_t &stream) = 0;//for twisted mass only
-    virtual void apply_twisted_clover(Float a, const cudaStream_t &stream) = 0;//for twisted clover only
 
     long long bytes() const { 
       size_t faceBytes = (inputPerSite() + outputPerSite())*this->threads()*sizeof(((FloatN*)0)->x);
@@ -1123,9 +1134,6 @@ namespace quda {
   PackFaceWilson(FloatN *faces, const cudaColorSpinorField *in, 
 		 const int dagger, const int parity)
     : PackFace<FloatN, Float>(faces, in, dagger, parity, 1) { }
-  PackFaceWilson(FloatN *faces, const cudaColorSpinorField *in, 
-		 const FullClover *clov, const FullClover *clovInv, const int dagger, const int parity)
-    : PackFace<FloatN, Float>(faces, in, clov, clovInv, dagger, parity, 1) { }
     virtual ~PackFaceWilson() { }
 
     void apply(const cudaStream_t &stream) {
@@ -1140,36 +1148,6 @@ namespace quda {
       }
 #else
       errorQuda("Wilson face packing kernel is not built");
-#endif  
-    }
-
-    void apply_twisted(Float a, Float b, const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-#ifdef GPU_TWISTED_MASS_DIRAC
-      PackParam<FloatN> param = this->prepareParam();
-      if (this->dagger) {
-        packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      } else {
-        packTwistedFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
-      }
-#else
-      errorQuda("Twisted face packing kernel is not built");
-#endif  
-    }
-
-    void apply_twisted_clover(Float a, const cudaStream_t &stream) {
-      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-#ifdef GPU_TWISTED_CLOVER_DIRAC
-      PackParam<FloatN> param = this->prepareParam();
-      if (this->dagger) {
-        packCloverTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, param);
-      } else {
-        packCloverTwistedFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, param);
-      }
-#else
-      errorQuda("Twisted Clover face packing kernel is not built");
 #endif  
     }
 
@@ -1201,6 +1179,40 @@ namespace quda {
     }  
   }
 
+  template <typename FloatN, typename Float>
+    class PackFaceTwisted : public PackFace<FloatN, Float> {
+
+  private:
+
+    int inputPerSite() const { return 24; } // input is full spinor
+    int outputPerSite() const { return 12; } // output is spin projected
+    Float a;
+    Float b;
+
+  public:
+  PackFaceTwisted(FloatN *faces, const cudaColorSpinorField *in, 
+		  const int dagger, const int parity, Float a, Float b)
+    : PackFace<FloatN, Float>(faces, in, dagger, parity, 1), a(a), b(b) { }
+    virtual ~PackFaceTwisted() { }
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+
+#ifdef GPU_TWISTED_MASS_DIRAC
+      PackParam<FloatN> param = this->prepareParam();
+      if (this->dagger) {
+        packTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
+      } else {
+        packTwistedFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, b, param);
+      }
+#else
+      errorQuda("Twisted face packing kernel is not built");
+#endif  
+    }
+
+    long long flops() const { return outputPerSite()*this->threads(); }
+  };
+
   //!
   void packTwistedFaceWilson(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 
 			     const int parity, const double a, const double b, const cudaStream_t &stream) {
@@ -1208,24 +1220,57 @@ namespace quda {
     switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
-        PackFaceWilson<double2, double> pack((double2*)ghost_buf, &in, dagger, parity);
-        pack.apply_twisted((double)a, (double)b, stream);
+        PackFaceTwisted<double2, double> pack((double2*)ghost_buf, &in, dagger, parity, a, b);
+        pack.apply(stream);
       }
       break;
     case QUDA_SINGLE_PRECISION:
       {
-        PackFaceWilson<float4, float> pack((float4*)ghost_buf, &in, dagger, parity);
-        pack.apply_twisted((float)a, (float)b, stream);
+        PackFaceTwisted<float4, float> pack((float4*)ghost_buf, &in, dagger, parity, (float)a, (float)b);
+        pack.apply(stream);
       }
       break;
     case QUDA_HALF_PRECISION:
       {
-        PackFaceWilson<short4, float> pack((short4*)ghost_buf, &in, dagger, parity);
-        pack.apply_twisted((float)a, (float)b, stream);
+        PackFaceTwisted<short4, float> pack((short4*)ghost_buf, &in, dagger, parity, (float)a, (float)b);
+        pack.apply(stream);
       }
       break;
     }  
   }
+
+  template <typename FloatN, typename Float>
+    class PackFaceTwistedClover : public PackFace<FloatN, Float> {
+
+  private:
+
+    int inputPerSite() const { return 24; } // input is full spinor
+    int outputPerSite() const { return 12; } // output is spin projected
+    Float a;
+
+  public:
+  PackFaceTwistedClover(FloatN *faces, const cudaColorSpinorField *in, 
+			const FullClover *clov, const FullClover *clovInv, const int dagger, const int parity, Float a)
+    : PackFace<FloatN, Float>(faces, in, clov, clovInv, dagger, parity, 1), a(a) { }
+    virtual ~PackFaceTwistedClover() { }
+
+    void apply(const cudaStream_t &stream) {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+
+#ifdef GPU_TWISTED_CLOVER_DIRAC
+      PackParam<FloatN> param = this->prepareParam();
+      if (this->dagger) {
+        packCloverTwistedFaceWilsonKernel<1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, param);
+      } else {
+        packCloverTwistedFaceWilsonKernel<0><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(a, param);
+      }
+#else
+      errorQuda("Twisted Clover face packing kernel is not built");
+#endif  
+    }
+
+    long long flops() const { return outputPerSite()*this->threads(); }
+  };
 
   //!
   void packCloverTwistedFaceWilson(void *ghost_buf, cudaColorSpinorField &in, FullClover &clover, FullClover &clovInv,
@@ -1234,20 +1279,20 @@ namespace quda {
     switch(in.Precision()) {
     case QUDA_DOUBLE_PRECISION:
       {
-        PackFaceWilson<double2, double> pack((double2*)ghost_buf, &in, &clover, &clovInv, dagger, parity);
-        pack.apply_twisted_clover((double)a, stream);
+        PackFaceTwistedClover<double2, double> pack((double2*)ghost_buf, &in, &clover, &clovInv, dagger, parity, a);
+        pack.apply(stream);
       }
       break;
     case QUDA_SINGLE_PRECISION:
       {
-        PackFaceWilson<float4, float> pack((float4*)ghost_buf, &in, &clover, &clovInv, dagger, parity);
-        pack.apply_twisted_clover((float)a, stream);
+        PackFaceTwistedClover<float4, float> pack((float4*)ghost_buf, &in, &clover, &clovInv, dagger, parity, (float)a);
+        pack.apply(stream);
       }
       break;
     case QUDA_HALF_PRECISION:
       {
-        PackFaceWilson<short4, float> pack((short4*)ghost_buf, &in, &clover, &clovInv, dagger, parity);
-        pack.apply_twisted_clover((float)a, stream);
+        PackFaceTwistedClover<short4, float> pack((short4*)ghost_buf, &in, &clover, &clovInv, dagger, parity, (float)a);
+        pack.apply(stream);
       }
       break;
     }  
@@ -1635,9 +1680,6 @@ namespace quda {
 #endif  
     }
 
-    void apply_twisted(Float a, Float b, const cudaStream_t &stream) {}
-    void apply_twisted_clover(Float a, const cudaStream_t &stream) {}
-
     long long flops() const { return 0; }
   };
 
@@ -1868,9 +1910,6 @@ namespace quda {
 #endif  
     }
 
-    void apply_twisted(Float a, Float b, const cudaStream_t &stream) {}
-    void apply_twisted_clover(Float a, const cudaStream_t &stream) {}
-
     long long flops() const { return outputPerSite()*this->threads(); }
   };
 
@@ -1902,9 +1941,6 @@ namespace quda {
       errorQuda("4D preconditioned DW face packing kernel is not built");
 #endif  
     }
-
-    void apply_twisted(Float a, Float b, const cudaStream_t &stream) {}
-    void apply_twisted_clover(Float a, const cudaStream_t &stream) {}
 
     long long flops() const { return outputPerSite()*this->threads(); }
   };
@@ -2060,11 +2096,7 @@ namespace quda {
 #endif  
     }
 
-    void apply_twisted(Float a, Float b, const cudaStream_t &stream) {}
-    void apply_twisted_clover(Float a, const cudaStream_t &stream) {}
-
     long long flops() const { return outputPerSite()*this->threads(); }
-
   };
 
   void packFaceNdegTM(void *ghost_buf, cudaColorSpinorField &in, const int dagger, 

@@ -318,7 +318,7 @@ public:
   virtual ~ReduceCuda() { }
 
   inline TuneKey tuneKey() const { 
-    return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_str);
+    return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_tmp);
   }
 
   void apply(const cudaStream_t &stream) {
@@ -403,7 +403,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   }
 
   blasStrings.vol_str = x.VolString();
-  blasStrings.aux_str = x.AuxString();
+  strcpy(blasStrings.aux_tmp, x.AuxString());
+  strcat(blasStrings.aux_tmp, ",");
+  strcat(blasStrings.aux_tmp, y.AuxString());
 
   doubleN value;
 

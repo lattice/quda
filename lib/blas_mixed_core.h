@@ -76,7 +76,7 @@ public:
   virtual ~BlasCuda() { }
 
   inline TuneKey tuneKey() const { 
-    return TuneKey(blasStrings.vol_str, typeid(arg.f).name(), blasStrings.aux_str);
+    return TuneKey(blasStrings.vol_str, typeid(arg.f).name(), blasStrings.aux_tmp);
   }
 
   void apply(const cudaStream_t &stream) {
@@ -127,7 +127,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   }
 
   blasStrings.vol_str = x.VolString();
-  blasStrings.aux_str = x.AuxString();
+  strcpy(blasStrings.aux_tmp, x.AuxString());
+  strcat(blasStrings.aux_tmp, ",");
+  strcat(blasStrings.aux_tmp, y.AuxString());
 
   if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
     mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>

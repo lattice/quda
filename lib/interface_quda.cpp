@@ -1225,26 +1225,32 @@ namespace quda {
     dPre = Dirac::create(diracPreParam);
   }
 
-  void massRescale(QudaDslashType dslash_type, double &kappa, double &mass, 
-      QudaSolutionType solution_type, 
-      QudaMassNormalization mass_normalization, cudaColorSpinorField &b)
-  {   
+  static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
+
+  void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
+
+    double kappa5 = (0.5/(5.0 + param.m5));
+    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+		    param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+		    param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) ? kappa5 : param.kappa;
+
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
-      printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
+      printfQuda("Mass rescale: mass normalization: %d\n", param.mass_normalization);
       double nin = norm2(b);
       printfQuda("Mass rescale: norm of source in = %g\n", nin);
     }
 
-    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
-      switch (solution_type) {
+    // staggered dslash uses mass normalization internally
+    if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
+      switch (param.solution_type) {
         case QUDA_MAT_SOLUTION:
         case QUDA_MATPC_SOLUTION:
-          if (mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(2.0*mass, b);
+          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(2.0*param.mass, b);
           break;
         case QUDA_MATDAG_MAT_SOLUTION:
         case QUDA_MATPCDAG_MATPC_SOLUTION:
-          if (mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(4.0*mass*mass, b);
+          if (param.mass_normalization == QUDA_KAPPA_NORMALIZATION) axCuda(4.0*param.mass*param.mass, b);
           break;
         default:
           errorQuda("Not implemented");
@@ -1252,97 +1258,58 @@ namespace quda {
       return;
     }
 
+    for(int i=0; i<param.num_offset; i++) { 
+      unscaled_shifts[i] = param.offset[i];
+    }
+
     // multiply the source to compensate for normalization of the Dirac operator, if necessary
-    switch (solution_type) {
+    switch (param.solution_type) {
       case QUDA_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
+            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(2.0*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
         }
         break;
       case QUDA_MATDAG_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION ||
+            param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(4.0*kappa*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
         }
         break;
       case QUDA_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
           axCuda(4.0*kappa*kappa, b);
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
+        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(2.0*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 2.0*kappa;
         }
         break;
       case QUDA_MATPCDAG_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
+        if (param.mass_normalization == QUDA_MASS_NORMALIZATION) {
           axCuda(16.0*pow(kappa,4), b);
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 16.0*pow(kappa,4);
+        } else if (param.mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
           axCuda(4.0*kappa*kappa, b);
+	  for(int i=0; i<param.num_offset; i++)  param.offset[i] *= 4.0*kappa*kappa;
         }
         break;
       default:
-        errorQuda("Solution type %d not supported", solution_type);
+        errorQuda("Solution type %d not supported", param.solution_type);
     }
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
-      printfQuda("Mass rescale: mass normalization: %d\n", mass_normalization);
+      printfQuda("Mass rescale: mass normalization: %d\n", param.mass_normalization);
       double nin = norm2(b);
       printfQuda("Mass rescale: norm of source out = %g\n", nin);
     }
 
   }
-
-  void massRescaleCoeff(QudaDslashType dslash_type, double &kappa, QudaSolutionType solution_type, 
-      QudaMassNormalization mass_normalization, double &coeff)
-  {    
-    if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
-      if (mass_normalization != QUDA_MASS_NORMALIZATION) {
-        errorQuda("Staggered code only supports QUDA_MASS_NORMALIZATION");
-      }
-      return;
-    }
-
-    // multiply the source to compensate for normalization of the Dirac operator, if necessary
-    switch (solution_type) {
-      case QUDA_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff *= 2.0*kappa;
-        }
-        break;
-      case QUDA_MATDAG_MAT_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION ||
-            mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff *= 4.0*kappa*kappa;
-        }
-        break;
-      case QUDA_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
-          coeff *= 4.0*kappa*kappa;
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff *= 2.0*kappa;
-        }
-        break;
-      case QUDA_MATPCDAG_MATPC_SOLUTION:
-        if (mass_normalization == QUDA_MASS_NORMALIZATION) {
-          coeff*=16.0*pow(kappa,4);
-        } else if (mass_normalization == QUDA_ASYMMETRIC_MASS_NORMALIZATION) {
-          coeff*=4.0*kappa*kappa;
-        }
-        break;
-      default:
-        errorQuda("Solution type %d not supported", solution_type);
-    }
-
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Mass rescale done\n");   
-  }
 }
-
-/*void QUDA_DiracField(QUDA_DiracParam *param) {
-
-  }*/
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
@@ -2101,8 +2068,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-	      param->solution_type, param->mass_normalization, *b);
+  massRescale(*b, *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -2342,8 +2308,7 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass, 
-      param->solution_type, param->mass_normalization, *b);
+  massRescale(*b, *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
   if (getVerbosity() >= QUDA_VERBOSE) {
@@ -2635,13 +2600,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass,
-      param->solution_type, param->mass_normalization, *b);
-  double *unscaled_shifts = new double [param->num_offset];
-  for(int i=0; i < param->num_offset; i++){ 
-    unscaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, param->offset[i]);
-  }
+  massRescale(*b, *param);
 
   // use multi-shift CG
   {
@@ -2739,8 +2698,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   for(int i=0; i < param->num_offset; i++) { 
     param->offset[i] = unscaled_shifts[i];
   }
-
-  delete [] unscaled_shifts;
 
   profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
@@ -2960,13 +2917,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass,
-      param->solution_type, param->mass_normalization, *b);
-  double *unscaled_shifts = new double [param->num_offset];
-  for(int i=0; i < param->num_offset; i++){ 
-    unscaled_shifts[i] = param->offset[i];
-    massRescaleCoeff(param->dslash_type, param->kappa, param->solution_type, param->mass_normalization, param->offset[i]);
-  }
+  massRescale(*b, *param);
 
   // use multi-shift CG
   {
@@ -3034,8 +2985,6 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   for(int i=0; i < param->num_offset; i++) { 
     param->offset[i] = unscaled_shifts[i];
   }
-
-  delete [] unscaled_shifts;
 
   profileMulti.Start(QUDA_PROFILE_D2H);
   for(int i=0; i < param->num_offset; i++) { 
@@ -3244,7 +3193,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
   setTuning(param->tune);
 
-  massRescale(param->dslash_type, param->kappa, param->mass, param->solution_type, param->mass_normalization, *b);
+  massRescale(*b, *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
 //here...
@@ -3845,13 +3794,13 @@ void createCloverQuda(QudaInvertParam* invertParam)
   QudaReconstructType recon = (gaugePrecise->Reconstruct() == QUDA_RECONSTRUCT_8) ? 
     QUDA_RECONSTRUCT_12 : gaugePrecise->Reconstruct();
   GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), recon, pad, 
-			   QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+			   QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);  
   gParamEx.create = QUDA_ZERO_FIELD_CREATE;
   gParamEx.order = gaugePrecise->Order();
   gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParamEx.t_boundary = gaugePrecise->TBoundary();
   gParamEx.nFace = 1;
-
+  for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
 
   cudaGaugeField *cudaGaugeExtended = NULL;
   if (extendedGaugeResident) {
@@ -4754,7 +4703,9 @@ void computeStaggeredOprodQuda(void** oprod,
   oParam.link_type = QUDA_GENERAL_LINKS;
   oParam.reconstruct = QUDA_RECONSTRUCT_NO;
   oParam.order = QUDA_QDP_GAUGE_ORDER;
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   oParam.gauge = oprod[0];
+  oParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO; // no need for ghost exchange here
   cpuGaugeField cpuOprod0(oParam);
 
   oParam.gauge = oprod[1];
@@ -4788,7 +4739,8 @@ void computeStaggeredOprodQuda(void** oprod,
   qParam.nDim = 4;
   qParam.precision = oParam.precision;
   qParam.pad = 0;
-  for(int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir]; qParam.x[0] /= 2; 
+  for(int dir=0; dir<4; ++dir) qParam.x[dir] = oParam.x[dir];
+  qParam.x[0] /= 2;
 
   // create the device quark field
   qParam.create = QUDA_NULL_FIELD_CREATE;
