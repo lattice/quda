@@ -281,6 +281,8 @@ private:
   // these can't be curried into the Spinors because of Tesla argument length restriction
   char *X_h, *Y_h, *Z_h, *W_h, *V_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
+  const size_t *bytes_;
+  const size_t *norm_bytes_;
 
   unsigned int sharedBytesPerThread() const { return sizeof(ReduceType); }
 
@@ -303,10 +305,12 @@ private:
 
 public:
   ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, 
-	     SpinorW &W, SpinorV &V, Reducer &r, int length) :
+	     SpinorW &W, SpinorV &V, Reducer &r, int length,
+	     const size_t *bytes, const size_t *norm_bytes) :
   arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, length),
     result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0), 
-    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0) { }
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0),
+    bytes_(bytes), norm_bytes_(norm_bytes) { }
   virtual ~ReduceCuda() { }
 
   inline TuneKey tuneKey() const { 
@@ -318,23 +322,20 @@ public:
     result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>(arg, tp, stream);
   }
 
-#define BYTES(X) ( arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride() )
-#define NORM_BYTES(X) ( (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0 )
-
   void preTune() {
-    arg.X.save(&X_h, &Xnorm_h, BYTES(X), NORM_BYTES(X));
-    arg.Y.save(&Y_h, &Ynorm_h, BYTES(Y), NORM_BYTES(Y));
-    arg.Z.save(&Z_h, &Znorm_h, BYTES(Z), NORM_BYTES(Z));
-    arg.W.save(&W_h, &Wnorm_h, BYTES(W), NORM_BYTES(W));
-    arg.V.save(&V_h, &Vnorm_h, BYTES(V), NORM_BYTES(V));
+    arg.X.save(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.save(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.save(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.save(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.save(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   void postTune() {
-    arg.X.load(&X_h, &Xnorm_h, BYTES(X), NORM_BYTES(X));
-    arg.Y.load(&Y_h, &Ynorm_h, BYTES(Y), NORM_BYTES(Y));
-    arg.Z.load(&Z_h, &Znorm_h, BYTES(Z), NORM_BYTES(Z));
-    arg.W.load(&W_h, &Wnorm_h, BYTES(W), NORM_BYTES(W));
-    arg.V.load(&V_h, &Vnorm_h, BYTES(V), NORM_BYTES(V));
+    arg.X.load(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.load(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.load(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.load(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.load(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   long long flops() const { return arg.r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
@@ -402,6 +403,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
   // FIXME: use traits to encapsulate register type for shorts -
   // will reduce template type parameters from 3 to 2
 
+  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes(), v.Bytes()};
+  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes(), v.NormBytes()};
+
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
       const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
@@ -415,7 +419,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
 	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
 	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1){ //staggered
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
@@ -429,7 +433,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
 	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
 	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
@@ -446,7 +450,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float4,float4,float4,M,writeX,0>,  Spinor<float4,float4,float4,M,writeY,1>,
 	Spinor<float4,float4,float4,M,writeZ,2>,  Spinor<float4,float4,float4,M,writeW,3>,
 	Spinor<float4,float4,float4,M,writeV,4>, Reducer<ReduceType, float2, float4> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -464,7 +468,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float2,float2,float2,M,writeX,0>,  Spinor<float2,float2,float2,M,writeY,1>,
 	Spinor<float2,float2,float2,M,writeZ,2>,  Spinor<float2,float2,float2,M,writeW,3>,
 	Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -483,7 +487,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float4,float4,short4,6,writeX,0>, Spinor<float4,float4,short4,6,writeY,1>,
 	Spinor<float4,float4,short4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>,
 	Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -500,7 +504,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
 	Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
 	Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());

@@ -53,6 +53,8 @@ private:
   // these can't be curried into the Spinors because of Tesla argument length restriction
   char *X_h, *Y_h, *Z_h, *W_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h;
+  const size_t *bytes_;
+  const size_t *norm_bytes_;
 
   unsigned int sharedBytesPerThread() const { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -69,9 +71,10 @@ private:
 
 public:
   BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor &f, 
-	   int length) :
+	   int length, const size_t *bytes, const size_t *norm_bytes) :
   arg(X, Y, Z, W, f, length), X_h(0), Y_h(0), Z_h(0), W_h(0), 
-  Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0)
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0),
+    bytes_(bytes), norm_bytes_(norm_bytes)
     { ; }
   virtual ~BlasCuda() { }
 
@@ -84,21 +87,18 @@ public:
     blasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
   }
 
-#define BYTES(X) ( arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride() )
-#define NORM_BYTES(X) ( (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0 )
-
   void preTune() {
-    arg.X.save(&X_h, &Xnorm_h, BYTES(X), NORM_BYTES(X));
-    arg.Y.save(&Y_h, &Ynorm_h, BYTES(Y), NORM_BYTES(Y));
-    arg.Z.save(&Z_h, &Znorm_h, BYTES(Z), NORM_BYTES(Z));
-    arg.W.save(&W_h, &Wnorm_h, BYTES(W), NORM_BYTES(W));
+    arg.X.save(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.save(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.save(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.save(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
   }
 
   void postTune() {
-    arg.X.load(&X_h, &Xnorm_h, BYTES(X), NORM_BYTES(X));
-    arg.Y.load(&Y_h, &Ynorm_h, BYTES(Y), NORM_BYTES(Y));
-    arg.Z.load(&Z_h, &Znorm_h, BYTES(Z), NORM_BYTES(Z));
-    arg.W.load(&W_h, &Wnorm_h, BYTES(W), NORM_BYTES(W));
+    arg.X.load(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.load(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.load(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.load(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
   }
 
   long long flops() const { return arg.f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
@@ -142,6 +142,9 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   // FIXME: use traits to encapsulate register type for shorts -
   // will reduce template type parameters from 3 to 2
 
+  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
+  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
+
   if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4) {
       const int M = 12;
@@ -153,7 +156,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       BlasCuda<double2,M, Spinor<double2,double4,float4,M,writeX,0>, 
 	Spinor<double2,double2,double2,M,writeY,1>, Spinor<double2,double4,float4,M,writeZ,2>,
 	Spinor<double2,double4,float4,M,writeW,3>, Functor<double2, double2> > 
-	blas(X, Y, Z, W, f, y.Volume());
+	blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
       blas.apply(*blasStream);
     } else if (x.Nspin() == 1) {
       const int M = 3;
@@ -165,7 +168,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       BlasCuda<double2,M,
 	Spinor<double2,double2,float2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
 	Spinor<double2,double2,float2,M,writeZ,2>, Spinor<double2,double2,float2,M,writeW,3>,
-	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume());
+	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
       blas.apply(*blasStream);
     }
   } else if (x.Precision() == QUDA_HALF_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -179,7 +182,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       BlasCuda<double2,M,
 	Spinor<double2,double4,short4,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
 	Spinor<double2,double4,short4,M,writeZ,2>, Spinor<double2,double4,short4,M,writeW,3>,
-	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume());
+	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
       blas.apply(*blasStream);
     } else if (x.Nspin() == 1) {
       const int M = 3;
@@ -191,7 +194,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       BlasCuda<double2,M,
 	Spinor<double2,double2,short2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
 	Spinor<double2,double2,short2,M,writeZ,2>, Spinor<double2,double2,short2,M,writeW,3>,
-      Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume());
+	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
       blas.apply(*blasStream);
     }
   } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
@@ -205,7 +208,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       BlasCuda<float4,M,
 	Spinor<float4,float4,short4,M,writeX,0>, Spinor<float4,float4,float4,M,writeY,1>,
 	Spinor<float4,float4,short4,M,writeZ,2>, Spinor<float4,float4,short4,M,writeW,3>,
-	Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume());
+	Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
       blas.apply(*blasStream);
     } else if (x.Nspin() == 1) {
       const int M = 3;
@@ -217,7 +220,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       BlasCuda<float2, M,
 	Spinor<float2,float2,short2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>,
 	Spinor<float2,float2,short2,M,writeZ,2>, Spinor<float2,float2,short2,M,writeW,3>,
-	Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume());
+	Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
       blas.apply(*blasStream);
     }
   } else {
