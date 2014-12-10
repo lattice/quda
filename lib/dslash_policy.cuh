@@ -982,8 +982,8 @@ struct DslashFusedExterior : DslashPolicyImp {
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
-    int scatterIndex = 0;
 #ifdef MULTI_GPU
+    int scatterIndex = 0;
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
     {
@@ -1307,7 +1307,9 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
     }
   }
 #endif
+#ifdef PTHREADS
   bool interiorLaunched = false;
+#endif
   int completeSum = 0;
   while (completeSum < pattern.commDimTotal) {
     for (int i=3; i>=0; i--) {

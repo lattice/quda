@@ -70,6 +70,8 @@ extern QudaPrecision prec;
 extern int device;
 extern bool verify_results;
 
+extern bool kernel_pack_t;
+
 int X[4];
 
 Dirac* dirac;
@@ -79,9 +81,7 @@ void init()
 
   initQuda(device);
 
-#ifdef GPU_COMMS
-  setKernelPackT(true);
-#endif
+  setKernelPackT(kernel_pack_t);
 
   setVerbosity(QUDA_VERBOSE);
 
@@ -117,6 +117,11 @@ void init()
   inv_param.dagger = dagger;
   inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
   inv_param.dslash_type = dslash_type;
+
+  // ensure that the default is improved staggered
+  if (inv_param.dslash_type != QUDA_STAGGERED_DSLASH &&
+      inv_param.dslash_type != QUDA_ASQTAD_DSLASH)
+    inv_param.dslash_type = QUDA_ASQTAD_DSLASH;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;

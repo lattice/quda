@@ -10,7 +10,6 @@
 #define DD_AXPY 0
 #define DD_RECON 8
 #define DD_PREC 0
-#define DD_IMPROVED 0
 #endif
 
 // set options for current iteration
@@ -45,7 +44,11 @@
 #if (DD_PREC==0) // DOUBLE PRECISION
 
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1, const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1, const double2* longGauge0, const double2* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
 #endif
@@ -65,7 +68,11 @@
 
 #elif (DD_PREC==1) // SINGLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
 #endif
@@ -85,7 +92,11 @@
 
 #else // HALF PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1, const short4* longGauge0, const short4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1
 #endif
@@ -110,7 +121,11 @@
 
 #if (DD_PREC==0) // DOUBLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1, const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1, const double2* longGauge0, const double2* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
 #endif
@@ -133,7 +148,11 @@
 
 #elif (DD_PREC==1) // SINGLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
 #endif
@@ -156,7 +175,11 @@
 
 #else // HALF PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1, const short4* longGauge0, const short4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2* fatGauge1
 #endif
@@ -183,7 +206,11 @@
 
 #if (DD_PREC==0) // DOUBLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
 #endif
@@ -202,7 +229,11 @@
 
 #elif (DD_PREC==1) // SINGLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
 #endif
@@ -221,7 +252,11 @@
 
 #else // HALF PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1
 #endif
@@ -245,7 +280,11 @@
 
 #if (DD_PREC==0) // DOUBLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
 #endif
@@ -267,7 +306,11 @@
 
 #elif (DD_PREC==1) // SINGLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
 #endif
@@ -289,7 +332,11 @@
 
 #else // HALF PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1
 #endif
@@ -316,7 +363,11 @@
 
 #if (DD_PREC==0) // DOUBLE PRECISION
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1, const double* longPhase0, const double* longPhase1
+#else
+#define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1,  const double2* longGauge0, const double2* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const double2 *fatGauge0, const double2 *fatGauge1
 #endif
@@ -334,7 +385,11 @@
 #elif (DD_PREC==1) // SINGLE PRECISION
 
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1, const float* longPhase0, const float* longPhase1
+#else
+#define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1, const float4* longGauge0, const float4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const float2 *fatGauge0, const float2 *fatGauge1
 #endif
@@ -353,7 +408,11 @@
 #else  // HALF PRECISION
 
 #if (DD_IMPROVED==1)
+#if (__COMPUTE_CAPABILITY__ >= 200)
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1, const short* longPhase0, const short* longPhase1
+#else // Tesla doesn't support reconstruct 9/13
+#define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1, const short4* longGauge0, const short4* longGauge1
+#endif
 #else
 #define DD_PARAM_GAUGE const short2 *fatGauge0, const short2 *fatGauge1
 #endif
@@ -599,6 +658,8 @@
 
 #endif
 
+#ifdef GPU_STAGGERED_DIRAC
+
 // only build double precision if supported
 #if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
 
@@ -649,11 +710,11 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
 #endif
 }
 
-
 #endif
 
 #endif // !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 
+#endif // ! GPU_STAGGERED_DIRAC
 
 // clean up
 
@@ -732,20 +793,11 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
 #undef DD_PREC
 #define DD_PREC 0
 
-#if (DD_IMPROVED==0)
-#undef DD_IMPROVED
-#define DD_IMPROVED 1
-#elif (DD_IMPROVED==1)
-#undef DD_IMPROVED
-#define DD_IMPROVED 0
-
 #undef DD_LOOP
 #undef DD_AXPY
 #undef DD_RECON
 #undef DD_PREC
-#undef DD_IMPROVED
 
-#endif // DD_IMPROVED
 #endif // DD_PREC
 #endif // DD_RECON
 #endif // DD_AXPY

@@ -295,7 +295,7 @@
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     // all dslashes expect a 4-d volume here (dwf Ls is y thread dimension)
     unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); } 
-    char aux[7][256];
+    char aux[7][TuneKey::aux_n];
 
     void fillAux(KernelType kernel_type, const char *kernel_str) {
       strcpy(aux[kernel_type],kernel_str);
@@ -359,7 +359,9 @@
       setPackComms(dslashParam.commDim);
 
       for (int i=0; i<4; i++) dslashParam.X[i] = in->X(i);
+#ifdef GPU_DOMAIN_WALL_DIRAC
       dslashParam.Ls = in->X(4); // needed by tuneLaunch()
+#endif
       // this is a c/b field so double the x dimension
       dslashParam.X[0] *= 2;
     }

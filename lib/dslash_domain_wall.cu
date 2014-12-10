@@ -27,6 +27,8 @@
 namespace quda {
 
   namespace domainwall {
+
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -35,7 +37,9 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
 #include <dw_dslash_def.h>        // Domain Wall kernels
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -49,6 +53,7 @@ namespace quda {
 
   using namespace domainwall;
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
   template <typename sFloat, typename gFloat>
   class DomainWallDslashCuda : public DslashCuda {
 
@@ -160,6 +165,7 @@ namespace quda {
       return (x ? 1368ll : 1320ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
     }
   };
+#endif // GPU_DOMAIN_WALL_DIRAC
 
 #include <dslash_policy.cuh>
 
@@ -214,17 +220,11 @@ namespace quda {
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
     dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
 
-/*
 #ifndef GPU_COMMS
     DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
 #else
     DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
 #endif
-*/
-    DslashPolicyImp* dslashImp = new DslashFusedExterior;
-
-    printfQuda("Calling the fused exterior dslash operator\n");
-
 
     (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, in->Volume()/in->X(4), ghostFace, profile);
     delete dslashImp;

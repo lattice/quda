@@ -225,7 +225,6 @@ namespace quda {
     }
   }
 
-
   template<typename Float, typename GaugeOr, typename GaugeDs>
     __global__ void computeAPEStep(GaugeAPEArg<Float,GaugeOr,GaugeDs> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
@@ -288,8 +287,12 @@ namespace quda {
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           computeAPEStep<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#else
+	  errorQuda("GaugeAPE not supported on pre-Fermi architecture");
+#endif
         }else{
           errorQuda("CPU not supported yet\n");
           //computeAPEStepCPU(arg);

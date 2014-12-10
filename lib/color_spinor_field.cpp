@@ -251,11 +251,26 @@ namespace quda {
   }
 
   void ColorSpinorField::setTuningString() {
-    sprintf(vol_string, "%d", x[0]);
-    for (int d=1; d<nDim; d++) sprintf(vol_string, "%sx%d", vol_string, x[d]);
-    sprintf(aux_string, "vol=%d,stride=%d,precision=%d", volume, stride, precision);
-    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID)
-      sprintf(aux_string, "%s,TwistFlavour=%d", aux_string, twistFlavor);
+    char vol_tmp[TuneKey::volume_n];
+    int check;
+    check = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
+    if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+    for (int d=1; d<nDim; d++) {
+      strcpy(vol_tmp, vol_string);
+      check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
+      if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+    }
+
+    int aux_string_n = TuneKey::aux_n / 2;
+    char aux_tmp[aux_string_n];
+    check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d", volume, stride, precision);
+    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+
+    if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
+      strcpy(aux_tmp, aux_string);
+      check = snprintf(aux_string, aux_string_n, "%s,TwistFlavour=%d", aux_tmp, twistFlavor);
+      if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+    }
   }
 
   void ColorSpinorField::destroy() {

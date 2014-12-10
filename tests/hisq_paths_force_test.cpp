@@ -213,7 +213,6 @@ hisq_force_init()
   gParam = GaugeFieldParam(0, qudaGaugeParam);
   gParam.create = QUDA_NULL_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.order  = QUDA_QDP_GAUGE_ORDER;
   cpuGauge = new cpuGaugeField(gParam);
 
 #ifdef MULTI_GPU
@@ -543,11 +542,6 @@ hisq_force_test(void)
   setVerbosity(QUDA_VERBOSE);
 
   hisq_force_init();
-
-  TimeProfile profile("dummy");
-  initLatticeConstants(*cpuMom, profile);
-
-
 
   //float weight = 1.0;
   float act_path_coeff[6];

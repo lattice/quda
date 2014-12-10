@@ -148,6 +148,9 @@ namespace quda {
     /** Message handles for sending backwards */
     MsgHandle ***mh_send_back[2];
     
+    char vol_string[TuneKey::volume_n]; /** used as a label in the autotuner */
+    virtual void setTuningString(); /** set the vol_string for use in tuning */
+
   public:
     LatticeField(const LatticeFieldParam &param);
     virtual ~LatticeField();
@@ -192,6 +195,8 @@ namespace quda {
     virtual void scatter(int nFace, int dagger, int dir)
     { errorQuda("Not implemented"); }
 
+    /** Return the volume string used by the autotuner */
+    const char *VolString() const { return vol_string; }
   };
 
 } // namespace quda

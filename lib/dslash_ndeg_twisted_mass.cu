@@ -37,7 +37,10 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+    //#if (__COMPUTE_CAPABILITY__) >= 200 && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
 #include <tm_ndeg_dslash_def.h>   // Non-degenerate twisted Mass
+#endif
 
 #ifndef NDEGTM_SHARED_FLOATS_PER_THREAD
 #define NDEGTM_SHARED_FLOATS_PER_THREAD 0
@@ -52,6 +55,7 @@ namespace quda {
 
   using namespace ndegtwisted;
 
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
   template <typename sFloat, typename gFloat>
   class NdegTwistedDslashCuda : public SharedDslashCuda {
 
@@ -115,6 +119,8 @@ namespace quda {
 
     long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
+#endif // GPU_NDEG_TWISTED_MASS_DIRAC
+
 
 #include <dslash_policy.cuh> 
 
@@ -126,7 +132,7 @@ namespace quda {
 				 const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     int ghost_threads[4] = {0};
@@ -177,7 +183,13 @@ namespace quda {
 
     checkCudaError();
 #else
+
+#if (__COMPUTE_CAPABILITY__ < 200)
+  errorQuda("Non-degenerate twisted-mass fermions not supported on pre-Fermi architecture");
+#else
     errorQuda("Non-degenerate twisted mass dslash has not been built");
+#endif
+
 #endif
   }
 

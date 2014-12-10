@@ -27,6 +27,8 @@
 namespace quda {
 
   namespace mobius {
+
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -35,10 +37,12 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
 #include <mdw_dslash4_def.h>      // Dslash4, intermediate operator for Mobius Mat_4 kernels
 #include <mdw_dslash4pre_def.h>   // Dslash4pre, intermediate operator for Mobius Mat_4 kernels
 #include <mdw_dslash5_def.h>      // Dslash5 Mobius Domain Wall kernels
 #include <mdw_dslash5inv_def.h>   // Dslash5inv Mobius Domain Wall kernels
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -52,6 +56,7 @@ namespace quda {
 
   using namespace mobius;
 
+#ifdef GPU_DOMAIN_WALL_DIRAC
   //Dslash class definition for Mobius Domain Wall Fermion
   template <typename sFloat, typename gFloat>
   class MDWFDslashPCCuda : public DslashCuda {
@@ -224,6 +229,7 @@ namespace quda {
       return flops_Tmp;
     }
   };
+#endif // GPU_DOMAIN_WALL_DIRAC
 
 #include <dslash_policy.cuh>
 

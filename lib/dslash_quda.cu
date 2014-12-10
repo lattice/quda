@@ -42,7 +42,7 @@
 #endif
 #endif // GPU_STAGGERED_DIRAC
 
-#include <quda_internal.h>h
+#include <quda_internal.h>
 #include <dslash_quda.h>
 #include <sys/time.h>
 #include <blas_quda.h>
@@ -175,7 +175,9 @@ class CloverCuda : public Tunable {
     {
       bindSpinorTex<sFloat>(in);
       dslashParam.sp_stride = in->Stride();
+#ifdef GPU_CLOVER_DIRAC
       dslashParam.cl_stride = cl_stride;
+#endif
     }
     virtual ~CloverCuda() { unbindSpinorTex<sFloat>(in); }
     void apply(const cudaStream_t &stream)
@@ -287,10 +289,14 @@ class TwistGamma5Cuda : public Tunable {
     dslashParam.sp_stride = in->Stride();
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {
       setTwistParam(a, b, kappa, mu, dagger, twist);
+#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
       dslashParam.fl_stride = in->VolumeCB();
+#endif
     } else {//twist doublet
       a = kappa, b = mu, c = epsilon;
+#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
       dslashParam.fl_stride = in->VolumeCB()/2;
+#endif
     } 
   }
 
@@ -379,7 +385,9 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 #endif // GPU_TWISTED_MASS_DIRAC
 }
 
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
 #include "dslash_core/tmc_gamma_core.h"
+#endif
 
 template <typename cFloat, typename sFloat>
 class TwistCloverGamma5Cuda : public Tunable {
@@ -409,8 +417,10 @@ class TwistCloverGamma5Cuda : public Tunable {
   {
     bindSpinorTex<sFloat>(in);
     dslashParam.sp_stride = in->Stride();
+#ifdef GPU_TWISTED_CLOVER_DIRAC
     dslashParam.cl_stride = cl_stride;
     dslashParam.fl_stride = in->VolumeCB();
+#endif
     twist = tw;
     clover = clov;
     cNorm = cN;
@@ -434,8 +444,7 @@ class TwistCloverGamma5Cuda : public Tunable {
 
     void apply(const cudaStream_t &stream)
     {
-      //A.S.: should this be GPU_TWISTED_CLOVER_DIRAC instead?
-#if (defined GPU_TWISTED_CLOVER_DIRAC)
+#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)

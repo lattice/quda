@@ -29,6 +29,10 @@
 
 // Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
 extern QudaDslashType dslash_type;
+
+// Twisted mass flavor type
+extern QudaTwistFlavorType twist_flavor;
+
 extern bool tune;
 extern int device;
 extern int xdim;
@@ -42,8 +46,11 @@ extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern QudaInverterType  inv_type;
+extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern QudaMassNormalization normalization; // mass normalization of Dirac operators
+extern QudaMatPCType matpc_type; // preconditioning type
 
 extern char latfile[];
 
@@ -54,11 +61,14 @@ display_test_info()
 {
   printfQuda("running the following test:\n");
     
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
-	     get_prec_str(prec),get_prec_str(prec_sloppy),
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
+  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+	     get_prec_str(prec),get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), 
 	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
+	     get_recon_str(link_recon_sloppy),  
+	     xdim, ydim, zdim, tdim, Lsdim, 
+	     get_dslash_str(dslash_type), 
+	     get_mass_normalization_str(normalization));     
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
@@ -152,8 +162,7 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = 0.12;
     inv_param.epsilon = 0.1385;
-    //inv_param.twist_flavor = QUDA_TWIST_NONDEG_DOUBLET;
-    inv_param.twist_flavor = QUDA_TWIST_MINUS;
+    inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
@@ -182,15 +191,14 @@ int main(int argc, char **argv)
 
   inv_param.inv_type = inv_type;
   if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     inv_param.solution_type = multishift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
   }
+  inv_param.matpc_type = matpc_type;
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
+  inv_param.mass_normalization = normalization;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
@@ -206,6 +214,7 @@ int main(int argc, char **argv)
 
   inv_param.pipeline = 0;
 
+  inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
@@ -228,8 +237,7 @@ int main(int argc, char **argv)
   inv_param.max_res_increase = 1;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = 
-    inv_param.inv_type == QUDA_GCR_INVERTER ? QUDA_MR_INVERTER : QUDA_INVALID_INVERTER;
+  inv_param.inv_type_precondition = precon_type;
     
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
@@ -404,6 +412,9 @@ int main(int argc, char **argv)
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
   if (multishift) {
+    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+      errorQuda("Mass normalization not supported for multi-shift solver in invert_test");
+    }
 
     void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
@@ -462,14 +473,22 @@ int main(int argc, char **argv)
         wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
+//      } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+//        dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
+//      } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+//        mdw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else {
         printfQuda("Unsupported dslash_type\n");
         exit(-1);
       }
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+            dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+            dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
           ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-        } else {
+        } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+          ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinorSiteSize, inv_param.cpu_prec);
+	} else {
           ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
         }
       }
@@ -486,6 +505,20 @@ int main(int argc, char **argv)
                   inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+      } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+        dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+      } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+        double *kappa_b, *kappa_c;
+        kappa_b = (double*)malloc(Lsdim*sizeof(double));
+        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        for(int xs = 0 ; xs < Lsdim ; xs++)
+        {
+          kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
+          kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
+        }
+        mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+        free(kappa_b);
+        free(kappa_c);
       } else {
         printfQuda("Unsupported dslash_type\n");
         exit(-1);

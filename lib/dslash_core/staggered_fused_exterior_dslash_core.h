@@ -346,23 +346,18 @@ spinorFloat o02_im;
 
   const int X1X0 = X[1]*X[0];
   const int X2X1X0 = X[2]*X1X0;
-#if (DD_IMPROVED == 1)
+#if (DD_IMPROVED == 1 && defined(MULTI_GPU))
   const int X3X1X0 = X[3]*X1X0;
 #endif
-  const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
 
-  int za,zb; 
-  int x0h;
-  int y[4];
-  int x0odd;
-  int full_idx;
-  int half_idx;
+int y[4] = {};
 
-
-  bool active = false;
-  int dim=4;
+int full_idx=0;
 #ifdef MULTI_GPU
-  dim = dimFromFaceIndex (idx, param);
+  int x0h;
+  int x0odd;
+  bool active = false;
+  int dim = dimFromFaceIndex (idx, param);
     
   if(dim == 0){
     coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_X, X);
@@ -374,9 +369,12 @@ spinorFloat o02_im;
     coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_T, X);
   }
 
+  int za,zb; 
+
+  const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
   full_idx = ((y[3]*X[2] +y[2])*X[1] +y[1])*X[0]+y[0];
-  half_idx = full_idx>>1;
 #endif // MULTI_GPU
+  int half_idx = full_idx>>1;
 
 
 

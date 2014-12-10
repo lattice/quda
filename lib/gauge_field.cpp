@@ -33,6 +33,12 @@ namespace quda {
       length = 2*(nDim*(nDim-1)/2)*stride*reconstruct; // two comes from being full lattice
     }
 
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
+      for (int d=0; d<nDim; d++) r[d] = param.r[d];
+    } else {
+      for (int d=0; d<nDim; d++) r[d] = 0;
+    }
+
 
     if(reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13)
     {
@@ -128,6 +134,9 @@ namespace quda {
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
     output << "ghostExchange = " << param.ghostExchange << std::endl;
+    for (int i=0; i<param.nDim; i++) {
+      output << "r[" << i << "] = " << param.r[i] << std::endl;    
+    }
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
     output << "staggeredPhaseApplied = " << param.staggeredPhaseApplied << std::endl;
 

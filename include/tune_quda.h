@@ -8,85 +8,10 @@
 #include <iostream>
 #include <iomanip>
 #include <cstring>
+#include <stdarg.h>
+#include <tune_key.h>
 
 namespace quda {
-
-class TuneKey {
-
-  public:
-    char volume[32];
-    char name[256];
-    char aux[256];
-
-    TuneKey() { }
-    TuneKey(const char v[], const char n[], const char a[]="type=default") {
-      strcpy(volume, v);
-      strcpy(name, n);
-      strcpy(aux, a);
-    } 
-    TuneKey(const TuneKey &key) {
-      strcpy(volume,key.volume);
-      strcpy(name,key.name);
-      strcpy(aux,key.aux);
-    }
-
-    TuneKey& operator=(const TuneKey &key) {
-      if (&key != this) {
-	strcpy(volume,key.volume);
-	strcpy(name,key.name);
-	strcpy(aux,key.aux);
-      }
-      return *this;
-    }
-
-    bool operator<(const TuneKey &other) const {
-      int vc = std::strcmp(volume, other.volume);
-      if (vc < 0) {
-	return true;
-      } else if (vc == 0) {
-	int nc = std::strcmp(name, other.name);
-	if (nc < 0) {
-	  return true;
-	} else if (nc == 0) {
-	  return (std::strcmp(aux, other.aux) < 0 ? true : false);
-	}
-      }
-      return false;
-    }
-
-  };
-
-
-/*class TuneKey {
-
-  public:
-    std::string volume;
-    std::string name;
-    std::string aux;
-
-    TuneKey() { }
-  TuneKey(std::string v, std::string n, std::string a=std::string("type=default"))
-    : volume(v), name(n), aux(a) { }
-  TuneKey(const TuneKey &key)
-    : volume(key.volume), name(key.name), aux(key.aux) { }
-
-    TuneKey& operator=(const TuneKey &key) {
-      if (&key != this) {
-	volume = key.volume;
-	name = key.name;
-	aux = key.aux;
-      }
-      return *this;
-    }
-
-    bool operator<(const TuneKey &other) const {
-      return (volume < other.volume) ||
-	((volume == other.volume) && (name < other.name)) ||
-	((volume == other.volume) && (name == other.name) && (aux < other.aux));
-    }
-
-  };*/
-
 
   class TuneParam {
 
@@ -208,8 +133,16 @@ class TuneKey {
       }
     }
 
-    char vol[32];
-    char aux[1024];
+    char aux[TuneKey::aux_n];
+
+    void writeAuxString(const char *format, ...) {
+      va_list arguments;
+      va_start(arguments, format);
+      int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
+      //int n = snprintf(aux, QUDA_TUNE_AUX_STR_LENGTH, "threads=%d,prec=%lu,stride=%d,geometery=%d",
+      //	       arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
+      if (n < 0 || n >= 512) errorQuda("Error writing auxiliary string");
+    }
 
   public:
     Tunable() { }

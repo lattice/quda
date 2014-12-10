@@ -50,13 +50,19 @@ static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 static size_t gSize;
 
 
+namespace quda {
+  namespace fatlink {
+    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
+  }
+}
+
   static int
 unitarize_link_test()
 {
 
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
-  initQuda(0);
+  initQuda(device);
 
   cpu_prec = prec;
   gSize = cpu_prec;  
@@ -116,16 +122,7 @@ unitarize_link_test()
 
   TimeProfile profile("dummy");
 
-#define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
-#if (QUDA_VER > 400)
-  quda::initLatticeConstants(*cudaFatLink, profile);
-#else
-  quda::initCommonConstants(*cudaFatLink, profile);
-#endif
-
-
-
-
+  quda::fatlink::initLatticeConstants(*cudaFatLink, profile);
 
   void* fatlink = (void*)malloc(4*V*gaugeSiteSize*gSize);
   if(fatlink == NULL){

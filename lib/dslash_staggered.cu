@@ -47,7 +47,12 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
+#undef GPU_CLOVER_DIRAC
+#undef GPU_DOMAIN_WALL_DIRAC
+#define DD_IMPROVED 0
 #include <staggered_dslash_def.h> // staggered Dslash kernels
+#undef DD_IMPROVED
+
 #include <dslash_quda.cuh>
   } // end namespace staggered
 
@@ -63,6 +68,7 @@ namespace quda {
   template<> struct RealType<short2> { typedef short type; };
   template<> struct RealType<short4> { typedef short type; };
 
+#ifdef GPU_STAGGERED_DIRAC
   template <typename sFloat, typename gFloat>
   class StaggeredDslashCuda : public DslashCuda {
 
@@ -106,6 +112,7 @@ namespace quda {
       return flops;
     } 
   };
+#endif // GPU_STAGGERED_DIRAC
 
 #include <dslash_policy.cuh>
 
