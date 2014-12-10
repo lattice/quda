@@ -506,7 +506,7 @@ namespace quda
 	
   public:
     CovDevCuda(cudaColorSpinorField *out, const cudaGaugeField *gauge, const cudaColorSpinorField *in, const int parity, const int mu)
-      : SharedDslashCuda(out, in, 0, gauge->Reconstruct()), gauge(gauge), parity(parity), mu(mu), dir(mu%4), dagger(mu<4 ? 0 : 1), binded(false)
+      : SharedDslashCuda(out, in, 0, gauge->Reconstruct(), mu<4 ? 0 : 1), gauge(gauge), parity(parity), mu(mu), dir(mu%4), dagger(mu<4 ? 0 : 1), binded(false)
     { 
       bindSpinorTex<Float2>	(in, out); 
       bindGaugeTex		(*gauge, parity, &gauge0, &gauge1);
