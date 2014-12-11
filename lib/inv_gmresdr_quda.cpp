@@ -233,6 +233,7 @@ namespace quda {
     for(int i = 0; i < nev; i++) memset(H, 0, (ldm-nev-1)*sizeof(Complex));
 
     delete [] tau;
+
     return;
   }
 
