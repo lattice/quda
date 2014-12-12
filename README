@@ -167,6 +167,14 @@ Known Issues:
   QUDA_SUMMARIZE), rather than the correct values.  This does not
   affect the tuning process or actual performance.
 
+* When the auto-tuner is active in a multi-GPU run it may cause issues
+  with binary reproducibility of this run. This is caused by the
+  possibility of different launch configurations being used on
+  different GPUs in the tuning run. If binary reproducibility is
+  strictly required make sure that a run with active tuning has
+  completed. This will ensure that the same launch configurations for
+  a given Kernel is used on all GPUs and binary reproducibility.
+
 Getting Help:
 
 Please visit http://lattice.github.com/quda for contact information.
@@ -206,6 +214,7 @@ Claudio Rebbi (Boston University)
 Guochun Shi (NCSA)
 Alexei Strelchenko (Fermi National Accelerator Laboratory)
 Alejandro Vaquero (INFN Sezione Milano Bicocca)
+Mathias Wagner (Indiana University)
 
 Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications
