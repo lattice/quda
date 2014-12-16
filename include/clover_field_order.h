@@ -9,6 +9,7 @@
 
 #include <register_traits.h>
 #include <clover_field.h>
+#include <complex_quda.h>
 
 namespace quda {
 
@@ -20,45 +21,156 @@ namespace quda {
        freedom stored as follows (s=spin, c = color)
 
        i |  col  |  row  |
-       s   c   s   c   z
+           s   c   s   c   z
        0   0   0   0   0   0
        1   0   1   0   1   0
        2   0   2   0   2   0
        3   1   0   1   0   0
        4   1   1   1   1   0
        5   1   2   1   2   0
-       6   0   1   0   0   0
-       7   0   1   0   0   1
-       8   0   2   0   0   0
-       9   0   2   0   0   1
-       10  1   0   0   0   0
-       11  1   0   0   0   1
-       12  1   1   0   0   0
-       13  1   1   0   0   1
-       14  1   2   0   0   0
-       15  1   2   0   0   1
-       16  0   2   0   1   0
-       17  0   2   0   1   1
-       18  1   0   0   1   0
-       19  1   0   0   1   1
-       20  1   1   0   1   0
-       21  1   1   0   1   1
-       22  1   2   0   1   0
-       23  1   2   0   1   1
-       24  1   0   0   2   0
-       25  1   0   0   2   1
-       26  1   1   0   2   0
-       27  1   1   0   2   1
-       28  1   2   0   2   0
-       29  1   2   0   2   1
-       30  1   1   1   0   0
-       31  1   1   1   0   1
-       32  1   2   1   0   0
-       33  1   2   1   0   1
-       34  1   2   1   1   0
-       35  1   2   1   1   1
+                               ((c_row*2 + s_col)*3 + c_col)*2 + z
+                               col  row
+       6   0   1   0   0   0   1    0
+       7   0   1   0   0   1   1    0
+       8   0   2   0   0   0   2    0
+       9   0   2   0   0   1   2    0
+       10  1   0   0   0   0   3    0
+       11  1   0   0   0   1   3    0
+       12  1   1   0   0   0   4    0
+       13  1   1   0   0   1   4    0
+       14  1   2   0   0   0   5    0
+       15  1   2   0   0   1   5    0
+       16  0   2   0   1   0   2    1
+       17  0   2   0   1   1   2    1
+       18  1   0   0   1   0   3    1
+       19  1   0   0   1   1   3    1
+       20  1   1   0   1   0   4    1
+       21  1   1   0   1   1   4    1
+       22  1   2   0   1   0   5    1
+       23  1   2   0   1   1   5    1
+       24  1   0   0   2   0   3    2
+       25  1   0   0   2   1   3    2
+       26  1   1   0   2   0   4    2
+       27  1   1   0   2   1   4    2
+       28  1   2   0   2   0   5    2
+       29  1   2   0   2   1   5    2
+       30  1   1   1   0   0   4    3
+       31  1   1   1   0   1   4    3
+       32  1   2   1   0   0   5    3
+       33  1   2   1   0   1   5    3
+       34  1   2   1   1   0   5    4
+       35  1   2   1   1   1   5    4
+
+       first 6 sites are the pure real diagonal entries
+
+       1/2 * N * (N-1) sites N = 6, so 15 complex sites on the strictly lower triangular
+
+       storage order on the strictly lower triangular is column major
+
+       // psuedo code in lieu of implementation
+       int row = s_row*3 + c_row;
+       int col = s_col*3 + c_col;
+       if (row == col) {
+         return complex(a[row])
+       } else {
+         int idx = row * (row+1) + col;
+       }
+
     */
 
+    template<typename Float, int nColor, int nSpin, QudaCloverFieldOrder order> struct Accessor {
+      mutable complex<Float> dummy;
+      __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row, int s_col,
+							    int c_row, int c_col) const {
+#ifndef __CUDA_ARCH__
+	errorQuda("Not implemented");
+#endif
+	return dummy;
+      }
+    };
+
+    template<typename Float, int nColor, int nSpin> 
+      struct Accessor<Float,nColor,nSpin,QUDA_PACKED_CLOVER_ORDER> { 
+      complex <Float> *a[2];
+      int volumeCB;
+    Accessor(const CloverField &A, bool inverse=false) : volumeCB(A.VolumeCB()) { 
+	// even
+	a[0] = static_cast<complex<Float>*>(const_cast<void*>(A.V(inverse))); 
+	// odd
+	a[1] = static_cast<complex<Float>*>(static_cast<char*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/2); 
+      }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
+	//assert(s_col / 2 == s_row / 2); // clover matrix is block Hermitian and only defined at (0,0) and (1,1) wrt chirality 
+	const int chirality = s_col / 2;
+#ifndef __CUDA_ARCH__
+	errorQuda("Not implemented");
+#endif
+	return a[parity][0]; }
+    };
+
+    /**
+       This is a template driven generic clover field accessor.  To
+       deploy for a specifc field ordering, the two operator()
+       accessors have to be specialized for that ordering.
+     */
+    template <typename Float, int nColor, int nSpin, QudaCloverFieldOrder order>
+      struct FieldOrder {
+
+      protected:
+	/** An internal reference to the actual field we are accessing */
+	CloverField &A;
+	const int volumeCB;
+	const Accessor<Float,nColor,nSpin,order> accessor;
+
+      public:
+	/** 
+	 * Constructor for the FieldOrder class
+	 * @param field The field that we are accessing
+	 */
+      FieldOrder(CloverField &A) : A(A), volumeCB(A.VolumeCB()), accessor(A)
+	{ }
+	
+	CloverField& Field() { return A; }
+	
+	virtual ~FieldOrder() { ; } 
+    
+    	/**
+	 * Read-only complex-member accessor function
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ inline const complex<Float>& operator()(int d, int parity, int x, int s_row, 
+								    int s_col, int c_row, int c_col) const {
+	  return accessor(parity, x, s_row, s_col, c_row, c_col);
+	}
+	
+	/**
+	 * Complex-member accessor function
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int s_row, 
+							     int s_col, int c_row, int c_col) {
+	  return accessor(d, parity, x, s_row, s_col, c_row, c_col);
+	}
+	
+	/** Returns the number of field colors */
+	__device__ __host__ inline int Ncolor() const { return nColor; }
+
+	/** Returns the field volume */
+	__device__ __host__ inline int Volume() const { return 2*volumeCB; }
+
+	/** Returns the field volume */
+	__device__ __host__ inline int VolumeCB() const { return volumeCB; }
+      };
 
     /**
        FloatN ordering for clover fields
