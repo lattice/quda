@@ -114,7 +114,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 	    profile, QUDA_PROFILE_PACK_KERNEL);
   } else {
     PROFILE(face[it]->pack(*inSpinor, *inClover, *inCloverInv, 1-parity, dagger,
-			   streams, twist_a, twist_b), profile, QUDA_PROFILE_PACK_KERNEL);
+			   streams, false, twist_a), profile, QUDA_PROFILE_PACK_KERNEL);
   }
 
   if (pack) {
@@ -313,7 +313,7 @@ struct DslashCuda2 : DslashPolicyImp {
       PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
@@ -471,7 +471,7 @@ struct DslashPthreads : DslashPolicyImp {
       PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
@@ -623,7 +623,7 @@ struct DslashGPUComms : DslashPolicyImp {
       PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
@@ -746,7 +746,7 @@ struct DslashFusedGPUComms : DslashPolicyImp {
       PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
@@ -867,7 +867,7 @@ struct DslashFaceBuffer : DslashPolicyImp {
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     } else {
       PROFILE(face[it]->pack(*inputSpinor, *inClover, *inCloverInv, 1-parity, dagger,
-			     streams, twist_a, twist_b), profile, QUDA_PROFILE_PACK_KERNEL);
+			     streams, false, twist_a), profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
     if (pack) {
@@ -1013,7 +1013,7 @@ struct DslashFusedExterior : DslashPolicyImp {
       PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
     }
 
@@ -1248,7 +1248,7 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
     PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
 	    profile, QUDA_PROFILE_PACK_KERNEL);
   } else {
-    PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
+    PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a),
 	    profile, QUDA_PROFILE_PACK_KERNEL);
   }
 
