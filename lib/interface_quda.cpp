@@ -1077,6 +1077,8 @@ void endQuda(void)
     profileStaggeredOprod.Print();
     profileAsqtadForce.Print();
     profileHISQForce.Print();
+    profileContract.Print();
+    profileCovDev.Print();
     profileEnd.Print();
 
     printLaunchTimer();
