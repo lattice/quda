@@ -2,7 +2,7 @@ include ../make.inc
 
 QUDA = libquda.a
 
-QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
+QUDA_OBJS = gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o gauge_phase.o timer.o malloc.o solver.o			\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
 	inv_eigcg_quda.o gauge_ape.o gauge_plaq.o inv_gcr_quda.o	\
 	inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o	\
