@@ -234,17 +234,17 @@ namespace quda {
 
     // first copy over the direct part (if it exists)
     if (V(false)) {
-      cudaMemcpy(packClover, clover, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(packClover, clover, bytes, cudaMemcpyDeviceToHost);
       if (precision == QUDA_HALF_PRECISION)
-	cudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     }
 
     // now copy the inverse part (if it exists)
     if (V(true)) {
-      cudaMemcpy(packClover, cloverInv, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(packClover, cloverInv, bytes, cudaMemcpyDeviceToHost);
 	if (precision == QUDA_HALF_PRECISION)
-	  cudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyHostToDevice);
+	  cudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     }
 
