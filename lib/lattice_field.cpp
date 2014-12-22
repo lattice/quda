@@ -44,7 +44,7 @@ namespace quda {
   LatticeField::~LatticeField() {
   }
 
-  void LatticeField::checkField(const LatticeField &a) {
+  void LatticeField::checkField(const LatticeField &a) const {
     if (a.volume != volume) errorQuda("Volume does not match %d %d", volume, a.volume);
     if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %d %d", volumeCB, a.volumeCB);
     if (a.nDim != nDim) errorQuda("nDim does not match %d %d", nDim, a.nDim);
