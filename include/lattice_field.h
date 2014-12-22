@@ -235,7 +235,7 @@ namespace quda {
        Check that the metadata of *this and a are compatible
        @param a The LatticeField to which we are comparing
     */
-    void checkField(const LatticeField &a);
+    void checkField(const LatticeField &a) const;
     
     /**
        Read in the field specified by filenemae

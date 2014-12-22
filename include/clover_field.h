@@ -117,7 +117,7 @@ namespace quda {
       Copy from this CloverField into cpuCloverField cpu
       @param cpu The cpu clover destination field
     */
-    void saveCPUField(cpuCloverField &cpu);  
+    void saveCPUField(cpuCloverField &cpu) const;
 
 
     friend class DiracClover;

@@ -223,6 +223,33 @@ namespace quda {
 
   void cudaCloverField::loadCPUField(const cpuCloverField &cpu) { copy(cpu); }
 
+  void cudaCloverField::saveCPUField(cpuCloverField &cpu) const {
+    checkField(cpu);
+
+    // we know we are copying from GPU to CPU here, so for now just
+    // assume that reordering is on CPU
+    resizeBufferPinned(bytes + norm_bytes);
+    void *packClover = bufferPinned;
+    void *packCloverNorm = (precision == QUDA_HALF_PRECISION) ? (char*)bufferPinned + bytes : 0;
+
+    // first copy over the direct part (if it exists)
+    if (V(false)) {
+      cudaMemcpy(packClover, clover, bytes, cudaMemcpyHostToDevice);
+      if (precision == QUDA_HALF_PRECISION)
+	cudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyHostToDevice);
+      copyGenericClover(cpu, *this, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
+    }
+
+    // now copy the inverse part (if it exists)
+    if (V(true)) {
+      cudaMemcpy(packClover, cloverInv, bytes, cudaMemcpyHostToDevice);
+	if (precision == QUDA_HALF_PRECISION)
+	  cudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyHostToDevice);
+      copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
+    }
+
+  }
+
   /**
      Computes Fmunu given the gauge field U
   */
