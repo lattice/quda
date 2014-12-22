@@ -218,7 +218,10 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
+
+  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField &clover);
 
   // Even-odd preconditioned clover
   class DiracCloverPC : public DiracClover {

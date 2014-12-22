@@ -353,6 +353,69 @@ namespace quda {
     }
   }
 
+  template<typename Float, typename coarseGauge, typename F, typename clover>
+  void createCoarseClover(coarseGauge &X, F &V,  clover &C, int ndim, const int *x_size, const int *xc_size, const int *geo_bs, int spin_bs)  {
+
+    const int nDim = 4;
+    const Float half = 0.5;
+    int coord[QUDA_MAX_DIM];
+    int coord_coarse[QUDA_MAX_DIM];
+    int coarse_size = 1;
+    for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
+
+    for (int parity=0; parity<2; parity++) {
+      int x_cb = 0;
+      for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
+        for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
+          for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
+            for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
+
+              int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
+              coord[0] = 2*coord[0] + oddBit;
+              for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
+              int coarse_parity = 0;
+              for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
+              coarse_parity &= 1;
+              coord_coarse[0] /= 2;
+              int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
+
+              coord[0] /= 2;
+
+              //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu}
+
+                //printf("C.Ncolor() = %d C.NcolorCoarse() = %d\n",C.Ncolor(), C.NcolorCoarse());
+                for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin row
+                  for(int s_col = 0; s_col < V.Nspin(); s_col++) { //Loop over fine spin column
+
+                    for(int ic_c = 0; ic_c < X.NcolorCoarse(); ic_c++) { //Coarse Color row
+                      for(int jc_c = 0; jc_c < X.NcolorCoarse(); jc_c++) { //Coarse Color column
+
+                        for(int ic = 0; ic < C.Ncolor(); ic++) { //Sum over fine color row
+                          for(int jc = 0; jc < C.Ncolor(); jc++) {  //Sum over fine color column
+                          //printfQuda("coord[0] = %d, coord[1] = %d, coord[2] = %d, coord[3] = %d, x_size[0] = %d, x_size[1] = %d, x_size[2] \
+= %d, x_size[3] = %d, coarse_parity=%d, coarse_x_cb = %d, s=%d, s_col=%d, ic_c = %d, jc_c = %d, parity = %d, x_cb = %d, ic = %d, jc = %d, V.Ns\
+pin() = %d\n",coord[0], coord[1], coord[2], coord[3], x_size[0], x_size[1], x_size[2], x_size[3], coarse_parity, coarse_x_cb, s, s_col, ic_c, \
+jc_c, parity, x_cb, ic, jc, V.Nspin());
+                          X(0,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c) += conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col\
+, ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
+                          } //Fine color column
+                        }  //Fine color row
+                      } //Coarse Color column
+                    } //Coarse Color row
+                  }  //Fine spin column
+                } //Fine spin
+
+
+              x_cb++;
+            } // coord[0]
+          } // coord[1]
+        } // coord[2]
+      } // coord[3]
+    } // parity
+
+  }
+
+
   //Does the heavy lifting of creating the coarse color matrices Y
   template<typename Float, typename F, typename coarseGauge, typename fineGauge>
   void calculateY(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, const int *x_size) {
@@ -532,6 +595,58 @@ namespace quda {
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
+  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField &clover) {
+    QudaPrecision precision = Y.Precision();
+    //First make a cpu gauge field from the cuda gauge field
+
+    int pad = 0;
+    GaugeFieldParam gf_param(gauge.X(), precision, gauge.Reconstruct(), pad, gauge.Geometry());
+    gf_param.order = QUDA_QDP_GAUGE_ORDER;
+    gf_param.fixed = gauge.GaugeFixed();
+    gf_param.link_type = gauge.LinkType();
+    gf_param.t_boundary = gauge.TBoundary();
+    gf_param.anisotropy = gauge.Anisotropy();
+    gf_param.gauge = NULL;
+    gf_param.create = QUDA_NULL_FIELD_CREATE;
+    gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+
+    cpuGaugeField g(gf_param);
+
+    //Copy the cuda gauge field to the cpu
+    gauge.saveCPUField(g, QUDA_CPU_FIELD_LOCATION);
+
+    //Create a field UV which holds U*V.  Has the same structure as V.
+    ColorSpinorParam UVparam(T.Vectors());
+    UVparam.create = QUDA_ZERO_FIELD_CREATE;
+    cpuColorSpinorField uv(UVparam);
+
+    //Create a cpuCloverField from the cudaCloverField
+    CloverFieldParam cf_param;
+    cf_param.nDim = 4;
+    cf_param.pad = pad;
+    cf_param.precision = clover.Precision();
+    for(int i = 0; i < cf_param.nDim; i++) {
+      cf_param.x[i] = clover.X()[i];
+    }
+
+    cf_param.order = QUDA_PACKED_CLOVER_ORDER;
+    cf_param.direct = true;
+    cf_param.inverse = false;
+    cf_param.clover = NULL;
+    cf_param.norm = 0;
+    cf_param.cloverInv = NULL;
+    cf_param.invNorm = 0;
+    cf_param.create = QUDA_NULL_FIELD_CREATE;
+    cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+
+    cpuCloverField c(cf_param);
+    clover.saveCPUField(c);
+
+    calculateY(Y, X, uv, T, g);
+  }
+
+  //Calculates the coarse color matrix and puts the result in Y.
+  //N.B. Assumes Y, X have been allocated.
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge) {
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
@@ -559,6 +674,7 @@ namespace quda {
 
     calculateY(Y, X, uv, T, g);
   }
+
 
   //out(x) = (1-2*kappa*X)*in(x), where X is the local color-spin matrix on the coarse grid.
   template<typename Float, typename F, typename G>
