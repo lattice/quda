@@ -82,15 +82,18 @@
       //Spinor matrix vector product:
       void SpinorMatVec(void *spinorOut, const void *spinorSetIn, const int sld, const int slen, const void *vec, const int vlen);
 
+      void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *tau, void *Vm, const int cldn);
+
       //Pure LAPACK routines (when problem size is very small, no need for MAGMA routines):
 
       void LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldH, int* index_arr);//ipiv
       //Compute right eigenvectors and eigenvalues of a complex non-symm. matrix
-      void LapackRGEEV(void *Mat, const int m,  const int ldm, void *harVecs, const int *ldv, void *harVals);
+      void LapackRightEV(void *Mat, const int m,  const int ldm, void *harVecs, const int *ldv, void *harVals);
       //
       void LapackGEQR(const int n, void *Mat, const int m, const int ldm, void *tau);//QR decomposion of a (m by n) matrix, ldm is the leading dimension
       //
-      void LapackLCUNMQR(const int m, const int n, const int nref, void *QRM, const int ldm, void *tau, void *v, const int ldv);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
+      void LapackLeftConjUNMQR(const int m, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
+      void LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
       //
       void Sort(const int m, const int ldm, void *eVecs, const int nev, void *eVals);//Sort nev smallest eigenvectors
 
