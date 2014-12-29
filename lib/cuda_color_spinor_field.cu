@@ -34,6 +34,7 @@ namespace quda {
   cudaEvent_t cudaColorSpinorField::ipcRemoteEvent[2][2][QUDA_MAX_DIM];
   cudaIpcEventHandle_t cudaColorSpinorField::ipcLocalEventHandle[2][2][QUDA_MAX_DIM];
   cudaIpcEventHandle_t cudaColorSpinorField::ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
+  cudaEvent_t cudaColorSpinorField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
   // Pointers to ghost buffers on the local process and remote processes
   cudaIpcMemHandle_t cudaColorSpinorField::ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
@@ -49,9 +50,9 @@ namespace quda {
 
   void cudaColorSpinorField::createIPCDslashComms(){
 
-//#ifndef GPU_COMMS
-//    errorQUDA("GPU_COMMS must be enabled");
-//#else
+#ifndef GPU_COMMS
+    errorQUDA("GPU_COMMS must be enabled");
+ #else
     if(!initComms) errorQuda("Can only be called after create comms\n");
       
     comm_dslash_peer2peer_init();
@@ -76,6 +77,8 @@ namespace quda {
             cudaEventCreate(&ipcRemoteEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
             cudaIpcGetEventHandle(&ipcRemoteEventHandle[b][dir][dim], ipcRemoteEvent[b][dir][dim]);
 
+            // create the events used to record the end of the inter-process copy
+            cudaEventCreate(&ipcCopyEvent[b][dir][dim]);
 
             void* ghost_buffer = (dir==0) ? backGhostFaceBuffer[b][dim] : fwdGhostFaceBuffer[b][dim];
 
@@ -87,7 +90,7 @@ namespace quda {
                                                   &ipcRemoteGhostBufferHandle[b][1-dir][dim], 
                                                   sizeof(ipcRemoteGhostBufferHandle[b][1-dir][dim]));
 
-            void** remoteGhostSrcBuffer = (dir==1) ? &(fwdGhostFaceSrcBuffer[b][dim]) : &(backGhostFaceSrcBuffer[b][dim]);
+            void** remoteGhostSrcBuffer = (dir==0) ? &(fwdGhostFaceSrcBuffer[b][dim]) : &(backGhostFaceSrcBuffer[b][dim]);
 
             cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][1-dir][dim], cudaIpcMemLazyEnablePeerAccess); 
  
@@ -95,7 +98,7 @@ namespace quda {
         }
       }
     }
-//#endif
+#endif
   }
 
 
@@ -1371,6 +1374,9 @@ namespace quda {
   void cudaColorSpinorField::recvStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir/2;
     if(!commDimPartitioned(dim)) return;
+#ifdef GPU_COMMS
+    if(!comm_dslash_peer2peer_enabled(dir%2,dim)){
+#endif
 
     if (dir%2 == 0) { // sending backwards
       // Prepost receive
@@ -1379,6 +1385,10 @@ namespace quda {
       // Prepost receive
       comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
     }
+#ifdef GPU_COMMS
+    } // if !peer-to-peer enabled
+#endif
+
 #ifdef GPU_COMMS
     if(precision != QUDA_HALF_PRECISION) return;
 
@@ -1395,12 +1405,39 @@ namespace quda {
   void cudaColorSpinorField::sendStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return;
+#ifdef GPU_COMMS
+    if(!comm_dslash_peer2peer_enabled(dir%2,dim)){
+#endif
+      if (dir%2 == 0) { // sending backwards
+        comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+      } else { //sending forwards
+        comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+      }
+#ifdef GPU_COMMS 
+    }else{ // if(comms_dslash_peer2peer_enabled(dir%2,dim)
 
-    if (dir%2 == 0) { // sending backwards
-      comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
-    } else { //sending forwards
-      comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+      // Local packing complete 
+      // The remote process in the dir direction is now free to initiate 
+      // inter-device copy  
+      cudaEventRecord(ipcLocalEvent[bufferIndex][dir%2][dim]);
+  
+      // Wait for the remote process  
+      cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1-(dir%2)][dim], 0);
+
+      // The following code actually initiates a receive
+      if(dir%2 == 0){
+        cudaMemcpyAsync(from_fwd_face[bufferIndex][dim], 
+                        fwdGhostFaceSrcBuffer[bufferIndex][dim],
+                        ghost_face_bytes[dim], cudaMemcpyDeviceToDevice, *stream_p);
+      } else { // remote process sends forwards
+        cudaMemcpyAsync(from_back_face[bufferIndex][dim],
+                        backGhostFaceSrcBuffer[bufferIndex][dim],
+                        ghost_face_bytes[dim], cudaMemcpyDeviceToDevice, *stream_p);
+      }
     }
+#endif
+
+
 #ifdef GPU_COMMS
     if(precision != QUDA_HALF_PRECISION) return;
     if (dir%2 == 0) { // sending backwards
@@ -1420,32 +1457,37 @@ namespace quda {
 #ifdef GPU_COMMS
     if(!comm_dslash_peer2peer_enabled(dir%2,dim)){
 #endif
-    if (dir%2 == 0) { // sending backwards
-      // Prepost receive
-      comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
-      comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
-    } else { //sending forwards
-      // Prepost receive
-      comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
-      // Begin forward send
-      comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
-    }
+      if (dir%2 == 0) { // sending backwards
+        // Prepost receive
+        comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+        comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+      } else { //sending forwards
+        // Prepost receive
+        comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
+        // Begin forward send
+        comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+      }
 #ifdef GPU_COMMS
    }else{ // if(comms_dslash_peer2peer_enabled(dir%2,dim) 
      // indicates that the remote process in the dir direction is free to initiate an inter-device copy
      cudaEventRecord(ipcLocalEvent[bufferIndex][dir%2][dim]);
 
-     // wait for the process in the 1-dir direction to get to the same point
+     // wait for the remote process to get to the same point
      cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1-(dir%2)][dim], 0);
-     // copy from the 1-dir process
-     if(dir%2 == 0){ // remote process sends backwards
-      cudaMemcpyAsync(from_back_face[bufferIndex][dim], 
-                      backGhostFaceSrcBuffer[bufferIndex][dim], 
-                      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice, *stream_p);
-     } else { // remote process sends forwards
+     // copy from the process in the dir direction
+     if(dir%2 == 0){ // remote process sends forwards
+      // fwdGhostFaceSrcBuffer is on the remote process
       cudaMemcpyAsync(from_fwd_face[bufferIndex][dim], 
                       fwdGhostFaceSrcBuffer[bufferIndex][dim], 
                       ghost_face_bytes[dim], cudaMemcpyDeviceToDevice, *stream_p);
+
+      cudaEventRecord(ipcCopyEvent[bufferIndex][dir%2][dim]);
+     } else { // remote process sends backwards
+      cudaMemcpyAsync(from_back_face[bufferIndex][dim], 
+                      backGhostFaceSrcBuffer[bufferIndex][dim], 
+                      ghost_face_bytes[dim], cudaMemcpyDeviceToDevice, *stream_p);
+ 
+      cudaEventRecord(ipcCopyEvent[bufferIndex][dir%2][dim]);
      }
    }  
 
@@ -1471,6 +1513,10 @@ namespace quda {
     if(!commDimPartitioned(dim)) return 0;
 
 #ifdef GPU_COMMS
+    if(!comm_dslash_peer2peer_enabled(dir%2,dim)){
+#endif
+
+#ifdef GPU_COMMS
     if(precision != QUDA_HALF_PRECISION){
 #endif
     if(dir%2==0) {
@@ -1494,6 +1540,19 @@ namespace quda {
 	  comm_query(mh_send_norm_fwd[bufferIndex][nFace-1][2*dim+dagger])) return 1;
     }
    } // half precision
+#endif
+
+#ifdef GPU_COMMS
+  // !peer-to-peer enabled
+  } else {
+    // Query the peer-to-peer asynchronous copy. 
+    // At the moment, I just imitate what the QMP/MPI comms are doing. 
+    cudaError_t event_test = cudaEventQuery(ipcCopyEvent[bufferIndex][dir%2][dir/2]);
+    if(cudaSuccess == event_test) {
+      return 1;
+    } 
+
+  }
 #endif
     return 0;
   }

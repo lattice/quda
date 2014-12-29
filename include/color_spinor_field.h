@@ -366,11 +366,12 @@ namespace quda {
 
     static cudaIpcMemHandle_t ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
     static cudaIpcMemHandle_t ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
-  
+ 
     static void* fwdGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
     static void* backGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
 
-
+    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+  
 
     void create(const QudaFieldCreate);
     void destroy();
