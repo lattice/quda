@@ -309,7 +309,8 @@ struct GaugeFixQualityArg {
   double2 *quality;
   double2 *quality_h;
   GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data)
-    : dataOr(dataOr), quality_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
+    : dataOr(dataOr) {
+    //: dataOr(dataOr), quality_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
 
     for(int dir=0; dir<4; ++dir){
       X[dir] = data.X()[dir] - data.R()[dir]*2;
@@ -318,7 +319,9 @@ struct GaugeFixQualityArg {
       #endif
     }
     threads = X[0]*X[1]*X[2]*X[3];
-    cudaHostGetDevicePointer(&quality, quality_h, 0);
+    quality = (double2*)device_malloc(sizeof(double2));
+    quality_h = (double2*)safe_malloc(sizeof(double2));
+    //cudaHostGetDevicePointer(&quality, quality_h, 0);
   }
   double getAction(){return quality_h[0].x;}
   double getTheta(){return quality_h[0].y;}
@@ -403,16 +406,17 @@ class GaugeFixQuality : Tunable {
   public:
   GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ)
     : argQ(argQ) {}
-  ~GaugeFixQuality () { host_free(argQ.quality_h);}
+  ~GaugeFixQuality () { host_free(argQ.quality_h);device_free(argQ.quality);}
 
   void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      argQ.quality_h[0] = make_double2(0.0,0.0);
+      //argQ.quality_h[0] = make_double2(0.0,0.0);
+      cudaMemset(argQ.quality, 0, sizeof(double2));
       LAUNCH_KERNEL(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
-      cudaDeviceSynchronize();
-      #ifdef MULTI_GPU
-        
-        comm_allreduce_array((double*)argQ.quality_h, 2);
+      cudaMemcpy(argQ.quality_h, argQ.quality, sizeof(double2), cudaMemcpyDeviceToHost);
+      //cudaDeviceSynchronize();
+      #ifdef MULTI_GPU        
+        if(comm_size() != 1) comm_allreduce_array((double*)argQ.quality_h, 2);
         const int nNodes = comm_dim(0)*comm_dim(1)*comm_dim(2)*comm_dim(3);
         argQ.quality_h[0].x  /= (double)(3*gauge_dir*argQ.threads*nNodes);
         argQ.quality_h[0].y  /= (double)(3*argQ.threads*nNodes);
