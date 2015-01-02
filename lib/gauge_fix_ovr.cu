@@ -13,8 +13,10 @@
 #include <comm_quda.h>
 
 
-#include <gauge_fix_ovr_extra.h> //some extra stuff for multi-GPU gauge fixing using thrust library
- //due to some incompatibilities with this library, that code cannot compile here...
+#include <gauge_fix_ovr_extra.h>
+
+
+#include <gauge_fix_ovr_hit_devf.cuh>
 
 
 namespace quda {
@@ -65,7 +67,7 @@ static int numParams = 18;
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
     }\
   }\
-  else{\
+  else if(tp.block.z==2){\
   switch (tp.block.x) {             \
   case 256:                \
     kernel<2, 32,__VA_ARGS__>           \
@@ -86,6 +88,123 @@ static int numParams = 18;
   default:                \
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
     }\
+  }\
+  else if(tp.block.z==3){\
+  switch (tp.block.x) {             \
+  case 128:                \
+    kernel<3, 32,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 256:                \
+    kernel<3, 64,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 384:                \
+    kernel<3, 96,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 512:               \
+    kernel<3, 128,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 640:               \
+    kernel<3, 160,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 768:               \
+    kernel<3, 192,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 896:               \
+    kernel<3, 224,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 1024:               \
+    kernel<3, 256,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  default:                \
+    errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
+    }\
+  }\
+  else if(tp.block.z==4){\
+  switch (tp.block.x) {             \
+  case 128:                \
+    kernel<4, 32,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 256:                \
+    kernel<4, 64,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 384:                \
+    kernel<4, 96,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 512:               \
+    kernel<4, 128,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 640:               \
+    kernel<4, 160,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 768:               \
+    kernel<4, 192,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 896:               \
+    kernel<4, 224,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 1024:               \
+    kernel<4, 256,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  default:                \
+    errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
+    }\
+  }\
+  else if(tp.block.z==5){\
+  switch (tp.block.x) {             \
+  case 128:                \
+    kernel<5, 32,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 256:                \
+    kernel<5, 64,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 384:                \
+    kernel<5, 96,__VA_ARGS__>           \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 512:               \
+    kernel<5, 128,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 640:               \
+    kernel<5, 160,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 768:               \
+    kernel<5, 192,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 896:               \
+    kernel<5, 224,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  case 1024:               \
+    kernel<5, 256,__VA_ARGS__>            \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>>(arg, parity);   \
+    break;                \
+  default:                \
+    errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
+    }\
+  }\
+  else{\
+    errorQuda("Not implemented for %d", tp.block.z);\
   }
 
 
@@ -172,377 +291,6 @@ static __device__ __host__ inline void getCoords3(int x[4], int cb_index, const 
   return;
 }
 
-
-
-
-template<class T>
-struct SharedMemory
-{
-    __device__ inline operator       T*()
-        {
-            extern __shared__ int __smem[];
-            return (T*)__smem;
-        }
-
-    __device__ inline operator const T*() const
-        {
-            extern __shared__ int __smem[];
-            return (T*)__smem;
-        }
-};
-
-template<int NCOLORS>
-static __host__ __device__ inline void   IndexBlock(int block, int &p, int &q){
-  if (NCOLORS == 3){
-    if(block == 0){p=0;q=1;}
-    else if(block == 1){p=1;q=2;}
-    else{p=0;q=2;}
-  }
-  else{ 
-      int i1;
-      int found = 0;
-      int del_i = 0;
-      int index = -1;
-      while ( del_i < (NCOLORS-1) && found == 0 ){
-          del_i++;
-          for ( i1 = 0; i1 < (NCOLORS-del_i); i1++ ){
-              index++;
-              if ( index == block ){
-                  found = 1;
-                  break;
-              }
-          }
-      }
-      q = i1 + del_i;
-      p = i1;
-  }
-}
-
-
-__inline__ __device__ double atomicAdd(double *addr, double val){
-  double old=*addr, assumed;
-  do {
-    assumed = old;
-    old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-            __double_as_longlong(assumed),
-            __double_as_longlong(val+assumed)));
-  } while( __double_as_longlong(assumed)!=__double_as_longlong(old) );
-  
-  return old;
-}
-
-__inline__ __device__ double2 atomicAdd(double2 *addr, double2 val){
-    double2 old=*addr;
-    old.x = atomicAdd((double*)addr, val.x);
-    old.y = atomicAdd((double*)addr+1, val.y);
-    return old;
-  }
-
-
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 200
-//CUDA 6.5 NOT DETECTING ATOMICADD FOR FLOAT TYPE!!!!!!!
-__inline__ __device__ float atomicAdd(float *address, float val)
-{
-  return __fAtomicAdd(address, val);
-}
-#endif /* !__CUDA_ARCH__ || __CUDA_ARCH__ >= 200 */
-
-
-
-template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-__forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
-
-  //Container for the four real parameters of SU(2) subgroup in shared memory
-  //__shared__ Float elems[blockSize * 4];
-  Float *elems = SharedMemory<Float>();
-  //initialize shared memory
-  if( threadIdx.x < blockSize * 4) elems[threadIdx.x] = 0.0;
-  __syncthreads();
-
-
-  //Loop over all SU(2) subroups of SU(N)
-  //#pragma unroll
-  for(int block = 0; block < (NCOLORS*(NCOLORS-1)/2); block++){
-    int p, q;
-    //Get the two indices for the SU(N) matrix
-    IndexBlock<NCOLORS>(block, p, q);
-    Float asq = 1.0;
-    if(threadIdx.x < blockSize * 4) asq = -1.0;
-    //FOR COULOMB AND LANDAU!!!!!!!!
-    //if(nu0<gauge_dir){
-    //In terms of thread index
-    if(threadIdx.x < blockSize * gauge_dir || (threadIdx.x >= blockSize * 4 && threadIdx.x < blockSize * (gauge_dir + 4))){
-      //Retrieve the four SU(2) parameters...
-      // a0
-      atomicAdd(elems + tid, (link(p,p)).x + (link(q,q)).x);//a0
-      // a1
-      atomicAdd(elems + tid + blockSize, (link(p,q).y + link(q,p).y) * asq);//a1
-      // a2
-      atomicAdd(elems + tid + blockSize * 2, (link(p,q).x - link(q,p).x) * asq);//a2
-      // a3
-      atomicAdd(elems + tid + blockSize * 3, (link(p,p).y - link(q,q).y) * asq);//a3
-    }//FLOP per lattice site = gauge_dir * 2 * (4 + 7) = gauge_dir * 22
-    __syncthreads();
-    if( threadIdx.x < blockSize){
-      //Over-relaxation boost
-      asq =  elems[threadIdx.x + blockSize] * elems[threadIdx.x + blockSize];
-      asq += elems[threadIdx.x + blockSize * 2] * elems[threadIdx.x + blockSize * 2];
-      asq += elems[threadIdx.x + blockSize * 3] * elems[threadIdx.x + blockSize * 3];
-      Float a0sq = elems[threadIdx.x] * elems[threadIdx.x];
-      Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-      Float r = rsqrt((a0sq + x * x * asq));
-      elems[threadIdx.x] *= r;
-      elems[threadIdx.x + blockSize] *= x * r;
-      elems[threadIdx.x + blockSize * 2] *= x * r;
-      elems[threadIdx.x + blockSize * 3] *= x * r;
-    }//FLOP per lattice site = 22CUB: "Collective" Software Primitives for CUDA Kernel Development
-    __syncthreads();
-        //_____________
-    if(threadIdx.x < blockSize * 4){
-      Float2 m0;
-      //Do SU(2) hit on all upward links
-      //left multiply an su3_matrix by an su2 matrix
-      //link <- u * link
-      //#pragma unroll 
-      for(int j = 0; j < NCOLORS; j++){
-        m0 = link(p,j);
-        link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-        link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
-      }
-    }
-    else{
-      Float2 m0;
-      //Do SU(2) hit on all downward links
-      //right multiply an su3_matrix by an su2 matrix
-      //link <- link * u_adj
-      //#pragma unroll
-      for(int j = 0; j < NCOLORS; j++){
-        m0 = link(j,p);
-        link(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
-        link(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
-      }
-    }
-        //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
-    if(block < (NCOLORS*(NCOLORS-1)/2)-1){
-      __syncthreads();
-      //reset shared memory SU(2) elements
-      if( threadIdx.x < blockSize * 4) elems[threadIdx.x] = 0.0;
-      __syncthreads();
-    }
-  }//FLOP per lattice site = (block < NCOLORS * ( NCOLORS - 1) / 2) * (22 + 28 gauge_dir + 224 NCOLORS)
-  //write updated link to global memory
-}
-
-
-
-template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-__forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
-
-  //Container for the four real parameters of SU(2) subgroup in shared memory
-  //__shared__ Float elems[blockSize * 4 * 8];
-  Float *elems = SharedMemory<Float>();
-
-
-  //Loop over all SU(2) subroups of SU(N)
-  //#pragma unroll
-  for(int block = 0; block < (NCOLORS * (NCOLORS-1)/2); block++){
-    int p, q;
-    //Get the two indices for the SU(N) matrix
-    IndexBlock<NCOLORS>(block, p, q);
-    /*Float asq = 1.0;
-    if(threadIdx.x < blockSize * 4) asq = -1.0;
-    if(threadIdx.x < blockSize * gauge_dir || (threadIdx.x >= blockSize * 4 && threadIdx.x < blockSize * (gauge_dir + 4))){
-      elems[threadIdx.x] = link(p,p).x + link(q,q).x;
-      elems[threadIdx.x + blockSize * 8] = (link(p,q).y + link(q,p).y) * asq;
-      elems[threadIdx.x + blockSize * 8 * 2] = (link(p,q).x - link(q,p).x) * asq;
-      elems[threadIdx.x + blockSize * 8 * 3] = (link(p,p).y - link(q,q).y) * asq;
-    }*///FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
-    if(threadIdx.x < blockSize * gauge_dir){
-      elems[threadIdx.x] = link(p,p).x + link(q,q).x;
-      elems[threadIdx.x + blockSize * 8] = -(link(p,q).y + link(q,p).y);
-      elems[threadIdx.x + blockSize * 8 * 2] = -(link(p,q).x - link(q,p).x);
-      elems[threadIdx.x + blockSize * 8 * 3] = -(link(p,p).y - link(q,q).y);
-    }
-    if((threadIdx.x >= blockSize * 4 && threadIdx.x < blockSize * (gauge_dir + 4))){
-      elems[threadIdx.x] = link(p,p).x + link(q,q).x;
-      elems[threadIdx.x + blockSize * 8] = (link(p,q).y + link(q,p).y);
-      elems[threadIdx.x + blockSize * 8 * 2] = (link(p,q).x - link(q,p).x);
-      elems[threadIdx.x + blockSize * 8 * 3] = (link(p,p).y - link(q,q).y);
-    }
-    //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
-    __syncthreads();
-    if( threadIdx.x < blockSize){
-      Float a0, a1, a2, a3;
-      a0 = 0.0; a1 = 0.0; a2 = 0.0; a3 = 0.0;
-      #pragma unroll
-      for(int i = 0; i < gauge_dir; i++){
-        a0 += elems[tid + i * blockSize] + elems[tid + (i + 4) * blockSize];
-        a1 += elems[tid + i * blockSize + blockSize * 8] + elems[tid + (i + 4) * blockSize + blockSize * 8];
-        a2 += elems[tid + i * blockSize + blockSize * 8 * 2] + elems[tid + (i + 4) * blockSize + blockSize * 8 * 2];
-        a3 += elems[tid + i * blockSize + blockSize * 8 * 3] + elems[tid + (i + 4) * blockSize + blockSize * 8 * 3];
-      } 
-      //Over-relaxation boost
-      Float asq =  a1 * a1 + a2 * a2 + a3 * a3;
-      Float a0sq = a0 * a0;
-      Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-      Float r = rsqrt((a0sq + x * x * asq));
-      elems[threadIdx.x] = a0 * r;
-      elems[threadIdx.x + blockSize] = a1 * x * r;
-      elems[threadIdx.x + blockSize * 2] = a2 * x * r;
-      elems[threadIdx.x + blockSize * 3] = a3 * x * r;
-    }//FLOP per lattice site = 22 + 8 * 4
-    __syncthreads();
-        //_____________
-    if(threadIdx.x < blockSize * 4){
-      Float2 m0;
-      //Do SU(2) hit on all upward links
-      //left multiply an su3_matrix by an su2 matrix
-      //link <- u * link
-      //#pragma unroll 
-      for(int j = 0; j < NCOLORS; j++){
-        m0 = link(p,j);
-        link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-        link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
-      }
-    }
-    else{
-      Float2 m0;
-      //Do SU(2) hit on all downward links
-      //right multiply an su3_matrix by an su2 matrix
-      //link <- link * u_adj
-      //#pragma unroll
-      for(int j = 0; j < NCOLORS; j++){
-        m0 = link(j,p);
-        link(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
-        link(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
-      }
-    }
-    //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
-    if(block < (NCOLORS*(NCOLORS-1)/2)-1){ __syncthreads(); }
-  }//FLOP per lattice site = (NCOLORS * ( NCOLORS - 1) / 2) * (22 + 28 gauge_dir + 224 NCOLORS)
-  //write updated link to global memory
-}
-
-
-
-template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
-__forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
-
-  //Container for the four real parameters of SU(2) subgroup in shared memory
-  //__shared__ Float elems[blockSize * 4 * 8];
-  Float *elems = SharedMemory<Float>();
-
-  //Loop over all SU(2) subroups of SU(N)
-  //#pragma unroll
-  for(int block = 0; block < (NCOLORS * (NCOLORS-1)/2); block++){
-    int p, q;
-    //Get the two indices for the SU(N) matrix
-    IndexBlock<NCOLORS>(block, p, q);
-
-    if(threadIdx.x < blockSize){
-      elems[tid] = link(p,p).x + link(q,q).x;
-      elems[tid + blockSize] = -(link(p,q).y + link(q,p).y);
-      elems[tid + blockSize * 2] = -(link(p,q).x - link(q,p).x);
-      elems[tid + blockSize * 3] = -(link(p,p).y - link(q,q).y);
-    }
-    __syncthreads();
-    if(threadIdx.x < blockSize * 2 && threadIdx.x >= blockSize){
-      elems[tid] += link(p,p).x + link(q,q).x;
-      elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
-      elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
-      elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
-    }
-    __syncthreads();
-    if(threadIdx.x < blockSize * 3 && threadIdx.x >= blockSize * 2){
-      elems[tid] += link(p,p).x + link(q,q).x;
-      elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
-      elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
-      elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
-    }
-    if(gauge_dir==4){
-      __syncthreads();
-      if(threadIdx.x < blockSize * 4 && threadIdx.x >= blockSize * 3){
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] -= (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] -= (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] -= (link(p,p).y - link(q,q).y);
-      }
-    }
-    __syncthreads();
-    if(threadIdx.x < blockSize * 5 && threadIdx.x >= blockSize * 4){
-      elems[tid] += link(p,p).x + link(q,q).x;
-      elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-      elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-      elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-    }
-    __syncthreads();
-    if(threadIdx.x < blockSize * 6 && threadIdx.x >= blockSize * 5){
-      elems[tid] += link(p,p).x + link(q,q).x;
-      elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-      elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-      elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-    }
-    __syncthreads();
-    if(threadIdx.x < blockSize * 7 && threadIdx.x >= blockSize * 6){
-      elems[tid] += link(p,p).x + link(q,q).x;
-      elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-      elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-      elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-    }
-    if(gauge_dir==4){
-      __syncthreads();
-      if(threadIdx.x < blockSize * 8 && threadIdx.x >= blockSize * 7){
-        elems[tid] += link(p,p).x + link(q,q).x;
-        elems[tid + blockSize] += (link(p,q).y + link(q,p).y);
-        elems[tid + blockSize * 2] += (link(p,q).x - link(q,p).x);
-        elems[tid + blockSize * 3] += (link(p,p).y - link(q,q).y);
-      }
-    }
-     //FLOP per lattice site = gauge_dir * 2 * 7 = gauge_dir * 14
-    __syncthreads();
-    if( threadIdx.x < blockSize){
-      Float asq =  elems[tid + blockSize] * elems[tid + blockSize];
-      asq += elems[tid + blockSize * 2] * elems[tid + blockSize * 2];
-      asq += elems[tid + blockSize * 3] * elems[tid + blockSize * 3];
-      Float a0sq = elems[tid] * elems[tid];
-      Float x = (relax_boost * a0sq + asq) / (a0sq + asq);
-      Float r = rsqrt((a0sq + x * x * asq));
-      elems[tid] *= r;
-      elems[tid + blockSize] *= x * r;
-      elems[tid + blockSize * 2] *= x * r;
-      elems[tid + blockSize * 3] *= x * r;
-    }//FLOP per lattice site = 22 + 8 * 4
-    __syncthreads();
-        //_____________
-    if(threadIdx.x < blockSize * 4){
-      Float2 m0;
-      //Do SU(2) hit on all upward links
-      //left multiply an su3_matrix by an su2 matrix
-      //link <- u * link
-      //#pragma unroll 
-      for(int j = 0; j < NCOLORS; j++){
-        m0 = link(p,j);
-        link(p,j) = makeComplex( elems[tid], elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], elems[tid + blockSize] ) * link(q,j);
-        link(q,j) = makeComplex(-elems[tid + blockSize * 2], elems[tid + blockSize]) * m0 + makeComplex( elems[tid],-elems[tid + blockSize * 3] ) * link(q,j);
-      }
-    }
-    else{
-      Float2 m0;
-      //Do SU(2) hit on all downward links
-      //right multiply an su3_matrix by an su2 matrix
-      //link <- link * u_adj
-      //#pragma unroll
-      for(int j = 0; j < NCOLORS; j++){
-        m0 = link(j,p);
-        link(j,p) = makeComplex( elems[tid], -elems[tid + blockSize * 3] ) * m0 + makeComplex( elems[tid + blockSize * 2], -elems[tid + blockSize] ) * link(j,q);
-        link(j,q) = makeComplex(-elems[tid + blockSize * 2], -elems[tid + blockSize]) * m0 + makeComplex( elems[tid],elems[tid + blockSize * 3] ) * link(j,q);
-      }
-    }
-    //_____________ //FLOP per lattice site = 8 * NCOLORS * 2 * (2*6+2) = NCOLORS * 224
-    if(block < (NCOLORS*(NCOLORS-1)/2)-1){ __syncthreads(); }
-  }//FLOP per lattice site = (NCOLORS * ( NCOLORS - 1) / 2) * (22 + 28 gauge_dir + 224 NCOLORS)
-  //write updated link to global memory
-}
 
 
 
@@ -728,7 +476,7 @@ struct GaugeFixArg {
 
 
 
-template<int atomicadd, int blockSize, typename Float, typename Gauge, int gauge_dir>
+template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
 __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity){
   int tid = (threadIdx.x + blockSize) % blockSize;  
   int idx = blockIdx.x * blockSize + tid;
@@ -737,33 +485,68 @@ __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity){
 
   typedef typename ComplexTypeId<Float>::Type Cmplx;
 
-  int X[4]; 
-  #pragma unroll
-  for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
+  if(ImplementationType<3){
+    int X[4]; 
+    #pragma unroll
+    for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
-  int x[4];
-  getCoords3(x, idx, X, parity);
-#ifdef MULTI_GPU
-  #pragma unroll
-  for(int dr=0; dr<4; ++dr) {
-       x[dr] += arg.border[dr];
-       X[dr] += 2*arg.border[dr];
+    int x[4];
+    getCoords3(x, idx, X, parity);
+  #ifdef MULTI_GPU
+    #pragma unroll
+    for(int dr=0; dr<4; ++dr) {
+         x[dr] += arg.border[dr];
+         X[dr] += 2*arg.border[dr];
+    }
+  #endif
+    int mu = (threadIdx.x / blockSize);
+    int oddbit = parity;
+    if(threadIdx.x >= blockSize * 4){
+      mu -= 4;
+      x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
+      oddbit = 1 - parity;
+    }
+    idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link;
+    arg.dataOr.load((Float*)(link.data),idx, mu, oddbit);
+    if(ImplementationType==0) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    if(ImplementationType==1) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    if(ImplementationType==2)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    arg.dataOr.save((Float*)(link.data),idx, mu, oddbit);
   }
-#endif
-  int mu = (threadIdx.x / blockSize);
-  int oddbit = parity;
-  if(threadIdx.x >= blockSize * 4){
-    mu -= 4;
+  else{
+    int X[4]; 
+    #pragma unroll
+    for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
+
+    int x[4];
+    getCoords3(x, idx, X, parity);
+  #ifdef MULTI_GPU
+    #pragma unroll
+    for(int dr=0; dr<4; ++dr) {
+         x[dr] += arg.border[dr];
+         X[dr] += 2*arg.border[dr];
+    }
+  #endif
+    int mu = (threadIdx.x / blockSize);
+    idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link;
+    arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+
+
     x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-    oddbit = 1 - parity;
+    int idx1 = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link1;
+    arg.dataOr.load((Float*)(link1.data),idx1, mu, 1-parity);
+
+    if(ImplementationType==3) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+    if(ImplementationType==4) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+    if(ImplementationType==5)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+
+    arg.dataOr.save((Float*)(link.data),idx, mu, parity);
+    arg.dataOr.save((Float*)(link1.data),idx1, mu, 1-parity);
+
   }
-  idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
-  Matrix<Cmplx,3> link;
-  arg.dataOr.load((Float*)(link.data),idx, mu, oddbit);
-  if(atomicadd==1) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  if(atomicadd==0) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  if(atomicadd==2)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  arg.dataOr.save((Float*)(link.data),idx, mu, oddbit);
 }
 
 
@@ -780,29 +563,35 @@ protected:
 
   dim3 createGrid   (const dim3 &block) const {
     unsigned int blockx = block.x / 8;
+    if(block.z > 2) blockx = block.x / 4;
     unsigned int  gx  = (arg.threads + blockx - 1) / blockx;
-    unsigned int  gy  = 1;
-    unsigned int  gz  = 1;
-    return  dim3(gx, gy, gz);
+    return  dim3(gx, 1, 1);
   }
   bool advanceBlockDim  (TuneParam &param) const {
     //Use param.block.z to tune and save state for best kernel option
-    // to make use or not of atomicAdd operations
-    const unsigned int min_threads = 32 * 8;
+    // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
+    const unsigned int min_threads0 = 32 * 8;
+    const unsigned int min_threads1 = 32 * 4;
     const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
     const unsigned int atmadd = 0;
-    param.block.x += min_threads;   
-    param.block.y = 1;    
+    unsigned int min_threads = min_threads0;
     param.block.z += atmadd;    //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
+    if(param.block.z > 2) min_threads = 32 * 4;
+    param.block.x += min_threads;
+    param.block.y = 1;    
     param.grid  = createGrid(param.block);
 
+
+    
     if  ((param.block.x >= min_threads) && (param.block.x <= max_threads)){
       if(param.block.z == 0) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-      else param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 1 || param.block.z == 2) param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 3) param.shared_bytes = param.block.x * 4 * sizeof(Float);
+      else if(param.block.z == 4 || param.block.z == 5) param.shared_bytes = param.block.x * sizeof(Float);
       return  true;
     }
     else if(param.block.z == 0){
-      param.block.x = min_threads;   
+      param.block.x = min_threads0;   
       param.block.y = 1;    
       param.block.z = 1;    //USE FOR ATOMIC ADD
       param.grid  = createGrid(param.block);
@@ -810,11 +599,35 @@ protected:
       return true;
     }
     else if(param.block.z == 1){
-      param.block.x = min_threads;   
+      param.block.x = min_threads0;   
       param.block.y = 1;    
       param.block.z = 2;    //USE FOR NO ATOMIC ADD and LESS SHARED MEM
       param.grid  = createGrid(param.block);
       param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      return true;
+    }
+    else if(param.block.z == 2){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 3;        //USE FOR NO ATOMIC ADD 
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * 4 * sizeof(Float);
+      return true;
+    }
+    else if(param.block.z == 3){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 4;
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * sizeof(Float);
+      return true;
+    }
+    else if(param.block.z == 4){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 5;
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * sizeof(Float);
       return true;
     }
     else
@@ -826,7 +639,9 @@ protected:
   }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { 
       if(param.block.z == 0) return param.block.x * 4 * sizeof(Float);
-      else return param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 1 || param.block.z == 2) return param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 3) return param.block.x * 4 * sizeof(Float);
+      else return param.block.x * sizeof(Float);
   }
 
   bool tuneSharedBytes() const { return false; } // Don't tune shared memory
@@ -834,6 +649,12 @@ protected:
   unsigned int minThreads() const { return arg.threads; }
 
   public:
+  virtual void initTuneParam(TuneParam &param) const{
+    param.block = dim3(256, 1, 0);
+    param.grid = createGrid(param.block);
+    param.shared_bytes = param.block.x * 4 * sizeof(Float);
+  }
+
   GaugeFix(GaugeFixArg<Float, Gauge> &arg) : arg(arg) {
       int parity = 0;
     }
@@ -843,12 +664,6 @@ protected:
   void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     LAUNCH_KERNEL_GAUGEFIX(computeFix, tp, stream, arg, parity, Float, Gauge, gauge_dir);
-  }
-
-  virtual void initTuneParam(TuneParam &param) const{
-    param.block = dim3(256, 1, 0);
-    param.grid = createGrid(param.block);
-    param.shared_bytes = param.block.x * 4 * sizeof(Float);
   }
 
   /** Sets default values for when tuning is disabled - this is guaranteed to work, but will be slow */
@@ -913,7 +728,7 @@ struct GaugeFixInteriorPointsArg {
 
 
 
-template<int atomicadd, int blockSize, typename Float, typename Gauge, int gauge_dir>
+template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
 __global__ void computeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> arg, int parity){
   int tid = (threadIdx.x + blockSize) % blockSize;  
   int idx = blockIdx.x * blockSize + tid;
@@ -942,19 +757,43 @@ __global__ void computeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge>
   getCoords3(x, idx, X, parity);
 #endif
   int mu = (threadIdx.x / blockSize);
-  if(threadIdx.x >= blockSize * 4){
-    mu -= 4;
-    x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-    parity = 1 - parity;
+
+  if(ImplementationType<3){
+    if(threadIdx.x >= blockSize * 4){
+      mu -= 4;
+      x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
+      parity = 1 - parity;
+    }
+    idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link;
+    arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+    if(ImplementationType==0) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    if(ImplementationType==1) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    if(ImplementationType==2)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    arg.dataOr.save((Float*)(link.data),idx, mu, parity);
   }
-  idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
-  Matrix<Cmplx,3> link;
-  arg.dataOr.load((Float*)(link.data),idx, mu, parity);
-  if(atomicadd==1) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  if(atomicadd==0) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  if(atomicadd==2)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  arg.dataOr.save((Float*)(link.data),idx, mu, parity);
+ else{
+    idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link;
+    arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+
+
+    x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
+    int idx1 = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link1;
+    arg.dataOr.load((Float*)(link1.data),idx1, mu, 1-parity);
+
+    if(ImplementationType==3) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+    if(ImplementationType==4) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+    if(ImplementationType==5)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+
+    arg.dataOr.save((Float*)(link.data),idx, mu, parity);
+    arg.dataOr.save((Float*)(link1.data),idx1, mu, 1-parity);
+
+  }
 }
+
+
 
 
 
@@ -970,30 +809,35 @@ protected:
 
   dim3 createGrid   (const dim3 &block) const {
     unsigned int blockx = block.x / 8;
+    if(block.z > 2) blockx = block.x / 4;
     unsigned int  gx  = (arg.threads + blockx - 1) / blockx;
-    unsigned int  gy  = 1;
-    unsigned int  gz  = 1;
-    return  dim3(gx, gy, gz);
+    return  dim3(gx, 1, 1);
   }
   bool advanceBlockDim  (TuneParam &param) const {
     //Use param.block.z to tune and save state for best kernel option
-    // to make use or not of atomicAdd operations
-    const unsigned int min_threads = 32 * 8;
+    // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
+    const unsigned int min_threads0 = 32 * 8;
+    const unsigned int min_threads1 = 32 * 4;
     const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
     const unsigned int atmadd = 0;
-    param.block.x += min_threads;   
-    param.block.y = 1;    
+    unsigned int min_threads = min_threads0;
     param.block.z += atmadd;    //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
+    if(param.block.z > 2) min_threads = 32 * 4;
+    param.block.x += min_threads;
+    param.block.y = 1;    
     param.grid  = createGrid(param.block);
 
-   
+
+    
     if  ((param.block.x >= min_threads) && (param.block.x <= max_threads)){
       if(param.block.z == 0) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-      else param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 1 || param.block.z == 2) param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 3) param.shared_bytes = param.block.x * 4 * sizeof(Float);
+      else if(param.block.z == 4 || param.block.z == 5) param.shared_bytes = param.block.x * sizeof(Float);
       return  true;
     }
     else if(param.block.z == 0){
-      param.block.x = min_threads;   
+      param.block.x = min_threads0;   
       param.block.y = 1;    
       param.block.z = 1;    //USE FOR ATOMIC ADD
       param.grid  = createGrid(param.block);
@@ -1001,11 +845,35 @@ protected:
       return true;
     }
     else if(param.block.z == 1){
-      param.block.x = min_threads;   
+      param.block.x = min_threads0;   
       param.block.y = 1;    
       param.block.z = 2;    //USE FOR NO ATOMIC ADD and LESS SHARED MEM
       param.grid  = createGrid(param.block);
       param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      return true;
+    }
+    else if(param.block.z == 2){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 3;        //USE FOR NO ATOMIC ADD 
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * 4 * sizeof(Float);
+      return true;
+    }
+    else if(param.block.z == 3){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 4;
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * sizeof(Float);
+      return true;
+    }
+    else if(param.block.z == 4){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 5;
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * sizeof(Float);
       return true;
     }
     else
@@ -1017,7 +885,9 @@ protected:
   }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { 
       if(param.block.z == 0) return param.block.x * 4 * sizeof(Float);
-      else return param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 1 || param.block.z == 2) return param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 3) return param.block.x * 4 * sizeof(Float);
+      else return param.block.x * sizeof(Float);
   }
 
   bool tuneSharedBytes() const { return false; } // Don't tune shared memory
@@ -1025,6 +895,11 @@ protected:
   unsigned int minThreads() const { return arg.threads; }
 
   public:
+  virtual void initTuneParam(TuneParam &param) const{
+    param.block = dim3(256, 1, 0);
+    param.grid = createGrid(param.block);
+    param.shared_bytes = param.block.x * 4 * sizeof(Float);
+  }
   GaugeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> &arg) : arg(arg) {
       int parity = 0;
     }
@@ -1036,11 +911,6 @@ protected:
     LAUNCH_KERNEL_GAUGEFIX(computeFixInteriorPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
   }
 
-  virtual void initTuneParam(TuneParam &param) const{
-    param.block = dim3(256, 1, 0);
-    param.grid = createGrid(param.block);
-    param.shared_bytes = param.block.x * 4 * sizeof(Float);
-  }
 
   /** Sets default values for when tuning is disabled - this is guaranteed to work, but will be slow */
   virtual void defaultTuneParam(TuneParam &param) const{ initTuneParam(param); }
@@ -1121,7 +991,7 @@ struct GaugeFixBorderPointsArg {
   }
 };
 
-template<int atomicadd, int blockSize, typename Float, typename Gauge, int gauge_dir>
+template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
 __global__ void computeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> arg, int parity){
   int tid = (threadIdx.x + blockSize) % blockSize;  
   int idx = blockIdx.x * blockSize + tid;
@@ -1138,19 +1008,43 @@ __global__ void computeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> arg
   for(int dr=0; dr<4; ++dr) x[dr] += arg.border[dr];
   #pragma unroll
   for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr] + 2 * arg.border[dr];
-  if(threadIdx.x >= blockSize * 4){
-    mu -= 4;
-    x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
-    parity = 1 - parity;
+
+  if(ImplementationType<3){
+    if(threadIdx.x >= blockSize * 4){
+        mu -= 4;
+        x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
+        parity = 1 - parity;
+    }
+    idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link;
+    arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+    if(ImplementationType==0) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    if(ImplementationType==1) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    if(ImplementationType==2)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
+    arg.dataOr.save((Float*)(link.data),idx, mu, parity);
   }
-  idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
-  Matrix<Cmplx,3> link;
-  arg.dataOr.load((Float*)(link.data),idx, mu, parity);
-  if(atomicadd==1) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  if(atomicadd==0) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  if(atomicadd==2)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-  arg.dataOr.save((Float*)(link.data),idx, mu, parity);
+  else{
+    idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link;
+    arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+
+
+    x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
+    int idx1 = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+    Matrix<Cmplx,3> link1;
+    arg.dataOr.load((Float*)(link1.data),idx1, mu, 1-parity);
+
+    if(ImplementationType==3) GaugeFixHit_NoAtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+    if(ImplementationType==4) GaugeFixHit_AtomicAdd<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+    if(ImplementationType==5)GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Cmplx, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
+
+    arg.dataOr.save((Float*)(link.data),idx, mu, parity);
+    arg.dataOr.save((Float*)(link1.data),idx1, mu, 1-parity);
+  }
 }
+
+
+
 
 template<typename Float, typename Gauge, int gauge_dir>
 class GaugeFixBorderPoints : Tunable {
@@ -1161,30 +1055,35 @@ protected:
 
   dim3 createGrid   (const dim3 &block) const {
     unsigned int blockx = block.x / 8;
+    if(block.z > 2) blockx = block.x / 4;
     unsigned int  gx  = (arg.threads + blockx - 1) / blockx;
-    unsigned int  gy  = 1;
-    unsigned int  gz  = 1;
-    return  dim3(gx, gy, gz);
+    return  dim3(gx, 1, 1);
   }
   bool advanceBlockDim  (TuneParam &param) const {
     //Use param.block.z to tune and save state for best kernel option
-    // to make use or not of atomicAdd operations
-    const unsigned int min_threads = 32 * 8;
+    // to make use or not of atomicAdd operations and 4 or 8 threads per lattice site!!!
+    const unsigned int min_threads0 = 32 * 8;
+    const unsigned int min_threads1 = 32 * 4;
     const unsigned int max_threads = 1024; // FIXME: use deviceProp.maxThreadsDim[0];
     const unsigned int atmadd = 0;
-    param.block.x += min_threads;   
-    param.block.y = 1;    
+    unsigned int min_threads = min_threads0;
     param.block.z += atmadd;    //USE TO SELECT BEST KERNEL OPTION WITH/WITHOUT USING ATOMICADD
+    if(param.block.z > 2) min_threads = 32 * 4;
+    param.block.x += min_threads;
+    param.block.y = 1;    
     param.grid  = createGrid(param.block);
+
 
     
     if  ((param.block.x >= min_threads) && (param.block.x <= max_threads)){
       if(param.block.z == 0) param.shared_bytes = param.block.x * 4 * sizeof(Float);
-      else param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 1 || param.block.z == 2) param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 3) param.shared_bytes = param.block.x * 4 * sizeof(Float);
+      else if(param.block.z == 4 || param.block.z == 5) param.shared_bytes = param.block.x * sizeof(Float);
       return  true;
     }
     else if(param.block.z == 0){
-      param.block.x = min_threads;   
+      param.block.x = min_threads0;   
       param.block.y = 1;    
       param.block.z = 1;    //USE FOR ATOMIC ADD
       param.grid  = createGrid(param.block);
@@ -1192,11 +1091,35 @@ protected:
       return true;
     }
     else if(param.block.z == 1){
-      param.block.x = min_threads;   
+      param.block.x = min_threads0;   
       param.block.y = 1;    
       param.block.z = 2;    //USE FOR NO ATOMIC ADD and LESS SHARED MEM
       param.grid  = createGrid(param.block);
       param.shared_bytes = param.block.x * 4 * sizeof(Float) / 8;
+      return true;
+    }
+    else if(param.block.z == 2){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 3;        //USE FOR NO ATOMIC ADD 
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * 4 * sizeof(Float);
+      return true;
+    }
+    else if(param.block.z == 3){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 4;
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * sizeof(Float);
+      return true;
+    }
+    else if(param.block.z == 4){
+      param.block.x = min_threads1;   
+      param.block.y = 1;    
+      param.block.z = 5;
+      param.grid  = createGrid(param.block);
+      param.shared_bytes = param.block.x * sizeof(Float);
       return true;
     }
     else
@@ -1208,7 +1131,9 @@ protected:
   }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { 
       if(param.block.z == 0) return param.block.x * 4 * sizeof(Float);
-      else return param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 1 || param.block.z == 2) return param.block.x * 4 * sizeof(Float) / 8;
+      else if(param.block.z == 3) return param.block.x * 4 * sizeof(Float);
+      else return param.block.x * sizeof(Float);
   }
 
   bool tuneSharedBytes() const { return false; } // Don't tune shared memory
@@ -1216,6 +1141,11 @@ protected:
   unsigned int minThreads() const { return arg.threads; }
 
   public:
+  virtual void initTuneParam(TuneParam &param) const{
+    param.block = dim3(256, 1, 0);
+    param.grid = createGrid(param.block);
+    param.shared_bytes = param.block.x * 4 * sizeof(Float);
+  }
   GaugeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> &arg) : arg(arg) {
       int parity = 0;
   }
@@ -1227,12 +1157,6 @@ protected:
   void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     LAUNCH_KERNEL_GAUGEFIX(computeFixBorderPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
-  }
-
-  virtual void initTuneParam(TuneParam &param) const{
-    param.block = dim3(256, 1, 0);
-    param.grid = createGrid(param.block);
-    param.shared_bytes = param.block.x * 4 * sizeof(Float);
   }
 
   /** Sets default values for when tuning is disabled - this is guaranteed to work, but will be slow */

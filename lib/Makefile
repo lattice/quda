@@ -2,7 +2,9 @@ include ../make.inc
 
 QUDA = libquda.a
 
-QUDA_OBJS = gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o gauge_phase.o timer.o malloc.o solver.o			\
+QUDA_OBJS = pgauge_exchange.o pgauge_init.o pgauge_plaquette.o \
+	pgauge_heatbath.o random.o gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o \
+	gauge_phase.o timer.o malloc.o solver.o			\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
 	inv_eigcg_quda.o gauge_ape.o gauge_plaq.o inv_gcr_quda.o	\
 	inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o	\
@@ -45,7 +47,8 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	texture.h eig_variables.h numa_affinity.h misc_helpers.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
-	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h
+	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h \
+	random.h pgauge_monte.h
 
 
 # These are only inlined into blas_quda.cu
