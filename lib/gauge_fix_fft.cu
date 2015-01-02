@@ -358,12 +358,15 @@ struct GaugeFixQualityArg {
 	double2 *quality_h;
 
 	GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data, Cmplx *delta)
-	: dataOr(dataOr), delta(delta), quality_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
+	: dataOr(dataOr), delta(delta) {
+	//: dataOr(dataOr), delta(delta), quality_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
 
 		for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 
 		threads = X[0]*X[1]*X[2]*X[3];
-		cudaHostGetDevicePointer(&quality, quality_h, 0);
+		//cudaHostGetDevicePointer(&quality, quality_h, 0);
+	    quality = (double2*)device_malloc(sizeof(double2));
+	    quality_h = (double2*)safe_malloc(sizeof(double2));
 	}
 	double getAction(){return quality_h[0].x;}
 	double getTheta(){return quality_h[0].y;}
@@ -442,9 +445,11 @@ public:
 
 	void apply(const cudaStream_t &stream){
 		TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-		argQ.quality_h[0] = make_double2(0.0,0.0);
+		//argQ.quality_h[0] = make_double2(0.0,0.0);
+      	cudaMemset(argQ.quality, 0, sizeof(double2));
 		LAUNCH_KERNEL(computeFix_quality, tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
-		cudaDeviceSynchronize();
+      	cudaMemcpy(argQ.quality_h, argQ.quality, sizeof(double2), cudaMemcpyDeviceToHost);
+		//cudaDeviceSynchronize();
 		argQ.quality_h[0].x  /= (double)(3*gauge_dir*argQ.threads);
 		argQ.quality_h[0].y  /= (double)(3*argQ.threads);
 	}
