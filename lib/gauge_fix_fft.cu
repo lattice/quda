@@ -441,7 +441,7 @@ private:
 public:
 	GaugeFixQuality(GaugeFixQualityArg<typename ComplexTypeId<Float>::Type, Gauge> &argQ)
 : argQ(argQ) {}
-	~GaugeFixQuality () { host_free(argQ.quality_h);}
+	~GaugeFixQuality () { host_free(argQ.quality_h);device_free(argQ.quality);}
 
 	void apply(const cudaStream_t &stream){
 		TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
