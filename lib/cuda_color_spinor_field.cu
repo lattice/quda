@@ -1195,7 +1195,7 @@ namespace quda {
       cudaHostGetDevicePointer(&my_face_d, my_face[bufferIndex], 0); // set the matching device pointer
       packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d, a);
     } else {
-      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[stream_idx-1], 0, a);
+      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[stream_idx], 0, a);
     }
   }
 
