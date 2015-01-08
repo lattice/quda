@@ -549,10 +549,19 @@ double dslashCUDA(int niter) {
     } else {
       switch (test_type) {
         case 0:
-          if (transfer) {
-            dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
+          if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH && (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD)) {
+            if (transfer) {
+              dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
+            } else {
+	      ((DiracTwistedCloverPC *) dirac)->TwistCloverInv(*tmp1, *cudaSpinor, (parity+1)%2);
+              dirac->Dslash(*cudaSpinorOut, *tmp1, parity);
+            }
           } else {
-            dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+            if (transfer) {
+              dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
+            } else {
+              dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
+            }
           }
           break;
         case 1:

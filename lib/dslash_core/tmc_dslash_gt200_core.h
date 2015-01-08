@@ -703,9 +703,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1<X1m1)) ||
   
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#ifdef CLOVER_TWIST_INV_DSLASH
-    APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_im;
@@ -901,9 +898,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[0] || x1>0)) ||
   
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#ifdef CLOVER_TWIST_INV_DSLASH
-    APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_im;
@@ -1095,9 +1089,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2<X2m1)) ||
   
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#ifdef CLOVER_TWIST_INV_DSLASH
-    APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
     
     // project spinor into half spinors
     a0_re = +i00_re-i30_re;
@@ -1293,9 +1284,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[1] || x2>0)) ||
   
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#ifdef CLOVER_TWIST_INV_DSLASH
-    APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
     
     // project spinor into half spinors
     a0_re = +i00_re+i30_re;
@@ -1487,9 +1475,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3<X3m1)) ||
   
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#ifdef CLOVER_TWIST_INV_DSLASH
-    APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
     
     // project spinor into half spinors
     a0_re = +i00_re+i20_im;
@@ -1685,9 +1670,6 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[2] || x3>0)) ||
   
     // read spinor from device memory
     READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#ifdef CLOVER_TWIST_INV_DSLASH
-    APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
     
     // project spinor into half spinors
     a0_re = +i00_re-i20_im;
@@ -1880,12 +1862,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read spinor from device memory
-#ifndef CLOVER_TWIST_INV_DSLASH
       READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#else
-      READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-      APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -1905,26 +1882,17 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-      //const int t_proj_scale = TPROJSCALE;
+      const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
       READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
       
-#ifdef CLOVER_TWIST_INV_DSLASH
-      a0_re = i00_re;  a0_im = i00_im;
-      a1_re = i01_re;  a1_im = i01_im;
-      a2_re = i02_re;  a2_im = i02_im;
-      b0_re = i10_re;  b0_im = i10_im;
-      b1_re = i11_re;  b1_im = i11_im;
-      b2_re = i12_re;  b2_im = i12_im;
-#else  
-      a0_re = 2*i00_re;  a0_im = 2*i00_im;
-      a1_re = 2*i01_re;  a1_im = 2*i01_im;
-      a2_re = 2*i02_re;  a2_im = 2*i02_im;
-      b0_re = 2*i10_re;  b0_im = 2*i10_im;
-      b1_re = 2*i11_re;  b1_im = 2*i11_im;
-      b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
@@ -1965,12 +1933,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
 #endif
     
       // read spinor from device memory
-#ifndef CLOVER_TWIST_INV_DSLASH
       READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#else
-      READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-      APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
       
       // project spinor into half spinors
       a0_re = +2*i20_re;
@@ -1990,26 +1953,17 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4<X4m1)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-      //const int t_proj_scale = TPROJSCALE;
+      const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
       READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx + (SPINOR_HOP/2)*sp_stride_pad, sp_norm_idx);
       
-#ifdef CLOVER_TWIST_INV_DSLASH
-      a0_re = i00_re;  a0_im = i00_im;
-      a1_re = i01_re;  a1_im = i01_im;
-      a2_re = i02_re;  a2_im = i02_im;
-      b0_re = i10_re;  b0_im = i10_im;
-      b1_re = i11_re;  b1_im = i11_im;
-      b2_re = i12_re;  b2_im = i12_im;
-#else  
-      a0_re = 2*i00_re;  a0_im = 2*i00_im;
-      a1_re = 2*i01_re;  a1_im = 2*i01_im;
-      a2_re = 2*i02_re;  a2_im = 2*i02_im;
-      b0_re = 2*i10_re;  b0_im = 2*i10_im;
-      b1_re = 2*i11_re;  b1_im = 2*i11_im;
-      b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
@@ -2166,12 +2120,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read spinor from device memory
-#ifndef CLOVER_TWIST_INV_DSLASH
       READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#else
-      READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-      APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -2191,26 +2140,17 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-      //const int t_proj_scale = TPROJSCALE;
+      const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
       READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
       
-#ifdef CLOVER_TWIST_INV_DSLASH
-      a0_re = i00_re;  a0_im = i00_im;
-      a1_re = i01_re;  a1_im = i01_im;
-      a2_re = i02_re;  a2_im = i02_im;
-      b0_re = i10_re;  b0_im = i10_im;
-      b1_re = i11_re;  b1_im = i11_im;
-      b2_re = i12_re;  b2_im = i12_im;
-#else  
-      a0_re = 2*i00_re;  a0_im = 2*i00_im;
-      a1_re = 2*i01_re;  a1_im = 2*i01_im;
-      a2_re = 2*i02_re;  a2_im = 2*i02_im;
-      b0_re = 2*i10_re;  b0_im = 2*i10_im;
-      b1_re = 2*i11_re;  b1_im = 2*i11_im;
-      b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
@@ -2251,12 +2191,7 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
 #endif
     
       // read spinor from device memory
-#ifndef CLOVER_TWIST_INV_DSLASH
       READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-#else
-      READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);
-      APPLY_CLOVER_TWIST_INV(c, cinv, a, i);
-#endif
       
       // project spinor into half spinors
       a0_re = +2*i00_re;
@@ -2276,26 +2211,17 @@ if ( (kernel_type == INTERIOR_KERNEL && (!param.ghostDim[3] || x4>0)) ||
     } else {
     
       const int sp_stride_pad = ghostFace[static_cast<int>(kernel_type)];
-      //const int t_proj_scale = TPROJSCALE;
+      const int t_proj_scale = TPROJSCALE;
       
       // read half spinor from device memory
       READ_HALF_SPINOR(SPINORTEX, sp_stride_pad, sp_idx, sp_norm_idx);
       
-#ifdef CLOVER_TWIST_INV_DSLASH
-      a0_re = i00_re;  a0_im = i00_im;
-      a1_re = i01_re;  a1_im = i01_im;
-      a2_re = i02_re;  a2_im = i02_im;
-      b0_re = i10_re;  b0_im = i10_im;
-      b1_re = i11_re;  b1_im = i11_im;
-      b2_re = i12_re;  b2_im = i12_im;
-#else  
-      a0_re = 2*i00_re;  a0_im = 2*i00_im;
-      a1_re = 2*i01_re;  a1_im = 2*i01_im;
-      a2_re = 2*i02_re;  a2_im = 2*i02_im;
-      b0_re = 2*i10_re;  b0_im = 2*i10_im;
-      b1_re = 2*i11_re;  b1_im = 2*i11_im;
-      b2_re = 2*i12_re;  b2_im = 2*i12_im;
-#endif 
+      a0_re = t_proj_scale*i00_re;  a0_im = t_proj_scale*i00_im;
+      a1_re = t_proj_scale*i01_re;  a1_im = t_proj_scale*i01_im;
+      a2_re = t_proj_scale*i02_re;  a2_im = t_proj_scale*i02_im;
+      b0_re = t_proj_scale*i10_re;  b0_im = t_proj_scale*i10_im;
+      b1_re = t_proj_scale*i11_re;  b1_im = t_proj_scale*i11_im;
+      b2_re = t_proj_scale*i12_re;  b2_im = t_proj_scale*i12_im;
       
     }
 #endif // MULTI_GPU
@@ -2436,10 +2362,8 @@ if (!incomplete)
   READ_ACCUM(ACCUMTEX, param.sp_stride)
   
 #ifndef CLOVER_TWIST_XPAY
-#ifndef CLOVER_TWIST_INV_DSLASH
   //perform invert twist first:
   APPLY_CLOVER_TWIST_INV(c, cinv, a, o);
-#endif
   o00_re = b*o00_re + acc00_re;
   o00_im = b*o00_im + acc00_im;
   o01_re = b*o01_re + acc01_re;
@@ -2492,9 +2416,7 @@ if (!incomplete)
   o32_im = b*o32_im + acc32_im;
 #endif//CLOVER_TWIST_XPAY
 #else //no XPAY
-#ifndef CLOVER_TWIST_INV_DSLASH
   APPLY_CLOVER_TWIST_INV(c, cinv, a, o);
-#endif
 #endif
 }
 
