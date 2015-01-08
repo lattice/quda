@@ -162,8 +162,6 @@ namespace quda {
       errorQuda("Twisted-clover dslash does not yet support a fused exterior dslash kernel");
 
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-    inClover = (FullClover*) clover;
-    inCloverInv = (FullClover*) cloverInv;
 #if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
@@ -179,7 +177,8 @@ namespace quda {
     }
 
 #ifdef MULTI_GPU
-    twist_a	= 2.*mu*kappa;
+    twist_a	= 0.;
+    twist_b	= 0.;
 #endif
 
     void *gauge0, *gauge1;
