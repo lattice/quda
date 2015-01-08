@@ -232,6 +232,21 @@ void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir, int strea
   }
 }
 
+void FaceBuffer::pack(cudaColorSpinorField &in, int dir, int parity, int dagger, 
+                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
+{
+  const int dim = -1;
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+}
+
+void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger, 
+                      cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
+{
+  const int dim = -1; // pack all partitioned space-time dimensions
+  const int dir = 2; // pack both forward and backwards directions
+  pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
+
+}
 
 void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir){
   
