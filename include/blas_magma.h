@@ -86,16 +86,16 @@
 
       //Pure LAPACK routines (when problem size is very small, no need for MAGMA routines):
 
-      void LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldH, int* index_arr);//ipiv
+      void LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldH);
       //Compute right eigenvectors and eigenvalues of a complex non-symm. matrix
-      void LapackRightEV(void *Mat, const int m,  const int ldm, void *harVecs, const int *ldv, void *harVals);
+      void LapackRightEV(const int m,  const int ldm, void *Mat, void *harVals, void *harVecs, const int *ldv);
       //
       void LapackGEQR(const int n, void *Mat, const int m, const int ldm, void *tau);//QR decomposion of a (m by n) matrix, ldm is the leading dimension
       //
       void LapackLeftConjUNMQR(const int m, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
       void LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
       //
-      void Sort(const int m, const int ldm, void *eVecs, const int nev, void *eVals);//Sort nev smallest eigenvectors
+      void Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals);//Sort nev smallest eigenvectors
 
    };
 

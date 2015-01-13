@@ -63,7 +63,7 @@ namespace quda {
 
       void ResetHessenberg();
  
-      void ConjugateH(const int cols);//rows = cols+1
+      void ConjugateH();//rows = cols+1
 
       void SetHessenbergElement(const int i, const int j, const Complex h_ij);
       //
@@ -85,9 +85,9 @@ namespace quda {
 
     int mp1 = m+1;    
 
-    if(ldm < mp1) errorQuda("\nError: leading dimension must be not be less then (m+1)..\n");   
+    if(ldm < mp1) errorQuda("\nError: the leading dimension is not correct.\n");   
 
-    if(first_cycle_flag && nev == 0) errorQuda("\nError: incorrect restart size..\n");
+    if(first_cycle_flag && nev == 0) errorQuda("\nError: incorrect deflation size..\n");
     //magma library initialization:
 
     gmresdr_magma_args = new BlasMagmaArgs(m, nev, ldm, sizeof(double));
@@ -111,47 +111,43 @@ namespace quda {
     return;
   }
 
-  void GmresDRArgs::ConjugateH(const int cols)//rows = cols+1
+  void GmresDRArgs::ConjugateH()//rows = cols+1
   {
-    if(cols > ldm) errorQuda("\nWrong number of columns for the Hessenberg matrix!\n");
-
-    const int rows = cols + 1;
-
-    for(int c = 0; c < cols; c++ )
+    for(int c = 0; c < nev; c++ )
     {
-      for(int r = 0; r < rows; r++ ) cH[r*ldm+c] = conj(H[c*ldm+r]);
+      for(int r = 0; r < (nev+1); r++ ) cH[r*ldm+c] = conj(H[c*ldm+r]);
     }
 
     return;
   }
 
   //helper method
-  void GmresDRArgs::SetHessenbergElement(const int row, const int col, const Complex h_ij)
+  void GmresDRArgs::SetHessenbergElement(const int row, const int col, const Complex el)
   {
-    H[col*ldm+row]  = h_ij;
-    cH[row*ldm+col] = conj(h_ij); 
+    H[col*ldm+row]  = el;
+
+    cH[row*ldm+col] = conj(el); 
 
     return;
   }
 
   void GmresDRArgs::ComputeQR(Complex *triangH, Complex *Omega_k,  *Complex tau)
   {
-    memcpy( triangH, H, ldm*m*sizeof(Complex) );//first copy (restarted) H to triangH
+    memcpy( Omega_k, H, ldm*nev*sizeof(Complex) );//first copy (restarted) H to triangH
 
-    gmresdr_magma_args->LapackGEQR(nev, triangH, (nev+1), ldm, tau); //H is a (nev+1, nev) matrix
+    gmresdr_magma_args->LapackGEQR(nev, Omega_k, (nev+1), ldm, tau); //H is a (nev+1, nev) matrix
 
-    //copy this to Omega_k:
-    memcpy( Omega_k, triangH, ldm*nev*sizeof(Complex));
-    //extract upper traingular part (not strictly needed):
-    for(int i = 0; i <= nev; i++) memset(triangH, 0, (ldm-(i+1))*sizeof(Complex));//set to zero (ldm-(i+1)) elements
+    //extract upper traingular part:
+    for(int i = 0; i < nev; i++) memset(&triangH[ldm*i], &Omega_k[ldm*i], (i+1)*sizeof(Complex));
 
     return;
   }
 
-  void GmresDRArgs::ApplyOmegaK(Complex *u, Complex *Omega_k, Complex *tau)
+  void GmresDRArgs::ApplyOmegaK(Complex *g, Complex *Omega_k, Complex *tau)
   {
     //Apply Omega_k^{H}*u
-    gmresdr_magma_args->LapackLeftConjUNMQR((nev+1), 1, nev, Omega_k, ldm, tau, u, ldm);
+    //gmresdr_magma_args->LapackLeftConjUNMQR((nev+1), 1, nev, Omega_k, ldm, tau, u, ldm);
+    gmresdr_magma_args->LapackLeftConjUNMQR(nev/*# of reflectors*/, 1, g, (nev+1)/*# of rows*/, ldm, Omega_k, ldm, tau);//as in the prototype code
 
     return;
   }
@@ -160,23 +156,17 @@ namespace quda {
   {
     const double beta2 = norm(H[ldm*(m-1)+m]);//compute ||h_(m+1,m)|| squared
  
-    int *iarr = (int*)malloc(ldm*sizeof(int));
-
-    memset(iarr, 0, ldm*sizeof(int));
- 
     Complex *em = new Complex[ldm];
 
     em[m-1] = Complex(beta2, 0.0);
 
-    gmresdr_magma_args->LapackGESV(em, ldm, m, cH, ldm, iarr);//output-> em array and index array iarr
+    gmresdr_magma_args->LapackGESV(em, ldm, m, cH, ldm);
 
     memcpy( harMat, H, ldm*m*sizeof(Complex) );
 
-    for(int i = 0; i < m; i++ ) harMat[ldm*(m-1)+i] += em[(iarr[i])]; 
+    for(int i = 0; i < m; i++ ) harMat[ldm*(m-1)+i] += em[i]; 
 
     delete [] em;
-
-    free(iarr);
 
     return;
   }
@@ -202,10 +192,11 @@ namespace quda {
     {
        memcpy(&triangH[(col)*ldm], &H[(col)*ldm], (nev+1)*sizeof(Complex));
        //Apply Omega_k^{H}*H[(col)*ldm]
-       gmresdr_magma_args->LapackLeftConjUNMQR((nev+1)/*number of rows of Omega or elements in the column of H*/, 
-                                               1 /*number of columns of H*/, 
-                                               nev/*number of reflctors*/, 
-                                               Omega_k, ldm, tau, &H[ldm*(col)], ldm);
+       //gmresdr_magma_args->LapackLeftConjUNMQR((nev+1)/*number of rows of Omega or elements in the column of H*/, 
+       //                                        1 /*number of columns of H*/, 
+       //                                        nev/*number of reflctors*/, 
+       //                                        Omega_k, ldm, tau, &H[ldm*(col)], ldm);
+       gmresdr_magma_args->LapackLeftConjUNMQR(nev/*# of reflectors*/, 1, &H[ldm*(col)], (nev+1)/*# of rows*/, ldm, Omega_k, ldm, tau);//as in the prototype code
    
        tmp = H[(col)*ldm+(nev)];
 
@@ -223,16 +214,22 @@ namespace quda {
 
   void GmresDRArgs::ComputeHarmonicEigenpairs()
   {
-    memset(harMat, 0, ldm*m*sizeof(Complex));
+
+    Complex *unsorted_harVecs = new Complex[ldm*m];
 
     ConstructHarmonicMatrix();
 
     //Compute right eigenvectors, and eigenvalues:
-    gmresdr_magma_args->LapackRightEV(harmMat, m, ldm, harVecs, ldm, harVals );
+    gmresdr_magma_args->LapackRightEV(m, ldm, harmMat, harVals, harVecs, ldm);
 
     //Sort out the smallest nev eigenvectors:
 
-    gmresdr_magma_args->Sort(m, ldm, harVecs, nev, harVals); 
+    gmresdr_magma_args->Sort(m, ldm, harVecs, nev, unsorted_harVecs, harVals); 
+
+    memset(cH, 0, ldm*mp1*sizeof(Complex)); 
+    memset(harMat, 0, ldm*m*sizeof(Complex)); 
+
+    delete[] unsorted_harVecs;
 
     return;
   }
@@ -244,7 +241,7 @@ namespace quda {
     memcpy(&harVecs[nev*ldm], u, ldm*sizeof(Complex)); //load nev+1 vector
     //note: u is a (m+1) vector but be sure that (m+1) element of harVecs is zero!
 
-    gmresdr_magma_args->LapackGEQR((nev+1), harVecs, m, ldm, tau); 
+    gmresdr_magma_args->LapackGEQR((nev+1), harVecs, (m+1), ldm, tau); 
 
     int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
     int clen = Vm->EigvLength()      >> 1; //complex vector length    
@@ -257,7 +254,11 @@ namespace quda {
 
     gmresdr_magma_args->LapackLeftConjUNMQR((m+1), nev, (nev+1), harVecs, ldm, tau, H, ldm);
 
-    for(int i = 0; i < nev; i++) memset(H, 0, (ldm-nev-1)*sizeof(Complex));
+    for(int i = 0; i < nev; i++) memset(&H[ldm*i+nev+1], 0, (ldm-nev-1)*sizeof(Complex));
+
+    for(int e = (nev+1); e < (m+1); e++) zeroCuda(Vm->Eigenvec(e));
+
+    memset(&H[ldm*nev], 0, (m-nev)*sizeof(Complex));
 
     delete [] tau;
 
@@ -336,7 +337,7 @@ namespace quda {
     //
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     //make this external.
-    cudaColorSpinorField Av(x, csParam);
+    cudaColorSpinorField *Av = NULL;
     //
     cudaColorSpinorField tmp(x, csParam);
 
@@ -371,17 +372,17 @@ namespace quda {
     }
     else
     {
-       Omega_k = new Complex[ldm*m];
+       Omega_k = new Complex[ldm*k];
 
-       tau     = new Complex[(k+1)];//note k+1
+       tau     = new Complex[k];
 
        args->ComputeQR(triangH, Omega_k, tau);//perform QR decomposition of the (dense!) (nev+1) x nev H matrix 
        //
        //Apply Omega_k on vector u: 
        //Note: Omega_k is usually a small matrix, no need for GPU magma routines, LAPACK is fine.
-       args->ApplyOmegaK(u, Omega_k, tau);
+       args->ApplyOmegaK(g, Omega_k, tau);
        //
-       args->ConjugateH(k);//conjugate the matrix H
+       args->ConjugateH();//conjugate the matrix H
     }
 
     int j = k;
@@ -390,25 +391,32 @@ namespace quda {
 
     while(j < m && !convergence(r2, stop))//column index
     {
-       matSloppy(Av, Vm->Eigenvec(j), tmp, tmp2);
+       Av = &Vm->Eigenvec(j+1);
+
+       matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);
 
        for(int i = 0; i <= j; i++)
        {
-          Complex h_ij = cDotProductCuda(Av, Vm->Eigenvec(i));
+          Complex h_ij = cDotProductCuda(*Av, Vm->Eigenvec(i));
           //
           args->SetHessenbergElement(i, j, h_ij);//set i-row, j-col element in the Hessenberg matrix (and its conjugate)
           //
-          caxpyCuda(-h_ij, Vm->Eigenvec(i), Av);
+          caxpyCuda(-h_ij, Vm->Eigenvec(i), *Av);
        } 
 
        //compute h(j+1, j)
-       double h_jp1j = sqrt(norm2(Av));
+       double h_jp1j = sqrt(norm2(*Av));
        //
+       if(h_jp1j < 1e-15){
+
+         warningQuda("\nInvariant subspace was built\n");
+
+         return r2;
+       }
+
        args->SetHessenbergElement((j+1), j,  Complex(h_jp1j, 0.0));
        //
-       axCuda(1. / h_jp1j, Av);//no check?
-       //
-       copyCuda(Vm->Eigenvec(j+1), Av);
+       axCuda(1. / h_jp1j, *Av);
        //
        //Now do QR decomposition needed for the least squared problem:
        Complex e = args->ApplyGivens(triangH, Omega_k, tau, Cn, Sn, j);//applies Omega_k to the last column of H (copied to givensH), returns the last element 
@@ -434,7 +442,7 @@ namespace quda {
        j += 1; 
     }//end while loop
 
-    //solve least squares problem:
+    //solve ls problem:
     Complex *sol = new Complex[ldm];
 
     for(int l = (j-1); l >= 0; l--)
@@ -481,6 +489,8 @@ namespace quda {
     {
       delete tmp2_p;
     }
+
+    //clean cH and harmonic matrix?
 
     delete[] triangH;
 
@@ -564,7 +574,11 @@ namespace quda {
 
      double beta = sqrt(r2);
 
-     if(beta < 1.0e-12) errorQuda("\nSolver seems to be divergent.\n");
+     if(beta < 1.0e-15) 
+     {
+       warningQuda("\nSolution was already found.\n");
+       return;
+     }
 
      u[0] = Complex(beta, 0.0);
      //load the first Vm vector:
@@ -574,14 +588,14 @@ namespace quda {
 
      //launch the first Arnoldi cycle:
 
-     double cylcer2 = GmresDRCycle(*out, r2, u, stop);
+     double cycler2 = GmresDRCycle(*out, r2, u, stop);
      //
      //Compute full precision residual (not needed for the solo-precision solver.)
      mat(r, *out, tmp, tmp2);
      //
      r2 = xmyNormCuda(*in, r);//compute full precision residual
 
-     //now start deflation restarts:
+     //now begin deflation restarts:
      int cycle_idx = 1;
      //
      const int max_cycles = param.deflation_grid;
@@ -590,7 +604,7 @@ namespace quda {
 
      while(cylce_idx < param.deflation_grid && && !convergence(r2, stop))
      {
-        args->ComputeHarmonicEigenpairs();
+        args->ComputeHarmonicEigenpairs();//also clean cH and harMat
         //
         args->RestartVH(Vm, u);//creates Vm^{new}, H^{new}
 
