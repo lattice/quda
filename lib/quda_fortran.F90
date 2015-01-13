@@ -16,6 +16,7 @@
 
 #define QUDA_MAX_DIM 5
 #define QUDA_MAX_MULTI_SHIFT 32
+#define QUDA_MAX_DWF_LS 128
 
 module quda_fortran
 
@@ -97,8 +98,8 @@ module quda_fortran
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance 
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
-     integer(4) :: int max_res_increase ! How many residual increases we tolerate when doing reliable updates
-
+     integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates
+     integer(4) :: max_res_increase_total ! Total number of residual increases we tolerate
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver 
     
