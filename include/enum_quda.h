@@ -96,12 +96,12 @@ extern "C" {
 
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
-    QUDA_MPBICGSTAB_INVERTER,
     QUDA_BICGSTAB_INVERTER,
     QUDA_GCR_INVERTER,
+    QUDA_MR_INVERTER,
+    QUDA_MPBICGSTAB_INVERTER,
     QUDA_SD_INVERTER,
     QUDA_XSD_INVERTER,
-    QUDA_MR_INVERTER,
     QUDA_PCG_INVERTER,
     QUDA_MPCG_INVERTER,
     QUDA_EIGCG_INVERTER,
@@ -112,7 +112,7 @@ extern "C" {
   typedef enum QudaEigType_s {
     QUDA_LANCZOS, //Normal Lanczos eigen solver
     QUDA_IMP_RST_LANCZOS, //implicit restarted lanczos solver
-    QUDA_INVALID_TYPE
+    QUDA_INVALID_TYPE = QUDA_INVALID_ENUM
   } QudaEigType;
 
   typedef enum QudaSolutionType_s {
@@ -310,7 +310,7 @@ extern "C" {
   typedef enum QudaGammaBasis_s {
     QUDA_DEGRAND_ROSSI_GAMMA_BASIS,
     QUDA_UKQCD_GAMMA_BASIS,
-	QUDA_CHIRAL_GAMMA_BASIS,
+    QUDA_CHIRAL_GAMMA_BASIS,
     QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM
   } QudaGammaBasis;
 
@@ -324,7 +324,7 @@ extern "C" {
   typedef enum QudaDWFPCType_s {
     QUDA_5D_PC,
     QUDA_4D_PC,
-    QUDA_PC_INVALID
+    QUDA_PC_INVALID = QUDA_INVALID_ENUM
   } QudaDWFPCType; 
 
   typedef enum QudaTwistFlavorType_s {
