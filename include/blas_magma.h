@@ -82,22 +82,71 @@
       //Spinor matrix vector product:
       void SpinorMatVec(void *spinorOut, const void *spinorSetIn, const int sld, const int slen, const void *vec, const int vlen);
 
-      void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *tau, void *Vm, const int cldn);
+      void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn);
+
+      void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *pQR, const int ldqr, void *pTau, void *pVm, const int cldn);
 
       //Pure LAPACK routines (when problem size is very small, no need for MAGMA routines):
 
-      void LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldH);
+      void LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldh);
       //Compute right eigenvectors and eigenvalues of a complex non-symm. matrix
       void LapackRightEV(const int m,  const int ldm, void *Mat, void *harVals, void *harVecs, const int *ldv);
       //
       void LapackGEQR(const int n, void *Mat, const int m, const int ldm, void *tau);//QR decomposion of a (m by n) matrix, ldm is the leading dimension
       //
-      void LapackLeftConjUNMQR(const int m, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
+      void LapackLeftConjUNMQR(const int k /*number of reflectors*/, const int n /*number of columns of H*/, void *H, const int dh /*number of rows*/, const int ldh, void * QR,  const int ldqr, void *tau)//for vectors: n =1
+
       void LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
       //
       void Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals);//Sort nev smallest eigenvectors
 
    };
+
+#define LAPACK(s) s ## _
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
+void LAPACK(zgels)(char* transa, int* M, int* N, int* NRHS, _Complex double a[], int* lda, 
+		 _Complex double b[], int* ldb, _Complex double work[], int* lwork, int* info, int len_transa);
+
+void LAPACK(zgesv)(int* n, int* nrhs, _Complex double a[], int* lda,
+		 int ipivot[], _Complex double b[], int* ldb, int *info);
+
+extern void LAPACK(zgeevx)(char* balanc, char* jobvl, char* jobvr, char* sense,	 int* N, _Complex double A[], int* lda, _Complex double W[], _Complex double vl[], 
+			 int* ldvl, _Complex double vr[], int* ldvr, int* ilo, int* ihi, double scale[], double* abnrm, double rcone[], double rconv[],
+                         _Complex double work[], int* lwork, double work2[], int* info);
+
+
+extern void LAPACK(zgeev)(char* jobvl, char* jobvr, int* N, _Complex double A[], int* lda, _Complex double W[], _Complex double vl[], 
+			 int* ldvl, _Complex double vr[], int* ldvr, _Complex double work[], int* lwork, double work2[], int* info);
+
+
+extern void LAPACK(zgetrs)(char* trans, int* n, int* nrhs, _Complex double a[],
+        int* lda, int ipiv[], _Complex double b[], int* ldb, int* info,
+        int len_trans);
+
+extern void LAPACK(zgetrf)(int* m, int* n, _Complex double a[], int* lda, int ipiv[],
+        int* info);
+
+extern void LAPACK(zgeqrf)(int *M, int *N, _Complex double *A, int *LDA, _Complex double *TAU,
+                         _Complex double  *WORK, int *LWORK, int *INFO);
+
+
+extern void LAPACK(zunmqr)(char *SIDE, char *TRANS, int *M, int *N, int *K,
+                         _Complex double  *A, int *LDA, _Complex double  *TAU, _Complex double  *C,
+                         int *LDC, _Complex double  *WORK, int *LWORK, int *INFO);
+
+
+
+
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif // _BLAS_MAGMA_H
