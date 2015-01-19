@@ -108,12 +108,10 @@
 extern "C" {
 #endif
 
+extern void LAPACK(zlarft)(char* direct, char* storev, int *n, int *k, _Complex double V[], int *ldV, _Complex double TAU[], _Complex double T[], int *ldT);
 
 
-void LAPACK(zgels)(char* transa, int* M, int* N, int* NRHS, _Complex double a[], int* lda, 
-		 _Complex double b[], int* ldb, _Complex double work[], int* lwork, int* info, int len_transa);
-
-void LAPACK(zgesv)(int* n, int* nrhs, _Complex double a[], int* lda,
+extern void LAPACK(zgesv)(int* n, int* nrhs, _Complex double a[], int* lda,
 		 int ipivot[], _Complex double b[], int* ldb, int *info);
 
 extern void LAPACK(zgeevx)(char* balanc, char* jobvl, char* jobvr, char* sense,	 int* N, _Complex double A[], int* lda, _Complex double W[], _Complex double vl[], 
@@ -125,12 +123,6 @@ extern void LAPACK(zgeev)(char* jobvl, char* jobvr, int* N, _Complex double A[],
 			 int* ldvl, _Complex double vr[], int* ldvr, _Complex double work[], int* lwork, double work2[], int* info);
 
 
-extern void LAPACK(zgetrs)(char* trans, int* n, int* nrhs, _Complex double a[],
-        int* lda, int ipiv[], _Complex double b[], int* ldb, int* info,
-        int len_trans);
-
-extern void LAPACK(zgetrf)(int* m, int* n, _Complex double a[], int* lda, int ipiv[],
-        int* info);
 
 extern void LAPACK(zgeqrf)(int *M, int *N, _Complex double *A, int *LDA, _Complex double *TAU,
                          _Complex double  *WORK, int *LWORK, int *INFO);
@@ -139,10 +131,6 @@ extern void LAPACK(zgeqrf)(int *M, int *N, _Complex double *A, int *LDA, _Comple
 extern void LAPACK(zunmqr)(char *SIDE, char *TRANS, int *M, int *N, int *K,
                          _Complex double  *A, int *LDA, _Complex double  *TAU, _Complex double  *C,
                          int *LDC, _Complex double  *WORK, int *LWORK, int *INFO);
-
-
-
-
 
 #ifdef __cplusplus
 }
