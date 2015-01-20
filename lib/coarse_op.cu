@@ -784,7 +784,7 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 
     cf_param.order = QUDA_PACKED_CLOVER_ORDER;
     cf_param.direct = true;
-    cf_param.inverse = false;
+    cf_param.inverse = true;
     cf_param.clover = NULL;
     cf_param.norm = 0;
     cf_param.cloverInv = NULL;
