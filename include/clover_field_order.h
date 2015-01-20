@@ -115,16 +115,17 @@ namespace quda {
       Float *a[2];
       int volumeCB;
       const int N = nSpin * nColor / 2;
-      const complex<Float> zero;
+      complex<Float> zero;
     Accessor(const CloverField &A, bool inverse=false) : volumeCB(A.VolumeCB()) { 
 	// even
 	a[0] = static_cast<Float*>(const_cast<void*>(A.V(inverse)));
 	// odd
-	a[1] = static_cast<Float*>(static_cast<char*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/2);
+	//a[1] = static_cast<Float*>(static_cast<char*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/2);
+	a[1] = static_cast<Float*>(const_cast<void*>(A.V(inverse))) + A.Bytes()/(2*sizeof(Float));
 	zero = complex<Float>(0.0,0.0);
       }
 
-      __device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
+      __device__ __host__ inline complex<Float> operator()(int parity, int x, int s_row, int s_col, int c_row, int c_col) const {
 	// if not in the diagonal chiral block then return 0.0
 	if (s_col / 2 != s_row / 2) { return zero; }
 
@@ -142,7 +143,7 @@ namespace quda {
 	  int col2 = (N-1) - col;
 	  int k = (N*(N-1)/2 - 1) - (row2*(row2-1)/2 + col2);
 	  int idx = (x*2 + chirality)*N*N + 2*k + N;
-	  complex<Float>* tmp = static_cast<complex<Float>*>(a[parity]+idx);
+	  complex<Float> *tmp = static_cast<complex<Float>*>((void *)(a[parity]+idx));
 	  return *tmp;
 	} else {
 	  // requesting upper triangular so return conjuate transpose
@@ -187,7 +188,7 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline const complex<Float>& operator()(int d, int parity, int x, int s_row, 
+	__device__ __host__ inline const complex<Float> operator()(int d, int parity, int x, int s_row, 
 								    int s_col, int c_row, int c_col) const {
 	  return accessor(parity, x, s_row, s_col, c_row, c_col);
 	}
@@ -201,10 +202,13 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
+	/*
 	__device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int s_row, 
 							     int s_col, int c_row, int c_col) {
-	  return accessor(d, parity, x, s_row, s_col, c_row, c_col);
-	}
+	  //errorQuda("Clover accessor not implemented as a lvalue");
+	  return accessor(parity, x, s_row, s_col, c_row, c_col);
+	  }
+	*/
 	
 	/** Returns the number of field colors */
 	__device__ __host__ inline int Ncolor() const { return nColor; }

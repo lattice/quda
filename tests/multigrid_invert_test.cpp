@@ -262,7 +262,7 @@ int main(int argc, char **argv)
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = QUDA_DEBUG_VERBOSE;
 
   // declare the dimensions of the communication grid
   initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);

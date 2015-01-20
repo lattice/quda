@@ -263,13 +263,23 @@ namespace quda {
   }
 
   cpuCloverField::cpuCloverField(const CloverFieldParam &param) : CloverField(param) {
-    if (create != QUDA_REFERENCE_FIELD_CREATE) errorQuda("Create type %d not supported", create);
 
-    if (create == QUDA_REFERENCE_FIELD_CREATE) {
+    if(create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
+      clover = (void *) safe_malloc(bytes);
+      if (precision == QUDA_HALF_PRECISION) norm = (void *) safe_malloc(norm_bytes);
+      if(create == QUDA_ZERO_FIELD_CREATE) {
+	memset(clover, '\0', bytes);
+	if(precision == QUDA_HALF_PRECISION) memset(norm, '\0', norm_bytes);
+      }
+    }
+    else if (create == QUDA_REFERENCE_FIELD_CREATE) {
       clover = param.clover;
       norm = param.norm;
       cloverInv = param.cloverInv;
       invNorm = param.invNorm;
+    }
+    else {
+      errorQuda("Create type %d not supported", create);
     }
   }
 

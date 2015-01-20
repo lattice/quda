@@ -608,6 +608,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   CloverField *in = NULL;
 
   if(!device_calc){
+    printfQuda("Device_calc = %d\n", device_calc);
     // create a param for the cpu clover field
     profileClover.Start(QUDA_PROFILE_INIT);
     CloverFieldParam cpuParam;
@@ -636,7 +637,9 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     clover_param.inverse = (h_clovinv || pc_solve) ? true : false;
     clover_param.create = QUDA_NULL_FIELD_CREATE;
     clover_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    printfQuda("Making new cloverPrecise\n");
     cloverPrecise = new cudaCloverField(clover_param);
+    printfQuda("Done\n");
     profileClover.Stop(QUDA_PROFILE_INIT);
 
     profileClover.Start(QUDA_PROFILE_H2D);
