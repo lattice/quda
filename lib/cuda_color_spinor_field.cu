@@ -51,7 +51,7 @@ namespace quda {
   void cudaColorSpinorField::createIPCDslashComms(){
 
 #ifndef GPU_COMMS
-    errorQUDA("GPU_COMMS must be enabled");
+    errorQuda("GPU_COMMS must be enabled");
  #else
     if(!initComms) errorQuda("Can only be called after create comms\n");
       
