@@ -553,7 +553,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
     magmaDoubleComplex *tau = (magmaDoubleComplex *)pTau;
     
     magmaDoubleComplex *T, *T2;
-    magma_int_t i, i1, i2, ib, ic, jc, nb, mi, ni, nq, nq_i, nw, step;
+    magma_int_t i, ii, i1, i2, ib, ic, j, jc, nb, mi, ni, nq, nq_i, nw, step;
     magma_int_t iinfo, ldwork, lwkopt;
     /* NQ is the order of Q and NW is the minimum dimension of WORK */
     nq = qrlen;
@@ -613,7 +613,7 @@ magma_int_t magma_get_zgelqf_nb( magma_int_t m )
 
         
     for (i = i1; (i < i2); i += step) {
-        ib = min(nb, nrefls - i);
+        ib = nb < (nrefls - i) ? nb : (nrefls - i) ; //min(nb, nrefls - i);
 
         /* Form the triangular factor of the block reflector
            H = H(i) H(i+1) . . . H(i+ib-1) */
@@ -623,10 +623,37 @@ magma_int_t magma_get_zgelqf_nb( magma_int_t m )
         /* 1) set upper triangle of panel in A to identity,
            2) copy the panel from A to the GPU, and
            3) restore A                                      */
-        zpanel_to_q( MagmaUpper, ib, QR(i,i), ldqr, T2 );//?
+        //zpanel_to_q( MagmaUpper, ib, QR(i,i), ldqr, T2 );//?
+        magmaDoubleComplex *col;
+        
+        magma_int_t k = 0;
+        
+        for(ii = 0; ii < ib; ++ii) {
+            col = QR(i,i) + ii*ldqr;
+            for(j = 0; j < ii; ++j) {
+                T2[k] = col[j];
+                col [j] = MAGMA_Z_ZERO;
+                ++k;
+            }
+            
+            work[k] = col[ii];
+            col [j] = MAGMA_Z_ONE;
+            ++k;
+        }
+        
         magma_zsetmatrix( nq_i,  ib, QR(i,i), ldqr, dV, nq_i );//?
-        zq_to_panel( MagmaUpper, ib, QR(i,i), ldqr, T2 );//?
-
+        
+        //zq_to_panel( MagmaUpper, ib, QR(i,i), ldqr, T2 );//?
+        k = 0;
+        
+        for(ii = 0; ii < ib; ++ii) {
+            col = QR(i,i) + ii*ldqr;
+            for(j = 0; j <= ii; ++j) {
+                col[j] = T2[k];
+                ++k;
+            }
+        }
+        
         /* H or H**H is applied to C(1:m,i:n) */
         ni = qrlen - i;
         jc = i;
