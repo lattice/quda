@@ -226,8 +226,11 @@ namespace quda {
     #else
     tmp_coarse->Source(QUDA_POINT_SOURCE,0,0,0);
     #endif
+    printfQuda("prolongation\n");
     transfer->P(*tmp1, *tmp_coarse);
+    printfQuda("MatResidual\n");
     param.matResidual(*tmp2,*tmp1);	
+    printfQuda("restrict\n");
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
     #if 0
