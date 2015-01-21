@@ -82,12 +82,12 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
 void comm_exchange(int dest_rank, void* send_buffer, int send_bytes, void* recv_buffer, int recv_bytes){
   MPI_Status status;
-  int rank = comm_rank();
-  int tag = rank;
+  int send_tag = comm_rank();
+  int recv_tag = dest_rank;
 
   // Have to be careful how we use this in order to avoid deadlock
-  MPI_Sendrecv(send_buffer, send_bytes, MPI_BYTE, dest_rank, tag, 
-               recv_buffer, recv_bytes, MPI_BYTE, dest_rank, tag, MPI_COMM_WORLD, &status);
+  MPI_Sendrecv(send_buffer, send_bytes, MPI_BYTE, dest_rank, send_tag, 
+               recv_buffer, recv_bytes, MPI_BYTE, dest_rank, recv_tag, MPI_COMM_WORLD, &status);
 
   return;
 }
