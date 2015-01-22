@@ -661,7 +661,7 @@ namespace quda {
 	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
       }
 
-      __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dir, int dummy,
+      __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dummy, int dir, 
 						  int dim, int g, int parity, const int R[]) const {
 	for (int i=0; i<length; i++) {
 	  v[i] = ghost[dim]
