@@ -1082,9 +1082,10 @@ static void constructCloverField(Float *res, double norm, double diag) {
   Float c = 2.0 * norm / RAND_MAX;
 
   for(int i = 0; i < V; i++) {
+    
     for (int j = 0; j < 72; j++) {
-      res[i*72 + j] = c*rand() - norm;
-    }
+       res[i*72 + j] = c*rand() - norm;
+     }
     for (int j = 0; j< 6; j++) {
       res[i*72 + j] += diag;
       res[i*72 + j+36] += diag;
