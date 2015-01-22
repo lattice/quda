@@ -89,6 +89,7 @@ namespace quda {
     } else {
       blas::copy(r, b);
       r2 = b2;
+      blas::zero(x); // defensive measure in case solution isn't already zero
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -103,20 +104,28 @@ namespace quda {
 
     // set field aliasing according to whether we are doing mixed precision or not
     if (param.precision_sloppy == x.Precision()) {
-      x_sloppy = &x;
       r_sloppy = &r;
       r_0 = &b;
-      blas::zero(*x_sloppy);
     } else {
       ColorSpinorParam csParam(x);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy = ColorSpinorField::Create(csParam);
       csParam.create = QUDA_NULL_FIELD_CREATE;
       r_sloppy = ColorSpinorField::Create(csParam);
       *r_sloppy = r;
       r_0 = ColorSpinorField::Create(csParam);
       *r_0 = r;
+    }
+
+    // set field aliasing according to whether we are doing mixed precision or not
+    if (param.precision_sloppy == x.Precision() ||
+	!param.use_sloppy_partial_accumulator) {
+      x_sloppy = &x;
+      blas::zero(*x_sloppy);
+    } else {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      csParam.setPrecision(param.precision_sloppy);
+      x_sloppy = new cudaColorSpinorField(x, csParam);
     }
 
     // Syntatic sugar
@@ -226,8 +235,13 @@ namespace quda {
       }
 
       if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	blas::copy(tmp,y);
-	heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+	if (&x != &xSloppy) {
+	  blas::copy(tmp,y);
+	  heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+	} else {
+	  blas::copy(r, rSloppy);
+	  heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);	  
+	}
       }
 
       if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
@@ -312,8 +326,10 @@ namespace quda {
     if (param.precision_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
-      delete x_sloppy;
     }
+
+    if (&x != &xSloppy) delete x_sloppy;
+
     profile.Stop(QUDA_PROFILE_FREE);
     
     return;

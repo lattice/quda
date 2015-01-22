@@ -18,7 +18,6 @@ extern int Vh_ex;
 
   static int OPP_DIR(int dir){ return 7-dir; }
   static bool GOES_FORWARDS(int dir){ return (dir<=3); }
-  static bool GOES_BACKWARDS(int dir){ return (dir>3); }
 
   template<int N>
 	struct Sign{

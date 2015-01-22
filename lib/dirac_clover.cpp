@@ -4,16 +4,26 @@
 
 namespace quda {
 
+  namespace clover {
+#include <dslash_init.cuh>
+  }
+
+  namespace asym_clover {
+#include <dslash_init.cuh>
+  }
+
   DiracClover::DiracClover(const DiracParam &param)
     : DiracWilson(param), clover(*(param.clover))
   {
-    initCloverConstants(clover, profile);
+    clover::initConstants(*param.gauge, profile);
+    asym_clover::initConstants(*param.gauge, profile);
   }
 
   DiracClover::DiracClover(const DiracClover &dirac) 
     : DiracWilson(dirac), clover(dirac.clover)
   {
-    initCloverConstants(clover, profile);
+    clover::initConstants(*dirac.gauge, profile);
+    asym_clover::initConstants(*dirac.gauge, profile);
   }
 
   DiracClover::~DiracClover() { }
@@ -46,8 +56,7 @@ namespace quda {
     checkSpinorAlias(in, out);
       
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
-      setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+      asym_clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       
       FullClover cs(clover);
       asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
@@ -66,8 +75,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
-      
       FullClover cs(clover);     // regular clover term
       cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
 		 &static_cast<const cudaColorSpinorField&>(in), parity);
@@ -173,7 +180,6 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
       // needs to be cloverinv
       FullClover cs(clover, true);
       cloverCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
@@ -195,8 +201,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
-      setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+      clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
@@ -217,8 +222,7 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
-      setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+      clover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       
       FullClover cs(clover, true);
       cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 

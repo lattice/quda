@@ -49,9 +49,19 @@ namespace quda {
       double c2 = zeta_old[j] * alpha_old[j_low] * (1.0+(offset[j]-offset[0])*alpha[j_low]);
       
       zeta_old[j] = zeta[j];
-      zeta[j] = c0 / (c1 + c2); 
-      alpha[j] = alpha[j_low] * zeta[j] / zeta_old[j];
-    }	
+      if (c1+c2 != 0.0){
+        zeta[j] = c0 / (c1 + c2);
+      }
+      else {
+        zeta[j] = 0.0;
+      }
+      if (zeta[j] != 0.0){
+        alpha[j] = alpha[j_low] * zeta[j] / zeta_old[j];
+      }
+      else {
+        alpha[j] = 0.0;    
+      }
+    }  
   }
 
   void MultiShiftCG::operator()(std::vector<ColorSpinorField*>x, ColorSpinorField &b)
@@ -98,8 +108,8 @@ namespace quda {
     for (int j=0; j<num_offset; j++) 
       if (param.tol_offset[j] < param.delta) reliable = true;
 
+
     cudaColorSpinorField *r = new cudaColorSpinorField(b);
-    cudaColorSpinorField *r_sloppy;
     std::vector<ColorSpinorField*> x_sloppy;
     x_sloppy.resize(num_offset);
     std::vector<ColorSpinorField*> y;
@@ -114,17 +124,24 @@ namespace quda {
 
     csParam.setPrecision(param.precision_sloppy);
   
+    cudaColorSpinorField *r_sloppy;
     if (param.precision_sloppy == x[0]->Precision()) {
+      r_sloppy = r;
+    } else {
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      r_sloppy = new cudaColorSpinorField(*r, csParam);
+    }
+  
+    if (param.precision_sloppy == x[0]->Precision() ||
+	!param.use_sloppy_partial_accumulator) {
       for (int i=0; i<num_offset; i++){
 	x_sloppy[i] = x[i];
 	blas::zero(*x_sloppy[i]);
       }
-      r_sloppy = r;
     } else {
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
       for (int i=0; i<num_offset; i++)
 	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = new cudaColorSpinorField(*r, csParam);
     }
   
     cudaColorSpinorField **p = new cudaColorSpinorField*[num_offset];  
@@ -167,7 +184,19 @@ namespace quda {
       maxrr[i] = rNorm[i];
     }
     double delta = param.delta;
+
+    // this parameter determines how many consective reliable update
+    // reisudal increases we tolerate before terminating the solver,
+    // i.e., how long do we want to keep trying to converge
+    const int maxResIncrease =  param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
     
+    int resIncrease = 0;
+    int resIncreaseTotal[QUDA_MAX_MULTI_SHIFT];
+    for (int i=0; i<num_offset; i++) {
+      resIncreaseTotal[i]=0;
+    }
+
     int k = 0;
     int rUpdate = 0;
     blas::flops = 0;
@@ -235,12 +264,23 @@ namespace quda {
 	blas::copy(*r_sloppy, *r);            
 
 	// break-out check if we have reached the limit of the precision
+
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
-	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e", 
-		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift]);
-	  k++;
-	  rUpdate++;
-	  if (reliable_shift == j_low) break;
+    resIncrease++;
+    resIncreaseTotal[reliable_shift]++;
+	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)", 
+		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
+
+
+	  if (resIncrease > maxResIncrease or resIncreaseTotal[reliable_shift] > maxResIncreaseTotal) break; // check if we reached the limit of our tolerancebreak;
+	} else {
+	  resIncrease = 0;
+	}
+
+	// explicitly restore the orthogonality of the gradient vector
+	for (int j=0; j<num_offset_now; j++) {
+	  double rp = blas::reDotProduct(*r_sloppy, *p[j]) / (r2[0]);
+	  blas::axpy(-rp, *r_sloppy, *p[j]);
 	}
 
 	// update beta and p
@@ -262,11 +302,18 @@ namespace quda {
 
       // now we can check if any of the shifts have converged and remove them
       for (int j=1; j<num_offset_now; j++) {
+        if (zeta[j] == 0.0) {
+          num_offset_now--;
+          if (getVerbosity() >= QUDA_VERBOSE)
+              printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
+        }
+        else {
 	r2[j] = zeta[j] * zeta[j] * r2[0];
 	if (r2[j] < stop[j]) {
+            num_offset_now--;
 	  if (getVerbosity() >= QUDA_VERBOSE)
 	    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
-	  num_offset_now--;
+          }
 	}
       }
 
@@ -327,6 +374,10 @@ namespace quda {
 
     if (&tmp2 != &tmp1) delete tmp2_p;
 
+    if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;
+    for (int i=0; i<num_offset; i++) 
+       if (x_sloppy[i]->Precision() != x[i]->Precision()) delete x_sloppy[i];
+  
     delete r;
     for (int i=0; i<num_offset; i++) delete p[i];
     delete []p;
@@ -334,11 +385,6 @@ namespace quda {
     if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
 
     delete Ap;
-  
-    if (param.precision_sloppy != x[0]->Precision()) {
-      for (int i=0; i<num_offset; i++) delete x_sloppy[i];
-      delete r_sloppy;
-    }
   
     delete []zeta_old;
     delete []zeta;

@@ -1,7 +1,16 @@
 #include <gauge_field_order.h>
 #include <comm_quda.h>
 
+/**
+   This code has not been checked.  In particular, I suspect it is
+ erroneous in multi-GPU since it looks like the halo ghost region
+ isn't being treated here.
+ */
+
 namespace quda {
+
+#ifdef GPU_GAUGE_TOOLS
+
   template <typename Float, typename Order>
   struct GaugePhaseArg {
     Order order;
@@ -133,6 +142,7 @@ namespace quda {
   template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
   class GaugePhase : Tunable {
     Arg &arg;
+    const GaugeField &meta; // used for meta data only
     QudaFieldLocation location;
 
   private:
@@ -143,7 +153,10 @@ namespace quda {
     unsigned int minThreads() const { return arg.volume>>1; }
 
   public:
-    GaugePhase(Arg &arg, QudaFieldLocation location) : arg(arg), location(location) { }
+    GaugePhase(Arg &arg, const GaugeField &meta, QudaFieldLocation location) 
+      : arg(arg), meta(meta), location(location) { 
+      writeAuxString("stride=%d,prec=%lu",arg.order.stride,sizeof(Float));
+    }
     virtual ~GaugePhase() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -158,14 +171,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];    
-      aux << "stride=" << arg.order.stride << ",prec=" << sizeof(Float);
-      aux << "stride=" << arg.order.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
@@ -181,22 +187,21 @@ namespace quda {
 
 
   template <typename Float, int length, typename Order>
-  void gaugePhase(Order order, QudaStaggeredPhase phaseType, QudaTboundary tBoundary,
-		  const int *X, QudaFieldLocation location) {  
-    if (phaseType == QUDA_MILC_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
+  void gaugePhase(Order order, const GaugeField &u,  QudaFieldLocation location) {  
+    if (u.StaggeredPhase() == QUDA_MILC_STAGGERED_PHASE) {
+      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
       GaugePhase<Float,length,QUDA_MILC_STAGGERED_PHASE,
-		 GaugePhaseArg<Float,Order> > phase(arg, location);
+		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
-    } else if (phaseType == QUDA_CPS_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
+    } else if (u.StaggeredPhase() == QUDA_CPS_STAGGERED_PHASE) {
+      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
       GaugePhase<Float,length,QUDA_CPS_STAGGERED_PHASE,
-		 GaugePhaseArg<Float,Order> > phase(arg, location);
+		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
-    } else if (phaseType == QUDA_TIFR_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
+    } else if (u.StaggeredPhase() == QUDA_TIFR_STAGGERED_PHASE) {
+      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
       GaugePhase<Float,length,QUDA_TIFR_STAGGERED_PHASE,
-		 GaugePhaseArg<Float,Order> > phase(arg, location);
+		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
     } else {
       errorQuda("Undefined phase type");
@@ -213,41 +218,36 @@ namespace quda {
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
+    using namespace gauge;
+    
     if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  gaugePhase<Float,length>(gauge::FloatNOrder<Float,length,2,19>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,19>(u), u, location);
 	} else {
-	  gaugePhase<Float,length>(gauge::FloatNOrder<Float,length,2,18>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,18>(u), u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	gaugePhase<Float,length>(gauge::FloatNOrder<Float,length,2,12>(u), u.StaggeredPhase(), 
-				 u.TBoundary(), u.X(), location);
+	gaugePhase<Float,length>(FloatNOrder<Float,length,2,12>(u), u, location);
       } else {
 	errorQuda("Unsupported recsontruction type");
       }
     } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  gaugePhase<Float,length>(gauge::FloatNOrder<Float,length,1,19>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,19>(u), u, location);
 	} else {
-	  gaugePhase<Float,length>(gauge::FloatNOrder<Float,length,1,18>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,18>(u),u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	gaugePhase<Float,length>(gauge::FloatNOrder<Float,length,4,12>(u), u.StaggeredPhase(), 
-				 u.TBoundary(), u.X(), location);
+	gaugePhase<Float,length>(FloatNOrder<Float,length,4,12>(u), u, location);
       } else {
 	errorQuda("Unsupported recsontruction type");
       }
     } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      gaugePhase<Float,length>(gauge::TIFROrder<Float,length>(u), u.StaggeredPhase(), 
-			       u.TBoundary(), u.X(), location);
+      gaugePhase<Float,length>(TIFROrder<Float,length>(u), u, location);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif
@@ -258,7 +258,11 @@ namespace quda {
 
   }
 
+#endif
+
   void applyGaugePhase(GaugeField &u) {
+
+#ifdef GPU_GAUGE_TOOLS
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       gaugePhase<double>(u);
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
@@ -266,6 +270,10 @@ namespace quda {
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }
+#else
+    errorQuda("Gauge tools are not build");
+#endif
+
   }
 
 } // namespace quda

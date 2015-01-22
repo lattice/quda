@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <cuda.h>
+
+ #include <cuda.h>
 #include <cuda_runtime.h>
 
 #include "quda.h"
@@ -49,13 +50,19 @@ static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 static size_t gSize;
 
 
+namespace quda {
+  namespace fatlink {
+    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
+  }
+}
+
   static int
 unitarize_link_test()
 {
 
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
-  initQuda(0);
+  initQuda(device);
 
   cpu_prec = prec;
   gSize = cpu_prec;  
@@ -85,7 +92,6 @@ unitarize_link_test()
   qudaGaugeParam.gauge_fix   	   = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad      	   = 0;
   qudaGaugeParam.gaugeGiB    	   = 0;
-  qudaGaugeParam.preserve_gauge             = false;
 
 
   qudaGaugeParam.cpu_prec = cpu_prec;
@@ -102,29 +108,21 @@ unitarize_link_test()
   GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
   gParam.order     = QUDA_QDP_GAUGE_ORDER;
-  gParam.pad         = 0;
-  gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.link_type   = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+
+  gParam.pad         = 0;
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.order       = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaGaugeField *cudaFatLink = new cudaGaugeField(gParam);
   cudaGaugeField *cudaULink   = new cudaGaugeField(gParam);  
-  
-  gParam.order = QUDA_QDP_GAUGE_ORDER;
+
+  gParam.order = gauge_order;
 
   TimeProfile profile("dummy");
 
-#define QUDA_VER ((10000*QUDA_VERSION_MAJOR) + (100*QUDA_VERSION_MINOR) + QUDA_VERSION_SUBMINOR)
-#if (QUDA_VER > 400)
-  quda::initLatticeConstants(*cudaFatLink, profile);
-#else
-  quda::initCommonConstants(*cudaFatLink, profile);
-#endif
-
-
-
-
+  quda::fatlink::initLatticeConstants(*cudaFatLink, profile);
 
   void* fatlink = (void*)malloc(4*V*gaugeSiteSize*gSize);
   if(fatlink == NULL){
@@ -142,8 +140,6 @@ unitarize_link_test()
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
   void* inlink =  (void*)malloc(4*V*gaugeSiteSize*gSize);
 
-  printfQuda("About to assign values to inlink\n");
-  fflush(stdout);
 
   if(prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(inlink);
@@ -167,8 +163,6 @@ unitarize_link_test()
     }
   }
 
-  printfQuda("Values assigned to inlink\n");
-  fflush(stdout);
 
   double act_path_coeff[6];
   act_path_coeff[0] = 0.625000;
@@ -180,11 +174,8 @@ unitarize_link_test()
 
 
 
-  printfQuda("Calling computeKSLinkQuda\n");
-  fflush(stdout);
-    computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
-        QUDA_COMPUTE_FAT_STANDARD);
-  printfQuda("Call to computeKSLinkQuda complete\n");
+  computeKSLinkQuda(fatlink, NULL, NULL, inlink, act_path_coeff, &qudaGaugeParam,
+		    QUDA_COMPUTE_FAT_STANDARD);
 
 
   void* fatlink_2d[4];
@@ -193,28 +184,22 @@ unitarize_link_test()
   }
 
 
-  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge     = fatlink_2d;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.gauge  = fatlink_2d;
   cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
 
-  printfQuda("About to call cudaFatLink->loadCPUField\n");
-  printfQuda("cudaFatLink->Order() = %d\n", cudaFatLink->Order());
-  printfQuda("cpuOutLink->Order() = %d\n", cpuOutLink->Order());
-  fflush(stdout);
   
 
   cudaFatLink->loadCPUField(*cpuOutLink, QUDA_CPU_FIELD_LOCATION);
-  printfQuda("Call to cudFatLink->loadCPUField complete\n"); 
  
 
-  delete cpuOutLink;
 
   setUnitarizeLinksConstants(unitarize_eps,
-      max_allowed_error,
-      reunit_allow_svd,
-      reunit_svd_only,
-      svd_rel_error,
-      svd_abs_error);
+			     max_allowed_error,
+			     reunit_allow_svd,
+			     reunit_svd_only,
+			     svd_rel_error,
+			     svd_abs_error);
 
   setUnitarizeLinksPadding(0,0);
 
@@ -226,15 +211,10 @@ unitarize_link_test()
 
   struct timeval t0, t1;
 
-  printfQuda("About to call unitarizeLinksCuda\n");
-  fflush(stdout);
   gettimeofday(&t0,NULL);
   unitarizeLinksCuda(qudaGaugeParam,*cudaFatLink, cudaULink, num_failures_dev);
   cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
- 
-  printfQuda("Call to unitarizeLinksCuda complete\n");
-  fflush(stdout); 
 
   int num_failures=0;
   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
@@ -243,6 +223,9 @@ unitarize_link_test()
   delete cudaFatLink;
   delete cudaULink;
   for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
+
+  free(fatlink);
+
   cudaFree(num_failures_dev); 
 
   free(inlink);
@@ -313,7 +296,7 @@ main(int argc, char **argv)
   printfQuda("Number of failures = %d\n", num_failures);
   if(num_failures > 0){
     printfQuda("Failure rate = %lf\n", num_failures/(4.0*V*num_procs));
-    printfQuda("You may want to increase your error tolerance or vary the unitarization parameters\n");
+    printfQuda("You may want to increase the error tolerance or vary the unitarization parameters\n");
   }else{
     printfQuda("Unitarization successfull!\n");
   }

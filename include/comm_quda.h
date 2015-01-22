@@ -69,6 +69,7 @@ extern "C" {
   */
   MsgHandle *comm_declare_strided_receive_relative(void *buffer, int dim, int dir, 
 						   size_t blksize, int nblocks, size_t stride);
+
   void comm_finalize(void);
   void comm_dim_partitioned_set(int dim);
   int comm_dim_partitioned(int dim);
@@ -120,6 +121,7 @@ extern "C" {
   */
   MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
 						    size_t blksize, int nblocks, size_t stride);
+
   void comm_free(MsgHandle *mh);
   void comm_start(MsgHandle *mh);
   void comm_wait(MsgHandle *mh);

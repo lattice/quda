@@ -13,7 +13,12 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
-    CloverFieldOrder order;
+
+//for twisted mass only:
+    bool twisted; // whether to create twisted mass clover
+    double mu2;
+
+    QudaCloverFieldOrder order;
     QudaFieldCreate create;
     void setPrecision(QudaPrecision precision) {
       this->precision = precision;
@@ -21,6 +26,8 @@ namespace quda {
 	QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
     }
   };
+
+  std::ostream& operator<<(std::ostream& output, const CloverFieldParam& param);
 
   class CloverField : public LatticeField {
 
@@ -36,8 +43,11 @@ namespace quda {
     void *norm;
     void *cloverInv;
     void *invNorm;
+//new!
+    bool twisted; 
+    double mu2;
 
-    CloverFieldOrder order;
+    QudaCloverFieldOrder order;
     QudaFieldCreate create;
 
     double *trlog;
@@ -53,9 +63,12 @@ namespace quda {
 
     double* TrLog() const { return trlog; }
     
-    CloverFieldOrder Order() const { return order; }
+    QudaCloverFieldOrder Order() const { return order; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
+//new!
+    bool Twisted() const {return twisted; }
+    double Mu2() const {return mu2; }
   };
 
   class cudaCloverField : public CloverField {
@@ -119,7 +132,6 @@ namespace quda {
     */
     void saveCPUField(cpuCloverField &cpu) const;
 
-
     friend class DiracClover;
     friend class DiracCloverPC;
     friend struct FullClover;
@@ -144,6 +156,7 @@ namespace quda {
     QudaPrecision precision;
     size_t bytes; // sizeof each clover field (per parity)
     size_t norm_bytes; // sizeof each norm field (per parity)
+    int stride; // stride (volume + pad)
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t &evenTex;
@@ -157,7 +170,7 @@ namespace quda {
 #endif
 
     FullClover(const cudaCloverField &clover, bool inverse=false) :
-      precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes)
+    precision(clover.precision), bytes(clover.bytes), norm_bytes(clover.norm_bytes), stride(clover.stride)
 #ifdef USE_TEXTURE_OBJECTS
 	, evenTex(inverse ? clover.evenInvTex : clover.evenTex)
 	, evenNormTex(inverse ? clover.evenInvNormTex : clover.evenNormTex)

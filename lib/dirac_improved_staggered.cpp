@@ -3,18 +3,25 @@
 
 namespace quda {
 
+  namespace improvedstaggered {
+#include <dslash_init.cuh>
+  }
+
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) : 
     Dirac(param), fatGauge(*(param.fatGauge)), longGauge(*(param.longGauge)), 
-    face(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
+    face1(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()),
+    face2(param.fatGauge->X(), 4, 6, 3, param.fatGauge->Precision()) 
     //FIXME: this may break mixed precision multishift solver since may not have fatGauge initializeed yet
   {
-    initStaggeredConstants(fatGauge, longGauge, profile);
+    improvedstaggered::initConstants(*param.gauge, profile);    
+    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac) 
-  : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face(dirac.face)
+  : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge), face1(dirac.face1), face2(dirac.face2)
   {
-    initStaggeredConstants(fatGauge, longGauge, profile);
+    improvedstaggered::initConstants(*dirac.gauge, profile);
+    improvedstaggered::initStaggeredConstants(fatGauge, longGauge, profile);
   }
 
   DiracImprovedStaggered::~DiracImprovedStaggered() { }
@@ -25,7 +32,8 @@ namespace quda {
       Dirac::operator=(dirac);
       fatGauge = dirac.fatGauge;
       longGauge = dirac.longGauge;
-      face = dirac.face;
+      face1 = dirac.face1;
+      face2 = dirac.face2;
     }
     return *this;
   }
@@ -58,8 +66,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
-      setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 				  &static_cast<const cudaColorSpinorField&>(in), parity, 
 				  dagger, 0, 0, commDim, profile);
@@ -77,8 +84,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     if (Location(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      initSpinorConstants(static_cast<const cudaColorSpinorField&>(in), profile);
-      setFace(face); // FIXME: temporary hack maintain C linkage for dslashCuda
+      improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
       improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
 			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
 			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);

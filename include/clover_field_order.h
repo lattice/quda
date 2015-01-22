@@ -231,13 +231,20 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
-      FloatNOrder(const CloverField &clover, bool inverse, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()) {
+	const bool twisted;
+	const Float mu2;
+
+      FloatNOrder(const CloverField &clover, bool inverse, Float *clover_=0, float *norm_=0) : volumeCB(clover.VolumeCB()), stride(clover.Stride()),
+	  twisted(clover.Twisted()), mu2(clover.Mu2()) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
 	this->norm[0] = norm_ ? norm_ : (float*)(clover.Norm(inverse));
 	this->norm[1] = (float*)((char*)this->norm[0] + clover.NormBytes()/2);
       }
       
+	bool  Twisted()	const	{return twisted;}
+	Float Mu2()	const	{return mu2;}
+	
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  const int M=length/(N*2);
 	  for (int chirality=0; chirality<2; chirality++) {
@@ -297,11 +304,17 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
+	const bool twisted;
+	const Float mu2;
+
       QDPOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
-      : volumeCB(clover.VolumeCB()), stride(volumeCB) {
+      : volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
       }
+
+	bool  Twisted()	const	{return twisted;}
+	Float Mu2()	const	{return mu2;}
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  for (int i=0; i<length; i++) v[i] = 0.5*clover[parity][x*length+i]; // factor of 0.5 comes from basis change
@@ -325,12 +338,18 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
+	const bool twisted;
+	const Float mu2;
+
       QDPJITOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
-      : volumeCB(clover.VolumeCB()), stride(volumeCB) {
+      : volumeCB(clover.VolumeCB()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
 	offdiag = clover_ ? ((Float**)clover_)[0] : ((Float**)clover.V(inverse))[0];
 	diag = clover_ ? ((Float**)clover_)[1] : ((Float**)clover.V(inverse))[1];
       }
 	
+      bool  Twisted()	const	{return twisted;}
+      Float Mu2()	const	{return mu2;}
+
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // the factor of 0.5 comes from a basis change
 	  for (int chirality=0; chirality<2; chirality++) {
@@ -385,11 +404,18 @@ namespace quda {
 	const int volumeCB;
 	const int stride;
 
+	const bool twisted;
+	const Float mu2;
+
       BQCDOrder(const CloverField &clover, bool inverse, Float *clover_=0) 
-      : volumeCB(clover.Stride()), stride(volumeCB) {
+      : volumeCB(clover.Stride()), stride(volumeCB), twisted(clover.Twisted()), mu2(clover.Mu2()) {
 	this->clover[0] = clover_ ? clover_ : (Float*)(clover.V(inverse));
 	this->clover[1] = (Float*)((char*)this->clover[0] + clover.Bytes()/2);
       }
+
+
+	bool  Twisted()	const	{return twisted;}
+	Float Mu2()	const	{return mu2;}
 
 	/**
 	   @param v The output clover matrix in QUDA order
@@ -403,7 +429,7 @@ namespace quda {
 			 10, 11, 18, 19, 26, 27,                  // column 3  24
 			 2,  3,  4,  5,                           // column 4  30
 			 12, 13};
-	
+	  
 	  // flip the sign of the imaginary components
 	  int sign[36];
 	  for (int i=0; i<6; i++) sign[i] = 1;

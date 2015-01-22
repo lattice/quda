@@ -173,11 +173,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.out.Volume(); 
-      // FIXME should use stride here
-      aux << "out_stride=" << arg.out.Volume() << ",in_stride=" << arg.in.Volume();
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey("fixme", typeid(*this).name(), "fixme");
     }
 
     void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }

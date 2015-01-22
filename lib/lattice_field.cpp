@@ -8,9 +8,11 @@
 
 namespace quda {
 
-  void* LatticeField::bufferPinned = NULL;
-  bool LatticeField::bufferPinnedInit = false;
-  size_t LatticeField::bufferPinnedBytes = 0;
+  void* LatticeField::bufferPinned[] = {NULL};
+  bool LatticeField::bufferPinnedInit[] = {false};
+  size_t LatticeField::bufferPinnedBytes[] = {0};
+  size_t LatticeField::bufferPinnedResizeCount = 0;
+
 
   void* LatticeField::bufferDevice = NULL;
   bool LatticeField::bufferDeviceInit = false;
@@ -34,14 +36,29 @@ namespace quda {
     volumeCB = (siteSubset == QUDA_FULL_SITE_SUBSET) ? volume / 2 : volume;
     stride = volumeCB + pad;
   
+    // for parity fields the factor of half is present for all surfaces dimensions except x, so add it manually
     for (int i=0; i<nDim; i++) 
-      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET) ? surface[i] / 2 : surface[i];
+      surfaceCB[i] = (siteSubset == QUDA_FULL_SITE_SUBSET || i==0) ? surface[i] / 2 : surface[i];
 
     // for 5-dimensional fields, we only communicate in the space-time dimensions
     nDimComms = nDim == 5 ? 4 : nDim;
+
+    setTuningString();
   }
 
   LatticeField::~LatticeField() {
+  }
+
+  void LatticeField::setTuningString() {
+    char vol_tmp[TuneKey::volume_n];
+    int check;
+    check = snprintf(vol_string, TuneKey::volume_n, "%d", x[0]);
+    if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+    for (int d=1; d<nDim; d++) {
+      strcpy(vol_tmp, vol_string);
+      check = snprintf(vol_string, TuneKey::volume_n, "%sx%d", vol_tmp, x[d]);
+      if (check < 0 || check >= TuneKey::volume_n) errorQuda("Error writing volume string");
+    }
   }
 
   void LatticeField::checkField(const LatticeField &a) const {
@@ -96,30 +113,32 @@ namespace quda {
     return -1;
   }
 
-  void LatticeField::resizeBufferPinned(size_t bytes) const {
-    if ((bytes > bufferPinnedBytes || bufferPinnedInit == 0) && bytes > 0) {
-      if (bufferPinnedInit) host_free(bufferPinned);
-      bufferPinned = pinned_malloc(bytes);
-      bufferPinnedBytes = bytes;
-      bufferPinnedInit = true;
+  void LatticeField::resizeBufferPinned(size_t bytes, const int idx) const {
+    if ((bytes > bufferPinnedBytes[idx] || bufferPinnedInit[idx] == 0) && bytes > 0) {
+      if (bufferPinnedInit[idx]) host_free(bufferPinned[idx]);
+      bufferPinned[idx] = pinned_malloc(bytes);
+      bufferPinnedBytes[idx] = bytes;
+      bufferPinnedInit[idx] = true;
+      bufferPinnedResizeCount++;
+      if (bufferPinnedResizeCount == 0) bufferPinnedResizeCount = 1; // keep 0 as initialization state
     }
   }
 
   void LatticeField::resizeBufferDevice(size_t bytes) const {
     if ((bytes > bufferDeviceBytes || bufferDeviceInit == 0) && bytes > 0) {
-      if (bufferDeviceInit) host_free(bufferPinned);
+      if (bufferDeviceInit) device_free(bufferDevice);
       bufferDevice = device_malloc(bytes);
       bufferDeviceBytes = bytes;
       bufferDeviceInit = true;
     }
   }
 
-  void LatticeField::freeBuffer() {
-    if (bufferPinnedInit) {
-      host_free(bufferPinned);
-      bufferPinned = NULL;
-      bufferPinnedBytes = 0;
-      bufferPinnedInit = false;
+  void LatticeField::freeBuffer(int index) {
+    if (bufferPinnedInit[index]) {
+      host_free(bufferPinned[index]);
+      bufferPinned[index] = NULL;
+      bufferPinnedBytes[index] = 0;
+      bufferPinnedInit[index] = false;
     }
     if (bufferDeviceInit) {
       device_free(bufferDevice);

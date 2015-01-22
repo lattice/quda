@@ -51,9 +51,10 @@ namespace quda {
     static cudaStream_t *blasStream;
 
     static struct {
-      int x[QUDA_MAX_DIM];
-      int stride;
-    } blasConstants;
+      const char *vol_str;
+      const char *aux_str;
+      char aux_tmp[TuneKey::aux_n];
+    } blasStrings;
 
     void initReduce();
     void endReduce();
@@ -319,10 +320,17 @@ namespace quda {
 
     void axpyBzpcx(const double &a, ColorSpinorField& x, ColorSpinorField& y, const double &b, 
 		   ColorSpinorField& z, const double &c) {
-      blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(c,0.0), 
-				  x, y, z, x);
+      if (x.Precision() != y.Precision()) {
+	// call hacked mixed precision kernel
+	mixed::blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+					    make_double2(c,0.0),	x, y, z, x);
+      } else {
+	// swap arguments around 
+	blasCuda<axpyBzpcx_,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), 
+				     make_double2(c,0.0), x, y, z, x);
+      }
     }
-
+  
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]
     */
@@ -486,7 +494,7 @@ namespace quda {
 					  make_double2(0.0, 0.0), x, y, z, w);
       }
     }
-
+  
   } // namespace blas
 
 } // namespace quda

@@ -248,17 +248,17 @@ namespace quda {
 
           }
           // 3 matrix additions, 12 matrix-matrix multiplications, 8 matrix conjugations
-          // Each matrix conjugation involves 9 unary minus operations
+          // Each matrix conjugation involves 9 unary minus operations but these ar not included in the operation count
           // Each matrix addition involves 18 real additions
           // Each matrix-matrix multiplication involves 9*3 complex multiplications and 9*2 complex additions 
           // = 9*3*6 + 9*2*2 = 198 floating-point ops
           // => Total number of floating point ops per site above is 
-          // 8*9 + 3*18 + 12*198 = 72 + 54 + 2376 = 2502 
+          // 3*18 + 12*198 =  54 + 2376 = 2430
           
           { 
-            F -= conj(F); // 18 real subtractions + one matrix conjugation (=9 unary minus ops)
+            F -= conj(F); // 18 real subtractions + one matrix conjugation
             F *= 1.0/8.0; // 18 real multiplications
-            // 45 floating point operations here
+            // 36 floating point operations here
           }
           
 
@@ -295,6 +295,7 @@ namespace quda {
   template<typename Float, typename Clover, typename Gauge>
     class FmunuCompute : Tunable {
       CloverArg<Float,Clover,Gauge> arg;
+      const GaugeField &meta;
       const QudaFieldLocation location;
 
       private: 
@@ -306,28 +307,27 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      FmunuCompute(CloverArg<Float,Clover,Gauge> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {}
+      FmunuCompute(CloverArg<Float,Clover,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
+        : arg(arg), meta(meta), location(location) {
+	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
+      }
       virtual ~FmunuCompute() {}
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           computeFmunuKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+#else
+	  errorQuda("computeFmunuKernel not supported on pre-Fermi architecture");
+#endif
         }else{
           computeFmunuCPU(arg);
         }
       }
 
       TuneKey tuneKey() const {
-        std::stringstream vol, aux;
-        vol << arg.X[0] << "x";
-        vol << arg.X[1] << "x";
-        vol << arg.X[2] << "x";
-        vol << arg.X[3];
-        aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
-        aux << ",stride=" << arg.clover.stride;
-        return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
 
@@ -340,8 +340,8 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return (2502 + 45)*6*arg.threads; }
-      long long bytes() const { return (4*4*18 + 18)*6*arg.threads*sizeof(Float); } // Only correct if there is no link reconstruction
+      long long flops() const { return (2430 + 36)*6*arg.threads; }
+      long long bytes() const { return (4*4*18 + 18)*6*arg.threads*sizeof(Float); } //  Ignores link reconstruction
 
     }; // FmunuCompute
 
@@ -382,7 +382,6 @@ namespace quda {
       }
       typedef typename ComplexTypeId<Float>::Type Cmplx;
 
-      Float cloverCoeff = arg.cloverCoeff;
 
       // Load the field-strength tensor from global memory
       Matrix<Cmplx,3> F[6];
@@ -390,13 +389,14 @@ namespace quda {
         loadLinkVariableFromArray(arg.Fmunu + parity*arg.FmunuOffset, i, idx, arg.FmunuStride, &F[i]); 
       }
 
-      Cmplx I; I.x = 0; I.y = 1.;
+      Cmplx I; I.x = 0; I.y = 1.0;
+      Cmplx coeff; coeff.x = 0; coeff.y = arg.cloverCoeff;
       Matrix<Cmplx,3> block1[2];
       Matrix<Cmplx,3> block2[2];
-      block1[0] =  cloverCoeff*I*(F[0]-F[5]); // (18 + 6*9 + 18 =) 90 floating-point ops 
-      block1[1] =  cloverCoeff*I*(F[0]+F[5]); // 90 floating-point ops 
-      block2[0] =  cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 108 floating-point ops
-      block2[1] =  cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 108 floating-point ops
+      block1[0] =  coeff*(F[0]-F[5]); // (18 + 6*9=) 72 floating-point ops 
+      block1[1] =  coeff*(F[0]+F[5]); // 72 floating-point ops 
+      block2[0] =  arg.cloverCoeff*(F[1]+F[4] - I*(F[2]-F[3])); // 126 floating-point ops
+      block2[1] =  arg.cloverCoeff*(F[1]-F[4] - I*(F[2]+F[3])); // 126 floating-point ops
 
 
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
@@ -444,7 +444,7 @@ namespace quda {
           A[ch*36+6+2*i + 1] = 0.5*triangle[idtab[i]].y;
         } 
       } // ch
-      // 96 floating-point ops
+      // 84 floating-point ops
 
 
       arg.clover.save(A, idx, parity);
@@ -471,6 +471,7 @@ namespace quda {
   template<typename Float, typename Clover, typename Gauge>
     class CloverCompute : Tunable {
       CloverArg<Float, Clover, Gauge> arg;
+      const GaugeField &meta;
       const QudaFieldLocation location;
 
       private: 
@@ -482,29 +483,28 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      CloverCompute(CloverArg<Float,Clover,Gauge> &arg, QudaFieldLocation location) 
-        : arg(arg), location(location) {}
+      CloverCompute(CloverArg<Float,Clover,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location) 
+        : arg(arg), meta(meta), location(location) {
+	writeAuxString("threads=%d,stride=%d,prec=%lu",arg.threads,arg.clover.stride,sizeof(Float));
+      }
 
       virtual ~CloverCompute() {}
 
       void apply(const cudaStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  
+#else
+	  errorQuda("cloverComputeKernel not supported on pre-Fermi architecture");
+#endif
         }else{ // run the CPU code
           cloverComputeCPU(arg);
         }
       }
 
       TuneKey tuneKey() const {
-        std::stringstream vol, aux;
-        vol << arg.X[0] << "x";
-        vol << arg.X[1] << "x";
-        vol << arg.X[2] << "x";
-        vol << arg.X[3];
-        aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
-        aux << ",stride=" << arg.clover.stride;
-        return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+	return TuneKey(meta.VolString(), typeid(*this).name(), aux);
       }
 
       std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
@@ -516,7 +516,7 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return 492*arg.threads; } 
+      long long flops() const { return 480*arg.threads; } 
       long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } 
     };
 
@@ -525,9 +525,9 @@ namespace quda {
   template<typename Float,typename Clover,typename Gauge>
     void computeClover(Clover clover, Gauge gauge, GaugeField& Fmunu, Float cloverCoeff, QudaFieldLocation location){
       CloverArg<Float,Clover,Gauge> arg(clover, gauge, Fmunu, cloverCoeff);
-      FmunuCompute<Float,Clover,Gauge> fmunuCompute(arg, location);
+      FmunuCompute<Float,Clover,Gauge> fmunuCompute(arg, Fmunu, location);
       fmunuCompute.apply(0);
-      CloverCompute<Float,Clover,Gauge> cloverCompute(arg, location);
+      CloverCompute<Float,Clover,Gauge> cloverCompute(arg, Fmunu, location);
       cloverCompute.apply(0);
       cudaDeviceSynchronize();
     }
@@ -556,7 +556,8 @@ namespace quda {
             computeClover(clover::FloatNOrder<Float,72,2>(clover,0), gauge::FloatNOrder<Float, 18, 2, 18>(gauge), *Fmunu, cloverCoeff, location);  
           }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
             computeClover(clover::FloatNOrder<Float,72,2>(clover,0), gauge::FloatNOrder<Float, 18, 2, 12>(gauge),  *Fmunu, cloverCoeff, location);
-
+          }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_8){
+            computeClover(clover::FloatNOrder<Float,72,2>(clover,0), gauge::FloatNOrder<Float, 18, 2, 8>(gauge),  *Fmunu, cloverCoeff, location);
           }else{
             errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
           }

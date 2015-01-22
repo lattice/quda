@@ -12,20 +12,23 @@ namespace quda {
                               const QudaGaugeParam& param,
                               const cudaGaugeField& oprod, 
                               const cudaGaugeField& link, 
-                              cudaGaugeField *newOprod);
+                              cudaGaugeField *newOprod,
+			      long long* flops = NULL);
 
 
    void hisqLongLinkForceCuda(double coeff,
                              const QudaGaugeParam& param,
                              const cudaGaugeField &oprod,
                              const cudaGaugeField &link,
-                             cudaGaugeField *newOprod);
+                             cudaGaugeField *newOprod, 
+			     long long* flops = NULL);
 
 
    void hisqCompleteForceCuda(const QudaGaugeParam &param,
 				 const cudaGaugeField &oprod,
                                  const cudaGaugeField &link,
-                                 cudaGaugeField *force);
+                                 cudaGaugeField *force, 
+				 long long* flops = NULL);
 
 
 
@@ -37,7 +40,8 @@ namespace quda {
   void unitarizeForceCuda(cudaGaugeField &cudaOldForce,
                           cudaGaugeField &cudaGauge,
                           cudaGaugeField *cudaNewForce,
-			  int* unitarization_failed);
+			  int* unitarization_failed, 
+			  long long* flops = NULL);
 
   void unitarizeForceCPU( cpuGaugeField &cpuOldForce,
                           cpuGaugeField &cpuGauge,

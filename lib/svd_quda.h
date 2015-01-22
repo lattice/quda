@@ -1,7 +1,6 @@
 #ifndef _SVD_QUDA_H_
 #define _SVD_QUDA_H_
 
-
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11
 #define LOG2 0.69314718055994530942
@@ -307,7 +306,8 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
 
     if(mat(0,0).x > 0.0){ beta = -beta; }
 
-    w = mat(0,0) - beta; 
+    w.x = mat(0,0).x - beta; // work around for LLVM
+    w.y = mat(0,0).y;
     norm1 = cabs(w);
     w = Conj(w)/norm1; 
 
@@ -334,13 +334,15 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
     vec[1] = COMPLEX_UNITY;  
 
     if( p(0,1).x > 0.0 ){ beta = -beta; }
-    w = p(0,1)-beta;
+    w.x = p(0,1).x-beta; // work around for LLVM
+    w.y = p(0,1).y;
     norm1 = cabs(w);
     w = Conj(w)/norm1; 
     z = Conj(p(0,2))/norm1;
     vec[2] = z*Conj(w);
 
-    tau = (beta - p(0,1))/beta;
+    tau.x = (beta - p(0,1).x)/beta; // work around for LLVM
+    tau.y = (- p(0,1).y)/beta;
     // construct the Householder matrix
     constructHHMat(tau, vec, temp);
     p = p*temp;
@@ -358,7 +360,8 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
     vec[1] = COMPLEX_UNITY;
 
     if( p(1,1).x > 0 ){ beta = -beta; }
-    w = p(1,1) - beta;
+    w.x = p(1,1).x - beta; // work around for LLVM
+    w.y = p(1,1).y;
     norm1 = cabs(w);
     w = Conj(w)/norm1;
     z = p(2,1)/norm1;
@@ -610,6 +613,7 @@ void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
       }
 
     } // end if b(1,2) == 0
+    it++;
   } while( (b(0,1) != 0.0 || b(1,2) != 0.0) && it < max_it);
 
 

@@ -30,7 +30,7 @@ static QudaGaugeParam gaugeParam;
 
 extern int gridsize_from_cmdline[];
 
-static int verify_results = 0;
+extern bool verify_results;
 
 int ODD_BIT = 1;
 extern int xdim, ydim, zdim, tdim;
@@ -158,6 +158,11 @@ fermion_force_end()
   endQuda();
 }
 
+namespace quda {
+  namespace fermionforce {
+    void initLatticeConstants(const LatticeField &lat, TimeProfile &profile);
+  }
+}
 
 static int 
 fermion_force_test(void) 
@@ -165,7 +170,7 @@ fermion_force_test(void)
  
   fermion_force_init();
   TimeProfile profile("dummy");
-  initLatticeConstants(*cudaGauge, profile);
+  fermionforce::initLatticeConstants(*cudaGauge, profile);
   fermion_force_init_cuda(&gaugeParam);
 
     
@@ -269,11 +274,6 @@ main(int argc, char **argv)
       continue;
     }
         
-    if( strcmp(argv[i], "--verify") == 0){
-      verify_results=1;
-      continue;	    
-    }	
-
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }

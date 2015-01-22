@@ -124,10 +124,6 @@ namespace quda {
     {
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
 
-      if(idx==0){ 
-        printf("arg.threads = %d\n", arg.threads);
-      }
-
       if(idx >= arg.threads) return;
       completeKSForceCore<Float,Oprod,Gauge,Mom>(arg,idx);
     }
@@ -149,6 +145,7 @@ namespace quda {
     class KSForceComplete : Tunable {
 
       KSForceArg<Oprod, Gauge, Mom> arg;
+      const GaugeField &meta;
       const QudaFieldLocation location;
 
       private:
@@ -160,28 +157,29 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      KSForceComplete(KSForceArg<Oprod,Gauge,Mom> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {}
+      KSForceComplete(KSForceArg<Oprod,Gauge,Mom> &arg, const GaugeField &meta, QudaFieldLocation location)
+        : arg(arg), meta(meta), location(location) {
+	writeAuxString("prec=%lu,stride=%d",sizeof(Float),arg.mom.stride);
+      }
 
       virtual ~KSForceComplete() {}
 
       void apply(const cudaStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
           // Fix this
           dim3 blockDim(128, 1, 1);
           dim3 gridDim((arg.threads + blockDim.x - 1) / blockDim.x, 1, 1);
           completeKSForceKernel<Float><<<gridDim,blockDim>>>(arg);
+#else
+	  errorQuda("completeKSForce not supported on pre-Fermi architecture");
+#endif
         }else{
           completeKSForceCPU<Float>(arg);
         }
       }
 
-      TuneKey tuneKey() const {
-        std::stringstream vol, aux;
-        vol << arg.threads;
-        aux << "stride=" << arg.mom.stride;
-        return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      }
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
       std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
         std::stringstream ps;
@@ -191,22 +189,23 @@ namespace quda {
       }
 
 
-      long long flops() const { return 0; } // Fix this
+      long long flops() const { return 792*arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3]; } 
       long long bytes() const { return 0; } // Fix this
     };
 
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
-    void completeKSForce(Oprod oprod, Gauge gauge, Mom mom, int dim[4], QudaFieldLocation location)
+  void completeKSForce(Oprod oprod, Gauge gauge, Mom mom, int dim[4], const GaugeField &meta, QudaFieldLocation location, long long *flops)
     {
       KSForceArg<Oprod,Gauge,Mom> arg(oprod, gauge, mom, dim);
-      KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,location);
+      KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,meta,location);
       completeForce.apply(0);
+      if(flops) *flops = completeForce.flops();	
       cudaDeviceSynchronize();
     }
 
 
   template<typename Float>
-    void completeKSForce(GaugeField& mom, const GaugeField& oprod, const GaugeField& gauge, QudaFieldLocation location)
+    void completeKSForce(GaugeField& mom, const GaugeField& oprod, const GaugeField& gauge, QudaFieldLocation location, long long *flops)
     {
 
       if(location != QUDA_CUDA_FIELD_LOCATION){
@@ -216,26 +215,26 @@ namespace quda {
           errorQuda("Reconstruct type not supported");
         }else{
           completeKSForce<Float>(FloatNOrder<Float, 18, 2, 18>(oprod),
-              FloatNOrder<Float, 18, 2, 18>(gauge),
-              FloatNOrder<Float, 10, 2, 10>(mom),
-              const_cast<int*>(mom.X()),
-              location);
+				 FloatNOrder<Float, 18, 2, 18>(gauge),
+				 FloatNOrder<Float, 10, 2, 10>(mom),
+				 const_cast<int*>(mom.X()),
+				 gauge, location, flops);
         }
       }
       return;
     }
 
 
-  void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location)
+  void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location, long long *flops)
   {
     if(mom.Precision() == QUDA_HALF_PRECISION){
       errorQuda("Half precision not supported");
     }
 
     if(mom.Precision() == QUDA_SINGLE_PRECISION){
-      completeKSForce<float>(mom, oprod, gauge, location);
+      completeKSForce<float>(mom, oprod, gauge, location, flops);
     }else if(mom.Precision() == QUDA_DOUBLE_PRECISION){
-      completeKSForce<double>(mom, oprod, gauge, location);
+      completeKSForce<double>(mom, oprod, gauge, location, flops);
     }else{
       errorQuda("Precision %d not supported", mom.Precision());
     }
@@ -367,6 +366,7 @@ class KSLongLinkForce : Tunable {
 
 
   KSLongLinkArg<Result,Oprod,Gauge> arg;
+  const GaugeField &meta;
   const QudaFieldLocation location;
 
   private:
@@ -378,28 +378,29 @@ class KSLongLinkForce : Tunable {
   unsigned int minThreads() const { return arg.threads; }
 
   public:
-  KSLongLinkForce(KSLongLinkArg<Result,Oprod,Gauge> &arg, QudaFieldLocation location)
-    : arg(arg), location(location) {}
+  KSLongLinkForce(KSLongLinkArg<Result,Oprod,Gauge> &arg, const GaugeField &meta, QudaFieldLocation location)
+    : arg(arg), meta(meta), location(location) {
+    writeAuxString("prec=%lu,stride=%d",sizeof(Float),arg.res.stride);
+  }
 
   virtual ~KSLongLinkForce() {}
 
   void apply(const cudaStream_t &stream) {
     if(location == QUDA_CUDA_FIELD_LOCATION){
+#if (__COMPUTE_CAPABILITY__ >= 200)
       // Fix this
       dim3 blockDim(128, 1, 1);
       dim3 gridDim((arg.threads + blockDim.x - 1) / blockDim.x, 1, 1);
       computeKSLongLinkForceKernel<Float><<<gridDim,blockDim>>>(arg);
+#else
+      errorQuda("computeKSLongLinkForce not supported on pre-Fermi architecture");
+#endif
     }else{
       computeKSLongLinkForceCPU<Float>(arg);
     }
   }
 
-  TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << arg.threads;
-    aux << "stride=" << arg.res.stride;
-    return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-  }
+  TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
   std::string paramString(const TuneParam &param) const { // Don't print the grid dim.
     std::stringstream ps;
@@ -418,11 +419,11 @@ class KSLongLinkForce : Tunable {
 
 
 
-  template<typename Float, typename Result, typename Oprod, typename Gauge>
-void computeKSLongLinkForce(Result res, Oprod oprod, Gauge gauge, int dim[4], QudaFieldLocation location)
+template<typename Float, typename Result, typename Oprod, typename Gauge>
+void computeKSLongLinkForce(Result res, Oprod oprod, Gauge gauge, int dim[4], const GaugeField &meta, QudaFieldLocation location)
 {
   KSLongLinkArg<Result,Oprod,Gauge> arg(res, oprod, gauge, dim);
-  KSLongLinkForce<Float,Result,Oprod,Gauge> computeLongLink(arg,location);
+  KSLongLinkForce<Float,Result,Oprod,Gauge> computeLongLink(arg,meta,location);
   computeLongLink.apply(0);
   cudaDeviceSynchronize();
 }
@@ -442,7 +443,7 @@ void computeKSLongLinkForce(GaugeField& result, const GaugeField &oprod, const G
 				    FloatNOrder<Float, 18, 2, 18>(oprod),
 				    FloatNOrder<Float, 18, 2, 18>(gauge),
 				    const_cast<int*>(result.X()),
-				    location);
+				    gauge, location);
     }
   }
   return;

@@ -50,6 +50,10 @@ void initComms(int argc, char **argv, const int *commDims)
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+
+  // FIXME? - tests crash without this
+  QMP_declare_logical_topology(commDims, 4);
+
 #elif defined(MPI_COMMS)
   MPI_Init(&argc, &argv);
 #endif
@@ -80,7 +84,6 @@ void initRand()
 
   srand(17*rank + 137);
 }
-
 
 void setDims(int *X) {
   V = 1;
@@ -646,6 +649,11 @@ int fullLatticeIndex_4d(int i, int oddBit) {
 //ok
 int fullLatticeIndex_5d(int i, int oddBit) {
   int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2) + i/(Z[3]*Z[2]*Z[1]*Z[0]/2);
+  return 2*i + (boundaryCrossings + oddBit) % 2;
+}
+
+int fullLatticeIndex_5d_4dpc(int i, int oddBit) {
+  int boundaryCrossings = i/(Z[0]/2) + i/(Z[1]*Z[0]/2) + i/(Z[2]*Z[1]*Z[0]/2);
   return 2*i + (boundaryCrossings + oddBit) % 2;
 }
 
@@ -1557,8 +1565,14 @@ int test_type = 0;
 int nvec  = 1;
 char vecfile[256] = "";
 QudaInverterType inv_type;
+QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
+bool verify_results = true;
 double mass = 0.1;
+QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
+bool kernel_pack_t = false;
+QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
+QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 
 int gpu_prolongate = 0;
 int mg_levels = 2;
@@ -1569,7 +1583,6 @@ int dimPartitioned(int dim)
 {
   return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]);
 }
-
 
 void __attribute__((weak)) usage_extra(char** argv){};
 
@@ -1596,17 +1609,23 @@ void usage(char** argv )
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
-  printf("    --kernel_pack_t                           # Set T dimension kernel packing to be true (default false)\n");
+  printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash_type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted_mass/staggered/asqtad/domain_wall\n");
+	 "                                                  wilson/clover/twisted_mass/twisted_clover/staggered\n"
+         "                                                  /asqtad/domain_wall/domain_wall_4d/mobius\n");
+  printf("    --flavor <type>                           # Set the twisted mass flavor type (minus (default), plus, deg_doublet, nondeg_doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
+  printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified))\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
+  printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
+  printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
+  printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
+  printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
   printf("    --nvec                                    # Number of vectors to load\n");
-  printf("    --mass                                    # Mass of Dirac operator\n");
   printf("    --gpu-prolongate <true/false>             # Whether to do the transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --load-vec file                           # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
@@ -1638,6 +1657,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     usage(argv);
   }
 
+  if( strcmp(argv[i], "--verify") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }	    
+
+    if (strcmp(argv[i+1], "true") == 0){
+      verify_results = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      verify_results = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid verify type\n");	
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--device") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -1802,8 +1840,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--kernel_pack_t") == 0){
-    quda::setKernelPackT(true);
+  if( strcmp(argv[i], "--kernel-pack-t") == 0){
+    kernel_pack_t = true;
     ret= 0;
     goto out;
   }
@@ -1932,16 +1970,66 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
-  if( strcmp(argv[i], "--inv_type") == 0){
+  if( strcmp(argv[i], "--flavor") == 0){
     if (i+1 >= argc){
       usage(argv);
     }     
-    inv_type =  get_solver_type(argv[i+1]);
+    twist_flavor =  get_flavor_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
   
+  if( strcmp(argv[i], "--inv_type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }     
+    inv_type = get_solver_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
+  if( strcmp(argv[i], "--precon_type") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    precon_type = get_solver_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mass") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mass-normalization") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    normalization = get_mass_normalization_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--matpc") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    matpc_type = get_matpc_type(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--load-gauge") == 0){
     if (i+1 >= argc){
       usage(argv);

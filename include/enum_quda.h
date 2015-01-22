@@ -76,25 +76,53 @@ extern "C" {
     QUDA_WILSON_DSLASH,
     QUDA_CLOVER_WILSON_DSLASH,
     QUDA_DOMAIN_WALL_DSLASH,
+    QUDA_DOMAIN_WALL_4D_DSLASH,
+    QUDA_MOBIUS_DWF_DSLASH,
     QUDA_STAGGERED_DSLASH,
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
+    QUDA_TWISTED_CLOVER_DSLASH,
     QUDA_INVALID_DSLASH = QUDA_INVALID_ENUM
   } QudaDslashType;
+
+  typedef enum QudaDslashPolicy_s {
+    QUDA_DSLASH,
+    QUDA_DSLASH2,
+    QUDA_PTHREADS_DSLASH,
+    QUDA_GPU_COMMS_DSLASH,
+    QUDA_FUSED_DSLASH,
+    QUDA_FUSED_GPU_COMMS_DSLASH,
+    QUDA_DSLASH_NC
+  } QudaDslashPolicy;
 
   typedef enum QudaInverterType_s {
     QUDA_CG_INVERTER,
     QUDA_BICGSTAB_INVERTER,
     QUDA_GCR_INVERTER,
     QUDA_MR_INVERTER,
+    QUDA_MPBICGSTAB_INVERTER,
+    QUDA_SD_INVERTER,
+    QUDA_XSD_INVERTER,
+    QUDA_PCG_INVERTER,
+    QUDA_MPCG_INVERTER,
+    QUDA_EIGCG_INVERTER,
+    QUDA_INC_EIGCG_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
+
+  typedef enum QudaEigType_s {
+    QUDA_LANCZOS, //Normal Lanczos eigen solver
+    QUDA_IMP_RST_LANCZOS, //implicit restarted lanczos solver
+    QUDA_INVALID_TYPE = QUDA_INVALID_ENUM
+  } QudaEigType;
 
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
     QUDA_MATDAG_MAT_SOLUTION,
     QUDA_MATPC_SOLUTION,
+    QUDA_MATPC_DAG_SOLUTION,
     QUDA_MATPCDAG_MATPC_SOLUTION,
+    QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION,
     QUDA_INVALID_SOLUTION = QUDA_INVALID_ENUM
   } QudaSolutionType;
 
@@ -103,6 +131,8 @@ extern "C" {
     QUDA_NORMOP_SOLVE,
     QUDA_DIRECT_PC_SOLVE,
     QUDA_NORMOP_PC_SOLVE,
+    QUDA_NORMERR_SOLVE,
+    QUDA_NORMERR_PC_SOLVE,
     QUDA_NORMEQ_SOLVE = QUDA_NORMOP_SOLVE, // deprecated
     QUDA_NORMEQ_PC_SOLVE = QUDA_NORMOP_PC_SOLVE, // deprecated
     QUDA_INVALID_SOLVE = QUDA_INVALID_ENUM
@@ -153,7 +183,7 @@ extern "C" {
 
   typedef enum QudaSolverNormalization_s {
     QUDA_DEFAULT_NORMALIZATION, // leave source and solution untouched
-    QUDA_SOURCE_NORMALIZATION, // normalize such that || src || = 1
+    QUDA_SOURCE_NORMALIZATION  // normalize such that || src || = 1
   } QudaSolverNormalization;
 
   typedef enum QudaPreserveSource_s {
@@ -223,12 +253,16 @@ extern "C" {
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
+    QUDA_DOMAIN_WALL_4DPC_DIRAC,// 4D preconditioned domain wall dirac operator
+    QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
     QUDA_STAGGERED_DIRAC,
     QUDA_STAGGEREDPC_DIRAC,
     QUDA_ASQTAD_DIRAC,
     QUDA_ASQTADPC_DIRAC,
     QUDA_TWISTED_MASS_DIRAC,
     QUDA_TWISTED_MASSPC_DIRAC,
+    QUDA_TWISTED_CLOVER_DIRAC,
+    QUDA_TWISTED_CLOVERPC_DIRAC,
     QUDA_INVALID_DIRAC = QUDA_INVALID_ENUM
   } QudaDiracType;
 
@@ -277,6 +311,7 @@ extern "C" {
   typedef enum QudaGammaBasis_s {
     QUDA_DEGRAND_ROSSI_GAMMA_BASIS,
     QUDA_UKQCD_GAMMA_BASIS,
+    QUDA_CHIRAL_GAMMA_BASIS,
     QUDA_INVALID_GAMMA_BASIS = QUDA_INVALID_ENUM
   } QudaGammaBasis;
 
@@ -288,6 +323,13 @@ extern "C" {
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
+  // used to select preconditioning method in domain-wall fermion
+  typedef enum QudaDWFPCType_s {
+    QUDA_5D_PC,
+    QUDA_4D_PC,
+    QUDA_PC_INVALID = QUDA_INVALID_ENUM
+  } QudaDWFPCType; 
+
   typedef enum QudaTwistFlavorType_s {
     QUDA_TWIST_MINUS = -1,
     QUDA_TWIST_PLUS = +1,
@@ -304,6 +346,13 @@ extern "C" {
     QUDA_NONDEG_DSLASH,
     QUDA_DSLASH_INVALID = QUDA_INVALID_ENUM
   } QudaTwistDslashType;
+
+  typedef enum QudaTwistCloverDslashType_s {
+    QUDA_DEG_CLOVER_TWIST_INV_DSLASH,
+    QUDA_DEG_DSLASH_CLOVER_TWIST_INV,
+    QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY,
+    QUDA_TC_DSLASH_INVALID = QUDA_INVALID_ENUM
+  } QudaTwistCloverDslashType;
 
   typedef enum QudaTwistGamma5Type_s {
     QUDA_TWIST_GAMMA5_DIRECT,
@@ -356,6 +405,19 @@ extern "C" {
     QUDA_TIFR_STAGGERED_PHASE = 2,
     QUDA_INVALID_STAGGERED_PHASE = QUDA_INVALID_ENUM
   } QudaStaggeredPhase;
+
+  typedef enum QudaContractType_s {
+    QUDA_CONTRACT,
+    QUDA_CONTRACT_PLUS,
+    QUDA_CONTRACT_MINUS,
+    QUDA_CONTRACT_GAMMA5,
+    QUDA_CONTRACT_GAMMA5_PLUS,
+    QUDA_CONTRACT_GAMMA5_MINUS,
+    QUDA_CONTRACT_TSLICE,
+    QUDA_CONTRACT_TSLICE_PLUS,
+    QUDA_CONTRACT_TSLICE_MINUS,
+    QUDA_CONTRACT_INVALID = QUDA_INVALID_ENUM
+  } QudaContractType;
 
 #ifdef __cplusplus
 }

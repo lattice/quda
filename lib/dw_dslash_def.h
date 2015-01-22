@@ -385,6 +385,19 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 }
 
+template <>
+__global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
+     (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
+
+#ifdef GPU_DOMAIN_WALL_DIRAC
+#if DD_DAG
+#include "dw_fused_exterior_dslash_dagger_core.h"
+#else
+#include "dw_fused_exterior_dslash_core.h"
+#endif
+#endif
+}
+
 #endif
 
 // clean up

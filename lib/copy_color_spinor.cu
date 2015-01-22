@@ -5,7 +5,7 @@ namespace quda {
   void copyGenericColorSpinorDD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorDS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorDH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
-
+  
   void copyGenericColorSpinorSD(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorSS(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);
   void copyGenericColorSpinorSH(ColorSpinorField &, const ColorSpinorField&, QudaFieldLocation, void*, void*, void*a=0, void *b=0);

@@ -1,4 +1,17 @@
 
+Version 0.6.1 - 10th March 2014
+
+- All unit tests now enable/disable CPU-side verification with the "--verify
+  true/false" flag.  The default is true.
+
+- The google test API is now used in some of the unit tests
+  (dslash_test, staggered_dslash_test and blas_test).  (Eventually all
+  unit tests will be built using this.)
+
+- Various bugs have been fixed in fermion_force_test,
+  hisq_paths_force_test, hisq_unitarize_force_test and
+  unitarize_link_test
+
 Version 0.6.0 - 23rd January 2014
 
 - Support for reconstruct 9/13 for the long link in HISQ fermions.

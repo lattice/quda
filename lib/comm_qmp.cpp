@@ -3,19 +3,16 @@
 #include <quda_internal.h>
 #include <comm_quda.h>
 
-
 #define QMP_CHECK(qmp_call) do {                     \
   QMP_status_t status = qmp_call;                    \
   if (status != QMP_SUCCESS)                         \
     errorQuda("(QMP) %s", QMP_error_string(status)); \
 } while (0)
 
-
 struct MsgHandle_s {
   QMP_msgmem_t mem;
   QMP_msghandle_t handle;
 };
-
 
 static int gpuid = -1;
 
@@ -87,7 +84,6 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
   return mh;
 }
 
-
 /**
  * Declare a message handle for receiving from a node displaced in (x,y,z,t) according to "displacement"
  */
@@ -128,7 +124,6 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
 
   return mh;
 }
-
 
 /**
  * Declare a message handle for strided receiving from a node

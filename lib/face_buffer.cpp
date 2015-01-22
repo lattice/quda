@@ -219,6 +219,19 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int dim, int dir,  int parity, i
   }
 }
 
+void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir, int stream_idx){
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
+
+  if (dir%2==0) {
+    // backwards copy to host
+    in.sendGhost(my_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[stream_idx]); 
+  } else {
+    // forwards copy to host
+    in.sendGhost(my_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[stream_idx]);
+  }
+}
+
 void FaceBuffer::pack(cudaColorSpinorField &in, int dir, int parity, int dagger, 
                       cudaStream_t *stream_p, bool zeroCopyPack, double a, double b)
 {
@@ -234,21 +247,6 @@ void FaceBuffer::pack(cudaColorSpinorField &in, int parity, int dagger,
   pack(in, dim, dir, parity, dagger, stream_p, zeroCopyPack, a, b);
 
 }
-
-
-void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir, int stream_idx){
-  int dim = dir/2;
-  if(!commDimPartitioned(dim)) return;
-
-  if (dir%2==0) {
-    // backwards copy to host
-    in.sendGhost(my_back_face[dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[stream_idx]); 
-  } else {
-    // forwards copy to host
-    in.sendGhost(my_fwd_face[dim], nFace, dim, QUDA_FORWARDS, dagger, &stream[stream_idx]);
-  }
-}
-
 
 void FaceBuffer::gather(cudaColorSpinorField &in, int dagger, int dir){
   
@@ -322,6 +320,36 @@ void FaceBuffer::commsStart(int dir) {
   } else { //sending forwards
     // Prepost receive
     comm_start(mh_recv_back[dim]);
+    // Begin forward send
+#ifndef GPU_DIRECT
+    memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);
+#endif
+    comm_start(mh_send_fwd[dim]);
+  }
+}
+
+void FaceBuffer::recvStart(int dir){
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
+
+  if(dir&1){
+    comm_start(mh_recv_back[dim]);
+  }else{
+    comm_start(mh_recv_fwd[dim]);
+  }
+  return;
+}
+
+void FaceBuffer::sendStart(int dir){
+  int dim = dir/2;
+  if(!commDimPartitioned(dim)) return;
+
+  if (dir%2 == 0) { // sending backwards
+#ifndef GPU_DIRECT
+    memcpy(ib_my_back_face[dim], my_back_face[dim], nbytes[dim]);
+#endif
+    comm_start(mh_send_back[dim]);
+  } else { //sending forwards
     // Begin forward send
 #ifndef GPU_DIRECT
     memcpy(ib_my_fwd_face[dim], my_fwd_face[dim], nbytes[dim]);

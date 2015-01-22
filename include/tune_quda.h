@@ -7,39 +7,11 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include <cstring>
+#include <stdarg.h>
+#include <tune_key.h>
 
 namespace quda {
-
-  class TuneKey {
-
-  public:
-    std::string volume;
-    std::string name;
-    std::string aux;
-
-    TuneKey() { }
-  TuneKey(std::string v, std::string n, std::string a=std::string("type=default"))
-    : volume(v), name(n), aux(a) { }
-  TuneKey(const TuneKey &key)
-    : volume(key.volume), name(key.name), aux(key.aux) { }
-
-    TuneKey& operator=(const TuneKey &key) {
-      if (&key != this) {
-	volume = key.volume;
-	name = key.name;
-	aux = key.aux;
-      }
-      return *this;
-    }
-
-    bool operator<(const TuneKey &other) const {
-      return (volume < other.volume) ||
-	((volume == other.volume) && (name < other.name)) ||
-	((volume == other.volume) && (name == other.name) && (aux < other.aux));
-    }
-
-  };
-
 
   class TuneParam {
 
@@ -161,6 +133,17 @@ namespace quda {
       }
     }
 
+    char aux[TuneKey::aux_n];
+
+    void writeAuxString(const char *format, ...) {
+      va_list arguments;
+      va_start(arguments, format);
+      int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
+      //int n = snprintf(aux, QUDA_TUNE_AUX_STR_LENGTH, "threads=%d,prec=%lu,stride=%d,geometery=%d",
+      //	       arg.volumeCB,sizeof(Complex)/2,arg.forceOffset);
+      if (n < 0 || n >= 512) errorQuda("Error writing auxiliary string");
+    }
+
   public:
     Tunable() { }
     virtual ~Tunable() { }
@@ -260,7 +243,7 @@ namespace quda {
 
   void loadTuneCache(QudaVerbosity verbosity);
   void saveTuneCache(QudaVerbosity verbosity);
-  TuneParam tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
+  TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
 
 } // namespace quda
 

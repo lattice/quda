@@ -16,6 +16,7 @@ namespace quda{
 namespace{
   #include <svd_quda.h>
 }
+
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
@@ -445,7 +446,7 @@ namespace{
       vol << inField.X()[3] << "x";
       aux << "threads=" << inField.Volume() << ",prec=" << inField.Precision();
       aux << "stride=" << inField.Stride();
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
     }  
   }; // UnitarizeLinksCuda
     

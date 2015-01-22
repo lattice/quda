@@ -84,6 +84,46 @@ namespace quda {
       }
     };
 
+  /** Transform from chiral into non-relavisitic basis */
+  template <typename FloatOut, typename FloatIn, int Ns, int Nc>
+    struct ChiralToNonRelBasis {
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+    __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+	int s1[4] = {0, 1, 0, 1};
+	int s2[4] = {2, 3, 2, 3};
+	RegTypeOut K1[4] = {-kP, -kP, kP, kP};
+	RegTypeOut K2[4] = { kP,  kP, kP, kP};
+	for (int s=0; s<Ns; s++) {
+	  for (int c=0; c<Nc; c++) {
+	    for (int z=0; z<2; z++) {
+	      out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
+	    }
+	  }
+	}
+      }
+  };
+
+  /** Transform from non-relativistic into chiral basis */
+  template <typename FloatOut, typename FloatIn, int Ns, int Nc>
+    struct NonRelToChiralBasis {
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+    __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+	int s1[4] = {0, 1, 0, 1};
+	int s2[4] = {2, 3, 2, 3};
+	RegTypeOut K1[4] = {-kU, -kU,  kU,  kU};
+	RegTypeOut K2[4] = { kU,  kU,  kU,  kU};
+	for (int s=0; s<Ns; s++) {
+	  for (int c=0; c<Nc; c++) {
+	    for (int z=0; z<2; z++) {
+	      out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
+	    }
+	  }
+	}
+    }
+  };
+
   /** CPU function to reorder spinor fields.  */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder, typename Basis>
     void packSpinor(OutOrder &outOrder, const InOrder &inOrder, Basis basis, int volume) {  
@@ -118,7 +158,7 @@ namespace quda {
     const InOrder &in;
     OutOrder &out;
     Basis &basis;
-    int volume;
+    const ColorSpinorField &meta; // this reference is for meta data only
 
   private:
     unsigned int sharedBytesPerThread() const { 
@@ -130,31 +170,29 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (param.block.x+1)*sharedBytesPerThread(); }
     bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return volume; }
+    unsigned int minThreads() const { return meta.VolumeCB(); }
     bool advanceBlockDim(TuneParam &param) const {
       bool advance = Tunable::advanceBlockDim(param);
       param.shared_bytes = sharedBytesPerThread() * (param.block.x+1); // FIXME: use sharedBytesPerBlock
       return advance;
     }
 
+
   public:
-  PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, int volume) 
-    : out(out), in(in), basis(basis), volume(volume) { ; }
+    PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, const ColorSpinorField &meta) 
+      : out(out), in(in), basis(basis), meta(meta) {
+      writeAuxString("out_stride=%d,in_stride=%d", out.stride, in.stride);
+    }
     virtual ~PackSpinor() { ; }
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>> 
-	(out, in, basis, volume);
+	(out, in, basis, meta.VolumeCB());
     }
 
-    TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << in.volumeCB; 
-      aux << "out_stride=" << out.stride << ",in_stride=" << in.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;
@@ -170,34 +208,58 @@ namespace quda {
 
   /** Decide whether we are changing basis or not */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>
-    void genericCopyColorSpinor(OutOrder &outOrder, const InOrder &inOrder, int Vh, 
-				QudaGammaBasis dstBasis, QudaGammaBasis srcBasis, QudaFieldLocation location) {
+    void genericCopyColorSpinor(OutOrder &outOrder, const InOrder &inOrder, 
+				QudaGammaBasis dstBasis, QudaGammaBasis srcBasis, 
+				const ColorSpinorField &out, QudaFieldLocation location) {
     if (dstBasis==srcBasis) {
       PreserveBasis<FloatOut, FloatIn, Ns, Nc> basis;
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, Vh);
+	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, out.VolumeCB());
       } else {
-	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, PreserveBasis<FloatOut, FloatIn, Ns, Nc> > pack(outOrder, inOrder, basis, Vh);
+	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, PreserveBasis<FloatOut, FloatIn, Ns, Nc> > 
+	  pack(outOrder, inOrder, basis, out);
 	pack.apply(0);
       }
     } else if (dstBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
       NonRelBasis<FloatOut, FloatIn, Ns, Nc> basis;
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, Vh);
+	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, out.VolumeCB());
       } else {
-	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelBasis<FloatOut, FloatIn, Ns, Nc> > pack(outOrder, inOrder, basis, Vh);
+	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelBasis<FloatOut, FloatIn, Ns, Nc> > 
+	  pack(outOrder, inOrder, basis, out);
 	pack.apply(0);
       }
     } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && dstBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
       RelBasis<FloatOut, FloatIn, Ns, Nc> basis;
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, Vh);    
+	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, out.VolumeCB());    
       } else {
-	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, RelBasis<FloatOut, FloatIn, Ns, Nc> > pack(outOrder, inOrder, basis, Vh);
+	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, RelBasis<FloatOut, FloatIn, Ns, Nc> > 
+	  pack(outOrder, inOrder, basis, out);
 	pack.apply(0);
       } 
+    } else if (dstBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_CHIRAL_GAMMA_BASIS) {
+      if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
+      ChiralToNonRelBasis<FloatOut, FloatIn, Ns, Nc> basis;
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, out.VolumeCB());
+      } else {
+	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, ChiralToNonRelBasis<FloatOut, FloatIn, Ns, Nc> >
+	  pack(outOrder, inOrder, basis, out);
+	pack.apply(0);
+      }
+    } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && dstBasis == QUDA_CHIRAL_GAMMA_BASIS) {
+      if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
+      NonRelToChiralBasis<FloatOut, FloatIn, Ns, Nc> basis;
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+	packSpinor<FloatOut, FloatIn, Ns, Nc>(outOrder, inOrder, basis, out.VolumeCB());
+      } else {
+	PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelToChiralBasis<FloatOut, FloatIn, Ns, Nc> >
+	  pack(outOrder, inOrder, basis, out);
+	pack.apply(0);
+      }
     } else {
       errorQuda("Basis change not supported");
     }
@@ -211,19 +273,19 @@ namespace quda {
     if (out.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
       FloatNOrder<FloatOut, Ns, Nc, 4> outOrder(out, Out, outNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       FloatNOrder<FloatOut, Ns, Nc, 2> outOrder(out, Out, outNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
@@ -254,10 +316,10 @@ namespace quda {
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-    } /*else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
+    } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-      } */else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
+    } else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER) {
 
 #ifdef BUILD_QDPJIT_INTERFACE
       QDPJITDiracOrder<FloatIn, Ns, Nc> inOrder(in, In);

@@ -25,6 +25,8 @@ namespace quda {
 
     double axpyNorm(const double &a, ColorSpinorField &x, ColorSpinorField &y);
     double reDotProduct(ColorSpinorField &x, ColorSpinorField &y);
+    double2 reDotProductNormA(ColorSpinorField &a, ColorSpinorField &b);
+
     double xmyNorm(ColorSpinorField &x, ColorSpinorField &y);
 
     void axpby(const double &a, ColorSpinorField &x, const double &b, ColorSpinorField &y);
@@ -72,6 +74,8 @@ namespace quda {
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);
     double3 tripleCGReduction(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
+    void reDotProduct(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);
+    void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b); 
   } // namespace blas
 
 } // namespace quda

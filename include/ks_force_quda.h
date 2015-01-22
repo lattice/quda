@@ -6,7 +6,7 @@
 
 namespace quda {
 
-void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location);
+void completeKSForce(GaugeField &mom, const GaugeField &oprod, const GaugeField &gauge, QudaFieldLocation location, long long *flops = NULL);
 
 } // namespace quda
 

@@ -18,8 +18,11 @@ namespace quda {
     bool computeTraceLog;
     double * const trlogA_h;
     double *trlogA_d;
+//extra attributes for twisted mass clover
+    bool twist;
+    double mu2;
     CloverInvertArg(Clover &inverse, const Clover &clover, bool computeTraceLog=0, double* const trlogA=0) :
-      inverse(inverse), clover(clover), computeTraceLog(computeTraceLog), trlogA_h(trlogA) { 
+      inverse(inverse), clover(clover), computeTraceLog(computeTraceLog), trlogA_h(trlogA), twist(clover.Twisted()), mu2(clover.Mu2()){
       cudaHostGetDevicePointer(&trlogA_d, trlogA_h, 0); // set the matching device pointer
     }
   };
@@ -65,6 +68,58 @@ namespace quda {
       const int idtab[15]={0,1,3,6,10,2,4,7,11,5,8,12,9,13,14};
       for (int i=0; i<15; i++) tri[idtab[i]] = complex<Float>(2.0*A[ch*36+6+2*i], 2.0*A[ch*36+6+2*i+1]);
 
+//Compute (T^2 + mu2) first, then invert (not optimized!):
+      if(arg.twist)
+      {
+         complex<Float> aux[15];//hmmm, better to reuse A-regs...
+         //another solution just to define (but compiler may not be happy with this, swapping everything in
+         //the global buffer):
+         //complex<Float>* aux = (complex<Float>*)&A[ch*36];
+         //compute off-diagonal terms:
+//
+         aux[ 0] = tri[0]*diag[0]+diag[1]*tri[0]+conj(tri[2])*tri[1]+conj(tri[4])*tri[3]+conj(tri[7])*tri[6]+conj(tri[11])*tri[10];
+//
+         aux[ 1] = tri[1]*diag[0]+diag[2]*tri[1]+tri[2]*tri[0]+conj(tri[5])*tri[3]+conj(tri[8])*tri[6]+conj(tri[12])*tri[10];
+
+         aux[ 2] = tri[2]*diag[1]+diag[2]*tri[2]+tri[1]*conj(tri[0])+conj(tri[5])*tri[4]+conj(tri[8])*tri[7]+conj(tri[12])*tri[11];
+//
+         aux[ 3] = tri[3]*diag[0]+diag[3]*tri[3]+tri[4]*tri[0]+tri[5]*tri[1]+conj(tri[9])*tri[6]+conj(tri[13])*tri[10];
+
+         aux[ 4] = tri[4]*diag[1]+diag[3]*tri[4]+tri[3]*conj(tri[0])+tri[5]*tri[2]+conj(tri[9])*tri[7]+conj(tri[13])*tri[11];
+
+         aux[ 5] = tri[5]*diag[2]+diag[3]*tri[5]+tri[3]*conj(tri[1])+tri[4]*conj(tri[2])+conj(tri[9])*tri[8]+conj(tri[13])*tri[12];
+//
+         aux[ 6] = tri[6]*diag[0]+diag[4]*tri[6]+tri[7]*tri[0]+tri[8]*tri[1]+tri[9]*tri[3]+conj(tri[14])*tri[10];
+
+         aux[ 7] = tri[7]*diag[1]+diag[4]*tri[7]+tri[6]*conj(tri[0])+tri[8]*tri[2]+tri[9]*tri[4]+conj(tri[14])*tri[11];
+
+         aux[ 8] = tri[8]*diag[2]+diag[4]*tri[8]+tri[6]*conj(tri[1])+tri[7]*conj(tri[2])+tri[9]*tri[5]+conj(tri[14])*tri[12];
+
+         aux[ 9] = tri[9]*diag[3]+diag[4]*tri[9]+tri[6]*conj(tri[3])+tri[7]*conj(tri[4])+tri[8]*conj(tri[5])+conj(tri[14])*tri[13];
+//
+         aux[10] = tri[10]*diag[0]+diag[5]*tri[10]+tri[11]*tri[0]+tri[12]*tri[1]+tri[13]*tri[3]+tri[14]*tri[6];
+
+         aux[11] = tri[11]*diag[1]+diag[5]*tri[11]+tri[10]*conj(tri[0])+tri[12]*tri[2]+tri[13]*tri[4]+tri[14]*tri[7];
+
+         aux[12] = tri[12]*diag[2]+diag[5]*tri[12]+tri[10]*conj(tri[1])+tri[11]*conj(tri[2])+tri[13]*tri[5]+tri[14]*tri[8];
+
+         aux[13] = tri[13]*diag[3]+diag[5]*tri[13]+tri[10]*conj(tri[3])+tri[11]*conj(tri[4])+tri[12]*conj(tri[5])+tri[14]*tri[9];
+
+         aux[14] = tri[14]*diag[4]+diag[5]*tri[14]+tri[10]*conj(tri[6])+tri[11]*conj(tri[7])+tri[12]*conj(tri[8])+tri[13]*conj(tri[9]);
+
+
+         //update diagonal elements:
+         diag[0] = (Float)arg.mu2+diag[0]*diag[0]+norm(tri[ 0])+norm(tri[ 1])+norm(tri[ 3])+norm(tri[ 6])+norm(tri[10]);
+         diag[1] = (Float)arg.mu2+diag[1]*diag[1]+norm(tri[ 0])+norm(tri[ 2])+norm(tri[ 4])+norm(tri[ 7])+norm(tri[11]); 
+         diag[2] = (Float)arg.mu2+diag[2]*diag[2]+norm(tri[ 1])+norm(tri[ 2])+norm(tri[ 5])+norm(tri[ 8])+norm(tri[12]); 
+         diag[3] = (Float)arg.mu2+diag[3]*diag[3]+norm(tri[ 3])+norm(tri[ 4])+norm(tri[ 5])+norm(tri[ 9])+norm(tri[13]); 
+         diag[4] = (Float)arg.mu2+diag[4]*diag[4]+norm(tri[ 6])+norm(tri[ 7])+norm(tri[ 8])+norm(tri[ 9])+norm(tri[14]);
+         diag[5] = (Float)arg.mu2+diag[5]*diag[5]+norm(tri[10])+norm(tri[11])+norm(tri[12])+norm(tri[13])+norm(tri[14]);
+
+        //update off-diagonal elements:
+         for(int i = 0; i < 15; i++) tri[i] = aux[i];
+      }
+//
       for (int j=0; j<6; j++) {
 	diag[j] = sqrt(diag[j]);
 	tmp[j] = 1.0 / diag[j];
@@ -166,6 +221,7 @@ namespace quda {
   template <typename Float, typename Clover>
   class CloverInvert : Tunable {
     CloverInvertArg<Clover> arg;
+    const CloverField &meta; // used for meta data only
     const QudaFieldLocation location;
 
   private:
@@ -177,8 +233,10 @@ namespace quda {
     unsigned int minThreads() const { return arg.clover.volumeCB; }
 
   public:
-    CloverInvert(CloverInvertArg<Clover> &arg, QudaFieldLocation location) 
-      : arg(arg), location(location) { ; }
+    CloverInvert(CloverInvertArg<Clover> &arg, const CloverField &meta, QudaFieldLocation location) 
+      : arg(arg), meta(meta), location(location) { 
+      writeAuxString("stride=%d,prec=%lu",arg.clover.stride,sizeof(Float));
+    }
     virtual ~CloverInvert() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -197,10 +255,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.clover.volumeCB; 
-      aux << "stride=" << arg.clover.stride;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
@@ -216,9 +271,9 @@ namespace quda {
 
   template <typename Float, typename Clover>
   void cloverInvert(Clover inverse, const Clover clover, bool computeTraceLog, 
-		    double* const trlog, QudaFieldLocation location) {
+		    double* const trlog, const CloverField &meta, QudaFieldLocation location) {
     CloverInvertArg<Clover> arg(inverse, clover, computeTraceLog, trlog);
-    CloverInvert<Float,Clover> invert(arg, location);
+    CloverInvert<Float,Clover> invert(arg, meta, location);
     invert.apply(0);
     cudaDeviceSynchronize();
   }
@@ -228,11 +283,11 @@ namespace quda {
     if (clover.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
       cloverInvert<Float>(FloatNOrder<Float,72,2>(clover, 1), 
 			  FloatNOrder<Float,72,2>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), location);
+			  computeTraceLog, clover.TrLog(), clover, location);
     } else if (clover.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
       cloverInvert<Float>(FloatNOrder<Float,72,4>(clover, 1), 
 			  FloatNOrder<Float,72,4>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), location);
+			  computeTraceLog, clover.TrLog(), clover, location);
     } else {
       errorQuda("Clover field %d order not supported", clover.Order());
     }

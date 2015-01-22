@@ -142,6 +142,8 @@ namespace quda {
       K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR preconditioner
       K = new MR(matPrecon, Kparam, profile);
+    else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner MR preconditioner
+      K = new SD(matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unknown preconditioner
       K = NULL;
     else 
@@ -263,8 +265,18 @@ namespace quda {
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
+
+    // this parameter determines how many consective reliable update
+    // reisudal increases we tolerate before terminating the solver,
+    // i.e., how long do we want to keep trying to converge
+    const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
+    const int maxResIncreaseTotal = param.max_res_increase_total;
+
     double heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
+
+    int resIncrease = 0;
+    int resIncreaseTotal = 0;
 
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
@@ -300,7 +312,7 @@ namespace quda {
 
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
 	  else blas::copy(pPre, rPre);
-	
+
 	  // relaxation p = omega*p + (1-omega)*r
 	  //if (param.omega!=1.0) blas::axpby((1.0-param.omega), rPre, param.omega, pPre);
 	
@@ -354,6 +366,18 @@ namespace quda {
 	r2 = blas::xmyNorm(b, r);  
 
 	if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
+
+	// break-out check if we have reached the limit of the precision
+	if (r2 > r2_old) {
+	  resIncrease++;
+	  resIncreaseTotal++;
+	  warningQuda("GCR: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+		      sqrt(r2), sqrt(r2_old), resIncreaseTotal);
+	  if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
+	} else {
+	  resIncrease = 0;
+	}
+
 	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
@@ -368,6 +392,8 @@ namespace quda {
 	  // prevent ending the Krylov space prematurely if other convergence criteria not met 
 	  if (r2 < stop) l2_converge = true; 
 	}
+
+	r2_old = r2;
 
       }
 

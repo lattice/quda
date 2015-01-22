@@ -23,6 +23,14 @@ namespace quda {
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
+  
+  class EigValueSet;
+  class cudaEigValueSet;
+  class cpuEigValueSet;
+
+  class EigVecSet;
+  class cpuEigVecSet;
+  class cudaEigVecSet;
 
   class GaugeField;
   class cpuGaugeField;
@@ -91,19 +99,20 @@ namespace quda {
     /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset;
 
-    /**
-	Pinned-memory buffer that is used by all derived classes 
-    */
-    static void *bufferPinned; 
+    /** Pinned-memory buffer that is used by all derived classes */
+    static void *bufferPinned[2]; 
 
     /** Whether the pinned-memory buffer has already been initialized or not */
-    static bool bufferPinnedInit;
+    static bool bufferPinnedInit[2];
 
     /** The size in bytes of pinned-memory buffer */
-    static size_t bufferPinnedBytes;
+    static size_t bufferPinnedBytes[2];
 
     /** Resize the pinned-memory buffer */
-    void resizeBufferPinned(size_t bytes) const;
+    void resizeBufferPinned(size_t bytes, const int index=0) const;
+
+    /** Keep track of resizes to the pinned memory buffers */
+    static size_t bufferPinnedResizeCount;
 
     /** Device-memory buffer that is used by all derived classes */
     static void *bufferDevice; 
@@ -117,6 +126,8 @@ namespace quda {
     /** Resize the device-memory buffer */
     void resizeBufferDevice(size_t bytes) const;
 
+
+
     // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
 
     /** The number of dimensions we partition for communication */
@@ -129,27 +140,33 @@ namespace quda {
     */
 
     /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *my_face;
-    void *my_fwd_face[QUDA_MAX_DIM];
-    void *my_back_face[QUDA_MAX_DIM];
+    void *my_face[2];
+    void *my_fwd_face[2][QUDA_MAX_DIM];
+    void *my_back_face[2][QUDA_MAX_DIM];
 
     /** Memory buffer used for sending all messages (regardless of Nface) */
-    void *from_face;
-    void *from_back_face[QUDA_MAX_DIM];
-    void *from_fwd_face[QUDA_MAX_DIM];
+    void *from_face[2];
+    void *from_back_face[2][QUDA_MAX_DIM];
+    void *from_fwd_face[2][QUDA_MAX_DIM];
     
     /** Message handles for receiving from forwards */
-    MsgHandle ***mh_recv_fwd;
+    MsgHandle ***mh_recv_fwd[2];
 
     /** Message handles for receiving from backwards */
-    MsgHandle ***mh_recv_back;
+    MsgHandle ***mh_recv_back[2];
 
     /** Message handles for sending forwards */
-    MsgHandle ***mh_send_fwd;
+    MsgHandle ***mh_send_fwd[2];
 
     /** Message handles for sending backwards */
-    MsgHandle ***mh_send_back;
+    MsgHandle ***mh_send_back[2];
     
+    /** Used as a label in the autotuner */
+    char vol_string[TuneKey::volume_n];
+    
+    /** Sets the vol_string for use in tuning */
+    virtual void setTuningString(); 
+
  public:
 
     /**
@@ -163,11 +180,11 @@ namespace quda {
     */
     virtual ~LatticeField();
     
-    /**
-       Free the pinned-memory buffer 
+    /** 
+	Free the pinned-memory buffer 
     */
-    static void freeBuffer();
-    
+    static void freeBuffer(int index=0);
+
     /**
        @return The dimension of the lattice 
     */
@@ -253,7 +270,7 @@ namespace quda {
 		      double a=0, double b=0)
     { errorQuda("Not implemented"); }
 
-    virtual void gather(int nFace, int dagger, int dir)
+    virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 
     virtual void commsStart(int nFace, int dir, int dagger=0)
@@ -265,6 +282,8 @@ namespace quda {
     virtual void scatter(int nFace, int dagger, int dir)
     { errorQuda("Not implemented"); }
 
+    /** Return the volume string used by the autotuner */
+    const char *VolString() const { return vol_string; }
   };
   
 } // namespace quda

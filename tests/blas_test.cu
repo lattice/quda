@@ -11,6 +11,9 @@
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
 
+// google test
+#include <gtest.h>
+
 // Wilson, clover-improved Wilson, and twisted mass are supported.
 extern QudaDslashType dslash_type;
 extern bool tune;
@@ -23,6 +26,7 @@ extern int gridsize_from_cmdline[];
 extern int niter;
 
 extern bool tune;
+extern bool verify_results;
 
 extern void usage(char** );
 
@@ -195,139 +199,138 @@ double benchmark(int kernel, const int niter) {
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);
 
-  for (int i=0; i < niter; ++i) {
-
+  {
     switch (kernel) {
 
     case 0:
-      blas::copy(*yD, *hD);
+      for (int i=0; i < niter; ++i) blas::copy(*yD, *hD);
       break;
 
     case 1:
-      blas::copy(*yD, *lD);
+      for (int i=0; i < niter; ++i) blas::copy(*yD, *lD);
       break;
       
     case 2:
-      blas::axpby(a, *xD, b, *yD);
+      for (int i=0; i < niter; ++i) blas::axpby(a, *xD, b, *yD);
       break;
 
     case 3:
-      blas::xpy(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::xpy(*xD, *yD);
       break;
 
     case 4:
-      blas::axpy(a, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::axpy(a, *xD, *yD);
       break;
 
     case 5:
-      blas::xpay(*xD, a, *yD);
+      for (int i=0; i < niter; ++i) blas::xpay(*xD, a, *yD);
       break;
 
     case 6:
-      blas::mxpy(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::mxpy(*xD, *yD);
       break;
 
     case 7:
-      blas::ax(a, *xD);
+      for (int i=0; i < niter; ++i) blas::ax(a, *xD);
       break;
 
     case 8:
-      blas::caxpy(a2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::caxpy(a2, *xD, *yD);
       break;
 
     case 9:
-      blas::caxpby(a2, *xD, b2, *yD);
+      for (int i=0; i < niter; ++i) blas::caxpby(a2, *xD, b2, *yD);
       break;
 
     case 10:
-      blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
+      for (int i=0; i < niter; ++i) blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
       break;
 
     case 11:
-      blas::axpyBzpcx(a, *xD, *yD, b, *zD, c);
+      for (int i=0; i < niter; ++i) blas::axpyBzpcx(a, *xD, *yD, b, *zD, c);
       break;
 
     case 12:
-      blas::axpyZpbx(a, *xD, *yD, *zD, b);
+      for (int i=0; i < niter; ++i) blas::axpyZpbx(a, *xD, *yD, *zD, b);
       break;
 
     case 13:
-      blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
+      for (int i=0; i < niter; ++i) blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
       break;
       
     case 14:
-      blas::cabxpyAx(a, b2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cabxpyAx(a, b2, *xD, *yD);
       break;
 
     case 15:
-      blas::caxpbypz(a2, *xD, b2, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpbypz(a2, *xD, b2, *yD, *zD);
       break;
 
     case 16:
-      blas::caxpbypczpw(a2, *xD, b2, *yD, c2, *zD, *wD);
+      for (int i=0; i < niter; ++i) blas::caxpbypczpw(a2, *xD, b2, *yD, c2, *zD, *wD);
       break;
 
     case 17:
-      blas::caxpyXmaz(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpyXmaz(a2, *xD, *yD, *zD);
       break;
 
       // double
     case 18:
-      blas::norm2(*xD);
+      for (int i=0; i < niter; ++i) blas::norm(*xD);
       break;
 
     case 19:
-      blas::reDotProduct(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::reDotProduct(*xD, *yD);
       break;
 
     case 20:
-      blas::axpyNorm(a, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::axpyNorm(a, *xD, *yD);
       break;
 
     case 21:
-      blas::xmyNorm(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::xmyNorm(*xD, *yD);
       break;
       
     case 22:
-      blas::caxpyNorm(a2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::caxpyNorm(a2, *xD, *yD);
       break;
 
     case 23:
-      blas::caxpyXmazNormX(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpyXmazNormX(a2, *xD, *yD, *zD);
       break;
 
     case 24:
-      blas::cabxpyAxNorm(a, b2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cabxpyAxNorm(a, b2, *xD, *yD);
       break;
 
     // double2
     case 25:
-      blas::cDotProduct(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cDotProduct(*xD, *yD);
       break;
 
     case 26:
-      blas::xpaycDotzy(*xD, a, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::xpaycDotzy(*xD, a, *yD, *zD);
       break;
       
     case 27:
-      blas::caxpyDotzy(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpyDotzy(a2, *xD, *yD, *zD);
       break;
 
     // double3
     case 28:
-      blas::cDotProductNormA(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cDotProductNormA(*xD, *yD);
       break;
 
     case 29:
-      blas::cDotProductNormB(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cDotProductNormB(*xD, *yD);
       break;
 
     case 30:
-      blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      for (int i=0; i < niter; ++i) blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
     case 31:
-      blas::HeavyQuarkResidualNorm(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::HeavyQuarkResidualNorm(*xD, *yD);
       break;
 
     default:
@@ -630,6 +633,50 @@ double test(int kernel) {
   return error;
 }
 
+// Only benchmark double precision if supported
+#if (__COMPUTE_CAPABILITY__ >= 130)
+int Nprec = 3;
+#else
+int Nprec = 2;
+#endif
+
+const char *prec_str[] = {"half", "single", "double"};
+
+const char *names[] = {
+  "copyHS",
+  "copyLS",
+  "axpby",
+  "xpy",
+  "axpy",
+  "xpay",
+  "mxpy",
+  "ax",
+  "caxpy",
+  "caxpby",
+  "cxpaypbz",
+  "axpyBzpcx",
+  "axpyZpbx",
+  "caxpbypzYmbw",
+  "cabxpyAx",
+  "caxpbypz",
+  "caxpbypczpw",
+  "caxpyXmaz",
+  "norm",
+  "reDotProduct",
+  "axpyNorm",
+  "xmyNorm",
+  "caxpyNorm",
+  "caxpyXmazNormX",
+  "cabxpyAxNorm",
+  "cDotProduct",
+  "xpaycDotzy",
+  "caxpyDotzy",
+  "cDotProductNormA",
+  "cDotProductNormB",
+  "caxpbypzYmbwcDotProductWYNormY",
+  "HeavyQuarkResidualNorm"
+};
+
 int main(int argc, char** argv)
 {
   for (int i = 1; i < argc; i++){
@@ -645,50 +692,6 @@ int main(int argc, char** argv)
   display_test_info();
   initQuda(device);
 
-  char *names[] = {
-    "copyHS",
-    "copyLS",
-    "axpby",
-    "xpy",
-    "axpy",
-    "xpay",
-    "mxpy",
-    "ax",
-    "caxpy",
-    "caxpby",
-    "cxpaypbz",
-    "axpyBzpcx",
-    "axpyZpbx",
-    "caxpbypzYmbw",
-    "cabxpyAx",
-    "caxpbypz",
-    "caxpbypczpw",
-    "caxpyXmaz",
-    "norm",
-    "reDotProduct",
-    "axpyNorm",
-    "xmyNorm",
-    "caxpyNorm",
-    "caxpyXmazNormX",
-    "cabxpyAxNorm",
-    "cDotProduct",
-    "xpaycDotzy",
-    "caxpyDotzy",
-    "cDotProductNormA",
-    "cDotProductNormB",
-    "caxpbypzYmbwcDotProductWYNormY",
-    "HeavyQuarkResidualNorm"
-  };
-
-  char *prec_str[] = {"half", "single", "double"};
-  
-  // Only benchmark double precision if supported
-#if (__COMPUTE_CAPABILITY__ >= 130)
-  int Nprec = 3;
-#else
-  int Nprec = 2;
-#endif
-
   // enable the tuning
   setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
   setVerbosity(QUDA_SILENT);
@@ -699,7 +702,7 @@ int main(int argc, char** argv)
     initFields(prec);
 
     for (int kernel = 0; kernel < Nkernels; kernel++) {
-      // only benchmark "high precision" copyCuda() if double is supported
+      // only benchmark "high precision" blas::copy() if double is supported
       if ((Nprec < 3) && (kernel == 0)) continue;
 
       // do the initial tune
@@ -723,20 +726,143 @@ int main(int argc, char** argv)
   cudaGetLastError();
 
   // lastly check for correctness
-  for (int prec = 0; prec < Nprec; prec++) {
-    printfQuda("\nTesting %s precision...\n\n", prec_str[prec]);
-    initFields(prec);
-    
-    for (int kernel = 0; kernel < Nkernels; kernel++) {
-      // only benchmark "high precision" copyCuda() if double is supported
-      if ((Nprec < 3) && (kernel == 0)) continue;
-      double error = test(kernel);
-      printfQuda("%-35s error = %e, \n", names[kernel], error);
-    }
-    freeFields();
+  if (verify_results) {
+    ::testing::InitGoogleTest(&argc, argv);
+    if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
   }
 
   endQuda();
 
   finalizeComms();
 }
+
+// The following tests each kernel at each precision using the google testing framework
+
+class BlasTest : public ::testing::TestWithParam<int2> {
+protected:
+  int2 param;
+
+public:
+  virtual ~BlasTest() { }
+  virtual void SetUp() { 
+    param = GetParam();
+    initFields(param.x); 
+  }
+  virtual void TearDown() { freeFields(); }
+
+  virtual void NormalExit() { printf("monkey\n"); }
+
+};
+
+TEST_P(BlasTest, verify) {
+  int prec = param.x;
+  int kernel = param.y;
+  double deviation = test(kernel);
+  printfQuda("%-35s error = %e\n", names[kernel], deviation);
+  double tol = (prec == 2 ? 1e-12 : (prec == 1 ? 1e-5 : 1e-3));
+  tol = (kernel < 2) ? 1e-4 : tol; // use different tolerance for copy
+  EXPECT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
+}
+
+// half precision
+INSTANTIATE_TEST_CASE_P(copyHS_half, BlasTest, ::testing::Values( make_int2(0,0) ));
+INSTANTIATE_TEST_CASE_P(copyLS_half, BlasTest, ::testing::Values( make_int2(0,1) ));
+INSTANTIATE_TEST_CASE_P(axpby_half, BlasTest, ::testing::Values( make_int2(0,2) ));
+INSTANTIATE_TEST_CASE_P(xpy_half, BlasTest, ::testing::Values( make_int2(0,3) ));
+INSTANTIATE_TEST_CASE_P(axpy_half, BlasTest, ::testing::Values( make_int2(0,4) ));
+INSTANTIATE_TEST_CASE_P(xpay_half, BlasTest, ::testing::Values( make_int2(0,5) ));
+INSTANTIATE_TEST_CASE_P(mxpy_half, BlasTest, ::testing::Values( make_int2(0,6) ));
+INSTANTIATE_TEST_CASE_P(ax_half, BlasTest, ::testing::Values( make_int2(0,7) ));
+INSTANTIATE_TEST_CASE_P(caxpy_half, BlasTest, ::testing::Values( make_int2(0,8) ));
+INSTANTIATE_TEST_CASE_P(caxpby_half, BlasTest, ::testing::Values( make_int2(0,9) ));
+INSTANTIATE_TEST_CASE_P(cxpaypbz_half, BlasTest, ::testing::Values( make_int2(0,10) ));
+INSTANTIATE_TEST_CASE_P(axpyBzpcx_half, BlasTest, ::testing::Values( make_int2(0,11) ));
+INSTANTIATE_TEST_CASE_P(axpyZpbx_half, BlasTest, ::testing::Values( make_int2(0,12) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbw_half, BlasTest, ::testing::Values( make_int2(0,13) ));
+INSTANTIATE_TEST_CASE_P(cabxpyAx_half, BlasTest, ::testing::Values( make_int2(0,14) ));
+INSTANTIATE_TEST_CASE_P(caxpbypz_half, BlasTest, ::testing::Values( make_int2(0,15) ));
+INSTANTIATE_TEST_CASE_P(caxpbypczpw_half, BlasTest, ::testing::Values( make_int2(0,16) ));
+INSTANTIATE_TEST_CASE_P(caxpyXmaz_half, BlasTest, ::testing::Values( make_int2(0,17) ));
+INSTANTIATE_TEST_CASE_P(norm2_half, BlasTest, ::testing::Values( make_int2(0,18) ));
+INSTANTIATE_TEST_CASE_P(reDotProduct_half, BlasTest, ::testing::Values( make_int2(0,19) ));
+INSTANTIATE_TEST_CASE_P(axpyNorm_half, BlasTest, ::testing::Values( make_int2(0,20) ));
+INSTANTIATE_TEST_CASE_P(xmyNorm_half, BlasTest, ::testing::Values( make_int2(0,21) ));
+INSTANTIATE_TEST_CASE_P(caxpyNorm_half, BlasTest, ::testing::Values( make_int2(0,22) ));
+INSTANTIATE_TEST_CASE_P(caxpyXmazNormX_half, BlasTest, ::testing::Values( make_int2(0,23) ));
+INSTANTIATE_TEST_CASE_P(cabxpyAxNorm_half, BlasTest, ::testing::Values( make_int2(0,24) ));
+INSTANTIATE_TEST_CASE_P(cDotProduct_half, BlasTest, ::testing::Values( make_int2(0,25) ));
+INSTANTIATE_TEST_CASE_P(xpaycDotzy_half, BlasTest, ::testing::Values( make_int2(0,26) ));
+INSTANTIATE_TEST_CASE_P(caxpyDotzy_half, BlasTest, ::testing::Values( make_int2(0,27) ));
+INSTANTIATE_TEST_CASE_P(cDotProductNormA_half, BlasTest, ::testing::Values( make_int2(0,28) ));
+INSTANTIATE_TEST_CASE_P(cDotProductNormB_half, BlasTest, ::testing::Values( make_int2(0,29) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_half, BlasTest, ::testing::Values( make_int2(0,30) ));
+INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_half, BlasTest, ::testing::Values( make_int2(0,31) ));
+
+// single precision
+INSTANTIATE_TEST_CASE_P(copyHS_single, BlasTest, ::testing::Values( make_int2(1,0) ));
+INSTANTIATE_TEST_CASE_P(copyLS_single, BlasTest, ::testing::Values( make_int2(1,1) ));
+INSTANTIATE_TEST_CASE_P(axpby_single, BlasTest, ::testing::Values( make_int2(1,2) ));
+INSTANTIATE_TEST_CASE_P(xpy_single, BlasTest, ::testing::Values( make_int2(1,3) ));
+INSTANTIATE_TEST_CASE_P(axpy_single, BlasTest, ::testing::Values( make_int2(1,4) ));
+INSTANTIATE_TEST_CASE_P(xpay_single, BlasTest, ::testing::Values( make_int2(1,5) ));
+INSTANTIATE_TEST_CASE_P(mxpy_single, BlasTest, ::testing::Values( make_int2(1,6) ));
+INSTANTIATE_TEST_CASE_P(ax_single, BlasTest, ::testing::Values( make_int2(1,7) ));
+INSTANTIATE_TEST_CASE_P(caxpy_single, BlasTest, ::testing::Values( make_int2(1,8) ));
+INSTANTIATE_TEST_CASE_P(caxpby_single, BlasTest, ::testing::Values( make_int2(1,9) ));
+INSTANTIATE_TEST_CASE_P(cxpaypbz_single, BlasTest, ::testing::Values( make_int2(1,10) ));
+INSTANTIATE_TEST_CASE_P(axpyBzpcx_single, BlasTest, ::testing::Values( make_int2(1,11) ));
+INSTANTIATE_TEST_CASE_P(axpyZpbx_single, BlasTest, ::testing::Values( make_int2(1,12) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbw_single, BlasTest, ::testing::Values( make_int2(1,13) ));
+INSTANTIATE_TEST_CASE_P(cabxpyAx_single, BlasTest, ::testing::Values( make_int2(1,14) ));
+INSTANTIATE_TEST_CASE_P(caxpbypz_single, BlasTest, ::testing::Values( make_int2(1,15) ));
+INSTANTIATE_TEST_CASE_P(caxpbypczpw_single, BlasTest, ::testing::Values( make_int2(1,16) ));
+INSTANTIATE_TEST_CASE_P(caxpyXmaz_single, BlasTest, ::testing::Values( make_int2(1,17) ));
+INSTANTIATE_TEST_CASE_P(norm2_single, BlasTest, ::testing::Values( make_int2(1,18) ));
+INSTANTIATE_TEST_CASE_P(reDotProduct_single, BlasTest, ::testing::Values( make_int2(1,19) ));
+INSTANTIATE_TEST_CASE_P(axpyNorm_single, BlasTest, ::testing::Values( make_int2(1,20) ));
+INSTANTIATE_TEST_CASE_P(xmyNorm_single, BlasTest, ::testing::Values( make_int2(1,21) ));
+INSTANTIATE_TEST_CASE_P(caxpyNorm_single, BlasTest, ::testing::Values( make_int2(1,22) ));
+INSTANTIATE_TEST_CASE_P(caxpyXmazNormX_single, BlasTest, ::testing::Values( make_int2(1,23) ));
+INSTANTIATE_TEST_CASE_P(cabxpyAxNorm_single, BlasTest, ::testing::Values( make_int2(1,24) ));
+INSTANTIATE_TEST_CASE_P(cDotProduct_single, BlasTest, ::testing::Values( make_int2(1,25) ));
+INSTANTIATE_TEST_CASE_P(xpaycDotzy_single, BlasTest, ::testing::Values( make_int2(1,26) ));
+INSTANTIATE_TEST_CASE_P(caxpyDotzy_single, BlasTest, ::testing::Values( make_int2(1,27) ));
+INSTANTIATE_TEST_CASE_P(cDotProductNormA_single, BlasTest, ::testing::Values( make_int2(1,28) ));
+INSTANTIATE_TEST_CASE_P(cDotProductNormB_single, BlasTest, ::testing::Values( make_int2(1,29) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_single, BlasTest, ::testing::Values( make_int2(1,30) ));
+INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_single, BlasTest, ::testing::Values( make_int2(1,31) ));
+
+// double precision
+INSTANTIATE_TEST_CASE_P(copyHS_double, BlasTest, ::testing::Values( make_int2(2,0) ));
+INSTANTIATE_TEST_CASE_P(copyLS_double, BlasTest, ::testing::Values( make_int2(2,1) ));
+INSTANTIATE_TEST_CASE_P(axpby_double, BlasTest, ::testing::Values( make_int2(2,2) ));
+INSTANTIATE_TEST_CASE_P(xpy_double, BlasTest, ::testing::Values( make_int2(2,3) ));
+INSTANTIATE_TEST_CASE_P(axpy_double, BlasTest, ::testing::Values( make_int2(2,4) ));
+INSTANTIATE_TEST_CASE_P(xpay_double, BlasTest, ::testing::Values( make_int2(2,5) ));
+INSTANTIATE_TEST_CASE_P(mxpy_double, BlasTest, ::testing::Values( make_int2(2,6) ));
+INSTANTIATE_TEST_CASE_P(ax_double, BlasTest, ::testing::Values( make_int2(2,7) ));
+INSTANTIATE_TEST_CASE_P(caxpy_double, BlasTest, ::testing::Values( make_int2(2,8) ));
+INSTANTIATE_TEST_CASE_P(caxpby_double, BlasTest, ::testing::Values( make_int2(2,9) ));
+INSTANTIATE_TEST_CASE_P(cxpaypbz_double, BlasTest, ::testing::Values( make_int2(2,10) ));
+INSTANTIATE_TEST_CASE_P(axpyBzpcx_double, BlasTest, ::testing::Values( make_int2(2,11) ));
+INSTANTIATE_TEST_CASE_P(axpyZpbx_double, BlasTest, ::testing::Values( make_int2(2,12) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbw_double, BlasTest, ::testing::Values( make_int2(2,13) ));
+INSTANTIATE_TEST_CASE_P(cabxpyAx_double, BlasTest, ::testing::Values( make_int2(2,14) ));
+INSTANTIATE_TEST_CASE_P(caxpbypz_double, BlasTest, ::testing::Values( make_int2(2,15) ));
+INSTANTIATE_TEST_CASE_P(caxpbypczpw_double, BlasTest, ::testing::Values( make_int2(2,16) ));
+INSTANTIATE_TEST_CASE_P(caxpyXmaz_double, BlasTest, ::testing::Values( make_int2(2,17) ));
+INSTANTIATE_TEST_CASE_P(norm2_double, BlasTest, ::testing::Values( make_int2(2,18) ));
+INSTANTIATE_TEST_CASE_P(reDotProduct_double, BlasTest, ::testing::Values( make_int2(2,19) ));
+INSTANTIATE_TEST_CASE_P(axpyNorm_double, BlasTest, ::testing::Values( make_int2(2,20) ));
+INSTANTIATE_TEST_CASE_P(xmyNorm_double, BlasTest, ::testing::Values( make_int2(2,21) ));
+INSTANTIATE_TEST_CASE_P(caxpyNorm_double, BlasTest, ::testing::Values( make_int2(2,22) ));
+INSTANTIATE_TEST_CASE_P(caxpyXmazNormX_double, BlasTest, ::testing::Values( make_int2(2,23) ));
+INSTANTIATE_TEST_CASE_P(cabxpyAxNorm_double, BlasTest, ::testing::Values( make_int2(2,24) ));
+INSTANTIATE_TEST_CASE_P(cDotProduct_double, BlasTest, ::testing::Values( make_int2(2,25) ));
+INSTANTIATE_TEST_CASE_P(xpaycDotzy_double, BlasTest, ::testing::Values( make_int2(2,26) ));
+INSTANTIATE_TEST_CASE_P(caxpyDotzy_double, BlasTest, ::testing::Values( make_int2(2,27) ));
+INSTANTIATE_TEST_CASE_P(cDotProductNormA_double, BlasTest, ::testing::Values( make_int2(2,28) ));
+INSTANTIATE_TEST_CASE_P(cDotProductNormB_double, BlasTest, ::testing::Values( make_int2(2,29) ));
+INSTANTIATE_TEST_CASE_P(caxpbypzYmbwcDotProductWYNormY_double, BlasTest, ::testing::Values( make_int2(2,30) ));
+INSTANTIATE_TEST_CASE_P(HeavyQuarkResidualNorm_double, BlasTest, ::testing::Values( make_int2(2,31) ));
+

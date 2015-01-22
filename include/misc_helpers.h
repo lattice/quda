@@ -12,7 +12,7 @@ namespace quda {
 			      int Vh, int stride, QudaPrecision prec,
 			      cudaStream_t stream);
   
-  void collectGhostStaple(int* X, void* even, void* odd, int volume, 
+  void collectGhostStaple(int* X, void* even, void* odd, int volumeCB, int stride, 
 			  QudaPrecision precision, void* ghost_staple_gpu,		   
 			  int dir, int whichway, cudaStream_t* stream);
 

@@ -743,7 +743,7 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
 #endif  
   
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
-  int len[4] = {
+  size_t len[4] = {
     Vsh_x*gaugeSiteSize*sizeof(Float),
     Vsh_y*gaugeSiteSize*sizeof(Float),
     Vsh_z*gaugeSiteSize*sizeof(Float),
@@ -823,11 +823,11 @@ exchange_gpu_staple_start(int* X, void* _cudaStaple, int dir, int whichway, cuda
 
   void* even = cudaStaple->Even_p();
   void* odd = cudaStaple->Odd_p();
-  int volume = cudaStaple->VolumeCB();
+  int volumeCB = cudaStaple->VolumeCB();
   QudaPrecision prec = cudaStaple->Precision();
   int stride = cudaStaple->Stride();
   
-  packGhostStaple(X, even, odd, volume, prec, stride, 
+  packGhostStaple(X, even, odd, volumeCB, prec, stride, 
 		  dir, whichway, fwd_nbr_staple_gpu, back_nbr_staple_gpu,
 		  fwd_nbr_staple_sendbuf, back_nbr_staple_sendbuf, stream);
 }
@@ -885,7 +885,7 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dim, int send_dir, cudaS
 
   void* even = cudaStaple->Even_p();
   void* odd = cudaStaple->Odd_p();
-  int volume = cudaStaple->VolumeCB();
+  int volumeCB = cudaStaple->VolumeCB();
   QudaPrecision prec = cudaStaple->Precision();
   int stride = cudaStaple->Stride();
 
@@ -904,11 +904,11 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dim, int send_dir, cudaS
     comm_free(llfat_recv.back[dim]);
 
 #ifdef GPU_DIRECT
-    unpackGhostStaple(X, even, odd, volume, prec, stride, 
+    unpackGhostStaple(X, even, odd, volumeCB, prec, stride, 
 		      dim, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else   
     memcpy(back_nbr_staple[dim], back_nbr_staple_cpu[dim], len);
-    unpackGhostStaple(X, even, odd, volume, prec, stride, 
+    unpackGhostStaple(X, even, odd, volumeCB, prec, stride, 
 		      dim, QUDA_BACKWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #endif
 
@@ -921,11 +921,11 @@ exchange_gpu_staple_wait(int* X, void* _cudaStaple, int dim, int send_dir, cudaS
     comm_free(llfat_recv.fwd[dim]);
 
 #ifdef GPU_DIRECT
-    unpackGhostStaple(X, even, odd, volume, prec, stride, 
+    unpackGhostStaple(X, even, odd, volumeCB, prec, stride, 
 		      dim, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #else        
     memcpy(fwd_nbr_staple[dim], fwd_nbr_staple_cpu[dim], len);
-    unpackGhostStaple(X, even, odd, volume, prec, stride,
+    unpackGhostStaple(X, even, odd, volumeCB, prec, stride,
 		      dim, QUDA_FORWARDS, fwd_nbr_staple, back_nbr_staple, stream);
 #endif
 

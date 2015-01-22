@@ -8,6 +8,7 @@ HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h  
 	domain_wall_dslash_reference.h test_util.h dslash_util.h qio_util.h
 
 TESTS = su3_test pack_test blas_test dslash_test invert_test	\
+	deflation_test						\
 	$(DIRAC_TEST) $(STAGGERED_DIRAC_TEST) $(FATLINK_TEST)	\
 	$(GAUGE_FORCE_TEST) $(FERMION_FORCE_TEST)		\
 	$(UNITARIZE_LINK_TEST) $(HISQ_PATHS_FORCE_TEST)		\
@@ -16,7 +17,7 @@ TESTS = su3_test pack_test blas_test dslash_test invert_test	\
 
 all: $(TESTS)
 
-dslash_test: dslash_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o misc.o $(QIO_UTIL) $(QUDA)
+dslash_test: dslash_test.o test_util.o gtest-all.o wilson_dslash_reference.o domain_wall_dslash_reference.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
@@ -24,7 +25,11 @@ invert_test: invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dsl
 
 multigrid_invert_test: multigrid_invert_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
-staggered_dslash_test: staggered_dslash_test.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
+
+deflation_test: deflation_test.o test_util.o wilson_dslash_reference.o domain_wall_dslash_reference.o blas_reference.o misc.o $(QIO_UTIL) $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+
+staggered_dslash_test: staggered_dslash_test.o gtest-all.o test_util.o staggered_dslash_reference.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS) 
 
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
@@ -36,7 +41,7 @@ su3_test: su3_test.o test_util.o misc.o $(QIO_UTIL) $(QUDA)
 pack_test: pack_test.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-blas_test: blas_test.o test_util.o misc.o $(QUDA)
+blas_test: blas_test.o gtest-all.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 llfat_test: llfat_test.o llfat_reference.o test_util.o misc.o $(QUDA)
@@ -61,7 +66,7 @@ multigrid_test: wilson_dslash_reference.o multigrid_test.o test_util.o misc.o $(
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
 clean:
-	-rm -f *.o dslash_test invert_test staggered_dslash_test	\
+	-rm -f *.o dslash_test invert_test deflation_test staggered_dslash_test	\
 	staggered_invert_test su3_test pack_test blas_test llfat_test	\
 	gauge_force_test fermion_force_test hisq_paths_force_test	\
 	hisq_unitarize_force_test unitarize_link_test multigrid_test	\

@@ -17,6 +17,10 @@ namespace quda {
     const Rotator V;
     const int *geo_map;  // need to make a device copy of this
     int spin_map[4];
+
+    const char *vol_str;
+    char aux_tmp[TuneKey::aux_n];
+
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
 		  const int *geo_map, const int *spin_map) : 
       out(out), in(in), V(V), geo_map(geo_map)  {
@@ -121,11 +125,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.out.Volume(); 
-      // FIXME should use stride here
-      aux << "out_stride=" << arg.out.Volume() << ",in_stride=" << arg.in.Volume();
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey("fixme", typeid(*this).name(), "fixme");
     }
 
     void initTuneParam(TuneParam &param) const {

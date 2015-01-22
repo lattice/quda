@@ -346,9 +346,11 @@ namespace quda {
 #else
       rtn.z /= x.Volume();
 #endif
-      return rtn;
-    }
-  
+    reduceDoubleArray((double*)&rtn, 3);
+
+    return rtn;
+  }
+    
     double3 HeavyQuarkResidualNormCpu(cpuColorSpinorField &x, cpuColorSpinorField &y, cpuColorSpinorField &r) {
       cpuColorSpinorField tmp(x);
       xpyCpu(y, tmp);

@@ -21,8 +21,9 @@ namespace quda {
       errorQuda("Field ordering %d presently disabled for this type", order);
 
 #ifdef MULTI_GPU
-    if (link_type != QUDA_ASQTAD_MOM_LINKS && 
-	ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
+    if (link_type != QUDA_ASQTAD_MOM_LINKS &&
+	ghostExchange == QUDA_GHOST_EXCHANGE_PAD && 
+	isNative()) {
       bool pad_check = true;
       for (int i=0; i<nDim; i++)
 	if (pad < nFace*surfaceCB[i]) pad_check = false;
@@ -211,12 +212,13 @@ namespace quda {
       if (!commDimPartitioned(d)) continue;
       total_bytes += 4*bytes[d]; // (2 from send/recv) x (2 from fwd/back)
     }
-    resizeBufferPinned(total_bytes);
+    resizeBufferPinned(total_bytes,0);
+
 
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-      recv_h[d] = static_cast<char*>(bufferPinned) + offset;
+      recv_h[d] = static_cast<char*>(bufferPinned[0]) + offset;
       send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
       offset += 4*bytes[d];
     }
@@ -345,14 +347,14 @@ namespace quda {
       copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, 
           static_cast<const cudaGaugeField&>(src).gauge);
     } else if (typeid(src) == typeid(cpuGaugeField)) {
-      LatticeField::resizeBufferPinned(bytes);
+      LatticeField::resizeBufferPinned(bytes,0);
 
       // copy field and ghost zone into bufferPinned
-      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned, 
+      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, bufferPinned[0], 
 		       static_cast<const cpuGaugeField&>(src).gauge); 
 
       // this copies over both even and odd
-      cudaMemcpy(gauge, bufferPinned, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(gauge, bufferPinned[0], bytes, cudaMemcpyHostToDevice);
     } else {
       errorQuda("Invalid gauge field type");
     }
@@ -371,12 +373,12 @@ namespace quda {
     if (pack_location == QUDA_CUDA_FIELD_LOCATION) {
       if (cpu.Order() == QUDA_MILC_GAUGE_ORDER ||
 	  cpu.Order() == QUDA_CPS_WILSON_GAUGE_ORDER) {
-	resizeBufferPinned(cpu.Bytes());
-	memcpy(bufferPinned, cpu.Gauge_p(), cpu.Bytes());
+	resizeBufferPinned(cpu.Bytes(),0);
+	memcpy(bufferPinned[0], cpu.Gauge_p(), cpu.Bytes());
 
 	// run kernel directly using host-mapped input data
 	void *bufferPinnedMapped;
-	cudaHostGetDevicePointer(&bufferPinnedMapped, bufferPinned, 0);
+	cudaHostGetDevicePointer(&bufferPinnedMapped, bufferPinned[0], 0);
 	copyGenericGauge(*this, cpu, QUDA_CUDA_FIELD_LOCATION, gauge, bufferPinnedMapped);
       } else {
 	errorQuda("Not implemented for order %d", cpu.Order());
@@ -457,13 +459,13 @@ namespace quda {
       }
 
     } else if (pack_location == QUDA_CPU_FIELD_LOCATION) { // do copy then host-side reorder
-      resizeBufferPinned(bytes);
+      resizeBufferPinned(bytes,0);
 
       // this copies over both even and odd
-      cudaMemcpy(bufferPinned, gauge, bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy(bufferPinned[0], gauge, bytes, cudaMemcpyDeviceToHost);
       checkCudaError();
 
-      copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, bufferPinned);
+      copyGenericGauge(cpu, *this, QUDA_CPU_FIELD_LOCATION, cpu.gauge, bufferPinned[0]);
     } else {
       errorQuda("Invalid pack location %d", pack_location);
     }

@@ -51,6 +51,8 @@ private:
   // these can't be curried into the Spinors because of Tesla argument length restriction
   char *X_h, *Y_h, *Z_h, *W_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h;
+  const size_t *bytes_;
+  const size_t *norm_bytes_;
 
   unsigned int sharedBytesPerThread() const { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -67,43 +69,33 @@ private:
 
 public:
   BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor &f, 
-	   int length) :
+	   int length, const size_t *bytes, const size_t *norm_bytes) :
   arg(X, Y, Z, W, f, length), X_h(0), Y_h(0), Z_h(0), W_h(0), 
-  Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0)
-    { ; }
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), bytes_(bytes), norm_bytes_(norm_bytes) { }
+
   virtual ~BlasCuda() { }
 
-  TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << blasConstants.x[0] << "x";
-    vol << blasConstants.x[1] << "x";
-    vol << blasConstants.x[2] << "x";
-    vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << arg.X.Precision();
-    return TuneKey(vol.str(), typeid(arg.f).name(), aux.str());
-  }  
+  inline TuneKey tuneKey() const { 
+    return TuneKey(blasStrings.vol_str, typeid(arg.f).name(), blasStrings.aux_str);
+  }
 
-  void apply(const cudaStream_t &stream) {
+  inline void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     blasKernel<FloatN,M> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
   }
 
   void preTune() {
-    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
-    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    arg.X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
-    arg.Y.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    arg.Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
-    arg.W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.X.save(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.save(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.save(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.save(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
   }
 
   void postTune() {
-    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
-    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    arg.X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
-    arg.Y.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    arg.Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
-    arg.W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
+    arg.X.load(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.load(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.load(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.load(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
   }
 
   long long flops() const { return arg.f.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
@@ -111,6 +103,7 @@ public:
     size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M;
     if (arg.X.Precision() == QUDA_HALF_PRECISION) bytes += sizeof(float);
     return arg.f.streams()*bytes*arg.length; }
+  int tuningIter() const { return 3; }
 };
 
 double2 make_Float2(const std::complex<double> &a) {
@@ -211,9 +204,9 @@ template <typename Float, int writeX, int writeY, int writeZ, int writeW, typena
  */
 template <template <typename Float, typename FloatN> class Functor,
   int writeX, int writeY, int writeZ, int writeW>
-void blasCuda(const double2 &a, const double2 &b, const double2 &c,
-	      ColorSpinorField &x, ColorSpinorField &y, 
-	      ColorSpinorField &z, ColorSpinorField &w) {
+  void blasCuda(const double2 &a, const double2 &b, const double2 &c,
+		ColorSpinorField &x, ColorSpinorField &y, 
+		ColorSpinorField &z, ColorSpinorField &w) {
   checkSpinor(x, y);
   checkSpinor(x, z);
   checkSpinor(x, w);
@@ -234,11 +227,14 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       return;
     }
 
-    for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
-    blasConstants.stride = x.Stride();
+    blasStrings.vol_str = x.VolString();
+    blasStrings.aux_str = x.AuxString();
 
-  // FIXME: use traits to encapsulate register type for shorts -
-  // will reduce template type parameters from 3 to 2
+    // FIXME: use traits to encapsulate register type for shorts -
+    // will reduce template type parameters from 3 to 2
+
+    size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
+    size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
 
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
       const int M = 1;
@@ -250,7 +246,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       BlasCuda<double2,M,
 	Spinor<double2,double2,double2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
 	Spinor<double2,double2,double2,M,writeZ,2>, Spinor<double2,double2,double2,M,writeW,3>,
-	Functor<double2, double2> > blas(X, Y, Z, W, f, x.Length()/(2*M));
+	Functor<double2, double2> > blas(X, Y, Z, W, f, x.Length()/(2*M), bytes, norm_bytes);
       blas.apply(*blasStream);
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       const int M = 1;
@@ -264,7 +260,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	BlasCuda<float4,M,
 	  Spinor<float4,float4,float4,M,writeX,0>, Spinor<float4,float4,float4,M,writeY,1>, 
 	  Spinor<float4,float4,float4,M,writeZ,2>, Spinor<float4,float4,float4,M,writeW,3>, 
-	  Functor<float2, float4> > blas(X, Y, Z, W, f, x.Length()/(4*M));
+	  Functor<float2, float4> > blas(X, Y, Z, W, f, x.Length()/(4*M), bytes, norm_bytes);
 	blas.apply(*blasStream);
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -279,7 +275,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	BlasCuda<float2,M,
 	  Spinor<float2,float2,float2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>, 
 	  Spinor<float2,float2,float2,M,writeZ,2>, Spinor<float2,float2,float2,M,writeW,3>, 
-	  Functor<float2, float2> > blas(X, Y, Z, W, f, x.Length()/(2*M));
+	  Functor<float2, float2> > blas(X, Y, Z, W, f, x.Length()/(2*M), bytes, norm_bytes);
 	blas.apply(*blasStream);
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -297,7 +293,7 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	BlasCuda<float4, 6, 
 	  Spinor<float4,float4,short4,6,writeX,0>, Spinor<float4,float4,short4,6,writeY,1>, 
 	  Spinor<float4,float4,short4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>, 
-	  Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume());
+	  Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	blas.apply(*blasStream);
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -312,13 +308,15 @@ void blasCuda(const double2 &a, const double2 &b, const double2 &c,
 	BlasCuda<float2, 3,
 	  Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
 	  Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
-	  Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume());
+	  Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
 	blas.apply(*blasStream);
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-      bytes += Functor<double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
+      } else {
+	errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+      }
+      blas::bytes += Functor<double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
     }
   } else { // fields on the cpu
     using namespace quda::colorspinor;

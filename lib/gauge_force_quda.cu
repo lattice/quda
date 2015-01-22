@@ -1,12 +1,22 @@
 #include <read_gauge.h>
 #include <gauge_field.h>
-
-#include "gauge_force_quda.h"
+#include <clover_field.h>
+#include <dslash_quda.h>
+#include <force_common.h>
+#include <gauge_force_quda.h>
 #ifdef MULTI_GPU
 #include "face_quda.h"
 #endif
 
 namespace quda {
+
+  namespace gaugeforce {
+#include <dslash_constants.h>
+#include <dslash_textures.h>
+  } // namespace gaugeforce
+
+  using namespace gaugeforce;
+
 
 #define GF_SITE_MATRIX_LOAD_TEX 1
 
@@ -114,7 +124,7 @@ namespace quda {
     fat_force_const_t gf_h;
     gf_h.path_max_length = path_max_length;  
 #ifdef MULTI_GPU  
-    int Vh_ex = (X[0]+4)*(X[1]+4)*(X[2]+4)*(X[3]+4)/2;
+    int Vh_ex = (X[0]+4)*(X[1]+4)*(X[2]+4)*(X[3]+4)/2; // FIXME - this should not be hardcoded
     gf_h.site_ga_stride = param->site_ga_pad + Vh_ex;
 #else  
     gf_h.site_ga_stride = param->site_ga_pad + Vh;
@@ -130,7 +140,7 @@ namespace quda {
   private:
     cudaGaugeField &mom;
     const int dir;
-    const double &eb3;
+    const double eb3;
     const cudaGaugeField &link;
     const int *input_path;
     const int *length;
@@ -255,7 +265,7 @@ namespace quda {
       aux << "threads=" << link.Volume() << ",prec=" << link.Precision();
       aux << "stride=" << link.Stride() << ",recon=" << link.Reconstruct();
       aux << "dir=" << dir << "num_paths=" << num_paths;
-      return TuneKey(vol.str(), typeid(*this).name(), aux.str());
+      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
     }  
   
   };
