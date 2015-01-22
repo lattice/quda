@@ -81,17 +81,17 @@ namespace quda {
 	 // compute the offset into the strictly lower triangular
 	 // part, counting from the lower right.  This requires we
 	 // change to prime coordinates.
-         int row' = (N-1) - row;
-	 int col' = (N-1) - col;
+         int row' = N - row;
+	 int col' = N - col;
 
 	 // The linear offset (in bottom-right coordinates) to the
-	 // required element is simply 1/2*row'*(row'-1)+col'.
+	 // required element is simply 1/2*col'*(col'-1) + col - row.
 	 // Subtract this offset from the number of elements: N=6,
 	 // means 15 elements (14 with C-style indexing)), multiply by
 	 // two to account for complexity and then add on number of
 	 // real diagonals at the end
 
-	 int k = 2 * ( (1/2 N*(N-1) -1) - 1/2 * row' * (row'-1) + col') + N;
+	 int k = 2 * ( (1/2 N*(N-1) -1) - (1/2 * col' * (col'-1) + col - row) + N;
          return complex(a[2*k], a[2*k+1]);
        } else {
          conj(swap(col,row));
@@ -150,7 +150,7 @@ namespace quda {
 	} else if (col < row) {
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
 	  int idx = (x*2 + chirality)*N*N + N + 2*k;
-	  complex<Float> tmp(a[parity][idx], -1.0*a[parity][idx+1]);
+	  complex<Float> tmp(a[parity][idx], a[parity][idx+1]);
 	  #if 0
 	  if(x==0 && parity ==0) {
 	  printf("row = %d col = %d k = %d idx = %d a[%d][%d] = %g a[%d][%d] = %g tmp.real() = %g tmp.imag() = %g\n", row, col, k, idx, parity, idx, a[parity][idx], parity, idx+1, a[parity][idx+1], tmp.real(), tmp.imag());
