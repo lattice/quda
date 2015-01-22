@@ -166,7 +166,7 @@ namespace quda {
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, 
 		   const GaugeField &X, double kappa);
-  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, const cpuGaugeField &clover);
+  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, const cpuGaugeField &clover, double kappa);
 
   class DiracCoarse : public Dirac {
 

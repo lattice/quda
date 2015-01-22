@@ -17,7 +17,7 @@ namespace quda {
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
   void DiracCoarse::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
-    CoarseCoarseOp(T, Y, X, *(this->Y), *(this->X));
+    CoarseCoarseOp(T, Y, X, *(this->Y), *(this->X), kappa);
   }
 
   void DiracCoarse::initializeCoarse() {

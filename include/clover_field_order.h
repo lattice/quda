@@ -137,6 +137,7 @@ namespace quda {
 	if (row == col) {
 	  complex<Float> tmp = a[parity][(x*2 + chirality)*N*N + row];
 	  return tmp;
+	  /*
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
 	  int row2 = (N-1) - row;
@@ -145,6 +146,17 @@ namespace quda {
 	  int idx = (x*2 + chirality)*N*N + 2*k + N;
 	  complex<Float> *tmp = static_cast<complex<Float>*>((void *)(a[parity]+idx));
 	  return *tmp;
+	  */
+	} else if (row < col) {
+	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+	  int idx = (x*2 + chirality)*N*N + N + 2*k;
+	  complex<Float> tmp(a[parity][idx], -1.0*a[parity][idx+1]);
+	  #if 0
+	  if(x==0 && parity ==0) {
+	  printf("row = %d col = %d k = %d idx = %d a[%d][%d] = %g a[%d][%d] = %g tmp.real() = %g tmp.imag() = %g\n", row, col, k, idx, parity, idx, a[parity][idx], parity, idx+1, a[parity][idx+1], tmp.real(), tmp.imag());
+	  }
+	  #endif
+          return tmp;           
 	} else {
 	  // requesting upper triangular so return conjuate transpose
 	  return conj(operator()(parity,x,s_col,s_row,c_col,c_row) );

@@ -224,21 +224,22 @@ namespace quda {
     #if 1
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     #else
-    tmp_coarse->Source(QUDA_POINT_SOURCE,0,0,0);
+    for(int s = 0; s < tmp_coarse->Nspin(); s++)
+      for(int c=0; c < tmp_coarse->Ncolor(); c++) 
+	tmp_coarse->Source(QUDA_POINT_SOURCE,0,s,c);
     #endif
-    printfQuda("prolongation\n");
     transfer->P(*tmp1, *tmp_coarse);
-    printfQuda("MatResidual\n");
     param.matResidual(*tmp2,*tmp1);	
-    printfQuda("restrict\n");
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
     #if 0
-    if(param.level == 2) {
+    if(param.level == 1) {
       printfQuda("x_coarse\n");
-      for (int x=0; x<x_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
+      //static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(0);
+      for (int x=0; x<x_coarse->Volume(); x++) if(x<2) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
       printfQuda("r_coarse\n");
-      for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
+      for (int x=0; x<r_coarse->Volume(); x++) if(x<2) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
+      //static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(0);
     }
     #endif
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
