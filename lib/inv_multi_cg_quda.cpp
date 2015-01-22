@@ -350,7 +350,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
       for(int i=0; i < num_offset; i++) { 
-	printfQuda(" shift=%d, relative residua: iterated = %e, true = %e\n", 
+	printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n", 
 		   i, sqrt(r2[i]/b2), param.true_res_offset[i]);
       }
     }      
