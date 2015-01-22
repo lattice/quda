@@ -32,14 +32,24 @@ namespace quda {
 
     template<typename Float, int nSpin, int nColor, int nVec> 
       struct Accessor<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> { 
-      Accessor(const ColorSpinorField &) { }
-      __device__ __host__ inline int index(int x, int s, int c, int v) const {	return ((x*nSpin+s)*nColor+c)*nVec+v; }
+      const size_t cb_offset;
+      const int volumeCB;
+    Accessor(const ColorSpinorField &field) : volumeCB(field.VolumeCB()), cb_offset((field.Bytes()>>1) / sizeof(complex<Float>)){ }
+      __device__ __host__ inline int index(int x, int s, int c, int v) const {	
+	int x_cb = (x >= volumeCB) ? x-volumeCB : x;
+	int parity = (x >= volumeCB) ? 1 : 0;
+        return parity*cb_offset + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec> 
       struct Accessor<Float,nSpin,nColor,nVec,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER> { 
-      Accessor(const ColorSpinorField &) { }
-      __device__ __host__ inline int index(int x, int s, int c, int v) const {	return ((x*nColor+c)*nSpin+s)*nVec+v; }
+      const size_t cb_offset;
+      const int volumeCB;
+    Accessor(const ColorSpinorField &field) : volumeCB(field.VolumeCB()), cb_offset((field.Bytes()>>1) / sizeof(complex<Float>)){ }
+      __device__ __host__ inline int index(int x, int s, int c, int v) const {	
+	int x_cb = (x >= volumeCB) ? x-volumeCB : x;
+	int parity = (x >= volumeCB) ? 1 : 0;
+	return parity*cb_offset + ((x_cb*nColor+c)*nSpin+s)*nVec+v; }
     };
 
 
