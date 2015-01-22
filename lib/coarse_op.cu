@@ -215,10 +215,13 @@ namespace quda {
 
     const int nDim = 4;
     const Float half = 0.5;
-    int coord[QUDA_MAX_DIM];
-    int coord_coarse[QUDA_MAX_DIM];
     int coarse_size = 1;
     for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
+    int coord[QUDA_MAX_DIM];
+    int coord_coarse[QUDA_MAX_DIM];
+
+    // paralleling this requires care with respect to race conditions
+    // on CPU, parallelize over dimension not parity
 
     //#pragma omp parallel for 
     for (int parity=0; parity<2; parity++) {
@@ -396,10 +399,7 @@ namespace quda {
 
                         for(int ic = 0; ic < C.Ncolor(); ic++) { //Sum over fine color row
                           for(int jc = 0; jc < C.Ncolor(); jc++) {  //Sum over fine color column
-                          //printfQuda("coord[0] = %d, coord[1] = %d, coord[2] = %d, coord[3] = %d, x_size[0] = %d, x_size[1] = %d, x_size[2] \
-= %d, x_size[3] = %d, coarse_parity=%d, coarse_x_cb = %d, s=%d, s_col=%d, ic_c = %d, jc_c = %d, parity = %d, x_cb = %d, ic = %d, jc = %d, V.Ns\
-pin() = %d\n",coord[0], coord[1], coord[2], coord[3], x_size[0], x_size[1], x_size[2], x_size[3], coarse_parity, coarse_x_cb, s, s_col, ic_c, \
-jc_c, parity, x_cb, ic, jc, V.Nspin());
+                          //printfQuda("coord[0] = %d, coord[1] = %d, coord[2] = %d, coord[3] = %d, x_size[0] = %d, x_size[1] = %d, x_size[2] = %d, x_size[3] = %d, coarse_parity=%d, coarse_x_cb = %d, s=%d, s_col=%d, ic_c = %d, jc_c = %d, parity = %d, x_cb = %d, ic = %d, jc = %d, V.Nspin() = %d\n",coord[0], coord[1], coord[2], coord[3], x_size[0], x_size[1], x_size[2], x_size[3], coarse_parity, coarse_x_cb, s, s_col, ic_c, jc_c, parity, x_cb, ic, jc, V.Nspin());
                           X(0,coarse_parity,coarse_x_cb,s_c,s_c,ic_c,jc_c) += conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col\
 , ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
                           } //Fine color column
@@ -880,8 +880,8 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template<typename Float, int nDim, typename F, typename Gauge>
   void coarseDslash(F &out, F &in, Gauge &Y, Gauge &X, Float kappa) {
-    int Nc = in.Ncolor();
-    int Ns = in.Nspin();
+    const int Nc = in.Ncolor();
+    const int Ns = in.Nspin();
     int x_size[QUDA_MAX_DIM];
     for(int d = 0; d < nDim; d++) x_size[d] = in.X(d);
 
