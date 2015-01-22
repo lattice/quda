@@ -11,23 +11,23 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Out, typename In, typename Rotator>
+  template <typename Out, typename In, typename Rotator, int fineSpin>
   struct RestrictArg {
     Out out;
     const In in;
     const Rotator V;
     const int *fine_to_coarse;
     const int *coarse_to_fine;
-    int spin_map[4];
-    RestrictArg(Out &out, const In &in, const Rotator &V, 
+    int spin_map[fineSpin];
+    RestrictArg(Out &out, const In &in, const Rotator &V,
 		const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) : 
       out(out), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine)
-    { for (int s=0; s<4; s++) this->spin_map[s] = spin_map[s]; }
+    { for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s]; }
 
-    RestrictArg(const RestrictArg<Out,In,Rotator> &arg) : 
+    RestrictArg(const RestrictArg<Out,In,Rotator,fineSpin> &arg) :
       out(arg.out), in(arg.in), V(arg.V), 
       fine_to_coarse(arg.fine_to_coarse), coarse_to_fine(arg.coarse_to_fine) 
-    { for (int s=0; s<4; s++) this->spin_map[s] = arg.spin_map[s]; }
+    { for (int s=0; s<fineSpin; s++) this->spin_map[s] = arg.spin_map[s]; }
   };
 
   /**
@@ -201,7 +201,7 @@ namespace quda {
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
     typedef FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order> packedSpinor;
-    typedef RestrictArg<coarseSpinor,fineSpinor,packedSpinor> Arg;
+    typedef RestrictArg<coarseSpinor,fineSpinor,packedSpinor,fineSpin> Arg;
 
     coarseSpinor Out(const_cast<ColorSpinorField&>(out));
     fineSpinor   In(const_cast<ColorSpinorField&>(in));
@@ -277,6 +277,9 @@ namespace quda {
 
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
+    if (out.Precision() != in.Precision() || v.Precision() != in.Precision())
+      errorQuda("Precision mismatch out=%d in=%d v=%d", out.Precision(), in.Precision(), v.Precision());
+
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       Restrict<double>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
