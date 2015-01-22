@@ -20,7 +20,7 @@ namespace quda {
        slowest running dimension, with the internal 36 degrees of
        freedom stored as follows (s=spin, c = color)
 
-       i |  col  |  row  |
+       i |  row  |  col  |
            s   c   s   c   z
        0   0   0   0   0   0
        1   0   1   0   1   0
@@ -147,8 +147,8 @@ namespace quda {
 	  complex<Float> *tmp = static_cast<complex<Float>*>((void *)(a[parity]+idx));
 	  return *tmp;
 	  */
-	} else if (row < col) {
-	  int k = N*(N-1)/2 - (N-row)*(N-row-1)/2 + col - row - 1;
+	} else if (col < row) {
+	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
 	  int idx = (x*2 + chirality)*N*N + N + 2*k;
 	  complex<Float> tmp(a[parity][idx], -1.0*a[parity][idx+1]);
 	  #if 0
