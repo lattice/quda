@@ -10,22 +10,22 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Out, typename In, typename Rotator>
+  template <typename Out, typename In, typename Rotator, int fineSpin>
   struct ProlongateArg {
     Out out;
     const In in;
     const Rotator V;
     const int *geo_map;  // need to make a device copy of this
-    int spin_map[4];
+    int spin_map[fineSpin];
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
 		  const int *geo_map, const int *spin_map) : 
       out(out), in(in), V(V), geo_map(geo_map)  {
-      for (int s=0; s<4; s++) this->spin_map[s] = spin_map[s];
+      for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s];
     }
 
-    ProlongateArg(const ProlongateArg<Out,In,Rotator> &arg) : 
+    ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin> &arg) :
       out(arg.out), in(arg.in), V(arg.V), geo_map(arg.geo_map) {
-      for (int s=0; s<4; s++) this->spin_map[s] = arg.spin_map[s];      
+      for (int s=0; s<fineSpin; s++) this->spin_map[s] = arg.spin_map[s];
     }
   };
 
@@ -150,7 +150,7 @@ namespace quda {
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
     typedef FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order> packedSpinor;
-    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor> Arg;
+    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,fineSpin> Arg;
 
     fineSpinor   Out(const_cast<ColorSpinorField&>(out));
     coarseSpinor In(const_cast<ColorSpinorField&>(in));
@@ -226,6 +226,9 @@ namespace quda {
 
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int Nvec, const int *fine_to_coarse, const int *spin_map) {
+    if (out.Precision() != in.Precision() || v.Precision() != in.Precision()) 
+      errorQuda("Precision mismatch out=%d in=%d v=%d", out.Precision(), in.Precision(), v.Precision());
+
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
       Prolongate<double>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
