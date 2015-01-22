@@ -195,7 +195,6 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
 
-    nvtxRangePushA("Prolongator"); 
 
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
@@ -220,13 +219,11 @@ namespace quda {
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
-    nvtxRangePop();
   }
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
 
-    nvtxRangePushA("Restrictor"); 
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
@@ -249,7 +246,6 @@ namespace quda {
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
-    nvtxRangePop();
   }
 
 } // namespace quda
