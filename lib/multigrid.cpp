@@ -193,7 +193,7 @@ namespace quda {
       transfer->R(*r_coarse, *param.B[i]);
 
       transfer->P(*tmp2, *r_coarse);
-      printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp2));
+      printfQuda("Vector %d: norms %e %e (coarse tmp %e) ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp2), blas::norm2(*r_coarse));
       printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *tmp2));
     }
 #if 0
@@ -210,14 +210,14 @@ namespace quda {
     }
 #endif
 
-    printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c \n");
+    printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c (level %d)\n", param.level);
     x_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
-    printfQuda("Vector norms %e %e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
+    printfQuda("Vector norms %e %e (fine tmp %e) ", blas::norm2(*x_coarse), blas::norm2(*r_coarse), blas::norm2(*tmp2));
     printfQuda("deviation = %e\n", blas::xmyNorm(*x_coarse, *r_coarse));
 
-    printfQuda("\nComparing native coarse operator to emulated operator\n");
+    printfQuda("\nComparing native coarse operator to emulated operator (level %d)\n", param.level);
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
     blas::zero(*tmp_coarse);
     blas::zero(*r_coarse);

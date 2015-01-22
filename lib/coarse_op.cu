@@ -1032,6 +1032,11 @@ namespace quda {
       errorQuda("Unsupported precision mix");
 
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (out.Precision() != in.Precision() ||
+	Y.Precision() != in.Precision() ||
+	X.Precision() != in.Precision()) 
+      errorQuda("Precision mismatch out=%d in=%d Y=%d X=%d", 
+		out.Precision(), in.Precision(), Y.Precision(), X.Precision());
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyCoarse<double>(out, in, Y, X, kappa);
