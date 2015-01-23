@@ -323,6 +323,9 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("MultiShift CG: Reliable updates = %d\n", rUpdate);
+
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
     
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
