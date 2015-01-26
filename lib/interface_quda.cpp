@@ -133,6 +133,8 @@ cudaCloverField *cloverInvPrecondition = NULL;
 cudaGaugeField *momResident = NULL;
 cudaGaugeField *extendedGaugeResident = NULL;
 
+cudaColorSpinorField *solutionResident = NULL;
+
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 #ifdef PTHREADS
@@ -1031,6 +1033,9 @@ void endQuda(void)
 
   if(cudaStapleField) delete cudaStapleField; cudaStapleField=NULL;
   if(cudaStapleField1) delete cudaStapleField1; cudaStapleField1=NULL;
+
+  if(solutionResident) delete solutionResident;
+  if(momResident) delete momResident;
 
   endBlas();
 
@@ -2208,8 +2213,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
-
-cudaColorSpinorField *solutionResident = NULL;
 
 void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
