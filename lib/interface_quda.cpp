@@ -3258,6 +3258,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     
     if(last_rhs)
     {
+      if(_h_u) solve->StoreRitzVecs(_h_u, X, param, param->nev); 
       printfQuda("\nDelete incremental EigCG solver resources...\n");
       //clean resources:
       solve->CleanResources();
