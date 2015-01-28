@@ -136,7 +136,7 @@ ifeq ($(strip $(BUILD_QIO)), yes)
   QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
 endif
 
-ifeq ($(strip $(BUILD_MAGMA)), yes)ifeq ($(strip $(BUILD_QMP)), yes)
+ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
