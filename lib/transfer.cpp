@@ -31,6 +31,10 @@ namespace quda {
     if (B[0]->X(0) == geo_bs[0]) 
       errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);
 
+    for (int d = 0; d < ndim; d++) 
+      if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
+	errorQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d\n", d, B[d]->X(d)/geo_bs[d]);
+
     printfQuda("Transfer: using block size %d", geo_bs[0]);
     for (int d=1; d<ndim; d++) printfQuda(" x %d", geo_bs[d]);
     printfQuda("\n");
