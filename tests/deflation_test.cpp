@@ -88,16 +88,8 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
-  // initialize QMP or MPI
-#if defined(QMP_COMMS)
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-#elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
-#endif
-
-  // call srand() with a rank-dependent seed
-  initRand();
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
 
@@ -269,10 +261,6 @@ int main(int argc, char **argv)
   }
 
   inv_param.verbosity = QUDA_VERBOSE;
-
-  // declare the dimensions of the communication grid
-  initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
-
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -540,11 +528,7 @@ int main(int argc, char **argv)
   endQuda();
 
   // finalize the communications layer
-#if defined(QMP_COMMS)
-  QMP_finalize_msg_passing();
-#elif defined(MPI_COMMS)
-  MPI_Finalize();
-#endif
+  finalizeComms();
 
   return 0;
 }

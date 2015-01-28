@@ -130,7 +130,13 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   COMM_OBJS = comm_mpi.o
 endif
 
-ifeq ($(strip $(BUILD_QMP)), yes)
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio -llime
+  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
+endif
+
+ifeq ($(strip $(BUILD_MAGMA)), yes)ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
   QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
@@ -138,12 +144,6 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
 endif 
-
-ifeq ($(strip $(BUILD_QIO)), yes)
-  INC += -DHAVE_QIO -I$(QIO_HOME)/include
-  LIB += -L$(QIO_HOME)/lib -lqio -llime
-  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
-endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
