@@ -559,7 +559,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #else
 
 #if DD_DAG
-  //#include "wilson_fused_exterior_dslash_dagger_gt200_core.h"
+#include "wilson_fused_exterior_dslash_dagger_gt200_core.h"
 #else
 #include "wilson_fused_exterior_dslash_gt200_core.h"
 #endif

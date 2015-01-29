@@ -146,9 +146,9 @@ namespace quda {
     /**< The precision of the Ritz vectors */
     QudaPrecision precision_ritz;//also search space precision
 
-    int nev;//number of eigenvectors produced by EigCG or GMRESDR
-    int m;//Dimension of the search space (or of the Krylov subspace basis (+1) for the GMRESDR solver)
-    int deflation_grid;//(for the GMRESDR solver: maximum number of cycles)
+    int nev;//number of eigenvectors produced by EigCG
+    int m;//Dimension of the search space
+    int deflation_grid;
     int rhs_idx;
     
     /**
@@ -527,7 +527,6 @@ namespace quda {
 		    cudaColorSpinorField **q, int N);
   };
 
-
   class DeflatedSolver {
 
   protected:
@@ -549,7 +548,7 @@ namespace quda {
     virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
 
 //    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
-    virtual void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) = 0;//extrenal method
+    virtual void StoreRitzVecs(void *host_buffer, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
 
     virtual void CleanResources() = 0;
 
@@ -574,8 +573,7 @@ namespace quda {
 
   };
 
-//forward declaration:
-  struct DeflationParam; // rename to IncrementalDeflationParam.
+  struct DeflationParam;//Forward declaration
 
   class IncEigCG : public DeflatedSolver {
 
@@ -628,7 +626,7 @@ namespace quda {
     //
     void SaveEigCGRitzVecs(DeflationParam *param, bool cleanResources = false);
     //
-    void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) {};//extrenal method
+    void StoreRitzVecs(void *host_buf, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
     //
     void CleanResources(); 
 
@@ -637,8 +635,6 @@ namespace quda {
     void ReportEigenvalueAccuracy(DeflationParam *param, int nevs_to_print);
 
   };
-
-//GMRES-DR/GMRES-Proj solver
 
 //forward declaration
  class GmresDRArgs; 

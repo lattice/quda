@@ -429,7 +429,6 @@ class TwistCloverGamma5Cuda : public Tunable {
 
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
       setTwistParam(a, b, kappa, mu, dagger, tw);
-    //	  a = 2.*kappa*mu;
     else{//twist doublet
       errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
     } 

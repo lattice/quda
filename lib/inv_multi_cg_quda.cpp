@@ -323,6 +323,9 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_COMPUTE);
     profile.Start(QUDA_PROFILE_EPILOGUE);
 
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("MultiShift CG: Reliable updates = %d\n", rUpdate);
+
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
     
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
@@ -350,7 +353,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
       for(int i=0; i < num_offset; i++) { 
-	printfQuda(" shift=%d, relative residua: iterated = %e, true = %e\n", 
+	printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n", 
 		   i, sqrt(r2[i]/b2), param.true_res_offset[i]);
       }
     }      

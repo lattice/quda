@@ -50,35 +50,35 @@ namespace quda {
 
      DeflationParam(ColorSpinorParam &eigv_param, SolverParam &param) : cur_dim(0), rtz_dim(0), added_nevs(0), cuda_ritz_alloc(true), in_incremental_stage(true){
 
-       if(param.nev == 0 || param.deflation_grid == 0) errorQuda("\nIncorrect deflation space parameters...\n");
+        if(param.nev == 0 || param.deflation_grid == 0) errorQuda("\nIncorrect deflation space parameters...\n");
        
-       tot_dim      = param.deflation_grid*param.nev;
+        tot_dim      = param.deflation_grid*param.nev;
 
-       ld           = ((tot_dim+15) / 16) * tot_dim;
+        ld           = ((tot_dim+15) / 16) * tot_dim;
 
-       //allocate deflation resources:
-       proj_matrix  = new Complex[ld*tot_dim];
-       ritz_values  = (double*)calloc(tot_dim, sizeof(double));
+        //allocate deflation resources:
+        proj_matrix  = new Complex[ld*tot_dim];
+        ritz_values  = (double*)calloc(tot_dim, sizeof(double));
        
-       ritz_prec = param.precision_ritz;
+        ritz_prec = param.precision_ritz;
 
-       eigv_param.setPrecision(ritz_prec);//the same as for full precision iterations (see diracDeflateParam)
-       eigv_param.create   = QUDA_ZERO_FIELD_CREATE;
-       eigv_param.eigv_dim = tot_dim;
-       eigv_param.eigv_id  = -1;
+        eigv_param.setPrecision(ritz_prec);//the same as for full precision iterations (see diracDeflateParam)
+        eigv_param.create   = QUDA_ZERO_FIELD_CREATE;
+        eigv_param.eigv_dim = tot_dim;
+        eigv_param.eigv_id  = -1;
   
-       //if(eigv_param.siteSubset == QUDA_FULL_SITE_SUBSET) eigv_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-       cudaRitzVectors = new cudaColorSpinorField(eigv_param);
+        //if(eigv_param.siteSubset == QUDA_FULL_SITE_SUBSET) eigv_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+        cudaRitzVectors = new cudaColorSpinorField(eigv_param);
 
-       return;
+        return;
      }
 
      ~DeflationParam(){
-       if(proj_matrix)        delete[] proj_matrix;
+        if(proj_matrix)        delete[] proj_matrix;
 
-       if(cuda_ritz_alloc)    delete cudaRitzVectors;
+        if(cuda_ritz_alloc)    delete cudaRitzVectors;
 
-       if(ritz_values)        free(ritz_values);
+        if(ritz_values)        free(ritz_values);
      }
 
      //reset current dimension:
@@ -97,56 +97,56 @@ namespace quda {
      //print information about the deflation space:
      void PrintInfo(){
 
-       printfQuda("\nProjection matrix information:\n");
-       printfQuda("Leading dimension %d\n", ld);
-       printfQuda("Total dimension %d\n", tot_dim);
-       printfQuda("Current dimension %d\n", cur_dim);
-       printfQuda("Host pointer: %p\n", proj_matrix);
+        printfQuda("\nProjection matrix information:\n");
+        printfQuda("Leading dimension %d\n", ld);
+        printfQuda("Total dimension %d\n", tot_dim);
+        printfQuda("Current dimension %d\n", cur_dim);
+        printfQuda("Host pointer: %p\n", proj_matrix);
 
-       return;
+        return;
 
      }
 
      void CleanDeviceRitzVectors()
      {
-       if( cuda_ritz_alloc ){
+        if( cuda_ritz_alloc ){
 
-         delete cudaRitzVectors;
+          delete cudaRitzVectors;
 
-         cuda_ritz_alloc = false;
-       }
+          cuda_ritz_alloc = false;
+        }
 
-       return;
+        return;
      }
 
      void ReshapeDeviceRitzVectorsSet(const int nev, QudaPrecision new_ritz_prec = QUDA_INVALID_PRECISION)//reset param.ritz_prec?
      {
-       if(nev > tot_dim || (nev == tot_dim && new_ritz_prec == QUDA_INVALID_PRECISION)) return;//nothing to do
+        if(nev > tot_dim || (nev == tot_dim && new_ritz_prec == QUDA_INVALID_PRECISION)) return;//nothing to do
 
-       if(!cuda_ritz_alloc) errorQuda("\nCannot reshape Ritz vectors set.\n");
-       //
-       ColorSpinorParam cudaEigvParam(cudaRitzVectors->Eigenvec(0));
+        if(!cuda_ritz_alloc) errorQuda("\nCannot reshape Ritz vectors set.\n");
+        //
+        ColorSpinorParam cudaEigvParam(cudaRitzVectors->Eigenvec(0));
 
-       cudaEigvParam.create   = QUDA_ZERO_FIELD_CREATE;
-       cudaEigvParam.eigv_dim = nev;
-       cudaEigvParam.eigv_id  = -1;
+        cudaEigvParam.create   = QUDA_ZERO_FIELD_CREATE;
+        cudaEigvParam.eigv_dim = nev;
+        cudaEigvParam.eigv_id  = -1;
 
-       if(new_ritz_prec != QUDA_INVALID_PRECISION)
-       {
+        if(new_ritz_prec != QUDA_INVALID_PRECISION)
+        {
 	  ritz_prec = new_ritz_prec;
 
           cudaEigvParam.setPrecision(ritz_prec);
-       }
+        }
 
-       CleanDeviceRitzVectors();
+        CleanDeviceRitzVectors();
 
-       cudaRitzVectors = new cudaColorSpinorField(cudaEigvParam);
+        cudaRitzVectors = new cudaColorSpinorField(cudaEigvParam);
 
-       cur_dim = nev;
+        cur_dim = nev;
 
-       cuda_ritz_alloc = true;
+        cuda_ritz_alloc = true;
 
-       return;
+        return;
      }
 
    };
@@ -1061,6 +1061,35 @@ namespace quda {
      return;
   }
 
+//not optimal : temorary hack!
+  void IncEigCG::StoreRitzVecs(void *hu, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources)
+  {
+      const int spinorSize = 24;
+      size_t h_size   = spinorSize*defl_param->ritz_prec*defl_param->cudaRitzVectors->EigvVolume();//WARNING: might be brocken when padding is set!
+      
+      int nev_to_copy = nev > defl_param->cur_dim ? defl_param->cur_dim : nev;
+      if(nev > defl_param->cur_dim) warningQuda("\nWill copy %d eigenvectors (requested %d)\n", nev_to_copy, nev);
+      
+      for(int i = 0; i < nev_to_copy; i++)
+      {
+          
+          size_t offset = i*h_size;
+          void *hptr    = (void*)((char*)hu+offset);
+          
+          ColorSpinorParam cpuParam(hptr, *inv_par, X, true);
+          
+          cpuColorSpinorField *tmp = new cpuColorSpinorField(cpuParam);
+          
+          *tmp = defl_param->cudaRitzVectors->Eigenvec(i);//copy gpu field
+          
+          delete tmp;
+      }
+      
+      if(cleanResources) CleanResources();
+      
+      return;
+  }
+
   void IncEigCG::CleanResources()
   {
     DeleteEigCGSearchSpace();
@@ -1124,6 +1153,8 @@ namespace quda {
 
         if(!use_mixed_prec) //ok, just run full precision eigcg.
         {
+           printf("\nRunning solo precision EigCG.\n");
+
            eigcg_restarts = EigCG(*out, *in);
 
            //store computed Ritz vectors: 
@@ -1133,6 +1164,9 @@ namespace quda {
         }
         else //this is mixed precision eigcg
         {
+
+           printf("\nRunning mixed precision EigCG.\n");
+
            const double ext_tol = param.tol;
 
            const double stop    = norm2(*in)*ext_tol*ext_tol;

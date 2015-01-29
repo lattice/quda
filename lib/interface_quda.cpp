@@ -133,6 +133,8 @@ cudaCloverField *cloverInvPrecondition = NULL;
 cudaGaugeField *momResident = NULL;
 cudaGaugeField *extendedGaugeResident = NULL;
 
+cudaColorSpinorField *solutionResident = NULL;
+
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 #ifdef PTHREADS
@@ -1032,6 +1034,9 @@ void endQuda(void)
   if(cudaStapleField) delete cudaStapleField; cudaStapleField=NULL;
   if(cudaStapleField1) delete cudaStapleField1; cudaStapleField1=NULL;
 
+  if(solutionResident) delete solutionResident;
+  if(momResident) delete momResident;
+
   endBlas();
 
   if (streams) {
@@ -1077,6 +1082,8 @@ void endQuda(void)
     profileStaggeredOprod.Print();
     profileAsqtadForce.Print();
     profileHISQForce.Print();
+    profileContract.Print();
+    profileCovDev.Print();
     profileEnd.Print();
 
     printLaunchTimer();
@@ -1371,7 +1378,15 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   setDiracParam(diracParam, inv_param, pc);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-  dirac->Dslash(out, in, parity); // apply the operator
+  if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    cudaColorSpinorField tmp1(in, cudaParam);
+    ((DiracTwistedCloverPC*) dirac)->TwistCloverInv(tmp1, in, (parity+1)%2); // apply the clover-twist
+    dirac->Dslash(out, tmp1, parity); // apply the operator
+  } else {
+    dirac->Dslash(out, in, parity); // apply the operator
+  }
+
   delete dirac; // clean up
 
   cpuParam.v = h_out;
@@ -2198,8 +2213,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
-
-cudaColorSpinorField *solutionResident = NULL;
 
 void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
@@ -3245,6 +3258,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     
     if(last_rhs)
     {
+      if(_h_u) solve->StoreRitzVecs(_h_u, X, param, param->nev); 
       printfQuda("\nDelete incremental EigCG solver resources...\n");
       //clean resources:
       solve->CleanResources();
@@ -3253,6 +3267,31 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     }
 
     delete solve;
+  }
+  else if (param.inv_type == QUDA_GMRESDR_INVERTER)
+  {
+
+    DiracM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
+    SolverParam solverParam(*param);
+
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mDeflate, profileInvert);  
+    
+    (*solve)(out, in);//run solver
+
+    solverParam.updateInvertParam(*param);//will update rhs_idx as well...
+    
+    if(last_rhs)
+    {
+      if(_h_u) solve->StoreRitzVecs(_h_u, X, param, param->nev); 
+      printfQuda("\nDelete GMRESDR solver resources...\n");
+      //clean resources:
+      solve->CleanResources();
+      // 
+      printfQuda("\n...done.\n");
+    }
+
+    delete solve;
+
   }
   else
   {
