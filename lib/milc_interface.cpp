@@ -1085,8 +1085,10 @@ void qudaLoadCloverField(int external_precision,
     }
   }
 
-  //trlog[0] = invertParam.trlogA[0];
-  //trlog[1] = invertParam.trlogA[1];
+  if (compute_trlog) {
+    trlog[0] = invertParam.trlogA[0];
+    trlog[1] = invertParam.trlogA[1];
+  }
 } // qudaLoadCoverField
 
 
