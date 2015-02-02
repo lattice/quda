@@ -293,7 +293,9 @@ struct DslashCuda2 : DslashPolicyImp {
 		
     inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
     inputSpinor->createComms(dslash.Nface()/2);	
+    inputSpinor->createIPCDslashComms();
     DslashCommsPattern pattern(dslashParam.commDim);
+
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
     for(int i=3; i>=0; i--){

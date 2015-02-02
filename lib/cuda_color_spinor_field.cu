@@ -48,6 +48,131 @@ namespace quda {
 
     }*/
 
+
+  void cudaColorSpinorField::createIPCDslashComms(){
+	
+    static int ipcInit = 0;
+
+    printfQuda("Calling createIPCDslashComms\n");
+    if(!initComms) errorQuda("Can only be called after create comms\n");
+
+    comm_dslash_peer2peer_init();
+
+    for(int dim=0; dim<4; ++dim){
+      if(!commDimPartitioned(dim)) continue;
+      for(int dir=0; dir<2; ++dir){
+        for(int b=0; b<2; ++b){
+	  MsgHandle* sendHandle = NULL;
+	  MsgHandle* receiveHandle = NULL;
+	  int disp = (dir==1) ? +1 : -1;
+
+          // first set up receive
+	  if(comm_dslash_peer2peer_enabled(1-dir,dim)){
+	    printfQuda("Setting receiveHandle\n");
+	    receiveHandle = comm_declare_receive_relative(&ipcRemoteGhostBufferHandle[b][1-dir][dim],
+						          dim,
+							  -disp,
+							  sizeof(ipcRemoteGhostBufferHandle[b][1-dir][dim]));
+	  }	  
+          // Now for send
+	  if(comm_dslash_peer2peer_enabled(dir,dim)){
+	    printfQuda("Setting sendHandle\n");
+	    void* ghost_buffer = (dir==0) ? backGhostFaceBuffer[b][dim] : fwdGhostFaceBuffer[b][dim];
+            cudaIpcGetMemHandle(&ipcLocalGhostBufferHandle[b][dir][dim], ghost_buffer);
+	    sendHandle = comm_declare_send_relative(&ipcLocalGhostBufferHandle[b][dir][dim],
+						    dim,
+						    disp,
+						    sizeof(ipcLocalGhostBufferHandle[b][dir][dim]));
+	  }
+
+	  if(receiveHandle) comm_start(receiveHandle);
+	  if(sendHandle) comm_start(sendHandle);
+
+          comm_wait(receiveHandle);
+	  comm_wait(sendHandle);
+
+	  if(sendHandle) comm_free(sendHandle);
+	  if(receiveHandle) comm_free(receiveHandle);	
+	
+        } // loop over b
+      } // loop over dir (0,1)
+    } // loop over dim
+
+    for(int dim=0; dim<4; ++dim){
+      if(!commDimPartitioned(dim)) continue;
+      for(int dir=0; dir<1; ++dir){
+        if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
+	for(int b=0; b<2; ++b){
+	  void** remoteGhostSrcBuffer = (dir==0) ? &(fwdGhostFaceSrcBuffer[b][dim]) 
+					: &(backGhostFaceSrcBuffer[b][dim]);
+
+	
+          if(ipcInit){
+	    cudaIpcCloseMemHandle(*remoteGhostSrcBuffer);
+	  }
+
+	  cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][dir][dim], 
+						     cudaIpcMemLazyEnablePeerAccess);
+	}
+      }
+    }
+
+   // communicate the Event handles
+
+   for(int dim=0; dim<4; ++dim){
+      if(!commDimPartitioned(dim)) continue;
+     for(int dir=0; dir<2; ++dir){
+        for(int b=0; b<2; ++b){
+	  MsgHandle* sendHandle = NULL;
+	  MsgHandle* receiveHandle = NULL;
+	  int disp = (dir==1) ? +1 : -1;
+
+          // first set up receive
+	  if(comm_dslash_peer2peer_enabled(1-dir,dim)){
+	    receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[b][1-dir][dim],
+						          dim,
+							  -disp,
+							  sizeof(ipcRemoteEventHandle[b][1-dir][dim]));
+	  }	  
+          // Now for send
+	  if(comm_dslash_peer2peer_enabled(dir,dim)){
+	    if(!ipcInit) cudaEventCreate(&ipcLocalEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
+            cudaIpcGetEventHandle(&ipcLocalEventHandle[b][dir][dim], ipcLocalEvent[b][dir][dim]);
+	    sendHandle = comm_declare_send_relative(&ipcLocalGhostBufferHandle[b][dir][dim],
+						    dim,
+						    disp,
+						    sizeof(ipcLocalGhostBufferHandle[b][dir][dim]));
+
+	  }
+
+	  if(receiveHandle) comm_start(receiveHandle);
+  	  if(sendHandle) comm_start(sendHandle);
+	  
+	  comm_wait(receiveHandle);
+	  comm_wait(sendHandle);
+
+	  comm_free(receiveHandle);
+	  comm_free(sendHandle);
+	} // loop over b
+      } // loop over dir
+    } // loop over dim   
+
+     
+    // Creat local events for asynchronous copies from the peer process
+    for(int dim=0; dim<4; ++dim){
+      if(!commDimPartitioned(dim)) continue;
+      for(int dir=0; dir<2; ++dir){
+        if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
+	for(int b=0; b<2; ++b){
+	  if(!ipcInit) cudaEventCreate(&ipcCopyEvent[b][dir][dim]);
+	}
+      }
+    }
+
+    ipcInit = 1;
+  }
+
+/*
   void cudaColorSpinorField::createIPCDslashComms(){
 
 #ifndef GPU_COMMS
@@ -100,7 +225,7 @@ namespace quda {
     }
 #endif
   }
-
+*/
 
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
