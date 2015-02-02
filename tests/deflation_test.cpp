@@ -324,11 +324,15 @@ int main(int argc, char **argv)
 
   void *ritzVects = 0;
 
+  double *inverse_ritzVals = 0;
+
   const int defl_dim  = inv_param.deflation_grid*inv_param.nev;
 
-  ritzVects = malloc((defl_dim+1)*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
+  ritzVects = malloc(defl_dim*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
 
-  memset(ritzVects, 0, (defl_dim+1)*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+  memset(ritzVects, 0, defl_dim*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+
+  inverse_ritzVals = (double*)malloc(defl_dim*sizeof(double));
 
   //printf("\nDeflation: %p :: %u\n", ritzVects, defl_size);
 
@@ -369,9 +373,9 @@ int main(int argc, char **argv)
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-  // perform the inversion
+  // perform the inversions
+  printfQuda("\nStart the incremental stage.\n");
 
- //!
   for(int is = 0; is < inv_param.deflation_grid; is++)
   {
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
@@ -390,7 +394,7 @@ int main(int argc, char **argv)
     double time1 = -((double)clock());
 
     inv_param.cuda_prec_sloppy = cuda_prec_sloppy; 
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, 0);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, 0);
 
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -403,6 +407,7 @@ int main(int argc, char **argv)
 
   printfQuda("\n Total eigCG RHS : %d\n", inv_param.rhs_idx);
 //***
+  printfQuda("\nStart the initCG stage.\n");
 
   const int initCGruns = 16; 
 
@@ -428,7 +433,7 @@ int main(int argc, char **argv)
     double time1 = -((double)clock());
 
     inv_param.cuda_prec_sloppy = cuda_prec_precondition;//QUDA_HALF_PRECISION
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, last_rhs);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, inverse_ritzVals, last_rhs);
   
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -520,6 +525,8 @@ int main(int argc, char **argv)
 	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
   free(ritzVects);
+
+  free(inverse_ritzVals);
 
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) freeCloverQuda();
