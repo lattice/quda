@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.7.0                          xxth November 2014
+Release Notes for QUDA v0.7.0                          xxth February 2015
 -----------------------------
 
 Overview:
@@ -21,17 +21,18 @@ Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
 GCR are provided, including robust mixed-precision variants supporting
 combinations of double, single, and half (16-bit "block floating
 point") precision.  The library also includes routines for HISQ link
-fattening and force terms for the HISQ fermion action and one-loop
-improved Symanzik gauge action.  Use of many GPUs in parallel is
-supported throughout, with communication handled by QMP or MPI.
+fattening, force terms for the HISQ fermion action and one-loop
+improved Symanzik gauge action and clover field construction and
+inversion.  Use of many GPUs in parallel is supported throughout, with
+communication handled by QMP or MPI.
 
 
 Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.8 and Ubuntu 12.04)
-using release 5.0, 5.5, 6.0 and 6.5 of the CUDA toolkit.  CUDA 4.x
-and earlier are not supported.  The library also works under Mac OS X
-10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
+using release 5.0, 5.5, 6.0, 6.5 and 7.0 of the CUDA toolkit.  CUDA
+4.x and earlier are not supported.  The library also works under Mac
+OS X 10.6.8 ("Snow Leopard") and 10.7.3 ("Lion") on recent 64-bit
 Intel-based Macs.  Due to issues with compilation using LLVM, under
 Mac OS X 10.9.x it is required to install and use GCC instead of the
 default clang compiler.

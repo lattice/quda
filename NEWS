@@ -1,3 +1,91 @@
+Version 0.7.0 - xx Ferbuary 2015
+
+- Added support for twisted-clover, 4-d preconditioned domain wall and
+  4-d preconditioned Mobius fermions.
+
+- Reoworked auto tuning framework to drastically reduce the lookup
+  overhead of querying the tune cache.  This has the effect of
+  improving the strong scaling (great thern 10% improvement in solver
+  performance seen at scale).
+
+- Support for GPU-aware MPI and GPUDirect RDMA for faster multi-GPU
+  communication.  This option is enabled using the --enable-gpu-comms
+  option (GPU_COMMS in make.in), and requires a GPU-aware MPI stack
+  (MVAPICH or OpenMPI).
+
+- Reworked multi-GPU dslash interface: there are now different
+  policies supported for a variety of execution flows.  Supported
+  polcies at the moment are QUDA_DSLASH2 (the default - regular multi-GPU dslash
+  with CPU-routed communication), QUDA_FUSED_DSLASH (use a single
+  kernel to update all boundaries after all communication has
+  finished), QUDA_GPU_COMMS_DSLASH (all communication eminates
+  directly from GPU memory locations).  Not all policies that have
+  been exposed are fully supported yet, so this can be described as
+  experimental.
+  
+- New routines for construction of the clover matrix field and
+  inversion of the clover matrices (with optional computation of the
+  trace log of the clover field).  Presently exposed by using
+  loadCloverQuda with NULL pointers to host fields to force
+  construction instead of download of the clover field.
+
+- Implemented support for exact gauge field exponentiation to
+  complement the pre-exisiting Taylor expanded variant
+  (updateGaugeFieldQuda).
+
+- Partial implementation of the clover field force terms
+  (clover_deriv_quda.cu and clover_trace_quda.cu).
+
+- All extended gauge field creation routines have been offloaded to
+  QUDA, minimizing PCIe traffic and minimizing CPU time.  This has
+  lead to a significant speedup in routines that need this, e.g., the
+  gauge force.
+
+- Initial support for extended fermion field creation routines (only
+  supports staggered fields).
+
+- Fermion field outer product implemented in QUDA.  Only exposed for
+  staggered fermions at present (computeStaggeredOprodQuda).
+
+- EigCG eigenvector deflation algorithm and subsequent initCG
+  implemented for the preconditioned normal operator.  Added a
+  deflation_test to demonstrate the use of this algorithm.
+
+- Implemented Lanczos eigenvector solver (no unit test yet for
+  demonstrating this - presently only hooked into the CPS).
+
+- Implemented initial support for communication-avoiding s-step
+  solvers: CG - QUDA_MPCG_INVERTER and BiCGstab -
+  QUDA_MPBICGSTAB_INVERTER.  Only proof of concept at the moment and
+  need to be optimized.
+
+- Implemented initial support for overlapping domain-decomposition
+  preconditioners.  Presently only proof of concept and needs further
+  development.
+
+- Implemented initial support for applying different phases to a gauge
+  field.  Presently only proof of concept and needs further
+  development.  Will be useful for minimizing memory and PCIe traffic
+  in staggered HMC.
+
+- Implemented support for computation of the gauge field plaquette.
+
+- Implemented initial support for fermion field contractions.
+
+- Added support for the CGNE solver, to complement the already
+  existing CGNR.
+
+- Improvements to stability and robustness of the solvers in mixed
+  precision.  QUDA will default to always using a high precision
+  solution accumulator since this drastically improves convergence,
+  espcially using half precision.
+
+- Separated dslash_quda.cu into multiple files to allow for parallel
+  building to increase compilation speed.
+
+- Multiple bug fixes that affects stability and correctness throughout
+  the library.
+
 
 Version 0.6.1 - 10th March 2014
 
