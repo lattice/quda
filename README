@@ -92,6 +92,12 @@ recommended to only enable those interfaces that are used by a given
 application.  The QDP and MILC interfaces can be disabled with the,
 e.g., --disable-milc-interface flag.
 
+The eigen-vector solvers (eigCG and incremental eigCG) require the
+installation of the MAGMA dense linear algebra package.  Supported
+versions are MAGMA 1.5.x and 1.6.x, available from
+http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
+configure option --with-magma=MAGMA_PATH.
+
 If Fortran interface support is desired, the F90 environment variable
 should be set when configure is invoked, and "make fortran" must be
 run explicitly, since the Fortran interface modules are not built by
