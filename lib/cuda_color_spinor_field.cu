@@ -53,7 +53,6 @@ namespace quda {
 	
     static int ipcInit = 0;
 
-    printfQuda("Calling createIPCDslashComms\n");
     if(!initComms) errorQuda("Can only be called after create comms\n");
 
     comm_dslash_peer2peer_init();
@@ -138,10 +137,10 @@ namespace quda {
 	  if(comm_dslash_peer2peer_enabled(dir,dim)){
 	    if(!ipcInit) cudaEventCreate(&ipcLocalEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
             cudaIpcGetEventHandle(&ipcLocalEventHandle[b][dir][dim], ipcLocalEvent[b][dir][dim]);
-	    sendHandle = comm_declare_send_relative(&ipcLocalGhostBufferHandle[b][dir][dim],
+	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle[b][dir][dim],
 						    dim,
 						    disp,
-						    sizeof(ipcLocalGhostBufferHandle[b][dir][dim]));
+						    sizeof(ipcLocalEventHandle[b][dir][dim]));
 
 	  }
 
@@ -157,6 +156,18 @@ namespace quda {
       } // loop over dir
     } // loop over dim   
 
+
+    for(int dim=0; dim<4; ++dim){
+      if(!commDimPartitioned(dim)) continue;
+      for(int dir=0; dir<2; ++dir){
+        if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
+	for(int b=0; b<2; ++b){
+	  if(ipcInit) cudaEventDestroy(ipcRemoteEvent[b][dir][dim]); 
+	  cudaIpcOpenEventHandle(&ipcRemoteEvent[b][dir][dim],
+				 ipcRemoteEventHandle[b][dir][dim]);
+        }
+      }
+    }
      
     // Creat local events for asynchronous copies from the peer process
     for(int dim=0; dim<4; ++dim){
@@ -172,60 +183,6 @@ namespace quda {
     ipcInit = 1;
   }
 
-/*
-  void cudaColorSpinorField::createIPCDslashComms(){
-
-#ifndef GPU_COMMS
-    errorQuda("GPU_COMMS must be enabled");
- #else
-    if(!initComms) errorQuda("Can only be called after create comms\n");
-      
-    comm_dslash_peer2peer_init();
-
-
-    for(int dir=0; dir<2; ++dir){
-      for(int dim=0; dim<4; ++dim){
-        if(comm_dslash_peer2peer_enabled(dir,dim)){
-          int displacement[4] = {0,0,0,0};
-          displacement[dim] = (dir==0) ? -1 : +1; // dir==0/1 corresponds to -ve/+ve displacement
-          for(int b=0; b<2; ++b){ // 2 buffers 
-            // create events and event handles
-            cudaEventCreate(&ipcLocalEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
-            cudaIpcGetEventHandle(&ipcLocalEventHandle[b][dir][dim], ipcLocalEvent[b][dir][dim]);
-
-            // ipcLocalEventHandle[dir][dim] from the neighboring process is copied into 
-            // ipcRemoteEventHandle[dir][dim]
-
-            comm_exchange_displaced(displacement, &ipcLocalEventHandle[b][dir][dim], sizeof(ipcLocalEventHandle[b][dir][dim]),
-                  &ipcRemoteEventHandle[b][1-dir][dim], sizeof(ipcRemoteEventHandle[b][1-dir][dim]) );
-
-            cudaEventCreate(&ipcRemoteEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
-            cudaIpcGetEventHandle(&ipcRemoteEventHandle[b][dir][dim], ipcRemoteEvent[b][dir][dim]);
-
-            // create the events used to record the end of the inter-process copy
-            cudaEventCreate(&ipcCopyEvent[b][dir][dim]);
-
-            void* ghost_buffer = (dir==0) ? backGhostFaceBuffer[b][dim] : fwdGhostFaceBuffer[b][dim];
-
-            // create local memory handle
-            cudaIpcGetMemHandle(&ipcLocalGhostBufferHandle[b][dir][dim], ghost_buffer);
-            // communicate memory handle
-            comm_exchange_displaced(displacement, &ipcLocalGhostBufferHandle[b][dir][dim], 
-                                                  sizeof(ipcLocalGhostBufferHandle[b][dir][dim]),
-                                                  &ipcRemoteGhostBufferHandle[b][1-dir][dim], 
-                                                  sizeof(ipcRemoteGhostBufferHandle[b][1-dir][dim]));
-
-            void** remoteGhostSrcBuffer = (dir==0) ? &(fwdGhostFaceSrcBuffer[b][dim]) : &(backGhostFaceSrcBuffer[b][dim]);
-
-            cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][1-dir][dim], cudaIpcMemLazyEnablePeerAccess); 
- 
-          }
-        }
-      }
-    }
-#endif
-  }
-*/
 
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
@@ -1574,8 +1531,51 @@ namespace quda {
   }
 
 
+  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
+    int dim = dir/2;
+     
+    if(!commDimPartitioned(dim)) return;
+	
+    if(dir%2 == 0){ // sending backwards
+      printfQuda("Sending backwards\n");
+      // Prepost receive 
+      comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+      comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+
+      if(comm_dslash_peer2peer_enabled(0,dim)){
+        cudaEventRecord(ipcLocalEvent[bufferIndex][0][dim]);
+      }
+      comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
+
+      if(comm_dslash_peer2peer_enabled(1,dim)) {
+        // begin the copy from the forward processor
+	cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1][dim],0);
+//	cudaMemcpyAsync(); // copy from forward processor
+	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim]);
+      }
 
 
+    } else { // sending forwards 
+      // Prepost receive
+      printfQuda("Sending forwards\n");
+      comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
+      comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+
+
+      if(comm_dslash_peer2peer_enabled(1,dim)){
+        cudaEventRecord(ipcLocalEvent[bufferIndex][1][dim]);
+      }
+      comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
+
+      if(comm_dslash_peer2peer_enabled(0,dim)) {
+        cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][0][dim],0);
+	// cudaMemcpyAsync() // copy from backward processor
+	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim]);
+      }
+    }
+  }
+
+/*
  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return;
@@ -1632,7 +1632,25 @@ namespace quda {
     }
 #endif
   }
+*/
 
+
+  int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p) {
+
+    int dim = dir/2;
+    if(!commDimPartitioned(dim)) return 0;
+
+    if(dir%2==0) {
+      if (comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]) && 
+	  comm_query(mh_send_back[bufferIndex][nFace-1][2*dim+dagger])) return 1;
+    } else {
+      if (comm_query(mh_recv_back[bufferIndex][nFace-1][dim]) && 
+	  comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger])) return 1;
+    }
+    return 0;
+  }
+
+/*
   int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p) {
     int dim = dir / 2;
     if(!commDimPartitioned(dim)) return 0;
@@ -1681,8 +1699,7 @@ namespace quda {
 #endif
     return 0;
   }
-
-
+*/
   void cudaColorSpinorField::scatter(int nFace, int dagger, int dir, cudaStream_t* stream_p)
   {
     int dim = dir/2;
