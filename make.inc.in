@@ -7,7 +7,7 @@ QDPXX_LDFLAGS = @QDPXX_LDFLAGS@
 QDPXX_LIBS = @QDPXX_LIBS@
 
 CPU_ARCH = @CPU_ARCH@  	  # x86 or x86_64
-GPU_ARCH = @GPU_ARCH@	  # sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, or sm_35
+GPU_ARCH = @GPU_ARCH@	  # sm_13, sm_20, sm_21, sm_30, or sm_35
 OS       = @QUDA_OS@	  # linux or osx
 
 PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
