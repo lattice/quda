@@ -20,8 +20,6 @@
 #include <mpi.h>
 #endif
 
-#include <omp.h>
-
 #include <gauge_qio.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
