@@ -142,13 +142,18 @@ namespace quda {
     cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
   
     cudaColorSpinorField tmp1(*Ap, csParam);
-    cudaColorSpinorField *tmp2_p = &tmp1;
-    // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
-	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(*Ap, csParam);
-    }
+
+    // tmp2 only needed for multi-gpu Wilson-like kernels
+    cudaColorSpinorField *tmp2_p = !mat.isStaggered() ?
+      new cudaColorSpinorField(*Ap, csParam) : &tmp1;
     cudaColorSpinorField &tmp2 = *tmp2_p;
+
+    // additional high-precision temporary if Wilson and mixed-precision
+    csParam.setPrecision(param.precision);
+    cudaColorSpinorField *tmp3_p =
+      (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
+      new cudaColorSpinorField(*r, csParam) : &tmp1;
+    cudaColorSpinorField &tmp3 = *tmp3_p;
 
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
@@ -245,7 +250,7 @@ namespace quda {
 	  xpyCuda(*x[j], *y[j]);
 	}
 
-	mat(*r, *y[0], *x[0]); // here we can use x as tmp
+	mat(*r, *y[0], *x[0], tmp3); // here we can use x as tmp
 	if (r->Nspin()==4) axpyCuda(offset[0], *y[0], *r);
 
 	r2[0] = xmyNormCuda(b, *r);
@@ -366,6 +371,7 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_EPILOGUE);
     profile.Start(QUDA_PROFILE_FREE);
 
+    if (&tmp3 != &tmp1) delete tmp3_p;
     if (&tmp2 != &tmp1) delete tmp2_p;
 
     if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;

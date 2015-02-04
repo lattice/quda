@@ -51,17 +51,14 @@ namespace quda {
     mat(r, x, y);
 
     double r2 = xmyNormCuda(b, r);
-  
+
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField Ap(x, csParam);
     cudaColorSpinorField tmp(x, csParam);
 
-    cudaColorSpinorField *tmp2_p = &tmp;
-    // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
-	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(x, csParam);
-    }
+    // tmp2 only needed for multi-gpu Wilson-like kernels
+    cudaColorSpinorField *tmp2_p = !mat.isStaggered() ?
+      new cudaColorSpinorField(x, csParam) : &tmp;
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     cudaColorSpinorField *r_sloppy;
@@ -80,6 +77,13 @@ namespace quda {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       x_sloppy = new cudaColorSpinorField(x, csParam);
     }
+
+    // additional high-precision temporary if Wilson and mixed-precision
+    csParam.setPrecision(param.precision);
+    cudaColorSpinorField *tmp3_p =
+      (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
+      new cudaColorSpinorField(x, csParam) : &tmp;
+    cudaColorSpinorField &tmp3 = *tmp3_p;
 
     cudaColorSpinorField &xSloppy = *x_sloppy;
     cudaColorSpinorField &rSloppy = *r_sloppy;
@@ -222,7 +226,7 @@ namespace quda {
 	copyCuda(x, xSloppy); // nop when these pointers alias
       
 	xpyCuda(x, y); // swap these around?
-	mat(r, y, x); // here we can use x as tmp
+	mat(r, y, x, tmp3); // here we can use x as tmp
 	r2 = xmyNormCuda(b, r);
 
 	copyCuda(rSloppy, r); //nop when these pointers alias
@@ -337,6 +341,7 @@ namespace quda {
     profile.Stop(QUDA_PROFILE_EPILOGUE);
     profile.Start(QUDA_PROFILE_FREE);
 
+    if (&tmp3 != &tmp) delete tmp3_p;
     if (&tmp2 != &tmp) delete tmp2_p;
 
     if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
