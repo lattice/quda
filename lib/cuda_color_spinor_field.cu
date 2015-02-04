@@ -99,7 +99,7 @@ namespace quda {
 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
-      for(int dir=0; dir<1; ++dir){
+      for(int dir=0; dir<2; ++dir){
         if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
 	for(int b=0; b<2; ++b){
 	  void** remoteGhostSrcBuffer = (dir==0) ? &(fwdGhostFaceSrcBuffer[b][dim]) 
@@ -1635,6 +1635,13 @@ namespace quda {
 */
 
 
+  int cudaColorSpinorField::ipcCopyComplete(int b, int dir, int dim){
+    if(cudaSuccess == cudaEventQuery(ipcCopyEvent[b][dir][dim])){
+      return 1;
+    }
+    return 0;
+  }
+
   int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p) {
 
     int dim = dir/2;
@@ -1647,6 +1654,44 @@ namespace quda {
       if (comm_query(mh_recv_back[bufferIndex][nFace-1][dim]) && 
 	  comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger])) return 1;
     }
+
+/*
+
+    if(!commDimPartitioned(dim)) return 0;
+
+    int receive_complete=0;
+    int send_complete=0;
+    if(dir%2==0){
+
+      if(comm_dslash_peer2peer_enabled(1,dim)){
+	receive_complete = ipcCopyComplete(bufferIndex, 1, dim);
+      } else {
+	receive_complete = comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+      }
+
+      if(comm_dslash_peer2peer_enabled(0,dim)){
+	send_complete = 1; // no send in this direction
+      } else {
+	send_complete = comm_query(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+      }
+
+    } else { // dir%2 == 1
+
+      if(comm_dslash_peer2peer_enabled(0,dim)){
+        receive_complete = ipcCopyComplete(bufferIndex, 0, dim);
+      } else {
+	receive_complete = comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+      }
+
+      if(comm_dslash_peer2peer_enabled(1,dim)){
+	send_complete = 1;
+      } else {
+	send_complete = comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+      }
+
+    }
+    if(receive_complete && send_complete) return 1;
+  */
     return 0;
   }
 

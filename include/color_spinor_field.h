@@ -513,6 +513,7 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
+    static int ipcCopyComplete(int b, int dir, int dim);
 
 
 #ifdef USE_TEXTURE_OBJECTS
