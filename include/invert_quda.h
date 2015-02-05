@@ -666,7 +666,8 @@ namespace quda {
     virtual ~GmresDR();
 
     //GMRES-DR solver
-    void GmresDRCycle(cudaColorSpinorField &out, cudaColorSpinorField &in, Complex *u);
+    //void   GmresDRCycle(cudaColorSpinorField &out, cudaColorSpinorField &in, Complex *u);
+    double GmresDRCycle(cudaColorSpinorField &x, double r2, Complex *u, const double stop);
     //GMRES-DR solver 
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
     //
