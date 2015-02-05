@@ -1,4 +1,4 @@
-Version 0.7.0 - xx February 2015
+Version 0.7.0 - 4th February 2015
 
 - Added support for twisted-clover, 4-d preconditioned domain wall and
   4-d preconditioned Mobius fermions.
@@ -113,15 +113,16 @@ Version 0.7.0 - xx February 2015
   http://luscher.web.cern.ch/luscher/DD-HMC.  This is selected through
   setting QudaInvertParam::gamma_basis = QUDA_CHIRAL_GAMMA_BASIS.
 
-- Multiple bug fixes that affects stability and correctness throughout
-  the library.
-
 - QUDA will now complain and exit if it detects that a stale tunecache
   is being used.
 
 - Removed official support for obsolete compute capabilities 1.1 and
   1.2.  This makes the minimum supported device compute capability 1.3
   (GT200).
+
+- Multiple bug fixes that affects stability and correctness throughout
+  the library.  Many of these fixes are listed here:
+  https://github.com/lattice/quda/issues?q=milestone%3A%22QUDA+0.7.0+%22+is%3Aclosed.
 
 - Although not strictly related to this release, we have started to
   collect common running settings and hints in the QUDA wiki:
