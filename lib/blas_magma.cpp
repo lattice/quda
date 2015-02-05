@@ -518,7 +518,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
         magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, &qW, lwork, dtau, nb, &info); 
         if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
 
-        lwork = (int)(qW.x);
+        lwork = (magma_int_t) MAGMA_Z_REAL(qW);
 
         magma_malloc_cpu((void**)&hW, lwork*sizeof(magmaDoubleComplex));
 
