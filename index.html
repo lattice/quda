@@ -18,16 +18,21 @@ the following fermion actions:
 <li> Wilson
 <li> Clover-improved Wilson
 <li> Twisted mass (degenerate or non-degenerate)
+<li> Twisted mass with a clover term
+<li> Staggered fermions
 <li> Improved staggered (asqtad or HISQ)
-<li> Domain wall
+<li> Domain wall (4-d or 5-d preconditioned)
+<li> Mobius fermions
+
 </ul>
 Implementations of CG, multi-shift CG, BiCGstab, and DD-preconditioned
 GCR are provided, including robust mixed-precision variants supporting
 combinations of double, single, and half (16-bit "block floating
-point") precision.  The library also includes routines for HISQ link
-fattening and force terms for the HISQ fermion action and one-loop
-improved Symanzik gauge action.  Use of many GPUs in parallel is
+point") precision.  The library also includes auxiliary routines
+necessary for Hybrid Monte Carlo, such as HISQ link fattening, force
+terms and clover-field construction.  Use of many GPUs in parallel is
 supported throughout, with communication handled by QMP or MPI.
+
 </p>
 
 <p>
