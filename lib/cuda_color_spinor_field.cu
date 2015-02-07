@@ -26,6 +26,8 @@ namespace quda {
   void* cudaColorSpinorField::ghostFaceBuffer[2]; //gpu memory
   void* cudaColorSpinorField::fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
+  int cudaColorSpinorField::fwdGhostBufferOffset[2][QUDA_MAX_DIM]; // offsets in bytes for fwdGhostFaceBuffer
+  int cudaColorSpinorField::backGhostBufferOffset[2][QUDA_MAX_DIM]; // offsets in bytes for backGhostFaceBuffer
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
   
 
@@ -760,11 +762,17 @@ namespace quda {
     for (int i=0; i<4; i++) {
       if(!commDimPartitioned(i)) continue;
     
-      for(int b=0; b<2; ++b) backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+      for(int b=0; b<2; ++b){
+	 backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+	 backGhostBufferOffset[b][i] = offset;
+      }
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
-      
-      for(int b=0; b<2; ++b) fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+     
+      for(int b=0; b<2; ++b){ 
+	fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+	fwdGhostBufferOffset[b][i] = offset;
+      }
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
     }   

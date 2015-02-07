@@ -355,6 +355,8 @@ namespace quda {
     static void* ghostFaceBuffer[2]; // gpu memory
     static void* fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static int fwdGhostBufferOffset[2][QUDA_MAX_DIM];
+    static int backGhostBufferOffset[2][QUDA_MAX_DIM];
     static int initGhostFaceBuffer;
 
 
