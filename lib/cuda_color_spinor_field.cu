@@ -26,8 +26,8 @@ namespace quda {
   void* cudaColorSpinorField::ghostFaceBuffer[2]; //gpu memory
   void* cudaColorSpinorField::fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
-  int fwdGhostBufferOffset[2][QUDA_MAX_DIM];
-  int backGhostBufferOffset[2][QUDA_MAX_DIM];
+  int cudaColorSpinorField::fwdGhostBufferOffset[2][QUDA_MAX_DIM];
+  int cudaColorSpinorField::backGhostBufferOffset[2][QUDA_MAX_DIM];
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
   
 
@@ -769,11 +769,17 @@ namespace quda {
     for (int i=0; i<4; i++) {
       if(!commDimPartitioned(i)) continue;
     
-      for(int b=0; b<2; ++b) backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+      for(int b=0; b<2; ++b){
+	backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+	backGhostBufferOffset[b][i] = offset; 
+      }
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
       
-      for(int b=0; b<2; ++b) fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+      for(int b=0; b<2; ++b){ 
+	fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+	fwdGhostBufferOffset[b][i] = offset;
+      }
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
     }   
@@ -953,6 +959,9 @@ namespace quda {
 					 const int dim, const QudaDirection dir, 
 					 const int dagger, cudaStream_t* stream) 
   {
+
+     printfQuda("Calling unpackGhost\n");
+	
     int Nint = (nColor * nSpin * 2) / (nSpin == 4 ? 2 : 1);  // (spin proj.) degrees of freedom
 
     int len = nFace*ghostFace[dim]*Nint*precision;
@@ -1544,6 +1553,7 @@ namespace quda {
     int dim = dir/2;
      
     if(!commDimPartitioned(dim)) return;
+
 	
     if(dir%2 == 0){ // sending backwards
       printfQuda("Sending backwards\n");
@@ -1558,8 +1568,17 @@ namespace quda {
 
       if(comm_dslash_peer2peer_enabled(1,dim)) {
         // begin the copy from the forward processor
+	void *ghost_dst = ghost_field + precision*ghostOffset[dim][1];
+
 	cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1][dim],0);
-//	cudaMemcpyAsync(); // copy from forward processor
+/*
+	cudaMemcpyAsync(ghost_dst, 
+			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
+			+ backGhostBufferOffset[bufferIndex][dim]),
+			ghost_face_bytes[dim],
+			cudaMemcpyDeviceToDevice,
+			*stream_p); // copy from forward processor
+*/
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim]);
       }
 
@@ -1577,8 +1596,17 @@ namespace quda {
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
 
       if(comm_dslash_peer2peer_enabled(0,dim)) {
+	// copy from backward processor
+	void *ghost_dst = ghost_field + precision*ghostOffset[dim][0];
         cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][0][dim],0);
-	// cudaMemcpyAsync() // copy from backward processor
+/*
+	cudaMemcpyAsync(ghost_dst, 
+			(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
+			+ fwdGhostBufferOffset[bufferIndex][dim]),
+			ghost_face_bytes[dim],
+			cudaMemcpyDeviceToDevice,
+			*stream_p); // copy from backward processor
+*/
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim]);
       }
     }
