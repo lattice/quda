@@ -52,9 +52,9 @@ namespace quda {
 
 
   void cudaColorSpinorField::createIPCDslashComms(){
-	
-    static int ipcInit = 0;
 
+#ifdef P2P_COMMS	
+    static int ipcInit = 0;
 
     int myrank = comm_rank();
 
@@ -194,6 +194,7 @@ namespace quda {
     }
 
     ipcInit = 1;
+#endif // P2P_COMMS
   }
 
 
@@ -775,14 +776,18 @@ namespace quda {
     
       for(int b=0; b<2; ++b){
 	backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+#ifdef P2P_COMMS
 	backGhostBufferOffset[b][i] = offset; 
+#endif
       }
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
       
       for(int b=0; b<2; ++b){ 
 	fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
+#ifdef P2P_COMMS
 	fwdGhostBufferOffset[b][i] = offset;
+#endif
       }
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
@@ -1479,11 +1484,15 @@ namespace quda {
 
     if(dir%2 == 0){
       // backwards copy to host
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(0,dim)) return;
+#endif
       sendGhost(my_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, pack_stream);
     } else {
       // forwards copy to host
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)) return;
+#endif
       sendGhost(my_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, pack_stream);
     }
   }
@@ -1576,14 +1585,20 @@ namespace quda {
     if(dir%2 == 0){ // sending backwards
       printfQuda("Sending backwards\n");
       // Prepost receive 
-      if(!comm_dslash_peer2peer_enabled(1,dim)){
+#ifdef P2P_COMMS
+      if(!comm_dslash_peer2peer_enabled(1,dim))
+#endif
+      {
         comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
       }
-
-      if(!comm_dslash_peer2peer_enabled(0,dim)){
+#ifdef P2P_COMMS
+      if(!comm_dslash_peer2peer_enabled(0,dim))
+#endif
+      {
         comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
       }
 
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(0,dim)){
         cudaEventRecord(ipcLocalEvent[bufferIndex][0][dim]);
       }
@@ -1604,23 +1619,27 @@ namespace quda {
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy from forward processor
 
-//	cudaDeviceSynchronize();
 
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
       }
-
-
+#endif
     } else { // sending forwards 
       // Prepost receive
       printfQuda("Sending forwards\n");
-      
-      if(!comm_dslash_peer2peer_enabled(0,dim)){
+#ifdef P2P_COMMS 
+      if(!comm_dslash_peer2peer_enabled(0,dim))
+#endif
+      {
         comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
       }
-      if(!comm_dslash_peer2peer_enabled(1,dim)){
+#ifdef P2P_COMMS
+      if(!comm_dslash_peer2peer_enabled(1,dim))
+#endif
+      {
 	comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
       }
 
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)){
         cudaEventRecord(ipcLocalEvent[bufferIndex][1][dim]);
       }
@@ -1641,7 +1660,9 @@ namespace quda {
 
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim],*copy_stream);
       }
+#endif
     }
+
   }
 
 /*
@@ -1732,29 +1753,40 @@ namespace quda {
     int send_complete=0;
     if(dir%2==0){
 
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)){
 	receive_complete = ipcCopyComplete(bufferIndex, 1, dim);
-      } else {
+      } else 
+#endif
+      {
 	receive_complete = comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]);
       }
 
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(0,dim)){
 	send_complete = 1; // no send in this direction
-      } else {
+      } else 
+#endif
+      {
 	send_complete = comm_query(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
       }
 
     } else { // dir%2 == 1
-
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(0,dim)){
         receive_complete = ipcCopyComplete(bufferIndex, 0, dim);
-      } else {
+      } else 
+#endif
+      {
 	receive_complete = comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]);
       }
 
+#ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)){
 	send_complete = 1;
-      } else {
+      } else 
+#endif
+      {
 	send_complete = comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
       }
 

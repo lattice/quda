@@ -26,10 +26,11 @@ struct MsgHandle_s {
 static int rank = -1;
 static int size = -1;
 static int gpuid = -1;
+#ifdef P2P_COMMS
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
 static bool peer2peer_init = false;
-
+#endif
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -106,6 +107,7 @@ void comm_exchange_displaced(const int displacement[], void* send_buffer, int se
 
 void comm_dslash_peer2peer_init()
 {
+#ifdef P2P_COMMS
   // first check that the local GPU supports UVA
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop,gpuid);
@@ -146,12 +148,16 @@ void comm_dslash_peer2peer_init()
 
   host_free(hostname_recv_buf);
   host_free(gpuid_recv_buf);
- 
+#endif 
   return;
 }
 
 bool comm_dslash_peer2peer_enabled(int dir, int dim){
+#ifdef P2P_COMMS
   return peer2peer_enabled[dir][dim];
+#else
+  return false;
+#endif
 }
 
 
