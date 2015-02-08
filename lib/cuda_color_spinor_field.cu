@@ -1808,6 +1808,41 @@ namespace quda {
     } else { // receive from backwards
       unpackGhost(from_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, &stream[2*dim/*+1*/]);
     }
+
+    cudaDeviceSynchronize();
+ 
+    printfQuda("precision = %d\n", precision);
+    if(dir%2 == 0){
+      float* ghost_element = (float*)((char*)ghost_field + precision*ghostOffset[dim][1]);
+      float host_element;
+      cudaMemcpy(&host_element, ghost_element, sizeof(float), cudaMemcpyDeviceToHost);
+      printfQuda("element = %lf\n",host_element);
+      printfQuda("back offset = %d\n", backGhostBufferOffset[bufferIndex][dim]); 
+	
+      float* remote_device_element;
+      cudaMalloc(&remote_device_element,sizeof(float));
+    
+      cudaMemcpy(remote_device_element,
+		 backGhostFaceSrcBuffer[bufferIndex][dim],
+		 sizeof(float),
+		 cudaMemcpyDeviceToDevice);      
+
+
+
+      float remote_host_element;
+      cudaMemcpy(&remote_host_element, remote_device_element, sizeof(float), cudaMemcpyDeviceToHost);
+
+      cudaDeviceSynchronize();
+	
+      printfQuda("remote_element = %lf\n", remote_host_element); 
+      //*remote_device_element = *((float*)(backGhostFaceSrcBuffer[bufferIndex][dim]));
+    }else{ 
+      float* ghost_element = (float*)((char*)ghost_field + precision*ghostOffset[dim][0]);
+      float host_element;
+      cudaMemcpy(&host_element, ghost_element, sizeof(float), cudaMemcpyDeviceToHost);
+      printfQuda("element = %lf\n",host_element);
+      printfQuda("fwd offset = %d\n", fwdGhostBufferOffset[bufferIndex][dim]); 
+    }
   }
 
   
