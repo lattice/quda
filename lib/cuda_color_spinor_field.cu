@@ -1574,27 +1574,36 @@ namespace quda {
     if(dir%2 == 0){ // sending backwards
       printfQuda("Sending backwards\n");
       // Prepost receive 
-//      comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
-//      comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+      if(!comm_dslash_peer2peer_enabled(1,dim)){
+        comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+      }
+
+      if(!comm_dslash_peer2peer_enabled(0,dim)){
+        comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+      }
 
       if(comm_dslash_peer2peer_enabled(0,dim)){
         cudaEventRecord(ipcLocalEvent[bufferIndex][0][dim]);
       }
+
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
+
+      cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
 
       if(comm_dslash_peer2peer_enabled(1,dim)) {
         // begin the copy from the forward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][1];
 
 	cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1][dim],0);
-//	cudaMemcpyAsync(ghost_dst, 
-	cudaMemcpy(ghost_dst, 
+	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ backGhostBufferOffset[bufferIndex][dim]),
 			ghost_face_bytes[dim],
-			cudaMemcpyDeviceToDevice
-			);
-	//		*stream_p); // copy from forward processor
+			cudaMemcpyDeviceToDevice,
+			*copy_stream); // copy from forward processor
+
+	cudaDeviceSynchronize();
+
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim]);
       }
 
@@ -1602,26 +1611,32 @@ namespace quda {
     } else { // sending forwards 
       // Prepost receive
       printfQuda("Sending forwards\n");
-//      comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
-//      comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
-
+      
+      if(!comm_dslash_peer2peer_enabled(0,dim)){
+        comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
+      }
+      if(!comm_dslash_peer2peer_enabled(1,dim)){
+	comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+      }
 
       if(comm_dslash_peer2peer_enabled(1,dim)){
         cudaEventRecord(ipcLocalEvent[bufferIndex][1][dim]);
       }
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
 
+      cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
       if(comm_dslash_peer2peer_enabled(0,dim)) {
 	// copy from backward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][0];
         cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][0][dim],0);
-	//cudaMemcpyAsync(ghost_dst, 
-	cudaMemcpy(ghost_dst, 
+	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ fwdGhostBufferOffset[bufferIndex][dim]),
 			ghost_face_bytes[dim],
-			cudaMemcpyDeviceToDevice);
-//			*stream_p); // copy from backward processor
+			cudaMemcpyDeviceToDevice,
+			*copy_stream); // copy from backward processor
+	cudaDeviceSynchronize();
+
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim]);
       }
     }
@@ -1804,8 +1819,10 @@ namespace quda {
 
     // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
+      if (comm_dslash_peer2peer_enabled(1,dim)) return;
       unpackGhost(from_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, stream_p);
     } else { // receive from backwards
+      if (comm_dslash_peer2peer_enabled(0,dim)) return;
       unpackGhost(from_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, stream_p);
     }
   }
@@ -1816,24 +1833,7 @@ namespace quda {
   {
     int dim = dir/2;
     if(!commDimPartitioned(dim)) return;
-/*
-    if(dir%2 == 0){
-      void *ghost_dst = ghost_field + precision*ghostOffset[dim][1];
-      cudaMemcpy(ghost_dst, 
-  		(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
-		+ backGhostBufferOffset[bufferIndex][dim]),
-		ghost_face_bytes[dim],
-		cudaMemcpyDeviceToDevice);
-    }else{ 
 
-      void *ghost_dst = ghost_field + precision*ghostOffset[dim][0];
-      cudaMemcpy(ghost_dst, 
-  		(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
-		+ fwdGhostBufferOffset[bufferIndex][dim]),
-		ghost_face_bytes[dim],
-		cudaMemcpyDeviceToDevice);
-    }
-*/
     // both scattering occurances now go through the same stream
     if (dir%2==0) {// receive from forwards
       if (comm_dslash_peer2peer_enabled(1,dim)) return;
