@@ -1479,9 +1479,11 @@ namespace quda {
 
     if(dir%2 == 0){
       // backwards copy to host
+      if(comm_dslash_peer2peer_enabled(0,dim)) return;
       sendGhost(my_back_face[bufferIndex][dim], nFace, dim, QUDA_BACKWARDS, dagger, pack_stream);
     } else {
       // forwards copy to host
+      if(comm_dslash_peer2peer_enabled(1,dim)) return;
       sendGhost(my_fwd_face[bufferIndex][dim], nFace, dim, QUDA_FORWARDS, dagger, pack_stream);
     }
   }
