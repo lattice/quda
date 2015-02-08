@@ -1602,9 +1602,9 @@ namespace quda {
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy from forward processor
 
-	cudaDeviceSynchronize();
+//	cudaDeviceSynchronize();
 
-	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim]);
+	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
       }
 
 
@@ -1635,9 +1635,9 @@ namespace quda {
 			ghost_face_bytes[dim],
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy from backward processor
-	cudaDeviceSynchronize();
+//	cudaDeviceSynchronize();
 
-	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim]);
+	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim],*copy_stream);
       }
     }
   }
@@ -1714,6 +1714,7 @@ namespace quda {
     int dim = dir/2;
     if(!commDimPartitioned(dim)) return 0;
 
+/*
     if(dir%2==0) {
       if (comm_query(mh_recv_fwd[bufferIndex][nFace-1][dim]) && 
 	  comm_query(mh_send_back[bufferIndex][nFace-1][2*dim+dagger])) return 1;
@@ -1721,8 +1722,7 @@ namespace quda {
       if (comm_query(mh_recv_back[bufferIndex][nFace-1][dim]) && 
 	  comm_query(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger])) return 1;
     }
-
-/*
+*/
 
     if(!commDimPartitioned(dim)) return 0;
 
@@ -1758,7 +1758,6 @@ namespace quda {
 
     }
     if(receive_complete && send_complete) return 1;
-  */
     return 0;
   }
 
