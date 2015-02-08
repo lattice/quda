@@ -26,8 +26,8 @@ namespace quda {
   void* cudaColorSpinorField::ghostFaceBuffer[2]; //gpu memory
   void* cudaColorSpinorField::fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
-  int cudaColorSpinorField::fwdGhostBufferOffset[2][QUDA_MAX_DIM]; // offsets in bytes for fwdGhostFaceBuffer
-  int cudaColorSpinorField::backGhostBufferOffset[2][QUDA_MAX_DIM]; // offsets in bytes for backGhostFaceBuffer
+  int fwdGhostBufferOffset[2][QUDA_MAX_DIM];
+  int backGhostBufferOffset[2][QUDA_MAX_DIM];
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
   
 
@@ -61,6 +61,7 @@ namespace quda {
 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
+      const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<2; ++dir){
         for(int b=0; b<2; ++b){
 	  MsgHandle* sendHandle = NULL;
@@ -78,7 +79,9 @@ namespace quda {
           // Now for send
 	  if(comm_dslash_peer2peer_enabled(dir,dim)){
 	    printfQuda("Setting sendHandle\n");
-	    void* ghost_buffer = (dir==0) ? backGhostFaceBuffer[b][dim] : fwdGhostFaceBuffer[b][dim];
+	    //void* ghost_buffer = (dir==0) ? backGhostFaceBuffer[b][dim] : fwdGhostFaceBuffer[b][dim];
+	    void* ghost_buffer = ghostFaceBuffer[b];
+
             cudaIpcGetMemHandle(&ipcLocalGhostBufferHandle[b][dir][dim], ghost_buffer);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostBufferHandle[b][dir][dim],
 						    dim,
@@ -101,13 +104,13 @@ namespace quda {
 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
-      for(int dir=0; dir<2; ++dir){
+      const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
+      for(int dir=0; dir<num_dir; ++dir){
         if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
 	for(int b=0; b<2; ++b){
 	  void** remoteGhostSrcBuffer = (dir==0) ? &(fwdGhostFaceSrcBuffer[b][dim]) 
 					: &(backGhostFaceSrcBuffer[b][dim]);
 
-	
           if(ipcInit){
 	    cudaIpcCloseMemHandle(*remoteGhostSrcBuffer);
 	  }
@@ -115,6 +118,10 @@ namespace quda {
 	  cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][dir][dim], 
 						     cudaIpcMemLazyEnablePeerAccess);
 	}
+      }
+	
+      if(num_dir == 1){
+	for(int b=0; b<2; ++b) backGhostFaceSrcBuffer[b][dim] = fwdGhostFaceSrcBuffer[b][dim];
       }
     }
 
@@ -762,17 +769,11 @@ namespace quda {
     for (int i=0; i<4; i++) {
       if(!commDimPartitioned(i)) continue;
     
-      for(int b=0; b<2; ++b){
-	 backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
-	 backGhostBufferOffset[b][i] = offset;
-      }
+      for(int b=0; b<2; ++b) backGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
-     
-      for(int b=0; b<2; ++b){ 
-	fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
-	fwdGhostBufferOffset[b][i] = offset;
-      }
+      
+      for(int b=0; b<2; ++b) fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
     }   
