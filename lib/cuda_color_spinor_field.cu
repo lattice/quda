@@ -55,6 +55,9 @@ namespace quda {
 	
     static int ipcInit = 0;
 
+
+    int myrank = comm_rank();
+
     if(!initComms) errorQuda("Can only be called after create comms\n");
 
     comm_dslash_peer2peer_init();
@@ -81,6 +84,7 @@ namespace quda {
 	    printfQuda("Setting sendHandle\n");
 	    //void* ghost_buffer = (dir==0) ? backGhostFaceBuffer[b][dim] : fwdGhostFaceBuffer[b][dim];
 	    void* ghost_buffer = ghostFaceBuffer[b];
+
 
             cudaIpcGetMemHandle(&ipcLocalGhostBufferHandle[b][dir][dim], ghost_buffer);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostBufferHandle[b][dir][dim],
@@ -1366,6 +1370,10 @@ namespace quda {
 
   void cudaColorSpinorField::pack(FullClover &clov, FullClover &clovInv, int nFace, int parity,
 				  int dagger, cudaStream_t *stream_p, bool zeroCopyPack, double a) {
+
+
+    printfQuda("Calling pack1\n");
+
     allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
     createComms(nFace); // must call this first
 
@@ -1385,6 +1393,10 @@ namespace quda {
 
   void cudaColorSpinorField::pack(FullClover &clov, FullClover &clovInv, int nFace, int parity,
 				  int dagger, int stream_idx, bool zeroCopyPack, double a) {
+
+
+    printfQuda("Calling pack2\n");
+
     allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
     createComms(nFace); // must call this first
 
@@ -1402,6 +1414,10 @@ namespace quda {
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
 				  bool zeroCopyPack, double a, double b) {
+
+
+    printfQuda("Calling pack3\n");
+
     allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
     createComms(nFace); // must call this first
 
@@ -1813,7 +1829,20 @@ namespace quda {
  
     printfQuda("precision = %d\n", precision);
     if(dir%2 == 0){
+
+      void *ghost_dst = ghost_field + precision*ghostOffset[dim][1];
+
+      cudaMemcpy(ghost_dst, 
+  		(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
+		+ backGhostBufferOffset[bufferIndex][dim]),
+		ghost_face_bytes[dim],
+		cudaMemcpyDeviceToDevice);
+
+      cudaDeviceSynchronize();
+
       float* ghost_element = (float*)((char*)ghost_field + precision*ghostOffset[dim][1]);
+  
+
       float host_element;
       cudaMemcpy(&host_element, ghost_element, sizeof(float), cudaMemcpyDeviceToHost);
       printfQuda("element = %lf\n",host_element);
@@ -1823,7 +1852,7 @@ namespace quda {
       cudaMalloc(&remote_device_element,sizeof(float));
     
       cudaMemcpy(remote_device_element,
-		 backGhostFaceSrcBuffer[bufferIndex][dim],
+		 (void*)((char*)backGhostFaceSrcBuffer[bufferIndex][dim] + backGhostBufferOffset[bufferIndex][dim]),
 		 sizeof(float),
 		 cudaMemcpyDeviceToDevice);      
 
@@ -1837,11 +1866,39 @@ namespace quda {
       printfQuda("remote_element = %lf\n", remote_host_element); 
       //*remote_device_element = *((float*)(backGhostFaceSrcBuffer[bufferIndex][dim]));
     }else{ 
+
+
+      void *ghost_dst = ghost_field + precision*ghostOffset[dim][0];
+
+      cudaMemcpy(ghost_dst, 
+  		(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
+		+ fwdGhostBufferOffset[bufferIndex][dim]),
+		ghost_face_bytes[dim],
+		cudaMemcpyDeviceToDevice);
+
+      cudaDeviceSynchronize(); 
+
+
       float* ghost_element = (float*)((char*)ghost_field + precision*ghostOffset[dim][0]);
       float host_element;
       cudaMemcpy(&host_element, ghost_element, sizeof(float), cudaMemcpyDeviceToHost);
       printfQuda("element = %lf\n",host_element);
       printfQuda("fwd offset = %d\n", fwdGhostBufferOffset[bufferIndex][dim]); 
+
+      float* remote_device_element;
+      cudaMalloc(&remote_device_element,sizeof(float));
+
+      cudaMemcpy(remote_device_element,
+	         (void*)((char*)fwdGhostFaceSrcBuffer[bufferIndex][dim] + fwdGhostBufferOffset[bufferIndex][dim]),
+		 sizeof(float),
+		 cudaMemcpyDeviceToDevice);
+
+      float remote_host_element;
+      cudaMemcpy(&remote_host_element, remote_device_element, sizeof(float), cudaMemcpyDeviceToHost);
+
+      cudaDeviceSynchronize();
+      printfQuda("remote_element = %lf\n", remote_host_element); 
+
     }
   }
 
