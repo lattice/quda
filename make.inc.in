@@ -7,7 +7,7 @@ QDPXX_LDFLAGS = @QDPXX_LDFLAGS@
 QDPXX_LIBS = @QDPXX_LIBS@
 
 CPU_ARCH = @CPU_ARCH@  	  # x86 or x86_64
-GPU_ARCH = @GPU_ARCH@	  # sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, or sm_35
+GPU_ARCH = @GPU_ARCH@	  # sm_13, sm_20, sm_21, sm_30, or sm_35
 OS       = @QUDA_OS@	  # linux or osx
 
 PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
@@ -31,12 +31,15 @@ BUILD_HISQLINK = @BUILD_HISQLINK@				# build code for computing hisq fat links?
 BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@				# build code for (1-loop Symanzik) gauge force?
 BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@			# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
+BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
+BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
 
 # Multi-GPU options
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
 BUILD_QMP = @BUILD_QMP@              # set to 'yes' to build the QMP multi-GPU code
 BUILD_MPI = @BUILD_MPI@              # set to 'yes' to build the MPI multi-GPU code
 POSIX_THREADS = @POSIX_THREADS@     # set to 'yes' to build pthread-enabled dslash
+
 
 #BLAS library
 BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
@@ -103,6 +106,8 @@ NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
 ifneq ($(TESLA_ARCH),true)
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false -w
+else
+  NVCCOPT += -w
 endif
 
 ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
@@ -120,9 +125,15 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   MPI_CFLAGS =
   MPI_LDFLAGS =
   MPI_LIBS =
-  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include/mpi
+  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include
   LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
   COMM_OBJS = comm_mpi.o
+endif
+
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio -llime
+  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
 endif
 
 ifeq ($(strip $(BUILD_QMP)), yes)
@@ -133,12 +144,6 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
 endif 
-
-ifeq ($(strip $(BUILD_QIO)), yes)
-  INC += -DHAVE_QIO -I$(QIO_HOME)/include
-  LIB += -L$(QIO_HOME)/lib -lqio -llime
-  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
-endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
@@ -155,12 +160,20 @@ else
   MAGMA_FLAGS   = 
 endif
 
+ifeq ($(strip $(BUILD_SSTEP)), yes)
+  NVCCOPT += -DSSTEP
+  COPT += -DSSTEP
+endif
 
 ifeq ($(strip $(POSIX_THREADS)), yes)
   NVCCOPT += -DPTHREADS
   COPT += -DPTHREADS
 endif
+
+ifeq ($(strip $(POSIX_THREADS)), yes)
   LIB += -lpthread
+endif
+
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
@@ -181,8 +194,8 @@ ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
 endif
 
 ifeq ($(strip $(BUILD_CLOVER_DIRAC)), yes)
-  NVCCOPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
-  COPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+  NVCCOPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
 endif
 
 ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
@@ -191,8 +204,8 @@ ifeq ($(strip $(BUILD_TWISTED_MASS_DIRAC)), yes)
 endif
 
 ifeq ($(strip $(BUILD_TWISTED_CLOVER_DIRAC)), yes)
-  NVCCOPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-  COPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
+  NVCCOPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS
 endif
 
 ifeq ($(strip $(BUILD_NDEG_TWISTED_MASS_DIRAC)), yes)
@@ -201,39 +214,44 @@ ifeq ($(strip $(BUILD_NDEG_TWISTED_MASS_DIRAC)), yes)
 endif
 
 ifeq ($(strip $(BUILD_FATLINK)), yes)
-  NVCCOPT += -DGPU_FATLINK
+  NVCCOPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
   FATLINK_TEST=llfat_test
-  COPT += -DGPU_FATLINK
 endif
 
 ifeq ($(strip $(BUILD_HISQLINK)), yes)
   ifneq ($(strip $(BUILD_FATLINK)), yes) 
-    NVCCOPT += -DGPU_FATLINK
+    NVCCOPT += -DGPU_FATLINK 
     COPT    += -DGPU_FATLINK
     FATLINK_TEST=llfat_test
   endif
   UNITARIZE_LINK_TEST=unitarize_link_test
-  NVCCOPT += -DGPU_UNITARIZE
-  COPT    += -DGPU_UNITARIZE
+  NVCCOPT += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
+  COPT    += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
 endif
 
 ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
-  NVCCOPT += -DGPU_GAUGE_FORCE
-  COPT += -DGPU_GAUGE_FORCE
+  NVCCOPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
   GAUGE_FORCE_TEST=gauge_force_test
 endif
 
 ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
-  NVCCOPT += -DGPU_FERMION_FORCE
-  COPT += -DGPU_FERMION_FORCE
+  NVCCOPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
   FERMION_FORCE_TEST=fermion_force_test
 endif
 
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
-  NVCCOPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD
-  COPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD
+  NVCCOPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
   HISQ_PATHS_FORCE_TEST=hisq_paths_force_test
   HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
+endif
+
+ifeq ($(strip $(BUILD_GAUGE_TOOLS)), yes)
+  NVCCOPT += -DGPU_GAUGE_TOOLS
+  COPT += -DGPU_GAUGE_TOOLS
 endif
 
 ifeq ($(strip $(HOST_DEBUG)), yes)

@@ -159,6 +159,25 @@ AC_ARG_ENABLE(hisq-force,
   [ build_hisq_force=${enableval} ],
   [ build_hisq_force="no" ]
 )
+
+AC_ARG_ENABLE(gauge-tools,
+  AC_HELP_STRING([--enable-gauge-tools], [ Build auxilary gauge tools: plaquette, gauge evolver, APE, extended gauge routines (default: disabled)]),
+  [ build_gauge_tools=${enableval} ],
+  [ build_gauge_tools="no" ]
+)
+
+AC_ARG_ENABLE(sstep,
+  AC_HELP_STRING([--enable-sstep], [ Build s-step linear solvers (default: disabled)]),
+  [ build_sstep=${enableval} ],
+  [ build_sstep="no" ]
+)
+
+AC_ARG_ENABLE(contract,
+  AC_HELP_STRING([--enable-contract], [ Build bilinear contraction code (default: disabled)]),
+  [ build_contract=${enableval} ],
+  [ build_contract="no" ]
+)
+
 dnl Multi-GPU options
 dnl ==================
 
@@ -256,7 +275,7 @@ if test "X${build_qdpjit}X" = "XyesX" ; then
   dnl AC_MSG_NOTICE([Found QDP++ configuration program ${QDPXX_CONFIG}])
   dnl AC_SUBST(CXX, "`${QDPXX_CONFIG} --cxx`")
   dnl AC_MSG_NOTICE([QDP++ compiler: ${CXX}])
-  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags | sed -e 's/-std=c++0x//g'`")
+  AC_SUBST(QDPXX_CXXFLAGS, "`${QDPXX_CONFIG} --cxxflags | sed -e 's/-std=c++0x//g'| sed -e 's/-fno-exceptions//g'| sed -e 's/-fno-rtti//g'| sed -e 's/-fPIC//g'| sed -e 's/-D_DEBUG//g'| sed -e 's/-D_GNU_SOURCE//g'| sed -e 's/-D__STDC_CONSTANT_MACROS//g'| sed -e 's/-D__STDC_FORMAT_MACROS//g'| sed -e 's/-D__STDC_LIMIT_MACROS//g'| sed -e 's/-fvisibility-inlines-hidden//g'| sed -e 's/-Woverloaded-virtual//g'| sed -e 's/-Wcast-qual//g'`")
   AC_MSG_NOTICE([QDP++ compile flags: ${QDPXX_CXXFLAGS}])
   AC_SUBST(QDPXX_LDFLAGS,  "`${QDPXX_CONFIG} --ldflags`")
   AC_MSG_NOTICE([QDP++ linking flags: ${QDPXX_LDFLAGS}])
@@ -476,6 +495,30 @@ yes|no);;
   ;;
 esac
 
+dnl Build Hisq force
+case ${build_gauge_tools} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-gauge-tools ])
+  ;;
+esac
+
+dnl Build sstep
+case ${build_sstep} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-sstep ])
+  ;;
+esac
+
+dnl Build Hisq force
+case ${build_contract} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-contract ])
+  ;;
+esac
+
 dnl Multi GPU
 case ${multi_gpu} in
 yes|no);;
@@ -636,6 +679,15 @@ AC_SUBST( BUILD_FERMION_FORCE, [${build_staggered_force}])
 
 AC_MSG_NOTICE([Setting BUILD_HISQ_FORCE = ${build_hisq_force} ] )
 AC_SUBST( BUILD_HISQ_FORCE, [${build_hisq_force}])
+
+AC_MSG_NOTICE([Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools} ] )
+AC_SUBST( BUILD_GAUGE_TOOLS, [${build_gauge_tools}])
+
+AC_MSG_NOTICE([Setting BUILD_SSTEP = ${build_sstep} ] )
+AC_SUBST( BUILD_SSTEP, [${build_sstep}])
+
+AC_MSG_NOTICE([Setting BUILD_CONTRACT = ${build_contract} ] )
+AC_SUBST( BUILD_CONTRACT, [${build_contract}])
 
 AC_MSG_NOTICE([Setting BUILD_MULTI_GPU = ${multi_gpu} ] )
 AC_SUBST( BUILD_MULTI_GPU, [${multi_gpu}])

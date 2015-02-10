@@ -79,6 +79,8 @@ void end() {
     free(gauge[dir]);
     free(new_gauge[dir]);
   }
+
+  finalizeComms();
 }
 
 extern void usage(char**);
@@ -93,6 +95,9 @@ void SU3Test(int argc, char **argv) {
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
+
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
 
   init();
 
@@ -115,11 +120,7 @@ void SU3Test(int argc, char **argv) {
 
 int main(int argc, char **argv) {
 
-  initComms(argc, argv, gridsize_from_cmdline);
-
   SU3Test(argc, argv);
-
-  finalizeComms();
 
   return 0;
 }

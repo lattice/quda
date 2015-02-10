@@ -3068,7 +3068,7 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
   profileMulti.Stop(QUDA_PROFILE_TOTAL);
 }
 
-void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, int last_rhs)
+void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals, int last_rhs)
 {
   setTuning(param->tune);
 
@@ -3258,7 +3258,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     
     if(last_rhs)
     {
-      if(_h_u) solve->StoreRitzVecs(_h_u, X, param, param->nev); 
+      if(_h_u) solve->StoreRitzVecs(_h_u, inv_eigenvals, X, param, param->nev); 
       printfQuda("\nDelete incremental EigCG solver resources...\n");
       //clean resources:
       solve->CleanResources();
@@ -3282,7 +3282,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     
     if(last_rhs)
     {
-      if(_h_u) solve->StoreRitzVecs(_h_u, X, param, param->nev); 
+      if(_h_u) solve->StoreRitzVecs(_h_u, inv_eigenvals, X, param, param->nev);; 
       printfQuda("\nDelete GMRESDR solver resources...\n");
       //clean resources:
       solve->CleanResources();

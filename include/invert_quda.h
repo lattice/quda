@@ -548,7 +548,7 @@ namespace quda {
     virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
 
 //    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
-    virtual void StoreRitzVecs(void *host_buffer, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
+    virtual void StoreRitzVecs(void *host_buffer, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
 
     virtual void CleanResources() = 0;
 
@@ -626,7 +626,7 @@ namespace quda {
     //
     void SaveEigCGRitzVecs(DeflationParam *param, bool cleanResources = false);
     //
-    void StoreRitzVecs(void *host_buf, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
+    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
     //
     void CleanResources(); 
 
@@ -671,9 +671,12 @@ namespace quda {
     //GMRES-DR solver 
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
     //
-    void CleanResources(); 
+    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
+    // 
+    void CleanResources() {};//not implemented yet 
 
   };
+
 
 
 } // namespace quda

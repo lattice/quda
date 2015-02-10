@@ -427,6 +427,9 @@ namespace quda {
        printfQuda("\nIncEigCG will deploy initCG solver.\n");
     }
 
+    //hack (think about this!): sloppy precision for the initCG is now always half precision
+    initCGparam.precision_sloppy = param.precision_precondition;
+
     return;
   }
 
@@ -893,7 +896,17 @@ namespace quda {
      magma_args.MagmaHEEVD(projm, evals, dpar->cur_dim, true);
 
      //reset projection matrix:
-     for(int i = 0; i < dpar->cur_dim; i++) dpar->ritz_values[i] = (fabs(evals[i]) > 1e-16) ? 1.0 / evals[i] : 0.0;
+     for(int i = 0; i < dpar->cur_dim; i++) 
+     {
+       if(fabs(evals[i]) > 1e-16) 
+       {
+         dpar->ritz_values[i] = 1.0 / evals[i];
+       }
+       else
+       {
+          errorQuda("\nCannot invert Ritz value.\n");
+       }
+     }
 
      ColorSpinorParam csParam(dpar->cudaRitzVectors->Eigenvec(0));
      csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -1062,7 +1075,7 @@ namespace quda {
   }
 
 //not optimal : temorary hack!
-  void IncEigCG::StoreRitzVecs(void *hu, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources)
+  void IncEigCG::StoreRitzVecs(void *hu, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources)
   {
       const int spinorSize = 24;
       size_t h_size   = spinorSize*defl_param->ritz_prec*defl_param->cudaRitzVectors->EigvVolume();//WARNING: might be brocken when padding is set!
@@ -1084,6 +1097,8 @@ namespace quda {
           
           delete tmp;
       }
+
+      if(inv_eigenvals) memcpy(inv_eigenvals, defl_param->ritz_values, nev_to_copy*sizeof(double));
       
       if(cleanResources) CleanResources();
       
@@ -1132,9 +1147,6 @@ namespace quda {
        printfQuda("\nWarning: IncEigCG will deploy initCG solver.\n");
 
        DeleteEigCGSearchSpace();
-
-       //temporary solution!
-       initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //may not be half, in general?    
        //
        initCGparam.use_sloppy_partial_accumulator=0;
 

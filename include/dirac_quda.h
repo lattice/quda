@@ -590,6 +590,13 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 
     std::string Type() const { return typeid(*dirac).name(); }
+    
+    bool isStaggered() const {
+      return (Type() == typeid(DiracStaggeredPC).name() ||
+	      Type() == typeid(DiracStaggered).name()   ||
+	      Type() == typeid(DiracImprovedStaggeredPC).name() ||
+	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
+    }
   };
 
   inline DiracMatrix::~DiracMatrix()

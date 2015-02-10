@@ -89,12 +89,14 @@ int main(int argc, char **argv)
   }
 
   // initialize QMP or MPI
-#if defined(QMP_COMMS)
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-#elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
-#endif
+//#if defined(QMP_COMMS)
+//  QMP_thread_level_t tl;
+//  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
+//#elif defined(MPI_COMMS)
+//  MPI_Init(&argc, &argv);
+//#endif
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
 
   // call srand() with a rank-dependent seed
   initRand();
@@ -169,6 +171,8 @@ int main(int argc, char **argv)
     //inv_param.solution_type = QUDA_MATPC_SOLUTION;
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
+    //inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+    //inv_param.solution_type = QUDA_MATPC_SOLUTION;
     inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
     inv_param.solution_type = QUDA_MATPC_SOLUTION;
   }
@@ -177,7 +181,7 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
-  inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
 
   inv_param.pipeline = 0;
 
@@ -186,7 +190,9 @@ int main(int argc, char **argv)
 
 //! For deflated solvers only:
   //inv_param.inv_type = QUDA_EIGCG_INVERTER;
-  inv_param.inv_type = QUDA_INC_EIGCG_INVERTER;
+  inv_param.inv_type = QUDA_GMRESDR_INVERTER;
+  //inv_param.inv_type = QUDA_INC_EIGCG_INVERTER;
+
 
   inv_param.rhs_idx = 0;
 
@@ -197,9 +203,9 @@ int main(int argc, char **argv)
     inv_param.deflation_grid = 24;//to test the stuff
     inv_param.cuda_prec_ritz = cuda_prec;
     inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
-  }else{
-    inv_param.nev = 0;
-    inv_param.max_search_dim = 0;
+  }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
+    inv_param.nev = 64;
+    inv_param.max_search_dim = 128;
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
@@ -384,6 +390,7 @@ int main(int argc, char **argv)
   // perform the inversion
 
  //!
+  //for(int is = 0; (is < inv_param.deflation_grid || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER); is++)
   for(int is = 0; is < inv_param.deflation_grid; is++)
   {
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
@@ -411,12 +418,14 @@ int main(int argc, char **argv)
          inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time1);
      
     printfQuda("\n Current RHS : %d\n", inv_param.rhs_idx);
+
+    if(inv_param.inv_type == QUDA_GMRESDR_INVERTER || inv_param.inv_type == QUDA_EIGCG_INVERTER) break;
   }
 
   printfQuda("\n Total eigCG RHS : %d\n", inv_param.rhs_idx);
 //***
 
-  const int initCGruns = 16; 
+  const int initCGruns = 1; 
 
   int last_rhs  = 0;
 
@@ -540,11 +549,12 @@ int main(int argc, char **argv)
   endQuda();
 
   // finalize the communications layer
-#if defined(QMP_COMMS)
-  QMP_finalize_msg_passing();
-#elif defined(MPI_COMMS)
-  MPI_Finalize();
-#endif
+//#if defined(QMP_COMMS)
+//  QMP_finalize_msg_passing();
+//#elif defined(MPI_COMMS)
+//  MPI_Finalize();
+//#endif
+  finalizeComms();
 
   return 0;
 }
