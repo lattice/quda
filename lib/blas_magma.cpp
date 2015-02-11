@@ -540,137 +540,107 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
   return;
 }
 
-
-//WARNING: experimental stuff -> modification of magma_zunmqr library routines.
+//WARNING: experimental stuff -> modification of magma_zunmqr library routines (see zunmqr.cpp file)
+//pQR, pTau : host arrays
+//pVm : device (cuda) arrays
+//computes pVm * pQR
 void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *pQR, const int ldqr, void *pTau, void *pVm, const int cldn)
 {
-#define  QR(i_,j_) ( QR + (i_) + (j_)*ldqr)
-#define  Vm(i_,j_) ( Vm + (i_) + (j_)*cldn)
+    #define  A(i_,j_) ( A + (i_) + (j_)*lda)
+    #define dC(i_,j_) (dC + (i_) + (j_)*ldc)
 
-    magmaDoubleComplex *QR  = (magmaDoubleComplex *)pQR;
-    magmaDoubleComplex *Vm  = (magmaDoubleComplex *)pVm;
+    cudaHostRegister(pQR, ldqr*nrefls*sizeof(magmaDoubleComplex), cudaHostRegisterMapped);
+
+    magmaDoubleComplex *A   = (magmaDoubleComplex *)pQR;
+    magmaDoubleComplex *dC  = (magmaDoubleComplex *)pVm;
     magmaDoubleComplex *tau = (magmaDoubleComplex *)pTau;
+
+    magma_int_t m = clen;//The number of rows of the matrix dC
+    magma_int_t n = qrlen;//The number of columns of the matrix C
+    magma_int_t k = nrefls;//The number of elementary reflectors whose product defines the matrix A, as returned by ZGEQRF.
+
+    magma_int_t lda = ldqr;//leading dimension of A
+    magma_int_t ldc = cldn;//WARNING: must be ((m+31)/32)*32;
+
     
     magmaDoubleComplex *T, *T2;
-    magma_int_t i, ii, i1, i2, ib, ic, j, jc, nb, mi, ni, nq, nq_i, nw, step;
-    magma_int_t ldwork;
-    /* NQ is the order of Q and NW is the minimum dimension of WORK */
-    nq = qrlen;
-    nw = clen;
+    magma_int_t i, i1, i2, ib, ic, jc, nb, mi, ni, nq_i;
 
-/*
-magma_int_t magma_get_zgelqf_nb( magma_int_t m )
-{
-    if      (m <  1024) return 64;
-    else                return 128;
-}
-*/    
+    magma_int_t nq = n;
+    magma_int_t nw = m;
 
-    /* Test the input arguments */
-    nb      = magma_get_zgelqf_nb( (clen < qrlen ) ? clen : qrlen );//in fact => 64 so number of reflators must be bigger than 64...
-    ldwork = nw;
+    magma_int_t ldwork = nw;
 
-    if (nb >= nrefls) {
-        printf("\nError: number of reflectors must be bigger then 64.\n"), exit(-1);
-        /* Use CPU code */
-        //think about this!
-        //LAPACK(zunmqr)( lapack_side_const(side), lapack_trans_const(trans), &m, &n, &k, A, &lda, tau, C, &ldc, work, &lwork, &iinfo);
-        //magma_free_cpu(work);
-    }
-    
+    nb = magma_get_zgelqf_nb( ( m < n ? m : n) ); //=64 for m < 1024, and 128 otherwise
+
+    if (nb >= nrefls) printf("\nError: number of reflectors must be bigger then 64. (%d : %d)\n", nb, nrefls), exit(-1);
+
     /* Use hybrid CPU-GPU code */
     /* Allocate work space on the GPU.
-    * nw*nb  for dwork (m or n) by nb
-    * nq*nb  for dV    (n or m) by nb
-    * nb*nb  for dT
-    * lddc*n for dC.
-    */
-    //magma_int_t lddc = ((m+31)/32)*32;check this!
-    magmaDoubleComplex *dwork, *dV, *dT;
-    magma_zmalloc( &dwork, (nw + nq + nb)*nb + cldn*qrlen );
+     * nw*nb  for dwork (m or n) by nb
+     * nq*nb  for dV    (n or m) by nb
+     * nb*nb  for dT
+     */
+     magmaDoubleComplex *dwork, *dV, *dT;
+     magma_zmalloc( &dwork, (nw + nq + nb)*nb+nb);//the last nb just padding
 
-    dV = dwork + nw*nb;
-    dT = dV    + nq*nb;
-    Vm = dT    + nb*nb;
-       
-    /* work space on CPU.
-    * nb*nb for T
-    * nb*nb for T2, used to save and restore diagonal block of panel */
-    magma_zmalloc_cpu( &T, 2*nb*nb );
+     if ( dwork == NULL ) printf("\nError: cannot allocate device memory!\n"), exit(-1);
 
-    T2 = T + nb*nb;
+     dV = dwork + nw*nb;
+     dT = dV    + nq*nb;
         
-    i1 = 0;
-    i2 = nrefls;
-    step = nb;
+     /* work space on CPU.
+      * nb*nb for T
+      * nb*nb for T2, used to save and restore diagonal block of panel */
+     magma_zmalloc_cpu( &T, 2*nb*nb );
+     if ( T == NULL ) printf("\nError: cannot allocate host memory!\n"), exit(-1);
 
-    // silence "uninitialized" warnings
-    ni = 0;
+     T2 = T + nb*nb;
         
-    mi = clen;
-    ic = 0;
+     i1 = 0;
+     i2 = k;
 
-        
-    for (i = i1; (i < i2); i += step) {
-        ib = nb < (nrefls - i) ? nb : (nrefls - i) ; //min(nb, nrefls - i);
+     // silence "uninitialized" warnings
+     ni = 0;
+     mi = m;
+     ic = 0;
 
-        /* Form the triangular factor of the block reflector
-           H = H(i) H(i+1) . . . H(i+ib-1) */
-        nq_i = nq - i;
+     for (i = i1; i < i2; i += nb) {
+         ib = (nb < (k - i)) ? nb : (k - i);
+         /* Form the triangular factor of the block reflector
+            H = H(i) H(i+1) . . . H(i+ib-1) */
+         nq_i = nq - i;
+         //zlarft("Forward", "Columnwise", &nq_i, &ib, A(i,i), &lda, &tau[i], T, &ib);
+         LAPACK(zlarft)("Forward", "Columnwise", &nq_i, &ib, (_Complex double*)(A(i,i)), &lda, (_Complex double*)&tau[i], (_Complex double*)T, &ib);
 
-        magma_int_t _ldqr = ldqr;
+            /* 1) set upper triangle of panel in A to identity,
+               2) copy the panel from A to the GPU, and
+               3) restore A                                      */
+         zpanel_to_q( MagmaUpper, ib, A(i,i), lda, T2 );
+         magma_zsetmatrix( nq_i,  ib, A(i,i), lda, dV, nq_i );
+         zq_to_panel( MagmaUpper, ib, A(i,i), lda, T2 );
 
-        LAPACK(zlarft)("Forward", "Columnwise", &nq_i, &ib, (_Complex double*)(QR(i,i)), &_ldqr, (_Complex double*)&tau[i], (_Complex double*)T, &ib);
+         /* H or H**H is applied to C(1:m,i:n) */
+         ni = n - i;
+         jc = i;
+         /* Apply H or H**H; First copy T to the GPU */
+         magma_zsetmatrix( ib, ib, T, ib, dT, ib );
 
-        /* 1) set upper triangle of panel in A to identity,
-           2) copy the panel from A to the GPU, and
-           3) restore A                                      */
-        //zpanel_to_q( MagmaUpper, ib, QR(i,i), ldqr, T2 );//?
-        magmaDoubleComplex *col;
-        
-        magma_int_t k = 0;
-        
-        for(ii = 0; ii < ib; ++ii) {
-            col = QR(i,i) + ii*ldqr;
-            for(j = 0; j < ii; ++j) {
-                T2[k] = col[j];
-                col [j] = MAGMA_Z_ZERO;
-                ++k;
-            }
-            
-            T2[k] = col[ii];
-            col [j] = MAGMA_Z_ONE;
-            ++k;
-        }
-        
-        magma_zsetmatrix( nq_i,  ib, QR(i,i), ldqr, dV, nq_i );//?
-        
-        //zq_to_panel( MagmaUpper, ib, QR(i,i), ldqr, T2 );//?
-        k = 0;
-        
-        for(ii = 0; ii < ib; ++ii) {
-            col = QR(i,i) + ii*ldqr;
-            for(j = 0; j <= ii; ++j) {
-                col[j] = T2[k];
-                ++k;
-            }
-        }
-        
-        /* H or H**H is applied to C(1:m,i:n) */
-        ni = qrlen - i;
-        jc = i;
+         magma_zlarfb_gpu( MagmaRight, MagmaNoTrans, MagmaForward, MagmaColumnwise,
+                              mi, ni, ib,
+                              dV, nq_i,
+                              dT, ib,
+                              dC(ic,jc), ldc,
+                              dwork, ldwork );
+     }
 
-        /* Apply H or H**H; First copy T to the GPU */
-        magma_zsetmatrix( ib, ib, T, ib, dT, ib );
-        magma_zlarfb_gpu( _cR, _cN, MagmaForward, MagmaColumnwise, mi, ni, ib, dV, nq_i, dT, ib, Vm(ic,jc), cldn, dwork, ldwork );
-    }
+     magma_free( dwork );
+     magma_free_cpu( T );
 
-    magma_free( dwork );
-    magma_free_cpu( T );
+     cudaHostUnregister(pQR);
 
-    return;
-}
-
+     return;   
+} 
 
 void BlasMagmaArgs::LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm)
 {
