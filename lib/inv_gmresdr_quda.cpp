@@ -90,7 +90,7 @@ namespace quda {
     if(first_cycle_flag && nev == 0) errorQuda("\nError: incorrect deflation size..\n");
     //magma library initialization:
 
-    gmresdr_magma_args = new BlasMagmaArgs(m, nev, ldm, sizeof(double));
+    gmresdr_magma_args = new BlasMagmaArgs(m, nev+1, ldm, sizeof(double));
 
     harVecs  = new Complex[ldm*m];//
     harVals  = new Complex[m];//
@@ -245,7 +245,7 @@ namespace quda {
     int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
     int clen = Vm->EigvLength()      >> 1; //complex vector length
 
-    gmresdr_magma_args->MagmaRightNotrUNMQR(clen, (nev+1), nev, harVecs, ldm, Vm, cldn);//this method performs QR decomposition on GPU, it does not change harVecs array.
+    gmresdr_magma_args->MagmaRightNotrUNMQR(clen, (nev+1), nev, harVecs, ldm, Vm->V(), cldn);//this method performs QR decomposition on GPU, it does not change harVecs array.
 
     //re-orthogonalize Vm->Eigenvec(nev) against Vm->Eigenvec(i), i = 0...nev-1  
     gmresdr_magma_args->LapackGEQR((nev+1), harVecs, (m+1), ldm, tau);
@@ -276,7 +276,7 @@ namespace quda {
     int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
     int clen = Vm->EigvLength()      >> 1; //complex vector length
 
-    gmresdr_magma_args->MagmaRightNotrUNMQR(clen, (nev+1), nev, harVecs, ldm, tau, Vm, cldn);//this method uses pre-computed QR on CPU
+    gmresdr_magma_args->MagmaRightNotrUNMQR(clen, (nev+1), nev, harVecs, ldm, tau, Vm->V(), cldn);//this method uses pre-computed QR on CPU
 
     //re-orthogonalize Vm->Eigenvec(nev) against Vm->Eigenvec(i), i = 0...nev-1  
     gmresdr_magma_args->LapackRightNotrUNMQR((m+1), m, nev, harVecs, ldm, tau, H, ldm);
@@ -608,6 +608,8 @@ namespace quda {
        warningQuda("\nSolution was already found.\n");
        return;
      }
+
+     profile.Stop(QUDA_PROFILE_INIT);
 
      u[0] = Complex(beta, 0.0);
      //load the first Vm vector:

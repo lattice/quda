@@ -197,7 +197,7 @@ namespace quda {
        
     //magma initialization:
     const int prec = sizeof(Float);
-    eigcg_magma_args = new BlasMagmaArgs(m, nev, ldm, prec);
+    eigcg_magma_args = new BlasMagmaArgs(m, 2*nev, ldm, prec);
 
     hTm     = new std::complex<Float>[ldm*m];//VH A V
     hTvalm  = (Float*)malloc(m*sizeof(Float));   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)

@@ -16,7 +16,7 @@
 
       //problem sizes:
       int m;
-      int nev;
+      int max_nev; //=2*nev for (incremental) eigCG and nev+1 for (F)GMRESDR
       int prec;
       int ldm;//(may include padding)
 
@@ -34,7 +34,7 @@
       int sideLR;
 
       int htsize;//MIN(l,k)-number of Householder reflectors, but we always have k <= MIN(m,n)
-      int dtsize;//in general: MIN(m,k) for side = 'L' and MIN(n,k) for side = 'R'
+      int dtsize;//
 
       int lwork_max; 
 
@@ -53,7 +53,7 @@
 
       BlasMagmaArgs(const int prec);
 
-      BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec);
+      BlasMagmaArgs(const int m, const int max_nev, const int ldm, const int prec);
 
       BlasMagmaArgs(const int m, const int ldm, const int prec);
 
@@ -81,6 +81,9 @@
       
       //Spinor matrix vector product:
       void SpinorMatVec(void *spinorOut, const void *spinorSetIn, const int sld, const int slen, const void *vec, const int vlen);
+
+      //Collection of methods for GMRESDR solver:
+      void RestartVH(void *dV, const int vld, const int vlen, void *dharVecs, void *dH, const int ldm);//ldm: leading dim for both dharVecs and dH. additional info: nev, nev+1 = max_nev, m
 
       void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn);
 

@@ -67,7 +67,7 @@ void BlasMagmaArgs::CloseMagma(){
     return;
 }
 
- BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), nev(0), prec(prec), ldm(0), info(-1), llwork(0), 
+ BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), max_nev(0), prec(prec), ldm(0), info(-1), llwork(0), 
   lrwork(0), liwork(0), sideLR(0), htsize(0), dtsize(0), lwork_max(0), W(0), W2(0), 
   hTau(0), dTau(0), lwork(0), rwork(0), iwork(0)
 {
@@ -90,7 +90,7 @@ void BlasMagmaArgs::CloseMagma(){
 
 
 BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec) 
-  : m(m), nev(0),  prec(prec), ldm(ldm), info(-1), sideLR(0), htsize(0), dtsize(0), 
+  : m(m), max_nev(0),  prec(prec), ldm(ldm), info(-1), sideLR(0), htsize(0), dtsize(0), 
   W(0), hTau(0), dTau(0)
 {
 
@@ -128,8 +128,8 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec)
 
 
 
-BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const int prec) 
-  : m(m), nev(nev),  prec(prec), ldm(ldm), info(-1)
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, const int prec) 
+  : m(m), max_nev(max_nev),  prec(prec), ldm(ldm), info(-1)
 {
 
 #ifdef MAGMA_LIB
@@ -142,22 +142,24 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int nev, const int ldm, const in
 
     const int complex_prec = 2*prec;
 
-    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(m) : magma_get_zhetrd_nb(m);//ldm
-    magma_int_t nbqrf = prec == 4 ? magma_get_cgeqrf_nb(m) : magma_get_zgeqrf_nb(m);//ldm
+    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(ldm) : magma_get_zhetrd_nb(ldm);//ldm<-m
+    magma_int_t nbqrf = prec == 4 ? magma_get_cgeqrf_nb(ldm) : magma_get_zgeqrf_nb(ldm);//ldm
+
+    htsize   = max_nev;//MIN(l,k)-number of Householder vectors, but we always have k <= MIN(m,n)
+    dtsize   = ( 2*htsize + ((htsize + 31)/32)*32 )*nbqrf;//in general: MIN(m,k) for side = 'L' and MIN(n,k) for side = 'R'
+
+    magma_malloc_pinned((void**)&hTau, htsize*complex_prec);
+    magma_malloc((void**)&dTau,        dtsize*complex_prec);
+
+//these are needed for the eigCG solver only.
+    sideLR = (m - max_nev + nbqrf)*(m + nbqrf) + m*nbqrf;//ldm
+
+    magma_malloc_pinned((void**)&W,    sideLR*complex_prec);
+    magma_malloc_pinned((void**)&W2,   ldm*m*complex_prec);
 
     llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm 
     lrwork = 1 + 5*m + 2*m*m;//ldm
     liwork = 3 + 5*m;//ldm
-
-    htsize   = 2*nev;//MIN(l,k)-number of Householder vectors, but we always have k <= MIN(m,n)
-    dtsize   = ( 2*htsize + ((htsize + 31)/32)*32 )*nbqrf;//in general: MIN(m,k) for side = 'L' and MIN(n,k) for side = 'R'
-
-    sideLR = (m - 2*nev + nbqrf)*(m + nbqrf) + m*nbqrf;//ldm
-
-    magma_malloc_pinned((void**)&W,    sideLR*complex_prec);
-    magma_malloc_pinned((void**)&W2,   ldm*m*complex_prec);
-    magma_malloc_pinned((void**)&hTau, htsize*complex_prec);
-    magma_malloc((void**)&dTau,        dtsize*complex_prec);
 
     magma_malloc_pinned((void**)&lwork, llwork*complex_prec);
     magma_malloc_cpu((void**)&rwork,    lrwork*prec);
@@ -184,11 +186,12 @@ BlasMagmaArgs::~BlasMagmaArgs()
      if(hTau) magma_free_pinned(hTau);
 
      if(W) magma_free_pinned(W);
-     magma_free_pinned(W2);
-     magma_free_pinned(lwork);
+     if(W2) magma_free_pinned(W2);
+     if(lwork) magma_free_pinned(lwork);
 
-     magma_free_cpu(rwork);
-     magma_free_cpu(iwork);
+     if(rwork) magma_free_cpu(rwork);
+     if(iwork) magma_free_cpu(iwork);
+
      alloc = false;
    }
 
@@ -248,7 +251,7 @@ void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, 
 
 int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 {
-     const int l = 2*nev;
+     const int l = max_nev;
 
 #ifdef MAGMA_LIB
      if(prec == 4)
@@ -293,7 +296,7 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 {
 #ifdef MAGMA_LIB 
        const int cprec = 2*prec;
-       int l           = 2*nev;
+       int l           = max_nev;
 //
        //void *Tmp = 0;
        //magma_malloc((void**)&Tmp, vld*l*cprec);     
@@ -476,7 +479,19 @@ void BlasMagmaArgs::SpinorMatVec
        return;
 }
 
+void BlasMagmaArgs::RestartVH(void *dV, const int vld, const int vlen, void *dharVecs, void *dH, const int ldm){}
 
+/*
+void BlasMagmaArgs::RestartVH(void *dV, const int vld, const int vlen, const int vprec, void *dharVecs, void *dH, const int ldm)
+{
+    if(prec == 4 || (prec != vprec))
+    {
+    }
+    //GPU code:
+
+    return; 
+}
+*/
 void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn)
 {
 
@@ -612,7 +627,6 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
          nq_i = nq - i;
          //zlarft("Forward", "Columnwise", &nq_i, &ib, A(i,i), &lda, &tau[i], T, &ib);
          LAPACK(zlarft)("Forward", "Columnwise", &nq_i, &ib, (_Complex double*)(A(i,i)), &lda, (_Complex double*)&tau[i], (_Complex double*)T, &ib);
-
             /* 1) set upper triangle of panel in A to identity,
                2) copy the panel from A to the GPU, and
                3) restore A                                      */
@@ -623,6 +637,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
          /* H or H**H is applied to C(1:m,i:n) */
          ni = n - i;
          jc = i;
+
          /* Apply H or H**H; First copy T to the GPU */
          magma_zsetmatrix( ib, ib, T, ib, dT, ib );
 
