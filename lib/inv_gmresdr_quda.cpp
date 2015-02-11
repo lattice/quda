@@ -19,7 +19,7 @@
 
 #define DEBUG_MODE
 
-#define MAX_EIGENVEC_WINDOW 16
+#define MAX_EIGENVEC_WINDOW 96
 
 /*
 Based on  GMRES-DR algorithm:
@@ -635,6 +635,8 @@ namespace quda {
      {
         args->ComputeHarmonicEigenpairs();//also clean cH and harMat
         //
+        checkCudaError();
+        //
         args->RestartVH(Vm, u);//creates Vm^{new}, H^{new}
 
         //Update u for the next Arnoldi cycle
@@ -654,6 +656,11 @@ namespace quda {
      }
 
      delete[] u;
+
+     if (matSloppy.Type() != typeid(DiracStaggeredPC).name() && matSloppy.Type() != typeid(DiracStaggered).name())
+     {
+       delete tmp2_p;
+     }
 
      return;
   }
