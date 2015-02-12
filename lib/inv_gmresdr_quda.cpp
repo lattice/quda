@@ -528,6 +528,8 @@ namespace quda {
 
     delete[] g;
 
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
+
     return r2;
   }
 

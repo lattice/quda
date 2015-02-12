@@ -1,6 +1,9 @@
 #include <blas_magma.h>
 #include <string.h>
 
+#include <vector>
+#include <algorithm>
+
 #ifndef MAX
 #define MAX(a, b) (a > b) ? a : b;
 #endif
@@ -910,6 +913,7 @@ void BlasMagmaArgs::LapackRightEV(const int m,  const int ldm, void *Mat, void *
   return;
 }
 
+#if 0
 void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals)
 {
 //use std::sort?
@@ -964,6 +968,45 @@ void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev,
  }
 
 }
+#endif
+
+//STL based version:
+//
+
+struct SortedEval{
+
+   double eval_nrm;
+   int    eval_idx;
+
+   SortedEval(double val, int idx) : eval_nrm(val), eval_idx(idx) {}; 
+};
+
+bool cmp_eigen_nrms (SortedEval v1, SortedEval v2)
+{
+  return (v1.eval_nrm < v2.eval_nrm);
+}
+
+void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals)
+{
+  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+
+  std::vector<SortedEval> sorted_evals_cntr;
+
+  for(int e = 0; e < m; e++) sorted_evals_cntr.push_back( SortedEval( abs(((std::complex<double>*)eVals)[e]), e ));
+
+  std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), cmp_eigen_nrms);
+  
+
+  for(int e = 0; e < nev; e++)
+  {  
+    memcpy(&(((std::complex<double>*)eVecs)[ldm*e]), &(((std::complex<double>*)unsorted_eVecs)[ldm*( sorted_evals_cntr[e].eval_idx)]), (ldm)*sizeof(std::complex<double>));
+    //set zero in m+1 element:
+    ((std::complex<double>*)eVecs)[ldm*e+m] = std::complex<double>(0.0, 0.0);
+  }
+
+  return;
+}
+
 
 #ifdef MAGMA_LIB
 
