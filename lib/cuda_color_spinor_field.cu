@@ -52,8 +52,10 @@ namespace quda {
 
 
   void cudaColorSpinorField::createIPCDslashComms(){
-
+  
 #ifdef P2P_COMMS	
+ 
+
     static int ipcInit = 0;
 
     int myrank = comm_rank();
@@ -61,6 +63,7 @@ namespace quda {
     if(!initComms) errorQuda("Can only be called after create comms\n");
 
     comm_dslash_peer2peer_init();
+
 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
