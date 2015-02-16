@@ -753,7 +753,7 @@ namespace quda {
       // add extra space for the norms for half precision
       if (precision == QUDA_HALF_PRECISION){ 
         faceBytes += 2*nFace*ghostFace[i]*sizeof(float);
-        ghost_face_bytes[i] = nFace*ghostFace[i]*sizeof(float);
+        ghost_face_bytes[i] += nFace*ghostFace[i]*sizeof(float);
       }
     }
 
@@ -874,7 +874,13 @@ namespace quda {
     if (dim !=3 || getKernelPackT() || getTwistPack()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       size_t bytes = nFace*Nint*ghostFace[dim]*precision;
+
+      printfQuda("bytes without half-prec = %d\n", bytes);
+	
       if (precision == QUDA_HALF_PRECISION) bytes += nFace*ghostFace[dim]*sizeof(float);
+
+      printfQuda("bytes with half-prec = %d\n", bytes);
+
       void* gpu_buf = 
 	(dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[bufferIndex][dim] : this->fwdGhostFaceBuffer[bufferIndex][dim];
 
@@ -1641,19 +1647,8 @@ namespace quda {
      
     if(!commDimPartitioned(dim)) return;
 
-    printfQuda("Calling sendStart\n");
 	
     if(dir%2 == 0){ // sending backwards
-      printfQuda("Sending backwards\n");
-      // Prepost receive 
-/*
-#ifdef P2P_COMMS
-      if(!comm_dslash_peer2peer_enabled(1,dim))
-#endif
-      {
-        comm_start(mh_recv_fwd[bufferIndex][nFace-1][dim]);
-      }
-*/
 #ifdef P2P_COMMS
       if(!comm_dslash_peer2peer_enabled(0,dim))
 #endif
@@ -1687,16 +1682,6 @@ namespace quda {
       }
 #endif
     } else { // sending forwards 
-      // Prepost receive
-      printfQuda("Sending forwards\n");
-/*
-#ifdef P2P_COMMS 
-      if(!comm_dslash_peer2peer_enabled(0,dim))
-#endif
-      {
-        comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
-      }
-*/
 #ifdef P2P_COMMS
       if(!comm_dslash_peer2peer_enabled(1,dim))
 #endif
@@ -1710,6 +1695,8 @@ namespace quda {
       }
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
 
+      printfQuda("ghost_face_bytes = %d\n", ghost_face_bytes[dim]);
+
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
       if(comm_dslash_peer2peer_enabled(0,dim)) {
 	// copy from backward processor
@@ -1721,7 +1708,6 @@ namespace quda {
 			ghost_face_bytes[dim],
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy from backward processor
-//	cudaDeviceSynchronize();
 
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim],*copy_stream);
       }

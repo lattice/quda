@@ -366,7 +366,6 @@ struct DslashCuda2 : DslashPolicyImp {
 	      pattern.gatherCompleted[2*i+dir] = 1;
 	      completeSum++;
 	      PROFILE(inputSpinor->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
-	      //PROFILE(inputSpinor->commsStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
 	    }
 	  }
 
