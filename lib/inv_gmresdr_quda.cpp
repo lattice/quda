@@ -183,7 +183,7 @@ namespace quda {
        //now just Givens rotations:
        for(int i = 0; i < col; i++)
        {
-         triangH[ldm*col+i]   =  Cn[i]*tmp + Sn[i]*H[ldm*col+i+1];
+         triangH[ldm*col+i]   =  conj(Cn[i])*tmp + Sn[i]*H[ldm*col+i+1];
 
          tmp    = -Sn[i]*tmp + Cn[i]*H[ldm*col+i+1];
        } 
@@ -203,7 +203,7 @@ namespace quda {
        //now just Givens rotations:
        for(int i = nev; i < col; i++)
        {
-         triangH[ldm*col+i]   =  Cn[i]*tmp + Sn[i]*H[ldm*col+i+1];
+         triangH[ldm*col+i]   =  conj(Cn[i])*tmp + Sn[i]*H[ldm*col+i+1];
 
          tmp    = -Sn[i]*tmp + Cn[i]*H[ldm*col+i+1];
        }
@@ -426,7 +426,7 @@ namespace quda {
 
        for(int i = 0; i <= j; i++)
        {
-          Complex h_ij = cDotProductCuda(*Av, Vm->Eigenvec(i));
+          Complex h_ij = cDotProductCuda(Vm->Eigenvec(i), *Av);
           //
           args->SetHessenbergElement(i, j, h_ij);//set i-row, j-col element in the Hessenberg matrix (and its conjugate)
           //
@@ -458,10 +458,10 @@ namespace quda {
        
        Sn[j] = h_jp1j * inv_denom;
        
-       triangH[ldm*j+j] = e*Cn[j]+Sn[j]*h_jp1j;
+       triangH[ldm*j+j] = e*conj(Cn[j])+Sn[j]*h_jp1j;
 
        g[j+1] = - Sn[j]*g[j];
-       g[j]   = g[j] * Cn[j];
+       g[j]   = g[j] * conj(Cn[j]);
        //update the residual norm squared:
 
        r2 = norm(g[j+1]);
