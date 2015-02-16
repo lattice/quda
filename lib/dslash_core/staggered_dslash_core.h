@@ -344,10 +344,12 @@ spinorFloat o02_im;
 
   const int X1X0 = X[1]*X[0];
   const int X2X1X0 = X[2]*X1X0;
+#ifdef MULTI_GPU
 #if (DD_IMPROVED == 1)
   const int X3X1X0 = X[3]*X1X0;
 #endif
   const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
+#endif
 
   int za,zb; 
   int x0h;

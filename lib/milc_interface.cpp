@@ -1019,6 +1019,7 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
 
   invertParam.cuda_prec_precondition        = device_precision_sloppy;
   invertParam.verbosity_precondition        = QUDA_SILENT;
+  invertParam.verbosity        = QUDA_SILENT;
   invertParam.cpu_prec                      = host_precision;
   invertParam.cuda_prec                     = device_precision;
   invertParam.cuda_prec_sloppy              = device_precision_sloppy;
@@ -1084,8 +1085,10 @@ void qudaLoadCloverField(int external_precision,
     }
   }
 
-  trlog[0] = invertParam.trlogA[0];
-  trlog[1] = invertParam.trlogA[1];
+  if (compute_trlog) {
+    trlog[0] = invertParam.trlogA[0];
+    trlog[1] = invertParam.trlogA[1];
+  }
 } // qudaLoadCoverField
 
 
@@ -1100,9 +1103,11 @@ void qudaFreeCloverField() {
 } // qudaFreeCloverField
 
 
+
 void qudaCloverInvert(int external_precision, 
     int quda_precision,
     double kappa,
+    double clover_coeff,
     QudaInvertArgs_t inv_args,
     double target_residual,
     double target_fermilab_residual,
@@ -1126,7 +1131,7 @@ void qudaCloverInvert(int external_precision,
 
   qudaLoadGaugeField(external_precision, quda_precision, inv_args, link);
 
-  double clover_coeff = 0.0;
+//  double clover_coeff = 0.0;
   qudaLoadCloverField(external_precision, quda_precision, inv_args, clover, cloverInverse,
       QUDA_MAT_SOLUTION, QUDA_DIRECT_PC_SOLVE, clover_coeff, 0, 0);
 
@@ -1170,6 +1175,9 @@ void qudaCloverMultishiftInvert(int external_precision,
     int* num_iters)
 {
 
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
   for(int i=0; i<num_offsets; ++i){
     if(target_residual_offset[i] == 0){
       errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
@@ -1193,6 +1201,9 @@ void qudaCloverMultishiftInvert(int external_precision,
   invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
   invertParam.inv_type           = QUDA_CG_INVERTER;
   invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+
+  invertParam.verbosity = verbosity;
+  invertParam.verbosity_precondition = QUDA_SILENT;
 
   invertMultiShiftQuda(solutionArray, source, &invertParam); 
 
@@ -1226,6 +1237,9 @@ void qudaCloverMultishiftMDInvert(int external_precision,
     double* const final_residual, 
     int* num_iters)
 {
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
   for(int i=0; i<num_offsets; ++i){
     if(target_residual_offset[i] == 0){
       errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
@@ -1249,6 +1263,9 @@ void qudaCloverMultishiftMDInvert(int external_precision,
   invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
   invertParam.inv_type           = QUDA_CG_INVERTER;
   invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+
+  invertParam.verbosity = verbosity;
+  invertParam.verbosity_precondition = QUDA_SILENT;
 
   invertMultiShiftMDQuda(psiEven, psiOdd, pEven, pOdd, source, &invertParam); 
 

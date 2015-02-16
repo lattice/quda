@@ -540,6 +540,7 @@ namespace quda {
       
       case 2:
 	switch(whichway){
+	case QUDA_BACKWARDS:
 	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_even, (double2*)even, even_parity, param);
 	  collectGhostStapleKernel<2, QUDA_BACKWARDS><<<gridDim, blockDim, 0, *stream>>>((double2*)gpu_buf_odd, (double2*)odd, odd_parity, param);
 	  break;

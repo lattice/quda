@@ -28,6 +28,7 @@ namespace quda {
 
   namespace asym_clover {
 
+#undef GPU_STAGGERED_DIRAC
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
@@ -36,9 +37,11 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#ifdef GPU_CLOVER_DIRAC
 #define DD_CLOVER 2
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #undef DD_CLOVER
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -53,6 +56,7 @@ namespace quda {
 
   using namespace asym_clover;
 
+#ifdef GPU_CLOVER_DIRAC
   template <typename sFloat, typename gFloat, typename cFloat>
   class AsymCloverDslashCuda : public SharedDslashCuda {
 
@@ -107,6 +111,7 @@ namespace quda {
 
     long long flops() const { return 1872ll * in->VolumeCB(); } // FIXME for multi-GPU
   };
+#endif // GPU_CLOVER_DIRAC
 
 #include <dslash_policy.cuh>
 

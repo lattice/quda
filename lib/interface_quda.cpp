@@ -133,6 +133,8 @@ cudaCloverField *cloverInvPrecondition = NULL;
 cudaGaugeField *momResident = NULL;
 cudaGaugeField *extendedGaugeResident = NULL;
 
+cudaColorSpinorField *solutionResident = NULL;
+
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 #ifdef PTHREADS
@@ -520,7 +522,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->cuda_prec != param->cuda_prec_sloppy ||
       param->reconstruct != param->reconstruct_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
+#if (__COMPUTE_CAPABILITY__ >= 200)
     sloppy->copy(*precise);
+#else
+    sloppy->copy(*in);
+#endif
     param->gaugeGiB += sloppy->GBytes();
   } else {
     sloppy = precise;
@@ -536,7 +542,11 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->cuda_prec_sloppy != param->cuda_prec_precondition ||
       param->reconstruct_sloppy != param->reconstruct_precondition) {
     precondition = new cudaGaugeField(gauge_param);
+#if (__COMPUTE_CAPABILITY__ >= 200)
     precondition->copy(*sloppy);
+#else
+    precondition->copy(*in);
+#endif
     param->gaugeGiB += precondition->GBytes();
   } else {
     precondition = sloppy;
@@ -1024,6 +1034,9 @@ void endQuda(void)
   if(cudaStapleField) delete cudaStapleField; cudaStapleField=NULL;
   if(cudaStapleField1) delete cudaStapleField1; cudaStapleField1=NULL;
 
+  if(solutionResident) delete solutionResident;
+  if(momResident) delete momResident;
+
   endBlas();
 
   if (streams) {
@@ -1069,6 +1082,8 @@ void endQuda(void)
     profileStaggeredOprod.Print();
     profileAsqtadForce.Print();
     profileHISQForce.Print();
+    profileContract.Print();
+    profileCovDev.Print();
     profileEnd.Print();
 
     printLaunchTimer();
@@ -1363,7 +1378,15 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   setDiracParam(diracParam, inv_param, pc);
 
   Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator
-  dirac->Dslash(out, in, parity); // apply the operator
+  if (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH && inv_param->dagger) {
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+    cudaColorSpinorField tmp1(in, cudaParam);
+    ((DiracTwistedCloverPC*) dirac)->TwistCloverInv(tmp1, in, (parity+1)%2); // apply the clover-twist
+    dirac->Dslash(out, tmp1, parity); // apply the operator
+  } else {
+    dirac->Dslash(out, in, parity); // apply the operator
+  }
+
   delete dirac; // clean up
 
   cpuParam.v = h_out;
@@ -1803,6 +1826,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 {
   QudaInvertParam *param;
   param = eig_param->invert_param;
+  setTuning(param->tune);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
@@ -1891,8 +1915,6 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
   }
   profileInvert.Stop(QUDA_PROFILE_H2D);
 
-  setTuning(param->tune);
-
   if(eig_param->RitzMat_lanczos == QUDA_MATPC_DAG_SOLUTION)
   {
     DiracMdag mat(dirac);
@@ -1954,6 +1976,8 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
@@ -2065,8 +2089,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     axCuda(1.0/sqrt(nb), *b);
     axCuda(1.0/sqrt(nb), *x);
   }
-
-  setTuning(param->tune);
 
   massRescale(*b, *param);
 
@@ -2192,10 +2214,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
 
-cudaColorSpinorField *solutionResident = NULL;
-
 void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   profileInvert.Start(QUDA_PROFILE_TOTAL);
@@ -2305,8 +2327,6 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     axCuda(1.0/sqrt(nb), *b);
     axCuda(1.0/sqrt(nb), *x);
   }
-
-  setTuning(param->tune);
 
   massRescale(*b, *param);
 
@@ -2452,6 +2472,8 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
  */
 void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   profileMulti.Start(QUDA_PROFILE_TOTAL);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
@@ -2597,8 +2619,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     axCuda(1.0/sqrt(nb), *b);
   }
-
-  setTuning(param->tune);
 
   massRescale(*b, *param);
 
@@ -2747,6 +2767,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **_hp_yo, 
     void *_hp_b, QudaInvertParam *param)
 {
+  setTuning(param->tune);
+
   profileMulti.Start(QUDA_PROFILE_TOTAL);
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
@@ -2915,8 +2937,6 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
     axCuda(1.0/sqrt(nb), *b);
   }
 
-  setTuning(param->tune);
-
   massRescale(*b, *param);
 
   // use multi-shift CG
@@ -3050,6 +3070,8 @@ void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, void **
 
 void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, int last_rhs)
 {
+  setTuning(param->tune);
+
   if(!InitMagma) openMagma();
 
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
@@ -3191,8 +3213,6 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     axCuda(1.0/sqrt(nb), *x);
   }
 
-  setTuning(param->tune);
-
   massRescale(*b, *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
@@ -3238,6 +3258,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     
     if(last_rhs)
     {
+      if(_h_u) solve->StoreRitzVecs(_h_u, X, param, param->nev); 
       printfQuda("\nDelete incremental EigCG solver resources...\n");
       //clean resources:
       solve->CleanResources();

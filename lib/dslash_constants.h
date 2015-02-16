@@ -8,27 +8,37 @@ enum KernelType {
 };
 
   struct DslashParam {
+#ifndef STAGGERED_TESLA_HACK
     char do_not_delete; // work around for bug in CUDA 6.5
+#endif
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
     int X[4];
+#ifdef GPU_DOMAIN_WALL_DIRAC 
     int Ls;
+#endif
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
+#ifndef STAGGERED_TESLA_HACK
     int commDim[QUDA_MAX_DIM]; // Whether to do comms or not
+#endif
     int ghostDim[QUDA_MAX_DIM]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM+1][2];
     int ghostNormOffset[QUDA_MAX_DIM+1][2];
     int sp_stride; // spinor stride
+#ifdef GPU_CLOVER_DIRAC
     int cl_stride; // clover stride
+#endif
+#if (defined GPU_TWISTED_MASS_DIRAC) || (defined GPU_NDEG_TWISTED_MASS_DIRAC)
     int fl_stride; // twisted-mass flavor stride
+#endif
 #ifdef GPU_STAGGERED_DIRAC
     int gauge_stride;
     int long_gauge_stride;
     float fat_link_max;
 #endif 
 #ifdef MULTI_GPU
-    int threadDimMapLower[QUDA_MAX_DIM];
-    int threadDimMapUpper[QUDA_MAX_DIM];
+    int threadDimMapLower[4];
+    int threadDimMapUpper[4];
 #endif
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -56,7 +66,9 @@ enum KernelType {
       printfQuda("threads = %d\n", threads);
       printfQuda("parity = %d\n", parity);
       printfQuda("X = {%d, %d, %d, %d}\n", X[0], X[1], X[2], X[3]);
+#ifdef GPU_DOMAIN_WALL_DIRAC
       printfQuda("Ls = %d\n", Ls);
+#endif
       printfQuda("commDim = {%d, %d, %d, %d}\n", commDim[0], commDim[1], commDim[2], commDim[3]);
       printfQuda("ghostDim = {%d, %d, %d, %d}\n", ghostDim[0], ghostDim[1], ghostDim[2], ghostDim[3]);
       printfQuda("ghostOffset = {{%d, %d}, {%d, %d}, {%d, %d}, {%d, %d}}\n", ghostOffset[0][0], ghostOffset[0][1], 
@@ -69,7 +81,9 @@ enum KernelType {
                                                                                  ghostNormOffset[3][0], ghostNormOffset[3][1]);
       printfQuda("kernel_type = %d\n", kernel_type);
       printfQuda("sp_stride = %d\n", sp_stride);
+#ifdef GPU_CLOVER_DIRAC
       printfQuda("cl_stride = %d\n", cl_stride);
+#endif
     }
   };
 

@@ -16,7 +16,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
 	fat_force_quda.o llfat_quda_itf.o llfat_quda.o			\
-	gauge_force_quda.o clover_quda.o dslash_quda.o			\
+	gauge_force_quda.o clover_quda.o dslash_quda.o covDev.o		\
 	dslash_wilson.o dslash_clover.o dslash_clover_asym.o		\
 	dslash_twisted_mass.o dslash_ndeg_twisted_mass.o		\
 	dslash_twisted_clover.o dslash_domain_wall.o			\

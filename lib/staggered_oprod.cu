@@ -393,6 +393,7 @@ namespace quda {
 
       private:
         StaggeredOprodArg<Complex,Output,InputA,InputB> arg;
+        const GaugeField &meta;
         QudaFieldLocation location; // location of the lattice fields
 
         unsigned int sharedBytesPerThread() const { return 0; }
@@ -403,10 +404,9 @@ namespace quda {
 
       public:
       StaggeredOprodField(const StaggeredOprodArg<Complex,Output,InputA,InputB> &arg,
-            QudaFieldLocation location)
-          : arg(arg), location(location) {
-	sprintf(vol,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-	  sprintf(aux,"threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
+			  const GaugeField &meta, QudaFieldLocation location)
+	: arg(arg), meta(meta), location(location) {
+   	  writeAuxString("threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
 	  // this sets the communications pattern for the packing kernel
 	  int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
 	  setPackComms(comms);
@@ -463,7 +463,7 @@ namespace quda {
 	  return 0; // fix this
         }
 
-        TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux);}
+        TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux);}
   }; // StaggeredOprodField
 
   template<typename Complex, typename Output, typename InputA, typename InputB>
@@ -481,7 +481,7 @@ namespace quda {
 							  outFieldB);
 
 
-      StaggeredOprodField<Complex,Output,InputA,InputB> oprod(arg, QUDA_CUDA_FIELD_LOCATION);
+      StaggeredOprodField<Complex,Output,InputA,InputB> oprod(arg, outFieldA, QUDA_CUDA_FIELD_LOCATION);
 
 #ifdef MULTI_GPU
       bool pack=false;
@@ -639,7 +639,7 @@ namespace quda {
       const unsigned int parity, const double coeff[2])
   {
 
-#ifdef GPU_STAGGERED_OPROD
+#ifdef GPU_STAGGERED_OPROD 
 
     if(outA.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", outA.Order());    
@@ -659,6 +659,7 @@ namespace quda {
     cudaColorSpinorField& inA = (parity&1) ? inOdd : inEven;
     cudaColorSpinorField& inB = (parity&1) ? inEven : inOdd;
 
+#if (__COMPUTE_CAPABILITY__ >= 200)
     if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
 
       Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA);
@@ -673,9 +674,14 @@ namespace quda {
       computeStaggeredOprodCuda<float2>(FloatNOrder<float, 18, 2, 18>(outA), FloatNOrder<float, 18, 2, 18>(outB), 
           outA, outB,
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
-    }else{
+    } else {
       errorQuda("Unsupported precision: %d\n", inEven.Precision());
     }
+#else
+    errorQuda("Staggered Outer Product not supported on pre-Fermi architecture");
+#endif
+
+
 #else // GPU_STAGGERED_OPROD not defined
    errorQuda("Staggered Outer Product has not been built!"); 
 #endif

@@ -106,6 +106,8 @@ NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
 ifneq ($(TESLA_ARCH),true)
   NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false -w
+else
+  NVCCOPT += -w
 endif
 
 ifeq ($(strip $(BUILD_MULTI_GPU)), yes)
@@ -128,6 +130,12 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   COMM_OBJS = comm_mpi.o
 endif
 
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio -llime
+  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
+endif
+
 ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
@@ -136,12 +144,6 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
 endif 
-
-ifeq ($(strip $(BUILD_QIO)), yes)
-  INC += -DHAVE_QIO -I$(QIO_HOME)/include
-  LIB += -L$(QIO_HOME)/lib -lqio -llime
-  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
-endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include

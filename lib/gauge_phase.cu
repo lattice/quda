@@ -142,9 +142,8 @@ namespace quda {
   template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
   class GaugePhase : Tunable {
     Arg &arg;
+    const GaugeField &meta; // used for meta data only
     QudaFieldLocation location;
-    mutable char vol_string[32]; // used as a label in the autotuner
-    mutable char aux_string[128]; // used as a label in the autotuner
 
   private:
     unsigned int sharedBytesPerThread() const { return 0; }
@@ -154,7 +153,10 @@ namespace quda {
     unsigned int minThreads() const { return arg.volume>>1; }
 
   public:
-    GaugePhase(Arg &arg, QudaFieldLocation location) : arg(arg), location(location) { }
+    GaugePhase(Arg &arg, const GaugeField &meta, QudaFieldLocation location) 
+      : arg(arg), meta(meta), location(location) { 
+      writeAuxString("stride=%d,prec=%lu",arg.order.stride,sizeof(Float));
+    }
     virtual ~GaugePhase() { ; }
   
     void apply(const cudaStream_t &stream) {
@@ -169,9 +171,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      sprintf(vol_string,"%dx%dx%dx%d",arg.X[0],arg.X[1],arg.X[2],arg.X[3]);
-      sprintf(aux_string,"stride=%d,prec=%lu",arg.order.stride,sizeof(Float));
-      return TuneKey(vol_string, typeid(*this).name(), aux_string);
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
@@ -187,22 +187,21 @@ namespace quda {
 
 
   template <typename Float, int length, typename Order>
-  void gaugePhase(Order order, QudaStaggeredPhase phaseType, QudaTboundary tBoundary,
-		  const int *X, QudaFieldLocation location) {  
-    if (phaseType == QUDA_MILC_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
+  void gaugePhase(Order order, const GaugeField &u,  QudaFieldLocation location) {  
+    if (u.StaggeredPhase() == QUDA_MILC_STAGGERED_PHASE) {
+      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
       GaugePhase<Float,length,QUDA_MILC_STAGGERED_PHASE,
-		 GaugePhaseArg<Float,Order> > phase(arg, location);
+		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
-    } else if (phaseType == QUDA_CPS_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
+    } else if (u.StaggeredPhase() == QUDA_CPS_STAGGERED_PHASE) {
+      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
       GaugePhase<Float,length,QUDA_CPS_STAGGERED_PHASE,
-		 GaugePhaseArg<Float,Order> > phase(arg, location);
+		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
-    } else if (phaseType == QUDA_TIFR_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, X, tBoundary);
+    } else if (u.StaggeredPhase() == QUDA_TIFR_STAGGERED_PHASE) {
+      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
       GaugePhase<Float,length,QUDA_TIFR_STAGGERED_PHASE,
-		 GaugePhaseArg<Float,Order> > phase(arg, location);
+		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
     } else {
       errorQuda("Undefined phase type");
@@ -222,38 +221,31 @@ namespace quda {
     if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,19>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,19>(u), u, location);
 	} else {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,18>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,18>(u), u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	gaugePhase<Float,length>(FloatNOrder<Float,length,2,12>(u), u.StaggeredPhase(), 
-				 u.TBoundary(), u.X(), location);
+	gaugePhase<Float,length>(FloatNOrder<Float,length,2,12>(u), u, location);
       } else {
 	errorQuda("Unsupported recsontruction type");
       }
     } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,19>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,19>(u), u, location);
 	} else {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,18>(u), u.StaggeredPhase(), 
-				   u.TBoundary(), u.X(), location);
+	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,18>(u),u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	gaugePhase<Float,length>(FloatNOrder<Float,length,4,12>(u), u.StaggeredPhase(), 
-				 u.TBoundary(), u.X(), location);
+	gaugePhase<Float,length>(FloatNOrder<Float,length,4,12>(u), u, location);
       } else {
 	errorQuda("Unsupported recsontruction type");
       }
     } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
 
 #ifdef BUILD_TIFR_INTERFACE
-      gaugePhase<Float,length>(TIFROrder<Float,length>(u), u.StaggeredPhase(), 
-			       u.TBoundary(), u.X(), location);
+      gaugePhase<Float,length>(TIFROrder<Float,length>(u), u, location);
 #else
       errorQuda("TIFR interface has not been built\n");
 #endif

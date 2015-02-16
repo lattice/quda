@@ -492,14 +492,14 @@ template <>
 __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
      (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
 
-#ifdef GPU_TWISTED_CLOVER_MASS_DIRAC
+#ifdef GPU_TWISTED_CLOVER_DIRAC
 
 #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
 
 #if DD_DAG
-#include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
+#include "tmc_fused_exterior_dslash_dagger_fermi_core.h"
 #else
-#include "tmc_fused_exterior_dslash_gt200_core.h"
+#include "tmc_fused_exterior_dslash_fermi_core.h"
 #endif
 
 #elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
@@ -578,9 +578,9 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
 
 #if DD_DAG
-#include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
+#include "tmc_fused_exterior_dslash_dagger_fermi_core.h"
 #else
-#include "tmc_fused_exterior_dslash_gt200_core.h"
+#include "tmc_fused_exterior_dslash_fermi_core.h"
 #endif
 
 #elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code

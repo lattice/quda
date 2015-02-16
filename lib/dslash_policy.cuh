@@ -1,6 +1,4 @@
 static cudaColorSpinorField *inSpinor;
-static FullClover *inClover = NULL;
-static FullClover *inCloverInv = NULL;
 
 /**
  * Arrays used for the dynamic scheduling.
@@ -109,13 +107,8 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
 
   // Initialize pack from source spinor
 
-  if (inCloverInv == NULL) {
-    PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, false, twist_a, twist_b), 
-	    profile, QUDA_PROFILE_PACK_KERNEL);
-  } else {
-    PROFILE(face[it]->pack(*inSpinor, *inClover, *inCloverInv, 1-parity, dagger,
-			   streams, twist_a, twist_b), profile, QUDA_PROFILE_PACK_KERNEL);
-  }
+  PROFILE(face[it]->pack(*inSpinor, 1-parity, dagger, streams, false, twist_a, twist_b), 
+	  profile, QUDA_PROFILE_PACK_KERNEL);
 
   if (pack) {
     // Record the end of the packing
@@ -312,14 +305,8 @@ struct DslashCuda2 : DslashPolicyImp {
 
 
     // Initialize pack from source spinor
-    if (inCloverInv == NULL) {
-      PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
-
+    PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing
@@ -470,14 +457,8 @@ struct DslashPthreads : DslashPolicyImp {
     }
 
     // Initialize pack from source spinor
-    if (inCloverInv == NULL) {
-      PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
-
+    PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing
@@ -622,14 +603,8 @@ struct DslashGPUComms : DslashPolicyImp {
         { pack = true; break; }
 
     // Initialize pack from source spinor
-    if (inCloverInv == NULL) {
       PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
 	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
-
 
     if (pack) {
       // Record the end of the packing
@@ -745,14 +720,8 @@ struct DslashFusedGPUComms : DslashPolicyImp {
         { pack = true; break; }
 
     // Initialize pack from source spinor
-    if (inCloverInv == NULL) {
-      PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
-
+    PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing
@@ -865,13 +834,8 @@ struct DslashFaceBuffer : DslashPolicyImp {
 
     // Initialize pack from source spinor
 
-    if (inCloverInv == NULL) {
-      PROFILE(face[it]->pack(*inputSpinor, 1-parity, dagger, streams, false, twist_a, twist_b), 
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {
-      PROFILE(face[it]->pack(*inputSpinor, *inClover, *inCloverInv, 1-parity, dagger,
-			     streams, twist_a, twist_b), profile, QUDA_PROFILE_PACK_KERNEL);
-    }
+    PROFILE(face[it]->pack(*inputSpinor, 1-parity, dagger, streams, false, twist_a, twist_b), 
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing
@@ -985,8 +949,8 @@ struct DslashFusedExterior : DslashPolicyImp {
     dslashParam.kernel_type = INTERIOR_KERNEL;
     dslashParam.threads = volume;
 
-    int scatterIndex = 0;
 #ifdef MULTI_GPU
+    int scatterIndex = 0;
     // Record the start of the dslash if doing communication in T and not kernel packing
     if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
     {
@@ -1012,14 +976,8 @@ struct DslashFusedExterior : DslashPolicyImp {
 
 
     // Initialize pack from source spinor
-    if (inCloverInv == NULL) {
-      PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    } else {
-      PROFILE(inputSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
-	      profile, QUDA_PROFILE_PACK_KERNEL);
-    }
-
+    PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
+	    profile, QUDA_PROFILE_PACK_KERNEL);
 
     if (pack) {
       // Record the end of the packing
@@ -1247,14 +1205,8 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 #endif
 
   // Initialize pack from source spinor
-  if (inCloverInv == NULL) {
-    PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
-	    profile, QUDA_PROFILE_PACK_KERNEL);
-  } else {
-    PROFILE(inSpinor->pack(*inClover, *inCloverInv, dslash.Nface()/2, 1-parity, dagger, packIndex, twist_a),
-	    profile, QUDA_PROFILE_PACK_KERNEL);
-  }
-
+  PROFILE(inSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
+	  profile, QUDA_PROFILE_PACK_KERNEL);
 
   if (pack) {
     // Record the end of the packing
@@ -1310,7 +1262,9 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
     }
   }
 #endif
+#ifdef PTHREADS
   bool interiorLaunched = false;
+#endif
   int completeSum = 0;
   while (completeSum < pattern.commDimTotal) {
     for (int i=3; i>=0; i--) {

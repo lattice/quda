@@ -865,10 +865,8 @@ def clover_twisted_xpay():
     str += "READ_ACCUM(ACCUMTEX, param.sp_stride)\n\n"
     if not dagger:
 	str += "#ifndef CLOVER_TWIST_XPAY\n"
-	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
 	str += "//perform invert twist first:\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, a, o);\n"
-	str += "#endif\n"
 	for s in range(0,4):
 	    for c in range(0,3):
 	        i = 3*s+c
@@ -883,9 +881,7 @@ def clover_twisted_xpay():
 		str += out_im(s,c) +" = b*"+out_im(s,c)+" + "+acc_im(s,c)+";\n"
 	str += "#endif//CLOVER_TWIST_XPAY\n"
 	str += "#else //no XPAY\n"
-	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, a, o);\n"
-	str += "#endif\n"
 	str += "#endif\n"
     else:
 	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
@@ -895,12 +891,12 @@ def clover_twisted_xpay():
 	str += "#else\n"
 	str += "APPLY_CLOVER_TWIST(c, -a, acc);\n"
 	str += "#endif\n"
+	str += "#endif\n"
 	for s in range(0,4):
 	    for c in range(0,3):
 		i = 3*s+c
 		str += out_re(s,c) +" = b*"+out_re(s,c)+" + "+acc_re(s,c)+";\n"
 		str += out_im(s,c) +" = b*"+out_im(s,c)+" + "+acc_im(s,c)+";\n"
-	str += "#endif\n"
 	str += "#else //no XPAY\n"
 	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);\n"

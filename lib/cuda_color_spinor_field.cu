@@ -32,10 +32,6 @@ namespace quda {
   
 
   // Need events to coordinate IPC memory copies
-  cudaEvent_t cudaColorSpinorField::ipcLocalEvent[2][2][QUDA_MAX_DIM];
-  cudaEvent_t cudaColorSpinorField::ipcRemoteEvent[2][2][QUDA_MAX_DIM];
-  cudaIpcEventHandle_t cudaColorSpinorField::ipcLocalEventHandle[2][2][QUDA_MAX_DIM];
-  cudaIpcEventHandle_t cudaColorSpinorField::ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
   cudaEvent_t cudaColorSpinorField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
   // Pointers to ghost buffers on the local process and remote processes
@@ -130,59 +126,6 @@ namespace quda {
       }
     }
 
-   // communicate the Event handles
-
-   for(int dim=0; dim<4; ++dim){
-      if(!commDimPartitioned(dim)) continue;
-     for(int dir=0; dir<2; ++dir){
-        for(int b=0; b<2; ++b){
-	  MsgHandle* sendHandle = NULL;
-	  MsgHandle* receiveHandle = NULL;
-	  int disp = (dir==1) ? +1 : -1;
-
-          // first set up receive
-	  if(comm_dslash_peer2peer_enabled(1-dir,dim)){
-	    receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[b][1-dir][dim],
-						          dim,
-							  -disp,
-							  sizeof(ipcRemoteEventHandle[b][1-dir][dim]));
-	  }	  
-          // Now for send
-	  if(comm_dslash_peer2peer_enabled(dir,dim)){
-	    if(!ipcInit) cudaEventCreate(&ipcLocalEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
-            cudaIpcGetEventHandle(&ipcLocalEventHandle[b][dir][dim], ipcLocalEvent[b][dir][dim]);
-	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle[b][dir][dim],
-						    dim,
-						    disp,
-						    sizeof(ipcLocalEventHandle[b][dir][dim]));
-
-	  }
-
-	  if(receiveHandle) comm_start(receiveHandle);
-  	  if(sendHandle) comm_start(sendHandle);
-	  
-	  comm_wait(receiveHandle);
-	  comm_wait(sendHandle);
-
-	  comm_free(receiveHandle);
-	  comm_free(sendHandle);
-	} // loop over b
-      } // loop over dir
-    } // loop over dim   
-
-
-    for(int dim=0; dim<4; ++dim){
-      if(!commDimPartitioned(dim)) continue;
-      for(int dir=0; dir<2; ++dir){
-        if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
-	for(int b=0; b<2; ++b){
-	  if(ipcInit) cudaEventDestroy(ipcRemoteEvent[b][dir][dim]); 
-	  cudaIpcOpenEventHandle(&ipcRemoteEvent[b][dir][dim],
-				 ipcRemoteEventHandle[b][dir][dim]);
-        }
-      }
-    }
-     
     // Creat local events for asynchronous copies from the peer process
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
@@ -814,35 +757,12 @@ namespace quda {
   }
 
   // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhost(FullClover &clov, FullClover &clovInv,
-				       const int nFace, const QudaParity parity, 
-                                       const int dim, const QudaDirection dir,
-				       const int dagger, cudaStream_t *stream, 
-				       void *buffer, double a) 
-  {
-    int face_num;
-    if(dir == QUDA_BACKWARDS){
-      face_num = 0;
-    }else if(dir == QUDA_FORWARDS){
-      face_num = 1;
-    }else{
-      face_num = 2;
-    }
-#ifdef MULTI_GPU
-    void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
-    packFace(packBuffer, *this, clov, clovInv, nFace, dagger, parity, dim, face_num, *stream, a); 
-#else
-    errorQuda("packGhost not built on single-GPU build");
-#endif
-
-  }
-
-  // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, 
                                        const int dim, const QudaDirection dir,
 				       const int dagger, cudaStream_t *stream, 
 				       void *buffer, double a, double b) 
   {
+#ifdef MULTI_GPU
     int face_num;
     if(dir == QUDA_BACKWARDS){
       face_num = 0;
@@ -851,7 +771,6 @@ namespace quda {
     }else{
       face_num = 2;
     }
-#ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
     packFace(packBuffer, *this, nFace, dagger, parity, dim, face_num, *stream, a, b); 
 #else
@@ -994,6 +913,7 @@ namespace quda {
                                        const int dagger, cudaStream_t *stream,
                                        void *buffer)
   {
+#ifdef MULTI_GPU
     int face_num;
     if(dir == QUDA_BACKWARDS){
       face_num = 0;
@@ -1002,7 +922,6 @@ namespace quda {
     }else{
       face_num = 2;
     }
-#ifdef MULTI_GPU
     void *packBuffer = buffer ? buffer : ghostFaceBuffer[bufferIndex];
     packFaceExtended(packBuffer, *this, nFace, R, dagger, parity, dim, face_num, *stream);
 #else
@@ -1374,47 +1293,6 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::pack(FullClover &clov, FullClover &clovInv, int nFace, int parity,
-				  int dagger, cudaStream_t *stream_p, bool zeroCopyPack, double a) {
-
-
-    allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
-    createComms(nFace); // must call this first
-
-    stream = stream_p;
-    
-    const int dim=-1; // pack all partitioned dimensions
- 
-    if (zeroCopyPack) {
-      void *my_face_d;
-      cudaHostGetDevicePointer(&my_face_d, my_face[bufferIndex], 0); // set the matching device pointer
-      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[0], my_face_d, a);
-    } else {
-      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[Nstream-1], 0, a);
-    }
-  }
-
-
-  void cudaColorSpinorField::pack(FullClover &clov, FullClover &clovInv, int nFace, int parity,
-				  int dagger, int stream_idx, bool zeroCopyPack, double a) {
-
-
-
-    allocateGhostBuffer(nFace);   // allocate the ghost buffer if not yet allocated  
-    createComms(nFace); // must call this first
-
-    const int dim=-1; // pack all partitioned dimensions
- 
-    if (zeroCopyPack) {
-      void *my_face_d;
-      cudaHostGetDevicePointer(&my_face_d, my_face[bufferIndex], 0); // set the matching device pointer
-      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[stream_idx], my_face_d, a);
-    } else {
-      packGhost(clov, clovInv, nFace, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger,  &stream[stream_idx-1], 0, a);
-    }
-  }
-
-
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, cudaStream_t *stream_p, 
 				  bool zeroCopyPack, double a, double b) {
 
@@ -1544,10 +1422,6 @@ namespace quda {
       }
 
 #ifdef P2P_COMMS
-      if(comm_dslash_peer2peer_enabled(0,dim)){
-        cudaEventRecord(ipcLocalEvent[bufferIndex][0][dim]);
-      }
-
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
 
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
@@ -1556,7 +1430,6 @@ namespace quda {
         // begin the copy from the forward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][1];
 
-	cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1][dim],0);
 	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ backGhostBufferOffset[bufferIndex][dim]),
@@ -1577,16 +1450,12 @@ namespace quda {
       }
 
 #ifdef P2P_COMMS
-      if(comm_dslash_peer2peer_enabled(1,dim)){
-        cudaEventRecord(ipcLocalEvent[bufferIndex][1][dim]);
-      }
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
 
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
       if(comm_dslash_peer2peer_enabled(0,dim)) {
 	// copy from backward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][0];
-        cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][0][dim],0);
 	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ fwdGhostBufferOffset[bufferIndex][dim]),
@@ -1621,10 +1490,6 @@ namespace quda {
       }
 
 #ifdef P2P_COMMS
-      if(comm_dslash_peer2peer_enabled(0,dim)){
-        cudaEventRecord(ipcLocalEvent[bufferIndex][0][dim]);
-      }
-
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
 
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
@@ -1633,7 +1498,6 @@ namespace quda {
         // begin the copy from the forward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][1];
 
-	cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][1][dim],0);
 	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ backGhostBufferOffset[bufferIndex][dim]),
@@ -1660,16 +1524,12 @@ namespace quda {
       }
 
 #ifdef P2P_COMMS
-      if(comm_dslash_peer2peer_enabled(1,dim)){
-        cudaEventRecord(ipcLocalEvent[bufferIndex][1][dim]);
-      }
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
 
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
       if(comm_dslash_peer2peer_enabled(0,dim)) {
 	// copy from backward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][0];
-        cudaStreamWaitEvent(NULL,ipcRemoteEvent[bufferIndex][0][dim],0);
 	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ fwdGhostBufferOffset[bufferIndex][dim]),

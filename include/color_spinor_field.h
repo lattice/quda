@@ -233,8 +233,7 @@ namespace quda {
       static void checkField(const ColorSpinorField &, const ColorSpinorField &);
       void clearGhostPointers();
 
-      char vol_string[32]; // used as a label in the autotuner
-      char aux_string[128]; // used as a label in the autotuner
+      char aux_string[TuneKey::aux_n]; // used as a label in the autotuner
       void setTuningString(); // set the vol_string and aux_string for use in tuning
 
     public:
@@ -267,7 +266,6 @@ namespace quda {
 
       void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
-      const char *VolString() const { return vol_string; }
       const char *AuxString() const { return aux_string; }
 
       void* V() {return v;}
@@ -361,11 +359,6 @@ namespace quda {
 
 
     // Static variables needed for peer-to-peer comms
-    static cudaEvent_t ipcLocalEvent[2][2][QUDA_MAX_DIM];
-    static cudaEvent_t ipcRemoteEvent[2][2][QUDA_MAX_DIM];
-    static cudaIpcEventHandle_t ipcLocalEventHandle[2][2][QUDA_MAX_DIM];
-    static cudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
-
     static cudaIpcMemHandle_t ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
     static cudaIpcMemHandle_t ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
  

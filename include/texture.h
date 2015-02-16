@@ -137,7 +137,7 @@ template<typename OutputType, typename InputType, int tex_id>
   { 
     // only bind if bytes > 0
     if (x->Bytes()) { 
-      if (tex_id_table[tex_id] && tex_id > 0 && tex_id <= MAX_TEX_ID) {
+      if (tex_id > 0 && tex_id <= MAX_TEX_ID && tex_id_table[tex_id]) {
 	errorQuda("Already bound to this texture reference");
       } else {
 	tex_id_table[tex_id] = true;

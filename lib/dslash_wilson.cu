@@ -37,9 +37,11 @@ namespace quda {
   //#define SHARED_WILSON_DSLASH
   //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
+#ifdef GPU_WILSON_DIRAC
 #define DD_CLOVER 0
 #include <wilson_dslash_def.h>    // Wilson Dslash kernels (including clover)
 #undef DD_CLOVER
+#endif
 
 #ifndef DSLASH_SHARED_FLOATS_PER_THREAD
 #define DSLASH_SHARED_FLOATS_PER_THREAD 0
@@ -54,6 +56,7 @@ namespace quda {
 
   using namespace wilson;
 
+#ifdef GPU_WILSON_DIRAC
   template <typename sFloat, typename gFloat>
   class WilsonDslashCuda : public SharedDslashCuda {
 
@@ -102,6 +105,7 @@ namespace quda {
 
     long long flops() const { return (x ? 1368ll : 1320ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
+#endif // GPU_WILSON_DIRAC
 
 #include <dslash_policy.cuh>
 

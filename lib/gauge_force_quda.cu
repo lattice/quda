@@ -261,7 +261,7 @@ namespace quda {
       vol << link.X()[0] << "x";
       vol << link.X()[1] << "x";
       vol << link.X()[2] << "x";
-      vol << link.X()[3] << "x";
+      vol << link.X()[3];
       aux << "threads=" << link.Volume() << ",prec=" << link.Precision();
       aux << "stride=" << link.Stride() << ",recon=" << link.Reconstruct();
       aux << "dir=" << dir << "num_paths=" << num_paths;
