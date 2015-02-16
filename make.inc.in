@@ -163,6 +163,11 @@ else
   MAGMA_FLAGS   = 
 endif
 
+ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
+  NVCCOPT += -DDYNAMIC_CLOVER
+  COPT += -DDYNAMIC_CLOVER
+endif
+
 ifeq ($(strip $(BUILD_SSTEP)), yes)
   NVCCOPT += -DSSTEP
   COPT += -DSSTEP
