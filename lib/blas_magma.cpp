@@ -482,19 +482,6 @@ void BlasMagmaArgs::SpinorMatVec
        return;
 }
 
-void BlasMagmaArgs::RestartVH(void *dV, const int vld, const int vlen, void *dharVecs, void *dH, const int ldm){}
-
-/*
-void BlasMagmaArgs::RestartVH(void *dV, const int vld, const int vlen, const int vprec, void *dharVecs, void *dH, const int ldm)
-{
-    if(prec == 4 || (prec != vprec))
-    {
-    }
-    //GPU code:
-
-    return; 
-}
-*/
 void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn)
 {
 
@@ -1005,6 +992,475 @@ void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev,
   }
 
   return;
+}
+
+
+///NEW STUFF:
+
+#include <complex.h>
+
+
+void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const int ldm, Complex  *tau)
+{
+  int _m   = m;//matrix size
+
+  int _nev = nev;//matrix size
+ 
+  int _ldm = ldm;
+
+  //Lapack parameters:   
+  int info  = 0;
+
+  int lwork = -1; 
+
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+
+  LAPACK(zgeqrf)(&_m, &_nev, (_Complex double *)evmat, &_ldm, (_Complex double *)tau, &qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  LAPACK(zgeqrf)(&_m, &_nev, (_Complex double *)evmat, &_ldm, (_Complex double *)tau, work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
+
+  if(work) free(work);
+
+  return;
+}
+
+//temporary hack: need to extract Q-matrix.
+
+void restoreOrthVectors(Complex * vnev,  const int nev, Complex  *QR, const int n, const int ldn, Complex *tau)
+{
+  int _n   = n;//vector size
+
+  int _k   = nev;
+
+  int _ldn = ldn;
+
+  //Lapack parameters:   
+  char _s = 'R';//apply P-matrix from the right
+
+  char _t = 'N';//no left eigenvectors 
+
+  int info  = 0;
+
+  int lwork = -1; 
+
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+
+  //Construct unit matrix to populate this later by the basis vectors (nxn matrix):
+  memset(vnev, 0, n*ldn*sizeof(Complex));
+
+  for(int d = 0; d < n; d++) vnev[ldn*d+d] = Complex(1.0, 0.0);
+
+  //First compute V_{nev} = V_{nev}*QR
+
+  LAPACK(zunmqr)(&_s, &_t, &_n, &_n, &_k, (_Complex double *)QR, &_ldn, (_Complex double *)tau, (_Complex double *)vnev, &_ldn, &qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork ( ZUNMQR ) : %d\n", lwork);
+#endif
+  LAPACK(zunmqr)(&_s, &_t, &_n, &_n, &_k, (_Complex double *)QR, &_ldn, (_Complex double *)tau, (_Complex double *)vnev, &_ldn, work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  return;
+}
+
+
+void BlasMagmaArgs::LeftConjZUNMQR(const int k /*number of reflectors*/, const int n /*number of columns of H*/, Complex *H, const int dh /*number of rows*/, 
+const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
+{
+//Note: # rows of QR = # rows of H.
+  int _h   = dh;//matrix size
+
+  int _n   = n;//vector size
+
+  int _k   = k;
+ 
+  int _ldh = ldh;
+
+  int _ldqr = ldqr;
+
+  //Lapack parameters:   
+  char _s = 'L';//apply QR-matrix from the left
+
+  char _t = 'C';//conjugate 
+
+  int info  = 0;
+
+  int lwork = -1; 
+
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+
+  //Pdagger_{k+1} PrevRes
+
+  LAPACK(zunmqr)(&_s, &_t, &_h, &_n, &_k, (_Complex double *)QR, &_ldqr, (_Complex double *)tau, (_Complex double *)H, &_ldh, &qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  free(work);
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  LAPACK(zunmqr)(&_s, &_t, &_h, &_n, &_k, (_Complex double *)QR, &_ldqr, (_Complex double *)tau, (_Complex double *)H, &_ldh, work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  free(work);
+
+  return;
+}
+
+
+void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * const conjH, const double beta2, const int m, const int ldH)
+{
+  //Lapack parameters:
+  int _m    = m;
+  //
+  int _ldH  = ldH;
+  //
+  int info  = 0;
+  //
+  int I_ONE = 1;
+  //
+  int *ipiv = (int* )calloc(ldH, sizeof(int));
+  //
+  //Construct H + beta*H^{-H} e_m*e_m^{T}
+  // 1. need to solve H^{H}y = e_m;
+  Complex *em = new Complex[m];
+  
+  em[m-1] = beta2;//in fact, we construct beta*em,
+
+  LAPACK(zgesv)(&_m, &I_ONE, (_Complex double *)conjH, &_ldH, ipiv, (_Complex double *)em, &_ldH, &info);
+
+  if( (info != 0 ) ) printf( "Error: DGESV, info %d\n",info), exit(-1);
+
+//make this cleaner!
+  //check solution:
+  for (int j = 0; j < m; j++)
+  {
+    Complex accum = 0.0;
+
+    for (int i = 0; i < m; i++) accum = (accum + harmH[ldH*j+i]*em[(ipiv[i])-1]);
+  } 
+
+  printf("\nDone for: stage 1\n"); 
+
+  // 2. Construct matrix for harmonic Ritz vectors:
+  //    Adjust last column with KroneckerProd((H^{-H}*beta*em)=em, em^{T}=[0,....,1]):
+
+  for(int i = 0; i < m; i++) harmH[ldH*(m-1)+i] += em[i]; 
+
+  printf("\nDone for: stage 2\n");
+
+  free(ipiv);
+  //
+  delete [] em; 
+}
+
+void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv) 
+{
+  int _m   = m;//matrix size
+ 
+  int _ldH = ldH;
+
+  int _ldv = ldv;
+
+  //Lapack parameters:   
+  int info = 0;
+  //
+  char _r = 'V';
+
+  char _l = 'N';//no left eigenvectors
+
+  int lwork = -1;
+ 
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+  
+  double *rwork       = (double*)calloc(2*_m, sizeof(double));
+
+  //_Complex double *vr = (_Complex double*) calloc(ldv*m, sizeof(_Complex double));
+#ifdef USE_ZGEEVX
+
+  char _b = 'N';//balance
+
+  char _s = 'N';//sense
+
+  int ilo, ihi;
+
+  double abnrm = 0.0;
+
+  double *scale  = calloc(_m, sizeof(double));
+
+  double *rconde = calloc(_m, sizeof(double));
+
+  double *rcondv = calloc(_m, sizeof(double));
+
+  //Get optimal work:
+  LAPACK(zgeevx)(&_b, &_l, &_r, &_s, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, &ilo, &ihi, scale, &abnrm, rconde, rcondv, &qwork, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  //now get eigenpairs:
+  LAPACK(zgeevx)(&_b, &_l, &_r, &_s, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, &ilo, &ihi, scale, &abnrm, rconde, rcondv, work, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  if(scale)  free(scale);
+  //
+  if(rcondv) free(rcondv);
+  //
+  if(rconde) free(rconde);
+
+#else
+
+  //Get optimal work:
+  LAPACK(zgeev)(&_l, &_r, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, &qwork, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  //now get eigenpairs:
+  LAPACK(zgeev)(&_l, &_r, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, work, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+
+#endif
+
+  if(rwork)  free(rwork);
+  //
+  if(work)   free(work);
+  //
+  return;
+}
+
+
+//in fact ldh = ldm, but let's keep it for a moment.
+void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh)
+{
+    if(prec == 4 || (prec != vprec))
+    {
+       printf("\nError: single precision and mixing single/double precisions is not currently supported\n");
+       exit(-1);
+    }
+
+    int nev  = (max_nev - 1); //(nev+1) - 1 for GMRESDR
+
+    int _m   = m;//matrix size
+
+    int _k   = nev;
+
+    int _kp1 = max_nev;
+
+    int _mp1 = (m+1);
+ 
+    int _ldm = ldh;
+
+  //Lapack parameters:   
+    char _s = 'R';//apply P-matrix from the right
+
+    char _t = 'N';//no left eigenvectors 
+
+    int info  = 0;
+
+    int lwork = -1; 
+
+    _Complex double *work = NULL;
+
+    _Complex double qwork; //parameter to extract optimal size of work
+
+    const int cprec = 2*prec;//currently: sizeof(Complex)
+    int lbsize           = 2*nev;
+
+    const int bufferSize = 2*vld+lbsize*lbsize;
+      
+    int bufferBlock = bufferSize / lbsize;//or: lbsize = (nev+1)
+
+    int l = max_nev;
+
+    void  *buffer = NULL;
+    void  *dQmat  = NULL;
+
+    magma_malloc(&buffer, bufferSize*cprec);
+    cudaMemset(buffer, 0, bufferSize*cprec);
+
+    magma_malloc(&dQmat, (max_nev)*ldh*cprec);
+
+    //GPU code:
+    Complex *tau  = new Complex[max_nev];//nev+1 =>max_nev
+
+    Complex *Qmat = new Complex[ldh*(m+1)];//need (m+1)x(m+1) matrix on input...
+
+    ComputeQR(max_nev, (Complex*)sortedHarVecs, (m+1), ldh, tau);//lapack version 
+#if 1    
+    //max_nev vectors are stored in Qmat (output):
+    //restoreOrthVectors(Qmat, max_nev, (Complex*)sortedHarVecs, (m+1), ldh, tau);
+    //Load diagonal units
+    for(int d = 0; d < (m+1); d++) Qmat[ldh*d+d] = Complex(1.0, 0.0);
+   
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)Qmat, &_ldm, &qwork, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    lwork = (int)(creal(qwork));
+  
+    work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)Qmat, &_ldm, work, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    free(work);
+
+    //Copy (nev+1) vectors on the device:
+    cudaMemcpy(dQmat, Qmat, (max_nev)*ldh*cprec, cudaMemcpyDefault);
+
+    for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+    {
+      if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+//printf("\nBuffer block : %d\n", bufferBlock);
+
+      magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
+
+      magmablas_zgemm(_cN, _cN, bufferBlock, l, _mp1, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dQmat, ldh, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
+
+      cudaMemcpy2D(ptrV, vld*cprec, buffer, bufferBlock*cprec,  bufferBlock*cprec, l, cudaMemcpyDefault);//make this async!
+    }
+//ups! make on GPU:
+    cudaMemset(&(((magmaDoubleComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaDoubleComplex));//= m - nev
+
+    printf("\nDone...\n");
+
+#else
+/////////////////////////////////START DEBUG:
+
+  printf("\nPrint vld , vlen: %d, %d, %d, %d, %d, %d\n", vld, vlen, nev, _mp1, _ldm, _m);
+
+  int _ldn = vld;
+
+  int _n   = vlen;
+
+  Complex *hVm = new Complex[vld*(m+1)];
+
+  cudaMemcpy(hVm , dV, vld*(m+1)* sizeof(Complex), cudaMemcpyDefault);
+
+  LAPACK(zunmqr)(&_s, &_t, &_n, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)hVm, &_ldn, &qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+
+  LAPACK(zunmqr)(&_s, &_t, &_n, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)hVm, &_ldn, work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  memset(&hVm[vld*(nev+1)], 0, (m-nev)*vld*sizeof(_Complex double));
+
+  cudaMemcpy(dV, hVm , vld*(m+1)* sizeof(Complex), cudaMemcpyDefault);
+
+  free(work);
+
+  printf("\nDone...\n");
+
+  delete [] hVm;
+/////////////////////////////////STOP DEBUG
+#endif
+
+    //Construct H_new = Pdagger_{k+1} \bar{H}_{m} P_{k}  
+
+    //bar{H}_{m} P_{k}
+
+    lwork = -1;
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_m, &_k, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, &qwork, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    lwork = (int)(creal(qwork));
+    //
+    work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_m, &_k, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, work, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    //Pdagger_{k+1} PrevRes
+
+    lwork = -1;
+
+    _s = 'L';
+
+    _t = 'C';
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_k, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, &qwork, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    lwork = (int)(creal(qwork));
+    //
+    free(work);
+    //
+    work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_k, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, work, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    const int len = ldh - nev-1;
+    for(int i = 0; i < nev; i++) memset(&(((Complex*)H)[ldh*i+nev+1]), 0, len*sizeof(Complex) );
+
+    //
+    memset(&(((Complex*)H)[ldh*(nev)]), 0, (m-nev)*ldh*sizeof(Complex));
+
+    free(work);
+
+    magma_free(buffer);
+    magma_free(dQmat);
+
+    delete [] Qmat;
+    delete [] tau ;
+
+    return; 
 }
 
 
