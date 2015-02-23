@@ -16,6 +16,7 @@
 #include <iostream>
 
 #include <blas_magma.h>
+#include <algorithm>
 
 #define DEBUG_MODE
 
@@ -30,6 +31,17 @@ Code design based on: A.Frommer et al, ArXiv hep-lat/1204.5463
 namespace quda {
 //Notes:
 //GmresDR does not require large m (and esp. nev), so this will use normal LAPACK routines.
+
+    struct SortEvals{
+
+      double eval_nrm;
+      int    eval_idx;
+
+      SortEvals(double val, int idx) : eval_nrm(val), eval_idx(idx) {}; 
+
+      static bool CmpEigenNrms (SortEvals v1, SortEvals v2) { return (v1.eval_nrm < v2.eval_nrm);}
+
+    };
 
     class GmresDRArgs{
      
@@ -49,11 +61,15 @@ namespace quda {
       //aux array to keep QR decomposed "restarted Hessenberg":
       Complex *qrH;
       Complex *tauH;//nev->m : for DEBUGING only!
+
+      //auxilary object
+      Complex *srtRes;//the "short residual" is in fact an alias pointer to &sortedHarVecs[nev*m] !
+      Complex *lsqSol;//ls problem solution
    
       public:
 
       int m;
-      int ldm;//leading dimension
+      int ldm;//leading dimension (must be >= m+1)
       int nev;//number of harmonic eigenvectors used for the restart
 
       //int k; //current number of the basis vectors (usually: nev, note that Vm contains k+1 vectors, including the last residual) 
@@ -76,12 +92,13 @@ namespace quda {
       //
       void ComputeHarmonicRitzPairs();
 
-      void RestartVH(cudaColorSpinorField &res, cudaColorSpinorField *Vm, Complex *resC, Complex *v);
+      void RestartVH(cudaColorSpinorField &res, cudaColorSpinorField *Vm);
 
       void PrepareDeflatedRestart(Complex *givensH, Complex *g);
 
       void PrepareGivens(Complex *givensH, const int col);
 
+      void UpdateSolution(cudaColorSpinorField &x, cudaColorSpinorField *Vm, Complex *givensH, const int ldH, Complex *g, const int j);
    };
 
   GmresDRArgs::GmresDRArgs(int m, int ldm, int nev, bool fc_flag): m(m), ldm(ldm), nev(nev), first_cycle_flag(fc_flag){
@@ -95,7 +112,7 @@ namespace quda {
 
      gmresdr_magma_args = new BlasMagmaArgs(m, nev+1, ldm, sizeof(double));
 
-     harVecs  = new Complex[ldm*m];//
+     harVecs  = new Complex[ldm*m];//(m+1)xm (note that ldm >= m+1)
      harVals  = new Complex[m];//
 
      sortedHarVecs  = new Complex[ldm*(nev+1)];//
@@ -108,6 +125,9 @@ namespace quda {
 
      qrH      = new Complex[ldm*m];
      tauH     = new Complex[m];//nev->m : for DEBUGING only!
+
+     srtRes   = &sortedHarVecs[ldm*(nev)];
+     lsqSol   = new Complex[(m+1)];
    
      return;
   }
@@ -159,6 +179,8 @@ namespace quda {
     delete[] qrH;
     delete[] tauH;
 
+    delete[] lsqSol;
+
     return;
   }
 
@@ -195,48 +217,34 @@ namespace quda {
 
   }
 
-#include <complex.h>
+//#include <complex.h>
+//new methods:
 
- void sortevals(int n, double *arr, int *idx){
-   double v, td;
-   int i, j, l, r, ti, tos, stack[32];
+ void GmresDRArgs::UpdateSolution(cudaColorSpinorField &x, cudaColorSpinorField *Vm, Complex *givensH, const int ldH, Complex *g, const int j)
+ {
+   memset(lsqSol, 0, (m+1)*sizeof(Complex));
+   //Get LS solution:
+   for(int l = (j-1); l >= 0; l--)
+   {
+     Complex accum = 0.0;
+
+     for(int k = (l+1); k <= (j-1); k++)
+     {
+        Complex cdtp = givensH[ldH*k+l]*lsqSol[k];
+        accum = accum+cdtp; 
+     }
   
-   l = 0; r = n-1; tos = -1;
-   for (;;){
-      while (r > l){ 
-	  v = arr[r]; i = l; j = r-1;
-	  for (;;){ 
-	    while (arr[i] < v) i ++;
-	    /* j > l prevents underflow */
-	    while (arr[j] >= v && j > l) j --;
-	    if (i >= j) break;
-	    td = arr[i]; arr[i] = arr[j]; arr[j] = td;
-	    ti = idx[i]; idx[i] = idx[j]; idx[j] = ti;
-	  }
-	  td = arr[i]; arr[i] = arr[r]; arr[r] = td;
-	  ti = idx[i]; idx[i] = idx[r]; idx[r] = ti;
-	  if (i-l > r-i){ 
-	    stack[++tos] = l; stack[++tos] = i-1; l = i+1; 
-	  }
-	  else{	    
-	    stack[++tos] = i+1; stack[++tos] = r; r = i-1; 
-	  }
-	  if(tos > 31) {
-	    fprintf(stderr,"Error in quicksort! Aborting...!");fflush(stderr);
-	    exit(31);
-	  }
-	} 
-      if (tos == -1) break;
-      r = stack[tos--]; l = stack[tos--]; 
-    }
+     lsqSol[l] = (g[l] - accum) / givensH[ldH*l+l]; 
+   }
+   //
+   //compute x = x0+Vm*lsqSol
+   for(int l = 0; l < j; l++)  caxpyCuda(lsqSol[l], Vm->Eigenvec(l), x);
+
+   return;
  }
 
-//new methods:
  void GmresDRArgs::ComputeHarmonicRitzPairs()
  {
-   double* eval_nrm = (double*)calloc(m, sizeof(double));
-   int*    eval_idx = (int*)calloc(m, sizeof(int));
-
    memcpy(harMat, H, ldm*m*sizeof(Complex));
 
    const double beta2 = norm(H[ldm*(m-1)+m]);
@@ -253,30 +261,18 @@ namespace quda {
 
    //for(int e = 0; e < m; e++) printf("\nEigenval #%d: %le, %le, %le\n", e, creal(evals[e]), cimag(evals[e]), cabs(evals[e]));
    //do sort:
+   std::vector<SortEvals> sorted_evals_cntr;
 
-   for(int e = 0; e < m; e++) 
-   {
-     eval_nrm[e] = abs(harVals[e]);
-     eval_idx[e] = e;
-   }
-   //works but not perfect: think about this!!!
-   //gmresdr_magma_args->Sort(m, ldm, sortedHarVecs, nev, harVecs, sortedHarVals);
+   for(int e = 0; e < m; e++) sorted_evals_cntr.push_back( SortEvals( abs(harVals[e]), e ));
 
-   sortevals(m, eval_nrm, eval_idx);
-   //for(int e = 0; e < m; e++) printf("\nEigenval #%d: %le (%le)\n", eval_idx[e], cabs(evals[(eval_idx[e])]), eval_nrm[e]);
-
-   //sort eigenvectors:
-   for(int e = 0; e < nev; e++) memcpy(&sortedHarVecs[ldm*e], &harVecs[ldm*(eval_idx[e])], (m+1)*sizeof(Complex));
-
-   //sort eigenvalues: not needed. 
-
-   free(eval_nrm);
-   free(eval_idx);
+   std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), SortEvals::CmpEigenNrms);
+  
+   for(int e = 0; e < nev; e++) memcpy(&sortedHarVecs[ldm*e], &harVecs[ldm*( sorted_evals_cntr[e].eval_idx)], (ldm)*sizeof(Complex));
 
    return;
  }
 
- void GmresDRArgs::RestartVH(cudaColorSpinorField &res, cudaColorSpinorField *Vm, Complex *resC, Complex *u)
+ void GmresDRArgs::RestartVH(cudaColorSpinorField &res, cudaColorSpinorField *Vm)
  {
    int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
    int clen = Vm->EigvLength()      >> 1; //complex vector length
@@ -287,18 +283,18 @@ namespace quda {
 
      for(int i = 0; i < m; i++) //column index
      {
-        accum += (H[ldm*i + j]*u[i]);
+        accum += (H[ldm*i + j]*lsqSol[i]);
      }
      
-     resC[j] -= accum;
+     srtRes[j] -= accum;
    }
 
    zeroCuda(res);
 
-   for(int i = 0; i <= m; i++) caxpyCuda(resC[i], Vm->Eigenvec(i), res);
+   for(int i = 0; i <= m; i++) caxpyCuda(srtRes[i], Vm->Eigenvec(i), res);
 
    /**** Update Vm and H ****/
-   memcpy(&sortedHarVecs[ldm*(nev)], resC, ldm*sizeof(Complex)); //WAS BUG HERE!!!
+//   memcpy(&sortedHarVecs[ldm*(nev)], resC, ldm*sizeof(Complex)); 
 
    gmresdr_magma_args->RestartVH(Vm->V(), clen, cldn, Vm->Precision(), sortedHarVecs, H, ldm);//check ldm with internal (magma) ldm
 
@@ -323,27 +319,34 @@ namespace quda {
 
  void GmresDRArgs::PrepareDeflatedRestart(Complex *givensH, Complex *g)
  {
-   memset(cH, 0, ldm*(m+1)*sizeof(Complex));
-   //
-   memset(harMat, 0, ldm*m*sizeof(Complex));
-   //
-   //now update conjugate matrix
-   for(int j = 0 ; j < nev; j++)
-   {
-     for(int i = 0 ; i < nev+1; i++)
+   //update initial values for the "short residual"
+   memcpy(srtRes, g, (m+1)*sizeof(Complex));
+
+   if(first_cycle_flag == false)
+   { 
+     memset(cH, 0, ldm*(m+1)*sizeof(Complex));
+     //
+     memset(harMat, 0, ldm*m*sizeof(Complex));
+     //
+     //now update conjugate matrix
+     for(int j = 0 ; j < nev; j++)
      {
-       cH[ldm*i+j] = conj(H[ldm*j+i]);
+       for(int i = 0 ; i < nev+1; i++)
+       {
+         cH[ldm*i+j] = conj(H[ldm*j+i]);
+       }
      }
+
+     memcpy(qrH, H, ldm*nev*sizeof(Complex));
+
+     gmresdr_magma_args->ComputeQR(nev, qrH, (nev+1), ldm, tauH);
+
+     //extract triangular part to the givens matrix:
+     for(int i = 0; i < nev; i++) memcpy(&givensH[ldm*i], &qrH[ldm*i], (i+1)*sizeof(Complex));
+
+     gmresdr_magma_args->LeftConjZUNMQR(nev /*number of reflectors*/, 1 /*number of columns of mat*/, g, (nev+1) /*number of rows*/, ldm, qrH, ldm, tauH);
    }
 
-   memcpy(qrH, H, ldm*nev*sizeof(Complex));
-
-   gmresdr_magma_args->ComputeQR(nev, qrH, (nev+1), ldm, tauH);
-
-   //extract triangular part to the givens matrix:
-   for(int i = 0; i < nev; i++) memcpy(&givensH[ldm*i], &qrH[ldm*i], (i+1)*sizeof(Complex));
-
-   gmresdr_magma_args->LeftConjZUNMQR(nev /*number of reflectors*/, 1 /*number of columns of mat*/, g, (nev+1) /*number of rows*/, ldm, qrH, ldm, tauH);
    return;
  }
 
@@ -403,10 +406,7 @@ namespace quda {
    Complex *givensH = new Complex[ldH*m];//complex
     
    //Auxilary objects: 
-   //vector g :
    Complex *g = new Complex[(m+1)];
-   //
-   Complex *u = new Complex[(m+1)];
 
    //Givens coefficients:
    Complex *Cn = new Complex[m];
@@ -437,9 +437,11 @@ namespace quda {
 
    //set g-vector:
    g[0] = beta;
+
+   args->PrepareDeflatedRestart(givensH, g);
+
    //Main GMRES loop:
    int j = 0;//here also a column index of H
-
 
    while((j < m) && (r2 > stop))
    {
@@ -524,21 +526,7 @@ namespace quda {
 
    //j -> m+1
    //update solution and final residual:
-   for(int l = (j-1); l >= 0; l--)
-   {
-     Complex accum = 0.0;
-
-     for(int k = (l+1); k <= (j-1); k++)
-     {
-        Complex cdtp = givensH[ldH*k+l]*u[k];
-        accum = accum+cdtp; 
-     }
-  
-     u[l] = (g[l] - accum) / givensH[ldH*l+l]; 
-   }
-   //
-   //compute x = x0+Vm*u
-   for(int l = 0; l < j; l++)  caxpyCuda(u[l], Vm->Eigenvec(l), x);
+   args->UpdateSolution(x, Vm, givensH, ldH, g, j);
 
    mat(r, *out, tmp, tmp2);
    //
@@ -546,19 +534,12 @@ namespace quda {
 
    printf("\nDone for: stage 0 (m = %d), true residual %1.15e\n", j, sqrt(r2));
 
-   memset(g, 0, (m+1)*sizeof(Complex));
-
-   //Compute u = c - Hy^{*}
-   g[0] = beta;//for the first cycle (resC)
-
-   Complex *resC = new Complex[m+1];
-
-   memcpy(resC, g, (m+1)*sizeof(Complex));
-
 //START RESTARTS:
    const int max_cycles = param.deflation_grid;
 
    int cycle_idx = 1;
+
+   args->first_cycle_flag = false;
 
    while(cycle_idx < max_cycles /*&& !convergence(r2, stop)*/)
    {
@@ -566,19 +547,16 @@ namespace quda {
 
      args->ComputeHarmonicRitzPairs();
 
-     args->RestartVH(res, Vm, resC, u);
+     args->RestartVH(res, Vm);
 
      memset(givensH, 0, ldH*m*sizeof(Complex));
 
      memset(g, 0 , (m+1)*sizeof(Complex));
-     memset(u, 0 , (m+1)*sizeof(Complex));
 
      memset(Cn, 0 , m*sizeof(Complex));
      memset(Sn, 0 , m*sizeof(double));
 
      for(int i = 0; i <= nev ; i++ ) g[i] = cDotProductCuda(Vm->Eigenvec(i), res);//
-
-     memcpy(resC, g, (m+1)*sizeof(Complex));//now we need to store g-vector for the following cycles!
 
      args->PrepareDeflatedRestart(givensH, g);
 
@@ -652,23 +630,7 @@ namespace quda {
        printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j); 
      }//end of main loop.
 
-     //update solution and final residual:
-     for(int l = (j-1); l >= 0; l--)
-     {
-       Complex accum = 0.0;
-
-       for(int k = (l+1); k <= (j-1); k++)
-       {
-          Complex cdtp = givensH[ldH*k+l]*u[k];
-          accum = accum+cdtp; 
-       }
-  
-       u[l] = (g[l] - accum) / givensH[ldH*l+l]; 
-     //printf("\nSol u: (%1.15e, %1.15e)\n", creal(g[l]), cimag(g[l]));   
-     }
-     //
-     //compute x = x0+Vm*u
-     for(int l = 0; l < j; l++) caxpyCuda(u[l], Vm->Eigenvec(l), x);
+     args->UpdateSolution(x, Vm, givensH, ldH, g, j);
 
      mat(r, *out, tmp, tmp2);
      //
@@ -682,11 +644,10 @@ namespace quda {
 
    printfQuda("\nClean main resources\n");
 
-   delete [] resC;
-
    delete [] givensH;
+
    delete [] g;
-   delete [] u;
+
    delete [] Cn;
 
    free(Sn);
