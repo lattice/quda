@@ -66,6 +66,8 @@ namespace quda {
 #include <blas_core.h>
 #include <blas_mixed_core.h>
 
+#include <dbldbl.h>
+  
   /**
      Functor to perform the operation y = a*x + b*y
   */
@@ -340,7 +342,7 @@ namespace quda {
     if (x.Precision() != y.Precision()) {
       // call hacked mixed precision kernel
       mixed::blasCuda<axpyZpbx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),
-									x, y, z, x);
+					x, y, z, x);
     } else {
       // swap arguments around 
       blasCuda<axpyZpbx,1,1,0,0>(make_double2(a,0.0), make_double2(b,0.0), make_double2(0.0,0.0),

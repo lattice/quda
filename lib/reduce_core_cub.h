@@ -1,94 +1,18 @@
 __host__ __device__ void zero(double &x) { x = 0.0; }
 __host__ __device__ void zero(double2 &x) { x.x = 0.0; x.y = 0.0; }
 __host__ __device__ void zero(double3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(double *s, const int i, const double x, const int block) { s[i] = x; }
-__device__ void copytoshared(double *s, const int i, const double2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(double *s, const int i, const double3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copytoshared(volatile double *s, const int i, const double x, const int block) { s[i] = x; }
-__device__ void copytoshared(volatile double *s, const int i, const double2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(volatile double *s, const int i, const double3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copyfromshared(double &x, const double *s, const int i, const int block) { x = s[i]; }
-__device__ void copyfromshared(double2 &x, const double *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(double3 &x, const double *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
 
-template<typename ReduceType, typename ReduceSimpleType> 
-__device__ void add(ReduceType &sum, ReduceSimpleType *s, const int i, const int block) { }
-template<> __device__ void add<double,double>(double &sum, double *s, const int i, const int block) 
-{ sum += s[i]; }
-template<> __device__ void add<double2,double>(double2 &sum, double *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; }
-template<> __device__ void add<double3,double>(double3 &sum, double *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; sum.z += s[i+2*block]; }
+__host__ __device__ void zero(doubledouble &x) { x.a.x = 0.0; x.a.y = 0.0; }
+__host__ __device__ void zero(doubledouble2 &x) { zero(x.x); zero(x.y); }
+__host__ __device__ void zero(doubledouble3 &x) { zero(x.x); zero(x.y); zero(x.z); }
 
-template<typename ReduceType, typename ReduceSimpleType> 
-__device__ void add(ReduceSimpleType *s, const int i, const int j, const int block) { }
-template<typename ReduceType, typename ReduceSimpleType> 
-__device__ void add(volatile ReduceSimpleType *s, const int i, const int j, const int block) { }
+ __host__ __device__ double set(double &x) { return x;}
+ __host__ __device__ double2 set(double2 &x) { return x;}
+ __host__ __device__ double3 set(double3 &x) { return x;}
 
-template<> __device__ void add<double,double>(double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-template<> __device__ void add<double,double>(volatile double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-
-template<> __device__ void add<double2,double>(double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-template<> __device__ void add<double2,double>(volatile double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-
-template<> __device__ void add<double3,double>(double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-template<> __device__ void add<double3,double>(volatile double *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-
-#if (__COMPUTE_CAPABILITY__ < 130)
-__host__ __device__ void zero(doublesingle &x) { x = 0.0; }
-__host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
-__host__ __device__ void zero(doublesingle3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle x, const int block) { s[i] = x; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle x, const int block) { s[i].a.x = x.a.x; s[i].a.y = x.a.y; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; 
-  s[i+2*block].a.x = x.z.a.x; s[i+2*block].a.y = x.z.a.y; }
-__device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
-__device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
-
-template<> __device__ void add<doublesingle,doublesingle>(doublesingle &sum, doublesingle *s, const int i, const int block) 
-{ sum += s[i]; }
-template<> __device__ void add<doublesingle2,doublesingle>(doublesingle2 &sum, doublesingle *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; }
-template<> __device__ void add<doublesingle3,doublesingle>(doublesingle3 &sum, doublesingle *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; sum.z += s[i+2*block]; }
-
-template<> __device__ void add<doublesingle,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-template<> __device__ void add<doublesingle,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-
-template<> __device__ void add<doublesingle2,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-template<> __device__ void add<doublesingle2,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-
-template<> __device__ void add<doublesingle3,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-template<> __device__ void add<doublesingle3,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-#endif
+__host__ __device__ double set(doubledouble &a) { return a.head(); }
+__host__ __device__ double2 set(doubledouble2 &a) { return make_double2(a.x.head(),a.y.head()); }
+__host__ __device__ double3 set(doubledouble3 &a) { return make_double3(a.x.head(),a.y.head(),a.z.head()); }
 
 __device__ unsigned int count = 0;
 __shared__ bool isLastBlockDone;
@@ -122,8 +46,9 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
   unsigned int gridSize = gridDim.x*blockDim.x;
 
   ReduceType sum;
-  zero(sum); 
-  while (i < arg.length) {
+  zero(sum);
+
+  while (i < arg.length) {  
     FloatN x[M], y[M], z[M], w[M], v[M];
     arg.X.load(x, i);
     arg.Y.load(y, i);
@@ -151,99 +76,6 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
     i += gridSize;
   }
 
-  //#define CUB_REDUCTION
-#ifndef CUB_REDUCTION
-
-  extern __shared__ ReduceSimpleType sdata[];
-  ReduceSimpleType *s = sdata + tid;  
-  if (tid >= warpSize) copytoshared(s, 0, sum, block_size);
-  __syncthreads();
-  
-  // now reduce using the first warp only
-  if (tid<warpSize) {
-    // Warp raking
-#pragma unroll
-    for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
-
-    // Intra-warp reduction
-    volatile ReduceSimpleType *sv = s;
-    copytoshared(sv, 0, sum, block_size);
-
-    if (block_size >= 32) { add<ReduceType>(sv, 0, 16, block_size); } 
-    if (block_size >= 16) { add<ReduceType>(sv, 0, 8, block_size); } 
-    if (block_size >= 8) { add<ReduceType>(sv, 0, 4, block_size); } 
-    if (block_size >= 4) { add<ReduceType>(sv, 0, 2, block_size); } 
-    if (block_size >= 2) { add<ReduceType>(sv, 0, 1, block_size); } 
-
-    // warpSize generic warp reduction - open64 can't handle it, only nvvm
-    //#pragma unroll
-    //for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); }
-  }
-
-  // write result for this block to global mem 
-  if (tid == 0) {    
-    ReduceType tmp;
-    copyfromshared(tmp, s, 0, block_size);
-    arg.partial[blockIdx.x] = tmp;
-    
-    __threadfence(); // flush result
-    
-    // increment global block counter
-    unsigned int value = atomicInc(&count, gridDim.x);
-    
-    // Determine if this block is the last block to be done
-    isLastBlockDone = (value == (gridDim.x-1));
-  }
-
-  __syncthreads();
-
-  // Finish the reduction if last block
-  if (isLastBlockDone) {
-    unsigned int i = threadIdx.x;
-
-    ReduceType sum;
-    zero(sum); 
-    while (i < gridDim.x) {
-      sum += arg.partial[i];
-      i += block_size;
-    }
-    
-    extern __shared__ ReduceSimpleType sdata[];
-    ReduceSimpleType *s = sdata + tid;  
-    if (tid >= warpSize) copytoshared(s, 0, sum, block_size);
-    __syncthreads();
-   
-    // now reduce using the first warp only
-    if (tid<warpSize) {
-      // Warp raking
-#pragma unroll
-      for (int i=warpSize; i<block_size; i+=warpSize) { add<ReduceType>(sum, s, i, block_size); }
-      
-      // Intra-warp reduction
-      volatile ReduceSimpleType *sv = s;
-      copytoshared(sv, 0, sum, block_size);
-
-      if (block_size >= 32) { add<ReduceType>(sv, 0, 16, block_size); } 
-      if (block_size >= 16) { add<ReduceType>(sv, 0, 8, block_size); } 
-      if (block_size >= 8) { add<ReduceType>(sv, 0, 4, block_size); } 
-      if (block_size >= 4) { add<ReduceType>(sv, 0, 2, block_size); } 
-      if (block_size >= 2) { add<ReduceType>(sv, 0, 1, block_size); } 
-
-      //#pragma unroll
-      //for (int i=warpSize/2; i>0; i/=2) { add<ReduceType>(sv, 0, i, block_size); } 
-    }
- 
-    // write out the final reduced value
-    if (threadIdx.x == 0) {
-      ReduceType tmp;
-      copyfromshared(tmp, s, 0, block_size);
-      arg.complete[0] = tmp;
-      count = 0;
-    }
-  }
-
-#else
-
   typedef cub::BlockReduce<ReduceType, block_size> BlockReduce;
   __shared__ typename BlockReduce::TempStorage temp_storage;
 
@@ -270,21 +102,20 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
     unsigned int i = threadIdx.x;
 
     ReduceType sum;
-    zero(sum); 
+    zero(sum);
     while (i < gridDim.x) {
       sum += arg.partial[i];
       i += block_size;
     }
 
     sum = BlockReduce(temp_storage).Sum(sum);
- 
+
     // write out the final reduced value
     if (threadIdx.x == 0) {
       arg.complete[0] = sum;
       count = 0;
     }
   }
-#endif
 
 }
 /**
@@ -298,138 +129,7 @@ doubleN reduceLaunch(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spinor
   if (tp.grid.x > REDUCE_MAX_BLOCKS) 
     errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, REDUCE_MAX_BLOCKS);
 
-  switch (tp.block.x) {
-  case 32:
-    reduceKernel<32,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 64:
-    reduceKernel<64,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 96:
-    reduceKernel<96,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 128:
-    reduceKernel<128,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 160:
-    reduceKernel<160,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 192:
-    reduceKernel<192,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 224:
-    reduceKernel<224,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 256:
-    reduceKernel<256,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 288:
-    reduceKernel<288,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 320:
-    reduceKernel<320,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 352:
-    reduceKernel<352,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 384:
-    reduceKernel<384,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 416:
-    reduceKernel<416,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 448:
-    reduceKernel<448,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 480:
-    reduceKernel<480,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 512:
-    reduceKernel<512,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 544:
-    reduceKernel<544,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 576:
-    reduceKernel<576,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 608:
-    reduceKernel<608,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 640:
-    reduceKernel<640,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 672:
-    reduceKernel<672,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 704:
-    reduceKernel<704,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 736:
-    reduceKernel<736,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 768:
-    reduceKernel<768,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 800:
-    reduceKernel<800,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 832:
-    reduceKernel<832,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 864:
-    reduceKernel<864,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 896:
-    reduceKernel<896,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 928:
-    reduceKernel<928,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 960:
-    reduceKernel<960,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 992:
-    reduceKernel<992,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  case 1024:
-    reduceKernel<1024,ReduceType,ReduceSimpleType,FloatN,M>
-      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);
-    break;
-  default:
-    errorQuda("Reduction not implemented for %d threads", tp.block.x);
-  }
+  LAUNCH_KERNEL(reduceKernel,tp,stream,arg,ReduceType,ReduceSimpleType,FloatN,M);
 
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
   if(deviceProp.canMapHostMemory) {
@@ -439,16 +139,17 @@ doubleN reduceLaunch(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,Spinor
 #endif
     { cudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost); }
 
-  doubleN cpu_sum;
-  zero(cpu_sum);
-  cpu_sum += ((ReduceType*)h_reduce)[0];
+  //(*(ReduceType*)h_reduce).print();
+  doubleN cpu_sum = set(((ReduceType*)h_reduce)[0]);
+  //cpu_sum += ((ReduceType*)h_reduce)[0];
 
+  //printf("h_reduce = %24.22e %24.22e\n", ((double*)h_reduce)[1], ((double*)h_reduce)[0]);
+  
   const int Nreduce = sizeof(doubleN) / sizeof(double);
   reduceDoubleArray((double*)&cpu_sum, Nreduce);
 
   return cpu_sum;
 }
-
 
 template <typename doubleN, typename ReduceType, typename ReduceSimpleType, typename FloatN, 
   int M, typename SpinorX, typename SpinorY, typename SpinorZ,  
@@ -463,6 +164,8 @@ private:
   // these can't be curried into the Spinors because of Tesla argument length restriction
   char *X_h, *Y_h, *Z_h, *W_h, *V_h;
   char *Xnorm_h, *Ynorm_h, *Znorm_h, *Wnorm_h, *Vnorm_h;
+  const size_t *bytes_;
+  const size_t *norm_bytes_;
 
   unsigned int sharedBytesPerThread() const { return sizeof(ReduceType); }
 
@@ -485,46 +188,37 @@ private:
 
 public:
   ReduceCuda(doubleN &result, SpinorX &X, SpinorY &Y, SpinorZ &Z, 
-	     SpinorW &W, SpinorV &V, Reducer &r, int length) :
+	     SpinorW &W, SpinorV &V, Reducer &r, int length,
+	     const size_t *bytes, const size_t *norm_bytes) :
   arg(X, Y, Z, W, V, r, (ReduceType*)d_reduce, (ReduceType*)hd_reduce, length),
     result(result), X_h(0), Y_h(0), Z_h(0), W_h(0), V_h(0), 
-    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0)
-    { ; }
+    Xnorm_h(0), Ynorm_h(0), Znorm_h(0), Wnorm_h(0), Vnorm_h(0),
+    bytes_(bytes), norm_bytes_(norm_bytes) { }
   virtual ~ReduceCuda() { }
 
-  TuneKey tuneKey() const {
-    std::stringstream vol, aux;
-    vol << blasConstants.x[0] << "x";
-    vol << blasConstants.x[1] << "x";
-    vol << blasConstants.x[2] << "x";
-    vol << blasConstants.x[3];    
-    aux << "stride=" << blasConstants.stride << ",prec=" << arg.X.Precision();
-    return TuneKey(vol.str(), typeid(arg.r).name(), aux.str());
-  }  
+  inline TuneKey tuneKey() const { 
+    return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_str);
+  }
 
   void apply(const cudaStream_t &stream) {
     TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
     result = reduceLaunch<doubleN,ReduceType,ReduceSimpleType,FloatN,M>(arg, tp, stream);
   }
 
-  void preTune() { 
-    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
-    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    arg.X.save(&X_h, &Xnorm_h, bytes, norm_bytes);
-    arg.Y.save(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    arg.Z.save(&Z_h, &Znorm_h, bytes, norm_bytes);
-    arg.W.save(&W_h, &Wnorm_h, bytes, norm_bytes);
-    arg.V.save(&V_h, &Vnorm_h, bytes, norm_bytes);
+  void preTune() {
+    arg.X.save(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.save(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.save(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.save(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.save(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   void postTune() {
-    size_t bytes = arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride();
-    size_t norm_bytes = (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0;
-    arg.X.load(&X_h, &Xnorm_h, bytes, norm_bytes);
-    arg.Y.load(&Y_h, &Ynorm_h, bytes, norm_bytes);
-    arg.Z.load(&Z_h, &Znorm_h, bytes, norm_bytes);
-    arg.W.load(&W_h, &Wnorm_h, bytes, norm_bytes);
-    arg.V.load(&V_h, &Vnorm_h, bytes, norm_bytes);
+    arg.X.load(&X_h, &Xnorm_h, bytes_[0], norm_bytes_[0]);
+    arg.Y.load(&Y_h, &Ynorm_h, bytes_[1], norm_bytes_[1]);
+    arg.Z.load(&Z_h, &Znorm_h, bytes_[2], norm_bytes_[2]);
+    arg.W.load(&W_h, &Wnorm_h, bytes_[3], norm_bytes_[3]);
+    arg.V.load(&V_h, &Vnorm_h, bytes_[4], norm_bytes_[4]);
   }
 
   long long flops() const { return arg.r.flops()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*arg.length*M; }
@@ -583,14 +277,17 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
     return value;
   }
 
-  for (int d=0; d<QUDA_MAX_DIM; d++) blasConstants.x[d] = x.X()[d];
-  blasConstants.stride = x.Stride();
+  blasStrings.vol_str = x.VolString();
+  blasStrings.aux_str = x.AuxString();
 
   int reduce_length = siteUnroll ? x.RealLength() : x.Length();
   doubleN value;
 
   // FIXME: use traits to encapsulate register type for shorts -
   // will reduce template type parameters from 3 to 2
+
+  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes(), v.Bytes()};
+  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes(), v.NormBytes()};
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
@@ -605,7 +302,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
 	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
 	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
     } else if (x.Nspin() == 1){ //staggered
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
@@ -619,7 +316,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
 	Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
 	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
@@ -636,7 +333,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float4,float4,float4,M,writeX,0>,  Spinor<float4,float4,float4,M,writeY,1>,
 	Spinor<float4,float4,float4,M,writeZ,2>,  Spinor<float4,float4,float4,M,writeW,3>,
 	Spinor<float4,float4,float4,M,writeV,4>, Reducer<ReduceType, float2, float4> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(4*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -654,7 +351,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float2,float2,float2,M,writeX,0>,  Spinor<float2,float2,float2,M,writeY,1>,
 	Spinor<float2,float2,float2,M,writeZ,2>,  Spinor<float2,float2,float2,M,writeW,3>,
 	Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
-	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M));
+	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -673,7 +370,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float4,float4,short4,6,writeX,0>, Spinor<float4,float4,short4,6,writeY,1>,
 	Spinor<float4,float4,short4,6,writeZ,2>, Spinor<float4,float4,short4,6,writeW,3>,
 	Spinor<float4,float4,short4,6,writeV,4>, Reducer<ReduceType, float2, float4> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -690,7 +387,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
 	Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
 	Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
-	reduce(value, X, Y, Z, W, V, r, y.Volume());
+	reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
 #else
       errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -705,4 +402,4 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 
   return value;
 }
-
+ 

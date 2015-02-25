@@ -276,4 +276,127 @@ __device__ __forceinline__ dbldbl rsqrt_dbldbl (dbldbl a)
 }
 #endif /* __cplusplus */
 
+/**
+   This C++ wrapper over the above dbldbl functions for easy
+   inclusion in C++ generic template code, e.g., CUB.
+ */
+struct doubledouble {
+
+  dbldbl a;
+
+  __device__ __host__ doubledouble() { a.x = 0.0; a.y = 0.0; }
+  __device__ __host__ doubledouble(const doubledouble &a) : a(a.a) { }
+  __device__ __host__ doubledouble(const dbldbl &a) : a(a) { }
+  __device__ __host__ doubledouble(const double &head, const double &tail) { a.y = head; a.x = tail; }
+  __device__ doubledouble(const double &head) {  
+    a = add_double_to_dbldbl(head, 0.0);
+  }
+
+  __device__ __host__ doubledouble& operator=(const double &head) {
+    this->a.y = head;
+    this->a.x = 0.0;
+  }
+
+  __device__ doubledouble& operator+=(const doubledouble &a) {
+    this->a = add_dbldbl(this->a, a.a);
+    return *this;
+  }
+
+  __device__ __host__ double head() const { return a.y; }
+  __device__ __host__ double tail() const { return a.x; }
+
+  __device__ __host__ void print() const { printf("scalar: %16.14e + %16.14e\n", head(), tail()); }
+
+};
+
+__device__  inline bool operator>(const doubledouble &a, const double &b) {
+  return a.head() > b;
+}
+
+__device__  inline doubledouble operator+(const doubledouble &a, const doubledouble &b) {
+  return doubledouble(add_dbldbl(a.a,b.a));
+}
+
+__device__  inline doubledouble operator-(const doubledouble &a, const doubledouble &b) {
+  return doubledouble(sub_dbldbl(a.a,b.a));
+}
+
+__device__ inline doubledouble operator*(const doubledouble &a, const doubledouble &b) {
+  return  doubledouble(mul_dbldbl(a.a,b.a));
+}
+
+__device__ inline doubledouble operator/(const doubledouble &a, const doubledouble &b) {
+  return doubledouble(div_dbldbl(a.a,b.a));
+}
+
+__device__ inline doubledouble add_double_to_doubledouble(const double &a, const double &b) {
+  return doubledouble(add_double_to_dbldbl(a,b));
+}
+
+__device__ inline doubledouble mul_double_to_doubledouble(const double &a, const double &b) {
+  return doubledouble(mul_double_to_dbldbl(a,b));
+}
+ 
+__host__ __device__ double2 operator+(const double2 &a, const double2 &b) { return make_double2(a.x + b.x, a.y + b.y); }
+__host__ __device__ double3 operator+(const double3 &a, const double3 &b) { return make_double3(a.x + b.x, a.y + b.y, a.z + b.z); }
+
+struct doubledouble2 {
+  doubledouble x;
+  doubledouble y;
+
+  __device__ __host__ doubledouble2() : x(), y() { }
+  __device__ __host__ doubledouble2(const doubledouble2 &a) : x(a.x), y(a.y) { }
+  __device__ __host__ doubledouble2(const double2 &a) : x(a.x), y(a.y) { }
+  __device__ __host__ doubledouble2(const doubledouble &x, const doubledouble &y) : x(x), y(y) { }
+
+  __device__ doubledouble2& operator+=(const doubledouble2 &a) {
+    x += a.x;
+    y += a.y;
+    return *this;
+  }
+
+  __device__ __host__ void print() const { printf("vec2: (%16.14e + %16.14e) (%16.14e + %16.14e)\n", x.head(), x.tail(), y.head(), y.tail()); }
+};
+
+struct doubledouble3 {
+  doubledouble x;
+  doubledouble y;
+  doubledouble z;
+
+  __device__ __host__ doubledouble3() : x(), y() { }
+  __device__ __host__ doubledouble3(const doubledouble3 &a) : x(a.x), y(a.y), z(a.z) { }
+  __device__ __host__ doubledouble3(const double3 &a) : x(a.x), y(a.y), z(a.z) { }
+  __device__ __host__ doubledouble3(const doubledouble &x, const doubledouble &y, const doubledouble &z) : x(x), y(y), z(z) { }
+
+  __device__ doubledouble3& operator+=(const doubledouble3 &a) {
+    x += a.x;
+    y += a.y;
+    z += a.z;
+    return *this;
+  }
+
+  __device__ __host__ void print() const { printf("vec3: (%16.14e + %16.14e) (%16.14e + %16.14e) (%16.14e + %16.14e)\n", x.head(), x.tail(), y.head(), y.tail(), z.head(), z.tail()); }
+};
+
+__device__ doubledouble2 operator+(const doubledouble2 &a, const doubledouble2 &b)
+{ return doubledouble2(a.x + b.x, a.y + b.y); }
+
+__device__ doubledouble3 operator+(const doubledouble3 &a, const doubledouble3 &b)
+{ return doubledouble3(a.x + b.x, a.y + b.y, a.z + b.z); }
+
+template<typename> struct ScalarType { };
+
+template<> struct ScalarType<double> { typedef double type; };
+template<> struct ScalarType<double2> { typedef double type; };
+template<> struct ScalarType<double3> { typedef double type; };
+
+template<> struct ScalarType<doubledouble> { typedef doubledouble type; };
+template<> struct ScalarType<doubledouble2> { typedef doubledouble type; };
+template<> struct ScalarType<doubledouble3> { typedef doubledouble type; };
+
+template<typename> struct Vec2Type { };
+
+template<> struct Vec2Type<double> { typedef double2 type; };
+template<> struct Vec2Type<doubledouble> { typedef doubledouble2 type; };
+
 #endif /* DBLDBL_H_ */
