@@ -259,15 +259,17 @@ namespace quda {
 
    gmresdr_magma_args->Compute_harmonic_matrix_eigenpairs(harMat, m, ldm, harVecs, harVals, ldm);//check it!
 
-   //for(int e = 0; e < m; e++) printf("\nEigenval #%d: %le, %le, %le\n", e, creal(evals[e]), cimag(evals[e]), cabs(evals[e]));
+//   for(int e = 0; e < m; e++) printf("\nEigenval #%d: %le, %le, %le\n", e, harVals[e].real(), harVals[e].imag(), abs(harVals[e]));
    //do sort:
    std::vector<SortEvals> sorted_evals_cntr;
 
    for(int e = 0; e < m; e++) sorted_evals_cntr.push_back( SortEvals( abs(harVals[e]), e ));
 
    std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), SortEvals::CmpEigenNrms);
-  
+ 
    for(int e = 0; e < nev; e++) memcpy(&sortedHarVecs[ldm*e], &harVecs[ldm*( sorted_evals_cntr[e].eval_idx)], (ldm)*sizeof(Complex));
+
+   //for(int e = 0; e < 8; e++) printfQuda("\nEigenval #%d: real %le imag %le abs %le\n", sorted_evals_cntr[e].eval_idx, harVals[(sorted_evals_cntr[e].eval_idx)].real(), harVals[(sorted_evals_cntr[e].eval_idx)].imag(),  abs(harVals[(sorted_evals_cntr[e].eval_idx)]));
 
    return;
  }
@@ -425,7 +427,7 @@ namespace quda {
    //
    double r2 = xmyNormCuda(*in, r);//compute residual
 
-   printf("\nInitial residual squred: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
+   printfQuda("\nInitial residual squred: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
 
    //copy the first vector:
    double beta = sqrt(r2);
@@ -442,6 +444,8 @@ namespace quda {
 
    //Main GMRES loop:
    int j = 0;//here also a column index of H
+
+   int tot_iters = 0;
 
    while((j < m) && (r2 > stop))
    {
@@ -519,10 +523,12 @@ namespace quda {
      //
      j += 1;
 
+     tot_iters += 1;
+
      printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j); 
    }//end of GMRES loop
 
-   printf("\nDone for: %d iters, %1.15e last residual\n", j, sqrt(r2)); 
+   printfQuda("\nDone for: %d iters, %1.15e last residual\n", j, sqrt(r2)); 
 
    //j -> m+1
    //update solution and final residual:
@@ -532,7 +538,7 @@ namespace quda {
    //
    r2 = xmyNormCuda(*in, r);//compute full precision residual
 
-   printf("\nDone for: stage 0 (m = %d), true residual %1.15e\n", j, sqrt(r2));
+   printfQuda("\nDone for: stage 0 (m = %d), true residual %1.15e\n", j, sqrt(r2));
 
 //START RESTARTS:
    const int max_cycles = param.deflation_grid;
@@ -543,7 +549,7 @@ namespace quda {
 
    while(cycle_idx < max_cycles /*&& !convergence(r2, stop)*/)
    {
-     printf("\nRestart #%d\n", cycle_idx);
+     printfQuda("\nRestart #%d\n", cycle_idx);
 
      args->ComputeHarmonicRitzPairs();
 
@@ -626,6 +632,8 @@ namespace quda {
        r2 = norm(g[j+1]);//stop criterio
        //
        j += 1;
+
+       tot_iters += 1;
  
        printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j); 
      }//end of main loop.
@@ -636,13 +644,13 @@ namespace quda {
      //
      r2 = xmyNormCuda(*in, r);//compute full precision residual
 
-     printf("\nDone for: stage 0 (m = %d), true residual %1.15e\n", j, sqrt(r2));
+     printfQuda("\nDone for: stage 0 (m = %d), true residual %1.15e\n", j, sqrt(r2));
 
      cycle_idx += 1;
 
    }//end of deflated restarts
 
-   printfQuda("\nClean main resources\n");
+   printfQuda("\nTotal iterations: %d\n", tot_iters);
 
    delete [] givensH;
 

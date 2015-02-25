@@ -3149,12 +3149,9 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   Dirac *dHalfPrec = Dirac::create(diracHalfPrecParam);
 
   Dirac &dirac = *d;
-  //Dirac &diracSloppy = param->rhs_idx < param->deflation_grid ? *d : *dSloppy; //hack!!!
-  //Dirac &diracSloppy   = param->rhs_idx < param->deflation_grid ? *dSloppy : *dHalfPrec;
   Dirac &diracSloppy   = *dSloppy;
   Dirac &diracHalf     = *dHalfPrec;  
-  Dirac &diracDeflate  = *d;//full precision deflation
-  //Dirac &diracHalfPrec = *dHalfPrec;  
+  Dirac &diracDeflate  = (param->cuda_prec_ritz == param->cuda_prec) ? *d : *dSloppy;//full precision deflation
 
   profileInvert.Start(QUDA_PROFILE_H2D);
 

@@ -334,20 +334,22 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
        {
          magmaFloatComplex *dtm;
 
+         const int cvprec = 2*vprec;
+
          if(prec == 8)
          {
-            magma_malloc((void**)&dtm, ldm*l*prec);
+            magma_malloc((void**)&dtm, ldm*l*cvprec);
 
             double *hbuff1;
             float  *hbuff2;
 
             magma_malloc_pinned((void**)&hbuff1, ldm*l*cprec);
-            magma_malloc_pinned((void**)&hbuff2, ldm*l*prec);
+            magma_malloc_pinned((void**)&hbuff2, ldm*l*cvprec);
 
             cudaMemcpy(hbuff1, dTm, ldm*l*cprec, cudaMemcpyDefault); 
             for(int i = 0; i < ldm*l; i++) hbuff2[i] = (float)hbuff1[i];
 
-            cudaMemcpy(dtm, hbuff2, ldm*l*prec, cudaMemcpyDefault); 
+            cudaMemcpy(dtm, hbuff2, ldm*l*cvprec, cudaMemcpyDefault); 
 
             magma_free_pinned(hbuff1);
             magma_free_pinned(hbuff2);
@@ -367,7 +369,7 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 
            magmablas_cgemm(_cN, _cN, bufferBlock, l, m, MAGMA_C_ONE, ptrV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)buffer, bufferBlock);
 
-           cudaMemcpy2D(ptrV, vld*cprec, buffer, bufferBlock*cprec,  bufferBlock*cprec, l, cudaMemcpyDefault);
+           cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
 
          }
 
