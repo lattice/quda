@@ -246,7 +246,7 @@ template <>
 struct UnitWord <float2>
 {
     typedef int         ShuffleWord;
-#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
+#if (CUB_PTX_ARCH > 0) && (CUB_PTX_ARCH <= 130)
     typedef float       VolatileWord;
     typedef uint2       DeviceWord;
 #else
@@ -261,7 +261,7 @@ template <>
 struct UnitWord <float4>
 {
     typedef int         ShuffleWord;
-#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
+#if (CUB_PTX_ARCH > 0) && (CUB_PTX_ARCH <= 130)
     typedef float               VolatileWord;
     typedef uint4               DeviceWord;
 #else
@@ -277,7 +277,7 @@ template <>
 struct UnitWord <char2>
 {
     typedef unsigned short      ShuffleWord;
-#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
+#if (CUB_PTX_ARCH > 0) && (CUB_PTX_ARCH <= 130)
     typedef unsigned short      VolatileWord;
     typedef short               DeviceWord;
 #else
@@ -502,20 +502,20 @@ struct Uninitialized
 /**
  * \brief An item value paired with a corresponding offset
  */
-template <typename _T, typename _Offset>
+template <typename _T, typename _OffsetT>
 struct ItemOffsetPair
 {
     typedef _T        T;                ///< Item data type
-    typedef _Offset   Offset;           ///< Integer offset data type
+    typedef _OffsetT  OffsetT;           ///< Integer offset data type
 
-#if (CUB_PTX_VERSION == 0)
+#if (CUB_PTX_ARCH == 0)
     union
     {
-        Offset                              offset;     ///< Offset
+        OffsetT                             offset;     ///< OffsetT
         typename UnitWord<T>::DeviceWord    align0;     ///< Alignment/padding (for Win32 consistency between host/device)
     };
 #else
-    Offset                                  offset;     ///< Offset
+    OffsetT                                 offset;     ///< OffsetT
 #endif
 
     T                                       value;      ///< Item value
@@ -557,7 +557,7 @@ struct KeyValuePair
 template <typename T>
 __host__ __device__ __forceinline__ T ZeroInitialize()
 {
-#if (CUB_PTX_VERSION > 0) && (CUB_PTX_VERSION <= 130)
+#if (CUB_PTX_ARCH > 0) && (CUB_PTX_ARCH <= 130)
 
     typedef typename UnitWord<T>::ShuffleWord ShuffleWord;
     const int MULTIPLE = sizeof(T) / sizeof(ShuffleWord);
@@ -581,8 +581,12 @@ __host__ __device__ __forceinline__ T ZeroInitialize()
 template <typename T, int COUNT>
 struct ArrayWrapper
 {
-    /// Static array of type \p T
+
+    /// Statically-sized array of type \p T
     T array[COUNT];
+
+    /// Constructor
+    __host__ __device__ __forceinline__ ArrayWrapper() {}
 };
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
@@ -624,6 +628,10 @@ struct DoubleBuffer
 
     /// \brief Return pointer to the currently valid buffer
     __host__ __device__ __forceinline__ T* Current() { return d_buffers[selector]; }
+
+    /// \brief Return pointer to the currently invalid buffer
+    __host__ __device__ __forceinline__ T* Alternate() { return d_buffers[selector ^ 1]; }
+
 };
 
 
@@ -817,21 +825,22 @@ template <typename T, typename BinaryOp>
 struct BinaryOpHasIdxParam
 {
 private:
+/*
     template <typename BinaryOpT, bool (BinaryOpT::*)(const T &a, const T &b, unsigned int idx) const>  struct SFINAE1 {};
     template <typename BinaryOpT, bool (BinaryOpT::*)(const T &a, const T &b, unsigned int idx)>        struct SFINAE2 {};
     template <typename BinaryOpT, bool (BinaryOpT::*)(T a, T b, unsigned int idx) const>                struct SFINAE3 {};
     template <typename BinaryOpT, bool (BinaryOpT::*)(T a, T b, unsigned int idx)>                      struct SFINAE4 {};
-
+*/
     template <typename BinaryOpT, bool (BinaryOpT::*)(const T &a, const T &b, int idx) const>           struct SFINAE5 {};
     template <typename BinaryOpT, bool (BinaryOpT::*)(const T &a, const T &b, int idx)>                 struct SFINAE6 {};
     template <typename BinaryOpT, bool (BinaryOpT::*)(T a, T b, int idx) const>                         struct SFINAE7 {};
     template <typename BinaryOpT, bool (BinaryOpT::*)(T a, T b, int idx)>                               struct SFINAE8 {};
-
+/*
     template <typename BinaryOpT> static char Test(SFINAE1<BinaryOpT, &BinaryOpT::operator()> *);
     template <typename BinaryOpT> static char Test(SFINAE2<BinaryOpT, &BinaryOpT::operator()> *);
     template <typename BinaryOpT> static char Test(SFINAE3<BinaryOpT, &BinaryOpT::operator()> *);
     template <typename BinaryOpT> static char Test(SFINAE4<BinaryOpT, &BinaryOpT::operator()> *);
-
+*/
     template <typename BinaryOpT> static char Test(SFINAE5<BinaryOpT, &BinaryOpT::operator()> *);
     template <typename BinaryOpT> static char Test(SFINAE6<BinaryOpT, &BinaryOpT::operator()> *);
     template <typename BinaryOpT> static char Test(SFINAE7<BinaryOpT, &BinaryOpT::operator()> *);
@@ -846,6 +855,8 @@ public:
 };
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
+
+
 
 /******************************************************************************
  * Simple type traits utilities.

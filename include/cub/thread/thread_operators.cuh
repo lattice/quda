@@ -132,20 +132,22 @@ struct Max
 
 
 /**
- * \brief Arg max functor (keeps the value and offset of the first occurrence of the l item)
+ * \brief Arg max functor (keeps the value and offset of the first occurrence of the larger item)
  */
 struct ArgMax
 {
     /// Boolean max operator, preferring the item having the smaller offset in case of ties
-    template <typename T, typename Offset>
-    __host__ __device__ __forceinline__ ItemOffsetPair<T, Offset> operator()(
-        const ItemOffsetPair<T, Offset> &a,
-        const ItemOffsetPair<T, Offset> &b) const
+    template <typename T, typename OffsetT>
+    __host__ __device__ __forceinline__ ItemOffsetPair<T, OffsetT> operator()(
+        const ItemOffsetPair<T, OffsetT> &a,
+        const ItemOffsetPair<T, OffsetT> &b) const
     {
-        if (a.value == b.value)
-            return (b.offset < a.offset) ? b : a;
+// Mooch BUG (device reduce argmax gk110 3.2 million random fp32)
+//        return ((b.value > a.value) || ((a.value == b.value) && (b.offset < a.offset))) ? b : a;
 
-        return (b.value > a.value) ? b : a;
+        if ((b.value > a.value) || ((a.value == b.value) && (b.offset < a.offset)))
+            return b;
+        return a;
     }
 };
 
@@ -170,15 +172,17 @@ struct Min
 struct ArgMin
 {
     /// Boolean min operator, preferring the item having the smaller offset in case of ties
-    template <typename T, typename Offset>
-    __host__ __device__ __forceinline__ ItemOffsetPair<T, Offset> operator()(
-        const ItemOffsetPair<T, Offset> &a,
-        const ItemOffsetPair<T, Offset> &b) const
+    template <typename T, typename OffsetT>
+    __host__ __device__ __forceinline__ ItemOffsetPair<T, OffsetT> operator()(
+        const ItemOffsetPair<T, OffsetT> &a,
+        const ItemOffsetPair<T, OffsetT> &b) const
     {
-        if (a.value == b.value)
-            return (b.offset < a.offset) ? b : a;
+// Mooch BUG (device reduce argmax gk110 3.2 million random fp32)
+//        return ((b.value < a.value) || ((a.value == b.value) && (b.offset < a.offset))) ? b : a;
 
-        return (b.value < a.value) ? b : a;
+        if ((b.value < a.value) || ((a.value == b.value) && (b.offset < a.offset)))
+            return b;
+        return a;
     }
 };
 
@@ -189,7 +193,7 @@ struct ArgMin
 template <typename B>
 struct Cast
 {
-    /// Boolean max operator, returns <tt>(a > b) ? a : b</tt>
+    /// Cast operator, returns <tt>(B) a</tt>
     template <typename A>
     __host__ __device__ __forceinline__ B operator()(const A &a) const
     {
@@ -197,6 +201,52 @@ struct Cast
     }
 };
 
+
+/**
+ * \brief Reduce-by-segment functor.
+ *
+ * Given two cub::ItemOffsetPair inputs \p a and \p b and a
+ * binary associative combining operator \p <tt>f(const T &x, const T &y)</tt>,
+ * an instance of this functor returns a cub::ItemOffsetPair whose \p offset
+ * field is <tt>a.offset</tt> + <tt>a.offset</tt>, and whose \p value field
+ * is either b.value if b.offset is non-zero, or f(a.value, b.value) otherwise.
+ *
+ * ReduceBySegmentOp is an associative, non-commutative binary combining operator
+ * for input sequences of cub::ItemOffsetPair pairings.  Such
+ * sequences are typically used to represent a segmented set of values to be reduced
+ * and a corresponding set of {0,1}-valued integer "head flags" demarcating the
+ * first value of each segment.
+ *
+ */
+template <
+    typename ReductionOp,                           ///< Binary reduction operator to apply to values
+    typename ItemOffsetPair>                        ///< ItemOffsetPair pairing of T (value) and OffsetT (head flag)
+class ReduceBySegmentOp
+{
+private:
+
+    /// Wrapped reduction operator
+    ReductionOp op;
+
+public:
+
+    /// Constructor
+    __host__ __device__ __forceinline__ ReduceBySegmentOp(ReductionOp op) : op(op) {}
+
+    /// Scan operator
+    __host__ __device__ __forceinline__ ItemOffsetPair operator()(
+        const ItemOffsetPair &first,       ///< First partial reduction
+        const ItemOffsetPair &second)      ///< Second partial reduction
+    {
+        // This expression uses less registers and is faster when compiled with Open64
+        ItemOffsetPair retval;
+        retval.offset = first.offset + second.offset;
+        retval.value = (second.offset) ?
+                second.value :                          // The second partial reduction spans a segment reset, so it's value aggregate becomes the running aggregate
+                op(first.value, second.value);          // The second partial reduction does not span a reset, so accumulate both into the running aggregate
+        return retval;
+    }
+};
 
 
 /** @} */       // end group UtilModule
