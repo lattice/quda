@@ -1443,7 +1443,10 @@ namespace quda {
 
     if (dir%2 == 0) { // sending backwards
 #ifdef P2P_COMMS
-      if(!comm_dslash_peer2peer_enabled(1,dim))
+      if(comm_dslash_peer2peer_enabled(1,dim)){
+	// receive from the processor in the +1 direction
+	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
+      } else 
 #endif
       {
         // Prepost receive
@@ -1452,7 +1455,9 @@ namespace quda {
     } else { //sending forwards
       // Prepost receive
 #ifdef P2P_COMMS
-      if(!comm_dslash_peer2peer_enabled(0,dim))
+      if (comm_dslash_peer2peer_enabled(0,dim)) {
+	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
+      } else
 #endif
       {
         comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
@@ -1486,20 +1491,10 @@ namespace quda {
         comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
 #ifdef P2P_COMMS
       } else {
-//      if(comm_dslash_peer2peer_enabled(0,dim)){
 	// send to the processor in the -1 direction
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
       } 
 
-      // should prepost the receive 
-      // I can put this in the recvStart method 	
-      // If I do that I should have different message handles for the different buffers
-      if(comm_dslash_peer2peer_enabled(1,dim)){
-	// receive from the processor in the +1 direction
-	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
-      }
-
-	
 
       if(comm_dslash_peer2peer_enabled(1,dim)) {
       	cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
@@ -1527,13 +1522,7 @@ namespace quda {
 #ifdef P2P_COMMS
       } else {
       // send a message to the processor in the forward direction
-   //   if(comm_dslash_peer2peer_enabled(1,dim)) {
 	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
-      }
-
-      // receive a message from the processor in the backward direction
-      if (comm_dslash_peer2peer_enabled(0,dim)) {
-	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
       }
 
 
