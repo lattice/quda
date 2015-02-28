@@ -28,8 +28,10 @@ namespace quda {
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   int cudaColorSpinorField::fwdGhostBufferOffset[2][QUDA_MAX_DIM];
   int cudaColorSpinorField::backGhostBufferOffset[2][QUDA_MAX_DIM];
+#ifdef P2P_COMMS
+//  bool cudaColorSpinorField::ipcInit = false;  
+#endif
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
-  
 
   // Need events to coordinate IPC memory copies
   cudaEvent_t cudaColorSpinorField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
@@ -50,11 +52,10 @@ namespace quda {
   void cudaColorSpinorField::createIPCDslashComms(){
   
 #ifdef P2P_COMMS	
- 
-
     static int ipcInit = 0;
 
-    int myrank = comm_rank();
+ //   if(ipcInit) return;
+
 
     if(!initComms) errorQuda("Can only be called after create comms\n");
 
@@ -89,6 +90,7 @@ namespace quda {
 						    disp,
 						    sizeof(ipcLocalGhostBufferHandle[b][dir][dim]));
 	  }
+
 
 	  if(receiveHandle) comm_start(receiveHandle);
 	  if(sendHandle) comm_start(sendHandle);
@@ -126,7 +128,7 @@ namespace quda {
       }
     }
 
-    // Creat local events for asynchronous copies from the peer process
+    // Create local events for asynchronous copies from the peer process
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
       for(int dir=0; dir<2; ++dir){
@@ -136,6 +138,34 @@ namespace quda {
 	}
       }
     }
+
+
+    // Create message handles for IPC synchronization
+    for(int dim=0; dim<4; ++dim){
+      if(!commDimPartitioned(dim)) continue;
+      if(comm_dslash_peer2peer_enabled(1,dim)){
+	int dummy = dim;
+	for(int b=0; b<2; ++b){
+	  // send to processor in forward direction
+	  mh_send_p2p_fwd[b][dim] = comm_declare_send_relative(&dummy,dim,+1,sizeof(int));
+	  // receive from processor in forward direction
+	  mh_recv_p2p_fwd[b][dim] = comm_declare_receive_relative(&dummy,dim,+1,sizeof(int)); 
+
+	}
+      }
+
+      if(comm_dslash_peer2peer_enabled(0,dim)){
+	int dummy;
+	for(int b=0; b<2; ++b){
+	  // send to processor in backward direction
+	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&dummy,dim,-1,sizeof(int));
+	  // receive from processor in backward direction
+	  mh_recv_p2p_back[b][dim] = comm_declare_receive_relative(&dummy,dim,-1,sizeof(int));
+	}
+      }
+    }
+
+
 
     ipcInit = 1;
 #endif // P2P_COMMS
@@ -1241,6 +1271,7 @@ namespace quda {
 	      comm_free(mh_send_back[b][j][2*i+1]);
 	    }
 #endif // GPU_COMMS
+
 	  }
 	}
 	delete []mh_recv_fwd[b][j];
@@ -1281,8 +1312,42 @@ namespace quda {
 	from_fwd_norm_face[b][i] = NULL;
 	from_back_norm_face[b][i] = NULL;
       }
-#endif      
+#endif 
+
+/*
+#ifdef P2P_COMMS
+	for(int i=0; i<4; ++i){
+          if(!commDimPartitioned(i)) continue;		
+      	  if(comm_dslash_peer2peer_enabled(0,i))  {
+	    printfQuda("Calling comm_free %d %d\n", b, i);
+	    comm_free(mh_send_p2p_back[b][i]);
+	    comm_free(mh_recv_p2p_back[b][i]);
+	  }
+
+	  if(comm_dslash_peer2peer_enabled(1,i)) {
+	    printfQuda("Calling comm_free %d %d\n", b, i);
+	    comm_free(mh_send_p2p_fwd[b][i]);
+	    comm_free(mh_recv_p2p_fwd[b][i]);
+	  }
+	}
+//	initIPCComms = false;
+#endif
+*/     
       } // loop over b
+
+/*  
+      for(int i=0; i<4; ++i){
+	if(!commDimPartitioned(i)) continue;
+	
+	for(int b=0; b<2; ++b){
+	  comm_free(mh_send_p2p_back[b][i]);
+	  comm_free(mh_send_p2p_fwd[b][i]);
+        }
+      }
+*/
+
+
+
       initComms = false;
       checkCudaError();
     }
@@ -1416,20 +1481,33 @@ namespace quda {
     if(dir%2 == 0){ // sending backwards
 #ifdef P2P_COMMS
       if(!comm_dslash_peer2peer_enabled(0,dim))
-#endif
       {
+#endif
         comm_start(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+#ifdef P2P_COMMS
+      } else {
+//      if(comm_dslash_peer2peer_enabled(0,dim)){
+	// send to the processor in the -1 direction
+	comm_start(mh_send_p2p_back[bufferIndex][dim]);
+      } 
+
+      // should prepost the receive 
+      // I can put this in the recvStart method 	
+      // If I do that I should have different message handles for the different buffers
+      if(comm_dslash_peer2peer_enabled(1,dim)){
+	// receive from the processor in the +1 direction
+	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
       }
 
-#ifdef P2P_COMMS
-      comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
-
-      cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
+	
 
       if(comm_dslash_peer2peer_enabled(1,dim)) {
+      	cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
         // begin the copy from the forward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][1];
-
+	
+	// Synchronize with the forward processor
+	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
 	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ backGhostBufferOffset[bufferIndex][dim]),
@@ -1443,19 +1521,30 @@ namespace quda {
 #endif
     } else { // sending forwards 
 #ifdef P2P_COMMS
-      if(!comm_dslash_peer2peer_enabled(1,dim))
+      if(!comm_dslash_peer2peer_enabled(1,dim)) {
 #endif
-      {
 	comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+#ifdef P2P_COMMS
+      } else {
+      // send a message to the processor in the forward direction
+   //   if(comm_dslash_peer2peer_enabled(1,dim)) {
+	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
 
-#ifdef P2P_COMMS
-      comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
+      // receive a message from the processor in the backward direction
+      if (comm_dslash_peer2peer_enabled(0,dim)) {
+	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
+      }
 
-      cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
+
+
       if(comm_dslash_peer2peer_enabled(0,dim)) {
+      	cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
 	// copy from backward processor
 	void *ghost_dst = ghost_field + precision*ghostOffset[dim][0];
+
+	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
+
 	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ fwdGhostBufferOffset[bufferIndex][dim]),
@@ -1525,6 +1614,17 @@ namespace quda {
 
 #ifdef P2P_COMMS
       comm_barrier(); // Sledgehammer synchronization, but okay for testing purposes
+      // Copy data from the processor in the backward direction
+      // This means I should send to the forward direction if peer-to-peer comms are enabled there
+      if(comm_dslash_peer2peer_enabled(1,dim)) {
+	// send a signal to the forward direction
+      }
+
+      if (comm_dslash_peer2peer_enabled(0,dim)) {
+	// wait for a signal from the backward direction
+      }
+
+
 
       cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
       if(comm_dslash_peer2peer_enabled(0,dim)) {

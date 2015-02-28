@@ -347,6 +347,14 @@ namespace quda {
    MsgHandle ***mh_send_norm_back[2];
 #endif
 
+#ifdef P2P_COMMS
+   MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+   MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
+   MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
+   MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
+#endif
+
+
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
@@ -385,6 +393,10 @@ namespace quda {
 
     /** Whether we have initialized communication for this field */
     bool initComms;
+
+#ifdef P2P_COMMS
+    static bool initIPCDslashComms;
+#endif
 
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
