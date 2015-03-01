@@ -395,7 +395,8 @@ namespace quda {
     bool initComms;
 
 #ifdef P2P_COMMS
-    static bool initIPCDslashComms;
+    /** Whether we have initialized peer-to-peer communication for this field */
+    bool initIPCDslashComms;
 #endif
 
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
@@ -427,6 +428,9 @@ namespace quda {
     void createIPCDslashComms();
     /** Destroy the communication handlers and buffers */
     void destroyComms();
+#ifdef P2P_COMMS
+    void destroyIPCDslashComms();
+#endif
     void allocateGhostBuffer(int nFace);
     static void freeGhostBuffer(void);
 

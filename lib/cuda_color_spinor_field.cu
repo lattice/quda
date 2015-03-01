@@ -28,9 +28,6 @@ namespace quda {
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   int cudaColorSpinorField::fwdGhostBufferOffset[2][QUDA_MAX_DIM];
   int cudaColorSpinorField::backGhostBufferOffset[2][QUDA_MAX_DIM];
-#ifdef P2P_COMMS
-//  bool cudaColorSpinorField::ipcInit = false;  
-#endif
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
 
   // Need events to coordinate IPC memory copies
@@ -52,9 +49,7 @@ namespace quda {
   void cudaColorSpinorField::createIPCDslashComms(){
   
 #ifdef P2P_COMMS	
-    static int ipcInit = 0;
-
- //   if(ipcInit) return;
+    if(initIPCDslashComms) return;
 
 
     if(!initComms) errorQuda("Can only be called after create comms\n");
@@ -113,11 +108,9 @@ namespace quda {
 	for(int b=0; b<2; ++b){
 	  void** remoteGhostSrcBuffer = (dir==0) ? &(fwdGhostFaceSrcBuffer[b][dim]) 
 					: &(backGhostFaceSrcBuffer[b][dim]);
-
-          if(ipcInit){
-	    cudaIpcCloseMemHandle(*remoteGhostSrcBuffer);
-	  }
-
+  //        if(initIPCDslashComms){
+  //	    cudaIpcCloseMemHandle(*remoteGhostSrcBuffer);
+  //	  }
 	  cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][dir][dim], 
 						     cudaIpcMemLazyEnablePeerAccess);
 	}
@@ -134,7 +127,8 @@ namespace quda {
       for(int dir=0; dir<2; ++dir){
         if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
 	for(int b=0; b<2; ++b){
-	  if(!ipcInit) cudaEventCreate(&ipcCopyEvent[b][dir][dim]);
+	  cudaEventCreate(&ipcCopyEvent[b][dir][dim]);
+	//  cudaEventCreate(&ipcCopyEvent[b][dir][dim]);
 	}
       }
     }
@@ -167,7 +161,7 @@ namespace quda {
 
 
 
-    ipcInit = 1;
+    initIPCDslashComms = true;
 #endif // P2P_COMMS
   }
 
@@ -176,6 +170,10 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
+
+#ifdef P2P_COMMS
+    initIPCDslashComms = false;
+#endif
 
     // this must come before create
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
@@ -200,6 +198,9 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
+#ifdef P2P_COMMS
+    initIPCDslashComms = false;
+#endif
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
   }
@@ -209,7 +210,9 @@ namespace quda {
 					     const ColorSpinorParam &param) :
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {  
-
+#ifdef P2P_COMMS
+    initIPCDslashComms = false;
+#endif
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
 	(param.create == QUDA_REFERENCE_FIELD_CREATE && 
@@ -263,6 +266,10 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorField &src) 
     : ColorSpinorField(src), alloc(false), init(true), texInit(false), 
       initComms(false), bufferMessageHandler(0), nFaceComms(0) {
+
+#ifdef P2P_COMMS
+    initIPCDslashComms = false;
+#endif
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
   }
@@ -1246,9 +1253,49 @@ namespace quda {
     }
     checkCudaError();
   }
+   
+#ifdef P2P_COMMS
+  void cudaColorSpinorField::destroyIPCDslashComms() {
+    if(!initIPCDslashComms) return;
+
+    for(int dim=0; dim<4; ++dim){
+
+      if(!commDimPartitioned(dim)) continue;
     
+      if(comm_dslash_peer2peer_enabled(1,dim)) {
+	for(int b=0; b<2; ++b){
+	  comm_free(mh_send_p2p_fwd[b][dim]);
+	  comm_free(mh_recv_p2p_fwd[b][dim]);
+
+	  cudaIpcCloseMemHandle(backGhostFaceSrcBuffer[b][dim]);
+	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
+	}
+      }
+
+
+	
+      if(comm_dslash_peer2peer_enabled(0,dim)) {
+        const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
+	for(int b=0; b<2; ++b){
+	  comm_free(mh_send_p2p_back[b][dim]);
+	  comm_free(mh_recv_p2p_back[b][dim]);
+
+	  if(num_dir == 2) cudaIpcCloseMemHandle(fwdGhostFaceSrcBuffer[b][dim]);
+	   
+	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
+	}
+      }    
+    }
+    checkCudaError();
+    initIPCDslashComms = false;
+  }
+#endif
+ 
   void cudaColorSpinorField::destroyComms() {
     if (initComms) {
+#ifdef P2P_COMMS
+      destroyIPCDslashComms();
+#endif
       for(int b=0; b<2; ++b){
       for (int j=0; j<maxNface; j++) {
 	for (int i=0; i<nDimComms; i++) {
@@ -1314,39 +1361,7 @@ namespace quda {
       }
 #endif 
 
-/*
-#ifdef P2P_COMMS
-	for(int i=0; i<4; ++i){
-          if(!commDimPartitioned(i)) continue;		
-      	  if(comm_dslash_peer2peer_enabled(0,i))  {
-	    printfQuda("Calling comm_free %d %d\n", b, i);
-	    comm_free(mh_send_p2p_back[b][i]);
-	    comm_free(mh_recv_p2p_back[b][i]);
-	  }
-
-	  if(comm_dslash_peer2peer_enabled(1,i)) {
-	    printfQuda("Calling comm_free %d %d\n", b, i);
-	    comm_free(mh_send_p2p_fwd[b][i]);
-	    comm_free(mh_recv_p2p_fwd[b][i]);
-	  }
-	}
-//	initIPCComms = false;
-#endif
-*/     
       } // loop over b
-
-/*  
-      for(int i=0; i<4; ++i){
-	if(!commDimPartitioned(i)) continue;
-	
-	for(int b=0; b<2; ++b){
-	  comm_free(mh_send_p2p_back[b][i]);
-	  comm_free(mh_send_p2p_fwd[b][i]);
-        }
-      }
-*/
-
-
 
       initComms = false;
       checkCudaError();
