@@ -348,10 +348,10 @@ namespace quda {
 #endif
 
 #ifdef P2P_COMMS
-   MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
-   MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
-   MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
-   MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
+   static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+   static MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
+   static MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
+   static MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
 #endif
 
 
@@ -396,7 +396,7 @@ namespace quda {
 
 #ifdef P2P_COMMS
     /** Whether we have initialized peer-to-peer communication for this field */
-    bool initIPCDslashComms;
+    static bool initIPCDslashComms;
 #endif
 
     /** Keep track of which pinned-memory buffer we used for creating message handlers */

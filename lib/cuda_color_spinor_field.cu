@@ -29,6 +29,11 @@ namespace quda {
   int cudaColorSpinorField::fwdGhostBufferOffset[2][QUDA_MAX_DIM];
   int cudaColorSpinorField::backGhostBufferOffset[2][QUDA_MAX_DIM];
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
+  MsgHandle* cudaColorSpinorField::mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_send_p2p_back[2][QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_recv_p2p_back[2][QUDA_MAX_DIM];
+  bool cudaColorSpinorField::initIPCDslashComms = false;
 
   // Need events to coordinate IPC memory copies
   cudaEvent_t cudaColorSpinorField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
@@ -51,11 +56,11 @@ namespace quda {
 #ifdef P2P_COMMS	
     if(initIPCDslashComms) return;
 
-
     if(!initComms) errorQuda("Can only be called after create comms\n");
 
     comm_dslash_peer2peer_init();
 
+    checkCudaError();
 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
@@ -100,6 +105,8 @@ namespace quda {
       } // loop over dir (0,1)
     } // loop over dim
 
+    checkCudaError();
+
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
@@ -108,19 +115,20 @@ namespace quda {
 	for(int b=0; b<2; ++b){
 	  void** remoteGhostSrcBuffer = (dir==0) ? &(fwdGhostFaceSrcBuffer[b][dim]) 
 					: &(backGhostFaceSrcBuffer[b][dim]);
-  //        if(initIPCDslashComms){
-  //	    cudaIpcCloseMemHandle(*remoteGhostSrcBuffer);
-  //	  }
-	  cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][dir][dim], 
+
+	  cudaError_t result = cudaIpcOpenMemHandle(remoteGhostSrcBuffer, ipcRemoteGhostBufferHandle[b][dir][dim], 
 						     cudaIpcMemLazyEnablePeerAccess);
 	}
       }
-	
       if(num_dir == 1){
-	for(int b=0; b<2; ++b) backGhostFaceSrcBuffer[b][dim] = fwdGhostFaceSrcBuffer[b][dim];
+	for(int b=0; b<2; ++b){ 
+	  backGhostFaceSrcBuffer[b][dim] = fwdGhostFaceSrcBuffer[b][dim];
+        }
       }
     }
 
+
+    checkCudaError();
     // Create local events for asynchronous copies from the peer process
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
@@ -133,6 +141,7 @@ namespace quda {
       }
     }
 
+    checkCudaError();
 
     // Create message handles for IPC synchronization
     for(int dim=0; dim<4; ++dim){
@@ -160,8 +169,8 @@ namespace quda {
     }
 
 
-
     initIPCDslashComms = true;
+    checkCudaError();
 #endif // P2P_COMMS
   }
 
@@ -172,7 +181,7 @@ namespace quda {
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 
 #ifdef P2P_COMMS
-    initIPCDslashComms = false;
+//    initIPCDslashComms = false;
 #endif
 
     // this must come before create
@@ -199,7 +208,7 @@ namespace quda {
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 #ifdef P2P_COMMS
-    initIPCDslashComms = false;
+//    initIPCDslashComms = false;
 #endif
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -211,7 +220,7 @@ namespace quda {
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {  
 #ifdef P2P_COMMS
-    initIPCDslashComms = false;
+//    initIPCDslashComms = false;
 #endif
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -268,7 +277,7 @@ namespace quda {
       initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 
 #ifdef P2P_COMMS
-    initIPCDslashComms = false;
+//    initIPCDslashComms = false;
 #endif
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -352,6 +361,9 @@ namespace quda {
     }
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+
+      printfQuda("QUDA_FULL_SITE_SUBSET\n");
+
       if(eigv_dim != 0) errorQuda("Eigenvectors must be parity fields!");
       // create the associated even and odd subsets
       ColorSpinorParam param;
@@ -1005,8 +1017,10 @@ namespace quda {
 
   void cudaColorSpinorField::createComms(int nFace) {
 
+    checkCudaError();
     if(bufferMessageHandler != bufferPinnedResizeCount) destroyComms();
 
+    checkCudaError();
     if (!initComms || nFaceComms != nFace) {
 
       // if we are requesting a new number of faces destroy and start over
@@ -1251,11 +1265,15 @@ namespace quda {
       initComms = true;
       nFaceComms = nFace;
     }
+#ifdef P2P_COMMS
+    createIPCDslashComms();
+#endif
     checkCudaError();
   }
    
 #ifdef P2P_COMMS
   void cudaColorSpinorField::destroyIPCDslashComms() {
+
     if(!initIPCDslashComms) return;
 
     for(int dim=0; dim<4; ++dim){
@@ -1286,6 +1304,7 @@ namespace quda {
 	}
       }    
     }
+
     checkCudaError();
     initIPCDslashComms = false;
   }
@@ -1295,6 +1314,7 @@ namespace quda {
     if (initComms) {
 #ifdef P2P_COMMS
       destroyIPCDslashComms();
+      checkCudaError();
 #endif
       for(int b=0; b<2; ++b){
       for (int j=0; j<maxNface; j++) {
@@ -1497,6 +1517,7 @@ namespace quda {
      
     if(!commDimPartitioned(dim)) return;
 
+    checkCudaError();
 	
     if(dir%2 == 0){ // sending backwards
 #ifdef P2P_COMMS
@@ -1507,9 +1528,10 @@ namespace quda {
 #ifdef P2P_COMMS
       } else {
 	// send to the processor in the -1 direction
+        checkCudaError();
 	comm_start(mh_send_p2p_back[bufferIndex][dim]);
+        checkCudaError();
       } 
-
 
       if(comm_dslash_peer2peer_enabled(1,dim)) {
       	cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
@@ -1518,13 +1540,13 @@ namespace quda {
 	
 	// Synchronize with the forward processor
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
+
 	cudaMemcpyAsync(ghost_dst, 
 			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ backGhostBufferOffset[bufferIndex][dim]),
 			ghost_face_bytes[dim],
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy from forward processor
-
 
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
       }
@@ -1550,7 +1572,7 @@ namespace quda {
 	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
 
 	cudaMemcpyAsync(ghost_dst, 
-			(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
+			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
 			+ fwdGhostBufferOffset[bufferIndex][dim]),
 			ghost_face_bytes[dim],
 			cudaMemcpyDeviceToDevice,
@@ -1560,6 +1582,7 @@ namespace quda {
       }
 #endif
     }
+    checkCudaError();
 }
 
   void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
