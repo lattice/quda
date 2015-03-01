@@ -100,7 +100,6 @@ namespace quda {
       }
       if(i==0){
 	ghostOffset[i][0] = 0;
-        ghost_bytes = 0;
       }else{
         if(precision == QUDA_HALF_PRECISION){
           ghostOffset[i][0] = (ghostNormOffset[i-1][1] + num_norm_faces*ghostFace[i-1]/2)*sizeof(float)/sizeof(short);
@@ -121,10 +120,8 @@ namespace quda {
         ghostOffset[i][1] = 4*((ghostOffset[i][1] + 3)/4);
         ghostNormOffset[i][1] = (ghostOffset[i][1] + (num_faces*ghostFace[i]*nSpin*nColor*2/2))*sizeof(short)/sizeof(float);
        
-        ghost_bytes = (ghostNormOffset[i][1] + num_norm_faces*ghostFace[i]/2)*QUDA_SINGLE_PRECISION;
       }else{
         ghostOffset[i][1] = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2/2;
-        ghost_bytes = ghostOffset[i][0] + num_faces*ghostFace[i]*nSpin*nColor*2*precision;
       }
 
 #ifdef MULTI_GPU
@@ -134,7 +131,6 @@ namespace quda {
 #endif
     }//end of outmost for loop (index i)
 
-    ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
     int ghostNormVolume = num_norm_faces * ghostVolume;
     ghostVolume *= num_faces;
 
@@ -166,6 +162,11 @@ namespace quda {
       printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
       printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
     }
+
+    ghost_bytes = ghost_length*precision;
+    if(precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
+  
+    ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
 
   } // createGhostZone
 
@@ -217,14 +218,12 @@ namespace quda {
 
     bytes = total_length * precision; // includes pads and ghost zones
     norm_bytes = total_norm_length * sizeof(float);
-    if(precision == QUDA_HALF_PRECISION) bytes += norm_bytes; // bytes includes the space for norm_bytes    
 
     bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
     norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
 
-    ghost_bytes = ghost_length*precision; // need to change this to include half-precision norms
+    ghost_bytes = ghost_length*precision;
     if(precision == QUDA_HALF_PRECISION) ghost_bytes += ghost_norm_length*sizeof(float);
-    
   
     ghost_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(ghost_bytes/2) : ALIGNMENT_ADJUST(ghost_bytes);
 
