@@ -33,7 +33,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	unitarize_links_quda.o milc_interface.o				\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
-	inv_mpcg_quda.o inv_mpbicgstab_quda.o
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o blas_magma_gpu.o
 
 
 # header files, found in include/
@@ -133,6 +133,9 @@ tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
+	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+
+blas_magma_gpu.o: blas_magma.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 reduce_quda.o: reduce_quda.cu $(HDRS) $(REDUCE_INLN)

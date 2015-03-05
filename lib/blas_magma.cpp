@@ -298,21 +298,22 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm)
 {
 #ifdef MAGMA_LIB 
-       const int cprec = 2*prec;
-       int l           = max_nev;
-//
-       //void *Tmp = 0;
-       //magma_malloc((void**)&Tmp, vld*l*cprec);     
+       if( (vld % 32) != 0) printf("\nError: leading dimension must be multiple of the warp size\n"), exit(-1);
 
-       //cudaMemset(Tmp, 0, vld*l*cprec);   
-//
-       const int bufferSize = 2*vld+l*l;
-      
-       int bufferBlock = bufferSize / l;
+       const int cvprec = 2*vprec;
+
+       const int l     = max_nev;
+
+       //int bufferSize =  2*vld+l*l;
+       //int bufferBlock = bufferSize / l;
+
+       int bufferBlock = (2*vld) / l;
+       bufferBlock     = (bufferBlock / 32) * 32;//corrected bufferBlock to be multiple of the warp size
+       int bufferSize  = (bufferBlock * l);
 
        void  *buffer = 0;
-       magma_malloc(&buffer, bufferSize*cprec);
-       cudaMemset(buffer, 0, bufferSize*cprec);
+       magma_malloc(&buffer, bufferSize*cvprec);
+       cudaMemset(buffer, 0, bufferSize*cvprec);
 
 
        if(prec == 4)
@@ -332,34 +333,7 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 
        if(vprec == 4)
        {
-         magmaFloatComplex *dtm;
-
-         const int cvprec = 2*vprec;
-
-         if(prec == 8)
-         {
-            magma_malloc((void**)&dtm, ldm*l*cvprec);
-
-            double *hbuff1;
-            float  *hbuff2;
-
-            magma_malloc_pinned((void**)&hbuff1, ldm*l*cprec);
-            magma_malloc_pinned((void**)&hbuff2, ldm*l*cvprec);
-
-            cudaMemcpy(hbuff1, dTm, ldm*l*cprec, cudaMemcpyDefault); 
-            for(int i = 0; i < ldm*l; i++) hbuff2[i] = (float)hbuff1[i];
-
-            cudaMemcpy(dtm, hbuff2, ldm*l*cvprec, cudaMemcpyDefault); 
-
-            magma_free_pinned(hbuff1);
-            magma_free_pinned(hbuff2);
-         }
-         else 
-         {
-            dtm = (magmaFloatComplex *)dTm;
-         }
-
-         //magmablas_cgemm('N', 'N', vlen, l, m, MAGMA_C_ONE, (magmaFloatComplex*)dV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)Tmp, vld);
+         if(prec == vprec) printf("\nError: option is not currently supported, exit ...\n"), exit(-1);
 
          for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
          {
@@ -367,19 +341,13 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 
            magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[blockOffset]);
 
-           magmablas_cgemm(_cN, _cN, bufferBlock, l, m, MAGMA_C_ONE, ptrV, vld, dtm, ldm, MAGMA_C_ZERO, (magmaFloatComplex*)buffer, bufferBlock);
+           sMM_v2(buffer, bufferBlock, ptrV, bufferBlock, m, vld, dTm, m, l, ldm);
 
            cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
-
          }
-
-         if(prec == 8) magma_free(dtm);
-
        }
        else
        {
-         //magmablas_zgemm('N', 'N', vlen, l, m, MAGMA_Z_ONE, (magmaDoubleComplex*)dV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)Tmp, vld);
-
          for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
          {
            if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
@@ -388,16 +356,12 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
 
            magmablas_zgemm(_cN, _cN, bufferBlock, l, m, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
 
-           cudaMemcpy2D(ptrV, vld*cprec, buffer, bufferBlock*cprec,  bufferBlock*cprec, l, cudaMemcpyDefault);
+           cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
 	 }
        }
 
-       //cudaMemcpy(dV, Tmp, vld*l*cprec, cudaMemcpyDefault); 
-
-       //magma_free(Tmp);
        magma_free(buffer);
 #endif
-
        return;
 }
 
@@ -1277,11 +1241,13 @@ void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int
 //in fact ldh = ldm, but let's keep it for a moment.
 void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh)
 {
-    if(prec == 4 || (prec != vprec))
+    if(prec == 4)
     {
-       printf("\nError: single precision and mixing single/double precisions is not currently supported\n");
+       printf("\nError: single precision is not currently supported\n");
        exit(-1);
     }
+
+    if( (vld % 32) != 0) printf("\nError: leading dimension must be multiple of the warp size\n"), exit(-1);
 
     int nev  = (max_nev - 1); //(nev+1) - 1 for GMRESDR
 
@@ -1308,30 +1274,35 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     _Complex double qwork; //parameter to extract optimal size of work
 
-    const int cprec = 2*prec;//currently: sizeof(Complex)
-    int lbsize           = 2*nev;
+    const int cprec  = 2*prec; //currently: sizeof(Complex)
+    const int cvprec = 2*vprec;
 
-    const int bufferSize = 2*vld+lbsize*lbsize;
-      
-    int bufferBlock = bufferSize / lbsize;//or: lbsize = (nev+1)
+    const int l = max_nev;
 
-    int l = max_nev;
+    int lbsize           = 2*((nev / 16)*16);
+
+    //const int bufferSize = 2*vld+lbsize*lbsize;
+    //int bufferBlock = bufferSize / lbsize;//or: lbsize = (nev+1)
+
+    int bufferBlock = (2*vld) / lbsize;
+    bufferBlock     = (bufferBlock / 32) * 32;//corrected bufferBlock to be multiple of the warp size
+    int bufferSize  = (bufferBlock * lbsize);
 
     void  *buffer = NULL;
     void  *dQmat  = NULL;
 
-    magma_malloc(&buffer, bufferSize*cprec);
-    cudaMemset(buffer, 0, bufferSize*cprec);
+    magma_malloc(&buffer, bufferSize*cvprec);
+    cudaMemset(buffer, 0, bufferSize*cvprec);
 
-    magma_malloc(&dQmat, (max_nev)*ldh*cprec);
+    magma_malloc(&dQmat, l*ldh*cprec);
 
     //GPU code:
-    Complex *tau  = new Complex[max_nev];//nev+1 =>max_nev
+    Complex *tau  = new Complex[l];//nev+1 =>max_nev
 
-    Complex *Qmat = new Complex[ldh*(m+1)];//need (m+1)x(m+1) matrix on input...
+    Complex *Qmat = new Complex[ldh*_mp1];//need (m+1)x(m+1) matrix on input...
 
-    ComputeQR(max_nev, (Complex*)sortedHarVecs, (m+1), ldh, tau);//lapack version 
-#if 1    
+    ComputeQR(l, (Complex*)sortedHarVecs, _mp1, ldh, tau);//lapack version 
+   
     //max_nev vectors are stored in Qmat (output):
     //restoreOrthVectors(Qmat, max_nev, (Complex*)sortedHarVecs, (m+1), ldh, tau);
     //Load diagonal units
@@ -1354,59 +1325,38 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
     //Copy (nev+1) vectors on the device:
     cudaMemcpy(dQmat, Qmat, (max_nev)*ldh*cprec, cudaMemcpyDefault);
 
-    for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+    if(cvprec == sizeof(magmaDoubleComplex))
     {
-      if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+      {
+        if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
 
 //printf("\nBuffer block : %d\n", bufferBlock);
 
-      magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
+        magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
 
-      magmablas_zgemm(_cN, _cN, bufferBlock, l, _mp1, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dQmat, ldh, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
+        magmablas_zgemm(_cN, _cN, bufferBlock, l, _mp1, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dQmat, ldh, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
 
-      cudaMemcpy2D(ptrV, vld*cprec, buffer, bufferBlock*cprec,  bufferBlock*cprec, l, cudaMemcpyDefault);//make this async!
+        cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);//make this async!
+      }
+    }
+    else // low precision field
+    {
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+      {
+        if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+        magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[blockOffset]);
+
+        sMM_v2(buffer, bufferBlock, ptrV, bufferBlock, _mp1, vld, dQmat, _mp1, l, ldh);
+
+        cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
+      }
     }
 //ups! make on GPU:
     cudaMemset(&(((magmaDoubleComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaDoubleComplex));//= m - nev
 
     printf("\nDone...\n");
-
-#else
-/////////////////////////////////START DEBUG:
-
-  printf("\nPrint vld , vlen: %d, %d, %d, %d, %d, %d\n", vld, vlen, nev, _mp1, _ldm, _m);
-
-  int _ldn = vld;
-
-  int _n   = vlen;
-
-  Complex *hVm = new Complex[vld*(m+1)];
-
-  cudaMemcpy(hVm , dV, vld*(m+1)* sizeof(Complex), cudaMemcpyDefault);
-
-  LAPACK(zunmqr)(&_s, &_t, &_n, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)hVm, &_ldn, &qwork, &lwork, &info);
-
-  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
-
-  lwork = (int)(creal(qwork));
-
-  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
-
-  LAPACK(zunmqr)(&_s, &_t, &_n, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)hVm, &_ldn, work, &lwork, &info);
-
-  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
-
-  memset(&hVm[vld*(nev+1)], 0, (m-nev)*vld*sizeof(_Complex double));
-
-  cudaMemcpy(dV, hVm , vld*(m+1)* sizeof(Complex), cudaMemcpyDefault);
-
-  free(work);
-
-  printf("\nDone...\n");
-
-  delete [] hVm;
-/////////////////////////////////STOP DEBUG
-#endif
 
     //Construct H_new = Pdagger_{k+1} \bar{H}_{m} P_{k}  
 
