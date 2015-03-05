@@ -269,9 +269,9 @@ namespace quda {
 
    if (mixed_precision_gmresdr && !r)//probably not a good idea, but I don't see why this should not work...
    {
-      double nrmr = sqrt(norm2(r));
-      axCuda(1.0 / nrmr, r);
-      copyCuda(Vm->Eigenvec(nev), r);
+      double nrmr = sqrt(norm2(*r));
+      axCuda(1.0 / nrmr, *r);
+      copyCuda(Vm->Eigenvec(nev), *r);
    }
 
    for(int j = 0; j < nev; j++)
