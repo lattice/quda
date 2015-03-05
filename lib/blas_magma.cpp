@@ -1339,6 +1339,8 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
         cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);//make this async!
       }
+
+      cudaMemset(&(((magmaDoubleComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaDoubleComplex));//= m - nev
     }
     else // low precision field
     {
@@ -1352,11 +1354,9 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
         cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
       }
-    }
-//ups! make on GPU:
-    cudaMemset(&(((magmaDoubleComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaDoubleComplex));//= m - nev
 
-    printf("\nDone...\n");
+      cudaMemset(&(((magmaFloatComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaFloatComplex));//= m - nev
+    }
 
     //Construct H_new = Pdagger_{k+1} \bar{H}_{m} P_{k}  
 

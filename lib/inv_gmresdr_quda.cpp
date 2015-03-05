@@ -273,8 +273,7 @@ namespace quda {
  
    for(int e = 0; e < nev; e++) memcpy(&sortedHarVecs[ldm*e], &harVecs[ldm*( sorted_evals_cntr[e].eval_idx)], (ldm)*sizeof(Complex));
 
-   for(int e = 0; e < 8; e++) printfQuda("\nEigenval #%d: real %le imag %le abs %le\n", sorted_evals_cntr[e].eval_idx, harVals[(sorted_evals_cntr[e].eval_idx)].real(), harVals[(sorted_evals_cntr[e].eval_idx)].imag(),  abs(harVals[(sorted_evals_cntr[e].eval_idx)]));
-//   for(int e = 0; e < 8; e++) printfQuda("\nEigenval #%d: %le\n", sorted_evals_cntr[e].eval_idx, abs(harVals[(sorted_evals_cntr[e].eval_idx)]));
+   for(int e = 0; e < nev / 8; e++) printfQuda("\nEigenval #%d: real %le imag %le abs %le\n", sorted_evals_cntr[e].eval_idx, harVals[(sorted_evals_cntr[e].eval_idx)].real(), harVals[(sorted_evals_cntr[e].eval_idx)].imag(),  abs(harVals[(sorted_evals_cntr[e].eval_idx)]));
 
    return;
  }
@@ -302,14 +301,6 @@ namespace quda {
    checkCudaError();
 
    /*****REORTH V_{nev+1}:****/
-   //use this trick for mixed precision only:
-   if (mixed_precision_gmresdr)
-   {
-      double nrmr = sqrt(norm2(r));
-      axCuda(1.0 / nrmr, r);
-      copyCuda(Vm->Eigenvec(nev), r);
-   }
-
    for(int j = 0; j < nev; j++)
    {
      Complex calpha = cDotProductCuda(Vm->Eigenvec(j), Vm->Eigenvec(nev));//
