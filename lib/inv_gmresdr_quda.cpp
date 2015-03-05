@@ -23,9 +23,9 @@
 #define MAX_EIGENVEC_WINDOW 64
 
 /*
-Based on  GMRES-DR algorithm:
-R. B. Morgan, "GMRES with deflated restarting"
-Code design based on: A.Frommer et al, ArXiv hep-lat/1204.5463
+GMRES-DR algorithm:
+R. B. Morgan, "GMRES with deflated restarting", SIAM J. Sci. Comput. 24 (2002) p. 20-37
+Code design based on: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES in Lattice QCD simulations" ArXiv hep-lat/1204.5463
 */
 
 namespace quda {
@@ -93,7 +93,7 @@ namespace quda {
       //
       void ComputeHarmonicRitzPairs();
 
-      void RestartVH(cudaColorSpinorField &res, cudaColorSpinorField *Vm);
+      void RestartVH(cudaColorSpinorField *Vm, cudaColorSpinorField *res = 0);
 
       void PrepareDeflatedRestart(Complex *givensH, Complex *g);
 
@@ -186,41 +186,6 @@ namespace quda {
   }
 
 
-  GmresDR::GmresDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
-    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), gmres_space_prec(QUDA_INVALID_PRECISION), 
-    Vm(0), profile(profile), args(0), gmres_alloc(false)
-  {
-     if(param.nev > MAX_EIGENVEC_WINDOW )
-     { 
-          warningQuda("\nWarning: the eigenvector window is too big, using default value %d.\n", MAX_EIGENVEC_WINDOW);
-          param.nev = MAX_EIGENVEC_WINDOW;
-     }
-
-     //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMRESDR is not currently supported.\n");
-     //
-     gmres_space_prec = param.precision_sloppy;//We don't allow half precision, do we?
-
-     //create GMRESDR objects:
-     int mp1    = param.m + 1;
-
-     int ldm    = mp1;//((mp1+15)/16)*16;//leading dimension
-
-     args = new GmresDRArgs(param.m, ldm, param.nev, (param.precision != param.precision_sloppy));//deflated_cycle flag is false by default  
-
-     return;
-  }
-
-  GmresDR::~GmresDR() {
-
-    delete args;
-
-    if(gmres_alloc)   delete Vm;
-
-  }
-
-//#include <complex.h>
-//new methods:
-
 //Note: in fact, x is an accumulation field initialized to zero (if a sloppy field is used!) and has the same precision as Vm
  void GmresDRArgs::UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorField *Vm, Complex *givensH, Complex *g, const int j)
  {
@@ -278,7 +243,7 @@ namespace quda {
    return;
  }
 
- void GmresDRArgs::RestartVH(cudaColorSpinorField &r, cudaColorSpinorField *Vm)
+ void GmresDRArgs::RestartVH(cudaColorSpinorField *Vm, cudaColorSpinorField *r)
  {
    int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
    int clen = Vm->EigvLength()      >> 1; //complex vector length
@@ -301,6 +266,14 @@ namespace quda {
    checkCudaError();
 
    /*****REORTH V_{nev+1}:****/
+
+   if (mixed_precision_gmresdr && !r)//probably not a good idea, but I don't see why this should not work...
+   {
+      double nrmr = sqrt(norm2(r));
+      axCuda(1.0 / nrmr, r);
+      copyCuda(Vm->Eigenvec(nev), r);
+   }
+
    for(int j = 0; j < nev; j++)
    {
      Complex calpha = cDotProductCuda(Vm->Eigenvec(j), Vm->Eigenvec(nev));//
@@ -360,6 +333,43 @@ namespace quda {
 
    return;
  }
+
+
+
+ GmresDR::GmresDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
+    DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), gmres_space_prec(QUDA_INVALID_PRECISION), 
+    Vm(0), profile(profile), args(0), gmres_alloc(false)
+ {
+     if(param.nev > MAX_EIGENVEC_WINDOW )
+     { 
+          warningQuda("\nWarning: the eigenvector window is too big, using default value %d.\n", MAX_EIGENVEC_WINDOW);
+          param.nev = MAX_EIGENVEC_WINDOW;
+     }
+
+     //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMRESDR is not currently supported.\n");
+     //
+     gmres_space_prec = param.precision_sloppy;//We don't allow half precision, do we?
+
+     //create GMRESDR objects:
+     int mp1    = param.m + 1;
+
+     int ldm    = mp1;//((mp1+15)/16)*16;//leading dimension
+
+     args = new GmresDRArgs(param.m, ldm, param.nev, (param.precision != param.precision_sloppy));//deflated_cycle flag is false by default  
+
+     return;
+ }
+
+ GmresDR::~GmresDR() {
+
+    delete args;
+
+    if(gmres_alloc)   delete Vm;
+
+ }
+
+
+
 
  void GmresDR::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) 
  {
@@ -478,7 +488,7 @@ namespace quda {
      //scale w:
      caxpyCuda(-h0, Vm->Eigenvec(0), *Av);
      //
-#if 0 //to unify:
+#if 0 //to unify this later like below:
     //k = 0; //(nev = 0 for the first cycle)
     Complex h0;
     for (int i = 0; i <= k; i++)//i is a row index
@@ -580,7 +590,7 @@ namespace quda {
 
      args->ComputeHarmonicRitzPairs();
 
-     args->RestartVH(r, Vm);
+     args->RestartVH( Vm );
 
      memset(givensH, 0, ldH*m*sizeof(Complex));
 
