@@ -93,7 +93,7 @@ namespace quda {
       //
       void ComputeHarmonicRitzPairs();
 
-      void RestartVH(cudaColorSpinorField *Vm, cudaColorSpinorField *res = 0);
+      void RestartVH(cudaColorSpinorField *Vm);
 
       void PrepareDeflatedRestart(Complex *givensH, Complex *g);
 
@@ -243,7 +243,7 @@ namespace quda {
    return;
  }
 
- void GmresDRArgs::RestartVH(cudaColorSpinorField *Vm, cudaColorSpinorField *r)
+ void GmresDRArgs::RestartVH(cudaColorSpinorField *Vm)
  {
    int cldn = Vm->EigvTotalLength() >> 1; //complex leading dimension
    int clen = Vm->EigvLength()      >> 1; //complex vector length
@@ -267,12 +267,12 @@ namespace quda {
 
    /*****REORTH V_{nev+1}:****/
 
-   if (mixed_precision_gmresdr && !r)//probably not a good idea, but I don't see why this should not work...
-   {
-      double nrmr = sqrt(norm2(*r));
-      axCuda(1.0 / nrmr, *r);
-      copyCuda(Vm->Eigenvec(nev), *r);
-   }
+   //if (mixed_precision_gmresdr && !r)//probably not a good idea, but I don't see why this should not work...
+   //{
+      //double nrmr = sqrt(norm2(*r));
+      //axCuda(1.0 / nrmr, *r);
+      //copyCuda(Vm->Eigenvec(nev), *r);
+   //}
 
    for(int j = 0; j < nev; j++)
    {
