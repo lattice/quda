@@ -365,16 +365,26 @@ namespace quda {
     static int backGhostBufferOffset[2][QUDA_MAX_DIM];
     static int initGhostFaceBuffer;
 
-
+#ifdef P2P_COMMS
     // Static variables needed for peer-to-peer comms
     static cudaIpcMemHandle_t ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
     static cudaIpcMemHandle_t ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
- 
     static void* fwdGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
     static void* backGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
 
+    // Communication in the temporal direction is a corner case
+    // since the source buffer is not static
+    cudaIpcMemHandle_t ipcLocalFieldHandle[2];
+    cudaIpcMemHandle_t ipcRemoteFieldHandle[2];
+    cudaIpcMemHandle_t ipcLocalNormHandle[2];
+    cudaIpcMemHandle_t ipcRemoteNormHandle[2];
+    void* fwdFieldSrcBuffer;
+    void* backFieldSrcBuffer;
+    void* fwdNormSrcBuffer;
+    void* backNormSrcBuffer;
+
     static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
-  
+#endif  
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -397,8 +407,9 @@ namespace quda {
 #ifdef P2P_COMMS
     /** Whether we have initialized peer-to-peer communication for this field */
     static bool initIPCDslashComms;
+    /** Whether we have initialized peer-to-peer comms in the temporal direction */
+    bool initIPCTimeComms; // should not be static
 #endif
-
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
 
@@ -425,10 +436,10 @@ namespace quda {
 
     /** Create the communication handlers and buffers */
     void createComms(int nFace);
-    void createIPCDslashComms();
     /** Destroy the communication handlers and buffers */
     void destroyComms();
 #ifdef P2P_COMMS
+    void createIPCDslashComms();
     void destroyIPCDslashComms();
 #endif
     void allocateGhostBuffer(int nFace);

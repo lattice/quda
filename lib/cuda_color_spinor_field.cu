@@ -29,6 +29,8 @@ namespace quda {
   int cudaColorSpinorField::fwdGhostBufferOffset[2][QUDA_MAX_DIM];
   int cudaColorSpinorField::backGhostBufferOffset[2][QUDA_MAX_DIM];
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
+
+#ifdef P2P_COMMS
   MsgHandle* cudaColorSpinorField::mh_send_p2p_fwd[2][QUDA_MAX_DIM];
   MsgHandle* cudaColorSpinorField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
   MsgHandle* cudaColorSpinorField::mh_send_p2p_back[2][QUDA_MAX_DIM];
@@ -44,26 +46,121 @@ namespace quda {
 
   void* cudaColorSpinorField::fwdGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
   void* cudaColorSpinorField::backGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
-
+#endif // P2P_COMMS
   /*cudaColorSpinorField::cudaColorSpinorField() : 
     ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
 
     }*/
 
-
-  void cudaColorSpinorField::createIPCDslashComms(){
-  
 #ifdef P2P_COMMS	
+  void cudaColorSpinorField::createIPCDslashComms(){
+
+    if(!initIPCTimeComms){
+      if(commDimPartitioned(3) && !getKernelPackT()){
+	
+        if(!initComms) errorQuda("Can only be called after create comms\n");
+
+        comm_dslash_peer2peer_init();
+	const int num_dir = (comm_dim(3) == 2) ? 1 : 2;
+
+	// first set up receive
+	for(int dir=0; dir<2; ++dir){
+	  MsgHandle* sendHandle = NULL;
+	  MsgHandle* receiveHandle = NULL;
+	  MsgHandle* sendNormHandle = NULL;
+	  MsgHandle* receiveNormHandle = NULL;
+	  int disp = (dir==1) ? +1 : -1;
+
+	  // first set up receive 
+	  if(comm_dslash_peer2peer_enabled(1-dir,3)){
+	    receiveHandle = comm_declare_receive_relative(&ipcRemoteFieldHandle[1-dir],
+							  3, 
+						          -disp, 
+							  sizeof(ipcRemoteFieldHandle[1-dir]));
+	    if(precision == QUDA_HALF_PRECISION){
+	      receiveNormHandle = comm_declare_receive_relative(&ipcRemoteNormHandle[1-dir],
+							   3,
+						          -disp,
+							   sizeof(ipcRemoteNormHandle[1-dir]));
+	    }
+	  } 
+
+
+	  // Now for send 
+	  if(comm_dslash_peer2peer_enabled(dir,3)){
+	    cudaIpcGetMemHandle(&ipcLocalFieldHandle[dir],v);
+	    sendHandle = comm_declare_send_relative(&ipcLocalFieldHandle[dir],
+						    3,
+						    disp,
+						    sizeof(ipcLocalFieldHandle[dir]));
+	    if(precision == QUDA_HALF_PRECISION){
+
+	   	cudaIpcGetMemHandle(&ipcLocalNormHandle[dir],norm);
+	    	sendNormHandle = comm_declare_send_relative(&ipcLocalNormHandle[dir],
+						    				3,
+						    				disp,
+										sizeof(ipcLocalNormHandle[dir]));
+
+	    }
+	  }
+
+	  if(receiveHandle) comm_start(receiveHandle);
+	  if(sendHandle) comm_start(sendHandle);
+
+	  if(receiveHandle) comm_wait(receiveHandle);
+	  if(sendHandle) comm_wait(sendHandle);
+
+	  if(sendHandle) comm_free(sendHandle);
+	  if(receiveHandle) comm_free(receiveHandle);
+
+	  if(precision == QUDA_HALF_PRECISION){
+	    if(receiveNormHandle) comm_start(receiveNormHandle);
+	    if(sendNormHandle) comm_start(sendNormHandle);
+
+	    if(receiveNormHandle) comm_wait(receiveNormHandle);
+	    if(sendNormHandle) comm_wait(sendNormHandle);
+
+	    if(sendNormHandle) comm_free(sendNormHandle);
+	    if(receiveNormHandle) comm_free(receiveNormHandle);
+	  }
+ 	} // loop over dir	
+	// Next, need to open the exported mem handles
+
+	for(int dir=0; dir<num_dir; ++dir){	
+	  if(!comm_dslash_peer2peer_enabled(dir,3)) continue;
+	  void** remoteFieldSrcBuffer = (dir==0) ? &fwdFieldSrcBuffer : &backFieldSrcBuffer;
+	  cudaIpcOpenMemHandle(remoteFieldSrcBuffer, 
+			       ipcRemoteFieldHandle[dir], 
+			       cudaIpcMemLazyEnablePeerAccess);
+
+	  if(precision == QUDA_HALF_PRECISION){
+	    void** remoteNormSrcBuffer = (dir==0) ? &fwdNormSrcBuffer : &backNormSrcBuffer;
+	    cudaIpcOpenMemHandle(remoteNormSrcBuffer, 
+			       ipcRemoteNormHandle[dir], 
+			       cudaIpcMemLazyEnablePeerAccess);
+	  }
+	}
+	if(num_dir == 1){
+	  backFieldSrcBuffer = fwdFieldSrcBuffer;
+	  backNormSrcBuffer = fwdNormSrcBuffer;
+	}
+        initIPCTimeComms = true;
+      }
+    } // communication in time
+
+
+
+  
     if(initIPCDslashComms) return;
 
     if(!initComms) errorQuda("Can only be called after create comms\n");
 
     comm_dslash_peer2peer_init();
 
-    checkCudaError();
 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
+      if(dim == 3 && !getKernelPackT()) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<2; ++dir){
         for(int b=0; b<2; ++b){
@@ -95,8 +192,8 @@ namespace quda {
 	  if(receiveHandle) comm_start(receiveHandle);
 	  if(sendHandle) comm_start(sendHandle);
 
-          comm_wait(receiveHandle);
-	  comm_wait(sendHandle);
+          if(receiveHandle) comm_wait(receiveHandle);
+	  if(sendHandle) comm_wait(sendHandle);
 
 	  if(sendHandle) comm_free(sendHandle);
 	  if(receiveHandle) comm_free(receiveHandle);	
@@ -105,10 +202,11 @@ namespace quda {
       } // loop over dir (0,1)
     } // loop over dim
 
-    checkCudaError();
+
 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
+      if(dim == 3 && !getKernelPackT()) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<num_dir; ++dir){
         if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
@@ -127,8 +225,6 @@ namespace quda {
       }
     }
 
-
-    checkCudaError();
     // Create local events for asynchronous copies from the peer process
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
@@ -141,7 +237,6 @@ namespace quda {
       }
     }
 
-    checkCudaError();
 
     // Create message handles for IPC synchronization
     for(int dim=0; dim<4; ++dim){
@@ -171,8 +266,8 @@ namespace quda {
 
     initIPCDslashComms = true;
     checkCudaError();
-#endif // P2P_COMMS
   }
+#endif // P2P_COMMS
 
 
 
@@ -181,6 +276,7 @@ namespace quda {
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 
 #ifdef P2P_COMMS
+    initIPCTimeComms = false;
 //    initIPCDslashComms = false;
 #endif
 
@@ -207,7 +303,8 @@ namespace quda {
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
-#ifdef P2P_COMMS
+#ifdef P2P_COMM
+    initIPCTimeComms = false;
 //    initIPCDslashComms = false;
 #endif
     create(QUDA_COPY_FIELD_CREATE);
@@ -220,6 +317,7 @@ namespace quda {
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {  
 #ifdef P2P_COMMS
+    initIPCTimeComms = false;
 //    initIPCDslashComms = false;
 #endif
     // can only overide if we are not using a reference or parity special case
@@ -277,6 +375,7 @@ namespace quda {
       initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 
 #ifdef P2P_COMMS
+    initIPCTimeComms = false;
 //    initIPCDslashComms = false;
 #endif
     create(QUDA_COPY_FIELD_CREATE);
@@ -1017,10 +1116,9 @@ namespace quda {
 
   void cudaColorSpinorField::createComms(int nFace) {
 
-    checkCudaError();
+
     if(bufferMessageHandler != bufferPinnedResizeCount) destroyComms();
 
-    checkCudaError();
     if (!initComms || nFaceComms != nFace) {
 
       // if we are requesting a new number of faces destroy and start over
@@ -1274,6 +1372,28 @@ namespace quda {
 #ifdef P2P_COMMS
   void cudaColorSpinorField::destroyIPCDslashComms() {
 
+
+    if(initIPCTimeComms){
+      if(commDimPartitioned(3) && !getKernelPackT()){ 
+
+	if(comm_dslash_peer2peer_enabled(1,3)){
+//	  cudaIpcCloseMemHandle(backFieldSrcBuffer);
+//	  if(precision == QUDA_HALF_PRECISION) cudaIpcCloseMemHandle(backNormSrcBuffer);
+	}
+
+	if(comm_dslash_peer2peer_enabled(0,3)){
+	  const int num_dir = (comm_dim(3) == 2) ? 1 : 2;
+		
+           if(num_dir == 2){
+ //            cudaIpcCloseMemHandle(fwdFieldSrcBuffer);
+ //	     if(precision == QUDA_HALF_PRECISION) cudaIpcCloseMemHandle(fwdNormSrcBuffer);
+	   }
+	}
+        initIPCTimeComms = false;
+      }
+    }
+
+
     if(!initIPCDslashComms) return;
 
     for(int dim=0; dim<4; ++dim){
@@ -1285,7 +1405,7 @@ namespace quda {
 	  comm_free(mh_send_p2p_fwd[b][dim]);
 	  comm_free(mh_recv_p2p_fwd[b][dim]);
 
-	  cudaIpcCloseMemHandle(backGhostFaceSrcBuffer[b][dim]);
+	  if(dim != 3 || getKernelPackT()) cudaIpcCloseMemHandle(backGhostFaceSrcBuffer[b][dim]);
 	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
 	}
       }
@@ -1298,12 +1418,13 @@ namespace quda {
 	  comm_free(mh_send_p2p_back[b][dim]);
 	  comm_free(mh_recv_p2p_back[b][dim]);
 
-	  if(num_dir == 2) cudaIpcCloseMemHandle(fwdGhostFaceSrcBuffer[b][dim]);
-	   
+	  if(dim != 3 || getKernelPackT()){
+	    if(num_dir == 2) cudaIpcCloseMemHandle(fwdGhostFaceSrcBuffer[b][dim]);
+	  } 
 	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
 	}
       }    
-    }
+    } // iterate over dim
 
     checkCudaError();
     initIPCDslashComms = false;
@@ -1514,7 +1635,6 @@ namespace quda {
 
   void cudaColorSpinorField::sendStart(int nFace, int dir, int dagger, cudaStream_t* stream_p) {
     int dim = dir/2;
-     
     if(!commDimPartitioned(dim)) return;
 
     checkCudaError();
@@ -1541,13 +1661,40 @@ namespace quda {
 	// Synchronize with the forward processor
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
 
-	cudaMemcpyAsync(ghost_dst, 
-			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
-			+ backGhostBufferOffset[bufferIndex][dim]),
-			ghost_face_bytes[dim],
-			cudaMemcpyDeviceToDevice,
-			*copy_stream); // copy from forward processor
+	if(dim != 3 || getKernelPackT()){
+	  cudaMemcpyAsync(ghost_dst, 
+		(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
+		+ backGhostBufferOffset[bufferIndex][dim]),
+		ghost_face_bytes[dim],
+		cudaMemcpyDeviceToDevice,
+		*copy_stream); // copy from forward processor
+	} else {
+	  int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+	  int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
+	  int Npad = Nint / Nvec;
+	  int offset = 0;
+	  if(nSpin == 1){
+	    offset = 0;
+	  } else if (nSpin == 4){
+	    // !dagger: send lower components backwards, send upper components forwards
+	    // dagger: send upper components backwards, send lower components forwards
+	    bool upper = dagger ? true : false;
+	    int lower_spin_offset = Npad*stride;	
+	    offset = upper ? 0 : lower_spin_offset;
+	 }
 
+	  void* src = (char*)backFieldSrcBuffer + offset*Nvec*precision;
+	  size_t len = nFace*ghostFace[3]*Nvec*precision;
+	  size_t spitch = stride*Nvec*precision;
+	  cudaMemcpy2DAsync(ghost_dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);
+
+	  if(precision == QUDA_HALF_PRECISION) {
+	    int norm_offset = 0;
+	    void *ghost_norm_dst = ghost_field + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1];
+	    void *src = backNormSrcBuffer;
+	    cudaMemcpyAsync(ghost_norm_dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToDevice, *copy_stream); 
+	  }
+	}
 	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
       }
 #endif
@@ -1571,13 +1718,40 @@ namespace quda {
 
 	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
 
-	cudaMemcpyAsync(ghost_dst, 
-			(void*)((char*)(backGhostFaceSrcBuffer[bufferIndex][dim]) 
-			+ fwdGhostBufferOffset[bufferIndex][dim]),
-			ghost_face_bytes[dim],
-			cudaMemcpyDeviceToDevice,
-			*copy_stream); // copy from backward processor
+	if(dim != 3 || getKernelPackT()) {
+	  cudaMemcpyAsync(ghost_dst, 
+		(void*)((char*)(fwdGhostFaceSrcBuffer[bufferIndex][dim]) 
+		+ fwdGhostBufferOffset[bufferIndex][dim]),
+		ghost_face_bytes[dim],
+		cudaMemcpyDeviceToDevice,
+		*copy_stream); // copy from backward processor
+	} else {
+	  int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
+	  int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
+	  int Npad = Nint / Nvec;
+	  int Nt_minus1_offset = (volume - nFace*ghostFace[3]);
+	  int offset;
+	  if(nSpin == 1){
+	    offset = Nt_minus1_offset;
+	  } else if(nSpin == 4){
+	    bool upper = dagger ? true : false; 
+	    upper = !upper;
+	    int lower_spin_offset = Npad*stride;
+	    offset = (upper) ? Nt_minus1_offset : lower_spin_offset + Nt_minus1_offset;
+	  }
 
+	  void *src = (char*)fwdFieldSrcBuffer + offset*Nvec*precision;
+	  size_t len = nFace*ghostFace[3]*Nvec*precision;
+	  size_t spitch = stride*Nvec*precision;
+	  cudaMemcpy2DAsync(ghost_dst, len, src, spitch, len, Npad, cudaMemcpyDeviceToDevice, *copy_stream);  
+
+	  if(precision == QUDA_HALF_PRECISION) {
+	    int norm_offset = Nt_minus1_offset*sizeof(float);
+	    void *ghost_norm_dst = ghost_field + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
+	    void *src = fwdNormSrcBuffer + norm_offset;
+	    cudaMemcpyAsync(ghost_norm_dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToDevice, *copy_stream); 
+	  }
+	}
 	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim],*copy_stream);
       }
 #endif
