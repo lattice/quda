@@ -265,7 +265,6 @@ namespace quda {
 
 
     initIPCDslashComms = true;
-    checkCudaError();
   }
 #endif // P2P_COMMS
 
@@ -297,7 +296,6 @@ namespace quda {
     } else if (param.create == QUDA_COPY_FIELD_CREATE){
       errorQuda("not implemented");
     }
-    checkCudaError();
   }
 
   cudaColorSpinorField::cudaColorSpinorField(const cudaColorSpinorField &src) : 
@@ -546,7 +544,6 @@ namespace quda {
         }
       }
     }
-    checkCudaError();
   }
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -588,7 +585,6 @@ namespace quda {
       else texDesc.readMode = cudaReadModeElementType;
       
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-      checkCudaError();
 
       // create the ghost texture object
      if(ghost_bytes){
@@ -601,7 +597,6 @@ namespace quda {
         resDesc.res.linear.sizeInBytes = ghost_bytes;
 
         cudaCreateTextureObject(&ghostTex, &resDesc, &texDesc, NULL);
-        checkCudaError();
       }
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION) {
@@ -622,7 +617,6 @@ namespace quda {
 	texDesc.readMode = cudaReadModeElementType;
 	
 	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
-	checkCudaError();
 
         // Assign ghostTexNorm
         if(ghost_bytes){ 
@@ -635,7 +629,6 @@ namespace quda {
       
 
 	  cudaCreateTextureObject(&ghostTexNorm, &resDesc, &texDesc, NULL);
-	  checkCudaError();
         }
       }
       
@@ -652,7 +645,6 @@ namespace quda {
         if(ghost_bytes)cudaDestroyTextureObject(ghostTexNorm);
       }
       texInit = false;
-      checkCudaError();
     }
   }
 #endif
@@ -786,7 +778,6 @@ namespace quda {
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
     }
 
-    checkCudaError();
     return;
   }
 
@@ -825,7 +816,6 @@ namespace quda {
       }
     }
 
-    checkCudaError();
     return;
   }
 
@@ -1680,6 +1670,8 @@ namespace quda {
 	    // dagger: send upper components backwards, send lower components forwards
 	    bool upper = dagger ? true : false;
 	    int lower_spin_offset = Npad*stride;	
+
+	    
 	    offset = upper ? 0 : lower_spin_offset;
 	 }
 
@@ -1708,7 +1700,6 @@ namespace quda {
       // send a message to the processor in the forward direction
 	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
-
 
 
       if(comm_dslash_peer2peer_enabled(0,dim)) {
@@ -2060,7 +2051,6 @@ namespace quda {
     printfQuda("\nDevice pointer: %p\n", resDesc.res.linear.devPtr);
     printfQuda("\nVolume (in bytes): %d\n", resDesc.res.linear.sizeInBytes);
     if (resDesc.resType == cudaResourceTypeLinear) printfQuda("\nResource type: linear \n");
-    checkCudaError();
 #endif
   }
 
