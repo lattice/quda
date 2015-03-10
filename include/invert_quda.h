@@ -637,6 +637,7 @@ namespace quda {
   };
 
 //forward declaration
+ struct GmresdrDeflationParam;
  class GmresDRArgs; 
 
  class GmresDR : public DeflatedSolver {
@@ -674,6 +675,9 @@ namespace quda {
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
     // 
     void CleanResources() {};//not implemented yet 
+    //
+    void PerformGalerkinProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *defl_param);
+
 
   };
 

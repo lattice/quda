@@ -3265,10 +3265,11 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
     delete solve;
   }
-  else if (param->inv_type == QUDA_GMRESDR_INVERTER)
+  else if (param->inv_type == QUDA_GMRESDR_INVERTER && direct_solve) 
   {
 
     DiracM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
+    //DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);//use for tests only.
     SolverParam solverParam(*param);
 
     DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mDeflate, profileInvert);  

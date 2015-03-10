@@ -32,6 +32,8 @@ namespace quda {
 //Notes:
 //GmresDR does not require large m (and esp. nev), so this will use normal LAPACK routines.
 
+    static GmresdrDeflationParam *defl_param = 0;
+
     struct SortEvals{
 
       double eval_nrm;
@@ -42,6 +44,50 @@ namespace quda {
       static bool CmpEigenNrms (SortEvals v1, SortEvals v2) { return (v1.eval_nrm < v2.eval_nrm);}
 
     };
+
+    struct GmresdrDeflationParam 
+    {
+
+      //Objects required for the Galerkin projections
+      Complex *projMat;  //host   projection matrix:
+      //
+      cudaColorSpinorField    *projVecs;      //device buffer for HRitz vectors
+      
+      int ld;                 //projection matrix leading dimension
+      int nv;                //(nv+1) => number of projection vectors, note also that projMat is a (nv+1) by (nv) matrix
+
+      bool alloc_flag;
+
+      GmresdrDeflationParam(cudaColorSpinorField  *Vm, const int ldm, const int nev) : ld(ldm), nv(nev), alloc_flag(true)
+      {
+        if(nev == 0) errorQuda("\nIncorrect deflation space parameters...\n");
+       
+        //Create deflation objects:
+        projMat  = new Complex[ld*nv];
+
+        ColorSpinorParam csParam(Vm->Eigenvec(0));
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+        csParam.eigv_dim  = (nv+1);
+        csParam.eigv_id   = -1;
+
+        projVecs  = new cudaColorSpinorField(csParam);//temporary field
+
+        for(int i = 0; i < (nv+1); i++) copyCuda(projVecs->Eigenvec(i), Vm->Eigenvec(i));    
+
+        return;
+      }
+
+      ~GmresdrDeflationParam(){
+        if(alloc_flag)    
+        {
+          delete projVecs;
+          delete[] projMat;
+        }
+      }
+
+    };
+
 
     class GmresDRArgs{
      
@@ -100,6 +146,8 @@ namespace quda {
       void PrepareGivens(Complex *givensH, const int col);
 
       void UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorField *Vm, Complex *givensH, Complex *g, const int j);
+
+      void StoreProjectionMatrix(Complex *srcMat);
    };
 
   GmresDRArgs::GmresDRArgs(int m, int ldm, int nev, bool mixed_prec, bool deflated_flag): m(m), ldm(ldm), nev(nev), mixed_precision_gmresdr(mixed_prec), deflated_cycle(deflated_flag){
@@ -162,6 +210,13 @@ namespace quda {
     return;
   }
 
+  void GmresDRArgs::StoreProjectionMatrix(Complex *srcMat)
+  {
+    memcpy(srcMat, H, nev*ldm*sizeof(Complex));
+
+    return;
+  }
+
 
   GmresDRArgs::~GmresDRArgs() {
 
@@ -189,9 +244,9 @@ namespace quda {
 //Note: in fact, x is an accumulation field initialized to zero (if a sloppy field is used!) and has the same precision as Vm
  void GmresDRArgs::UpdateSolution(cudaColorSpinorField *x, cudaColorSpinorField *Vm, Complex *givensH, Complex *g, const int j)
  {
-   if (mixed_precision_gmresdr) zeroCuda(*x);
-
+   //if (mixed_precision_gmresdr) zeroCuda(*x);//it's done in the main loop, no need for this
    memset(lsqSol, 0, (m+1)*sizeof(Complex));
+
    //Get LS solution:
    for(int l = (j-1); l >= 0; l--)
    {
@@ -238,7 +293,7 @@ namespace quda {
  
    for(int e = 0; e < nev; e++) memcpy(&sortedHarVecs[ldm*e], &harVecs[ldm*( sorted_evals_cntr[e].eval_idx)], (ldm)*sizeof(Complex));
 
-   for(int e = 0; e < nev / 8; e++) printfQuda("\nEigenval #%d: real %le imag %le abs %le\n", sorted_evals_cntr[e].eval_idx, harVals[(sorted_evals_cntr[e].eval_idx)].real(), harVals[(sorted_evals_cntr[e].eval_idx)].imag(),  abs(harVals[(sorted_evals_cntr[e].eval_idx)]));
+   for(int e = 0; e < 16; e++) printfQuda("\nEigenval #%d: real %le imag %le abs %le\n", sorted_evals_cntr[e].eval_idx, harVals[(sorted_evals_cntr[e].eval_idx)].real(), harVals[(sorted_evals_cntr[e].eval_idx)].imag(),  abs(harVals[(sorted_evals_cntr[e].eval_idx)]));
 
    return;
  }
@@ -266,13 +321,6 @@ namespace quda {
    checkCudaError();
 
    /*****REORTH V_{nev+1}:****/
-
-   //if (mixed_precision_gmresdr && !r)//probably not a good idea, but I don't see why this should not work...
-   //{
-      //double nrmr = sqrt(norm2(*r));
-      //axCuda(1.0 / nrmr, *r);
-      //copyCuda(Vm->Eigenvec(nev), *r);
-   //}
 
    for(int j = 0; j < nev; j++)
    {
@@ -327,6 +375,8 @@ namespace quda {
 
  void GmresDRArgs::PrepareGivens(Complex *givensH, const int col)
  {
+   if(deflated_cycle == false) return; //we are in the "projected" cycle nothing to do..
+
    memcpy(&givensH[ldm*col], &H[ldm*col], (nev+1)*sizeof(Complex) );
    //
    gmresdr_magma_args->LeftConjZUNMQR(nev /*number of reflectors*/, 1 /*number of columns of mat*/, &givensH[ldm*col], (nev+1) /*number of rows*/, ldm, qrH, ldm, tauH);
@@ -364,15 +414,54 @@ namespace quda {
 
     delete args;
 
-    if(gmres_alloc)   delete Vm;
+    if(gmres_alloc) 
+    {
+      delete Vm;
+      Vm = NULL;
+    }
 
  }
 
+ void GmresDR::PerformGalerkinProjection(cudaColorSpinorField &x_sloppy,  cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *dpar)
+ {
+    Complex *c    = new Complex[(dpar->nv+1)];
+    Complex *d    = new Complex[dpar->ld];
 
+    BlasMagmaArgs magma_args(sizeof(double));
 
+    //Compute c = VT^{pr}_k r0 
+    for(int i = 0; i < dpar->nv; i++ ) c[i] = cDotProductCuda(dpar->projVecs->Eigenvec(i), r_sloppy);//
+   
+    //Solve H^{pr}_k d = c: this nvxnv problem..
+    magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)dpar->projMat, dpar->ld);
+
+    //Compute the new approximate solution:
+    for(int l = 0; l < dpar->nv; l++)  caxpyCuda(d[l], dpar->projVecs->Eigenvec(l), x_sloppy); 
+
+    //Compute the new residual vector: 
+    memset(c, 0, (dpar->nv+1)*sizeof(Complex));//now use as a temp array
+
+    for(int j = 0; j < (dpar->nv+1); j++)
+      for (int i = 0; i < (dpar->nv); i++)
+      {
+         c[j] +=  (dpar->projMat[i*dpar->ld + j] * d[i]);//column major format
+      }   
+
+    for(int l = 0; l < (dpar->nv+1); l++)  caxpyCuda(-c[l], dpar->projVecs->Eigenvec(l), r_sloppy);
+
+    delete[] d;
+    delete[] c;
+
+    return;
+ }
+
+//Make this option available outside!
+//#define USE_PLAIN_GMRES
 
  void GmresDR::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) 
  {
+     profile.Start(QUDA_PROFILE_INIT);
+
      cudaColorSpinorField r(*in); //high precision residual 
      // 
      cudaColorSpinorField &x = *out;
@@ -432,9 +521,17 @@ namespace quda {
        gmres_alloc = true;
      }
 
+    profile.Stop(QUDA_PROFILE_INIT);
+    profile.Start(QUDA_PROFILE_PREAMBLE);
+
    const int m         = args->m;
    const int ldH       = args->ldm;
    const int nev       = args->nev;
+
+   const double tol_threshold = 2e+0;//think about other options: original value 4.0e+0, 2.0e+0 works better!
+
+   int tot_iters = 0;
+
    //GMRES objects:
    //Givens rotated matrix (m+1, m):
    Complex *givensH = new Complex[ldH*m];//complex
@@ -455,6 +552,8 @@ namespace quda {
    //
    double r2 = xmyNormCuda(*in, r);//compute residual
 
+   const double b2 = r2;
+
    printfQuda("\nInitial residual squred: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
 
    //copy the first vector:
@@ -466,15 +565,24 @@ namespace quda {
    //
    copyCuda(Vm->Eigenvec(0), r);
 
+   int j = 0;//here also a column index of H
+
    //set g-vector:
    g[0] = beta;
 
    args->PrepareDeflatedRestart(givensH, g);
 
-   //Main GMRES loop:
-   int j = 0;//here also a column index of H
+   const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
-   int tot_iters = 0;
+   double heavy_quark_res = 0.0; // heavy quark residual
+   if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+   int heavy_quark_check = 10; // how often to check the heavy quark residual
+
+   PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res);
+
+   profile.Stop(QUDA_PROFILE_PREAMBLE);
+   profile.Start(QUDA_PROFILE_COMPUTE);
+   blas_flops = 0;
 
    while((j < m) && (r2 > stop))
    {
@@ -554,10 +662,12 @@ namespace quda {
 
      tot_iters += 1;
 
-     printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j); 
+     //printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j); 
+     PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res);
+
    }//end of GMRES loop
 
-   printfQuda("\nDone for: %d iters, %1.15e last residual\n", j, sqrt(r2)); 
+   printfQuda("\nDone for: %d iters, %1.15e last residual squared.\n", j, r2); 
 
    //j -> m+1
    //update solution and final residual:
@@ -566,45 +676,89 @@ namespace quda {
    if (args->mixed_precision_gmresdr)
    {
      copyCuda(y, *x_sloppy);
-     xpyCuda(y, x);//don't mind arguments;)
+     xpyCuda(y, x);
+     zeroCuda(*x_sloppy);
    }
 
-   mat(r, *out, y);
+   mat(r, x, y);
    //
    r2 = xmyNormCuda(*in, r);//compute full precision residual
 
-   printfQuda("\nDone for: stage 0 (m = %d), true residual %1.15e\n", j, sqrt(r2));
+   printfQuda("\nDone for cycle 0, true residual squared %1.15e\n", r2);
+   //
+   PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res);
 
 //BEGIN RESTARTS:
    const int max_cycles = param.deflation_grid;
 
    int cycle_idx = 1;
 
+#ifndef USE_PLAIN_GMRES
    args->deflated_cycle = true;
+#else
+   args->deflated_cycle = false;
+#endif
 
-   while(cycle_idx < max_cycles /*&& !convergence(r2, stop)*/)
+   while(cycle_idx < max_cycles && !convergence(r2, heavy_quark_res, stop, param.tol_hq))
    {
      printfQuda("\nRestart #%d\n", cycle_idx);
 
      if (args->mixed_precision_gmresdr) copyCuda(*r_sloppy, r);
 
-     args->ComputeHarmonicRitzPairs();
-
-     args->RestartVH( Vm );
-
      memset(givensH, 0, ldH*m*sizeof(Complex));
-
      memset(g, 0 , (m+1)*sizeof(Complex));
-
+     //
      memset(Cn, 0 , m*sizeof(Complex));
      memset(Sn, 0 , m*sizeof(double));
 
-     for(int i = 0; i <= nev ; i++ ) g[i] = cDotProductCuda(Vm->Eigenvec(i), *r_sloppy);//
+     int j = nev;//here also a column index of H
+#ifndef USE_PLAIN_GMRES
+     args->ComputeHarmonicRitzPairs();
+
+     args->RestartVH( Vm );
+#endif
+
+     if(args->deflated_cycle)
+     {
+       for(int i = 0; i <= nev ; i++ ) g[i] = cDotProductCuda(Vm->Eigenvec(i), *r_sloppy);//
+     }
+     else //use Galerkin projection instead: 
+     {
+       j = 0; //we will launch a normal GMRESDR cycle
+#ifndef USE_PLAIN_GMRES
+       if(!defl_param)
+       {
+         defl_param = new GmresdrDeflationParam(Vm, args->ldm, args->nev);
+         //
+         args->StoreProjectionMatrix(defl_param->projMat);//merge this into the constructor..
+       }
+
+       PerformGalerkinProjection(*x_sloppy, *r_sloppy, defl_param);//note : full precision residual
+
+       if (args->mixed_precision_gmresdr)
+       {
+         copyCuda(y, *x_sloppy);
+         xpyCuda(y, x);
+         zeroCuda(*x_sloppy);
+         copyCuda(r, *r_sloppy);
+       }
+#endif
+       r2 = norm2(r);
+       
+       beta = sqrt(r2);
+       //
+       axCuda(1.0 / beta, r);
+       //
+       copyCuda(Vm->Eigenvec(0), r);
+
+       g[0] = beta;
+
+       printfQuda("\nNew residual %1.15e\n", beta);
+     }
 
      args->PrepareDeflatedRestart(givensH, g);
 
-     //Main GMRES loop:
-     int j = nev;//here also a column index of H
+     const int jlim = j;//=nev for deflated restarts and 0 for "projected" restarts (abused terminology!)
 
      while((j < m) && (r2 > stop))
      {
@@ -615,7 +769,7 @@ namespace quda {
        //
        Complex h0(0.0, 0.0);
        //
-       for (int i = 0; i <= nev; i++)//i is a row index
+       for (int i = 0; i <= jlim; i++)//i is a row index
        {
           h0 = cDotProductCuda(Vm->Eigenvec(i), *Av);//
           //Warning: column major format!!! (m+1) size of a column.
@@ -626,11 +780,11 @@ namespace quda {
        }
 
        //Let's do Givens rotation:
-       args->PrepareGivens(givensH, j);//won't work if args->deflated_cycle is false 
+       args->PrepareGivens(givensH, j);//check it! 
 
-       h0 = givensH[ldH*j+nev];
+       if(args->deflated_cycle) h0 = givensH[ldH*j+jlim];
 
-       for(int i = (nev+1); i <= j; i++)
+       for(int i = (jlim+1); i <= j; i++)
        {
           Complex h1 = cDotProductCuda(Vm->Eigenvec(i), *Av);//
           //Warning: column major format!!! (m+1) size of a column.
@@ -672,7 +826,8 @@ namespace quda {
 
        tot_iters += 1;
  
-       printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j); 
+       //printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j);
+       PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res); 
      }//end of main loop.
 
      args->UpdateSolution(x_sloppy, Vm, givensH, g, j);
@@ -681,19 +836,54 @@ namespace quda {
      {
        copyCuda(y, *x_sloppy);
        xpyCuda(y, x);//don't mind arguments;)
+       zeroCuda(*x_sloppy);
      }
 
-     mat(r, *out, y);
+     mat(r, x, y);
      //
-     r2 = xmyNormCuda(*in, r);//compute full precision residual
+     double ext_r2 = xmyNormCuda(*in, r);//compute full precision residual
 
-     printfQuda("\nDone for: stage 0 (m = %d), true residual %1.15e\n", j, sqrt(r2));
+     if(args->mixed_precision_gmresdr && ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold || (cycle_idx > 64)))
+     {
+       printfQuda("\nLaunch projection stage (%le)\n", sqrt(ext_r2 / r2));
+       args->deflated_cycle = false;
+     }
+
+     printfQuda("\nDone for cycle:  %d, true residual squared %1.15e\n", cycle_idx, ext_r2);
 
      cycle_idx += 1;
 
    }//end of deflated restarts
 
-   printfQuda("\nTotal iterations: %d\n", tot_iters);
+   profile.Stop(QUDA_PROFILE_COMPUTE);
+   profile.Start(QUDA_PROFILE_EPILOGUE);
+
+   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+   double gflops = (quda::blas_flops + mat.flops())*1e-9;
+   reduceDouble(gflops);
+   param.gflops = gflops;
+   param.iter += tot_iters;
+
+   // compute the true residuals
+   mat(r, x, y);
+   //matSloppy(r, x, tmp, tmp2);
+
+   param.true_res = sqrt(xmyNormCuda(*in, r) / b2);
+
+   PrintSummary("GMRESDR:", tot_iters, r2, b2);
+
+   // reset the flops counters
+   quda::blas_flops = 0;
+   mat.flops();
+
+   profile.Stop(QUDA_PROFILE_EPILOGUE);
+   profile.Start(QUDA_PROFILE_FREE);
+
+   if(defl_param) 
+   {
+     delete defl_param;
+     defl_param = 0;
+   }
 
    delete [] givensH;
 
@@ -712,7 +902,10 @@ namespace quda {
    }
 
    delete tmp2_p;
- 
+
+   profile.Stop(QUDA_PROFILE_FREE);
+
+   return;
  }//end of operator()
 
 } // namespace quda
