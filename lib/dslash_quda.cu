@@ -431,15 +431,19 @@ class TwistCloverGamma5Cuda : public Tunable {
       setTwistParam(a, b, kappa, mu, dagger, tw);
     else{//twist doublet
       errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
-    } 
+    }
+
+    if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+      writeAuxString("direct");
+    } else {
+      writeAuxString("inverse");
+    }
   }
     virtual ~TwistCloverGamma5Cuda() {
       unbindSpinorTex<sFloat>(in);    
     }
 
-    TuneKey tuneKey() const {
-      return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString());
-    }  
+    TuneKey tuneKey() const { return TuneKey(in->VolString(), typeid(*this).name(), aux); }
 
     void apply(const cudaStream_t &stream)
     {

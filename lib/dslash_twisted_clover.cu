@@ -98,25 +98,50 @@ namespace quda {
       b = mu;
       c = epsilon;
       d = k;
-    }
-    virtual ~TwistedCloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
-    TuneKey tuneKey() const
-    {
-      TuneKey key = DslashCuda::tuneKey();
       switch(dslashType){
       case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
-	strcat(key.aux,",CloverTwistInvDslash");
-	break;
+#ifdef MULTI_GPU 
+        fillAux(INTERIOR_KERNEL, "type=interior,CloverTwistInvDslash");
+        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,CloverTwistInvDslash");
+        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,CloverTwistInvDslash");
+        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,CloverTwistInvDslash");
+        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,CloverTwistInvDslash");
+        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,CloverTwistInvDslash");
+#else
+        fillAux(INTERIOR_KERNEL, "type=single-GPU,CloverTwistInvDslash");
+#endif // MULTI_GPU
+        break;
+
       case QUDA_DEG_DSLASH_CLOVER_TWIST_INV:
-	strcat(key.aux,",Dslash");
-	break;
+#ifdef MULTI_GPU 
+        fillAux(INTERIOR_KERNEL, "type=interior,Dslash");
+        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,Dslash");
+        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,Dslash");
+        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,Dslash");
+        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,Dslash");
+        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,Dslash");
+#else
+        fillAux(INTERIOR_KERNEL, "type=single-GPU,Dslash");
+#endif // MULTI_GPU
+        break;
+
       case QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY:
-	strcat(key.aux,",DslashCloverTwist");
-	break;
+#ifdef MULTI_GPU 
+        fillAux(INTERIOR_KERNEL, "type=interior,DslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,DslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,DslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,DslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,DslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,DslashCloverTwist");
+#else
+        fillAux(INTERIOR_KERNEL, "type=single-GPU,DslashCloverTwist");
+#endif // MULTI_GPU
+        break;
       }
-      return key;
     }
+
+    virtual ~TwistedCloverDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
 
     void apply(const cudaStream_t &stream)
     {
@@ -158,9 +183,6 @@ namespace quda {
 			       const double &epsilon, const double &k,  const int *commOverride,
 			       TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
-    if (dslashPolicy ==  QUDA_FUSED_DSLASH || dslashPolicy == QUDA_FUSED_GPU_COMMS_DSLASH)
-      errorQuda("Twisted-clover dslash does not yet support a fused exterior dslash kernel");
-
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 #if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code

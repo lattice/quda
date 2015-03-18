@@ -2216,7 +2216,7 @@
 }\
 /*Apply inverse clover*/\
 {\
-  ASSN_CLOVER(TMCLOVERTEX, 0) /* PUEDO EIMINARLO PORQUE YA LO HEMOS LEIDO */ \
+  /*ASSN_CLOVER(TMCLOVERTEX, 0)*/ /* PUEDO EIMINARLO PORQUE YA LO HEMOS LEIDO */ \
   INVERT_CLOVER(c) \
   spinorFloat a00_re = 0; spinorFloat a00_im = 0;\
   spinorFloat a01_re = 0; spinorFloat a01_im = 0;\
@@ -2537,7 +2537,7 @@
 }\
 /*Apply inverse clover*/\
 {\
-  ASSN_CLOVER(TMCLOVERTEX, 1) /* PUEDO EIMINARLO PORQUE YA LO HEMOS LEIDO */ \
+  /*ASSN_CLOVER(TMCLOVERTEX, 1)*/ /* PUEDO EIMINARLO PORQUE YA LO HEMOS LEIDO */ \
   INVERT_CLOVER(c) \
   spinorFloat a20_re = 0; spinorFloat a20_im = 0;\
   spinorFloat a21_re = 0; spinorFloat a21_im = 0;\
