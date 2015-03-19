@@ -808,7 +808,7 @@ __global__ void kernel_gauge_fix_U_EO( GaugeFixArg<Float> arg, Gauge dataOr){
 		#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
 		g.data[i] = TEXTURE_GX<Cmplx>(idd + i * arg.threads);
 		#else
-		g.data[i] = arg.gx[id + i * arg.threads];
+		g.data[i] = arg.gx[idd + i * arg.threads];
 		#endif
 	}
 	if(Elems==6){    
