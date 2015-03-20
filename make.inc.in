@@ -87,13 +87,13 @@ INC = -I$(CUDA_INSTALL_PATH)/include
 
 ifeq ($(strip $(CPU_ARCH)), x86_64)
   ifeq ($(strip $(OS)), osx)
-    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
+    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcufft -lcurand
     NVCCOPT = -m64
   else
-    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
+    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart -lcufft -lcurand
   endif
 else
-  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32
+  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -lcufft -lcurand -m32
   COPT = -malign-double -m32
   NVCCOPT = -m32
 endif
