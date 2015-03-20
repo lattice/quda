@@ -49,6 +49,9 @@ void unitarizeLinksCPU(const QudaGaugeParam& param,
 
 bool isUnitary(const QudaGaugeParam& param, cpuGaugeField& field, double max_error);
 
+
+void unitarizeLinksQuda(cudaGaugeField& links, int* fails);
+
 } // namespace quda
 
 

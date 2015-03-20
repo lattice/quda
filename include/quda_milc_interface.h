@@ -237,6 +237,34 @@ extern "C" {
 
   void* qudaCreateGaugeField(void* gauge, int geometry, int precision);
 
+
+
+
+void qudaGaugeFixingOVR( const int precision,
+    const unsigned int gauge_dir, 
+    const int Nsteps,
+    const int verbose_interval,
+    const double relax_boost,
+    const double tolerance,
+    const unsigned int reunit_interval,
+    const unsigned int stopWtheta,
+    void* milc_sitelink
+    );
+
+
+
+void qudaGaugeFixingFFT( int precision,
+    unsigned int gauge_dir, 
+    int Nsteps,
+    int verbose_interval,
+    double alpha,
+    unsigned int autotune,
+    double tolerance,
+    unsigned int stopWtheta,
+    void* milc_sitelink
+    );
+
+
   void qudaSaveGaugeField(void* gauge, void* inGauge);
 
   void qudaDestroyGaugeField(void* gauge);

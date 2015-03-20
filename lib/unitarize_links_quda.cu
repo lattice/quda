@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <cuda.h>
 #include <gauge_field.h>
+#include <gauge_field_order.h>
 
 #include <tune_quda.h>
 #include <quda_matrix.h>
@@ -505,6 +506,203 @@ namespace{
     } // i	  
     return true;
   } // is unitary
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  template <typename Gauge>
+  struct UnitarizeLinksQudaArg {
+    int threads; // number of active threads required
+    int X[4]; // grid dimensions
+    Gauge links;
+    int *fails;
+    UnitarizeLinksQudaArg(const Gauge &links, const GaugeField &data,  int* fails) : links(links), fails(fails) {
+    for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];  
+    threads = X[0]*X[1]*X[2]*X[3];
+    }
+  };
+
+
+__device__ __host__ inline int linkIndex(int x[], const int X[4]) {
+  int idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
+  return idx;
+}
+
+__device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) {
+  x[3] = cb_index/(X[2]*X[1]*X[0]/2);
+  x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
+  x[1] = (cb_index/(X[0]/2)) % X[1];
+  x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+
+  return;
+}
+
+
+template<typename Float, typename Gauge>
+__global__ void DoUnitarizedLink(UnitarizeLinksQudaArg<Gauge> arg){
+  int idx = threadIdx.x + blockIdx.x*blockDim.x;
+  if(idx >= arg.threads) return;
+  typedef typename ComplexTypeId<Float>::Type Cmplx;
+  int parity = 0;
+  if(idx >= arg.threads/2) {
+    parity = 1;
+    idx -= arg.threads/2;
+  }
+  int X[4]; 
+  for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
+  int x[4];
+  getCoords3(x, idx, X, parity);
+ 
+  idx = linkIndex(x,X);
+  Matrix<double2,3> v, result;
+  Matrix<Cmplx,3> tmp;
+  for (int mu = 0; mu < 4; mu++) { 
+    arg.links.load((Float*)(tmp.data),idx, mu, parity);
+      for(int i = 0; i < 9;i++) {
+        v.data[i].x = (double)tmp.data[i].x;
+        v.data[i].y = (double)tmp.data[i].y;
+      }
+      unitarizeLinkMILC(v, &result);
+#ifdef __CUDA_ARCH__
+#define FL_MAX_ERROR DEV_FL_MAX_ERROR
+#define FL_CHECK_UNITARIZATION DEV_FL_CHECK_UNITARIZATION
+#else
+#define FL_MAX_ERROR HOST_FL_MAX_ERROR
+#define FL_CHECK_UNITARIZATION HOST_FL_CHECK_UNITARIZATION
+#endif
+      if(FL_CHECK_UNITARIZATION){
+        if(isUnitary(result,FL_MAX_ERROR) == false)
+    {
+#ifdef __CUDA_ARCH__
+      atomicAdd(arg.fails, 1);
+#else 
+      (*arg.fails)++;
+#endif
+    }
+      }
+        //WRITE BACK IF FAIL??????????
+        for(int i = 0; i < 9;i++) {
+          tmp.data[i].x = (Float)result.data[i].x;
+          tmp.data[i].y = (Float)result.data[i].y;
+        }
+        arg.links.save((Float*)(tmp.data),idx, mu, parity); 
+  }
+}
+
+
+
+template<typename Float, typename Gauge>
+  class UnitarizeLinksQuda : Tunable {    
+    UnitarizeLinksQudaArg<Gauge> arg;
+    
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+    
+    // don't tune the grid dimension
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
+
+  public:
+    UnitarizeLinksQuda(UnitarizeLinksQudaArg<Gauge> &arg) : arg(arg) { }
+
+
+      void apply(const cudaStream_t &stream){
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          DoUnitarizedLink<Float,Gauge><<<tp.grid, tp.block, 0, stream>>>(arg);
+      }
+    void preTune() { ; }
+    void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
+    
+    long long flops() const { return 0; } // FIXME: add flops counter
+
+    TuneKey tuneKey() const {
+      std::stringstream vol, aux;
+      vol << arg.X[0] << "x";
+      vol << arg.X[1] << "x";
+      vol << arg.X[2] << "x";
+      vol << arg.X[3] << "x";
+      aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
+      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
+    }  
+}; 
+
+
+template<typename Float, typename Gauge>
+void unitarizeLinksQuda( Gauge links,  cudaGaugeField& data, int* fails) {
+
+      UnitarizeLinksQudaArg<Gauge> arg(links, data, fails);
+      UnitarizeLinksQuda<Float, Gauge> unitlinks(arg) ;
+      unitlinks.apply(0);
+}
+
+template<typename Float>
+void unitarizeLinksQuda( cudaGaugeField& links, int* fails) {
+
+        if(links.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+        if(links.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+        //printf("QUDA_RECONSTRUCT_NO\n");
+          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 2, 18>(links), links, fails) ;
+        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_12){
+        //printf("QUDA_RECONSTRUCT_12\n");
+          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 2, 12>(links), links, fails) ;
+        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_8){
+        //printf("QUDA_RECONSTRUCT_8\n");
+          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 2, 8>(links), links, fails) ;
+        
+        } else {
+          errorQuda("Reconstruction type %d of gauge field not supported", links.Reconstruct());
+        }
+      } else if(links.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
+        if(links.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+        //printf("QUDA_RECONSTRUCT_NO\n");
+          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 4, 18>(links), links, fails) ;
+        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_12){
+        //printf("QUDA_RECONSTRUCT_12\n");
+          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 4, 12>(links), links, fails) ;
+        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_8){
+        //printf("QUDA_RECONSTRUCT_8\n");
+          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 4, 8>(links), links, fails) ;
+        } else {
+          errorQuda("Reconstruction type %d of gauge field not supported", links.Reconstruct());
+        }
+      } else {
+        errorQuda("Invalid Gauge Order\n");
+      }
+    }
+  
+  void unitarizeLinksQuda(cudaGaugeField& links, int* fails) {
+
+    if(links.Precision() == QUDA_HALF_PRECISION) {
+      errorQuda("Half precision not supported\n");
+    }
+    if (links.Precision() == QUDA_SINGLE_PRECISION) {
+      unitarizeLinksQuda<float>(links, fails);
+    } else if(links.Precision() == QUDA_DOUBLE_PRECISION) {
+      unitarizeLinksQuda<double>(links, fails);
+    } else {
+      errorQuda("Precision %d not supported", links.Precision());
+    }
+  }
     
 } // namespace quda
 
