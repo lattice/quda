@@ -68,6 +68,7 @@ namespace quda {
 
     comm_dslash_peer2peer_init();
 
+    checkCudaError();
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
@@ -104,13 +105,14 @@ namespace quda {
       }
     }
 
+    checkCudaError();
     // open the remote memory handles 
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<num_dir; ++dir){
 	if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
-	for(int b=0; b<2; ++b){
+	for(int b=0; b<1; ++b){
 	  void** ghostDest = (dir==0) ? (&backGhostSendDest[b][dim]) 
 			   : &(fwdGhostSendDest[b][dim]);
 	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
@@ -118,12 +120,13 @@ namespace quda {
 	}
       }
       if(num_dir == 1){
-	for(int b=0; b<2; ++b){ // completely superfluous
+	for(int b=0; b<1; ++b){ // completely superfluous
 	  fwdGhostSendDest[b][dim] = backGhostSendDest[b][dim];
 	}
       }
     }
    
+    checkCudaError();
  
     // Note that the events can and probably should be static. 
     // We don't want a proliferation of events, I don't think
@@ -137,7 +140,8 @@ namespace quda {
 	  MsgHandle* sendHandle = NULL;
 	  MsgHandle* receiveHandle = NULL;
 	  int disp = (dir == 1) ? +1 : -1;
-
+		
+	  checkCudaError();
 	  // first set up receive
 	  if(comm_dslash_peer2peer_enabled(1-dir,dim)){
             receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[b][1-dir][dim],
@@ -145,14 +149,25 @@ namespace quda {
 							 -disp,
 							  sizeof(ipcRemoteEventHandle[b][1-dir][dim]));
 	  }
+
+	  checkCudaError();
           // now send
 	  if(comm_dslash_peer2peer_enabled(dir,dim)) {
-	    cudaEventCreate(&ipcCopyEvent[b][dir][dim]); 
-	    cudaIpcGetEventHandle(&ipcLocalEventHandle[b][dir][dim], ipcCopyEvent[b][dir][dim]);
+	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess); 
+	    checkCudaError();
+	    printfQuda("Called here 1\n");
+	    //cudaIpcGetEventHandle(&(ipcLocalEventHandle[b][dir][dim]), ipcCopyEvent[b][dir][dim]);
+
+	    cudaIpcEventHandle_t ipc_handle;
+	    cudaIpcGetEventHandle(&ipc_handle, ipcCopyEvent[b][dir][dim]);
+
+	    printfQuda("Called here 2\n");
+	    checkCudaError();
 	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle[b][dir][dim],
 						    dim,
 				                    disp,
 						    sizeof(ipcLocalEventHandle[b][dir][dim]));
+	    checkCudaError();
 	  }
 	  if(receiveHandle) comm_start(receiveHandle);
   	  if(sendHandle) comm_start(sendHandle);
@@ -165,6 +180,7 @@ namespace quda {
         }
       }
     }
+    checkCudaError();
     // the b index is completely superfluous here since the buffers aren't static
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
@@ -175,6 +191,7 @@ namespace quda {
 	}
       }
     }
+    checkCudaError();
 
     // Create message handles for IPC synchronization
     for(int dim=0; dim<4; ++dim){
@@ -189,6 +206,7 @@ namespace quda {
 	}
       }
 
+    checkCudaError();
       if(comm_dslash_peer2peer_enabled(0,dim)){
         int dummy;
         for(int b=0; b<2; ++b){
@@ -199,6 +217,9 @@ namespace quda {
         }
       }
     }
+    checkCudaError();
+
+    printfQuda("Call to createIPCDslashComms complete\n");
     initIPCDslashComms = true;
   }
 
@@ -426,8 +447,7 @@ namespace quda {
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 
 #ifdef P2P_COMMS
-    initIPCTimeComms = false;
-//    initIPCDslashComms = false;
+    initIPCDslashComms = false;
 #endif
 
     // this must come before create
@@ -453,8 +473,7 @@ namespace quda {
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 #ifdef P2P_COMM
-    initIPCTimeComms = false;
-//    initIPCDslashComms = false;
+    initIPCDslashComms = false;
 #endif
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -466,8 +485,7 @@ namespace quda {
     ColorSpinorField(src), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {  
 #ifdef P2P_COMMS
-    initIPCTimeComms = false;
-//    initIPCDslashComms = false;
+    initIPCDslashComms = false;
 #endif
     // can only overide if we are not using a reference or parity special case
     if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
@@ -524,8 +542,7 @@ namespace quda {
       initComms(false), bufferMessageHandler(0), nFaceComms(0) {
 
 #ifdef P2P_COMMS
-    initIPCTimeComms = false;
-//    initIPCDslashComms = false;
+    initIPCDslashComms = false;
 #endif
     create(QUDA_COPY_FIELD_CREATE);
     copySpinorField(src);
@@ -1504,6 +1521,7 @@ namespace quda {
       initComms = true;
       nFaceComms = nFace;
     }
+    checkCudaError();
 #ifdef P2P_COMMS
     createIPCDslashComms();
 #endif
