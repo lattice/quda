@@ -348,10 +348,10 @@ namespace quda {
 #endif
 
 #ifdef P2P_COMMS
-   static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
-   static MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
-   static MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
-   static MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
+   static MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
+   static MsgHandle* mh_send_p2p_back[QUDA_MAX_DIM];
+   static MsgHandle* mh_recv_p2p_fwd[QUDA_MAX_DIM];
+   static MsgHandle* mh_recv_p2p_back[QUDA_MAX_DIM];
 #endif
 
 
@@ -383,17 +383,17 @@ namespace quda {
     void* fwdNormSrcBuffer;
     void* backNormSrcBuffer;
 
-    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
-    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcCopyEvent[2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
 // for forward send 
-   void* fwdGhostSendDest[2][QUDA_MAX_DIM];
-   void* backGhostSendDest[2][QUDA_MAX_DIM];
-   cudaIpcMemHandle_t ipcLocalGhostDestHandle[2][2][QUDA_MAX_DIM];
-   cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
+   void* fwdGhostSendDest[QUDA_MAX_DIM];
+   void* backGhostSendDest[QUDA_MAX_DIM];
+   cudaIpcMemHandle_t ipcLocalGhostDestHandle[2][QUDA_MAX_DIM];
+   cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][QUDA_MAX_DIM];
 // As soon as the send starts need to register the even on the receiving process
 // to let that process know that it is safe to proceed.
-   static cudaIpcEventHandle_t ipcLocalEventHandle[2][2][QUDA_MAX_DIM]; 
-   static cudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
+   static cudaIpcEventHandle_t ipcLocalEventHandle[2][QUDA_MAX_DIM]; 
+   static cudaIpcEventHandle_t ipcRemoteEventHandle[2][QUDA_MAX_DIM];
 #endif  
 
     void create(const QudaFieldCreate);
@@ -545,8 +545,8 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-    static int ipcCopyComplete(int b, int dir, int dim);
-    static int ipcRemoteCopyComplete(int b, int dir, int dim);
+    static int ipcCopyComplete(int dir, int dim);
+    static int ipcRemoteCopyComplete(int dir, int dim);
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }

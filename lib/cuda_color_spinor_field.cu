@@ -31,15 +31,15 @@ namespace quda {
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
 
 #ifdef P2P_COMMS
-  MsgHandle* cudaColorSpinorField::mh_send_p2p_fwd[2][QUDA_MAX_DIM];
-  MsgHandle* cudaColorSpinorField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
-  MsgHandle* cudaColorSpinorField::mh_send_p2p_back[2][QUDA_MAX_DIM];
-  MsgHandle* cudaColorSpinorField::mh_recv_p2p_back[2][QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_send_p2p_fwd[QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_recv_p2p_fwd[QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_send_p2p_back[QUDA_MAX_DIM];
+  MsgHandle* cudaColorSpinorField::mh_recv_p2p_back[QUDA_MAX_DIM];
 //  bool cudaColorSpinorField::initIPCDslashComms = false;
 
   // Need events to coordinate IPC memory copies
-  cudaEvent_t cudaColorSpinorField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
-  cudaEvent_t cudaColorSpinorField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+  cudaEvent_t cudaColorSpinorField::ipcCopyEvent[2][QUDA_MAX_DIM];
+  cudaEvent_t cudaColorSpinorField::ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
 
   // Pointers to ghost buffers on the local process and remote processes
   cudaIpcMemHandle_t cudaColorSpinorField::ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
@@ -49,8 +49,8 @@ namespace quda {
   void* cudaColorSpinorField::backGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
 
 
-  cudaIpcEventHandle_t cudaColorSpinorField::ipcLocalEventHandle[2][2][QUDA_MAX_DIM];
-  cudaIpcEventHandle_t cudaColorSpinorField::ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
+  cudaIpcEventHandle_t cudaColorSpinorField::ipcLocalEventHandle[2][QUDA_MAX_DIM];
+  cudaIpcEventHandle_t cudaColorSpinorField::ipcRemoteEventHandle[2][QUDA_MAX_DIM];
 
 #endif // P2P_COMMS
   /*cudaColorSpinorField::cudaColorSpinorField() : 
@@ -71,37 +71,34 @@ namespace quda {
     checkCudaError();
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
-      const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<2; ++dir){
-        for(int b=0; b<2; ++b){
-	  MsgHandle* sendHandle = NULL;
-	  MsgHandle* receiveHandle = NULL;
-	  int disp = (dir == 1) ? +1 : -1;
+        MsgHandle* sendHandle = NULL;
+	MsgHandle* receiveHandle = NULL;
+	int disp = (dir == 1) ? +1 : -1;
 
-	  // first set up receive
-	  if(comm_dslash_peer2peer_enabled(1-dir,dim)){
-            receiveHandle = comm_declare_receive_relative(&ipcRemoteGhostDestHandle[b][1-dir][dim],
-							  dim, 
-							 -disp,
-							  sizeof(ipcRemoteGhostDestHandle[b][1-dir][dim]));
-	  }
-          // now send
-	  if(comm_dslash_peer2peer_enabled(dir,dim)) {
-	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle[b][dir][dim], ghost_field);
-	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle[b][dir][dim],
-						    dim,
-				                    disp,
-						    sizeof(ipcLocalGhostDestHandle[b][dir][dim]));
-	  }
-	  if(receiveHandle) comm_start(receiveHandle);
-  	  if(sendHandle) comm_start(sendHandle);
+	// first set up receive
+	if(comm_dslash_peer2peer_enabled(1-dir,dim)){
+          receiveHandle = comm_declare_receive_relative(&ipcRemoteGhostDestHandle[1-dir][dim],
+							dim, 
+							-disp,
+							sizeof(ipcRemoteGhostDestHandle[1-dir][dim]));
+	}
+        // now send
+	if(comm_dslash_peer2peer_enabled(dir,dim)) {
+	  cudaIpcGetMemHandle(&ipcLocalGhostDestHandle[dir][dim], ghost_field);
+	  sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle[dir][dim],
+						  dim,
+				                  disp,
+						  sizeof(ipcLocalGhostDestHandle[dir][dim]));
+	}
+	if(receiveHandle) comm_start(receiveHandle);
+  	if(sendHandle) comm_start(sendHandle);
 	  
-	  if(receiveHandle) comm_wait(receiveHandle);
-	  if(sendHandle) comm_wait(sendHandle);
+	if(receiveHandle) comm_wait(receiveHandle);
+	if(sendHandle) comm_wait(sendHandle);
 
-	  if(sendHandle) comm_free(sendHandle);
-	  if(receiveHandle) comm_free(receiveHandle);
-        }
+	if(sendHandle) comm_free(sendHandle);
+	if(receiveHandle) comm_free(receiveHandle);
       }
     }
 
@@ -112,17 +109,13 @@ namespace quda {
       const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<num_dir; ++dir){
 	if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
-	for(int b=0; b<1; ++b){
-	  void** ghostDest = (dir==0) ? (&backGhostSendDest[b][dim]) 
-			   : &(fwdGhostSendDest[b][dim]);
-	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
-				cudaIpcMemLazyEnablePeerAccess);
-	}
+	void** ghostDest = (dir==0) ? (&backGhostSendDest[dim]) 
+			 : &(fwdGhostSendDest[dim]);
+	cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[dir][dim],
+		cudaIpcMemLazyEnablePeerAccess);
       }
       if(num_dir == 1){
-	for(int b=0; b<1; ++b){ // completely superfluous
-	  fwdGhostSendDest[b][dim] = backGhostSendDest[b][dim];
-	}
+        fwdGhostSendDest[dim] = backGhostSendDest[dim];
       }
     }
    
@@ -134,50 +127,40 @@ namespace quda {
     // Now communicate the event handles
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
-      const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
       for(int dir=0; dir<2; ++dir){
-        for(int b=0; b<2; ++b){
-	  MsgHandle* sendHandle = NULL;
-	  MsgHandle* receiveHandle = NULL;
-	  int disp = (dir == 1) ? +1 : -1;
+        MsgHandle* sendHandle = NULL;
+	MsgHandle* receiveHandle = NULL;
+	int disp = (dir == 1) ? +1 : -1;
 		
-	  checkCudaError();
-	  // first set up receive
-	  if(comm_dslash_peer2peer_enabled(1-dir,dim)){
-            receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[b][1-dir][dim],
+	checkCudaError();
+	// first set up receive
+	if(comm_dslash_peer2peer_enabled(1-dir,dim)){
+          receiveHandle = comm_declare_receive_relative(&ipcRemoteEventHandle[1-dir][dim],
 							  dim, 
 							 -disp,
-							  sizeof(ipcRemoteEventHandle[b][1-dir][dim]));
-	  }
+							  sizeof(ipcRemoteEventHandle[1-dir][dim]));
+	}
 
-	  checkCudaError();
+	checkCudaError();
           // now send
-	  if(comm_dslash_peer2peer_enabled(dir,dim)) {
-	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess); 
-	    checkCudaError();
-	    printfQuda("Called here 1\n");
-	    //cudaIpcGetEventHandle(&(ipcLocalEventHandle[b][dir][dim]), ipcCopyEvent[b][dir][dim]);
+	if(comm_dslash_peer2peer_enabled(dir,dim)) {
+	  cudaEventCreate(&ipcCopyEvent[dir][dim], cudaEventDisableTiming | cudaEventInterprocess); 
+	  cudaIpcGetEventHandle(&(ipcLocalEventHandle[dir][dim]), ipcCopyEvent[dir][dim]);
 
-	    cudaIpcEventHandle_t ipc_handle;
-	    cudaIpcGetEventHandle(&ipc_handle, ipcCopyEvent[b][dir][dim]);
 
-	    printfQuda("Called here 2\n");
-	    checkCudaError();
-	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle[b][dir][dim],
-						    dim,
-				                    disp,
-						    sizeof(ipcLocalEventHandle[b][dir][dim]));
-	    checkCudaError();
-	  }
-	  if(receiveHandle) comm_start(receiveHandle);
-  	  if(sendHandle) comm_start(sendHandle);
+	  sendHandle = comm_declare_send_relative(&ipcLocalEventHandle[dir][dim],
+						  dim,
+				                  disp,
+						  sizeof(ipcLocalEventHandle[dir][dim]));
+	}
+	if(receiveHandle) comm_start(receiveHandle);
+  	if(sendHandle) comm_start(sendHandle);
 	  
-	  if(receiveHandle) comm_wait(receiveHandle);
-	  if(sendHandle) comm_wait(sendHandle);
+	if(receiveHandle) comm_wait(receiveHandle);
+	if(sendHandle) comm_wait(sendHandle);
 
-	  if(sendHandle) comm_free(sendHandle);
-	  if(receiveHandle) comm_free(receiveHandle);
-        }
+	if(sendHandle) comm_free(sendHandle);
+	if(receiveHandle) comm_free(receiveHandle);
       }
     }
     checkCudaError();
@@ -186,40 +169,31 @@ namespace quda {
       if(!commDimPartitioned(dim)) continue;
       for(int dir=0; dir<2; ++dir){
 	if(!comm_dslash_peer2peer_enabled(dir,dim)) continue;
-	for(int b=0; b<2; ++b){
-	  cudaIpcOpenEventHandle(&(ipcRemoteCopyEvent[b][dir][dim]), ipcRemoteEventHandle[b][dir][dim]);
-	}
+	cudaIpcOpenEventHandle(&(ipcRemoteCopyEvent[dir][dim]), ipcRemoteEventHandle[dir][dim]);
       }
     }
-    checkCudaError();
 
     // Create message handles for IPC synchronization
     for(int dim=0; dim<4; ++dim){
       if(!commDimPartitioned(dim)) continue;
       if(comm_dslash_peer2peer_enabled(1,dim)){
         int dummy;
-	for(int b=0; b<2; ++b){
-	  // send to processor in forward direction 
-	  mh_send_p2p_fwd[b][dim] = comm_declare_send_relative(&dummy,dim,+1,sizeof(int));
-	  // receive from processor in forward directin
-	  mh_recv_p2p_fwd[b][dim] = comm_declare_receive_relative(&dummy, dim, +1, sizeof(int));
-	}
+	// send to processor in forward direction 
+	mh_send_p2p_fwd[dim] = comm_declare_send_relative(&dummy,dim,+1,sizeof(int));
+	// receive from processor in forward directin
+	mh_recv_p2p_fwd[dim] = comm_declare_receive_relative(&dummy, dim, +1, sizeof(int));
       }
 
-    checkCudaError();
       if(comm_dslash_peer2peer_enabled(0,dim)){
         int dummy;
-        for(int b=0; b<2; ++b){
-	  // send to processor in backward direction
-	  mh_send_p2p_back[b][dim] = comm_declare_send_relative(&dummy,dim,-1,sizeof(int));
-	  // receive from processor in backward direction
-	  mh_recv_p2p_back[b][dim] = comm_declare_receive_relative(&dummy,dim,-1,sizeof(int));
-        }
+	// send to processor in backward direction
+	mh_send_p2p_back[dim] = comm_declare_send_relative(&dummy,dim,-1,sizeof(int));
+	// receive from processor in backward direction
+	mh_recv_p2p_back[dim] = comm_declare_receive_relative(&dummy,dim,-1,sizeof(int));
       }
     }
     checkCudaError();
 
-    printfQuda("Call to createIPCDslashComms complete\n");
     initIPCDslashComms = true;
   }
 
@@ -1560,28 +1534,24 @@ namespace quda {
       if(!commDimPartitioned(dim)) continue;
     
       if(comm_dslash_peer2peer_enabled(1,dim)) {
-	for(int b=0; b<2; ++b){
-	  comm_free(mh_send_p2p_fwd[b][dim]);
-	  comm_free(mh_recv_p2p_fwd[b][dim]);
+	comm_free(mh_send_p2p_fwd[dim]);
+	comm_free(mh_recv_p2p_fwd[dim]);
 
-	  if(dim != 3 || getKernelPackT()) cudaIpcCloseMemHandle(backGhostFaceSrcBuffer[b][dim]);
-	  cudaEventDestroy(ipcCopyEvent[b][1][dim]);
-	}
+//	if(dim != 3 || getKernelPackT()) cudaIpcCloseMemHandle(backGhostFaceSrcBuffer[dim]);
+	cudaEventDestroy(ipcCopyEvent[1][dim]);
       }
 
 
 	
       if(comm_dslash_peer2peer_enabled(0,dim)) {
         const int num_dir = (comm_dim(dim) == 2) ? 1 : 2;
-	for(int b=0; b<2; ++b){
-	  comm_free(mh_send_p2p_back[b][dim]);
-	  comm_free(mh_recv_p2p_back[b][dim]);
+	comm_free(mh_send_p2p_back[dim]);
+	comm_free(mh_recv_p2p_back[dim]);
 
-	  if(dim != 3 || getKernelPackT()){
-	    if(num_dir == 2) cudaIpcCloseMemHandle(fwdGhostFaceSrcBuffer[b][dim]);
-	  } 
-	  cudaEventDestroy(ipcCopyEvent[b][0][dim]);
-	}
+	if(dim != 3 || getKernelPackT()){
+//	  if(num_dir == 2) cudaIpcCloseMemHandle(fwdGhostFaceSrcBuffer[dim]);
+	} 
+	cudaEventDestroy(ipcCopyEvent[0][dim]);
       }    
     } // iterate over dim
 
@@ -1760,7 +1730,7 @@ namespace quda {
 #ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)){
 	// receive from the processor in the +1 direction
-	comm_start(mh_recv_p2p_fwd[bufferIndex][dim]);
+	comm_start(mh_recv_p2p_fwd[dim]);
       } else 
 #endif
       {
@@ -1771,24 +1741,13 @@ namespace quda {
       // Prepost receive
 #ifdef P2P_COMMS
       if (comm_dslash_peer2peer_enabled(0,dim)) {
-	comm_start(mh_recv_p2p_back[bufferIndex][dim]);
+	comm_start(mh_recv_p2p_back[dim]);
       } else
 #endif
       {
         comm_start(mh_recv_back[bufferIndex][nFace-1][dim]);
       }
     }
-#ifdef GPU_COMMS
-    if(precision != QUDA_HALF_PRECISION) return;
-
-    if (dir%2 == 0) { // sending backwards
-      // Prepost receive
-      comm_start(mh_recv_norm_fwd[bufferIndex][nFace-1][dim]);
-    } else { //sending forwards
-      // Prepost receive
-      comm_start(mh_recv_norm_back[bufferIndex][nFace-1][dim]);
-    }
-#endif
   }
 
 
@@ -1808,13 +1767,14 @@ namespace quda {
 	   cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;	
 	   // start the copy
 	   // all goes here
-	    void* ghost_dst = backGhostSendDest[bufferIndex][dim] + precision*ghostOffset[dim][1];
+	   void* ghost_dst = (void*)((char*)(backGhostSendDest[dim]) + precision*ghostOffset[dim][1]);
 	   if(dim != 3 || getKernelPackT()) {
 	    cudaMemcpyAsync(ghost_dst,
-			  backGhostFaceBuffer[bufferIndex][dim],
+			  backGhostFaceBuffer[bufferIndex][dim], // Change this??
 			  ghost_face_bytes[dim],
 			  cudaMemcpyDeviceToDevice,	
 			  *copy_stream); // copy to forward processor
+	    cudaDeviceSynchronize(); 
 	    } else {
 	     int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
 	     int Nint = (nColor * nSpin * 2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
@@ -1838,15 +1798,15 @@ namespace quda {
 
 	     if(precision == QUDA_HALF_PRECISION) {
 	       int norm_offset = 0;
-	       void *ghost_norm_dst = backGhostSendDest[bufferIndex][dim] + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1];
+	       void *ghost_norm_dst = backGhostSendDest[dim] + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][1];
 	       void* src = norm;
 	       cudaMemcpyAsync(ghost_norm_dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToDevice, *copy_stream);
 	     }
 	   }
 	   // record the event 
-	   cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim], *copy_stream);
+	   cudaEventRecord(ipcCopyEvent[0][dim], *copy_stream);
 	   // send to the propcessor in the -1 direction
-	   comm_start(mh_send_p2p_back[bufferIndex][dim]);
+	   comm_start(mh_send_p2p_back[dim]);
 	}
 #endif
       } else { // sending forwards
@@ -1859,7 +1819,7 @@ namespace quda {
 	  cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + dir;
 
 	  // start the copy 
-	  void* ghost_dst = fwdGhostSendDest[bufferIndex][dim] + precision*ghostOffset[dim][0];
+	  void* ghost_dst = (void*)((char*)(fwdGhostSendDest[dim]) + precision*ghostOffset[dim][0]);
 	
           if(dim != 3 || getKernelPackT()){
 	    cudaMemcpyAsync(ghost_dst,
@@ -1867,6 +1827,7 @@ namespace quda {
 			  ghost_face_bytes[dim],	  
 			  cudaMemcpyDeviceToDevice,	
 			  *copy_stream); // copy to forward processor
+	    cudaDeviceSynchronize(); 
 	  } else {
 	    int Nvec = (nSpin == 1 || precision == QUDA_DOUBLE_PRECISION) ? 2 : 4;
 	    int Nint = (nColor * nSpin *2)/(nSpin == 4 ? 2 : 1); // (spin proj.) degrees of freedom
@@ -1888,15 +1849,15 @@ namespace quda {
 
 	    if(precision == QUDA_HALF_PRECISION) {
 	      int norm_offset = Nt_minus1_offset*sizeof(float);
-	      void* ghost_norm_dst = fwdGhostSendDest[bufferIndex][dim] + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
+	      void* ghost_norm_dst = fwdGhostSendDest[dim] + QUDA_SINGLE_PRECISION*ghostNormOffset[dim][0];
 	      void *src = (char*)norm + norm_offset;
 	      cudaMemcpyAsync(ghost_norm_dst, src, nFace*ghostFace[3]*sizeof(float), cudaMemcpyDeviceToDevice, *copy_stream);
 	    }
 	  }
 
-	  cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
+	  cudaEventRecord(ipcCopyEvent[1][dim], *copy_stream);
 	  // send to the processor in the +1 direction
-	  comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
+	  comm_start(mh_send_p2p_fwd[dim]);
       }
 #endif
   }
@@ -2067,7 +2028,7 @@ namespace quda {
 			*copy_stream); // copy from forward processor
 
 
-	cudaEventRecord(ipcCopyEvent[bufferIndex][1][dim], *copy_stream);
+	cudaEventRecord(ipcCopyEvent[1][dim], *copy_stream);
       }
 #endif
     } else { // sending forwards 
@@ -2109,7 +2070,7 @@ namespace quda {
 			cudaMemcpyDeviceToDevice,
 			*copy_stream); // copy from backward processor
 
-	cudaEventRecord(ipcCopyEvent[bufferIndex][0][dim],*copy_stream);
+	cudaEventRecord(ipcCopyEvent[0][dim],*copy_stream);
       }
 #endif
     }
@@ -2118,17 +2079,17 @@ namespace quda {
 
 
 
-  int cudaColorSpinorField::ipcCopyComplete(int b, int dir, int dim){
-    if(cudaSuccess == cudaEventQuery(ipcCopyEvent[b][dir][dim])){
+  int cudaColorSpinorField::ipcCopyComplete(int dir, int dim){
+    if(cudaSuccess == cudaEventQuery(ipcCopyEvent[dir][dim])){
       return 1;
     }
     return 0;
   }
 
-  int cudaColorSpinorField::ipcRemoteCopyComplete(int b, int dir, int dim){
-//    if(cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[b][dir][dim])){
- //     return 1;
- //   }
+  int cudaColorSpinorField::ipcRemoteCopyComplete(int dir, int dim){
+    if(cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[dir][dim])){
+      return 1;
+    }
     return 0;
   }
 
@@ -2142,13 +2103,16 @@ namespace quda {
 
     int receive_complete=0;
     int send_complete=0;
+
+    comm_barrier(); printfQuda("Remove this!\n");
+
     if(dir%2==0){
 
 #ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)){
 
-	receive_complete = (comm_query(mh_recv_p2p_fwd[bufferIndex][dim])
-			    && ipcRemoteCopyComplete(bufferIndex,1,dim));
+	receive_complete = (comm_query(mh_recv_p2p_fwd[dim])
+			    && ipcRemoteCopyComplete(1,dim));
 
       } else 
 #endif
@@ -2158,7 +2122,7 @@ namespace quda {
 
 #ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(0,dim)){
-	send_complete = ipcCopyComplete(bufferIndex,0,dim);
+	send_complete = ipcCopyComplete(0,dim);
       } else 
 #endif
       {
@@ -2168,8 +2132,8 @@ namespace quda {
     } else { // dir%2 == 1
 #ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(0,dim)){
-        receive_complete = (comm_query(mh_recv_p2p_back[bufferIndex][dim])
-			    && ipcRemoteCopyComplete(bufferIndex, 0, dim));
+        receive_complete = (comm_query(mh_recv_p2p_back[dim])
+			    && ipcRemoteCopyComplete(0, dim));
       } else 
 #endif
       {
@@ -2178,7 +2142,7 @@ namespace quda {
 
 #ifdef P2P_COMMS
       if(comm_dslash_peer2peer_enabled(1,dim)){
-	send_complete = ipcCopyComplete(bufferIndex,1,dim);
+	send_complete = ipcCopyComplete(1,dim);
       } else 
 #endif
       {
