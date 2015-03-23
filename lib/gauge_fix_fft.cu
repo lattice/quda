@@ -19,13 +19,21 @@ namespace quda {
 
 //Comment if you don't want to use textures for Delta(x) and g(x)
 #define GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+
+//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
+#define GAUGEFIXING_DONT_USE_GX
 //Without using the precalculation of g(x), 
 //we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
 //and the gauge array in even/odd format
-//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
-//#define GAUGEFIXING_DONT_USE_GX
 
 
+
+
+#ifdef GAUGEFIXING_DONT_USE_GX
+#warning Don't use precalculated g(x)
+#else
+#warning Using precalculated g(x)
+#endif
 
 
 #ifndef FL_UNITARIZE_PI
@@ -516,20 +524,20 @@ struct GaugeFixArg {
 	GaugeFixArg( cudaGaugeField &data, const unsigned int Elems) : data(data){
 		for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 		threads = X[0]*X[1]*X[2]*X[3];
-		cudaMalloc((void**)&invpsq, sizeof(Float) * threads);
-		cudaMalloc((void**)&delta, sizeof(typename ComplexTypeId<Float>::Type) * threads * 6);
+	    invpsq = (Float*)device_malloc(sizeof(Float) * threads);
+	    delta = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads * 6);
 		#ifdef GAUGEFIXING_DONT_USE_GX
-		cudaMalloc((void**)&gx, sizeof(typename ComplexTypeId<Float>::Type) * threads);
+	    gx = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads);
 		#else
-		cudaMalloc((void**)&gx, sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
+	    gx = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
 		#endif
 		BindTex(delta, gx, sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
 	}
 	void free(){
-		cudaFree(invpsq);
-		cudaFree(delta);
-		cudaFree(gx);
 		UnBindTex(delta, gx);
+		device_free(invpsq);
+		device_free(delta);
+		device_free(gx);
 	}
 };
 
