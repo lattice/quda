@@ -17,19 +17,27 @@ namespace quda {
 
 
 
+//Comment if you don't want to use textures for Delta(x) and g(x)
+#define GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+//Without using the precalculation of g(x), 
+//we loose some performance, because Delta(x) is written in normal lattice coordinates need for the FFTs
+//and the gauge array in even/odd format
+//UNCOMMENT THIS IF YOU WAN'T TO USE LESS MEMORY
+//#define GAUGEFIXING_DONT_USE_GX
+
+
+
 
 #ifndef FL_UNITARIZE_PI
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
 
 
-
-#define GAUGEFIXING_SITE_MATRIX_LOAD_TEX 1
-
-
-
 texture<float2, 1, cudaReadModeElementType> GXTexSingle;
 texture<int4, 1, cudaReadModeElementType> GXTexDouble;
+//Delta is only stored using 12 real number parameters, 
+//	(0,0), (0,1), (0,2), (1,1), (1,2) and (2,2)
+//	(0,0), (1,1) and (0,1) don't have real part, however we need a complex for the FFTs
 texture<float2, 1, cudaReadModeElementType> DELTATexSingle;
 texture<int4, 1, cudaReadModeElementType> DELTATexDouble;
 
@@ -62,27 +70,35 @@ inline __device__ typename ComplexTypeId<double>::Type TEXTURE_DELTA<typename Co
 }
 
 static void BindTex(typename ComplexTypeId<float>::Type *delta, typename ComplexTypeId<float>::Type *gx, size_t bytes){
-	#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
-	cudaBindTexture(0, GXTexSingle, gx, bytes);
+	#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+		#ifndef GAUGEFIXING_DONT_USE_GX
+		cudaBindTexture(0, GXTexSingle, gx, bytes);
+		#endif
 	cudaBindTexture(0, DELTATexSingle, delta, bytes);
 	#endif
 }
 static void BindTex(typename ComplexTypeId<double>::Type *delta, typename ComplexTypeId<double>::Type *gx, size_t bytes){
-	#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
-	cudaBindTexture(0, GXTexDouble, gx, bytes);
+	#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+		#ifndef GAUGEFIXING_DONT_USE_GX
+		cudaBindTexture(0, GXTexDouble, gx, bytes);
+		#endif
 	cudaBindTexture(0, DELTATexDouble, delta, bytes);
 	#endif
 }
 
 static void UnBindTex(typename ComplexTypeId<float>::Type *delta, typename ComplexTypeId<float>::Type *gx){
-	#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
-	cudaUnbindTexture(GXTexSingle);
-	cudaUnbindTexture(DELTATexSingle);
+	#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+		#ifndef GAUGEFIXING_DONT_USE_GX
+		cudaUnbindTexture(GXTexSingle);
+		#endif
+		cudaUnbindTexture(DELTATexSingle);
 	#endif
 }
 static void UnBindTex(typename ComplexTypeId<double>::Type *delta, typename ComplexTypeId<double>::Type *gx){
-	#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
-	cudaUnbindTexture(GXTexDouble);
+	#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+		#ifndef GAUGEFIXING_DONT_USE_GX
+		cudaUnbindTexture(GXTexDouble);
+		#endif
 	cudaUnbindTexture(DELTATexDouble);
 	#endif
 }
@@ -418,7 +434,13 @@ __global__ void computeFix_quality(GaugeFixQualityArg<typename ComplexTypeId<Flo
 		//SAVE DELTA!!!!!
 		SubTraceUnit(delta);
 		idx = getCoords(idx, argQ.X, parity);
-		for(int i = 0; i < Elems; i++) argQ.delta[idx + i * argQ.threads] = delta.data[i];
+		//Saving Delta
+		argQ.delta[idx] = delta(0,0);
+		argQ.delta[idx + argQ.threads] = delta(0,1);
+		argQ.delta[idx + 2 * argQ.threads] = delta(0,2);
+		argQ.delta[idx + 3 * argQ.threads] = delta(1,1);
+		argQ.delta[idx + 4 * argQ.threads] = delta(1,2);
+		argQ.delta[idx + 5 * argQ.threads] = delta(2,2);
 		//12
 		data.y = getRealTraceUVdagger(delta, delta);
 		//35
@@ -495,8 +517,12 @@ struct GaugeFixArg {
 		for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 		threads = X[0]*X[1]*X[2]*X[3];
 		cudaMalloc((void**)&invpsq, sizeof(Float) * threads);
-		cudaMalloc((void**)&delta, sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
+		cudaMalloc((void**)&delta, sizeof(typename ComplexTypeId<Float>::Type) * threads * 6);
+		#ifdef GAUGEFIXING_DONT_USE_GX
+		cudaMalloc((void**)&gx, sizeof(typename ComplexTypeId<Float>::Type) * threads);
+		#else
 		cudaMalloc((void**)&gx, sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
+		#endif
 		BindTex(delta, gx, sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
 	}
 	void free(){
@@ -692,6 +718,166 @@ __host__ __device__ inline void reunit_link( Matrix<typename ComplexTypeId<Float
 
 
 
+
+
+
+#ifdef GAUGEFIXING_DONT_USE_GX
+
+static __device__ __host__ inline int linkNormalIndexP1(int x[], const int X[4], const int mu) {
+	int y[4];
+	for (int i=0; i<4; i++) y[i] = x[i];
+	y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
+	int idx = ((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0];
+	return idx;
+}
+
+
+
+
+template <typename Float, typename Gauge> 
+__global__ void kernel_gauge_fix_U_EO_NEW( GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha){
+	int idd = threadIdx.x + blockIdx.x*blockDim.x;
+
+	if(idd >= arg.threads) return;
+
+	int parity = 0;
+	int id = idd;
+	if(idd >= arg.threads / 2){
+		parity = 1;
+		id -= arg.threads / 2;
+	}
+	typedef typename ComplexTypeId<Float>::Type Cmplx;
+
+	int x[4];
+	getCoords3(x, id, arg.X, parity);
+	int idx = ((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0];
+	Matrix<Cmplx,3> de;
+	//Read Delta
+	#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+	de(0,0) = TEXTURE_DELTA<Cmplx>(idx);
+	de(0,1) = TEXTURE_DELTA<Cmplx>(idx + arg.threads);
+	de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
+	de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
+	de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
+	de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
+	#else
+	de(0,0) = arg.delta[idx];
+	de(0,1) = arg.delta[idx + arg.threads];
+	de(0,2) = arg.delta[idx + 2 * arg.threads];
+	de(1,1) = arg.delta[idx + 3 * arg.threads];
+	de(1,2) = arg.delta[idx + 4 * arg.threads];
+	de(2,2) = arg.delta[idx + 5 * arg.threads];
+	#endif
+	de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
+	de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
+	de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
+	Matrix<Cmplx,3> g;
+	setIdentity(&g);
+	g += de * half_alpha;
+	//36
+	reunit_link<Float>( g );
+	//130
+
+
+	for(int mu = 0; mu < 4; mu++){
+		Matrix<Cmplx,3> U;
+		Matrix<Cmplx,3> g0;
+		dataOr.load((Float*)(U.data),id, mu, parity);
+		U = g * U;
+		//198
+		idx = linkNormalIndexP1(x,arg.X,mu);
+		//Read Delta
+		#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+		de(0,0) = TEXTURE_DELTA<Cmplx>(idx);
+		de(0,1) = TEXTURE_DELTA<Cmplx>(idx + arg.threads);
+		de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
+		de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
+		de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
+		de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
+		#else
+		de(0,0) = arg.delta[idx];
+		de(0,1) = arg.delta[idx + arg.threads];
+		de(0,2) = arg.delta[idx + 2 * arg.threads];
+		de(1,1) = arg.delta[idx + 3 * arg.threads];
+		de(1,2) = arg.delta[idx + 4 * arg.threads];
+		de(2,2) = arg.delta[idx + 5 * arg.threads];
+		#endif
+		de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
+		de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
+		de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
+
+		setIdentity(&g0);
+		g0 += de * half_alpha;
+		//36
+		reunit_link<Float>( g0 );
+		//130
+	
+		U = U * conj(g0);
+		//198
+		dataOr.save((Float*)(U.data),id, mu, parity);
+	}
+}
+
+
+template<typename Float, typename Gauge>
+class GaugeFixNEW : Tunable {
+	GaugeFixArg<Float> arg;
+	Float half_alpha;
+	Gauge dataOr;
+	mutable char aux_string[128]; // used as a label in the autotuner
+private:
+	unsigned int sharedBytesPerThread() const { return 0; }
+	unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+	bool tuneSharedBytes() const { return false; } // Don't tune shared memory
+	bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+	unsigned int minThreads() const { return arg.threads; }
+
+public:
+	GaugeFixNEW(Gauge &dataOr, GaugeFixArg<Float> &arg, Float alpha)
+: dataOr(dataOr), arg(arg) { 
+	half_alpha = alpha * 0.5;
+    cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   cudaFuncCachePreferL1);
+   }
+	~GaugeFixNEW () { }
+
+	void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
+
+
+	void apply(const cudaStream_t &stream){
+		TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+		kernel_gauge_fix_U_EO_NEW<Float, Gauge><<<tp.grid, tp.block, 0, stream>>>(arg, dataOr, half_alpha);
+	}
+
+	TuneKey tuneKey() const {
+		std::stringstream vol;
+		vol << arg.X[0] << "x";
+		vol << arg.X[1] << "x";
+		vol << arg.X[2] << "x";
+		vol << arg.X[3];
+		sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+		return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
+
+	}
+	std::string paramString(const TuneParam &param) const {
+		std::stringstream ps;
+		ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
+		ps << "shared=" << param.shared_bytes;
+		return ps.str();
+	}
+	//need this
+	void preTune() { arg.data.backup(); }
+	void postTune() { arg.data.restore(); }
+	long long flops() const {  
+		return 2414LL * arg.threads;
+		//Not accounting here the reconstruction of the gauge if 12 or 8!!!!!! 
+	}
+  	long long bytes() const { return ( dataOr.Bytes() + 12LL * sizeof(Float)) * arg.threads;}  
+
+}; 
+
+
+
+#else
 template <unsigned int Elems, typename Float> 
 __global__ void kernel_gauge_GX(GaugeFixArg<Float> arg, Float half_alpha){
 
@@ -702,19 +888,27 @@ __global__ void kernel_gauge_GX(GaugeFixArg<Float> arg, Float half_alpha){
 	typedef typename ComplexTypeId<Float>::Type Cmplx;
 
 	Matrix<Cmplx,3> de;
-	for(int i = 0; i < Elems; i++){
-		#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
-		de.data[i] = TEXTURE_DELTA<Cmplx>(id + i * arg.threads);
-		#else
-		de.data[i] = arg.delta[id + i * arg.threads];
-		#endif
-	} 
-	if(Elems==6){    
-		de(2,0) = Conj(de(0,1) * de(1,2) - de(0,2) * de(1,1));
-		de(2,1) = Conj(de(0,2) * de(1,0) - de(0,0) * de(1,2));
-		de(2,2) = Conj(de(0,0) * de(1,1) - de(0,1) * de(1,0));
-		//42
-	}
+	//Read Delta
+	#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+	de(0,0) = TEXTURE_DELTA<Cmplx>(id);
+	de(0,1) = TEXTURE_DELTA<Cmplx>(id + arg.threads);
+	de(0,2) = TEXTURE_DELTA<Cmplx>(id + 2 * arg.threads);
+	de(1,1) = TEXTURE_DELTA<Cmplx>(id + 3 * arg.threads);
+	de(1,2) = TEXTURE_DELTA<Cmplx>(id + 4 * arg.threads);
+	de(2,2) = TEXTURE_DELTA<Cmplx>(id + 5 * arg.threads);
+	#else
+	de(0,0) = arg.delta[id];
+	de(0,1) = arg.delta[id + arg.threads];
+	de(0,2) = arg.delta[id + 2 * arg.threads];
+	de(1,1) = arg.delta[id + 3 * arg.threads];
+	de(1,2) = arg.delta[id + 4 * arg.threads];
+	de(2,2) = arg.delta[id + 5 * arg.threads];
+	#endif
+	de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
+	de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
+	de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
+
+
 	Matrix<Cmplx,3> g;
 	setIdentity(&g);
 	g += de * half_alpha;
@@ -808,7 +1002,7 @@ __global__ void kernel_gauge_fix_U_EO( GaugeFixArg<Float> arg, Gauge dataOr){
 	Matrix<Cmplx,3> g;
 	//for(int i = 0; i < Elems; i++) g.data[i] = arg.gx[idd + i * arg.threads]; 
 	for(int i = 0; i < Elems; i++){
-		#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
+		#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
 		g.data[i] = TEXTURE_GX<Cmplx>(idd + i * arg.threads);
 		#else
 		g.data[i] = arg.gx[idd + i * arg.threads];
@@ -832,7 +1026,7 @@ __global__ void kernel_gauge_fix_U_EO( GaugeFixArg<Float> arg, Gauge dataOr){
 		idm1 += (1 - parity) * arg.threads / 2;
 		//for(int i = 0; i < Elems; i++) g0.data[i] = arg.gx[idm1 + i * arg.threads];
 		for(int i = 0; i < Elems; i++){
-			#if (GAUGEFIXING_SITE_MATRIX_LOAD_TEX == 1)
+			#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
 			g0.data[i] = TEXTURE_GX<Cmplx>(idm1 + i * arg.threads);
 			#else
 			g0.data[i] = arg.gx[idm1 + i * arg.threads];
@@ -906,6 +1100,52 @@ public:
   	long long bytes() const { return 26LL * Elems * sizeof(Float) * arg.threads;}  
 
 }; 
+#endif 
+//GAUGEFIXING_DONT_USE_GX
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -951,8 +1191,14 @@ void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
 	GaugeFixINVPSP<Float> invpsp(arg);
 
 
+	#ifdef GAUGEFIXING_DONT_USE_GX
+	//without using GX, gx will be created only for plane rotation but with less size
+	GaugeFixNEW<Float, Gauge> gfixNew(dataOr, arg, alpha);
+	#else
+	//using GX
 	GaugeFix_GX<Elems, Float> calcGX(arg, alpha);
 	GaugeFix<Elems, Float, Gauge> gfix(dataOr, arg);
+	#endif
 
 	GaugeFixQualityArg<Cmplx, Gauge> argQ(dataOr, data, arg.delta);
 	GaugeFixQuality<Elems, Float, Gauge, gauge_dir> gfixquality(argQ);
@@ -964,7 +1210,7 @@ void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
 	double diff = 0.0;
 	int iter = 0;
 	for(iter = 0; iter < Nsteps; iter++){
-		for(int k = 0; k < Elems; k++){  
+		for(int k = 0; k < 6; k++){  
 			//------------------------------------------------------------------------
 			// Set a pointer do the element k in lattice volume
 			// each element is stored with stride lattice volume
@@ -1003,6 +1249,12 @@ void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
 			//------------------------------------------------------------------------    
 			ApplyFFT(plan_xy, arg.gx, _array, CUFFT_INVERSE);
 		}
+		#ifdef GAUGEFIXING_DONT_USE_GX
+		//------------------------------------------------------------------------
+		// Apply gauge fix to current gauge field
+		//------------------------------------------------------------------------
+		gfixNew.apply(0);
+		#else
 		//------------------------------------------------------------------------
 		// Calculate g(x)
 		//------------------------------------------------------------------------
@@ -1011,6 +1263,7 @@ void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
 		// Apply gauge fix to current gauge field
 		//------------------------------------------------------------------------
 		gfix.apply(0);
+		#endif
 		//------------------------------------------------------------------------
 		// Measure gauge quality and recalculate new Delta(x)
 		//------------------------------------------------------------------------
@@ -1022,7 +1275,11 @@ void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
 		if ( autotune && ((action - action0) < -1e-14) ) {
 			if(alpha > 0.01){
 				alpha = 0.95 * alpha;
+				#ifdef GAUGEFIXING_DONT_USE_GX
+				gfixNew.setAlpha(alpha);
+				#else
 				calcGX.setAlpha(alpha);
+				#endif 
 				printf(">>>>>>>>>>>>>> Warning: changing alpha down -> %.4e\n", alpha );
 			}
 		} 
@@ -1053,10 +1310,15 @@ void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
 	double byte = invpsp.bytes() * Elems;
 	flop += (GFRotate.flops() + fftflop) * Elems * 2;
 	byte += GFRotate.bytes() * Elems * 4; //includes FFT reads, assuming 1 read and 1 write per site
+	#ifdef GAUGEFIXING_DONT_USE_GX
+	flop += gfixNew.flops();
+	byte += gfixNew.bytes();
+	#else
 	flop += calcGX.flops();
 	byte += calcGX.bytes();
 	flop += gfix.flops();
 	byte += gfix.bytes();
+	#endif
 	flop += gfixquality.flops();
 	byte += gfixquality.bytes();
 	gflops += flop * iter;
@@ -1145,6 +1407,8 @@ void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
 	} else {
 		errorQuda("Precision %d not supported", data.Precision());
 	}
-
 }
+
+
+
 }

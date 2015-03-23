@@ -72,7 +72,7 @@ inline void SetPlanFFT2DMany( cufftHandle &plan, int4 size, int dim, float2 *dat
     }
     break;
     case 1:
-    {int n[2] = {size.y, size.x};
+    {int n[2] = {size.x, size.y};
         cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_C2C, size.z * size.w);
     }
     break;
@@ -88,7 +88,7 @@ inline void SetPlanFFT2DMany( cufftHandle &plan, int4 size, int dim, double2 *da
     }
     break;
     case 1:
-    {int n[2] = {size.y, size.x};
+    {int n[2] = {size.x, size.y};
         cufftPlanMany(&plan, 2, n, NULL, 1, 0, NULL, 1, 0, CUFFT_Z2Z, size.z * size.w);
     }
     break;
