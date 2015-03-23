@@ -384,6 +384,16 @@ namespace quda {
     void* backNormSrcBuffer;
 
     static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+// for forward send 
+   void* fwdGhostSendDest[2][QUDA_MAX_DIM];
+   void* backGhostSendDest[2][QUDA_MAX_DIM];
+   cudaIpcMemHandle_t ipcLocalGhostDestHandle[2][2][QUDA_MAX_DIM];
+   cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
+// As soon as the send starts need to register the even on the receiving process
+// to let that process know that it is safe to proceed.
+   static cudaIpcEventHandle_t ipcLocalEventHandle[2][2][QUDA_MAX_DIM]; 
+   static cudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
 #endif  
 
     void create(const QudaFieldCreate);
@@ -406,7 +416,7 @@ namespace quda {
 
 #ifdef P2P_COMMS
     /** Whether we have initialized peer-to-peer communication for this field */
-    static bool initIPCDslashComms;
+    bool initIPCDslashComms;
     /** Whether we have initialized peer-to-peer comms in the temporal direction */
     bool initIPCTimeComms; // should not be static
 #endif
@@ -536,7 +546,7 @@ namespace quda {
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
     static int ipcCopyComplete(int b, int dir, int dim);
-
+    static int ipcRemoteCopyComplete(int b, int dir, int dim);
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
