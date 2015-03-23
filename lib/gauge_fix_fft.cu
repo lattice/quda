@@ -722,7 +722,6 @@ __host__ __device__ inline void reunit_link( Matrix<typename ComplexTypeId<Float
 
 
 #ifdef GAUGEFIXING_DONT_USE_GX
-
 static __device__ __host__ inline int linkNormalIndexP1(int x[], const int X[4], const int mu) {
 	int y[4];
 	for (int i=0; i<4; i++) y[i] = x[i];
@@ -730,9 +729,6 @@ static __device__ __host__ inline int linkNormalIndexP1(int x[], const int X[4],
 	int idx = ((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0];
 	return idx;
 }
-
-
-
 
 template <typename Float, typename Gauge> 
 __global__ void kernel_gauge_fix_U_EO_NEW( GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha){
@@ -871,7 +867,7 @@ public:
 		return 2414LL * arg.threads;
 		//Not accounting here the reconstruction of the gauge if 12 or 8!!!!!! 
 	}
-  	long long bytes() const { return ( dataOr.Bytes() + 12LL * sizeof(Float)) * arg.threads;}  
+  	long long bytes() const { return ( dataOr.Bytes()*4LL + 5*12LL * sizeof(Float)) * arg.threads;}  
 
 }; 
 
