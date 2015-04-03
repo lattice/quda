@@ -1,5 +1,6 @@
 AC_INIT([quda],[0.7],[quda-developers@googlegroups.com])
 
+AC_CHECK_PROG([GIT],[git],git)
 
 dnl Specify CUDA Location
 AC_ARG_WITH(cuda,
