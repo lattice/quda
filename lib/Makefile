@@ -143,6 +143,15 @@ CORE = $(QUDA_CORE:%=dslash_core/%)
 CUDA_VERSION = $(shell awk '/\#define CUDA_VERSION/{print $$3}' $(CUDA_INSTALL_PATH)/include/cuda.h)
 HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH)),cuda_version=$(strip $(CUDA_VERSION))\"
 
+
+DGITVERSION =
+ifeq ($(strip $(GIT)), git)
+	GITVERSION = $(shell git describe --long --dirty 2> /dev/null)
+ifneq ($(GITVERSION),)
+	  DGITVERSION = -DGITVERSION=\"$(GITVERSION)\"
+endif
+endif
+
 # limit maximum number of registers in BLAS routines to increase occupancy
 ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30))
   MAXREG =
@@ -153,8 +162,8 @@ endif
 all: $(QUDA)
 
 
-$(QUDA): $(QUDA_OBJS) ../make.inc
-	ar cru $@ $(QUDA_OBJS)
+$(QUDA): $(QUDA_OBJS) version.o ../make.inc
+	ar cru $@  version.o $(QUDA_OBJS)
 
 gen:
 	$(PYTHON) generate/dslash_cuda_gen.py
@@ -172,6 +181,12 @@ gen:
 
 clean:
 	-rm -f *.o $(QUDA)
+
+version.o: version.cpp $(HDRS) $(QUDA_OBJS)
+	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
+
+interface_quda.o: interface_quda.cpp $(HDRS)
+	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
 
 tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@

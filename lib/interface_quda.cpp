@@ -425,9 +425,25 @@ void initQudaMemory()
   loadTuneCache(getVerbosity());
 }
 
+#define STR_(x) #x
+#define STR(x) STR_(x)
+  static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
+#undef STR
+#undef STR_
+
+extern char* gitversion;
+
 void initQuda(int dev)
 {
   profileInit.Start(QUDA_PROFILE_TOTAL);
+
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+#ifdef GITVERSION
+    printfQuda("QUDA %s (git %s)\n",quda_version.c_str(),gitversion);
+#else
+    printfQuda("QUDA %s\n",quda_version.c_str());
+#endif
+  }
 
   // initialize communications topology, if not already done explicitly via initCommsGridQuda()
   if (!comms_initialized) init_default_comms();
