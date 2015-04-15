@@ -1,6 +1,13 @@
 
 /* Originally from Galen Arnold, NCSA arnoldg@ncsa.illinois.edu 
  * modified by Guochun Shi
+ * modified by Don Holmgren
+ *     Rather than binding to a specific core, the code now binds
+ *     the process and children to cores belonging to the NUMA node
+ *     containing the cores of the processor socket that provides the
+ *     PCIe bus containing the device.  The code also sets a local
+ *     memory allocation policy, so all subsequent allocations use
+ *     memory local to the NUMA node.
  *
  */
 #undef _GNU_SOURCE
@@ -10,6 +17,7 @@
 #include <sched.h>
 #include <unistd.h>
 #include <string.h>
+#include <numa.h>
 #include <numa_affinity.h>
 #include <quda_internal.h>
 
@@ -170,13 +178,35 @@ setNumaAffinity(int devid)
 {
   int cpu_cores[128];
   int ncores=128;
-  int rc = getNumaAffinity(devid, cpu_cores, &ncores);
+  int rc;
+  int node;
+  struct bitmask *nodemask;
+
+  if (numa_available() < 0) {
+    warningQuda("numa_* functions unavailable, cannot set NUMA affinity for device %d", devid);
+    return 1;
+  }
+  rc = getNumaAffinity(devid, cpu_cores, &ncores);
   if(rc != 0){
     warningQuda("Failed to determine NUMA affinity for device %d (possibly not applicable)", devid);
     return 1;
   }
   int which = devid % ncores;
-  printfQuda("Setting NUMA affinity for device %d to CPU core %d\n", devid, cpu_cores[which]);
+
+  node = numa_node_of_cpu(cpu_cores[which]);
+  printfQuda("Setting NUMA affinity for device %d to node %d containing CPU core %d\n", devid, node, cpu_cores[which]);
+
+  nodemask = numa_allocate_nodemask();
+  if (nodemask == NULL) {
+    warningQuda("Failed to allocated nodemask for setting NUMA affinity for device %d", devid);
+    return 1;
+  }
+
+  numa_bitmask_clearall(nodemask);
+  numa_bitmask_setbit(nodemask, node);
+  numa_bind(nodemask);
+  numa_bitmask_free(nodemask);
+
 /*
   for(int i=0;i < ncores;i++){
    if (i != which ) continue;
@@ -188,6 +218,7 @@ setNumaAffinity(int devid)
   printfQuda("\n");
   */
 
+/*
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
   
@@ -201,6 +232,7 @@ setNumaAffinity(int devid)
     warningQuda("Failed to enforce NUMA affinity (probably due to lack of kernel support)");
     return -1;
   }
+*/
   
   
   return 0;
