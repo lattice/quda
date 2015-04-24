@@ -56,6 +56,8 @@ extern char latfile[];
 
 extern void usage(char** );
 
+static double tol = 1e-7;
+
 void
 display_test_info()
 {
@@ -81,6 +83,15 @@ display_test_info()
   
 }
 
+  void
+usage_extra(char** argv )
+{
+  printfQuda("Extra options:\n");
+  printfQuda("    --tol  <resid_tol>                       # Set residual tolerance\n");
+
+  return ;
+}
+
 int main(int argc, char **argv)
 {
 
@@ -88,6 +99,20 @@ int main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     } 
+      if( strcmp(argv[i], "--tol") == 0){
+      float tmpf;
+      if (i+1 >= argc){
+        usage(argv);
+      }
+      sscanf(argv[i+1], "%f", &tmpf);
+      if (tmpf <= 0){
+        printf("ERROR: invalid tol(%f)\n", tmpf);
+        usage(argv);
+      }
+      tol = tmpf;
+      i++;
+      continue;
+    }
     printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -207,7 +232,7 @@ int main(int argc, char **argv)
 
   inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-7;
+  inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
