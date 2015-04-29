@@ -55,8 +55,7 @@ cpuColorSpinorField* tmp;
 cpuGaugeField *cpuFat = NULL;
 cpuGaugeField *cpuLong = NULL;
 
-static double tol = 1e-7;
-
+extern double tol;
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -549,7 +548,6 @@ display_test_info()
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
-  printfQuda("    --tol  <resid_tol>                       # Set residual tolerance\n");
   printfQuda("    --test <0/1>                             # Test method\n");
   printfQuda("                                                0: Even even spinor CG inverter\n");
   printfQuda("                                                1: Odd odd spinor CG inverter\n");
@@ -567,20 +565,7 @@ int main(int argc, char** argv)
       continue;
     }   
 
-    if( strcmp(argv[i], "--tol") == 0){
-      float tmpf;
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      sscanf(argv[i+1], "%f", &tmpf);
-      if (tmpf <= 0){
-        printf("ERROR: invalid tol(%f)\n", tmpf);
-        usage(argv);
-      }
-      tol = tmpf;
-      i++;
-      continue;
-    }
+
 
     if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){

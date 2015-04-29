@@ -1567,6 +1567,7 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
+double tol = 1e-7;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
@@ -1617,6 +1618,7 @@ void usage(char** argv )
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
+  printf("    --tol  <resid_tol>                        # Set residual tolerance\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
@@ -1977,6 +1979,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    tol= atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

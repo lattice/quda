@@ -49,6 +49,7 @@ extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern double tol; // tolerance for inverter
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaMatPCType matpc_type; // preconditioning type
 
@@ -56,7 +57,7 @@ extern char latfile[];
 
 extern void usage(char** );
 
-static double tol = 1e-7;
+
 
 void
 display_test_info()
@@ -81,15 +82,6 @@ display_test_info()
   
   return ;
   
-}
-
-  void
-usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --tol  <resid_tol>                       # Set residual tolerance\n");
-
-  return ;
 }
 
 int main(int argc, char **argv)
