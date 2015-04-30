@@ -1568,7 +1568,7 @@ int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
 double tol = 1e-7;
-double tolhq = 0.;
+double tol_hq = 0.;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
@@ -2000,7 +2000,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    tolhq= atof(argv[i+1]);
+    tol_hq= atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;
