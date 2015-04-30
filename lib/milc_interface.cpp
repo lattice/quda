@@ -1007,7 +1007,7 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
     device_precision_sloppy = device_precision;
   }
  
-   
+  static const QudaVerbosity verbosity = getVerbosity();
 
   invertParam.dslash_type                   = QUDA_CLOVER_WILSON_DSLASH;
   invertParam.kappa                         = kappa;
@@ -1018,8 +1018,8 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.maxiter                       = inv_args.max_iter;
 
   invertParam.cuda_prec_precondition        = device_precision_sloppy;
-  invertParam.verbosity_precondition        = QUDA_SILENT;
-  invertParam.verbosity        = QUDA_SILENT;
+  invertParam.verbosity_precondition        = verbosity;
+  invertParam.verbosity        = verbosity;
   invertParam.cpu_prec                      = host_precision;
   invertParam.cuda_prec                     = device_precision;
   invertParam.cuda_prec_sloppy              = device_precision_sloppy;
