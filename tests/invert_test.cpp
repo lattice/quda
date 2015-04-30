@@ -50,6 +50,7 @@ extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
 extern double tol; // tolerance for inverter
+extern double tolhq; // heavy-quark tolerance for inverter
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaMatPCType matpc_type; // preconditioning type
 
@@ -229,7 +230,7 @@ int main(int argc, char **argv)
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
-  inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
+  inv_param.tol_hq = tolhq; // specify a tolerance for the residual for heavy quark residual
 #else
   // Pre Fermi architecture only supports L2 relative residual norm
   inv_param.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
