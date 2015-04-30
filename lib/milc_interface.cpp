@@ -11,7 +11,7 @@
 #include <dslash_quda.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
-#define BUILD_MILC_INTERFACE
+
 #ifdef BUILD_MILC_INTERFACE
 
 static bool initialized = false;
@@ -485,7 +485,7 @@ static void setInvertParams(const int dim[4],
   invertParam->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not used, but required by the code.
   invertParam->dirac_order = QUDA_DIRAC_ORDER;
 
-  invertParam->dslash_type = QUDA_STAGGERED_DSLASH;
+  invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
   invertParam->tune = QUDA_TUNE_YES;
   invertParam->gflops = 0.0;
 
