@@ -11,7 +11,7 @@
 #include <dslash_quda.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
-
+#define BUILD_MILC_INTERFACE
 #ifdef BUILD_MILC_INTERFACE
 
 static bool initialized = false;
@@ -485,7 +485,7 @@ static void setInvertParams(const int dim[4],
   invertParam->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // not used, but required by the code.
   invertParam->dirac_order = QUDA_DIRAC_ORDER;
 
-  invertParam->dslash_type = QUDA_ASQTAD_DSLASH;
+  invertParam->dslash_type = QUDA_STAGGERED_DSLASH;
   invertParam->tune = QUDA_TUNE_YES;
   invertParam->gflops = 0.0;
 
@@ -1121,10 +1121,7 @@ void qudaCloverInvert(int external_precision,
     int* num_iters)
 {
 
-  if(target_fermilab_residual !=0 && target_residual != 0){
-    errorQuda("qudaCloverInvert: conflicting residuals requested\n");
-    exit(1);
-  }else if(target_fermilab_residual == 0 && target_residual == 0){
+  if(target_fermilab_residual == 0 && target_residual == 0){
     errorQuda("qudaCloverInvert: requesting zero residual\n");
     exit(1);
   }
@@ -1137,8 +1134,12 @@ void qudaCloverInvert(int external_precision,
 
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa);
-  invertParam.residual_type = (target_residual != 0) ? QUDA_L2_RELATIVE_RESIDUAL : QUDA_HEAVY_QUARK_RESIDUAL;
-  invertParam.tol = (target_residual != 0) ? target_residual : target_fermilab_residual;
+  invertParam.residual_type = static_cast<QudaResidualType_s>(0);
+  invertParam.residual_type = (target_residual != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
+  invertParam.residual_type = (target_fermilab_residual != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
+
+  invertParam.tol =  target_residual;
+  invertParam.tol_hq = target_fermilab_residual;
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
