@@ -146,7 +146,7 @@ namespace quda {
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     double heavy_quark_res = use_heavy_quark_res ? sqrt(HeavyQuarkResidualNormCuda(x,r).z) : 0.0;
-    int heavy_quark_check = 10; // how often to check the heavy quark residual
+    const int heavy_quark_check = 1; // how often to check the heavy quark residual
 
     double delta = param.delta;
 
