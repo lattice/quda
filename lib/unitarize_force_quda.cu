@@ -16,7 +16,10 @@ namespace {
   #include <svd_quda.h>
 }
 
-//#ifdef GPU_HISQ_FORCE
+// work around for CUDA 7.0 bug on OSX
+#if defined(__APPLE__) && CUDA_VERSION >= 7000
+#define pow(x,y) ( exp(y * log(x)) )
+#endif
 
 namespace { // anonymous
 #include <svd_quda.h>
@@ -660,5 +663,9 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
 //#endif
 } // namespace quda
+
+#if defined(__APPLE__) && CUDA_VERSION >= 7000
+#undef pow
+#endif
 
 #endif
