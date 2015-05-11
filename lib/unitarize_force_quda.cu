@@ -15,7 +15,7 @@
 #if defined(__APPLE__) && CUDA_VERSION >= 7000 && CUDA_VERSION < 7050
 #define EXPONENT_TYPE Real
 #else
-typedef EXPONENT_TYPE int
+#define EXPONENT_TYPE int
 #endif
 
 namespace quda{
