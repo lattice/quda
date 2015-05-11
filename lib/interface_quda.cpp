@@ -1100,6 +1100,7 @@ void endQuda(void)
     profileHISQForce.Print();
     profileContract.Print();
     profileCovDev.Print();
+    profileAPE.Print();
     profileEnd.Print();
 
     printLaunchTimer();
