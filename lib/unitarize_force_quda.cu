@@ -16,11 +16,6 @@ namespace {
   #include <svd_quda.h>
 }
 
-// work around for CUDA 7.0 bug on OSX
-#if defined(__APPLE__) && CUDA_VERSION >= 7000
-#define pow(x,y) ( exp(y * log(x)) )
-#endif
-
 namespace { // anonymous
 #include <svd_quda.h>
 }
@@ -118,18 +113,18 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC00(const Real & u, const Real & v, const Real & w){
-      Real result =   -pow(w,3)*pow(u,6)
-	+ 3*v*pow(w,3)*pow(u,4)
-	+ 3*pow(v,4)*w*pow(u,4)
-	-   pow(v,6)*pow(u,3)
-	- 4*pow(w,4)*pow(u,3)
-	- 12*pow(v,3)*pow(w,2)*pow(u,3)
-	+ 16*pow(v,2)*pow(w,3)*pow(u,2)
-	+ 3*pow(v,5)*w*pow(u,2)
-	- 8*v*pow(w,4)*u
-	- 3*pow(v,4)*pow(w,2)*u
-	+ pow(w,5)
-	+ pow(v,3)*pow(w,3);
+      Real result = -pow(w,static_cast<Real>(3.0)) * pow(u,static_cast<Real>(6.0))
+	+ 3*v*pow(w,static_cast<Real>(3.0))*pow(u,static_cast<Real>(4.0))
+	+ 3*pow(v,static_cast<Real>(4.0))*w*pow(u,static_cast<Real>(4.0))
+	-   pow(v,static_cast<Real>(6.0))*pow(u,static_cast<Real>(3.0))
+	- 4*pow(w,static_cast<Real>(4.0))*pow(u,static_cast<Real>(3.0))
+	- 12*pow(v,static_cast<Real>(3.0))*pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(3.0))
+	+ 16*pow(v,static_cast<Real>(2.0))*pow(w,static_cast<Real>(3.0))*pow(u,static_cast<Real>(2.0))
+	+ 3*pow(v,static_cast<Real>(5.0))*w*pow(u,static_cast<Real>(2.0))
+	- 8*v*pow(w,static_cast<Real>(4.0))*u
+	- 3*pow(v,static_cast<Real>(4.0))*pow(w,static_cast<Real>(2.0))*u
+	+ pow(w,static_cast<Real>(5.0))
+	+ pow(v,static_cast<Real>(3.0))*pow(w,static_cast<Real>(3.0));
 
       return result;
     }
@@ -137,82 +132,82 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC01(const Real & u, const Real & v, const Real & w){
-      Real result =  - pow(w,2)*pow(u,7)
-	- pow(v,2)*w*pow(u,6)
-	+ pow(v,4)*pow(u,5)   // This was corrected!
-	+ 6*v*pow(w,2)*pow(u,5)
-	- 5*pow(w,3)*pow(u,4)    // This was corrected!
-	- pow(v,3)*w*pow(u,4)
-	- 2*pow(v,5)*pow(u,3)
-	- 6*pow(v,2)*pow(w,2)*pow(u,3)
-	+ 10*v*pow(w,3)*pow(u,2)
-	+ 6*pow(v,4)*w*pow(u,2)
-	- 3*pow(w,4)*u
-	- 6*pow(v,3)*pow(w,2)*u
-	+ 2*pow(v,2)*pow(w,3);
+      Real result =  - pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(7.0))
+	- pow(v,static_cast<Real>(2.0))*w*pow(u,static_cast<Real>(6.0))
+	+ pow(v,static_cast<Real>(4.0))*pow(u,static_cast<Real>(5.0))   // This was corrected!
+	+ 6*v*pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(5.0))
+	- 5*pow(w,static_cast<Real>(3.0))*pow(u,static_cast<Real>(4.0))    // This was corrected!
+	- pow(v,static_cast<Real>(3.0))*w*pow(u,static_cast<Real>(4.0))
+	- 2*pow(v,static_cast<Real>(5.0))*pow(u,static_cast<Real>(3.0))
+	- 6*pow(v,static_cast<Real>(2.0))*pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(3.0))
+	+ 10*v*pow(w,static_cast<Real>(3.0))*pow(u,static_cast<Real>(2.0))
+	+ 6*pow(v,static_cast<Real>(4.0))*w*pow(u,static_cast<Real>(2.0))
+	- 3*pow(w,static_cast<Real>(4.0))*u
+	- 6*pow(v,static_cast<Real>(3.0))*pow(w,static_cast<Real>(2.0))*u
+	+ 2*pow(v,static_cast<Real>(2.0))*pow(w,static_cast<Real>(3.0));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC02(const Real & u, const Real & v, const Real & w){
-      Real result =   pow(w,2)*pow(u,5)
-	+ pow(v,2)*w*pow(u,4)
-	- pow(v,4)*pow(u,3)
-	- 4*v*pow(w,2)*pow(u,3)
-	+ 4*pow(w,3)*pow(u,2)
-	+ 3*pow(v,3)*w*pow(u,2)
-	- 3*pow(v,2)*pow(w,2)*u
-	+ v*pow(w,3);
+      Real result =   pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(5.0))
+	+ pow(v,static_cast<Real>(2.0))*w*pow(u,static_cast<Real>(4.0))
+	- pow(v,static_cast<Real>(4.0))*pow(u,static_cast<Real>(3.0))
+	- 4*v*pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(3.0))
+	+ 4*pow(w,static_cast<Real>(3.0))*pow(u,static_cast<Real>(2.0))
+	+ 3*pow(v,static_cast<Real>(3.0))*w*pow(u,static_cast<Real>(2.0))
+	- 3*pow(v,static_cast<Real>(2.0))*pow(w,static_cast<Real>(2.0))*u
+	+ v*pow(w,static_cast<Real>(3.0));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC11(const Real & u, const Real & v, const Real & w){
-      Real result = - w*pow(u,8)
-	- pow(v,2)*pow(u,7)
-	+ 7*v*w*pow(u,6)
-	+ 4*pow(v,3)*pow(u,5)
-	- 5*pow(w,2)*pow(u,5)
-	- 16*pow(v,2)*w*pow(u,4)
-	- 4*pow(v,4)*pow(u,3)
-	+ 16*v*pow(w,2)*pow(u,3)
-	- 3*pow(w,3)*pow(u,2)
-	+ 12*pow(v,3)*w*pow(u,2)
-	- 12*pow(v,2)*pow(w,2)*u
-	+ 3*v*pow(w,3);
+      Real result = - w*pow(u,static_cast<Real>(8.0))
+	- pow(v,static_cast<Real>(2.0))*pow(u,static_cast<Real>(7.0))
+	+ 7*v*w*pow(u,static_cast<Real>(6.0))
+	+ 4*pow(v,static_cast<Real>(3.0))*pow(u,static_cast<Real>(5.0))
+	- 5*pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(5.0))
+	- 16*pow(v,static_cast<Real>(2.0))*w*pow(u,static_cast<Real>(4.0))
+	- 4*pow(v,static_cast<Real>(4.0))*pow(u,static_cast<Real>(3.0))
+	+ 16*v*pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(3.0))
+	- 3*pow(w,static_cast<Real>(3.0))*pow(u,static_cast<Real>(2.0))
+	+ 12*pow(v,static_cast<Real>(3.0))*w*pow(u,static_cast<Real>(2.0))
+	- 12*pow(v,static_cast<Real>(2.0))*pow(w,static_cast<Real>(2.0))*u
+	+ 3*v*pow(w,static_cast<Real>(3.0));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC12(const Real & u, const Real & v, const Real & w){
-      Real result =  w*pow(u,6)
-	+ pow(v,2)*pow(u,5) // Fixed this!
-	- 5*v*w*pow(u,4)  // Fixed this!
-	- 2*pow(v,3)*pow(u,3)
-	+ 4*pow(w,2)*pow(u,3)
-	+ 6*pow(v,2)*w*pow(u,2)
-	- 6*v*pow(w,2)*u
-	+ pow(w,3);
+      Real result =  w*pow(u,static_cast<Real>(6.0))
+	+ pow(v,static_cast<Real>(2.0))*pow(u,static_cast<Real>(5.0)) // Fixed this!
+	- 5*v*w*pow(u,static_cast<Real>(4.0))  // Fixed this!
+	- 2*pow(v,static_cast<Real>(3.0))*pow(u,static_cast<Real>(3.0))
+	+ 4*pow(w,static_cast<Real>(2.0))*pow(u,static_cast<Real>(3.0))
+	+ 6*pow(v,static_cast<Real>(2.0))*w*pow(u,static_cast<Real>(2.0))
+	- 6*v*pow(w,static_cast<Real>(2.0))*u
+	+ pow(w,static_cast<Real>(3.0));
       return result;
     }
 
     template<class Real>
     __device__ __host__
     Real DerivativeCoefficients<Real>::computeC22(const Real & u, const Real & v, const Real & w){
-      Real result = - w*pow(u,4)
-	- pow(v,2)*pow(u,3)
-	+ 3*v*w*pow(u,2)
-	- 3*pow(w,2)*u;
+      Real result = - w*pow(u,static_cast<Real>(4.0))
+	- pow(v,static_cast<Real>(2.0))*pow(u,static_cast<Real>(3.0))
+	+ 3*v*w*pow(u,static_cast<Real>(2.0))
+	- 3*pow(w,static_cast<Real>(2.0))*u;
       return result;
     }
 
     template <class Real>
     __device__ __host__
     void  DerivativeCoefficients<Real>::set(const Real & u, const Real & v, const Real & w){
-      const Real & denominator = 2.0*pow(w*(u*v-w),3); 
+      const Real & denominator = 2.0*pow(w*(u*v-w),static_cast<Real>(3.0)); 
       b[0] = computeC00(u,v,w)/denominator;
       b[1] = computeC01(u,v,w)/denominator;
       b[2] = computeC02(u,v,w)/denominator;
@@ -664,8 +659,5 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 //#endif
 } // namespace quda
 
-#if defined(__APPLE__) && CUDA_VERSION >= 7000
-#undef pow
-#endif
 
 #endif
