@@ -945,6 +945,7 @@ namespace quda {
 	  if (!commDimPartitioned(i)) continue;
 #ifdef GPU_COMMS
 	  size_t nbytes_Nface = surfaceCB[i]*Ndof*precision*(j+1);
+	  size_t nbytes_Nface_norm = surfaceCB[i]*(j+1)*sizeof(float);
 	  if (i != 3 || getKernelPackT() || getTwistPack()) {
 #else 
 	    size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
@@ -959,8 +960,8 @@ namespace quda {
 
 	    if(precision == QUDA_HALF_PRECISION){
 	      for(int b=0; b<2; ++b){
-		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
-		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(my_back_norm_face[b][i], i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm);
+		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(my_back_norm_face[b][i], i, -1, nbytes_Nface_norm);
 		mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
 		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i]; 	
 	      }
@@ -1041,8 +1042,8 @@ namespace quda {
 
 	  if(precision == QUDA_HALF_PRECISION){
             for(int b=0; b<2; ++b){
-	      mh_recv_norm_fwd[b][j][i] = comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, surfaceCB[i]*sizeof(float)*(j+1));
-	      mh_recv_norm_back[b][j][i] = comm_declare_receive_relative(from_back_norm_face[b][i], i, -1, surfaceCB[i]*sizeof(float)*(j+1));
+	      mh_recv_norm_fwd[b][j][i] = comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm);
+	      mh_recv_norm_back[b][j][i] = comm_declare_receive_relative(from_back_norm_face[b][i], i, -1, nbytes_Nface_norm);
             }
 	  }
 #endif // GPU_COMMS

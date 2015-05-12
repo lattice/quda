@@ -228,6 +228,16 @@ int comm_coord(int dim)
  */
 MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t nbytes)
 {
+#ifdef HOST_DEBUG
+  cudaPointerAttributes attributes;
+  cudaPointerGetAttributes(&attributes, buffer);
+  if (attributes->memoryType == cudaMemoryTypeHost) {
+    memset(buffer, 0, nbytes);
+  } else {
+    assert(cudaSuccess == cudaMemset(buffer, 0, nbytes));
+  }
+#endif
+
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
 
@@ -240,6 +250,16 @@ MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t nby
  */
 MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t nbytes)
 {
+#ifdef HOST_DEBUG
+  cudaPointerAttributes attributes;
+  cudaPointerGetAttributes(&attributes, buffer);
+  if (attributes->memoryType == cudaMemoryTypeHost) {
+    memset(buffer, 0, nbytes);
+  } else {
+    assert(cudaSuccess == cudaMemset(buffer, 0, nbytes));
+  }
+#endif
+
   int disp[QUDA_MAX_DIM] = {0};
   disp[dim] = dir;
 
