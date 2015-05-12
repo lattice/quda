@@ -751,19 +751,6 @@ extern "C" {
 
   void closeMagma();
 
-  /**
-   * Compute a volume or time-slice contraction of two spinors.
-   * @param x     Spinor to contract. This is conjugated before contraction.
-   * @param y     Spinor to contract.
-   * @param ctrn  Contraction output. The size must be Volume*16
-   * @param cType Contraction type, allows for volume or time-slice contractions.
-   * @param tC    Time-slice to contract in case the contraction is in a single time-slice.
-   */
-  void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType);
-
-  void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType, const int tC);
-
-
 #ifdef __cplusplus
 }
 #endif
