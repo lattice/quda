@@ -55,17 +55,24 @@ namespace quda {
     // FIXME - The ghost zone is allocated before we know which
     // operator (and hence number of faces are needed), thus we
     // allocate a ghost zone large enough to cope with the maximum
-    // number of faces (maxNface).  This can artificially raise the
-    // GPU memory requirements.  One potential future solution may be
-    // to separate the ghost zone memory allocation from the field
-    // itself, which has other benefits (1. on multi-gpu machines with
-    // UVA, we can read the ghost zone directly from the neighbouring
-    // field and 2.) we can use a single contiguous buffer for the
-    // ghost zone and its norm which will reduce latency for half
-    // precision and allow us to enable GPU_COMMS support for half
-    // precision).
-    int num_faces = ((nSpin == 1) ? 2 : 1) * maxNface;
-    int num_norm_faces = 2*maxNface;
+    // number of faces.  All Wilson-like operators support only
+    // involve the excahnge of one face so this is no problem.
+    // However, for staggered fermions, we have either nFace=1 or 3,
+    // thus we allocated using the latter.  This will artificially
+    // raise the GPU memory requirements for naive staggered fermions.
+    // One potential future solution may be to separate the ghost zone
+    // memory allocation from the field itself, which has other
+    // benefits (1. on multi-gpu machines with UVA, we can read the
+    // ghost zone directly from the neighbouring field and 2.) we can
+    // use a single contiguous buffer for the ghost zone and its norm
+    // which will reduce latency for half precision and allow us to
+    // enable GPU_COMMS support for half precision).
+    int nFaceGhost = (nSpin == 1) ? 3 : 1;
+
+    // For Wilson we have the number of effective faces since the
+    // fields are spin projected.
+    int num_faces = ((nSpin == 1) ? 2 : 1) * nFaceGhost;
+    int num_norm_faces = 2*nFaceGhost;
 
     // calculate size of ghost zone required
     int ghostVolume = 0;
