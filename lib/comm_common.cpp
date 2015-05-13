@@ -1,4 +1,5 @@
 #include <unistd.h> // for gethostname()
+#include <assert.h>
 
 #include <quda_internal.h>
 #include <comm_quda.h>
@@ -226,15 +227,32 @@ int comm_coord(int dim)
 /**
  * Send to the "dir" direction in the "dim" dimension
  */
-MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t nbytes)
+MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int line,
+				       void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
   cudaPointerAttributes attributes;
-  cudaPointerGetAttributes(&attributes, buffer);
-  if (attributes->memoryType == cudaMemoryTypeHost) {
-    memset(buffer, 0, nbytes);
+  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
+  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+    // test this memory allocation is ok by doing a memcpy from it
+    void *tmp = safe_malloc(nbytes);
+    try {
+      std::copy(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, static_cast<char*>(tmp));
+    } catch(std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("Aborting");
+    }
+    if (err != cudaSuccess) cudaGetLastError();
+    host_free(tmp);
   } else {
-    assert(cudaSuccess == cudaMemset(buffer, 0, nbytes));
+    // test this memory allocation is ok by doing a memcpy from it
+    void *tmp = device_malloc(nbytes);
+    cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("Aborting with error %s", cudaGetErrorString(err));
+    }
+    device_free(tmp);
   }
 #endif
 
@@ -244,19 +262,31 @@ MsgHandle *comm_declare_send_relative(void *buffer, int dim, int dir, size_t nby
   return comm_declare_send_displaced(buffer, disp, nbytes);
 }
 
-
 /**
  * Receive from the "dir" direction in the "dim" dimension
  */
-MsgHandle *comm_declare_receive_relative(void *buffer, int dim, int dir, size_t nbytes)
+MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, int line,
+					  void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
   cudaPointerAttributes attributes;
-  cudaPointerGetAttributes(&attributes, buffer);
-  if (attributes->memoryType == cudaMemoryTypeHost) {
-    memset(buffer, 0, nbytes);
+  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
+  if (err != cudaSuccess || attributes.memoryType == cudaMemoryTypeHost) {
+    // test this memory allocation is ok by filling it
+    try {
+      std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
+    } catch(std::exception &e) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("Aborting");
+    }
+    if (err != cudaSuccess) cudaGetLastError();
   } else {
-    assert(cudaSuccess == cudaMemset(buffer, 0, nbytes));
+    // test this memory allocation is ok by doing a memset
+    cudaError_t err = cudaMemset(buffer, 0, nbytes);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("Aborting with error %s", cudaGetErrorString(err));
+    }
   }
 #endif
 
