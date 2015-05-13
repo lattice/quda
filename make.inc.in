@@ -49,6 +49,9 @@ BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
 GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
 
+# Profiling options
+MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
+
 # Interface options
 BUILD_QDP_INTERFACE = @BUILD_QDP_INTERFACE@                     # build qdp interface
 BUILD_MILC_INTERFACE = @BUILD_MILC_INTERFACE@                   # build milc interface
@@ -154,6 +157,11 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
 endif 
+
+ifeq ($(strip $(MPI_NVTX)), yes)
+  COMM_OBJS += nvtx_pmpi.o
+  LIB += -lnvToolsExt
+endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include

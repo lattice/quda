@@ -203,6 +203,13 @@ AC_ARG_ENABLE(gpu-comms,
   [ gpu_comms="no" ]
 )
 
+dnl enable NVTX mark up for the MPI in the visual profiler
+AC_ARG_ENABLE(mpi-nvtx,
+  AC_HELP_STRING([--enable-mpi-nvtx], [ Enable NVTX markup for profiling MPI API calls in the visual profiler (default: disabled)]),
+  [ mpi_nvtx=${enableval}],
+  [ mpi_nvtx="no" ]
+)
+
 dnl enable packing and unpacking on the device
 AC_ARG_ENABLE(device-pack,
   AC_HELP_STRING([--enable-device-pack], [ Enable the packing / unpacking of fields on the device (default: disabled)]),
@@ -544,6 +551,14 @@ yes|no);;
   ;;
 esac
 
+dnl enable NVTX mark up for the MPI in the visual profiler
+case ${mpi_nvtx} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-mpi-nvtx ])
+  ;;
+esac
+
 dnl QDP-JIT support
 case ${build_qdpjit} in
 yes|no);;
@@ -707,6 +722,9 @@ AC_SUBST( GPU_DIRECT, [${gpu_direct}])
 
 AC_MSG_NOTICE([Setting GPU_COMMS= ${gpu_comms}])
 AC_SUBST( GPU_COMMS, [${gpu_comms}])
+
+AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
+AC_SUBST( MPI_NVTX, [${mpi_nvtx}])
 
 AC_MSG_NOTICE([Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}])
 AC_SUBST( BUILD_QDP_INTERFACE, [${build_qdp_interface}])
