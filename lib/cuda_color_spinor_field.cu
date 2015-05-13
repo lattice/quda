@@ -1042,15 +1042,15 @@ namespace quda {
 
 	  if(precision == QUDA_HALF_PRECISION){
             for(int b=0; b<2; ++b){
-	      mh_recv_norm_fwd[b][j][i] = comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm);
-	      mh_recv_norm_back[b][j][i] = comm_declare_receive_relative(from_back_norm_face[b][i], i, -1, nbytes_Nface_norm);
+	      mh_recv_norm_fwd[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm) : NULL;
+	      mh_recv_norm_back[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_back_norm_face[b][i], i, -1, nbytes_Nface_norm) : NULL;
             }
 	  }
 #endif // GPU_COMMS
 
 	  for(int b=0; b<2; ++b){
-	    mh_recv_fwd[b][j][i] = comm_declare_receive_relative(from_fwd_face[b][i], i, +1, nbytes_Nface);
-	    mh_recv_back[b][j][i] = comm_declare_receive_relative(from_back_face[b][i], i, -1, nbytes_Nface);
+	    mh_recv_fwd[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_fwd_face[b][i], i, +1, nbytes_Nface) : NULL;
+	    mh_recv_back[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_back_face[b][i], i, -1, nbytes_Nface) : NULL;
 	  }
 	 
 
@@ -1071,15 +1071,15 @@ namespace quda {
       for (int j=0; j<maxNface; j++) {
 	for (int i=0; i<nDimComms; i++) {
 	  if (commDimPartitioned(i)) {
-	    comm_free(mh_recv_fwd[b][j][i]);
-	    comm_free(mh_recv_back[b][j][i]);
+	    if (mh_recv_fwd[b][j][i]) comm_free(mh_recv_fwd[b][j][i]);
+	    if (mh_recv_fwd[b][j][i]) comm_free(mh_recv_back[b][j][i]);
 	    if (mh_send_fwd[b][j][2*i]) comm_free(mh_send_fwd[b][j][2*i]);
 	    if (mh_send_back[b][j][2*i]) comm_free(mh_send_back[b][j][2*i]);
 	    // only in a special case are these not aliasing pointers
 #ifdef GPU_COMMS
 	    if(precision == QUDA_HALF_PRECISION){
-	      comm_free(mh_recv_norm_fwd[b][j][i]);
-	      comm_free(mh_recv_norm_back[b][j][i]);
+	      if (mh_recv_norm_fwd[b][j][i]) comm_free(mh_recv_norm_fwd[b][j][i]);
+	      if (mh_recv_norm_back[b][j][i]) comm_free(mh_recv_norm_back[b][j][i]);
 	      if (mh_send_norm_fwd[b][j][2*i]) comm_free(mh_send_norm_fwd[b][j][2*i]);
 	      if (mh_send_norm_back[b][j][2*i]) comm_free(mh_send_norm_back[b][j][2*i]);
 	    }
