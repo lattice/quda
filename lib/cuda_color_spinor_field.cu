@@ -552,7 +552,6 @@ namespace quda {
     // only allocate if not already allocated or buffer required is bigger than previously
     if(initGhostFaceBuffer == 0 || faceBytes > ghostFaceBytes){    
 
-
       if (initGhostFaceBuffer){
         for(int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]); 
       }
@@ -951,8 +950,8 @@ namespace quda {
 	    size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 #endif
 	    for(int b=0; b<2; ++b){
-	      mh_send_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_face[b][i], i, +1, nbytes_Nface);
-	      mh_send_back[b][j][2*i+0] = comm_declare_send_relative(my_back_face[b][i], i, -1, nbytes_Nface);
+	      mh_send_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_fwd_face[b][i], i, +1, nbytes_Nface) : NULL;
+	      mh_send_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_back_face[b][i], i, -1, nbytes_Nface) : NULL;
 	      mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i]; // alias pointers
 	      mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i]; // alias pointers
 	    }
@@ -960,8 +959,8 @@ namespace quda {
 
 	    if(precision == QUDA_HALF_PRECISION){
 	      for(int b=0; b<2; ++b){
-		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm);
-		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(my_back_norm_face[b][i], i, -1, nbytes_Nface_norm);
+		mh_send_norm_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm) : NULL;
+		mh_send_norm_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_back_norm_face[b][i], i, -1, nbytes_Nface_norm) : NULL;
 		mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
 		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i]; 	
 	      }
@@ -1013,11 +1012,12 @@ namespace quda {
 	    //printf("%d strided sends with Nface=%d Nblocks=%d blksize=%d Stride=%d\n", i, j+1, Nblocks, blksize, Stride);
 
             for(int b=0; b<2; ++b){
-	      mh_send_fwd[b][j][2*i+0] = comm_declare_strided_send_relative(base[2], i, +1, blksize, Nblocks, Stride);
-	      mh_send_back[b][j][2*i+0] = comm_declare_strided_send_relative(base[0], i, -1, blksize, Nblocks, Stride);
+	      // only allocate a communicator for the present face (this needs cleaned up)
+	      mh_send_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[2], i, +1, blksize, Nblocks, Stride) : NULL;
+	      mh_send_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[0], i, -1, blksize, Nblocks, Stride) : NULL;
 	      if (nSpin ==4) { // dagger communicators
-	        mh_send_fwd[b][j][2*i+1] = comm_declare_strided_send_relative(base[3], i, +1, blksize, Nblocks, Stride);
-	        mh_send_back[b][j][2*i+1] = comm_declare_strided_send_relative(base[1], i, -1, blksize, Nblocks, Stride);
+	        mh_send_fwd[b][j][2*i+1] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[3], i, +1, blksize, Nblocks, Stride) : NULL;
+	        mh_send_back[b][j][2*i+1] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[1], i, -1, blksize, Nblocks, Stride) : NULL;
 	      } else {
 	        mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i+0];
 	        mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i+0];
@@ -1031,8 +1031,8 @@ namespace quda {
 	      void *norm_fwd = static_cast<float*>(norm) + Nt_minus1_offset;
 	      void *norm_back = norm; // the first time slice has zero offset
 	      for(int b=0; b<2; ++b){
-		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(norm_fwd, i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
-		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(norm_back, i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+		mh_send_norm_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(norm_fwd, i, +1, surfaceCB[i]*(j+1)*sizeof(float)) : NULL;
+		mh_send_norm_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(norm_back, i, -1, surfaceCB[i]*(j+1)*sizeof(float)) : NULL;
 		mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
 		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i];  
 	      }
@@ -1073,20 +1073,20 @@ namespace quda {
 	  if (commDimPartitioned(i)) {
 	    comm_free(mh_recv_fwd[b][j][i]);
 	    comm_free(mh_recv_back[b][j][i]);
-	    comm_free(mh_send_fwd[b][j][2*i]);
-	    comm_free(mh_send_back[b][j][2*i]);
+	    if (mh_send_fwd[b][j][2*i]) comm_free(mh_send_fwd[b][j][2*i]);
+	    if (mh_send_back[b][j][2*i]) comm_free(mh_send_back[b][j][2*i]);
 	    // only in a special case are these not aliasing pointers
 #ifdef GPU_COMMS
 	    if(precision == QUDA_HALF_PRECISION){
 	      comm_free(mh_recv_norm_fwd[b][j][i]);
 	      comm_free(mh_recv_norm_back[b][j][i]);
-	      comm_free(mh_send_norm_fwd[b][j][2*i]);
-	      comm_free(mh_send_norm_back[b][j][2*i]);
+	      if (mh_send_norm_fwd[b][j][2*i]) comm_free(mh_send_norm_fwd[b][j][2*i]);
+	      if (mh_send_norm_back[b][j][2*i]) comm_free(mh_send_norm_back[b][j][2*i]);
 	    }
 
 	    if (i == 3 && !getKernelPackT() && nSpin == 4) {
-	      comm_free(mh_send_fwd[b][j][2*i+1]);
-	      comm_free(mh_send_back[b][j][2*i+1]);
+	      if (mh_send_fwd[b][j][2*i+1]) comm_free(mh_send_fwd[b][j][2*i+1]);
+	      if (mh_send_back[b][j][2*i+1]) comm_free(mh_send_back[b][j][2*i+1]);
 	    }
 #endif // GPU_COMMS
 	  }
