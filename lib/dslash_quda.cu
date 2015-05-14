@@ -408,12 +408,13 @@ class TwistCloverGamma5Cuda : public Tunable {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return in->X(0) * in->X(1) * in->X(2) * in->X(3); }
     char *saveOut, *saveOutNorm;
+    char aux_string[TuneKey::aux_n];
 
   public:
     TwistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
         double kappa, double mu, double epsilon, const int dagger, QudaTwistGamma5Type tw,
 			  cFloat *clov, const float *cN, cFloat *clovInv, const float *cN2, int cl_stride) :
-      out(out), in(in)
+      clover(clov), cNorm(cN), cloverInv(clovInv), cNrm2(cN2), twist(tw), out(out), in(in)
   {
     bindSpinorTex<sFloat>(in);
     dslashParam.sp_stride = in->Stride();
@@ -421,24 +422,26 @@ class TwistCloverGamma5Cuda : public Tunable {
     dslashParam.cl_stride = cl_stride;
     dslashParam.fl_stride = in->VolumeCB();
 #endif
-    twist = tw;
-    clover = clov;
-    cNorm = cN;
-    cloverInv = clovInv;
-    cNrm2 = cN2;
 
     if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS))
       setTwistParam(a, b, kappa, mu, dagger, tw);
     else{//twist doublet
       errorQuda("ERROR: Non-degenerated twisted-mass not supported in this regularization\n");
     } 
+
+    strcpy(aux_string,in->AuxString());
+    if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
+      strcat(aux_string,"direct");
+    } else {
+      strcat(aux_string,"inverse");
+    }
   }
     virtual ~TwistCloverGamma5Cuda() {
       unbindSpinorTex<sFloat>(in);    
     }
 
     TuneKey tuneKey() const {
-      return TuneKey(in->VolString(), typeid(*this).name(), in->AuxString());
+      return TuneKey(in->VolString(), typeid(*this).name(), aux_string);
     }  
 
     void apply(const cudaStream_t &stream)
