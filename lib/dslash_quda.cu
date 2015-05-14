@@ -431,9 +431,9 @@ class TwistCloverGamma5Cuda : public Tunable {
 
     strcpy(aux_string,in->AuxString());
     if (twist == QUDA_TWIST_GAMMA5_DIRECT) {
-      strcat(aux_string,"direct");
+      strcat(aux_string,",direct");
     } else {
-      strcat(aux_string,"inverse");
+      strcat(aux_string,",inverse");
     }
   }
     virtual ~TwistCloverGamma5Cuda() {
