@@ -1007,7 +1007,7 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
     device_precision_sloppy = device_precision;
   }
  
-   
+  static const QudaVerbosity verbosity = getVerbosity();
 
   invertParam.dslash_type                   = QUDA_CLOVER_WILSON_DSLASH;
   invertParam.kappa                         = kappa;
@@ -1018,8 +1018,8 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
   invertParam.maxiter                       = inv_args.max_iter;
 
   invertParam.cuda_prec_precondition        = device_precision_sloppy;
-  invertParam.verbosity_precondition        = QUDA_SILENT;
-  invertParam.verbosity        = QUDA_SILENT;
+  invertParam.verbosity_precondition        = verbosity;
+  invertParam.verbosity        = verbosity;
   invertParam.cpu_prec                      = host_precision;
   invertParam.cuda_prec                     = device_precision;
   invertParam.cuda_prec_sloppy              = device_precision_sloppy;
@@ -1121,10 +1121,7 @@ void qudaCloverInvert(int external_precision,
     int* num_iters)
 {
 
-  if(target_fermilab_residual !=0 && target_residual != 0){
-    errorQuda("qudaCloverInvert: conflicting residuals requested\n");
-    exit(1);
-  }else if(target_fermilab_residual == 0 && target_residual == 0){
+  if(target_fermilab_residual == 0 && target_residual == 0){
     errorQuda("qudaCloverInvert: requesting zero residual\n");
     exit(1);
   }
@@ -1137,8 +1134,12 @@ void qudaCloverInvert(int external_precision,
 
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa);
-  invertParam.residual_type = (target_residual != 0) ? QUDA_L2_RELATIVE_RESIDUAL : QUDA_HEAVY_QUARK_RESIDUAL;
-  invertParam.tol = (target_residual != 0) ? target_residual : target_fermilab_residual;
+  invertParam.residual_type = static_cast<QudaResidualType_s>(0);
+  invertParam.residual_type = (target_residual != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
+  invertParam.residual_type = (target_fermilab_residual != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
+
+  invertParam.tol =  target_residual;
+  invertParam.tol_hq = target_fermilab_residual;
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
