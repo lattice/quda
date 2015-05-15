@@ -3981,9 +3981,9 @@ x86 | x86_64 ) ;;
 esac
 
 case ${gpu_arch} in
-sm_11 | sm_12 | sm_13 | sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
+sm_13 | sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
 *)
-  as_fn_error $? " GPU arch must be one of: sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
+  as_fn_error $? " GPU arch must be one of: sm_13, sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
   ;;
 esac
 
