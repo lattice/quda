@@ -49,6 +49,9 @@ BUILD_MAGMA = @BUILD_MAGMA@ 	# build magma interface
 GPU_DIRECT = @GPU_DIRECT@          # set to 'yes' to allow GPU and NIC to shared pinned buffers
 GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to communicate using RDMA
 
+# Profiling options
+MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
+
 # Interface options
 BUILD_QDP_INTERFACE = @BUILD_QDP_INTERFACE@                     # build qdp interface
 BUILD_MILC_INTERFACE = @BUILD_MILC_INTERFACE@                   # build milc interface
@@ -106,7 +109,16 @@ NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 
 TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
 ifneq ($(TESLA_ARCH),true)
-  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false -w
+  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false 
+else
+  NVCCOPT += 
+endif
+
+ifeq ($(strip $(GIT)), git)
+  GITCOUNT = $(shell git rev-list -q `git describe -q --abbrev=0 2> /dev/null`..  2> /dev/null | wc -l 2> /dev/null)
+  ifeq ($(strip $(GITCOUNT)),0)
+    NVCCOPT += -w
+  endif
 else
   NVCCOPT += -w
 endif
@@ -146,6 +158,11 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   COMM_OBJS = comm_qmp.o
 endif 
 
+ifeq ($(strip $(MPI_NVTX)), yes)
+  COMM_OBJS += nvtx_pmpi.o
+  LIB += -lnvToolsExt
+endif
+
 ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
@@ -171,10 +188,7 @@ ifeq ($(strip $(POSIX_THREADS)), yes)
   COPT += -DPTHREADS
 endif
 
-ifeq ($(strip $(POSIX_THREADS)), yes)
-  LIB += -lpthread
-endif
-
+LIB += -lpthread
 
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
