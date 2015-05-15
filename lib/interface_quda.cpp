@@ -381,12 +381,6 @@ void initQudaDevice(int dev) {
   }
 #endif
 
-  // if the device supports host-mapped memory, then enable this
-#ifndef USE_QDPJIT
-  if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
-  checkCudaError();
-#endif
-
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
