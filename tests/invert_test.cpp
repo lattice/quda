@@ -92,20 +92,6 @@ int main(int argc, char **argv)
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
     } 
-      if( strcmp(argv[i], "--tol") == 0){
-      float tmpf;
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      sscanf(argv[i+1], "%f", &tmpf);
-      if (tmpf <= 0){
-        printf("ERROR: invalid tol(%f)\n", tmpf);
-        usage(argv);
-      }
-      tol = tmpf;
-      i++;
-      continue;
-    }
     printfQuda("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
