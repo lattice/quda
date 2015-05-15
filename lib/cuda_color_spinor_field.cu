@@ -217,10 +217,20 @@ namespace quda {
       even = new cudaColorSpinorField(*this, param);
       odd = new cudaColorSpinorField(*this, param);
 
-      // need this hackery for the moment (need to locate the odd pointer half way into the full field)
+      // need this hackery for the moment (need to locate the odd pointers half way into the full field)
       (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
       if (precision == QUDA_HALF_PRECISION) 
 	(dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+
+      for(int i=0; i<nDim; ++i){
+        if(commDimPartitioned(i)){
+          (dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i] =
+	    static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i]) + bytes/2;
+          if(precision == QUDA_HALF_PRECISION)
+	    (dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i] =
+	      static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i]) + norm_bytes/2;
+        }
+      }
 
 #ifdef USE_TEXTURE_OBJECTS
       dynamic_cast<cudaColorSpinorField*>(even)->destroyTexObject();
