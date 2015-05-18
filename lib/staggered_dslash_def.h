@@ -480,8 +480,10 @@
 #else
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexDouble
+#define GHOSTSPINORTEX ghostSpinorTexDouble
 #endif // USE_TEXTURE_OBJECTS
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_DOUBLE_TEX
 #define READ_3RD_NBR_SPINOR READ_KS_NBR_SPINOR_DOUBLE_TEX
@@ -562,8 +564,10 @@
 #ifndef DIRECT_ACCESS_SPINOR
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexSingle2
+#define GHOSTSPINORTEX ghostSpinorTexSingle2
 #endif // USE_TEXTURE_OBJECTS
 #define READ_1ST_NBR_SPINOR READ_1ST_NBR_SPINOR_SINGLE_TEX
 #define READ_3RD_NBR_SPINOR READ_KS_NBR_SPINOR_SINGLE_TEX
@@ -630,8 +634,10 @@
 #define READ_3RD_NBR_SPINOR READ_KS_NBR_SPINOR_HALF_TEX
 #ifdef USE_TEXTURE_OBJECTS
 #define SPINORTEX param.inTex
+#define GHOSTSPINORTEX param.ghostTex
 #else
 #define SPINORTEX spinorTexHalf2
+#define GHOSTSPINORTEX ghostSpinorTexHalf2
 #endif // USE_TEXTURE_OBJECTS
 #define DD_PARAM_OUT short2* out, float *outNorm
 #define DD_PARAM_IN const short2* in, const float *inNorm

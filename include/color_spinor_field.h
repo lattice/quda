@@ -28,6 +28,7 @@ namespace quda {
 
       void *v; // pointer to field
       void *norm;
+      void *ghost_field;
 
       //! for eigcg:
       int eigv_dim;    //number of eigenvectors
@@ -171,6 +172,8 @@ namespace quda {
 
       void *v; // the field elements
       void *norm; // the normalization field
+      void *ghost_field; // used to hold halo data
+
       //! used for eigcg:
       int eigv_dim;
       int eigv_id;
@@ -184,8 +187,8 @@ namespace quda {
       void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
 
       int ghostFace[QUDA_MAX_DIM];// the size of each face
-      int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
-      int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
+      int ghostOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone
+      int ghostNormOffset[QUDA_MAX_DIM][2]; // offsets to each ghost zone for norm field
 
       int ghost_length; // length of ghost zone
       int ghost_norm_length; // length of ghost zone for norm
@@ -194,6 +197,9 @@ namespace quda {
 
       size_t bytes; // size in bytes of spinor field
       size_t norm_bytes; // size in bytes of norm field
+      size_t ghost_bytes; // size in bytes of the ghost field
+      size_t ghost_face_bytes[QUDA_MAX_DIM];
+
 
       /*Warning: we need copies of the above params for eigenvectors*/
       //multi_GPU parameters:
@@ -255,6 +261,9 @@ namespace quda {
       int Pad() const { return pad; }
       size_t Bytes() const { return bytes; }
       size_t NormBytes() const { return norm_bytes; }
+      size_t GhostBytes() const { return ghost_bytes; } 
+      size_t GhostNormBytes() const { return ghost_bytes; } 
+
       void PrintDims() const { printfQuda("dimensions=%d %d %d %d\n", x[0], x[1], x[2], x[3]); }
 
       const char *AuxString() const { return aux_string; }
@@ -263,6 +272,8 @@ namespace quda {
       const void* V() const {return v;}
       void* Norm(){return norm;}
       const void* Norm() const {return norm;}
+      void* Ghost() { return ghost_field; } 
+      const void* Ghost() const { return ghost_field; } // v will eventually be replaced by ghost_field
 
       //! for eigcg only:
       int EigvDim() const { return eigv_dim; }
@@ -287,8 +298,11 @@ namespace quda {
 
       int GhostLength() const { return ghost_length; }
       const int *GhostFace() const { return ghostFace; }  
-      int GhostOffset(const int i) const { return ghostOffset[i]; }  
-      int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  
+      int GhostOffset(const int i) const { return ghostOffset[i][0]; }  
+      int GhostOffset(const int i, const int j) const { return ghostOffset[i][j]; }
+      int GhostNormOffset(const int i ) const { return ghostNormOffset[i][0]; }  
+      int GhostNormOffset(const int i, const int j) const { return ghostNormOffset[i][j]; }
+
       void* Ghost(const int i);
       const void* Ghost(const int i) const;
       void* GhostNorm(const int i);
@@ -313,6 +327,8 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t tex;
     cudaTextureObject_t texNorm;
+    cudaTextureObject_t ghostTex;
+    cudaTextureObject_t ghostTexNorm;
     void createTexObject();
     void destroyTexObject();
 #endif
@@ -331,13 +347,54 @@ namespace quda {
    MsgHandle ***mh_send_norm_back[2];
 #endif
 
+#ifdef P2P_COMMS
+   static MsgHandle* mh_send_p2p_fwd[QUDA_MAX_DIM];
+   static MsgHandle* mh_send_p2p_back[QUDA_MAX_DIM];
+   static MsgHandle* mh_recv_p2p_fwd[QUDA_MAX_DIM];
+   static MsgHandle* mh_recv_p2p_back[QUDA_MAX_DIM];
+#endif
+
+
     bool reference; // whether the field is a reference or not
 
     static size_t ghostFaceBytes;
     static void* ghostFaceBuffer[2]; // gpu memory
     static void* fwdGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
     static void* backGhostFaceBuffer[2][QUDA_MAX_DIM]; // pointers to ghostFaceBuffer
+    static int fwdGhostBufferOffset[2][QUDA_MAX_DIM];
+    static int backGhostBufferOffset[2][QUDA_MAX_DIM];
     static int initGhostFaceBuffer;
+
+#ifdef P2P_COMMS
+    // Static variables needed for peer-to-peer comms
+    static cudaIpcMemHandle_t ipcLocalGhostBufferHandle[2][2][QUDA_MAX_DIM];
+    static cudaIpcMemHandle_t ipcRemoteGhostBufferHandle[2][2][QUDA_MAX_DIM];
+    static void* fwdGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
+    static void* backGhostFaceSrcBuffer[2][QUDA_MAX_DIM];
+
+    // Communication in the temporal direction is a corner case
+    // since the source buffer is not static
+    cudaIpcMemHandle_t ipcLocalFieldHandle[2];
+    cudaIpcMemHandle_t ipcRemoteFieldHandle[2];
+    cudaIpcMemHandle_t ipcLocalNormHandle[2];
+    cudaIpcMemHandle_t ipcRemoteNormHandle[2];
+    void* fwdFieldSrcBuffer;
+    void* backFieldSrcBuffer;
+    void* fwdNormSrcBuffer;
+    void* backNormSrcBuffer;
+
+    static cudaEvent_t ipcCopyEvent[2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcRemoteCopyEvent[2][QUDA_MAX_DIM];
+// for forward send 
+   void* fwdGhostSendDest[QUDA_MAX_DIM];
+   void* backGhostSendDest[QUDA_MAX_DIM];
+   cudaIpcMemHandle_t ipcLocalGhostDestHandle[2][QUDA_MAX_DIM];
+   cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][QUDA_MAX_DIM];
+// As soon as the send starts need to register the even on the receiving process
+// to let that process know that it is safe to proceed.
+   static cudaIpcEventHandle_t ipcLocalEventHandle[2][QUDA_MAX_DIM]; 
+   static cudaIpcEventHandle_t ipcRemoteEventHandle[2][QUDA_MAX_DIM];
+#endif  
 
     void create(const QudaFieldCreate);
     void destroy();
@@ -357,6 +414,12 @@ namespace quda {
     /** Whether we have initialized communication for this field */
     bool initComms;
 
+#ifdef P2P_COMMS
+    /** Whether we have initialized peer-to-peer communication for this field */
+    bool initIPCDslashComms;
+    /** Whether we have initialized peer-to-peer comms in the temporal direction */
+    bool initIPCTimeComms; // should not be static
+#endif
     /** Keep track of which pinned-memory buffer we used for creating message handlers */
     size_t bufferMessageHandler;
 
@@ -385,6 +448,10 @@ namespace quda {
     void createComms(int nFace);
     /** Destroy the communication handlers and buffers */
     void destroyComms();
+#ifdef P2P_COMMS
+    void createIPCDslashComms();
+    void destroyIPCDslashComms();
+#endif
     void allocateGhostBuffer(int nFace);
     static void freeGhostBuffer(void);
 
@@ -469,20 +536,23 @@ namespace quda {
 
     void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
 
-    void recvStart(int nFace, int dir, int dagger=0);
-    void sendStart(int nFace, int dir, int dagger=0);
-    void commsStart(int nFace, int dir, int dagger=0);
-    int commsQuery(int nFace, int dir, int dagger=0); 
+    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void sendStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL);
+    int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL); 
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
-
+    static int ipcCopyComplete(int dir, int dim);
+    static int ipcRemoteCopyComplete(int dir, int dim);
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
+    const cudaTextureObject_t& GhostTex() const { return ghostTex; }
+    const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm; }
 #endif
 
     cudaColorSpinorField& Even() const;

@@ -286,7 +286,9 @@ struct DslashCuda2 : DslashPolicyImp {
 		
     inputSpinor->allocateGhostBuffer(dslash.Nface()/2);
     inputSpinor->createComms(dslash.Nface()/2);	
+    inputSpinor->createIPCDslashComms();
     DslashCommsPattern pattern(dslashParam.commDim);
+
     inputSpinor->streamInit(streams);
     const int packIndex = Nstream-1;
     for(int i=3; i>=0; i--){
@@ -295,6 +297,7 @@ struct DslashCuda2 : DslashPolicyImp {
         PROFILE(inputSpinor->recvStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
       }
     }
+
     bool pack = false;
     for (int i=3; i>=0; i--) 
       if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 

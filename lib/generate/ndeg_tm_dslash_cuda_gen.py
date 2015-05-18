@@ -377,7 +377,7 @@ if (kernel_type == INTERIOR_KERNEL) {
   //sp_idx = face_idx + param.ghostOffset[dim];
 
 #if (DD_PREC==2) // half precision
-  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)] + face_num*ghostFace[static_cast<int>(kernel_type)];
+  sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)][0] + face_num*ghostFace[static_cast<int>(kernel_type)];
 #endif
 
   const int dims[] = {X1, X2, X3, X4};
@@ -479,7 +479,7 @@ def gen(dir, pack_only=False):
 
     str += "#ifdef MULTI_GPU\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
-    str += "  face_idx + param.ghostOffset[static_cast<int>(kernel_type)];\n"
+    str += "  face_idx + param.ghostOffset[static_cast<int>(kernel_type)][0];\n"
     str += "#else\n"
     str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
