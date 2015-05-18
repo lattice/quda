@@ -579,7 +579,7 @@ def gen(dir, pack_only=False):
     str += "\n"
 
     str += "faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4," + `dir/2` + ",Y);\n"
-    str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "];\n"
+    str += "const int sp_idx = face_idx + param.ghostOffset[" + `dir/2` + "][" + `1-dir%2` +"];\n"
 
     str += "#if (DD_PREC==2)\n"
     str += "  sp_norm_idx = face_idx + "

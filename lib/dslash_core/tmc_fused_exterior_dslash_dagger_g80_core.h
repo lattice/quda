@@ -674,7 +674,7 @@ if (isActive(dim,0,+1,x1,x2,x3,x4,param.commDim,param.X) && x1==X1m1 )
   // -i 0 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,0,Y);
-  const int sp_idx = face_idx + param.ghostOffset[0];
+  const int sp_idx = face_idx + param.ghostOffset[0][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + faceVolume[0] + param.ghostNormOffset[0];
 #endif
@@ -835,7 +835,7 @@ if (isActive(dim,0,-1,x1,x2,x3,x4,param.commDim,param.X) && x1==0 )
   // i 0 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,0,Y);
-  const int sp_idx = face_idx + param.ghostOffset[0];
+  const int sp_idx = face_idx + param.ghostOffset[0][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[0];
 #endif
@@ -996,7 +996,7 @@ if (isActive(dim,1,+1,x1,x2,x3,x4,param.commDim,param.X) && x2==X2m1 )
   // 1 0 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,1,Y);
-  const int sp_idx = face_idx + param.ghostOffset[1];
+  const int sp_idx = face_idx + param.ghostOffset[1][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + faceVolume[1] + param.ghostNormOffset[1];
 #endif
@@ -1157,7 +1157,7 @@ if (isActive(dim,1,-1,x1,x2,x3,x4,param.commDim,param.X) && x2==0 )
   // -1 0 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,1,Y);
-  const int sp_idx = face_idx + param.ghostOffset[1];
+  const int sp_idx = face_idx + param.ghostOffset[1][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[1];
 #endif
@@ -1318,7 +1318,7 @@ if (isActive(dim,2,+1,x1,x2,x3,x4,param.commDim,param.X) && x3==X3m1 )
   // 0 i 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,2,Y);
-  const int sp_idx = face_idx + param.ghostOffset[2];
+  const int sp_idx = face_idx + param.ghostOffset[2][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + faceVolume[2] + param.ghostNormOffset[2];
 #endif
@@ -1479,7 +1479,7 @@ if (isActive(dim,2,-1,x1,x2,x3,x4,param.commDim,param.X) && x3==0 )
   // 0 -i 0 1 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,2,Y);
-  const int sp_idx = face_idx + param.ghostOffset[2];
+  const int sp_idx = face_idx + param.ghostOffset[2][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[2];
 #endif
@@ -1640,7 +1640,7 @@ if (isActive(dim,3,+1,x1,x2,x3,x4,param.commDim,param.X) && x4==X4m1 )
   // 0 0 0 0 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,3,Y);
-  const int sp_idx = face_idx + param.ghostOffset[3];
+  const int sp_idx = face_idx + param.ghostOffset[3][1];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + faceVolume[3] + param.ghostNormOffset[3];
 #endif
@@ -1838,7 +1838,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
   // 0 0 0 2 
   
   faceIndexFromCoords<1>(face_idx,x1,x2,x3,x4,3,Y);
-  const int sp_idx = face_idx + param.ghostOffset[3];
+  const int sp_idx = face_idx + param.ghostOffset[3][0];
 #if (DD_PREC==2)
     sp_norm_idx = face_idx + param.ghostNormOffset[3];
 #endif
