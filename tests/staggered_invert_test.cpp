@@ -55,8 +55,8 @@ cpuColorSpinorField* tmp;
 cpuGaugeField *cpuFat = NULL;
 cpuGaugeField *cpuLong = NULL;
 
-static double tol = 1e-7;
-
+extern double tol; // tolerance for inverter
+extern double tol_hq; // heavy-quark tolerance for inverter
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -128,14 +128,24 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   
 #if __COMPUTE_CAPABILITY__ >= 200
+  if(tol_hq == 0 && tol == 0){
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
   // require both L2 relative and heavy quark residual to determine convergence
-  inv_param->residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
-  inv_param->tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
+  inv_param->residual_type = static_cast<QudaResidualType_s>(0);
+  inv_param->residual_type = (tol != 0) ? static_cast<QudaResidualType_s> ( inv_param->residual_type | QUDA_L2_RELATIVE_RESIDUAL) : inv_param->residual_type;
+  inv_param->residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param->residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param->residual_type;
+
+  inv_param->tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 #else
+  if(tol == 0){
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
   // Pre Fermi architecture only supports L2 relative residual norm
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 #endif
-  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
 
  
@@ -549,7 +559,6 @@ display_test_info()
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
-  printfQuda("    --tol  <resid_tol>                       # Set residual tolerance\n");
   printfQuda("    --test <0/1>                             # Test method\n");
   printfQuda("                                                0: Even even spinor CG inverter\n");
   printfQuda("                                                1: Odd odd spinor CG inverter\n");
@@ -567,20 +576,7 @@ int main(int argc, char** argv)
       continue;
     }   
 
-    if( strcmp(argv[i], "--tol") == 0){
-      float tmpf;
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      sscanf(argv[i+1], "%f", &tmpf);
-      if (tmpf <= 0){
-        printf("ERROR: invalid tol(%f)\n", tmpf);
-        usage(argv);
-      }
-      tol = tmpf;
-      i++;
-      continue;
-    }
+
 
     if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){
