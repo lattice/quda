@@ -585,7 +585,7 @@ def gen(dir, pack_only=False):
     str += "  sp_norm_idx = face_idx + "
     if dir%2 == 0:
       str += "faceVolume[" + `dir/2` + "] + "
-    str += "param.ghostNormOffset[" + `dir/2` + "];\n"
+    str += "param.ghostNormOffset[" + `dir/2` + "][" +  `1-dir%2` + "];\n"
     str += "#endif\n"
 
 
