@@ -545,8 +545,10 @@ namespace quda {
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
+#ifdef P2P_COMMS
     static int ipcCopyComplete(int dir, int dim);
     static int ipcRemoteCopyComplete(int dir, int dim);
+#endif
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }

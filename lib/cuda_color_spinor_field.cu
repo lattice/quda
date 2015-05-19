@@ -2089,7 +2089,7 @@ namespace quda {
   }
 
 
-
+#ifdef P2P_COMMS
   int cudaColorSpinorField::ipcCopyComplete(int dir, int dim){
     if(cudaSuccess == cudaEventQuery(ipcCopyEvent[dir][dim])){
       return 1;
@@ -2103,6 +2103,7 @@ namespace quda {
     }
     return 0;
   }
+#endif
 
   int cudaColorSpinorField::commsQuery(int nFace, int dir, int dagger, cudaStream_t *stream_p) {
 
@@ -2115,7 +2116,9 @@ namespace quda {
     int receive_complete=0;
     int send_complete=0;
 
-    comm_barrier(); printfQuda("Remove this!\n");
+#ifdef P2P_COMMS
+    comm_barrier(); // FIXME sledgehammer
+#endif
 
     if(dir%2==0){
 

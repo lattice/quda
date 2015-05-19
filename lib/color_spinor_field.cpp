@@ -121,8 +121,8 @@ namespace quda {
 
 #ifdef MULTI_GPU
       if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
-	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d ghostNormOffset = %6d, %6d\n", 
-		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i], ghostNormOffset[i][0], ghostNormOffset[i][1]);
+	printfQuda("face %d = %6d commDimPartitioned = %6d ghostOffset = %6d %6d ghostNormOffset = %6d, %6d\n", 
+		   i, ghostFace[i], commDimPartitioned(i), ghostOffset[i][0], ghostOffset[i][1], ghostNormOffset[i][0], ghostNormOffset[i][1]);
 #endif
     }//end of outmost for loop (index i)
 
