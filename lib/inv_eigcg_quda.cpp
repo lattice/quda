@@ -324,11 +324,14 @@ namespace quda {
 
     cudaColorSpinorField tmp (*W, csParam);
 
+    cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
+    cudaColorSpinorField &tmp2   = *tmp2_p;
+
     Complex alpha;
 
     for (int j = 0; j < nev; j++)//
     {
-       matDefl(*W, Vm->Eigenvec(j), tmp);
+       matDefl(*W, Vm->Eigenvec(j), tmp, tmp2);
 
        //off-diagonal:
        for (int i = 0; i < j; i++)//row id
@@ -359,7 +362,7 @@ namespace quda {
 
       double  norm2W = normCuda(*W);            
 
-      matDefl(*W2, *W, tmp);
+      matDefl(*W2, *W, tmp, tmp2);
  
       Complex dotWW2 = cDotProductCuda(*W, *W2);
 
@@ -376,6 +379,8 @@ namespace quda {
       printfQuda("Eigenvalue %d: %1.12e Res.: %1.12e\n", i+1, evals[i], relerr);
 
     }
+
+    if (&tmp2 != &tmp) delete tmp2_p;
 
     delete W;
     //
@@ -439,6 +444,10 @@ namespace quda {
 
   }
 
+/*
+ * This is a solo precision solver.
+*/
+
   int IncEigCG::EigCG(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
 
@@ -463,7 +472,6 @@ namespace quda {
     ColorSpinorParam csParam(x);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField y(b, csParam);
-
     //mat(r, x, y);
     //double r2 = xmyNormCuda(b, r);//compute residual
   
@@ -472,26 +480,21 @@ namespace quda {
     cudaColorSpinorField Ap(x, csParam);
 
     cudaColorSpinorField tmp(x, csParam);
-
-    cudaColorSpinorField *tmp2_p = &tmp;
-
     //matSloppy(r, x, tmp, tmp2);
     //double r2 = xmyNormCuda(b, r);//compute residual
 
-    // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
-	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(x, csParam);
-    }
+    // tmp2 only needed for multi-gpu Wilson-like kernels
+    cudaColorSpinorField *tmp2_p = ((param.precision != param.precision_sloppy) && !mat.isStaggered()) ? new cudaColorSpinorField(x, csParam) : &tmp;
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     matSloppy(r, x, tmp, tmp2);
+
     double r2 = xmyNormCuda(b, r);//compute residual
 
     cudaColorSpinorField p(r);
 
     zeroCuda(y);
-    
+
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     
@@ -790,9 +793,12 @@ namespace quda {
 
      cudaColorSpinorField tmp (*W, csParam);
 
+     cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
+     cudaColorSpinorField &tmp2   = *tmp2_p;
+
      for (int j = dpar->cur_dim; j < (dpar->cur_dim+addednev); j++)//
      {
-       matDefl(*W, dpar->cudaRitzVectors->Eigenvec(j), tmp);//precision must match!
+       matDefl(*W, dpar->cudaRitzVectors->Eigenvec(j), tmp, tmp2);//precision must match!
 
        //off-diagonal:
        for (int i = 0; i < j; i++)//row id
@@ -812,6 +818,8 @@ namespace quda {
      dpar->ResetDeflationCurrentDim(addednev);
 
      printfQuda("\n.. done.\n");
+
+     if (&tmp2 != &tmp) delete tmp2_p;
 
      delete W;
      delete W2;
@@ -848,13 +856,16 @@ namespace quda {
 
      cudaColorSpinorField tmp (*W, csParam);
 
+     cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
+     cudaColorSpinorField &tmp2   = *tmp2_p;
+
      for(int i = 0; i < nevs_to_print; i++)//newnev
      {
          for(int j = 0; j < curr_evals; j++) caxpyCuda(projm[i*dpar->ld+j], dpar->cudaRitzVectors->Eigenvec(j), *W);
 
          double  norm2W = normCuda(*W);            
 
-         matDefl(*W2, *W, tmp);
+         matDefl(*W2, *W, tmp, tmp2);
 
          Complex dotWW2 = cDotProductCuda(*W, *W2);
 
@@ -871,6 +882,8 @@ namespace quda {
          printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i+1, evals[i], relerr);
 
      }
+
+     if (&tmp2 != &tmp) delete tmp2_p;
 
      delete W;
     
@@ -930,6 +943,9 @@ namespace quda {
 
      cudaColorSpinorField tmp (*W, csParam);
 
+     cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
+     cudaColorSpinorField &tmp2   = *tmp2_p;
+
      if(eigcg_alloc == false){//or : search_space_prec != ritz_precision
 
        printfQuda("\nAllocating resources for the eigenvectors...\n");
@@ -961,7 +977,7 @@ namespace quda {
          {
              double  norm2W = normCuda(*W);            
 
-             matDefl(*W2, *W, tmp);
+             matDefl(*W2, *W, tmp, tmp2);
  
 	     Complex dotWW2 = cDotProductCuda(*W, *W2);
 
@@ -990,6 +1006,8 @@ namespace quda {
      printfQuda("\nUsed eigenvectors: %d\n", idx);
 
      dpar->rtz_dim = idx;//idx never exceeds cur_dim.
+
+     if (&tmp2 != &tmp) delete tmp2_p;
 
      delete W;
     
@@ -1329,6 +1347,7 @@ namespace quda {
               DeflateSpinor(y, r, defl_param);
               //
               copyCuda(*inSloppy, r);
+
               //
               copyCuda(*outSloppy, y);
               // 
@@ -1441,7 +1460,7 @@ namespace quda {
         //the mixed precision solver. Moreover, full precision acummulation results in worse performance of the deflated solver, upto 15% in my experiments
         //However, this parameter should be exposed to the enduser for the performance tuning, just in some rare cases when low-mode deflation will be insufficient 
         //for stable double-half mixed precision CG.
-        initCGparam.use_sloppy_partial_accumulator = 1;   
+        initCGparam.use_sloppy_partial_accumulator = 0;   
  
         initCGparam.delta = 1e-2; // might be a bit better than the default value 1e-1 (think about this)
 
@@ -1532,7 +1551,7 @@ namespace quda {
            
      
      mat(*final_r, *out, *tmp2);
-    
+
      param.true_res = sqrt(xmyNormCuda(*in, *final_r) / norm2(*in));
     
      delete final_r;
