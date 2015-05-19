@@ -81,8 +81,8 @@ namespace quda {
 	 // compute the offset into the strictly lower triangular
 	 // part, counting from the lower right.  This requires we
 	 // change to prime coordinates.
-         int row' = (N-1) - row;
-	 int col' = (N-1) - col;
+         int row' = N - row;
+	 int col' = N - col;
 
 	 // The linear offset (in bottom-right coordinates) to the
 	 // required element is simply 1/2*row'*(row'-1)+col'.
@@ -91,7 +91,8 @@ namespace quda {
 	 // two to account for complexity and then add on number of
 	 // real diagonals at the end
 
-	 int k = 2 * ( (1/2 N*(N-1) -1) - 1/2 * row' * (row'-1) + col') + N;
+	 //int k = 2 * ( (1/2 N*(N-1) -1) - 1/2 * row' * (row'-1) + col') + N;
+         int k = 2 * ( (1/2 N*(N-1) -1) - (1/2 * col' * (col'-1) + col - row) + N;
          return complex(a[2*k], a[2*k+1]);
        } else {
          conj(swap(col,row));
@@ -139,12 +140,20 @@ namespace quda {
 	  return tmp;
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
+	  /*
 	  int row2 = (N-1) - row;
 	  int col2 = (N-1) - col;
 	  int k = (N*(N-1)/2 - 1) - (row2*(row2-1)/2 + col2);
 	  int idx = (x*2 + chirality)*N*N + 2*k + N;
 	  complex<Float> *tmp = static_cast<complex<Float>*>((void *)(a[parity]+idx));
-	  return *tmp;
+
+          return *tmp;
+          */
+	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
+          int idx = (x*2 + chirality)*N*N + N + 2*k;
+          complex<Float> tmp(a[parity][idx], a[parity][idx+1]);
+
+	  return tmp;
 	} else {
 	  // requesting upper triangular so return conjuate transpose
 	  return conj(operator()(parity,x,s_col,s_row,c_col,c_row) );

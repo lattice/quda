@@ -9,7 +9,6 @@
 
 namespace quda {
 
-  using namespace gauge;
 #ifdef GPU_STAGGERED_OPROD
 
   namespace { // anonymous
@@ -658,22 +657,23 @@ namespace quda {
 
     if(inEven.Precision() != outA.Precision()) errorQuda("Mixed precision not supported: %d %d\n", inEven.Precision(), outA.Precision());
 
-    cudaColorSpinorField& inA = static_cast<cudaColorSpinorField&>((parity&1) ? in.Odd() : in.Even());
-    cudaColorSpinorField& inB = static_cast<cudaColorSpinorField&>((parity&1) ? in.Even() : in.Odd());
+    cudaColorSpinorField& inA = (parity&1) ? inOdd : inEven;
+    cudaColorSpinorField& inB = (parity&1) ? inEven : inOdd;
 
 #if (__COMPUTE_CAPABILITY__ >= 200)
     if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
 
       Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA);
       Spinor<double2, double2, double2, 3, 0, 1> spinorB(inB);
-      computeStaggeredOprodCuda<double2>(FloatNOrder<double, 18, 2, 18>(outA), FloatNOrder<double, 18, 2, 18>(outB), 
+
+      computeStaggeredOprodCuda<double2>(gauge::FloatNOrder<double, 18, 2, 18>(outA), gauge::FloatNOrder<double, 18, 2, 18>(outB), 
           outA, outB, 
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
     }else if(inEven.Precision() == QUDA_SINGLE_PRECISION){
 
       Spinor<float2, float2, float2, 3, 0, 0> spinorA(inA);
       Spinor<float2, float2, float2, 3, 0, 1> spinorB(inB);
-      computeStaggeredOprodCuda<float2>(FloatNOrder<float, 18, 2, 18>(outA), FloatNOrder<float, 18, 2, 18>(outB), 
+      computeStaggeredOprodCuda<float2>(gauge::FloatNOrder<float, 18, 2, 18>(outA), gauge::FloatNOrder<float, 18, 2, 18>(outB), 
           outA, outB,
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
     } else {

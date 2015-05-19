@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <vector>
 
+#include <nvToolsExt.h>
+
 namespace quda {
 
   // this determines where the prolongation / restriction will take place
@@ -28,6 +30,10 @@ namespace quda {
 
     if (B[0]->X(0) == geo_bs[0]) 
       errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);
+
+    for (int d = 0; d < ndim; d++) 
+      if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
+	errorQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d\n", d, B[d]->X(d)/geo_bs[d]);
 
     printfQuda("Transfer: using block size %d", geo_bs[0]);
     for (int d=1; d<ndim; d++) printfQuda(" x %d", geo_bs[d]);
@@ -193,6 +199,7 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
 
+
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
 
@@ -215,10 +222,12 @@ namespace quda {
     Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map);
 
     out = *output; // copy result to out field (aliasing handled automatically)
+
   }
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
@@ -240,6 +249,7 @@ namespace quda {
     Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
 
     out = *output; // copy result to out field (aliasing handled automatically)
+
   }
 
 } // namespace quda

@@ -215,10 +215,13 @@ namespace quda {
 
     const int nDim = 4;
     const Float half = 0.5;
-    int coord[QUDA_MAX_DIM];
-    int coord_coarse[QUDA_MAX_DIM];
     int coarse_size = 1;
     for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
+    int coord[QUDA_MAX_DIM];
+    int coord_coarse[QUDA_MAX_DIM];
+
+    // paralleling this requires care with respect to race conditions
+    // on CPU, parallelize over dimension not parity
 
     //#pragma omp parallel for 
     for (int parity=0; parity<2; parity++) {
@@ -291,13 +294,35 @@ namespace quda {
 
   }
 
-  //Adds the reverse links to the coarse diagonal term, which is just
-  //the conjugate of the existing coarse diagonal term but with
-  //plus/minus signs for off-diagonal spin components
+
+  //Adds the identity matrix to the coarse local term.
   template<typename Float, typename Gauge>
-  void coarseDiagonal(Gauge &X, int ndim, const int *xc_size) {
+  void addCoarseDiagonal(Gauge &X, int ndim, const int *xc_size) {
     const int nColor = X.NcolorCoarse();
     const int nSpin = X.NspinCoarse();
+    complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
+
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++) {
+        for(int s = 0; s < nSpin; s++) { //Spin
+         for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color
+            X(0,parity,x_cb,s,s,ic_c,ic_c) += 1.0;
+         } //Color
+        } //Spin
+      } // x_cb
+    } //parity
+   }
+
+
+  //Adds the reverse links to the coarse local term, which is just
+  //the conjugate of the existing coarse local term but with
+  //plus/minus signs for off-diagonal spin components
+  //Also multiply by the appropriate factor of -2*kappa
+  template<typename Float, typename Gauge>
+  void createCoarseLocal(Gauge &X, int ndim, const int *xc_size, double kappa) {
+    const int nColor = X.NcolorCoarse();
+    const int nSpin = X.NspinCoarse();
+    Float kap = (Float) kappa;
     complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
 	
     for (int parity=0; parity<2; parity++) {
@@ -325,7 +350,7 @@ namespace quda {
 	      for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
 		//Transpose color part
 		X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) =  
-		  sign*X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)+conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]);
+		  -2*kap*(sign*X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)+conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
 	      } //Color column
 	    } //Color row
 	  } //Spin column
@@ -389,19 +414,15 @@ namespace quda {
                 //printf("C.Ncolor() = %d C.NcolorCoarse() = %d\n",C.Ncolor(), C.NcolorCoarse());
                 for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin row
 		  s_c = s/spin_bs;
+		  //On the fine lattice, the clover field is chirally blocked, so loop over rows/columns
+		  //in the same chiral block.
                   for(int s_col = s_c*spin_bs; s_col < (s_c+1)*spin_bs; s_col++) { //Loop over fine spin column
-
                     for(int ic_c = 0; ic_c < X.NcolorCoarse(); ic_c++) { //Coarse Color row
                       for(int jc_c = 0; jc_c < X.NcolorCoarse(); jc_c++) { //Coarse Color column
 
                         for(int ic = 0; ic < C.Ncolor(); ic++) { //Sum over fine color row
                           for(int jc = 0; jc < C.Ncolor(); jc++) {  //Sum over fine color column
-                          //printfQuda("coord[0] = %d, coord[1] = %d, coord[2] = %d, coord[3] = %d, x_size[0] = %d, x_size[1] = %d, x_size[2] \
-= %d, x_size[3] = %d, coarse_parity=%d, coarse_x_cb = %d, s=%d, s_col=%d, ic_c = %d, jc_c = %d, parity = %d, x_cb = %d, ic = %d, jc = %d, V.Ns\
-pin() = %d\n",coord[0], coord[1], coord[2], coord[3], x_size[0], x_size[1], x_size[2], x_size[3], coarse_parity, coarse_x_cb, s, s_col, ic_c, \
-jc_c, parity, x_cb, ic, jc, V.Nspin());
-                          X(0,coarse_parity,coarse_x_cb,s_c,s_c,ic_c,jc_c) += conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col\
-, ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
+			    X(0,coarse_parity,coarse_x_cb,s_c,s_c,ic_c,jc_c) += conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col, ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
                           } //Fine color column
                         }  //Fine color row
                       } //Coarse Color column
@@ -419,186 +440,9 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 
   }
 
-
-  //Does the heavy lifting of creating the coarse color matrices Y
-  template<typename Float, typename F, typename coarseGauge, typename fineGauge>
-  void calculateY(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, const int *x_size) {
-    if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
-    const QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-
-    if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
-    const int nDim = 4;
-
-    const int *xc_size = Y.Field().X();
-    int geo_bs[QUDA_MAX_DIM]; 
-    for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
-    int spin_bs = V.Nspin()/Y.NspinCoarse();
-
-    for(int d = 0; d < nDim; d++) {
-      //First calculate UV
-      setZero<Float,F>(UV);
-
-      printfQuda("Computing %d UV and VUV\n", d);
-      //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y
-      if (d==0) {
-	computeUV<Float,0>(UV, V, G, nDim, x_size);
-	Gamma<Float, basis, 0> gamma;
-	computeVUV<Float,0>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
-      } else if (d==1) {
-	computeUV<Float,1>(UV, V, G, nDim, x_size);
-	Gamma<Float, basis, 1> gamma;
-	computeVUV<Float,1>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
-      } else if (d==2) {
-	computeUV<Float,2>(UV, V, G, nDim, x_size);
-	Gamma<Float, basis, 2> gamma;
-	computeVUV<Float,2>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
-      } else {
-	computeUV<Float,3>(UV, V, G, nDim, x_size);
-	Gamma<Float, basis, 3> gamma;
-	computeVUV<Float,3>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
-      }
-
-      printf("UV2[%d] = %e\n", d, UV.norm2());
-      printf("Y2[%d] = %e\n", d, Y.norm2(d));
-
-#if 0
-      for(int parity=0; parity<=1; parity++) {//Parity
-      for(int x_cb = 0; x_cb < Y.Volume()/2; x_cb++) {
-      for(int s = 0; s < Y.NspinCoarse(); s++) {  //Fine Spin row
-      for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
-          for(int ic = 0; ic < Y.NcolorCoarse(); ic++) { //Fine Color rows of gauge field
-            for(int jc = 0; jc < Y.NcolorCoarse(); jc++) {  //Fine Color columns of gauge field
-              printfQuda("Y(%d,%d,%d,%d,%d,%d,%d)= %e %e\n",d,parity,x_cb,ic,jc,s,s_col,Y(d,parity,x_cb,ic,jc,s,s_col).real(),Y(d,parity,x_cb,ic,jc,s,s_col).imag());
-	      }
-	    }
-	  }
-	}
-      }
-      }
-#endif
-
-    }
-
-    printf("X2 = %e\n", X.norm2(0));
-    printfQuda("Computing coarse diagonal\n");
-    coarseDiagonal<Float>(X, nDim, xc_size);
-    printf("X2 = %e\n", X.norm2(0));
-
-#if 0
-      for(int i = 0; i < Y.Volume(); i++) {
-	for(int s = 0; s < Y.NspinCoarse(); s++) {
-          for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
-            for(int c = 0; c < Y.NcolorCoarse(); c++) {
-              for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
-                printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e, Y(2*d+1) = %e %e\n",d,i,s,s_col,c,c_col,Y(2*d,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d,i%2,i/2,s,s_col,c,c_col).imag(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).real(),Y(2*d+1,i%2,i/2,s,s_col,c,c_col).imag());
-              }}}}}
-    for(int i = 0; i < Y.Volume(); i++) {
-      for(int s = 0; s < Y.NspinCoarse(); s++) {
-	for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
-	  for(int c = 0; c < Y.NcolorCoarse(); c++) {
-	    for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
-	      printf("d=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(2*d) = %e %e\n",nDim,i,s,s_col,c,c_col,
-		     X(0,i%2,i/2,s,s_col,c,c_col).real(),
-		     X(0,i%2,i/2,s,s_col,c,c_col).imag());
-	    }
-	  }
-	}
-      }
-    }
-#endif
-  }
-
-  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, 
-	    int fineColor, int fineSpin, int coarseColor, int coarseSpin>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder> F;
-    typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
-    typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
-
-    F vAccessor(const_cast<ColorSpinorField&>(T.Vectors()));
-    F uvAccessor(const_cast<ColorSpinorField&>(uv));
-    gFine gAccessor(const_cast<GaugeField&>(g));
-    gCoarse yAccessor(const_cast<GaugeField&>(Y));
-    gCoarse xAccessor(const_cast<GaugeField&>(X)); 
-
-    calculateY<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, g.X());
-  }
-
-
-  // template on the number of coarse degrees of freedom
-  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int fineColor, int fineSpin>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    if (T.Vectors().Nspin()/T.Spin_bs() != 2) 
-      errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
-    const int coarseSpin = 2;
-    const int coarseColor = Y.Ncolor() / coarseSpin;
-
-    if (coarseColor == 2) { 
-      calculateY<Float,csOrder,gOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, T, g);
-    } else if (coarseColor == 24) {
-      calculateY<Float,csOrder,gOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g);
-    } else {
-      errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
-    }
-  }
-
-  // template on fine spin
-  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int fineColor>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    if (uv.Nspin() == 4) {
-      calculateY<Float,csOrder,gOrder,fineColor,4>(Y, X, uv, T, g);
-    } else {
-      errorQuda("Unsupported number of spins %d\n", uv.Nspin());
-    }
-  }
-
-  // template on fine colors
-  template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    if (g.Ncolor() == 3) {
-      calculateY<Float,csOrder,gOrder,3>(Y, X, uv, T, g);
-    } else {
-      errorQuda("Unsupported number of colors %d\n", g.Ncolor());
-    }
-  }
-
-  template <typename Float, QudaFieldOrder csOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    if (g.FieldOrder() == QUDA_QDP_GAUGE_ORDER) {
-      calculateY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, uv, T, g);
-    } else {
-      errorQuda("Unsupported field order %d\n", g.FieldOrder());
-    }
-  }
-
-  template <typename Float>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    if (T.Vectors().FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      calculateY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, uv, T, g);
-    } else {
-      errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
-    }
-  }
-
-  //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g) {
-    if (X.Precision() != Y.Precision() || Y.Precision() != uv.Precision() || 
-	Y.Precision() != T.Vectors().Precision() || Y.Precision() != g.Precision())
-      errorQuda("Unsupported precision mix");
-
-    printfQuda("Computing Y field......\n");
-    if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
-      calculateY<double>(Y, X, uv, T, g);
-    } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-      calculateY<float>(Y, X, uv, T, g);
-    } else {
-      errorQuda("Unsupported precision %d\n", Y.Precision());
-    }
-    printfQuda("....done computing Y field\n");
-  }
-
+  //Calculates the coarse gauge field
   template<typename Float, typename F, typename coarseGauge, typename fineGauge, typename fineClover>
-  void calculateY(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineClover &C, const int *x_size) {
+  void calculateY(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineClover *C, const int *x_size, double kappa) {
     if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
     const QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
@@ -639,16 +483,27 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
     }
     printf("X2 = %e\n", X.norm2(0));
     printfQuda("Computing coarse diagonal\n");
-    coarseDiagonal<Float>(X, nDim, xc_size);
-    printfQuda("Computing fine->coarse clover term\n");
-    createCoarseClover<Float>(X, V, C, nDim, x_size, xc_size, geo_bs, spin_bs);
+    createCoarseLocal<Float>(X, nDim, xc_size, kappa);
+
+    //If C!=NULL we have to coarsen the fine clover term and add it in.
+    if (C != NULL) {
+      printfQuda("Computing fine->coarse clover term\n");
+      createCoarseClover<Float>(X, V, *C, nDim, x_size, xc_size, geo_bs, spin_bs);
+      printf("X2 = %e\n", X.norm2(0));
+    }
+    //Otherwise, we have a fine Wilson operator.  The "clover" term for the Wilson operator
+    //is just the identity matrix.
+    else {
+      addCoarseDiagonal<Float>(X, nDim, xc_size);
+    }
     printf("X2 = %e\n", X.norm2(0));
+
 }
 
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder,
             int fineColor, int fineSpin, int coarseColor, int coarseSpin>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
     typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder> F;
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
@@ -656,27 +511,33 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 
     F vAccessor(const_cast<ColorSpinorField&>(T.Vectors()));
     F uvAccessor(const_cast<ColorSpinorField&>(uv));
-    cFine cAccessor(const_cast<CloverField&>(c));
     gFine gAccessor(const_cast<GaugeField&>(g));
     gCoarse yAccessor(const_cast<GaugeField&>(Y));
     gCoarse xAccessor(const_cast<GaugeField&>(X));
 
-    calculateY<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cAccessor, g.X());
-    
+    if(c != NULL) {
+      cFine cAccessor(const_cast<CloverField&>(*c));
+
+      calculateY<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, &cAccessor, g.X(), kappa);
+    }
+    else {
+      cFine *cAccessor = NULL;
+      calculateY<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cAccessor, g.X(), kappa);
+    }    
   }
 
   // template on the number of coarse degrees of freedom
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder, int fineColor, int fineSpin>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
     if (T.Vectors().Nspin()/T.Spin_bs() != 2)
       errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
     if (coarseColor == 2) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, T, g, c);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, T, g, c, kappa);
     } else if (coarseColor == 24) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, c);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, c, kappa);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -684,9 +545,9 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 
   // template on fine spin
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder, int fineColor>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
     if (uv.Nspin() == 4) {
-      calculateY<Float,csOrder,gOrder,clOrder,fineColor,4>(Y, X, uv, T, g, c);
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,4>(Y, X, uv, T, g, c, kappa);
     } else {
       errorQuda("Unsupported number of spins %d\n", uv.Nspin());
     }
@@ -694,52 +555,53 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 
   // template on fine colors
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
     if (g.Ncolor() == 3) {
-      calculateY<Float,csOrder,gOrder,clOrder,3>(Y, X, uv, T, g, c);
+      calculateY<Float,csOrder,gOrder,clOrder,3>(Y, X, uv, T, g, c, kappa);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }
   }
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
-    if (c.Order() == QUDA_PACKED_CLOVER_ORDER) {
-      calculateY<Float,csOrder,gOrder,QUDA_PACKED_CLOVER_ORDER>(Y, X, uv, T, g, c);
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
+    //If c == NULL, then this is standard Wilson.  csOrder is dummy and will not matter      
+    if (c==NULL || c->Order() == QUDA_PACKED_CLOVER_ORDER) {
+      calculateY<Float,csOrder,gOrder,QUDA_PACKED_CLOVER_ORDER>(Y, X, uv, T, g, c, kappa);
     } else {
-      errorQuda("Unsupported field order %d\n", c.Order());
+      errorQuda("Unsupported field order %d\n", c->Order());
     }
   }
 
   template <typename Float, QudaFieldOrder csOrder>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
     if (g.FieldOrder() == QUDA_QDP_GAUGE_ORDER) {
-      calculateY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, uv, T, g, c);
+      calculateY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, uv, T, g, c, kappa);
     } else {
       errorQuda("Unsupported field order %d\n", g.FieldOrder());
     }
   }
 
  template <typename Float>
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
     if (T.Vectors().FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      calculateY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, uv, T, g, c);
+      calculateY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, uv, T, g, c, kappa);
     } else {
       errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
     }
   }
 
   //Does the heavy lifting of creating the coarse color matrices Y
-  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField &c) {
+  void calculateY(GaugeField &Y, GaugeField &X, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
     if (X.Precision() != Y.Precision() || Y.Precision() != uv.Precision() ||
         Y.Precision() != T.Vectors().Precision() || Y.Precision() != g.Precision())
       errorQuda("Unsupported precision mix");
 
     printfQuda("Computing Y field......\n");
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
-      calculateY<double>(Y, X, uv, T, g, c);
+      calculateY<double>(Y, X, uv, T, g, c, kappa);
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-      calculateY<float>(Y, X, uv, T, g, c);
+      calculateY<float>(Y, X, uv, T, g, c, kappa);
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
@@ -748,7 +610,7 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField &clover) {
+  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa) {
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
 
@@ -773,96 +635,37 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
     UVparam.create = QUDA_ZERO_FIELD_CREATE;
     cpuColorSpinorField uv(UVparam);
 
-    //Create a cpuCloverField from the cudaCloverField
-    CloverFieldParam cf_param;
-    cf_param.nDim = 4;
-    cf_param.pad = pad;
-    cf_param.precision = clover.Precision();
-    for(int i = 0; i < cf_param.nDim; i++) {
-      cf_param.x[i] = clover.X()[i];
+    //If the fine lattice operator is the clover operator, copy the cudaCloverField to cpuCloverField
+    if(clover != NULL) {
+      //Create a cpuCloverField from the cudaCloverField
+      CloverFieldParam cf_param;
+      cf_param.nDim = 4;
+      cf_param.pad = pad;
+      cf_param.precision = clover->Precision();
+      for(int i = 0; i < cf_param.nDim; i++) {
+        cf_param.x[i] = clover->X()[i];
+      }
+
+      cf_param.order = QUDA_PACKED_CLOVER_ORDER;
+      cf_param.direct = true;
+      cf_param.inverse = true;
+      cf_param.clover = NULL;
+      cf_param.norm = 0;
+      cf_param.cloverInv = NULL;
+      cf_param.invNorm = 0;
+      cf_param.create = QUDA_NULL_FIELD_CREATE;
+      cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
+
+      cpuCloverField c(cf_param);
+      clover->saveCPUField(c);
+
+      calculateY(Y, X, uv, T, g, &c, kappa);
     }
-
-    cf_param.order = QUDA_PACKED_CLOVER_ORDER;
-    cf_param.direct = true;
-    cf_param.inverse = true;
-    cf_param.clover = NULL;
-    cf_param.norm = 0;
-    cf_param.cloverInv = NULL;
-    cf_param.invNorm = 0;
-    cf_param.create = QUDA_NULL_FIELD_CREATE;
-    cf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
-
-    cpuCloverField c(cf_param);
-    clover.saveCPUField(c);
-
-    calculateY(Y, X, uv, T, g, c);
-  }
-
-  //Calculates the coarse color matrix and puts the result in Y.
-  //N.B. Assumes Y, X have been allocated.
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge) {
-    QudaPrecision precision = Y.Precision();
-    //First make a cpu gauge field from the cuda gauge field
-
-    int pad = 0;
-    GaugeFieldParam gf_param(gauge.X(), precision, gauge.Reconstruct(), pad, gauge.Geometry());
-    gf_param.order = QUDA_QDP_GAUGE_ORDER;
-    gf_param.fixed = gauge.GaugeFixed();
-    gf_param.link_type = gauge.LinkType();
-    gf_param.t_boundary = gauge.TBoundary();
-    gf_param.anisotropy = gauge.Anisotropy();
-    gf_param.gauge = NULL;
-    gf_param.create = QUDA_NULL_FIELD_CREATE;
-    gf_param.siteSubset = QUDA_FULL_SITE_SUBSET;
-
-    cpuGaugeField g(gf_param);
-
-    //Copy the cuda gauge field to the cpu
-    gauge.saveCPUField(g, QUDA_CPU_FIELD_LOCATION);
-
-    //Create a field UV which holds U*V.  Has the same structure as V.
-    ColorSpinorParam UVparam(T.Vectors());
-    UVparam.create = QUDA_ZERO_FIELD_CREATE;
-    cpuColorSpinorField uv(UVparam);
-
-    calculateY(Y, X, uv, T, g);
-  }
-
-
-  //out(x) = (1-2*kappa*X)*in(x), where X is the local color-spin matrix on the coarse grid.
-  template<typename Float, typename F, typename G>
-  void coarseClover(F &out, const F &in, const G &X, Float kappa) {
-    int Nc = out.Ncolor();
-    int Ns = out.Nspin();
-    int ndim = out.Ndim();
-    int sites = out.Volume();
-    int x_size[QUDA_MAX_DIM];
-    for(int d = 0; d < ndim; d++) {
-      x_size[d] = out.X(d);
+    else {
+      calculateY(Y, X, uv, T, g, NULL, kappa);
     }
-
-
-    for(int i = 0; i < out.Volume(); i++) { //Volume
-      int coord[QUDA_MAX_DIM];
-      int parity = 0;
-      int gauge_index = 0;
-      out.LatticeIndex(coord,i);
-      gauge_index = gauge_offset_index(coord, x_size, ndim, parity);
-
-      for(int s = 0; s < Ns; s++) { //Spin out
-        for(int c = 0; c < Nc; c++) { //Color out
-	  out(i,s,c) += in(i,s,c);
-	  for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
-	    for(int c_col = 0; c_col < Nc; c_col++) { //Color in
-              //printf("pre i = %d, s = %d, c = %d, s_col = %d, c_col = %d, parity = %d, gauge_index = %d, Y = %e, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,parity, gauge_index, Y(2*ndim,parity,gauge_index/2,s,s_col,c,c_col).real(),out(i,s,c).real(),in(i,s_col,c_col).real());
-	      out(i,s,c) -= 2*kappa*X(0, parity, gauge_index/2, s, s_col, c, c_col)*in(i,s_col,c_col);
-              //printf("post i = %d, s = %d, c = %d, s_col = %d, c_col = %d, out(i,s,c) = %e, in(i,s_col,c_col) = %e\n",i,s,c,s_col,c_col,out(i,s,c).real(),in(i,s_col,c_col).real());
-	    } //Color in
-          } //Spin in
-        } //Color out
-      } //Spin out
-    } //Volume
   }
+
 
   //Multiply a field by a real constant
   template<typename Float, typename F>
@@ -880,8 +683,8 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template<typename Float, int nDim, typename F, typename Gauge>
   void coarseDslash(F &out, F &in, Gauge &Y, Gauge &X, Float kappa) {
-    int Nc = in.Ncolor();
-    int Ns = in.Nspin();
+    const int Nc = in.Ncolor();
+    const int Ns = in.Nspin();
     int x_size[QUDA_MAX_DIM];
     for(int d = 0; d < nDim; d++) x_size[d] = in.X(d);
 
@@ -937,10 +740,13 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 	// apply clover term
 	for(int s = 0; s < Ns; s++) { //Spin out
 	  for(int c = 0; c < Nc; c++) { //Color out
-	    out(parity,x_cb,s,c) += in(parity,x_cb,s,c);
+	    //This term is now incorporated into the matrix X.
+	    //out(parity,x_cb,s,c) += in(parity,x_cb,s,c);
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin in
 	      for(int c_col = 0; c_col < Nc; c_col++) { //Color in
-		out(parity,x_cb,s,c) -= 2*kappa*X(0, parity, x_cb, s, s_col, c, c_col)*in(parity,x_cb,s_col,c_col);
+	        //Factor of 2*kappa now incorporated in X
+		//out(parity,x_cb,s,c) -= 2*kappa*X(0, parity, x_cb, s, s_col, c, c_col)*in(parity,x_cb,s_col,c_col);
+                out(parity,x_cb,s,c) += X(0, parity, x_cb, s, s_col, c, c_col)*in(parity,x_cb,s_col,c_col);
 	      } //Color in
 	    } //Spin in
 	  } //Color out
@@ -997,7 +803,7 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
 
 
   //Apply the coarse Dirac matrix to a coarse grid vector
-  //out(x) = M*in = (1-X)*in - 2*kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
+  //out(x) = M*in = X*in - 2*kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   //Uses the kappa normalization for the Wilson operator.
   //Note factor of 2*kappa compensates for the factor of 1/2 already
   //absorbed into the Y matrices.
@@ -1006,6 +812,11 @@ jc_c, parity, x_cb, ic, jc, V.Nspin());
       errorQuda("Unsupported precision mix");
 
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (out.Precision() != in.Precision() ||
+	Y.Precision() != in.Precision() ||
+	X.Precision() != in.Precision()) 
+      errorQuda("Precision mismatch out=%d in=%d Y=%d X=%d", 
+		out.Precision(), in.Precision(), Y.Precision(), X.Precision());
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyCoarse<double>(out, in, Y, X, kappa);

@@ -198,7 +198,7 @@ int main(int argc, char **argv)
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  inv_param.gcrNkrylov = 10;
+  inv_param.gcrNkrylov = 50;
   inv_param.tol = 1e-7;
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -303,7 +303,7 @@ int main(int argc, char **argv)
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-    double norm = 0.0; // clover components are random numbers in the range (-norm, norm)
+    double norm = 0.001; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = (inv_param.clover_cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);

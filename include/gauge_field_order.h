@@ -31,13 +31,13 @@ namespace quda {
     template<typename Float, int nColor, int nSpinCoarse> 
       struct Accessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> { 
       complex <Float> *u[QUDA_MAX_DIM];
-      int volumeCB;
-    Accessor(const GaugeField &U) : volumeCB(U.VolumeCB() ) { 
-	for (int d=0; d<U.Ndim(); d++) 
+      const size_t cb_offset;
+     Accessor(const GaugeField &U) : cb_offset((U.Bytes()>>1) / (sizeof(complex<Float>)*U.Geometry())) {
+       for (int d=0; d<U.Geometry(); d++)
 	  u[d] = static_cast<complex<Float>**>(const_cast<void*>(U.Gauge_p()))[d]; 
       }
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const 
-      { return u[d][ ((parity * volumeCB + x)*nColor + row)*nColor + col]; }
+      { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
     };
 
 

@@ -50,6 +50,24 @@ extern "C" {
   
   typedef void *ParityGauge;
 
+  // replace below with ColorSpinorField
+  typedef struct {
+    size_t bytes;
+    QudaPrecision precision;
+    int length; // total length
+    int volume; // geometric volume (single parity)
+    int X[QUDA_MAX_DIM]; // the geometric lengths (single parity)
+    int Nc; // length of color dimension
+    int Ns; // length of spin dimension
+    void *data; // either (double2*), (float4 *) or (short4 *), depending on precision
+    float *dataNorm; // used only when precision is QUDA_HALF_PRECISION
+  } ParityHw;
+  
+  typedef struct {
+    ParityHw odd;
+    ParityHw even;
+  } FullHw;
+
   struct QUDA_DiracField{
     void *field; /**< Pointer to a ColorSpinorField */
   };

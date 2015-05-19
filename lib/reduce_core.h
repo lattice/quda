@@ -664,7 +664,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 	  Spinor<float2,float2,short2,3,writeX,0>, Spinor<float2,float2,short2,3,writeY,1>,
 	  Spinor<float2,float2,short2,3,writeZ,2>, Spinor<float2,float2,short2,3,writeW,3>,
 	  Spinor<float2,float2,short2,3,writeV,4>, Reducer<ReduceType, float2, float2> >
-	  reduce(value, X, Y, Z, W, V, r, y.Volume());
+	  reduce(value, X, Y, Z, W, V, r, y.Volume(), bytes, norm_bytes );
 	reduce.apply(*blas::getStream());
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());

@@ -181,8 +181,6 @@ namespace quda {
     virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge);
-
   // Even-odd preconditioned Wilson
   class DiracWilsonPC : public DiracWilson {
 
@@ -232,7 +230,7 @@ namespace quda {
     virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField &clover);
+  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
 
   // Even-odd preconditioned clover
   class DiracCloverPC : public DiracClover {

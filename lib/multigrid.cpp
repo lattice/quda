@@ -193,7 +193,7 @@ namespace quda {
       transfer->R(*r_coarse, *param.B[i]);
 
       transfer->P(*tmp2, *r_coarse);
-      printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp2));
+      printfQuda("Vector %d: norms %e %e (coarse tmp %e) ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp2), blas::norm2(*r_coarse));
       printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *tmp2));
     }
 #if 0
@@ -210,35 +210,36 @@ namespace quda {
     }
 #endif
 
-    printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c \n");
+    printfQuda("\nChecking 0 = (1 - P^\\dagger P) eta_c (level %d)\n", param.level);
     x_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
-    printfQuda("Vector norms %e %e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
+    printfQuda("Vector norms %e %e (fine tmp %e) ", blas::norm2(*x_coarse), blas::norm2(*r_coarse), blas::norm2(*tmp2));
     printfQuda("deviation = %e\n", blas::xmyNorm(*x_coarse, *r_coarse));
 
-    printfQuda("\nComparing native coarse operator to emulated operator\n");
+    printfQuda("\nComparing native coarse operator to emulated operator (level %d)\n", param.level);
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
     blas::zero(*tmp_coarse);
     blas::zero(*r_coarse);
     #if 1
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
     #else
-    tmp_coarse->Source(QUDA_POINT_SOURCE,0,0,0);
+    for(int s = 0; s < tmp_coarse->Nspin(); s++)
+      for(int c=0; c < tmp_coarse->Ncolor(); c++) 
+	tmp_coarse->Source(QUDA_POINT_SOURCE,0,s,c);
     #endif
-    printfQuda("prolongation\n");
     transfer->P(*tmp1, *tmp_coarse);
-    printfQuda("MatResidual\n");
     param.matResidual(*tmp2,*tmp1);	
-    printfQuda("restrict\n");
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
     #if 0
-    if(param.level == 2) {
+    if(param.level == 1) {
       printfQuda("x_coarse\n");
-      for (int x=0; x<x_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
+      //static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(0);
+      for (int x=0; x<x_coarse->Volume(); x++) if(x<2) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
       printfQuda("r_coarse\n");
-      for (int x=0; x<r_coarse->Volume(); x++) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
+      for (int x=0; x<r_coarse->Volume(); x++) if(x<2) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
+      //static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(0);
     }
     #endif
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));

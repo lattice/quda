@@ -276,7 +276,7 @@ double benchmark(int kernel, const int niter) {
 
       // double
     case 18:
-      for (int i=0; i < niter; ++i) blas::norm(*xD);
+      for (int i=0; i < niter; ++i) blas::norm2(*xD);
       break;
 
     case 19:
