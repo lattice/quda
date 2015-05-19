@@ -409,7 +409,7 @@ int main(int argc, char **argv)
     double time1 = -((double)clock());
 
     inv_param.cuda_prec_sloppy = cuda_prec; //QUDA_DOUBLE_PRECISION;
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, 0);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, NULL, 0);
 
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -449,7 +449,7 @@ int main(int argc, char **argv)
     double time1 = -((double)clock());
 
     inv_param.cuda_prec_sloppy = cuda_prec_sloppy;//QUDA_SINGLE_PRECISION;
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, last_rhs);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, NULL, last_rhs);
   
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
