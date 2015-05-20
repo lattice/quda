@@ -109,6 +109,31 @@ extern "C" {
       double* const final_relative_residual,
       int* num_iters);
 
+  void qudaEigCGInvert(
+      int external_precision, 
+      int quda_precision,
+      double mass,
+      QudaInvertArgs_t inv_args,
+      double target_residual, 
+      double target_fermilab_residual,
+      const void* const fatlink,
+      const void* const longlink,
+      const double tadpole,
+      void* source,
+      void* solution,
+      void* ritzVects,//array of ritz vectors
+      double* ritzVals,//array of ritz values
+      int ritz_prec,
+      const int max_search_dim,
+      const int nev,
+      const int deflation_grid,
+      double tol_restart,//e.g.: 5e+3*target_residual
+      const int rhs_idx,//current rhs
+      const int last_rhs_flag,//is this the last rhs to solve?
+      double* const final_residual,
+      double* const final_fermilab_residual,
+      int *num_iters);
+
 
   void qudaCloverInvert(int external_precision, 
       int quda_precision,
@@ -126,6 +151,32 @@ extern "C" {
       double* const final_fermilab_residual,
       int* num_iters
       );
+
+  void qudaEigCGCloverInvert(
+      int external_precision, 
+      int quda_precision,
+      double kappa,
+      double clover_coeff,
+      QudaInvertArgs_t inv_args,
+      double target_residual, 
+      double target_fermilab_residual,
+      const void* milc_link,
+      void* milc_clover, 
+      void* milc_clover_inv,
+      void* source,
+      void* solution,
+      void* ritzVects,//array of ritz vectors
+      double* ritzVals,//array of ritz values
+      int ritz_prec,
+      const int max_search_dim,
+      const int nev,
+      const int deflation_grid,
+      double tol_restart,//e.g.: 5e+3*target_residual
+      const int rhs_idx,//current rhs
+      const int last_rhs_flag,//is this the last rhs to solve?
+      double* const final_residual,
+      double* const final_fermilab_residual,
+      int *num_iters);
 
   void qudaLoadGaugeField(int external_precision, 
       int quda_precision,
