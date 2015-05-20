@@ -345,9 +345,6 @@ VOLATILE spinorFloat *s = (spinorFloat*)s_data + CLOVER_SHARED_FLOATS_PER_THREAD
         prolog_str += "#include \"io_spinor.h\"\n"
         prolog_str += (
 """
-#if (defined MULTI_GPU) && (DD_PREC==2) // half precision
-int sp_norm_idx;
-#endif // MULTI_GPU half precision
 
 int sid = ((blockIdx.y*blockDim.y + threadIdx.y)*gridDim.x + blockIdx.x)*blockDim.x + threadIdx.x;
 if (sid >= param.threads*param.Ls) return;
@@ -358,7 +355,6 @@ int s_parity, boundaryCrossing;
 
 #ifdef MULTI_GPU
 int face_idx;
-int face_num;
 if (kernel_type == INTERIOR_KERNEL) {
 #endif
 
@@ -408,17 +404,12 @@ X += aux1;
 
 const int dim = static_cast<int>(kernel_type);
 const int face_volume = (param.threads*param.Ls >> 1); // volume of one face
-face_num = (sid >= face_volume); // is this thread updating face 0 or 1
+const int face_num = (sid >= face_volume); // is this thread updating face 0 or 1
 face_idx = sid - face_num*face_volume; // index into the respective face
 
 // ghostOffset is scaled to include body (includes stride) and number of FloatN arrays (SPINOR_HOP)
 // face_idx not sid since faces are spin projected and share the same volume index (modulo UP/DOWN reading)
 //sp_idx = face_idx + param.ghostOffset[dim];
-
-#if (DD_PREC==2) // half precision
-//sp_norm_idx = sid + param.ghostNormOffset[static_cast<int>(kernel_type)];
-sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][face_num];
-#endif
 
 const int dims[] = {X1, X2, X3, X4};
 coordsFromDWFaceIndex<1>(sid, x1, x2, x3, x4, xs, face_idx, face_volume, dim, face_num, param.parity, dims);
@@ -551,7 +542,10 @@ def gen(dir, pack_only=False):
 
     str += "#ifdef MULTI_GPU\n"
     str += "const int sp_idx = (kernel_type == INTERIOR_KERNEL) ? ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1 :\n"
-    str += " face_idx + param.ghostOffset[static_cast<int>(kernel_type)][face_num];\n"
+    str += " face_idx + param.ghostOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#if (DD_PREC==2) // half precision\n"
+    str += "const int sp_norm_idx = face_idx + param.ghostNormOffset[static_cast<int>(kernel_type)][" + `(dir+1)%2` + "];\n"
+    str += "#endif\n"
     str += "#else\n"
     str += "const int sp_idx = ("+boundary[dir]+" ? "+sp_idx_wrap[dir]+" : "+sp_idx[dir]+") >> 1;\n"
     str += "#endif\n"
