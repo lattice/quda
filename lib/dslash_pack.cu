@@ -789,6 +789,16 @@ namespace quda {
       comm[4] = '\0'; strcat(aux,",comm=");
       strcat(aux,comm);
       if (getKernelPackT() || getTwistPack()) { strcat(aux,",kernelPackT"); }
+      switch (nFace) {
+      case 1:
+	strcat(aux,",nFace=1");
+	break;
+      case 3:
+	strcat(aux,",nFace=3");
+	break;
+      default:
+	errorQuda("Number of faces not supported");
+      }
     }
 
   public:
