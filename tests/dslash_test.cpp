@@ -880,7 +880,7 @@ TEST(dslash, verify) {
 
 int main(int argc, char **argv)
 {
-
+  ::testing::InitGoogleTest(&argc, argv);
   for (int i =1;i < argc; i++){    
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -942,7 +942,7 @@ int main(int argc, char **argv)
     }
   
     if (verify_results) {
-      ::testing::InitGoogleTest(&argc, argv);
+//      ::testing::InitGoogleTest(&argc, argv);
       if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
     }
   }    

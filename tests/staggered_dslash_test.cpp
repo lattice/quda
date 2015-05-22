@@ -471,7 +471,7 @@ static int dslashTest(int argc, char **argv)
     }
   
     if (verify_results) {
-      ::testing::InitGoogleTest(&argc, argv);
+//      ::testing::InitGoogleTest(&argc, argv);
       if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
     }
   }
