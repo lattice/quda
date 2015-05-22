@@ -4234,6 +4234,11 @@ $as_echo "$as_me: Enabling Multi-GPU" >&6;}
 $as_echo "$as_me: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&6;}
   build_staggered_force="no";
 
+  if test "X${build_gauge_alg}X" = "XyesX"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&5
+$as_echo "$as_me: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&2;}
+  fi
+
 
   if test "X${qmp_home}X" = "XX"; then
 #    if test "X${mpi_home}X" = "XX"; then
@@ -5694,4 +5699,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-
