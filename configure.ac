@@ -603,6 +603,10 @@ then
   
   AC_MSG_NOTICE([Asqtad fermion force doesn't support multi-GPU yet: disabling ])
   build_staggered_force="no";
+  
+  if test "X${build_gauge_alg}X" = "XyesX"; then
+  AC_MSG_WARN([Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. ])
+  fi
 
 
   if test "X${qmp_home}X" = "XX"; then
