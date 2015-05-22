@@ -7,7 +7,6 @@
 #include <gauge_field.h>
 
 #include <comm_quda.h>
-#include <mpi.h>
 #include <test_util.h>
 #include <gauge_tools.h>
 
@@ -112,12 +111,11 @@ void RunTest(int argc, char **argv) {
   gParamEx.nFace = 1;
   for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
   cudaGaugeField *cudaInGauge = new cudaGaugeField(gParamEx); 
+  printf("Gauge Radius: %d:%d:%d:%d\n", gParamEx.r[0], gParamEx.r[1], gParamEx.r[2], gParamEx.r[3]);
 #else
   cudaGaugeField *cudaInGauge = new cudaGaugeField(gParam);
 #endif
 
-
-  printf("Gauge Radius: %d:%d:%d:%d\n", gParamEx.r[0], gParamEx.r[1], gParamEx.r[2], gParamEx.r[3]);
   printf("Gauge Radius: %d:%d:%d:%d\n", cudaInGauge->R()[0], cudaInGauge->R()[1], cudaInGauge->R()[2], cudaInGauge->R()[3]);
 
   const int *radius;
