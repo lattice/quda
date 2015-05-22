@@ -733,6 +733,31 @@ extern "C" {
 
   void performAPEnStep(unsigned int nSteps, double alpha);
   double plaqCuda();
+
+
+
+int computeGaugeFixingOVRQuda(void* gauge,
+                      const unsigned int gauge_dir,  
+                      const unsigned int Nsteps, 
+                      const unsigned int verbose_interval, 
+                      const double relax_boost, 
+                      const double tolerance, 
+                      const unsigned int reunit_interval, 
+                      const unsigned int stopWtheta, 
+                      QudaGaugeParam* param, 
+                      double* timeinfo);
+
+int computeGaugeFixingFFTQuda(void* gauge,
+                      const unsigned int gauge_dir,  
+                      const unsigned int Nsteps, 
+                      const unsigned int verbose_interval, 
+                      const double alpha,
+                      const unsigned int autotune, 
+                      const double tolerance,  
+                      const unsigned int stopWtheta, 
+                      QudaGaugeParam* param, 
+                      double* timeinfo);
+
   /**
   * Open/Close MAGMA library
   *
