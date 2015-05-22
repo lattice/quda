@@ -21,7 +21,7 @@
 
 namespace quda {
 
-
+#ifdef GPU_GAUGE_ALG
 
 static int numParams = 18;
 
@@ -1821,10 +1821,12 @@ void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir, \
   }
 }
 
-  void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir, \
-    const unsigned int Nsteps, const unsigned int verbose_interval, const double relax_boost, \
-    const double tolerance, const unsigned int reunit_interval, const unsigned int stopWtheta) {
+#endif // GPU_GAUGE_ALG
 
+  void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir,
+		       const unsigned int Nsteps, const unsigned int verbose_interval, const double relax_boost,
+		       const double tolerance, const unsigned int reunit_interval, const unsigned int stopWtheta) {
+#ifdef GPU_GAUGE_ALG
     if(data.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported\n");
     }
@@ -1835,6 +1837,9 @@ void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir, \
     } else {
       errorQuda("Precision %d not supported", data.Precision());
     }
+#else
+    errorQuda("Gauge fixinghas not been built");
+#endif // GPU_GAUGE_ALG
   }
 
 

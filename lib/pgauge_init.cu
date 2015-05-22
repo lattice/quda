@@ -29,11 +29,7 @@
 
 namespace quda {
 
-
-
-
-
-
+#ifdef GPU_GAUGE_ALG
 
 __device__ __host__ inline int linkIndex2(int x[], int dx[], const int X[4]) {
   int y[4];
@@ -570,22 +566,27 @@ void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
     errorQuda("Invalid Gauge Order\n");
   }
 }
-
+#endif // GPU_GAUGE_ALG
+  
 /** @brief Perform a hot start to the gauge field, random SU(3) matrix, followed by reunitarization, also exchange borders links in multi-GPU case.
 * 
 * @param[in,out] data Gauge field
 * @param[in,out] rngstate state of the CURAND random number generator
 */
-void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
-  if(data.Precision() == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision not supported\n");
+  void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
+#ifdef GPU_GAUGE_ALG
+    if(data.Precision() == QUDA_HALF_PRECISION) {
+      errorQuda("Half precision not supported\n");
+    }
+    if (data.Precision() == QUDA_SINGLE_PRECISION) {
+      InitGaugeField<float> (data, rngstate);
+    } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
+      InitGaugeField<double>(data, rngstate);
+    } else {
+      errorQuda("Precision %d not supported", data.Precision());
+    }
+#else
+    errorQuda("Pure gauge code has not been built");
+#endif
   }
-  if (data.Precision() == QUDA_SINGLE_PRECISION) {
-    InitGaugeField<float> (data, rngstate);
-  } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
-    InitGaugeField<double>(data, rngstate);
-  } else {
-    errorQuda("Precision %d not supported", data.Precision());
-  }
-}
 }

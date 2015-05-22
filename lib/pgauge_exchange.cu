@@ -17,6 +17,7 @@
 
 namespace quda {
 
+#ifdef GPU_GAUGE_ALG
 
 static int numParams = 18;
 
@@ -382,8 +383,11 @@ void PGaugeExchange( cudaGaugeField& data, const int dir, const int parity) {
   }
 }
 
+#endif // GPU_GAUGE_ALG
+
   void PGaugeExchange( cudaGaugeField& data, const int dir, const int parity) {
 
+#ifdef GPU_GAUGE_ALG
 #ifdef MULTI_GPU
   if(comm_size() > 1){
     if(data.Precision() == QUDA_HALF_PRECISION) {
@@ -397,6 +401,9 @@ void PGaugeExchange( cudaGaugeField& data, const int dir, const int parity) {
       errorQuda("Precision %d not supported", data.Precision());
     }
   }
+#endif
+#else
+  errorQuda("Pure gauge code has not been built");
 #endif
   }
 }

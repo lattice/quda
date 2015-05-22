@@ -30,9 +30,7 @@
 
 namespace quda {
 
-
-
-
+#ifdef GPU_GAUGE_ALG
 
 
 static  __inline__ __device__ double atomicAdd(double *addr, double val){
@@ -362,7 +360,7 @@ double2 Plaquette( cudaGaugeField& data) {
     errorQuda("Invalid Gauge Order\n");
   }
 }
-
+#endif // GPU_GAUGE_ALG
 
 /** @brief Calculate the plaquette
 * 
@@ -370,7 +368,8 @@ double2 Plaquette( cudaGaugeField& data) {
 * @returns double2 .x stores the space-space plaquette value and .y stores the space-time plaquette value
 */
 double2 Plaquette( cudaGaugeField& data) {
- if(data.Precision() == QUDA_HALF_PRECISION) {
+#ifdef GPU_GAUGE_ALG
+  if(data.Precision() == QUDA_HALF_PRECISION) {
     errorQuda("Half precision not supported\n");
   }
   if (data.Precision() == QUDA_SINGLE_PRECISION) {
@@ -380,14 +379,10 @@ double2 Plaquette( cudaGaugeField& data) {
   } else {
     errorQuda("Precision %d not supported", data.Precision());
   }
+#else
+  errorQuda("Pure gauge code has not been built");
+#endif // GPU_GAUGE_ALG
 }
-
-
-
-
-
-
-
 
 
 }

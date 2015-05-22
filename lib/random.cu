@@ -12,7 +12,8 @@
 
 namespace quda {
 
-
+#ifdef GPU_GAUGE_ALG
+  
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
 
 
@@ -209,5 +210,6 @@ void RNG::Release(){
         state = NULL;
     }
 }
+#endif // GPU_GAUGE_ALG
 
 }

@@ -9,13 +9,14 @@
 #include <device_functions.h>
 
 #include <cufft.h>
+
+#ifdef GPU_GAUGE_ALG
 #include <CUFFT_Plans.h>
-
-
+#endif
 
 namespace quda {
 
-
+#ifdef GPU_GAUGE_ALG
 
 //Comment if you don't want to use textures for Delta(x) and g(x)
 #define GAUGEFIXING_SITE_MATRIX_LOAD_TEX
@@ -1393,10 +1394,13 @@ void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
 	}
 }
 
+#endif // GPU_GAUGE_ALG
+  
 void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
 		const unsigned int Nsteps, const unsigned int verbose_interval, const double alpha, const unsigned int autotune, \
 		const double tolerance, const unsigned int stopWtheta) {
 
+#ifdef GPU_GAUGE_ALG
 #ifdef MULTI_GPU
 	if(comm_size() > 1)
 	errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!\n");
@@ -1411,6 +1415,9 @@ void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
 	} else {
 		errorQuda("Precision %d not supported", data.Precision());
 	}
+#else
+	errorQuda("Gauge fixing has bot been built");
+#endif
 }
 
 

@@ -2,9 +2,7 @@ include ../make.inc
 
 QUDA = libquda.a
 
-QUDA_OBJS = pgauge_exchange.o pgauge_init.o pgauge_plaquette.o \
-	pgauge_heatbath.o random.o gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o \
-    gauge_phase.o timer.o malloc.o solver.o			\
+QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
 	inv_eigcg_quda.o gauge_ape.o gauge_plaq.o inv_gcr_quda.o	\
 	inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o	\
@@ -28,15 +26,16 @@ QUDA_OBJS = pgauge_exchange.o pgauge_init.o pgauge_plaquette.o \
 	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
-	copy_gauge_double.o copy_gauge_single.o copy_gauge_half.o \
+	copy_gauge_double.o copy_gauge_single.o copy_gauge_half.o	\
 	copy_gauge.o copy_clover.o staggered_oprod.o			\
 	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
 	fermion_force_quda.o unitarize_force_quda.o			\
 	unitarize_links_quda.o milc_interface.o				\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
-	inv_mpcg_quda.o inv_mpbicgstab_quda.o
-
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o pgauge_exchange.o		\
+	pgauge_init.o pgauge_plaquette.o pgauge_heatbath.o random.o	\
+	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o 
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\

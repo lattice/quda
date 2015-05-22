@@ -616,6 +616,7 @@ BUILD_QMP
 BUILD_MULTI_GPU
 BUILD_CONTRACT
 BUILD_SSTEP
+BUILD_GAUGE_ALG
 BUILD_GAUGE_TOOLS
 BUILD_HISQ_FORCE
 BUILD_FERMION_FORCE
@@ -721,6 +722,7 @@ enable_gauge_force
 enable_staggered_force
 enable_hisq_force
 enable_gauge_tools
+enable_gauge_alg
 enable_sstep
 enable_contract
 enable_multi_gpu
@@ -1402,6 +1404,8 @@ Optional Features:
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
                           evolver, APE, extended gauge routines (default:
                           disabled)
+  --enable-gauge-alg      Build gauge fixing and pure gauge algorithms
+                          (default: disabled)
   --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
@@ -2235,6 +2239,15 @@ if test "${enable_gauge_tools+set}" = set; then :
   enableval=$enable_gauge_tools;  build_gauge_tools=${enableval}
 else
    build_gauge_tools="no"
+
+fi
+
+
+# Check whether --enable-gauge-alg was given.
+if test "${enable_gauge_alg+set}" = set; then :
+  enableval=$enable_gauge_alg;  build_gauge_alg=${enableval}
+else
+   build_gauge_alg="no"
 
 fi
 
@@ -4148,6 +4161,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_gauge_alg} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-gauge-alg " "$LINENO" 5
+  ;;
+esac
+
 case ${build_sstep} in
 yes|no);;
 *)
@@ -4361,6 +4381,11 @@ BUILD_HISQ_FORCE=${build_hisq_force}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&5
 $as_echo "$as_me: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&6;}
 BUILD_GAUGE_TOOLS=${build_gauge_tools}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&5
+$as_echo "$as_me: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&6;}
+BUILD_GAUGE_ALG=${build_gauge_alg}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_SSTEP = ${build_sstep}  " >&5

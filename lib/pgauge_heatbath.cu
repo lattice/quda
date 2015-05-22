@@ -30,10 +30,7 @@
 
 namespace quda {
 
-
-
-
-
+#ifdef GPU_GAUGE_ALG
 
 static  __inline__ __device__ double atomicAdd(double *addr, double val){
   double old=*addr, assumed;
@@ -972,7 +969,7 @@ void Monte( cudaGaugeField& data, cuRNGState *rngstate, Float Beta, unsigned int
     errorQuda("Invalid Gauge Order\n");
   }
 }
-
+#endif // GPU_GAUGE_ALG
 
 /** @brief Perform heatbath and overrelaxation. Performs nhb heatbath steps followed by nover overrelaxation steps.
 * 
@@ -983,6 +980,7 @@ void Monte( cudaGaugeField& data, cuRNGState *rngstate, Float Beta, unsigned int
 * @param[in] nover number of overrelaxation steps
 */
 void Monte( cudaGaugeField& data, cuRNGState *rngstate, double Beta, unsigned int nhb, unsigned int nover) {
+#ifdef GPU_GAUGE_ALG
   if(data.Precision() == QUDA_HALF_PRECISION) {
     errorQuda("Half precision not supported\n");
   }
@@ -993,6 +991,9 @@ void Monte( cudaGaugeField& data, cuRNGState *rngstate, double Beta, unsigned in
   } else {
     errorQuda("Precision %d not supported", data.Precision());
   }
+#else
+  errorQuda("Pure gauge code has not been built");
+#endif // GPU_GAUGE_ALG
 }
 
 

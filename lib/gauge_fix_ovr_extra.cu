@@ -1,8 +1,3 @@
-
-
-#ifdef MULTI_GPU
-
-
 #include <comm_quda.h>
 
 #include <thrust/device_vector.h>
@@ -18,8 +13,7 @@
 #include <gauge_fix_ovr_extra.h>
 namespace quda {
 
-
-
+#if defined(GPU_GAUGE_ALG) && defined(MULTI_GPU)
 
 struct BorderIdArg {
   int X[4]; // grid dimensions
@@ -116,8 +110,7 @@ void PreCalculateLatticeIndices(size_t faceVolume[4], size_t faceVolumeCB[4], in
     else errorQuda("BORDER: Even and Odd sizes does not match, not supported!!!!, %d:%d",size[0],size[1]);
 }
 
-
+#endif // GPU_GAUGE_ALG && MULTI_GPU
 
 }
 
-#endif
