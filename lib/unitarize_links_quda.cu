@@ -10,9 +10,8 @@
 #include <quda_matrix.h>
 #include <hisq_links_quda.h>
 
-#ifdef GPU_UNITARIZE
-
 namespace quda{
+#ifdef GPU_UNITARIZE
 
 namespace{
   #include <svd_quda.h>
@@ -93,41 +92,6 @@ namespace{
       }
     }
     return true;
-  }
-
-
-
-  void setUnitarizeLinksConstants(double unitarize_eps_h, double max_error_h, 
-				  bool allow_svd_h, bool svd_only_h,
-				  double svd_rel_error_h, double svd_abs_error_h, 
-				  bool check_unitarization_h)
-  {
-
-    // not_set is only initialised once
-    static bool not_set=true;
-		
-    if(not_set){
-      cudaMemcpyToSymbol(DEV_FL_UNITARIZE_EPS, &unitarize_eps_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_ALLOW_SVD, &allow_svd_h, sizeof(bool));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_ONLY, &svd_only_h, sizeof(bool));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_REL_ERROR, &svd_rel_error_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_ABS_ERROR, &svd_abs_error_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_MAX_ERROR, &max_error_h, sizeof(double));
-      cudaMemcpyToSymbol(DEV_FL_CHECK_UNITARIZATION, &check_unitarization_h, sizeof(bool));
-	  
-
-      HOST_FL_UNITARIZE_EPS = unitarize_eps_h;
-      HOST_FL_REUNIT_ALLOW_SVD = allow_svd_h;
-      HOST_FL_REUNIT_SVD_ONLY = svd_only_h;
-      HOST_FL_REUNIT_SVD_REL_ERROR = svd_rel_error_h;
-      HOST_FL_REUNIT_SVD_ABS_ERROR = svd_abs_error_h;
-      HOST_FL_MAX_ERROR = max_error_h;     
-      HOST_FL_CHECK_UNITARIZATION = check_unitarization_h;
-
-      not_set = false;
-    }
-    checkCudaError();
-    return;
   }
 
 
@@ -689,9 +653,10 @@ void unitarizeLinksQuda( cudaGaugeField& links, int* fails) {
         errorQuda("Invalid Gauge Order\n");
       }
     }
+#endif
   
   void unitarizeLinksQuda(cudaGaugeField& links, int* fails) {
-
+#ifdef GPU_UNITARIZE
     if(links.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported\n");
     }
@@ -702,8 +667,46 @@ void unitarizeLinksQuda( cudaGaugeField& links, int* fails) {
     } else {
       errorQuda("Precision %d not supported", links.Precision());
     }
+#else
+    errorQuda("Unitarization has not been built");
+#endif
   }
-    
+
+  void setUnitarizeLinksConstants(double unitarize_eps_h, double max_error_h, 
+				  bool allow_svd_h, bool svd_only_h,
+				  double svd_rel_error_h, double svd_abs_error_h, 
+				  bool check_unitarization_h)
+  {
+#ifdef GPU_UNITARIZE
+    // not_set is only initialised once
+    static bool not_set=true;
+		
+    if(not_set){
+      cudaMemcpyToSymbol(DEV_FL_UNITARIZE_EPS, &unitarize_eps_h, sizeof(double));
+      cudaMemcpyToSymbol(DEV_FL_REUNIT_ALLOW_SVD, &allow_svd_h, sizeof(bool));
+      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_ONLY, &svd_only_h, sizeof(bool));
+      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_REL_ERROR, &svd_rel_error_h, sizeof(double));
+      cudaMemcpyToSymbol(DEV_FL_REUNIT_SVD_ABS_ERROR, &svd_abs_error_h, sizeof(double));
+      cudaMemcpyToSymbol(DEV_FL_MAX_ERROR, &max_error_h, sizeof(double));
+      cudaMemcpyToSymbol(DEV_FL_CHECK_UNITARIZATION, &check_unitarization_h, sizeof(bool));
+	  
+
+      HOST_FL_UNITARIZE_EPS = unitarize_eps_h;
+      HOST_FL_REUNIT_ALLOW_SVD = allow_svd_h;
+      HOST_FL_REUNIT_SVD_ONLY = svd_only_h;
+      HOST_FL_REUNIT_SVD_REL_ERROR = svd_rel_error_h;
+      HOST_FL_REUNIT_SVD_ABS_ERROR = svd_abs_error_h;
+      HOST_FL_MAX_ERROR = max_error_h;     
+      HOST_FL_CHECK_UNITARIZATION = check_unitarization_h;
+
+      not_set = false;
+    }
+    checkCudaError();
+#else
+    errorQuda("Unitarization has not been built");
+#endif
+    return;
+  }
+  
 } // namespace quda
 
-#endif
