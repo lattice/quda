@@ -945,7 +945,6 @@ int main(int argc, char **argv)
     }
 
     if (verify_results) {
-//      ::testing::InitGoogleTest(&argc, argv);
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }

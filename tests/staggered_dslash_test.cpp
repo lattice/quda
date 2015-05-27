@@ -423,7 +423,7 @@ TEST(dslash, verify) {
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-static int dslashTest(int argc, char **argv) 
+static int dslashTest()
 {
   // return code for google test
   int test_rc = 0;
@@ -471,7 +471,6 @@ static int dslashTest(int argc, char **argv)
     }
 
     if (verify_results) {
-//      ::testing::InitGoogleTest(&argc, argv);
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0) warningQuda("Tests failed");
     }
@@ -532,7 +531,7 @@ int main(int argc, char **argv)
   display_test_info();
 
   // return result of RUN_ALL_TESTS
-  int test_rc = dslashTest(argc, argv);
+  int test_rc = dslashTest();
 
   finalizeComms();
 
