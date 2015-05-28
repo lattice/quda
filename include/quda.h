@@ -635,31 +635,91 @@ extern "C" {
 
 
   /**
-   * Take a gauge field on the host, extend it and load it onto the device. 
-   * Return a pointer to the extended gauge field.
+   * Take a gauge field on the host, load it onto the device and extend it.
+   * Return a pointer to the extended gauge field object.
+   *
+   * @param gauge The CPU gauge field (optional - if set to 0 then the gauge field zeroed)
+   * @param geometry The geometry of the matrix field to create (1 - scaler, 4 - vector, 6 - tensor)
+   * @param param The parameters of the external field and the field to be created
+   * @return Pointer to the gauge field (cast as a void*)
    */
-  void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
-
-  void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param);
-
-  void  saveGaugeField(void* outGauge, void* inGauge, QudaGaugeParam* param);
-
-  void  extendGaugeField(void* outGauge, void* inGauge);
-
+  void* createExtendedGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param);
 
   /**
-   *  Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   * Allocate a gauge (matrix) field on the device and optionally download a host gauge field.
+   *
+   * @param gauge The host gauge field (optional - if set to 0 then the gauge field zeroed)
+   * @param geometry The geometry of the matrix field to create (1 - scaler, 4 - vector, 6 - tensor)
+   * @param param The parameters of the external field and the field to be created
+   * @return Pointer to the gauge field (cast as a void*)
    */
-  void destroyQudaGaugeField(void* gauge);
+  void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param);
 
+  /**
+   * Copy the QUDA gauge (matrix) field on the device to the CPU
+   *
+   * @param outGauge Pointer to the host gauge field
+   * @param inGauge Pointer to the device gauge field (QUDA device field)
+   * @param param The parameters of the host and device fields
+   */
+  void  saveGaugeFieldQuda(void* outGauge, void* inGauge, QudaGaugeParam* param);
+
+  /**
+   * Take a gauge field on the device and copy to the extended gauge
+   * field.  The precisions and reconstruct types can differ between
+   * the input and output field, but they must be compatible (same volume, geometry).
+   *
+   * @param outGauge Pointer to the output extended device gauge field (QUDA extended device field)
+   * @param inGauge Pointer to the input device gauge field (QUDA gauge field)
+   */
+  void  extendGaugeFieldQuda(void* outGauge, void* inGauge);
+
+  /**
+   * Reinterpret gauge as a pointer to cudaGaugeField and call destructor.
+   *
+   * @param gauge Gauge field to be freed
+   */
+  void destroyGaugeFieldQuda(void* gauge);
+
+  /**
+   * Compute the clover field and its inverse from the resident gauge field.
+   *
+   * @param param The parameters of the clover field to create
+   */
   void createCloverQuda(QudaInvertParam* param);
 
+  /**
+   * Compute the sigma trace field (part of clover force computation).
+   * All the pointers here are for QUDA native device objects.  The
+   * precisions of all fields must match.  This function requires that
+   * there is a persistent clover field.
+   * 
+   * @param out Sigma trace field  (QUDA device field, geometry = 1)
+   * @param dummy (not used)
+   * @param mu mu direction
+   * @param nu nu direction
+   * @param dim array of local field dimensions
+   */
+  void computeCloverTraceQuda(void* out, void* dummy, int mu, int nu, int dim[4]);
 
-  void computeCloverTraceQuda(void* out, void* clover, int mu, int nu, int dim[4]);
-
+  /**
+   * Compute the derivative of the clover term (part of clover force
+   * computation).  All the pointers here are for QUDA native device
+   * objects.  The precisions of all fields must match.
+   * 
+   * @param out Clover derivative field (QUDA device field, geometry = 1)
+   * @param gauge Gauge field (extended QUDA device field, gemoetry = 4)
+   * @param oprod Matrix field (outer product) which is multiplied by the derivative
+   * @param mu mu direction
+   * @param nu nu direction
+   * @param coeff Coefficient of the clover derviative (including stepsize and clover coefficient)
+   * @param parity Parity for which we are computing
+   * @param param Gauge field meta data
+   * @param conjugate Whether to make the oprod field anti-hermitian prior to multiplication
+   */
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
-      double coeff,
-      QudaParity parity, QudaGaugeParam* param, int conjugate);
+				   double coeff,
+				   QudaParity parity, QudaGaugeParam* param, int conjugate);
 
   /**
    * Compute the quark-field outer product needed for gauge generation
