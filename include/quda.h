@@ -726,12 +726,20 @@ extern "C" {
    *  
    * @param oprod The outer product to be computed.
    * @param quark The input fermion field.
-   * @param displacement The fermion-field displacement in the outer product. 
+   * @param num The number of quark fields
    * @param coeff The coefficient multiplying the fermion fields in the outer product
    * @param param The parameters of the outer-product field.
    */
   void computeStaggeredOprodQuda(void** oprod, void** quark, int num, double** coeff, QudaGaugeParam* param);
 
+  /**
+   * Compute the naive staggered force (experimental).  All fields are
+   * QUDA device fields and must be in the same precision.
+   *
+   * mom Momentum field (QUDA device field)
+   * quark Quark field solution vectors
+   * coeff Step-size coefficient
+   */
   void computeStaggeredForceQuda(void* mom, void* quark, double* coeff);
 
   /**
