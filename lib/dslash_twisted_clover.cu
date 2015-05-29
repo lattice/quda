@@ -158,9 +158,6 @@ namespace quda {
 			       const double &epsilon, const double &k,  const int *commOverride,
 			       TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
-    if (dslashPolicy ==  QUDA_FUSED_DSLASH || dslashPolicy == QUDA_FUSED_GPU_COMMS_DSLASH)
-      errorQuda("Twisted-clover dslash does not yet support a fused exterior dslash kernel");
-
     inSpinor = (cudaColorSpinorField*)in; // EVIL
 #if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
