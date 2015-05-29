@@ -338,12 +338,6 @@ ifeq ($(strip $(NUMA_AFFINITY)), yes)
 endif
 
 ifeq ($(strip $(BUILD_CONTRACT)), yes)
-  LOOPVV_TEST=vvTrickLoops
-  LOOPVV_TUNE=tuneOneEndTrick
-  LOOPTD_TEST=tDilutionLoops
-  LPTDHP_TEST=tDilHPELoops
-  LOOPCV_TEST=loopsPlain
-  LOOPHP_TEST=loopsHPE
   NVCCOPT += -DGPU_CONTRACT
   COPT += -DGPU_CONTRACT
 endif
