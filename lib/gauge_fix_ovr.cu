@@ -300,9 +300,9 @@ namespace quda {
 
 
 
-  /* 
-  \brief container to pass parameters for the gauge fixing quality kernel
-  */
+  /**
+   * @brief container to pass parameters for the gauge fixing quality kernel
+   */
   template <typename Gauge>
   struct GaugeFixQualityArg {
     int threads; // number of active threads required
@@ -337,9 +337,9 @@ namespace quda {
   };
 
 
-  /* 
-  \brief Measure gauge fixing quality
-  */
+  /**
+   * @brief Measure gauge fixing quality
+   */
   template<int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix_quality(GaugeFixQualityArg<Gauge> argQ){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -403,9 +403,9 @@ namespace quda {
   }
 
 
-  /*
-  \brief Tunable object for the gauge fixing quality kernel
-  */
+  /**
+   * @brief Tunable object for the gauge fixing quality kernel
+   */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixQuality : Tunable {
     GaugeFixQualityArg<Gauge> argQ;
@@ -484,9 +484,9 @@ namespace quda {
   };
 
 
-  /*
-  \brief container to pass parameters for the gauge fixing kernel
-  */
+  /**
+   * @brief container to pass parameters for the gauge fixing kernel
+   */
   template <typename Float, typename Gauge>
   struct GaugeFixArg {
     int threads; // number of active threads required
@@ -514,9 +514,9 @@ namespace quda {
 
 
 
-  /*
-  \brief Kernel to perform gauge fixing with overrelaxation for single-GPU  
-  */
+  /**
+   * @brief Kernel to perform gauge fixing with overrelaxation for single-GPU  
+   */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity){
     int tid = (threadIdx.x + blockSize) % blockSize;
@@ -609,9 +609,9 @@ namespace quda {
 
 
 
-  /*
-  \brief Tunable object for the gauge fixing kernel
-  */
+  /**
+   * @brief Tunable object for the gauge fixing kernel
+   */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFix : Tunable {
     GaugeFixArg<Float, Gauge> arg;
@@ -805,9 +805,9 @@ namespace quda {
 
 
 
-  /*
-  \brief Kernel to perform gauge fixing with overrelaxation in the interior points for multi-GPU implementation
-  */
+  /**
+   * @brief Kernel to perform gauge fixing with overrelaxation in the interior points for multi-GPU implementation
+   */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFixInteriorPoints(GaugeFixInteriorPointsArg<Float, Gauge> arg, int parity){
     int tid = (threadIdx.x + blockSize) % blockSize;
@@ -892,9 +892,9 @@ namespace quda {
 
 
 
-  /*
-  \brief Tunable object for the interior points of the gauge fixing kernel in multi-GPU implementation
-  */
+  /**
+   * @brief Tunable object for the interior points of the gauge fixing kernel in multi-GPU implementation
+   */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixInteriorPoints : Tunable {
     GaugeFixInteriorPointsArg<Float, Gauge> arg;
@@ -1105,8 +1105,8 @@ namespace quda {
     }
   };
 
-  /*
-  \brief Kernel to perform gauge fixing with overrelaxation in the border points for multi-GPU implementation
+  /**
+   * @brief Kernel to perform gauge fixing with overrelaxation in the border points for multi-GPU implementation
   */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFixBorderPoints(GaugeFixBorderPointsArg<Float, Gauge> arg, int parity){
@@ -1175,9 +1175,9 @@ namespace quda {
 
 
 
-  /*
-  \brief Tunable object for the border points of the gauge fixing kernel in multi-GPU implementation
-  */
+  /**
+   * @brief Tunable object for the border points of the gauge fixing kernel in multi-GPU implementation
+   */
   template<typename Float, typename Gauge, int gauge_dir>
   class GaugeFixBorderPoints : Tunable {
     GaugeFixBorderPointsArg<Float, Gauge> arg;
@@ -1894,15 +1894,15 @@ namespace quda {
     profileGaugeFix.Stop(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
       double secs = profileGaugeFix.Last(QUDA_PROFILE_COMPUTE);
-      double gflops = (flop * 1e-9) / (secs);
-      double gbytes = byte / (secs * 1e9);
-      #ifdef MULTI_GPU
-      printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
-      #else
-      printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
-      #endif
-      printfQuda("Reunitarization flops and bandwidth not accounted!!!!!!\n");
-    }
+	  double gflops = (flop * 1e-9) / (secs);
+	  double gbytes = byte / (secs * 1e9);
+	  #ifdef MULTI_GPU
+	  printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops * comm_size(), gbytes * comm_size());
+	  #else
+	  printfQuda("Time: %6.6f s, Gflop/s = %6.1f, GB/s = %6.1f\n", secs, gflops, gbytes);
+	  #endif
+	  printfQuda("Reunitarization flops and bandwidth not accounted!!!!!!\n");
+	}
   }
 
   template<typename Float, int NElems, typename Gauge>
@@ -1969,18 +1969,17 @@ namespace quda {
 #endif // GPU_GAUGE_ALG
 
 
-
-  /*
-  \brief Gauge fixing with overrelaxation with support for single and multi GPU.
-  \param[in,out] data, quda gauge field
-  \param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
-  \param[in] Nsteps, maximum number of steps to perform gauge fixing
-  \param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
-  \param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-  \param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
-  \param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
-  \param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
-  */
+  /**
+   * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
+   * @param[in,out] data, quda gauge field
+   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
+   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
+   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
+   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   */
   void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir,
                        const unsigned int Nsteps, const unsigned int verbose_interval, const double relax_boost,
                        const double tolerance, const unsigned int reunit_interval, const unsigned int stopWtheta) {
