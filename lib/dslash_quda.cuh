@@ -381,7 +381,7 @@
 
     virtual void preTune()
     {
-      if (dslashParam.kernel_type < 5) { // exterior kernel
+      if ((dslashParam.kernel_type < 5) || (dslashParam.kernel_type == 6)) { // exterior kernel
 	saveOut = new char[out->Bytes()];
 	cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
 	if (out->Precision() == QUDA_HALF_PRECISION) {
@@ -393,7 +393,7 @@
     
     virtual void postTune()
     {
-      if (dslashParam.kernel_type < 5) { // exterior kernel
+      if ((dslashParam.kernel_type < 5) || (dslashParam.kernel_type == 6)) { // exterior kernel
 	cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
 	delete[] saveOut;
 	if (out->Precision() == QUDA_HALF_PRECISION) {
