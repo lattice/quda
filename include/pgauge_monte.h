@@ -10,19 +10,57 @@
 
 namespace quda {
   
-  double2 Plaquette( cudaGaugeField& data) ;
+  /** @brief Calculate the plaquette
+   *
+   * @param[in] data Gauge field
+   * @returns double2 .x stores the space-space plaquette value and .y stores the space-time plaquette value
+   */
+  double2 Plaquette( cudaGaugeField& data);
+
+  /** @brief Perform heatbath and overrelaxation. Performs nhb heatbath steps followed by nover overrelaxation steps.
+   *
+   * @param[in,out] data Gauge field
+   * @param[in,out] rngstate state of the CURAND random number generator
+   * @param[in] Beta inverse of the gauge coupling, beta = 2 Nc / g_0^2
+   * @param[in] nhb number of heatbath steps
+   * @param[in] nover number of overrelaxation steps
+   */
   void Monte( cudaGaugeField& data, cuRNGState *rngstate, double Beta, unsigned int nhb, unsigned int nover);
+
+  /** @brief Perform a cold start to the gauge field, identity SU(3) matrix, also fills the ghost links in multi-GPU case (no need to exchange data)
+   *
+   * @param[in,out] data Gauge field
+   */
   void InitGaugeField( cudaGaugeField& data);
+
+  /** @brief Perform a hot start to the gauge field, random SU(3) matrix, followed by reunitarization, also exchange borders links in multi-GPU case.
+   *
+   * @param[in,out] data Gauge field
+   * @param[in,out] rngstate state of the CURAND random number generator
+   */
   void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate);
 
+  /** @brief Perform heatbath and overrelaxation. Performs nhb heatbath steps followed by nover overrelaxation steps.
+   *
+   * @param[in,out] data Gauge field
+   * @param[in,out] rngstate state of the CURAND random number generator
+   * @param[in] Beta inverse of the gauge coupling, beta = 2 Nc / g_0^2
+   * @param[in] nhb number of heatbath steps
+   * @param[in] nover number of overrelaxation steps
+   */
+  void PGaugeExchange( cudaGaugeField& data, const int dir, const int parity);
   /*Exchange "borders" between nodes
   int R[4] = {0,0,0,0};
   for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
   Although the radius border is 2, it only updates the interior radius border, i.e., at 1 and X[d-2]
   where X[d] already includes the Radius border, and don't update at 0 and X[d-1] faces  */
-  void PGaugeExchange( cudaGaugeField& data, const int dir, const int parity);
+
+
+  /**
+   * @brief Release all allocated memory used to exchange data between nodes
+   */
   void PGaugeExchangeFree();
 
 }
 
-#endif 
+#endif
