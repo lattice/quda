@@ -110,40 +110,47 @@ process_core_string_list(const char* _str, int* list, int* ncores)
 static int 
 getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
 {
-  FILE *nvidia_info, *pci_bus_info;
+//  FILE *nvidia_info,
+  FILE *pci_bus_info;
   size_t nbytes = 255;
   char *my_line;
-  char nvidia_info_path[255], pci_bus_info_path[255];
-  char bus_info[255];
-  
+//  char nvidia_info_path[255];
+  char pci_bus_info_path[255];
+//  char bus_info[255];
+  char pcibusid[13];
+  cudaDeviceGetPCIBusId(pcibusid,13,my_gpu);
+//  std::cout << "PCI id "<< pcibusid << std::endl;
+
   // the nvidia driver populates this path for each gpu
-  sprintf(nvidia_info_path,"/proc/driver/nvidia/gpus/%d/information", my_gpu);
-  nvidia_info= fopen(nvidia_info_path,"r");
-  if (nvidia_info == NULL){
-    return -1;
-  }
+//  sprintf(nvidia_info_path,"/proc/driver/nvidia/gpus/%d/information", my_gpu);
+//  nvidia_info= fopen(nvidia_info_path,"r");
+//  if (nvidia_info == NULL){
+//    return -1;
+//  }
   
   my_line= (char *) safe_malloc(nbytes +1);
   
-  while (!feof(nvidia_info)){
-    if ( -1 == getline(&my_line, &nbytes, nvidia_info)){
-      break;
-    }else{
-      // the first 7 char of the Bus Location will lead to the corresponding
-      // path under /sys/class/pci_bus/  , cpulistaffinity showing cores on that
-      // bus is located there
-      if ( 1 == sscanf(my_line,"Bus Location: %s", bus_info )){
-	sprintf(pci_bus_info_path,"/sys/class/pci_bus/%.7s/cpulistaffinity",
-		bus_info);
-      }
-    }
-  }
+//  while (!feof(nvidia_info)){
+//    if ( -1 == getline(&my_line, &nbytes, nvidia_info)){
+//      break;
+//    }else{
+//      // the first 7 char of the Bus Location will lead to the corresponding
+//      // path under /sys/class/pci_bus/  , cpulistaffinity showing cores on that
+//      // bus is located there
+//      if ( 1 == sscanf(my_line,"Bus Location: %s", pcibusid )){
+//	sprintf(pci_bus_info_path,"/sys/class/pci_bus/%.7s/cpulistaffinity",
+//		bus_info);
+//      }
+//    }
+//  }
+//  std::cout << "sys path " << pci_bus_info_path << std::endl;
   // open the cpulistaffinity file on the pci_bus for "my_gpu"
+  sprintf(pci_bus_info_path,"/sys/class/pci_bus/%.7s/cpulistaffinity",pcibusid);
   pci_bus_info= fopen(pci_bus_info_path,"r");
   if (pci_bus_info == NULL){
     //printfQuda("Warning: opening file %s failed\n", pci_bus_info_path);
     host_free(my_line);
-    fclose(nvidia_info);
+//    fclose(nvidia_info);
     return -1;
   }
   
@@ -155,7 +162,7 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
       if(rc < 0){
 	warningQuda("Failed to process the line \"%s\"", my_line);
 	host_free(my_line);
-	fclose(nvidia_info);
+//	fclose(nvidia_info);
 	return  -1;
       }
     }
