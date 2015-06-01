@@ -20,7 +20,7 @@ namespace quda {
 
 
   /**
-   * @brief Gauge fixing with Steepest descent method with FFTs with support for single and multi GPU.
+   * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
