@@ -76,9 +76,9 @@ namespace quda {
     }
   }
 
-  /* 
-  \brief Pre-calculate lattice border points used by the gauge fixing with overrelaxation in multi-GPU implementation
-  */
+  /**
+  * @brief Pre-calculate lattice border points used by the gauge fixing with overrelaxation in multi-GPU implementation
+   */
   void PreCalculateLatticeIndices(size_t faceVolume[4], size_t faceVolumeCB[4], int X[4], int border[4], \
                                   int &threads, int *borderpoints[2]){
     BorderIdArg arg(X, border);
