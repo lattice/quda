@@ -465,13 +465,15 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 #if __COMPUTE_CAPABILITY__ >= 200
       const int hasPhase; 
       const size_t phaseOffset;
+      void *backup_h; //! host memory for backing up the field when tuning
+      size_t bytes;
 #endif
 
     FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
       reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry())
 #if __COMPUTE_CAPABILITY__ >= 200
 	, hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), 
-	phaseOffset(u.PhaseOffset())
+	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
 #endif
       {
 	if (gauge_) { gauge = gauge_; offset = u.Bytes()/(2*sizeof(Float));
@@ -487,7 +489,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
     : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), 
 	geometry(order.geometry) 
 #if __COMPUTE_CAPABILITY__ >= 200
-	, hasPhase(order.hasPhase), phaseOffset(order.phaseOffset) 
+	, hasPhase(order.hasPhase), phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
 #endif
       {
 	gauge = order.gauge;
@@ -643,6 +645,30 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	  copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) + R[dim]*faceVolumeCB[dim]*M*N + buff_idx], 
 	       static_cast<RegType>(phase/(2.*M_PI)));
 	}
+      }
+
+      /**
+	 used to backup the field to the host when tuning
+      */
+      void save() {
+#if __COMPUTE_CAPABILITY__ >= 200
+	if (backup_h) errorQuda("Already allocated host backup");
+	backup_h = safe_malloc(bytes);
+	cudaMemcpy(backup_h, gauge[0], bytes, cudaMemcpyDeviceToHost);
+	checkCudaError();
+#endif
+      }
+      
+      /**
+	 restore the field from the host after tuning
+      */
+      void load() {
+#if __COMPUTE_CAPABILITY__ >= 200
+	cudaMemcpy(gauge[0], backup_h, bytes, cudaMemcpyHostToDevice);
+	host_free(backup_h);
+	backup_h = 0;
+	checkCudaError();
+#endif
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }

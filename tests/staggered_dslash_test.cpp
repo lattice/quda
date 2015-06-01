@@ -423,10 +423,10 @@ TEST(dslash, verify) {
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-static int dslashTest(int argc, char **argv) 
+static int dslashTest()
 {
-  int accuracy_level = 0;
-
+  // return code for google test
+  int test_rc = 0;
   init();
 
   int attempts = 1;
@@ -469,15 +469,15 @@ static int dslashTest(int argc, char **argv)
     } else {
       printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
-  
+
     if (verify_results) {
-      ::testing::InitGoogleTest(&argc, argv);
-      if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+      test_rc = RUN_ALL_TESTS();
+      if (test_rc != 0) warningQuda("Tests failed");
     }
   }
   end();
 
-  return accuracy_level;
+  return test_rc;
 }
 
 
@@ -513,7 +513,8 @@ usage_extra(char** argv )
 
 int main(int argc, char **argv) 
 {
-
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
   int i;
   for (i =1;i < argc; i++){
 
@@ -529,15 +530,11 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  int ret =1;
-  int accuracy_level = dslashTest(argc, argv);
-
-  printfQuda("accuracy_level =%d\n", accuracy_level);
-
-  if (accuracy_level >= 1) ret = 0;    //probably no error, -1 means no matching  
+  // return result of RUN_ALL_TESTS
+  int test_rc = dslashTest();
 
   finalizeComms();
 
-  return ret;
+  return test_rc;
 }
 

@@ -194,19 +194,16 @@ LIB += -lpthread
 ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
   NVCCOPT += -DGPU_WILSON_DIRAC
   COPT += -DGPU_WILSON_DIRAC
-  DIRAC_TEST = dslash_test invert_test
 endif
 
 ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
   NVCCOPT += -DGPU_DOMAIN_WALL_DIRAC
   COPT += -DGPU_DOMAIN_WALL_DIRAC
-  DIRAC_TEST = dslash_test invert_test
 endif
 
 ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
   NVCCOPT += -DGPU_STAGGERED_DIRAC
   COPT += -DGPU_STAGGERED_DIRAC
-  STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
 endif
 
 ifeq ($(strip $(BUILD_CLOVER_DIRAC)), yes)
@@ -232,16 +229,13 @@ endif
 ifeq ($(strip $(BUILD_FATLINK)), yes)
   NVCCOPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
   COPT += -DGPU_FATLINK -DGPU_GAUGE_TOOLS
-  FATLINK_TEST=llfat_test
 endif
 
 ifeq ($(strip $(BUILD_HISQLINK)), yes)
   ifneq ($(strip $(BUILD_FATLINK)), yes) 
     NVCCOPT += -DGPU_FATLINK 
     COPT    += -DGPU_FATLINK
-    FATLINK_TEST=llfat_test
   endif
-  UNITARIZE_LINK_TEST=unitarize_link_test
   NVCCOPT += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
   COPT    += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
 endif
@@ -249,20 +243,16 @@ endif
 ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
   NVCCOPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
   COPT += -DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS
-  GAUGE_FORCE_TEST=gauge_force_test
 endif
 
 ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
   NVCCOPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
   COPT += -DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS
-  FERMION_FORCE_TEST=fermion_force_test
 endif
 
 ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   NVCCOPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
   COPT += -DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS
-  HISQ_PATHS_FORCE_TEST=hisq_paths_force_test
-  HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
 endif
 
 ifeq ($(strip $(BUILD_GAUGE_TOOLS)), yes)
@@ -356,12 +346,6 @@ ifeq ($(strip $(NUMA_AFFINITY)), yes)
 endif
 
 ifeq ($(strip $(BUILD_CONTRACT)), yes)
-  LOOPVV_TEST=vvTrickLoops
-  LOOPVV_TUNE=tuneOneEndTrick
-  LOOPTD_TEST=tDilutionLoops
-  LPTDHP_TEST=tDilHPELoops
-  LOOPCV_TEST=loopsPlain
-  LOOPHP_TEST=loopsHPE
   NVCCOPT += -DGPU_CONTRACT
   COPT += -DGPU_CONTRACT
 endif
