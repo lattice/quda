@@ -187,6 +187,9 @@ namespace quda {
 
 
 
+  /**
+   * @brief Release all allocated memory used to exchange data between nodes
+   */
   void PGaugeExchangeFree(){
 #ifdef MULTI_GPU
     if ( comm_size() > 1 ) {
