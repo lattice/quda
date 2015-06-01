@@ -26,11 +26,11 @@ namespace quda {
     }
   };
 
-  /*
-    Retrieve the SU(N) indices for the current block number
-      \param[in] block, current block number, from 0 to (NCOLORS * (NCOLORS - 1) / 2)
-      \param[out] p, row index pointing to the SU(N) matrix 
-      \param[out] q, column index pointing to the SU(N) matrix
+  /**
+   * Retrieve the SU(N) indices for the current block number
+   * @param[in] block, current block number, from 0 to (NCOLORS * (NCOLORS - 1) / 2)
+   * @param[out] p, row index pointing to the SU(N) matrix 
+   * @param[out] q, column index pointing to the SU(N) matrix
   */
   template<int NCOLORS>
   static __host__ __device__ inline void   IndexBlock(int block, int &p, int &q){
@@ -88,11 +88,11 @@ namespace quda {
 #endif /* !__CUDA_ARCH__ || __CUDA_ARCH__ >= 200 */
 
 
-  /*
-    Device function to perform gauge fixing with overrelxation.
-    Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-    This implementation needs 8x more shared memory than the implementation using atomicadd 
-  */
+  /**
+   * Device function to perform gauge fixing with overrelxation.
+   * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * This implementation needs 8x more shared memory than the implementation using atomicadd 
+   */
   template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
 
@@ -179,10 +179,10 @@ namespace quda {
 
 
 
-  /*
-    Device function to perform gauge fixing with overrelxation.
-    Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
-  */
+  /**
+   * Device function to perform gauge fixing with overrelxation.
+   * Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
+   */
   template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
 
@@ -273,11 +273,11 @@ namespace quda {
 
 
 
-  /*
-    Device function to perform gauge fixing with overrelxation.
-    Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-    This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-  */
+  /**
+   * Device function to perform gauge fixing with overrelxation.
+   * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
+   */
   template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<Float2,NCOLORS> &link, const Float relax_boost, const int tid){
 
@@ -411,11 +411,11 @@ namespace quda {
 
 
 
-  /*
-    Device function to perform gauge fixing with overrelxation.
-    Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-    This implementation needs 8x more shared memory than the implementation using atomicadd 
-  */
+  /**
+   * Device function to perform gauge fixing with overrelxation.
+   * Uses 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * This implementation needs 8x more shared memory than the implementation using atomicadd 
+   */
   template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_AtomicAdd(Matrix<Float2,NCOLORS> &link, Matrix<Float2,NCOLORS> &link1, const Float relax_boost, const int tid){
 
@@ -505,10 +505,10 @@ namespace quda {
 
 
 
-  /*
-    Device function to perform gauge fixing with overrelxation.
-    Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
-  */
+  /**
+   * Device function to perform gauge fixing with overrelxation.
+   * Uses 4 treads per lattice site, the reduction is performed by shared memory using atomicadd.
+   */
   template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd(Matrix<Float2,NCOLORS> &link, Matrix<Float2,NCOLORS> &link1, const Float relax_boost, const int tid){
 
@@ -580,11 +580,11 @@ namespace quda {
 
 
 
-  /*
-    Device function to perform gauge fixing with overrelxation.
-    Uses 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-    This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
-  */
+  /**
+   * Device function to perform gauge fixing with overrelxation.
+   * Uses 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+   * This implementation uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
+   */
   template<int blockSize, typename Float2, typename Float, int gauge_dir, int NCOLORS>
   __forceinline__ __device__ void GaugeFixHit_NoAtomicAdd_LessSM(Matrix<Float2,NCOLORS> &link, Matrix<Float2,NCOLORS> &link1, const Float relax_boost, const int tid){
 
