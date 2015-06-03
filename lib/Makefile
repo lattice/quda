@@ -179,6 +179,9 @@ gen:
 	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
 	$(PYTHON) generate/fused_exterior_dw_dslash_4D_cuda_gen.py
 
+mpi_nvtx:
+	$(PYTHON) generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
+
 clean:
 	-rm -f *.o $(QUDA)
 

@@ -880,7 +880,10 @@ TEST(dslash, verify) {
 
 int main(int argc, char **argv)
 {
-
+  // initalize google test, includes command line options
+  ::testing::InitGoogleTest(&argc, argv);
+  // return code for google test
+  int test_rc = 0;
   for (int i =1;i < argc; i++){    
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;
@@ -940,13 +943,14 @@ int main(int argc, char **argv)
     } else {
       printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
-  
+
     if (verify_results) {
-      ::testing::InitGoogleTest(&argc, argv);
-      if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+      test_rc = RUN_ALL_TESTS();
+      if (test_rc != 0) warningQuda("Tests failed");
     }
   }    
   end();
 
   finalizeComms();
+  return test_rc;
 }

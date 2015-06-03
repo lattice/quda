@@ -7,6 +7,43 @@ INC += -I../include -I.
 HDRS = blas_reference.h wilson_dslash_reference.h staggered_dslash_reference.h    \
 	domain_wall_dslash_reference.h test_util.h dslash_util.h
 
+ifeq ($(strip $(BUILD_WILSON_DIRAC)), yes)
+  DIRAC_TEST = dslash_test invert_test
+endif
+
+ifeq ($(strip $(BUILD_DOMAIN_WALL_DIRAC)), yes)
+  DIRAC_TEST = dslash_test invert_test
+endif
+
+ifeq ($(strip $(BUILD_STAGGERED_DIRAC)), yes)
+  STAGGERED_DIRAC_TEST=staggered_dslash_test staggered_invert_test
+endif
+
+ifeq ($(strip $(BUILD_FATLINK)), yes)
+  FATLINK_TEST=llfat_test
+endif
+
+ifeq ($(strip $(BUILD_HISQLINK)), yes)
+  ifneq ($(strip $(BUILD_FATLINK)), yes) 
+    FATLINK_TEST=llfat_test
+  endif
+  UNITARIZE_LINK_TEST=unitarize_link_test
+endif
+
+ifeq ($(strip $(BUILD_GAUGE_FORCE)), yes)
+  GAUGE_FORCE_TEST=gauge_force_test
+endif
+
+ifeq ($(strip $(BUILD_FERMION_FORCE)), yes)
+  FERMION_FORCE_TEST=fermion_force_test
+endif
+
+ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
+  HISQ_PATHS_FORCE_TEST=hisq_paths_force_test
+  HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
+endif
+
+
 TESTS = su3_test pack_test blas_test dslash_test invert_test	\
 	deflation_test						\
 	$(DIRAC_TEST) $(STAGGERED_DIRAC_TEST) $(FATLINK_TEST)	\
