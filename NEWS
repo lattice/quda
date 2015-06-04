@@ -17,6 +17,12 @@ Version 0.7.1 - xxth June 2015
   systems, and added much more robust memory checking of message memory when
   host debugging is enabled.
 
+- Multi-GPU dslash now correctly report flops and bandwidth when
+  autotuning.
+
+- Fixed a bug where by the 5-d domain wall dslash was called twice
+  every time it was called.
+
 - Fixed a bug when using both improved staggered fermions and naive
   staggered fermions with auto-tuning enabled.
 
