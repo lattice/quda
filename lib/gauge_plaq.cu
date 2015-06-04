@@ -149,11 +149,11 @@ namespace quda {
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
+          ((double *) arg.plaq_h)[0]    = 0.;
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	  LAUNCH_KERNEL(computePlaq, tp, stream, arg, Float, Gauge);
 
-//	  cudaMemcpy(arg.plaq_h, arg.plaq, sizeof(double), cudaMemcpyDeviceToHost); 
 	  cudaDeviceSynchronize();
 
 	  #ifdef MULTI_GPU
