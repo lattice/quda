@@ -924,16 +924,7 @@ int main(int argc, char **argv)
     //FIXME No flops count for twisted-clover yet
     unsigned long long flops = 0;
     if (!transfer) flops = dirac->Flops();
-    int spinor_floats = test_type ? 2*(7*24+24)+24 : 7*24+24;
-    if (inv_param.cuda_prec == QUDA_HALF_PRECISION) 
-      spinor_floats += test_type ? 2*(7*2 + 2) + 2 : 7*2 + 2; // relative size of norm is twice a short
-    int gauge_floats = (test_type ? 2 : 1) * (gauge_param.gauge_fix ? 6 : 8) * gauge_param.reconstruct;
-    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
-      gauge_floats += test_type ? 72*2 : 72;
-    }
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GB/s = %f\n\n", 
-	       (double)Vh*(Ls*spinor_floats+gauge_floats)*inv_param.cuda_prec/((secs/niter)*1e+9));
     
     double norm2_cpu = norm2(*spinorRef);
     double norm2_cpu_cuda= norm2(*spinorOut);
