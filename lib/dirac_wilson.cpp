@@ -49,7 +49,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim, profile);
+    wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim, profile, QUDA_FUSED_DSLASH);
 
     flops += 1320ll*in.Volume();
   }
