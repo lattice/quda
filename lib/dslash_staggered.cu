@@ -105,12 +105,6 @@ namespace quda {
     }
 
     int Nface() { return 2; } 
-
-    long long flops() const { 
-      long long flops;
-      flops = (x ? 666ll : 654ll) * in->VolumeCB();
-      return flops;
-    } 
   };
 #endif // GPU_STAGGERED_DIRAC
 
