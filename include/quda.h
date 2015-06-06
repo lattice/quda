@@ -731,8 +731,18 @@ extern "C" {
                       const void* const u_link,
                       const QudaGaugeParam* param);
 
-  void performAPEnStep(unsigned int nSteps, double alpha);
+  /**
+   * Computes the plaquette of the loaded gauge configuration.
+   */
   double plaqCuda();
+
+  /**
+   * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param alpha  Alpha coefficient for APE smearing.
+   */
+  void performAPEnStep(unsigned int nSteps, double alpha);
+
   /**
   * Open/Close MAGMA library
   *
@@ -740,7 +750,6 @@ extern "C" {
   void openMagma();
 
   void closeMagma();
-
 
 #ifdef __cplusplus
 }

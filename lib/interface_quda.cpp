@@ -72,6 +72,10 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #include <gauge_tools.h>
 
+#ifdef GPU_CONTRACT
+#include <contractQuda.h>
+#endif
+
 int numa_affinity_enabled = 1;
 
 using namespace quda;
@@ -1124,6 +1128,7 @@ void endQuda(void)
     profileHISQForce.Print();
     profileContract.Print();
     profileCovDev.Print();
+    profileAPE.Print();
     profileEnd.Print();
 
     printLaunchTimer();
@@ -5315,7 +5320,9 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  printfQuda("Plaquette after 0 APE steps: %le\n", plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Plaquette after 0 APE steps: %le\n", plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  }
 
   for (unsigned int i=0; i<nSteps; i++) {
     #ifdef MULTI_GPU
@@ -5335,9 +5342,37 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     gaugeSmeared->exchangeExtendedGhost(R,true);
   #endif
 
-  printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() >= QUDA_VERBOSE) {
+    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  }
 
   profileAPE.Stop(QUDA_PROFILE_TOTAL);
 }
 
-//#include"contractions.cpp"	Contraction interface, to be added soon
+void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType)
+{
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    contractCuda(x.Even(), y.Even(), ((double2*)ctrn), cType, QUDA_EVEN_PARITY, profileContract);
+    contractCuda(x.Odd(),  y.Odd(),  ((double2*)ctrn), cType, QUDA_ODD_PARITY,  profileContract);
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    contractCuda(x.Even(), y.Even(), ((float2*) ctrn), cType, QUDA_EVEN_PARITY, profileContract);
+    contractCuda(x.Odd(),  y.Odd(),  ((float2*) ctrn), cType, QUDA_ODD_PARITY,  profileContract);
+  } else {
+    errorQuda("Precision not supported for contractions\n");
+  }
+}
+
+void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType, const int tC)
+{
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+    contractCuda(x.Even(), y.Even(), ((double2*)ctrn), cType, tC, QUDA_EVEN_PARITY, profileContract);
+    contractCuda(x.Odd(),  y.Odd(),  ((double2*)ctrn), cType, tC, QUDA_ODD_PARITY,  profileContract);
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+    contractCuda(x.Even(), y.Even(), ((float2*) ctrn), cType, tC, QUDA_EVEN_PARITY, profileContract);
+    contractCuda(x.Odd(),  y.Odd(),  ((float2*) ctrn), cType, tC, QUDA_ODD_PARITY,  profileContract);
+  } else {
+    errorQuda("Precision not supported for contractions\n");
+  }
+}
+
+//#include"contractions.cpp"	// Contraction interface, to be added soon

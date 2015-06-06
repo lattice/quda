@@ -546,6 +546,4 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
 
 } // namespace quda
 
-#ifdef GPU_CONTRACT
 #include "contract.cu"
-#endif
