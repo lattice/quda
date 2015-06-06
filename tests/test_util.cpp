@@ -55,7 +55,13 @@ void initComms(int argc, char **argv, const int *commDims)
   QMP_declare_logical_topology(commDims, 4);
 
 #elif defined(MPI_COMMS)
+#ifdef PTHREADS
+  int provided;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+#else
   MPI_Init(&argc, &argv);
+#endif
+
 #endif
   initCommsGridQuda(4, commDims, NULL, NULL);
   initRand();
