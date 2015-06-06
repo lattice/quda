@@ -108,7 +108,61 @@ namespace quda {
 	     (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
     }
 
-    long long flops() const { return (x ? 1872ll : 1824ll) * in->VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const {
+      int clover_flops = 504;
+      long long flops = DslashCuda::flops();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	flops += clover_flops * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	flops += clover_flops * 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	break;
+      case INTERIOR_KERNEL:
+	flops += clover_flops * in->VolumeCB();	  
+
+	// now correct for flops done by exterior kernel
+	long long ghost_sites = 0;
+	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
+	flops -= clover_flops * ghost_sites;
+	
+	break;
+      }
+      return flops;
+    }
+
+    long long bytes() const {
+      bool isHalf = in->Precision() == sizeof(short) ? true : false;
+      int clover_bytes = 72 * in->Precision() + (isHalf ? 2*sizeof(float) : 0);
+
+      long long bytes = DslashCuda::bytes();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	bytes += clover_bytes * 2 * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	bytes += clover_bytes * 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	break;
+      case INTERIOR_KERNEL:
+	bytes += clover_bytes*in->VolumeCB();
+
+	// now correct for bytes done by exterior kernel
+	long long ghost_sites = 0;
+	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
+	bytes -= clover_bytes * ghost_sites;
+	
+	break;
+      }
+
+      return bytes;
+    }
+
   };
 #endif // GPU_CLOVER_DIRAC
 

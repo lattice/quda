@@ -12,7 +12,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	clover_field.o lattice_field.o gauge_field.o			\
 	cpu_gauge_field.o cuda_gauge_field.o extract_gauge_ghost.o	\
 	max_gauge.o gauge_update_quda.o dirac_clover.o dirac_wilson.o	\
-	dirac_staggered.o dirac_improved_staggered.o			\
+	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
 	fat_force_quda.o llfat_quda_itf.o llfat_quda.o			\
@@ -178,6 +178,9 @@ gen:
 	$(PYTHON) generate/fused_exterior_deg_tmc_dslash_cuda_gen.py
 	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
 	$(PYTHON) generate/fused_exterior_dw_dslash_4D_cuda_gen.py
+
+mpi_nvtx:
+	$(PYTHON) generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
 
 clean:
 	-rm -f *.o $(QUDA)

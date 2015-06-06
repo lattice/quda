@@ -423,10 +423,10 @@ TEST(dslash, verify) {
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
 }
 
-static int dslashTest(int argc, char **argv) 
+static int dslashTest()
 {
-  int accuracy_level = 0;
-
+  // return code for google test
+  int test_rc = 0;
   init();
 
   int attempts = 1;
@@ -439,6 +439,10 @@ static int dslashTest(int argc, char **argv)
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...", loops);	
+
+    // reset flop counter
+    dirac->Flops();
+
     double secs = dslashCUDA(loops);
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
@@ -447,19 +451,7 @@ static int dslashTest(int argc, char **argv)
     staggeredDslashRef();
 
     unsigned long long flops = dirac->Flops();
-    int link_floats = 8*gaugeParam.reconstruct+8*18;
-    int spinor_floats = 8*6*2 + 6;
-    int link_float_size = prec;
-    int spinor_float_size = 0;
-
-    link_floats = test_type ? (2*link_floats) : link_floats;
-    spinor_floats = test_type ? (2*spinor_floats) : spinor_floats;
-
-    int bytes_for_one_site = link_floats * link_float_size + spinor_floats * spinor_float_size;
-    if (prec == QUDA_HALF_PRECISION) bytes_for_one_site += (8*2 + 1)*4;	
-
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*1e+9));
 
     double norm2_cpu = norm2(*spinorRef);
     double norm2_cpu_cuda= norm2(*spinorOut);
@@ -469,15 +461,15 @@ static int dslashTest(int argc, char **argv)
     } else {
       printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
     }
-  
+
     if (verify_results) {
-      ::testing::InitGoogleTest(&argc, argv);
-      if (RUN_ALL_TESTS() != 0) warningQuda("Tests failed");
+      test_rc = RUN_ALL_TESTS();
+      if (test_rc != 0) warningQuda("Tests failed");
     }
   }
   end();
 
-  return accuracy_level;
+  return test_rc;
 }
 
 
@@ -513,7 +505,8 @@ usage_extra(char** argv )
 
 int main(int argc, char **argv) 
 {
-
+  // initalize google test
+  ::testing::InitGoogleTest(&argc, argv);
   int i;
   for (i =1;i < argc; i++){
 
@@ -529,15 +522,11 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  int ret =1;
-  int accuracy_level = dslashTest(argc, argv);
-
-  printfQuda("accuracy_level =%d\n", accuracy_level);
-
-  if (accuracy_level >= 1) ret = 0;    //probably no error, -1 means no matching  
+  // return result of RUN_ALL_TESTS
+  int test_rc = dslashTest();
 
   finalizeComms();
 
-  return ret;
+  return test_rc;
 }
 

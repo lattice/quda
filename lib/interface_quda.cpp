@@ -72,9 +72,13 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 
 #include <gauge_tools.h>
 
+<<<<<<< HEAD
 #ifdef GPU_CONTRACT
 #include <contractQuda.h>
 #endif
+=======
+#include <contractQuda.h>
+>>>>>>> origin/feature/contractions
 
 int numa_affinity_enabled = 1;
 
@@ -385,12 +389,6 @@ void initQudaDevice(int dev) {
   }
 #endif
 
-  // if the device supports host-mapped memory, then enable this
-#ifndef USE_QDPJIT
-  if(deviceProp.canMapHostMemory) cudaSetDeviceFlags(cudaDeviceMapHost);
-  checkCudaError();
-#endif
-
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   cudaGetDeviceProperties(&deviceProp, dev);
@@ -687,7 +685,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   if (!initialized) errorQuda("QUDA not initialized");
 
   if (!h_clover && !h_clovinv) {
-    printfQuda("clover_coeff: %lf\n", inv_param->clover_coeff);
     if(inv_param->clover_coeff != 0){
       device_calc = true;
     }else{
@@ -3823,7 +3820,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
   profileCloverCreate.Start(QUDA_PROFILE_TOTAL);
   profileCloverCreate.Start(QUDA_PROFILE_INIT);
   if(!cloverPrecise){
-    printfQuda("About to create cloverPrecise\n");
     CloverFieldParam cloverParam;
     cloverParam.nDim = 4;
     for(int dir=0; dir<4; ++dir) cloverParam.x[dir] = gaugePrecise->X()[dir];
@@ -3938,7 +3934,7 @@ void createCloverQuda(QudaInvertParam* invertParam)
   return;
 }
 
-void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
+void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
 {
 
   GaugeFieldParam gParam(0,*param);
@@ -3968,7 +3964,7 @@ void* createGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 }
 
 
-void saveGaugeField(void* gauge, void* inGauge, QudaGaugeParam* param){
+void saveGaugeFieldQuda(void* gauge, void* inGauge, QudaGaugeParam* param){
 
   cudaGaugeField* cudaGauge = reinterpret_cast<cudaGaugeField*>(inGauge);
 
@@ -3986,7 +3982,7 @@ void saveGaugeField(void* gauge, void* inGauge, QudaGaugeParam* param){
 }
 
 
-void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
+void* createExtendedGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
 {
   profileExtendedGauge.Start(QUDA_PROFILE_TOTAL);
 
@@ -4068,7 +4064,7 @@ void* createExtendedGaugeField(void* gauge, int geometry, QudaGaugeParam* param)
 }
 
 // extend field on the GPU
-void extendGaugeField(void* out, void* in){
+void extendGaugeFieldQuda(void* out, void* in){
   cudaGaugeField* inGauge   = reinterpret_cast<cudaGaugeField*>(in);
   cudaGaugeField* outGauge  = reinterpret_cast<cudaGaugeField*>(out);
 
@@ -4082,7 +4078,7 @@ void extendGaugeField(void* out, void* in){
 
 
 
-void destroyQudaGaugeField(void* gauge){
+void destroyGaugeFieldQuda(void* gauge){
   cudaGaugeField* g = reinterpret_cast<cudaGaugeField*>(gauge);
   delete g;
 }
@@ -5349,6 +5345,15 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   profileAPE.Stop(QUDA_PROFILE_TOTAL);
 }
 
+  /**
+   * Compute a volume or time-slice contraction of two spinors.
+   * @param x     Spinor to contract. This is conjugated before contraction.
+   * @param y     Spinor to contract.
+   * @param ctrn  Contraction output. The size must be Volume*16
+   * @param cType Contraction type, allows for volume or time-slice contractions.
+   * @param tC    Time-slice to contract in case the contraction is in a single time-slice.
+   */
+
 void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType)
 {
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -5375,4 +5380,3 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
   }
 }
 
-//#include"contractions.cpp"	// Contraction interface, to be added soon
