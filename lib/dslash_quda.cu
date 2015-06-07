@@ -74,6 +74,12 @@ namespace quda {
 #define NDEGTM_SHARED_FLOATS_PER_THREAD 0
 #endif
 
+#define PROFILE(f, profile, idx)		\
+  profile.Start(idx);				\
+  f;						\
+  profile.Stop(idx); 
+
+
   // these should not be namespaced!!
   // determines whether the temporal ghost zones are packed with a gather kernel,
   // as opposed to multiple calls to cudaMemcpy()
@@ -93,9 +99,6 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-#ifdef PTHREADS
-    cudaEvent_t interiorDslashEnd;
-#endif
     cudaEvent_t packEnd[Nstream];
     cudaEvent_t gatherStart[Nstream];
     cudaEvent_t gatherEnd[Nstream];
@@ -103,6 +106,73 @@ namespace quda {
     cudaEvent_t scatterEnd[Nstream];
     cudaEvent_t dslashStart;
     cudaEvent_t dslashEnd;
+
+#ifdef PTHREADS
+    pthread_t commsThread;
+
+    bool initCommsThread = false;
+    volatile CommsParam *commsParam = NULL;
+    volatile bool sleepCommsThread = true;
+    volatile bool killCommsThread = false;
+
+
+    void *issueComms(void* ignored)
+    {
+      // do we need to set the device in this thread?
+      
+      while (!killCommsThread) {
+
+	if (!sleepCommsThread) {
+	  // launch receives as soon as possible
+	  volatile CommsParam *param = commsParam;
+	  
+	  cudaColorSpinorField *field = param->field;
+	  for(int i=3; i>=0; i--){
+	    if(!param->commDim[i]) continue;
+	    for(int dir=1; dir>=0; dir--){
+	      PROFILE(field->recvStart(param->nFace, 2*i+dir, param->dagger), (*(param->profile)), QUDA_PROFILE_COMMS_START);
+	    }
+	  }
+	  
+	  int total = 0;
+	  for (int i=3; i>=0; i--) { if (param->commDim[i]) total += 2; }
+	  
+	  // now query if gathers have completed and issue sends when ready
+	  int sum = 0;
+	  while (sum < total) {
+	    for(int i=3; i>=0; i--){
+	      if(!param->commDim[i]) continue;
+	      for(int dir=1; dir>=0; dir--){
+		if (!param->gatherCompleted[2*i+dir] && param->gatherCompleted[param->previousDir[2*i+dir]]
+		    && param->gatherEndPosted[2*i+dir]) { 
+		  PROFILE(cudaError_t event_test = cudaEventQuery( param->gatherEnd[2*i+dir]), 
+			  (*(param->profile)), QUDA_PROFILE_EVENT_QUERY);
+		  
+		  if (cudaSuccess == event_test) {
+		    param->gatherCompleted[2*i+dir] = 1;
+		    sum++;
+		    PROFILE(field->sendStart(param->nFace, 2*i+dir, param->dagger), 
+			    (*(param->profile)), QUDA_PROFILE_COMMS_START);
+		    
+		    // need to signal to CUDA thread it's ok to check
+		    param->sendPosted[2*i+dir] = true;
+		  }
+		  
+		}
+	      }
+	    }
+	  }
+
+	  sleepCommsThread = true;
+	} // !sleepCommsThread
+	
+      } // !killCommsThread
+      
+      return NULL;
+    }
+    
+#endif //PTHREADS
+
   }
 
   void createDslashEvents()
@@ -118,11 +188,20 @@ namespace quda {
     }
     cudaEventCreateWithFlags(&dslashStart, cudaEventDisableTiming);
     cudaEventCreateWithFlags(&dslashEnd, cudaEventDisableTiming);
-#ifdef PTHREADS
-    cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
-#endif
 
     checkCudaError();
+
+#ifdef PTHREADS
+    if (!initCommsThread) {
+      if(pthread_create(&commsThread, NULL, issueComms, NULL)) {
+	errorQuda("pthread_create failed");
+      }
+      initCommsThread = true;
+    } else {
+      errorQuda("commsThread should not already be initialized");
+    }
+#endif
+
   }
 
 
@@ -139,8 +218,14 @@ namespace quda {
 
     cudaEventDestroy(dslashStart);
     cudaEventDestroy(dslashEnd);
+
 #ifdef PTHREADS
-    cudaEventDestroy(interiorDslashEnd);
+    if (initCommsThread) {
+      killCommsThread = true; // release thread from its spin wait
+      if(pthread_join(commsThread, NULL)) errorQuda("pthread_join failed"); // reconverge
+    } else {
+      errorQuda("commsThread not initalized");
+    }
 #endif
 
     checkCudaError();

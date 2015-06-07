@@ -4,7 +4,7 @@ static cudaColorSpinorField *inSpinor;
  * Arrays used for the dynamic scheduling.
  */
 struct DslashCommsPattern {
-  int gatherCompleted[Nstream];
+  volatile int gatherCompleted[Nstream];
   int previousDir[Nstream];
   int commsCompleted[Nstream];
   int dslashCompleted[Nstream];
@@ -43,7 +43,7 @@ struct DslashCommsPattern {
     for (int i=3; i>=0; i--) {
       commDimTotal += commDim[i];
     }
-#ifndef GPU_COMMS
+#if !defined(GPU_COMMS) && !defined(PTHREADS)
     commDimTotal *= 4; // 2 from pipe length, 2 from direction
 #else
     commDimTotal *= 2; // 2 from pipe length, 2 from direction
@@ -206,49 +206,6 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   profile.Stop(QUDA_PROFILE_TOTAL);
 }
 
-#ifdef PTHREADS
-#include <pthread.h>
-
-
-namespace {
-
-  struct ReceiveParam 
-  {
-    TimeProfile* profile;
-    int nFace;
-    int dagger;
-  };
-
-  void *issueMPIReceive(void* receiveParam)
-  {
-    ReceiveParam* param = static_cast<ReceiveParam*>(receiveParam);
-    for(int i=3; i>=0; i--){
-      if(!dslashParam.commDim[i]) continue;
-      for(int dir=1; dir>=0; dir--){
-        PROFILE(inSpinor->recvStart(param->nFace, 2*i+dir, param->dagger), (*(param->profile)), QUDA_PROFILE_COMMS_START);
-      }
-    }
-    return NULL;
-  }
-
-  struct InteriorParam 
-  {
-    TimeProfile* profile;
-    DslashCuda* dslash;
-    int current_device;
-  };
-
-
- void* launchInteriorKernel(void* interiorParam)
-  {
-    InteriorParam* param = static_cast<InteriorParam*>(interiorParam);
-    cudaSetDevice(param->current_device); // set device in the new thread
-    PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
-    return NULL;
-  }
-
-} // anonymous namespace
-#endif
 
 namespace{
 
@@ -411,7 +368,8 @@ struct DslashPthreads : DslashPolicyImp {
     dslashParam.threads = volume;
 
 #ifdef MULTI_GPU
-  // Record the start of the dslash if doing communication in T and not kernel packing
+    // Record the start of the dslash if doing communication in T and not kernel packing
+    if (dslashParam.commDim[3] && !(getKernelPackT() || getTwistPack())) 
     {
       PROFILE(cudaEventRecord(dslashStart, streams[Nstream-1]), 
               profile, QUDA_PROFILE_EVENT_RECORD);
@@ -421,37 +379,34 @@ struct DslashPthreads : DslashPolicyImp {
     inputSpinor->createComms(dslash.Nface()/2);	
     DslashCommsPattern pattern(dslashParam.commDim);
     inputSpinor->streamInit(streams);
-    // and launch the interior dslash kernel
 
-    const int packIndex = Nstream-2;
-    //const int packIndex = Nstream-1;
-    pthread_t receiveThread, interiorThread;
-    ReceiveParam receiveParam;
-    receiveParam.profile = &profile;
-    receiveParam.nFace   = (dslash.Nface() >> 1);
-    receiveParam.dagger  = dagger;
+    const int packIndex = Nstream-1;
 
-    if(pthread_create(&receiveThread, NULL, issueMPIReceive, &receiveParam)){
-      errorQuda("pthread_create failed");
+      //pthread_t , interiorThread;
+    CommsParam commsParamLocal;
+    commsParamLocal.profile = &profile;
+    commsParamLocal.nFace   = (dslash.Nface() >> 1);
+    commsParamLocal.dagger  = dagger;
+    commsParamLocal.gatherCompleted = pattern.gatherCompleted;
+    commsParamLocal.previousDir = pattern.previousDir;
+    commsParamLocal.gatherEnd = gatherEnd;
+    for (int i=0; i<Nstream; i++) {
+      commsParamLocal.gatherEndPosted[i] = false;
+      commsParamLocal.sendPosted[i] = false;
     }
+    commsParamLocal.commDim = dslashParam.commDim;
+    commsParamLocal.field = inputSpinor;
 
-    InteriorParam interiorParam;
-    interiorParam.dslash   = &dslash;
-    interiorParam.profile  = &profile; 
+    // update the parameters for the comms thread
+    commsParam = &commsParamLocal;
 
-    cudaGetDevice(&(interiorParam.current_device)); // get the current device number
-    if(pthread_create(&interiorThread, NULL, launchInteriorKernel, &interiorParam)){
-      errorQuda("pthread_create failed");
-    }
+    // release the comms thread
+    sleepCommsThread = false;
+
     bool pack = false;
     for (int i=3; i>=0; i--) 
       if (dslashParam.commDim[i] && (i!=3 || getKernelPackT() || getTwistPack())) 
         { pack = true; break; }
-
-    if (pack){
-      PROFILE(cudaStreamWaitEvent(streams[packIndex], dslashStart, 0), 
-              profile, QUDA_PROFILE_STREAM_WAIT_EVENT); 
-    }
 
     // Initialize pack from source spinor
     PROFILE(inputSpinor->pack(dslash.Nface()/2, 1-parity, dagger, packIndex, false, twist_a, twist_b),
@@ -477,18 +432,20 @@ struct DslashPthreads : DslashPolicyImp {
         // Record the end of the gathering
         PROFILE(cudaEventRecord(gatherEnd[2*i+dir], streams[2*i+dir]), 
 	        profile, QUDA_PROFILE_EVENT_RECORD);
+
+	// need to signal to thread it's ok to check
+	commsParamLocal.gatherEndPosted[2*i+dir] = true;
       }
     }
 
 #endif // MULTI_GPU
 
-#if (!defined MULTI_GPU)
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-#endif
+
+    // barrier to wait all comms being started
+    while (!sleepCommsThread) { ; }
 
 #ifdef MULTI_GPU 
-    if(pthread_join(receiveThread, NULL)) errorQuda("pthread_join failed");
-    bool interiorLaunched = false;
     int completeSum = 0;
     while (completeSum < pattern.commDimTotal) {
       for (int i=3; i>=0; i--) {
@@ -496,21 +453,9 @@ struct DslashPthreads : DslashPolicyImp {
 
         for (int dir=1; dir>=0; dir--) {
 
-	  // Query if gather has completed
-	  if (!pattern.gatherCompleted[2*i+dir] && pattern.gatherCompleted[pattern.previousDir[2*i+dir]]) { 
-	    PROFILE(cudaError_t event_test = cudaEventQuery(gatherEnd[2*i+dir]), 
-		    profile, QUDA_PROFILE_EVENT_QUERY);
-
-	    if (cudaSuccess == event_test) {
-	      pattern.gatherCompleted[2*i+dir] = 1;
-	      completeSum++;
-	      PROFILE(inputSpinor->sendStart(dslash.Nface()/2, 2*i+dir, dagger), profile, QUDA_PROFILE_COMMS_START);
-	    }
-	  }
-
 	  // Query if comms has finished
 	  if(!pattern.commsCompleted[2*i+dir] && pattern.commsCompleted[pattern.previousDir[2*i+dir]] &&
-	      pattern.gatherCompleted[2*i+dir]) {
+	      pattern.gatherCompleted[2*i+dir] && commsParamLocal.sendPosted[2*i+dir]) {
 	    PROFILE(int comms_test = inputSpinor->commsQuery(dslash.Nface()/2, 2*i+dir, dagger), 
 		    profile, QUDA_PROFILE_COMMS_QUERY);
 	    if (comms_test) { 
@@ -532,11 +477,6 @@ struct DslashPthreads : DslashPolicyImp {
 	  PROFILE(cudaEventRecord(scatterEnd[2*i], streams[2*i]), 
 		  profile, QUDA_PROFILE_EVENT_RECORD);
 
-	  if(!interiorLaunched){
-	    if(pthread_join(interiorThread, NULL)) errorQuda("pthread_join failed");
-	    interiorLaunched = true;
-          }
-
 	  // wait for scattering to finish and then launch dslash
 	  PROFILE(cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[2*i], 0), 
 		  profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -552,6 +492,7 @@ struct DslashPthreads : DslashPolicyImp {
       }
 
     }
+
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
     profile.Stop(QUDA_PROFILE_TOTAL);
@@ -1131,6 +1072,8 @@ struct DslashFactory {
 
 } // anonymous namespace
 
+#if 0
+
 void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		 const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
@@ -1466,3 +1409,5 @@ void dslashCudaNC(DslashCuda &dslash, const size_t regSize, const int parity, co
 
   profile.Stop(QUDA_PROFILE_TOTAL);
 }
+
+#endif

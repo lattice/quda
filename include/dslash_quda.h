@@ -137,6 +137,46 @@ namespace quda {
 		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
 		const cudaStream_t &stream, const double a=0.0);
 
+#ifdef PTHREADS
+  namespace dslash {
+    /**
+       This struct is used to pass data to the communications thread
+       when using the threaded Dslash.
+    */
+    struct CommsParam 
+    {
+      TimeProfile* profile;
+      /** Number of faces */
+      int nFace; 
+
+      /** Whether the operator is daggered */
+      int dagger; 
+
+      /** Array used to determine optimal order for posting send communications */
+      int *previousDir; 
+
+      /** Shared array used to signal a gather has completed */
+      volatile int *gatherCompleted; 
+
+      /** Shared array use to signal the gatherEnd event has been posted so it's safe to query */
+      volatile bool gatherEndPosted[Nstream]; 
+
+      /** Shared array use to signal the send has been posted so it's safe to query (redundent given gatherCompelted?)*/
+      volatile bool sendPosted[Nstream];
+
+      /** Array of cudaEvents for querying with gather has completed */
+      cudaEvent_t *gatherEnd;
+
+      /** The field we are communicating */
+      cudaColorSpinorField *field;
+
+      /** Array determining whether communication is switched on in a given dimension */
+      int *commDim;
+    };
+  } // namespace dslash
+#endif // PTHREADS
+
+
 }
 
 #endif // _DSLASH_QUDA_H
