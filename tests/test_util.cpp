@@ -48,15 +48,32 @@ extern float fat_link_max;
 void initComms(int argc, char **argv, const int *commDims)
 {
 #if defined(QMP_COMMS)
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
 
-  // FIXME? - tests crash without this
+#ifdef PTHREADS
+  QMP_thread_level_t requested = QMP_THREAD_MULTIPLE;
+#else
+  QMP_thread_level_t requested = QMP_THREAD_SINGLE;
+#endif
+  QMP_thread_level_t provided;
+  QMP_init_msg_passing(&argc, &argv, requested, &provided);
   QMP_declare_logical_topology(commDims, 4);
 
 #elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
+
+#ifdef PTHREADS
+  int requested = MPI_THREAD_MULTIPLE;
+#else
+  int requested = MPI_THREAD_SINGLE;
 #endif
+  int provided;
+  MPI_Init_thread(&argc, &argv, requested, &provided);
+#endif // QMP_COMM / MPI_COMMS
+
+  if(provided!=requested) {
+    printf("Error thread level requested: %d, provided: %d\n", requested, provided);
+    exit(0);
+  }
+
   initCommsGridQuda(4, commDims, NULL, NULL);
   initRand();
 }
