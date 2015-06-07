@@ -908,8 +908,9 @@ int sign = 1;
       o01_im -= A1_im;
       o02_re -= A2_re;
       o02_im -= A2_im;
-    } else {
+    } else
 #endif
+    {
       READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
       ADJ_MAT_MUL_V(A, fat, i);
       o00_re -= A0_re;
