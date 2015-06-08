@@ -79,46 +79,49 @@ namespace quda {
   template<int blockSize, typename Float, typename Gauge>
     __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
-      if(idx >= arg.threads) return;
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
-      int parity = 0;
-      if(idx >= arg.threads/2) {
-        parity = 1;
-        idx -= arg.threads/2;
-      }
 
-      int X[4]; 
-      for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
-
-      int x[4];
-      getCoords3(x, idx, X, parity);
-#ifdef MULTI_GPU
-      for(int dr=0; dr<4; ++dr) {
-           x[dr] += arg.border[dr];
-           X[dr] += 2*arg.border[dr];
-      }
-#endif
       double plaq = 0.;
 
-      int dx[4] = {0, 0, 0, 0};
-      for (int mu = 0; mu < 3; mu++) {
-        for (int nu = (mu+1); nu < 4; nu++) {
-          Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
+      if(idx < arg.threads) {
+        typedef typename ComplexTypeId<Float>::Type Cmplx;
+        int parity = 0;
+        if(idx >= arg.threads/2) {
+          parity = 1;
+          idx -= arg.threads/2;
+        }
 
-          arg.dataOr.load((Float*)(U1.data),linkIndex3(x,dx,X), mu, parity);
-	  dx[mu]++;
-          arg.dataOr.load((Float*)(U2.data),linkIndex3(x,dx,X), nu, 1-parity);
-	  dx[mu]--;
-	  dx[nu]++;
-          arg.dataOr.load((Float*)(U3.data),linkIndex3(x,dx,X), mu, 1-parity);
-	  dx[nu]--;
-          arg.dataOr.load((Float*)(U4.data),linkIndex3(x,dx,X), nu, parity);
+        int X[4]; 
+        for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
-	  tmpM	= U1 * U2;
-	  tmpM  = tmpM * conj(U3);
-	  tmpM  = tmpM * conj(U4);
+        int x[4];
+        getCoords3(x, idx, X, parity);
+#ifdef MULTI_GPU
+        for(int dr=0; dr<4; ++dr) {
+          x[dr] += arg.border[dr];
+          X[dr] += 2*arg.border[dr];
+        }
+#endif
 
-	  plaq += getTrace(tmpM).x;
+        int dx[4] = {0, 0, 0, 0};
+        for (int mu = 0; mu < 3; mu++) {
+          for (int nu = (mu+1); nu < 4; nu++) {
+            Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
+
+            arg.dataOr.load((Float*)(U1.data),linkIndex3(x,dx,X), mu, parity);
+	    dx[mu]++;
+            arg.dataOr.load((Float*)(U2.data),linkIndex3(x,dx,X), nu, 1-parity);
+            dx[mu]--;
+            dx[nu]++;
+            arg.dataOr.load((Float*)(U3.data),linkIndex3(x,dx,X), mu, 1-parity);
+	    dx[nu]--;
+            arg.dataOr.load((Float*)(U4.data),linkIndex3(x,dx,X), nu, parity);
+
+	    tmpM = U1 * U2;
+	    tmpM = tmpM * conj(U3);
+	    tmpM = tmpM * conj(U4);
+
+	    plaq += getTrace(tmpM).x;
+          }
         }
       }
 
@@ -149,11 +152,11 @@ namespace quda {
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
+          ((double *) arg.plaq_h)[0]    = 0.;
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	  LAUNCH_KERNEL(computePlaq, tp, stream, arg, Float, Gauge);
 
-//	  cudaMemcpy(arg.plaq_h, arg.plaq, sizeof(double), cudaMemcpyDeviceToHost); 
 	  cudaDeviceSynchronize();
 
 	  #ifdef MULTI_GPU

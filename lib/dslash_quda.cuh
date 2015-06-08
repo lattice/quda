@@ -381,7 +381,7 @@
 
     virtual void preTune()
     {
-      if (dslashParam.kernel_type < 5) { // exterior kernel
+      if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel
 	saveOut = new char[out->Bytes()];
 	cudaMemcpy(saveOut, out->V(), out->Bytes(), cudaMemcpyDeviceToHost);
 	if (out->Precision() == QUDA_HALF_PRECISION) {
@@ -393,7 +393,7 @@
     
     virtual void postTune()
     {
-      if (dslashParam.kernel_type < 5) { // exterior kernel
+      if (dslashParam.kernel_type != INTERIOR_KERNEL) { // exterior kernel
 	cudaMemcpy(out->V(), saveOut, out->Bytes(), cudaMemcpyHostToDevice);
 	delete[] saveOut;
 	if (out->Precision() == QUDA_HALF_PRECISION) {
@@ -402,6 +402,102 @@
 	}
       }
     }
+
+    /*
+      per direction / dimension flops
+      spin project flops = Nc * Ns
+      SU(3) matrix-vector flops = (8 Nc - 2) * Nc
+      spin reconstruction flops = 2 * Nc * Ns (just an accumulation to all components)
+      xpay = 2 * 2 * Nc * Ns
+      
+      So for the full dslash we have, where for the final spin
+      reconstruct we have -1 since the first direction does not
+      require any accumulation.
+      
+      flops = (2 * Nd * Nc * Ns)  +  (2 * Nd * (Ns/2) * (8*Nc-2) * Nc)  +  ((2 * Nd - 1) * 2 * Nc * Ns)
+      flops_xpay = flops + 2 * 2 * Nc * Ns
+      
+      For Wilson this should give 1344 for Nc=3,Ns=2 and 1368 for the xpay equivalent
+    */
+    virtual long long flops() const {
+      int mv_flops = (8 * in->Ncolor() - 2) * in->Ncolor(); // SU(3) matrix-vector flops
+      int num_mv_multiply = in->Nspin() == 4 ? 2 : 1;
+      int ghost_flops = (num_mv_multiply * mv_flops + 2*in->Ncolor()*in->Nspin());
+      int xpay_flops = 2 * 2 * in->Ncolor() * in->Nspin(); // multiply and add per real component
+      int num_dir = 2 * 4;
+
+      long long flops;
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	flops = (ghost_flops + (x ? xpay_flops : 0)) * 2 * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	{
+	  long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	  flops = (ghost_flops + (x ? xpay_flops : 0)) * ghost_sites;
+	  break;
+	}
+      case INTERIOR_KERNEL:
+	{
+	  long long sites = in->VolumeCB();
+	  flops = (num_dir*(in->Nspin()/4)*in->Ncolor()*in->Nspin() +   // spin project (=0 for staggered)
+		   num_dir*num_mv_multiply*mv_flops +                   // SU(3) matrix-vector multiplies
+		   ((num_dir-1)*2*in->Ncolor()*in->Nspin())) * sites;   // accumulation
+	  if (x) flops += xpay_flops * sites;
+
+	  // now correct for flops done by exterior kernel
+	  long long ghost_sites = 0;
+	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
+	  flops -= (ghost_flops + (x ? xpay_flops : 0)) * ghost_sites;
+	  
+	  break;
+	}
+      }
+      return flops;
+    }
+
+    virtual long long bytes() const {
+      int gauge_bytes = reconstruct * in->Precision();
+      bool isHalf = in->Precision() == sizeof(short) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      int proj_spinor_bytes = (in->Nspin()==4 ? 1 : 2) * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + spinor_bytes;
+      int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
+
+      long long bytes;
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	bytes = (ghost_bytes + (x ? spinor_bytes : 0)) * 2 * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	{
+	  long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	  bytes = (ghost_bytes + (x ? spinor_bytes : 0)) * ghost_sites;
+	  break;
+	}
+      case INTERIOR_KERNEL:
+	{
+	  long long sites = in->VolumeCB();
+	  bytes = (num_dir*gauge_bytes + ((num_dir-2)*spinor_bytes + 2*proj_spinor_bytes) + spinor_bytes)*sites;
+	  if (x) bytes += spinor_bytes;
+
+	  // now correct for bytes done by exterior kernel
+	  long long ghost_sites = 0;
+	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
+	  bytes -= (ghost_bytes + (x ? spinor_bytes : 0)) * ghost_sites;
+	  
+	  break;
+	}
+      }
+      return bytes;
+    }
+
 
   };
 

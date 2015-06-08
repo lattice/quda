@@ -219,9 +219,8 @@ namespace quda {
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
 #if (__COMPUTE_CAPABILITY__ >= 200)
-          dim3 blockDim(128, 1, 1);
-          dim3 gridDim((arg.clover1.volumeCB + blockDim.x - 1)/blockDim.x, 1, 1);
-          cloverSigmaTraceKernel<Float,Clover1,Clover2,Gauge><<<gridDim,blockDim,0>>>(arg);
+	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+          cloverSigmaTraceKernel<Float,Clover1,Clover2,Gauge><<<tp.grid,tp.block,0>>>(arg);
 #else
 	  errorQuda("cloverSigmaTrace not supported on pre-Fermi architecture");
 #endif
@@ -240,7 +239,7 @@ namespace quda {
       }
 
       long long flops() const { return 0; } // Fix this
-      long long bytes() const { return 0; } // Fix this
+      long long bytes() const { return (arg.clover1.Bytes() + arg.gauge.Bytes()) * arg.clover1.volumeCB; } 
 
     }; // CloverSigmaTrace
 
@@ -252,7 +251,6 @@ namespace quda {
     CloverTraceArg<Clover1, Clover2, Gauge> arg(clover1, clover2, gauge, dir1, dir2);
     CloverSigmaTrace<Float,Clover1,Clover2,Gauge> traceCompute(arg, meta, location);
     traceCompute.apply(0);
-    cudaDeviceSynchronize();
     return;
   }
 
