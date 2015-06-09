@@ -20,7 +20,12 @@ namespace quda {
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
 		  const int *geo_map, const int *spin_map) : 
       out(out), in(in), V(V), geo_map(geo_map)  {
-      for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s];
+      if(spin_map)
+      {
+        for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s];
+      }
+      else
+      { this->spin_map[0] = 0;}//fineSpin=1
     }
 
     ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin> &arg) :
@@ -145,8 +150,8 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseColor, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  const int *fine_to_coarse, const int *spin_map) {
-    if (in.Nspin() != 2) errorQuda("coarseSpin != 2 not supported");
-    const int coarseSpin = 2;
+    if (in.Nspin() != 2 || in.Nspin() != 1) errorQuda("coarseSpin != 2 not supported");
+    const int coarseSpin = in.Nspin() == 1 ? 1 : 2;
 
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
@@ -173,6 +178,8 @@ namespace quda {
       Prolongate<Float,fineSpin,fineColor,2,order>(out, in, v, fine_to_coarse, spin_map);
     } else if (nVec == 24) {
       Prolongate<Float,fineSpin,fineColor,24,order>(out, in, v, fine_to_coarse, spin_map);
+    } else if (nVec == 48) {
+      Prolongate<Float,fineSpin,fineColor,48,order>(out, in, v, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nVec %d", nVec);
     }
@@ -188,6 +195,8 @@ namespace quda {
       Prolongate<Float,fineSpin,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 24) {
       Prolongate<Float,fineSpin,24,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+    } else if (out.Ncolor() == 48) {
+      Prolongate<Float,fineSpin,48,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nColor %d", out.Ncolor());
     }
@@ -201,6 +210,8 @@ namespace quda {
       Prolongate<Float,4,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Nspin() == 2) {
       Prolongate<Float,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+    } else if (out.Nspin() == 1) {
+      Prolongate<Float,1,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nSpin %d", out.Nspin());
     }

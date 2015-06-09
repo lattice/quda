@@ -22,7 +22,14 @@ namespace quda {
     RestrictArg(Out &out, const In &in, const Rotator &V,
 		const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) : 
       out(out), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine)
-    { for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s]; }
+    { 
+      if(spin_map)
+      { 
+       for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s]; 
+      }
+      else
+        this->spin_map[0] = 0
+    }
 
     RestrictArg(const RestrictArg<Out,In,Rotator,fineSpin> &arg) :
       out(arg.out), in(arg.in), V(arg.V), 
@@ -196,8 +203,8 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
 
-    if (out.Nspin() != 2) errorQuda("coarseSpin != 2 not supported");
-    const int coarseSpin = 2;
+    if (in.Nspin() != 2 || in.Nspin() != 1) errorQuda("coarseSpin != 2 not supported");
+    const int coarseSpin = in.Nspin() == 1 ? 1 : 2;
 
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
@@ -223,6 +230,8 @@ namespace quda {
       Restrict<Float,fineSpin,fineColor,2,order>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (nVec == 24) {
       Restrict<Float,fineSpin,fineColor,24,order>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (nVec == 48) {
+      Restrict<Float,fineSpin,fineColor,48,order>(out, in, v, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
       errorQuda("Unsupported nVec %d", nVec);
     }
@@ -238,6 +247,8 @@ namespace quda {
       Restrict<Float,fineSpin,2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 24) {
       Restrict<Float,fineSpin,24,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (in.Ncolor() == 48) {
+      Restrict<Float,fineSpin,48,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
       errorQuda("Unsupported nColor %d", in.Ncolor());
     }
@@ -251,6 +262,8 @@ namespace quda {
       Restrict<Float,4,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Nspin() == 2) {
       Restrict<Float,2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (in.Nspin() == 1) {
+      Restrict<Float,1,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
       errorQuda("Unsupported nSpin %d", in.Nspin());
     }

@@ -10,6 +10,7 @@
  * ordering.  Currently this is used for cpu fields only with limited
  * ordering support, but this will be expanded for device ordering
  *  also.
+ * A.S.: accessors seems to be generic, no modifications needed for the staggered case
  */
 
 #include <register_traits.h>

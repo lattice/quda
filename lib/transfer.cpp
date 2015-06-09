@@ -17,8 +17,12 @@ namespace quda {
   static bool gpu_transfer = false;
 
   void setTransferGPU(bool use_gpu) { gpu_transfer = use_gpu; }
+  /*
+  * for the staggered case, there is no spin blocking, 
+  * however we do even-odd to preserve chirality (that is straightforward)
+  */
 
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs)
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs = 1) 
     : B(B), Nvec(Nvec), V(0), V_h(0), V_d(0), tmp2(0), tmp3(0), geo_bs(0), 
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
@@ -50,17 +54,25 @@ namespace quda {
     param.create = QUDA_ZERO_FIELD_CREATE;
     // the V field is defined on all sites regardless of B field (maybe the B fields are always full?)
     if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+      //keep it the same for staggered:
       param.siteSubset = QUDA_FULL_SITE_SUBSET;
       param.x[0] *= 2;
     }
 
-    printfQuda("Transfer: creating V field with basis %d with location %d\n", param.gammaBasis, param.location);    
+    if (param.nSpin == 1){
+      //param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//host orthogonalization is implemented for SPIN_COLOR order only!
+      printfQuda("Transfer: creating V field with location %d\n", param.location);
+    }
+    else{
+      printfQuda("Transfer: creating V field with basis %d with location %d\n", param.gammaBasis, param.location);    
+    }
+
     // for cpu transfer this is the V field, for gpu it's just a temporary until we port the block orthogonalization
     V_h = ColorSpinorField::Create(param);
 
     if (gpu_transfer == true) {
       param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;//ok for staggered
     } 
 
     V_d = gpu_transfer ? ColorSpinorField::Create(param) : 0;
@@ -78,7 +90,7 @@ namespace quda {
       tmp2 = ColorSpinorField::Create(param);
 
       // used for basis changing
-      tmp3 = tmp2->CreateCoarse(geo_bs, spin_bs, Nvec);
+      tmp3 = tmp2->CreateCoarse(geo_bs, spin_bs, Nvec);//Remark: spin_bs = 1 for staggered, and even-odd blocking presumed
     } else {
       param = ColorSpinorParam(*B[0]);
 
@@ -87,7 +99,7 @@ namespace quda {
       tmp2 = ColorSpinorField::Create(param);
 
       // useful to have around
-      tmp3 = tmp2->CreateCoarse(geo_bs, spin_bs, Nvec);
+      tmp3 = tmp2->CreateCoarse(geo_bs, spin_bs, Nvec);//Remark: spin_bs = 1 for staggered, and even-odd blocking presumed
     }
 
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
@@ -106,9 +118,11 @@ namespace quda {
 
     createGeoMap(geo_bs);
 
-    // allocate the fine-to-coarse spin map
-    spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
-    createSpinMap(spin_bs);
+    // allocate the fine-to-coarse spin map (don't need it for staggered.)
+    if (param.nSpin != 1){
+      spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
+      createSpinMap(spin_bs);
+    }
 
     // orthogonalize the blocks
     printfQuda("Transfer: block orthogonalizing\n");
@@ -214,10 +228,11 @@ namespace quda {
     }
 
     *input = in; // copy result to input field (aliasing handled automatically)
-
-    if ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))
+    
+    if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))){
       errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
+    }
 
     Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map);
 
@@ -242,7 +257,7 @@ namespace quda {
 
     *input = in; // copy result to input field (aliasing handled automatically)  
     
-    if ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))
+    if ((V->Nspin() != 1) && (output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis())))
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
