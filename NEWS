@@ -1,4 +1,4 @@
-Version 0.7.1 - xxth June 2015
+Version 0.7.1 - 11th June 2015
 
 - Added Maxwell-generation GPU support.
 
@@ -579,7 +579,7 @@ Version 0.2.4 - 22 June 2010
 
 
 Version 0.2.3 - 2 June 2010
- 
+
 - Further improved performance of the blas routines.
 
 - Added 3D Wilson Dslash in anticipation of temporal preconditioning.
@@ -623,4 +623,3 @@ Version 0.2 - 16 December 2009
 Version 0.1 - 17 November 2009
 
 - Initial public release.
-
