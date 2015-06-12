@@ -287,6 +287,8 @@ namespace quda {
    //do sort:
    std::vector<SortEvals> sorted_evals_cntr;
 
+   sorted_evals_cntr.reserve(m);
+
    for(int e = 0; e < m; e++) sorted_evals_cntr.push_back( SortEvals( abs(harVals[e]), e ));
 
    std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), SortEvals::CmpEigenNrms);
@@ -584,7 +586,8 @@ namespace quda {
    profile.Start(QUDA_PROFILE_COMPUTE);
    blas_flops = 0;
 
-   while((j < m) && (r2 > stop))
+//   while((j < m) && (r2 > stop))
+   while(j < m)//we allow full cycle
    {
      cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
 
@@ -699,7 +702,9 @@ namespace quda {
    args->deflated_cycle = false;
 #endif
 
-   while(cycle_idx < max_cycles && !convergence(r2, heavy_quark_res, stop, param.tol_hq))
+   bool last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+
+   while(cycle_idx < max_cycles && !last_cycle)
    {
      printfQuda("\nRestart #%d\n", cycle_idx);
 
@@ -760,7 +765,8 @@ namespace quda {
 
      const int jlim = j;//=nev for deflated restarts and 0 for "projected" restarts (abused terminology!)
 
-     while((j < m) && (r2 > stop))
+//     while((j < m) && (r2 > stop))
+     while(j < m) //we allow full cycle
      {
        //pointer aliasing:
        cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
@@ -850,6 +856,8 @@ namespace quda {
      }
 
      printfQuda("\nDone for cycle:  %d, true residual squared %1.15e\n", cycle_idx, ext_r2);
+
+     last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq);
 
      cycle_idx += 1;
 
