@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.7.0                          4th February 2015
+Release Notes for QUDA v0.7.1                          11th June 2015
 -----------------------------
 
 Overview:
@@ -30,11 +30,11 @@ Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.8 and Ubuntu 14.04)
 using releases 5.5, 6.0, 6.5 and 7.0 of the CUDA toolkit and Cray
-XK7/XC30 machines using CUDA 5.5.  CUDA 4.x and earlier are not
-supported.  The library also works under Mac OS X 10.6.8 ("Snow
-Leopard") and 10.7.3 ("Lion") on recent 64-bit Intel-based Macs.  Due
-to issues with compilation using LLVM, under Mac OS X 10.9.x it is
-required to install and use GCC instead of the default clang compiler.
+XK7/XC30 machines using CUDA 5.5 and 6.5.  CUDA 4.x and earlier are not
+supported.  The library also works on recent 64-bit Intel-based Macs.
+Due to issues with compilation using LLVM, under Mac OS X 10.9.x it is
+required to install and use GCC instead of the default clang compiler,
+though this is unnecesary with Mac OS X 10.10.x.
 
 See also "Known Issues" below.
 
@@ -160,11 +160,6 @@ Known Issues:
   quda.h.  Therefore, any code to be linked against QUDA should also
   be compiled with this option.
 
-* The auto-tuner reports "0 Gflop/s" and "0 GB/s" for several of the
-  Dslash kernels (visible if the verbosity is set to at least
-  QUDA_SUMMARIZE), rather than the correct values.  This does not
-  affect the tuning process or actual performance.
-
 * When the auto-tuner is active in a multi-GPU run it may cause issues
   with binary reproducibility of this run. This is caused by the
   possibility of different launch configurations being used on
@@ -230,4 +225,3 @@ opinions, findings, and conclusions or recommendations expressed in
 this material are those of the authors and do not necessarily reflect
 the views of the Department of Energy, the National Science
 Foundation, or the PRACE project.
-
