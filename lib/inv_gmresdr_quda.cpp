@@ -432,7 +432,7 @@ namespace quda {
     BlasMagmaArgs magma_args(sizeof(double));
 
     //Compute c = VT^{pr}_k r0 
-    for(int i = 0; i < dpar->nv; i++ ) c[i] = cDotProductCuda(dpar->projVecs->Eigenvec(i), r_sloppy);//
+    for(int i = 0; i < dpar->nv; i++ ) d[i] = cDotProductCuda(dpar->projVecs->Eigenvec(i), r_sloppy);//
    
     //Solve H^{pr}_k d = c: this nvxnv problem..
     magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)dpar->projMat, dpar->ld);
@@ -441,7 +441,7 @@ namespace quda {
     for(int l = 0; l < dpar->nv; l++)  caxpyCuda(d[l], dpar->projVecs->Eigenvec(l), x_sloppy); 
 
     //Compute the new residual vector: 
-    memset(c, 0, (dpar->nv+1)*sizeof(Complex));//now use as a temp array
+    //memset(c, 0, (dpar->nv+1)*sizeof(Complex));//now use as a temp array
 
     for(int j = 0; j < (dpar->nv+1); j++)
       for (int i = 0; i < (dpar->nv); i++)
