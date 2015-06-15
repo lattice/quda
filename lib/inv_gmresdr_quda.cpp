@@ -458,7 +458,7 @@ namespace quda {
       //extract triangular part:
       for(int i = 0; i < dpar->nv; i++) memcpy(&qrProjMat[dpar->ld*i+i+1], 0, (dpar->ld-i-1)*sizeof(Complex));
       //Solve H^{pr}_k d = c: this nvxnv problem..
-      magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)dpar->qrProjMat, dpar->ld);
+      magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)qrProjMat, dpar->ld);
 
       delete[] qrProjMat;
       delete[] projTau;
