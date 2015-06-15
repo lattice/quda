@@ -676,8 +676,7 @@ namespace quda {
     // 
     void CleanResources() {};//not implemented yet 
     //
-    void PerformGalerkinProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *defl_param);
-
+    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *defl_param);
 
   };
 

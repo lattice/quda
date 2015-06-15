@@ -324,6 +324,13 @@ extern "C" {
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
+  // used to select projection method for deflated solvers
+  typedef enum QudaProjectionType_s {
+      QUDA_MINRES_PROJECTION,
+      QUDA_GALERKIN_PROJECTION,
+      QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
+  } QudaProjectionType;
+
   // used to select preconditioning method in domain-wall fermion
   typedef enum QudaDWFPCType_s {
     QUDA_5D_PC,

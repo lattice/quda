@@ -50,20 +50,24 @@ namespace quda {
 
       //Objects required for the Galerkin projections
       Complex *projMat;  //host   projection matrix:
+      //Complex *projTau;  //needed for QR
       //
       cudaColorSpinorField    *projVecs;      //device buffer for HRitz vectors
+
+      QudaProjectionType projType;
       
       int ld;                 //projection matrix leading dimension
       int nv;                //(nv+1) => number of projection vectors, note also that projMat is a (nv+1) by (nv) matrix
 
       bool alloc_flag;
 
-      GmresdrDeflationParam(cudaColorSpinorField  *Vm, const int ldm, const int nev) : ld(ldm), nv(nev), alloc_flag(true)
+      GmresdrDeflationParam(cudaColorSpinorField  *Vm, const int ldm, const int nev, QudaProjectionType projType = QUDA_GALERKIN_PROJECTION) : projType(projType), ld(ldm), nv(nev), alloc_flag(true)
       {
         if(nev == 0) errorQuda("\nIncorrect deflation space parameters...\n");
        
         //Create deflation objects:
         projMat  = new Complex[ld*nv];
+        //if(projType == QUDA_MINRES_PROJECTION) projTau  = new Complex[ld];
 
         ColorSpinorParam csParam(Vm->Eigenvec(0));
         csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -82,6 +86,7 @@ namespace quda {
         if(alloc_flag)    
         {
           delete projVecs;
+          //if(projType == QUDA_MINRES_PROJECTION) delete[] projTau;
           delete[] projMat;
         }
       }
@@ -387,7 +392,6 @@ namespace quda {
  }
 
 
-
  GmresDR::GmresDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
     DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), gmres_space_prec(QUDA_INVALID_PRECISION), 
     Vm(0), profile(profile), args(0), gmres_alloc(false)
@@ -424,19 +428,46 @@ namespace quda {
 
  }
 
- void GmresDR::PerformGalerkinProjection(cudaColorSpinorField &x_sloppy,  cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *dpar)
+ void GmresDR::PerformProjection(cudaColorSpinorField &x_sloppy,  cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *dpar)
  {
     Complex *c    = new Complex[(dpar->nv+1)];
     Complex *d    = new Complex[dpar->ld];
 
     BlasMagmaArgs magma_args(sizeof(double));
 
-    //Compute c = VT^{pr}_k r0 
-    for(int i = 0; i < dpar->nv; i++ ) d[i] = cDotProductCuda(dpar->projVecs->Eigenvec(i), r_sloppy);//
-   
-    //Solve H^{pr}_k d = c: this nvxnv problem..
-    magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)dpar->projMat, dpar->ld);
+    if(dpar->projType == QUDA_GALERKIN_PROJECTION)
+    {
+      //Compute c = VT^{pr}_k r0 
+      for(int i = 0; i < dpar->nv; i++ ) d[i] = cDotProductCuda(dpar->projVecs->Eigenvec(i), r_sloppy);//
+      //Solve H^{pr}_k d = c: this nvxnv problem..
+      magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)dpar->projMat, dpar->ld);
+    }
+    else if(dpar->projType == QUDA_MINRES_PROJECTION)
+    {
+      //Compute c = VT^{pr}_k+1 r0 
+      for(int i = 0; i < (dpar->nv + 1); i++ ) d[i] = cDotProductCuda(dpar->projVecs->Eigenvec(i), r_sloppy);//
 
+      Complex *qrProjMat = new Complex[dpar->ld*dpar->nv];
+      Complex *projTau   = new Complex[dpar->ld];
+      //
+      memcpy(qrProjMat, dpar->projMat, (dpar->nv)*(dpar->ld)*sizeof(Complex));
+      //
+      magma_args.ComputeQR( dpar->nv, qrProjMat, dpar->nv+1, dpar->ld, projTau );
+      //
+      magma_args.LeftConjZUNMQR(dpar->nv /*number of reflectors*/, 1 /*number of columns of mat*/, d, (dpar->nv+1) /*number of rows*/, dpar->ld, qrProjMat, dpar->ld, projTau);
+      //extract triangular part:
+      for(int i = 0; i < dpar->nv; i++) memcpy(&qrProjMat[dpar->ld*i+i+1], 0, (dpar->ld-i-1)*sizeof(Complex));
+      //Solve H^{pr}_k d = c: this nvxnv problem..
+      magma_args.SolveProjMatrix((void*)d, dpar->ld,  dpar->nv, (void*)dpar->qrProjMat, dpar->ld);
+
+      delete[] qrProjMat;
+      delete[] projTau;
+    }
+    else
+    {
+      errorQuda("\nProjection type is not supported.\n");
+    }
+   
     //Compute the new approximate solution:
     for(int l = 0; l < dpar->nv; l++)  caxpyCuda(d[l], dpar->projVecs->Eigenvec(l), x_sloppy); 
 
@@ -733,12 +764,12 @@ namespace quda {
 #ifndef USE_PLAIN_GMRES
        if(!defl_param)
        {
-         defl_param = new GmresdrDeflationParam(Vm, args->ldm, args->nev);
+         defl_param = new GmresdrDeflationParam(Vm, args->ldm, args->nev, QUDA_GALERKIN_PROJECTION);//WARNING: Projection type is currently not exposed!
          //
          args->StoreProjectionMatrix(defl_param->projMat);//merge this into the constructor..
        }
 
-       PerformGalerkinProjection(*x_sloppy, *r_sloppy, defl_param);//note : full precision residual
+       PerformProjection(*x_sloppy, *r_sloppy, defl_param);//note : full precision residual
 
        if (args->mixed_precision_gmresdr)
        {
