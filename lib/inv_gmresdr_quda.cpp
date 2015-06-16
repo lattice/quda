@@ -733,7 +733,7 @@ namespace quda {
    args->deflated_cycle = false;
 #endif
 
-   bool last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+   bool last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop);
 
    while(cycle_idx < max_cycles && !last_cycle)
    {
@@ -888,7 +888,7 @@ namespace quda {
 
      printfQuda("\nDone for cycle:  %d, true residual squared %1.15e\n", cycle_idx, ext_r2);
 
-     last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq);
+     last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop);
 
      cycle_idx += 1;
 
