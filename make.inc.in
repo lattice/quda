@@ -94,10 +94,10 @@ ifeq ($(strip $(CPU_ARCH)), x86_64)
     LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
     NVCCOPT = -m64
   else
-    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
+    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart -lnvidia-ml
   endif
 else
-  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32
+  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32 -lnvidia-ml
   COPT = -malign-double -m32
   NVCCOPT = -m32
 endif
