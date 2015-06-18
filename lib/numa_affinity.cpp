@@ -12,6 +12,9 @@
 #include <string.h>
 #include <numa_affinity.h>
 #include <quda_internal.h>
+#if (CUDA_VERSION >= 6000)
+#include <nvml.h>
+#endif
 
 static int 
 process_core_string_item(const char* str, int* sub_list, int* sub_ncores)
@@ -165,44 +168,83 @@ getNumaAffinity(int my_gpu, int *cpu_cores, int* ncores)
   return 0;
 }
 
-int 
-setNumaAffinity(int devid)
-{
-  int cpu_cores[128];
-  int ncores=128;
-  int rc = getNumaAffinity(devid, cpu_cores, &ncores);
-  if(rc != 0){
-    warningQuda("Failed to determine NUMA affinity for device %d (possibly not applicable)", devid);
-    return 1;
-  }
-  int which = devid % ncores;
-  printfQuda("Setting NUMA affinity for device %d to CPU core %d\n", devid, cpu_cores[which]);
-/*
-  for(int i=0;i < ncores;i++){
-   if (i != which ) continue;
-    printfQuda("%d", cpu_cores[i]);
-    if((i+1) < ncores){
-      printfQuda(",");
-    }
-  }
-  printfQuda("\n");
-  */
 
-  cpu_set_t cpu_set;
-  CPU_ZERO(&cpu_set);
-  
-  for(int i=0;i < ncores;i++){
-    if( i != which) continue;
-    CPU_SET(cpu_cores[i], &cpu_set);
-  }
-  
-  rc = sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set);
-  if (rc != 0){
-    warningQuda("Failed to enforce NUMA affinity (probably due to lack of kernel support)");
-    return -1;
-  }
-  
-  
-  return 0;
+int setNumaAffinity(int devid)
+{
+    int cpu_cores[128];
+    int ncores=128;
+    int rc = getNumaAffinity(devid, cpu_cores, &ncores);
+    if(rc != 0){
+      warningQuda("Failed to determine NUMA affinity for device %d (possibly not applicable)", devid);
+      return 1;
+    }
+    int which = devid % ncores;
+    printfQuda("Setting NUMA affinity for device %d to CPU core %d\n", devid, cpu_cores[which]);
+  /*
+    for(int i=0;i < ncores;i++){
+     if (i != which ) continue;
+      printfQuda("%d", cpu_cores[i]);
+      if((i+1) < ncores){
+        printfQuda(",");
+      }
+    }
+    printfQuda("\n");
+    */
+
+    cpu_set_t cpu_set;
+    CPU_ZERO(&cpu_set);
+
+    for(int i=0;i < ncores;i++){
+      if( i != which) continue;
+      CPU_SET(cpu_cores[i], &cpu_set);
+    }
+
+    rc = sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set);
+    if (rc != 0){
+      warningQuda("Failed to enforce NUMA affinity (probably due to lack of kernel support)");
+      return -1;
+    }
+
+
+    return 0;
 }
 
+int setNumaAffinityNVML(int devid)
+{
+#if (CUDA_VERSION >= 6000)
+  nvmlReturn_t result;
+
+  result = nvmlInit();
+  if (NVML_SUCCESS != result)
+  {
+    warningQuda("Failed to determine NUMA affinity for device %d (NVML Init failed)", devid);
+    return -1;
+  }
+  nvmlDevice_t device;
+  result = nvmlDeviceGetHandleByIndex(devid, &device);
+  if (NVML_SUCCESS != result)
+  {
+    warningQuda("Failed to determine NUMA affinity for device %d (NVML DeviceGetHandle failed)", devid);
+    return -1;
+  }
+  result = nvmlDeviceSetCpuAffinity(device);
+  if (NVML_SUCCESS != result)
+  {
+    warningQuda("Failed to determine NUMA affinity for device %d (NVML DeviceSetCpuAffinity failed)", devid);
+    return -1;
+  }
+  else{
+    printfQuda("Set NUMA affinity for device %d (NVML DeviceSetCpuAffinity)\n", devid);
+  }
+  result = nvmlShutdown();
+  if (NVML_SUCCESS != result)
+  {
+    warningQuda("Failed to determine NUMA affinity for device %d (NVML Shutdown failed)", devid);
+    return -1;
+  }
+  return 0;
+#else
+  warningQuda("Failed to determine NUMA affinity for device %d (NVML not supported in quda build)", devid);
+  return -1;
+#endif
+}

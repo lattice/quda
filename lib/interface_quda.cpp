@@ -425,7 +425,11 @@ void initQudaDevice(int dev) {
 
 #ifdef NUMA_AFFINITY
   if(numa_affinity_enabled){
+#if (CUDA_VERSION >= 6000)
+    setNumaAffinityNVML(dev);
+#else
     setNumaAffinity(dev);
+#endif
   }
 #endif
 
