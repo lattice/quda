@@ -454,7 +454,6 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;
       Reconstruct<reconLen,Float> reconstruct;
-      //Float *gauge[2];
       Float *gauge;
       size_t offset;
       Float *ghost[4];
@@ -654,7 +653,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 #if __COMPUTE_CAPABILITY__ >= 200
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-	cudaMemcpy(backup_h, gauge[0], bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
 	checkCudaError();
 #endif
       }
@@ -664,7 +663,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
       */
       void load() {
 #if __COMPUTE_CAPABILITY__ >= 200
-	cudaMemcpy(gauge[0], backup_h, bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = 0;
 	checkCudaError();
