@@ -2184,7 +2184,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
 
-
+#if 0
 void generateKSNULLVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *inv_param)
 {
   if ( ! (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
@@ -2263,7 +2263,7 @@ void generateKSNULLVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *in
         blas::caxpy(scale, prev_nullvec->Even(), *eV); //i-<j,i>j
 
         alpha = blas::cDotProduct(prev_nullvec->Odd(), *oV);//<j,i>
-        Complex scale = Complex(-alpha.real(), -alpha.imag());
+        scale = Complex(-alpha.real(), -alpha.imag());
         blas::caxpy(scale, prev_nullvec->Odd(), *oV); //i-<j,i>j
      }
 
@@ -2292,8 +2292,9 @@ void generateKSNULLVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *in
 
   popVerbosity();
 }
+#endif
 
-
+#include "contractQuda.h"
 
 void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_inv_param)//input/output => currently cpu fields!
 {
@@ -2464,7 +2465,9 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 
      //apply projectors:
      //(1+g5) / 2 * x: 
-     gamma5Cuda(*curr_gpunullvec_plus , x);
+     cudaColorSpinorField *tmp1 = static_cast<cudaColorSpinorField*>( curr_gpunullvec_plus);
+     cudaColorSpinorField *tmp2 = static_cast<cudaColorSpinorField*>(  x);
+     gamma5Cuda(tmp1 , tmp2);
      *curr_gpunullvec_minus = *curr_gpunullvec_plus;//copy for the opposite chirality
 
      blas::xpy(*x, *curr_gpunullvec_plus);  
@@ -2483,12 +2486,12 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
      {
         ColorSpinorField *prev_gpunullvec = gpuB[prevvec];
 
-        alpha = blas::cDotProduct(*prev_nullvec, *curr_gpunullvec_plus);//<j,i>
+        alpha = blas::cDotProduct(*prev_gpunullvec, *curr_gpunullvec_plus);//<j,i>
         Complex scale = Complex(-alpha.real(), -alpha.imag());
         blas::caxpy(scale, *prev_gpunullvec, *curr_gpunullvec_plus); //i-<j,i>j
 
         alpha = blas::cDotProduct(*prev_gpunullvec, *curr_gpunullvec_minus);//<j,i>
-        Complex scale = Complex(-alpha.real(), -alpha.imag());
+        scale = Complex(-alpha.real(), -alpha.imag());
         blas::caxpy(scale, *prev_gpunullvec, *curr_gpunullvec_minus); //i-<j,i>j
      }
 
@@ -2508,8 +2511,8 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
      else
         errorQuda("\nCannot orthogonalize ??th vector\n");
 
-     gpuB.pushback(curr_gpunullvec_plus);
-     gpuB.pushback(curr_gpunullvec_minus);
+     gpuB.push_back(curr_gpunullvec_plus);
+     gpuB.push_back(curr_gpunullvec_minus);
 //END
 
      delete x;
