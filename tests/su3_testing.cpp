@@ -53,9 +53,7 @@ int* SetReunitarizationConsts(){
 void RunTest(int argc, char **argv) {
 
 
-  setVerbosity(QUDA_DEBUG_VERBOSE);
-  //setVerbosity(QUDA_SILENT);
-  //setVerbosity(QUDA_VERBOSE);
+  setVerbosity(QUDA_VERBOSE);
   if (true) {
     printfQuda("Tuning...\n");
     setTuning(QUDA_TUNE_YES);
@@ -91,8 +89,6 @@ void RunTest(int argc, char **argv) {
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.link_type   = param.type;
   gParam.reconstruct = param.reconstruct;    
-  gParam.order       = (param.reconstruct == QUDA_RECONSTRUCT_12) ? QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
-  //gParam.order       = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.order       = (param.cuda_prec == QUDA_DOUBLE_PRECISION || param.reconstruct == QUDA_RECONSTRUCT_NO ) ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
 
@@ -111,16 +107,10 @@ void RunTest(int argc, char **argv) {
   gParamEx.nFace = 1;
   for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
   cudaGaugeField *cudaInGauge = new cudaGaugeField(gParamEx); 
-  printf("Gauge Radius: %d:%d:%d:%d\n", gParamEx.r[0], gParamEx.r[1], gParamEx.r[2], gParamEx.r[3]);
 #else
   cudaGaugeField *cudaInGauge = new cudaGaugeField(gParam);
 #endif
 
-  printf("Gauge Radius: %d:%d:%d:%d\n", cudaInGauge->R()[0], cudaInGauge->R()[1], cudaInGauge->R()[2], cudaInGauge->R()[3]);
-
-  const int *radius;
-  radius = cudaInGauge->R();
-  printf("Gauge Radius: %d:%d:%d:%d\n", radius[0], radius[1], radius[2], radius[3]);
 
   int nsteps = 1;
   int nhbsteps = 1;
@@ -134,24 +124,19 @@ void RunTest(int argc, char **argv) {
 
   int halfvolume = xdim*ydim*zdim*tdim >> 1;
   printfQuda("xdim=%d\tydim=%d\tzdim=%d\ttdim=%d\trng_size=%d\n",xdim,ydim,zdim,tdim,halfvolume);
+  // CURAND random generator initialization
   RNG randstates(halfvolume, 1234, param.X);
   randstates.Init();
-  //Reunitarization setup
+  // Reunitarization setup
   int num_failures=0;
   int *num_failures_dev = SetReunitarizationConsts();
 
-/*
-  cudaInGauge->exchangeExtendedGhost(R,false);
-
-exit(0);*/
 
   if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
   else{
     InitGaugeField( *cudaInGauge, randstates.State());
   }
   Plaquette( *cudaInGauge) ;
-  //double2 plaq = Plaquette( *cudaInGauge) ;
-  //printfQuda("!!!!!: %.16e, %.16e, %.16e\n", plaq.x, plaq.y, (plaq.x+plaq.y) / 2.);
 
   for(int step=1; step<=nsteps; ++step){
     printfQuda("Step %d\n",step);
@@ -172,129 +157,39 @@ exit(0);*/
 
 
   int reunit_interval = 1000;
-
-
-
-
-  printfQuda("OVR: #########################################Landau\n");
-  //cudaInGauge->backup();
-  //test::gaugefixingOVR_test(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
-  //cudaInGauge->restore();
+  printfQuda("Landau gauge fixing with overrelaxation\n");
   gaugefixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
-  printfQuda("OVR: #########################################Coulomb\n");
+  printfQuda("Coulomb gauge fixing with overrelaxation\n");
   gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-  //cudaInGauge->restore();
-  //cudaInGauge->backup();
- // gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
- // test::gaugefixingOVR_test(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-  //cudaInGauge->restore();
- // cudaInGauge->backup();
-
-  //gaugefixingFFT -> only single GPU...
-  printfQuda("FFT: #########################################Landau\n");
+  printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
   if(comm_size() == 1) gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-  //cudaInGauge->restore();
-  //cudaInGauge->backup();
-  printfQuda("FFT: #########################################Coulomb\n");
+  printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
   if(comm_size() == 1) gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
 
   randstates.Release();
   delete cudaInGauge;
-  cudaFree(num_failures_dev); 
+  cudaFree(num_failures_dev);
+  //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
   PGaugeExchangeFree();
   a0.Stop();
   printfQuda("Time -> %.6f s\n", a0.Last());
-
-
-
-
- // printf("@@@%d:::%d:%d:%d:%d\n",comm_rank(),comm_dim(0),comm_dim(1),comm_dim(2),comm_dim(3));
- // printf("###%d:::%d:%d:%d:%d\n",comm_rank(),comm_coord(0),comm_coord(1),comm_coord(2),comm_coord(3));
-
-
-
-
 }
 
 
 
-void SU3Test(int argc, char **argv) {
+void SU3GaugeFixTest(int argc, char **argv) {
 
   initQuda(-1);
-  
-if(1){
-  prec = QUDA_SINGLE_PRECISION;
-  link_recon = QUDA_RECONSTRUCT_NO;
-  printfQuda("QUDA_SINGLE_PRECISION#########################################QUDA_RECONSTRUCT_NO\n");
-  RunTest(argc, argv);
-  printfQuda("QUDA_SINGLE_PRECISION#########################################QUDA_RECONSTRUCT_12\n");
-  link_recon = QUDA_RECONSTRUCT_12;
-  RunTest(argc, argv);
-  printfQuda("QUDA_SINGLE_PRECISION#########################################QUDA_RECONSTRUCT_8\n");
-  link_recon = QUDA_RECONSTRUCT_8;
-  RunTest(argc, argv);
-  printfQuda("#########################################\n");
-
-
   prec = QUDA_DOUBLE_PRECISION;
   link_recon = QUDA_RECONSTRUCT_NO;
-  printfQuda("QUDA_DOUBLE_PRECISION#########################################QUDA_RECONSTRUCT_NO\n");
   RunTest(argc, argv);
-  printfQuda("QUDA_DOUBLE_PRECISION#########################################QUDA_RECONSTRUCT_12\n");
-  link_recon = QUDA_RECONSTRUCT_12;
-  RunTest(argc, argv);
-  printfQuda("QUDA_DOUBLE_PRECISION#########################################QUDA_RECONSTRUCT_8\n");
-  link_recon = QUDA_RECONSTRUCT_8;
-  RunTest(argc, argv);
-  printfQuda("#########################################\n");
-}
-else{/*
-  prec = QUDA_DOUBLE_PRECISION;
-  link_recon = QUDA_RECONSTRUCT_NO;
-  printfQuda("QUDA_DOUBLE_PRECISION#########################################QUDA_RECONSTRUCT_NO\n");
-  RunTest(argc, argv);
-  printfQuda("QUDA_DOUBLE_PRECISION#########################################QUDA_RECONSTRUCT_12\n");
-  link_recon = QUDA_RECONSTRUCT_12;;
-  RunTest(argc, argv);
-  printfQuda("#########################################\n");
-  printfQuda("#########################################\n");
-  prec = QUDA_SINGLE_PRECISION;
-  link_recon = QUDA_RECONSTRUCT_NO;
-  printfQuda("QUDA_SINGLE_PRECISION#########################################QUDA_RECONSTRUCT_NO\n");
-  RunTest(argc, argv);
-  printfQuda("QUDA_SINGLE_PRECISION#########################################QUDA_RECONSTRUCT_12\n");
-  link_recon = QUDA_RECONSTRUCT_12;
-  RunTest(argc, argv);
-  printfQuda("#########################################\n");*/
-
-
-
-  prec = QUDA_DOUBLE_PRECISION;
-  link_recon = QUDA_RECONSTRUCT_NO;
-  printfQuda("QUDA_DOUBLE_PRECISION#########################################QUDA_RECONSTRUCT_NO\n");
-  RunTest(argc, argv);
-  printfQuda("#########################################\n");
-  }
-
   endQuda();
 
 }
 
+int main(int argc, char **argv){
 
-//mpirun -n 4 su3_testing --xgridsize 1 --ygridsize 1 --zgridsize 1 --tgridsize 4 --xdim 16
-
-//mpirun -n 4 env MV2_USE_CUDA=1 su3_testing --xgridsize 1 --ygridsize 1 --zgridsize 1 --tgridsize 4 --tdim 4
-
-//mpirun -n 8 env MV2_USE_CUDA=1 su3_testing --xgridsize 2 --ygridsize 1 --zgridsize 2 --tgridsize 2 --tdim 8 --xdim 8 --ydim 16 --zdim 8
-
-  int
-main(int argc, char **argv)
-{
-  //default to 18 reconstruct, 8^3 x 8
-  //link_recon = QUDA_RECONSTRUCT_NO;
   xdim=ydim=zdim=tdim=32;
-  //cpu_prec = prec = QUDA_DOUBLE_PRECISION;
-
   int i;
   for (i=1; i<argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
@@ -302,14 +197,11 @@ main(int argc, char **argv)
     }
 
     fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    //usage(argv);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  //display_test_info();
-  SU3Test(argc, argv);
-
+  SU3GaugeFixTest(argc, argv);
 
   finalizeComms();
 
