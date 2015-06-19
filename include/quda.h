@@ -118,6 +118,9 @@ extern "C" {
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
 
+    /**< After how many iterations shall the heavy quark residual be updated */
+    int heavy_quark_check;
+
     int pipeline; /**< Whether to use a pipelined solver with less global sums */
 
     int num_offset; /**< Number of offsets in the multi-shift solver */
