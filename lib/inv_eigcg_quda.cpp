@@ -500,7 +500,7 @@ namespace quda {
 
     double heavy_quark_res = 0.0; // heavy quark residual
     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-    int heavy_quark_check = 10; // how often to check the heavy quark residual
+    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double alpha=1.0, beta=0.0;
  

@@ -439,6 +439,10 @@ static int dslashTest()
       dslashCUDA(1);
     }
     printfQuda("Executing %d kernel loops...", loops);	
+
+    // reset flop counter
+    dirac->Flops();
+
     double secs = dslashCUDA(loops);
 
     if (!transfer) *spinorOut = *cudaSpinorOut;
@@ -447,19 +451,7 @@ static int dslashTest()
     staggeredDslashRef();
 
     unsigned long long flops = dirac->Flops();
-    int link_floats = 8*gaugeParam.reconstruct+8*18;
-    int spinor_floats = 8*6*2 + 6;
-    int link_float_size = prec;
-    int spinor_float_size = 0;
-
-    link_floats = test_type ? (2*link_floats) : link_floats;
-    spinor_floats = test_type ? (2*spinor_floats) : spinor_floats;
-
-    int bytes_for_one_site = link_floats * link_float_size + spinor_floats * spinor_float_size;
-    if (prec == QUDA_HALF_PRECISION) bytes_for_one_site += (8*2 + 1)*4;	
-
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
-    printfQuda("GB/s = %f\n\n", 1.0*Vh*bytes_for_one_site/((secs/loops)*1e+9));
 
     double norm2_cpu = norm2(*spinorRef);
     double norm2_cpu_cuda= norm2(*spinorOut);

@@ -204,29 +204,29 @@ namespace quda {
       }
     }
 
-    long long flops() const { // FIXME for multi-GPU
+    long long flops() const {
       long long Ls = in->X(4);
       long long vol4d = in->VolumeCB() / Ls;
       long long bulk = (Ls-2)*vol4d;
       long long wall = 2*vol4d;
-      long long flops_Tmp; 
+      long long flops; 
       switch(DS_type){
       case 0:
-	flops_Tmp = (x ? 1368ll : 1320ll)*in->VolumeCB();
+	flops = DslashCuda::flops();
 	break;
       case 1:
-	flops_Tmp = 72ll*in->VolumeCB() + 96ll*bulk + 120ll*wall;
+	flops = 72ll*in->VolumeCB() + 96ll*bulk + 120ll*wall;
 	break;
       case 2:
-	flops_Tmp = (x ? 96ll : 48ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
+	flops = (x ? 96ll : 48ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
 	break;
       case 3:
-	flops_Tmp = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
+	flops = 144ll*in->VolumeCB()*Ls + 3ll*Ls*(Ls-1ll);
 	break;
       default:
 	errorQuda("invalid Dslash type");
       }
-      return flops_Tmp;
+      return flops;
     }
   };
 #endif // GPU_DOMAIN_WALL_DIRAC

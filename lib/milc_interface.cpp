@@ -834,6 +834,9 @@ void qudaInvert(int external_precision,
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
       mass, target_res, target_res_hq, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   invertParam.use_sloppy_partial_accumulator = 0;
+  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
+
+
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
@@ -1153,6 +1156,7 @@ void qudaCloverInvert(int external_precision,
 
   invertParam.tol =  target_residual;
   invertParam.tol_hq = target_fermilab_residual;
+  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
