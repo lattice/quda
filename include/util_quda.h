@@ -53,13 +53,15 @@ char *getPrintBuffer();
 } while (0)
 
 #define warningQuda(...) do {                                   \
-  sprintf(getPrintBuffer(), __VA_ARGS__);			\
-  if (comm_rank() == 0) {                                       \
-    fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-    fprintf(getOutputFile(), "%s", getPrintBuffer());		\
-    fprintf(getOutputFile(), "\n");                             \
-    fflush(getOutputFile());                                    \
-  }                                                             \
+  if (getVerbosity() > QUDA_SILENT) {				\
+    sprintf(getPrintBuffer(), __VA_ARGS__);			\
+    if (comm_rank() == 0) {					\
+      fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix());	\
+      fprintf(getOutputFile(), "%s", getPrintBuffer());			\
+      fprintf(getOutputFile(), "\n");					\
+      fflush(getOutputFile());						\
+    }									\
+  }									\
 } while (0)
 
 #else
@@ -82,10 +84,12 @@ char *getPrintBuffer();
 } while (0)
 
 #define warningQuda(...) do {                                 \
-  fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
-  fprintf(getOutputFile(), __VA_ARGS__);                      \
-  fprintf(getOutputFile(), "\n");                             \
-  fflush(getOutputFile());                                    \
+  if (getVerbosity() > QUDA_SILENT) {			      \
+    fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix()); \
+    fprintf(getOutputFile(), __VA_ARGS__);                      \
+    fprintf(getOutputFile(), "\n");                             \
+    fflush(getOutputFile());                                    \
+  }								\
 } while (0)
 
 #endif // MULTI_GPU
