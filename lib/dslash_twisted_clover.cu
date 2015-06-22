@@ -102,6 +102,7 @@ namespace quda {
       switch(dslashType){
       case QUDA_DEG_CLOVER_TWIST_INV_DSLASH:
 #ifdef MULTI_GPU 
+#ifndef DYNAMIC_CLOVER
         fillAux(INTERIOR_KERNEL, "type=interior,CloverTwistInvDslash");
         fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,CloverTwistInvDslash");
         fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,CloverTwistInvDslash");
@@ -109,12 +110,25 @@ namespace quda {
         fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,CloverTwistInvDslash");
         fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,CloverTwistInvDslash");
 #else
+        fillAux(INTERIOR_KERNEL, "type=interior,CloverTwistInvDynDslash");
+        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,CloverTwistInvDynDslash");
+        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,CloverTwistInvDynDslash");
+        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,CloverTwistInvDynDslash");
+        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,CloverTwistInvDynDslash");
+        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,CloverTwistInvDynDslash");
+#endif // DYNAMIC_CLOVER
+#else
+#ifndef DYNAMIC_CLOVER
         fillAux(INTERIOR_KERNEL, "type=single-GPU,CloverTwistInvDslash");
+#else
+        fillAux(INTERIOR_KERNEL, "type=single-GPU,CloverTwistInvDynDslash");
+#endif // DYNAMIC_CLOVER
 #endif // MULTI_GPU
         break;
 
       case QUDA_DEG_DSLASH_CLOVER_TWIST_INV:
-#ifdef MULTI_GPU 
+#ifdef MULTI_GPU
+#ifndef DYNAMIC_CLOVER
         fillAux(INTERIOR_KERNEL, "type=interior,Dslash");
         fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,Dslash");
         fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,Dslash");
@@ -122,12 +136,25 @@ namespace quda {
         fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,Dslash");
         fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,Dslash");
 #else
+        fillAux(INTERIOR_KERNEL, "type=interior,DynDslash");
+        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,DynDslash");
+        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,DynDslash");
+        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,DynDslash");
+        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,DynDslash");
+        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,DynDslash");
+#endif // DYNAMIC_CLOVER
+#else
+#ifndef DYNAMIC_CLOVER
         fillAux(INTERIOR_KERNEL, "type=single-GPU,Dslash");
+#else
+        fillAux(INTERIOR_KERNEL, "type=single-GPU,DynDslash");
+#endif // DYNAMIC_CLOVER
 #endif // MULTI_GPU
         break;
 
       case QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY:
 #ifdef MULTI_GPU 
+#ifndef DYNAMIC_CLOVER
         fillAux(INTERIOR_KERNEL, "type=interior,DslashCloverTwist");
         fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,DslashCloverTwist");
         fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,DslashCloverTwist");
@@ -135,7 +162,19 @@ namespace quda {
         fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,DslashCloverTwist");
         fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,DslashCloverTwist");
 #else
+        fillAux(INTERIOR_KERNEL, "type=interior,DynDslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_ALL, "type=exterior_all,DynDslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_X, "type=exterior_x,DynDslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_Y, "type=exterior_y,DynDslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_Z, "type=exterior_z,DynDslashCloverTwist");
+        fillAux(EXTERIOR_KERNEL_T, "type=exterior_t,DynDslashCloverTwist");
+#endif // DYNAMIC_CLOVER
+#else
+#ifndef DYNAMIC_CLOVER
         fillAux(INTERIOR_KERNEL, "type=single-GPU,DslashCloverTwist");
+#else
+        fillAux(INTERIOR_KERNEL, "type=single-GPU,DynDslashCloverTwist");
+#endif // DYNAMIC_CLOVER
 #endif // MULTI_GPU
         break;
       }
