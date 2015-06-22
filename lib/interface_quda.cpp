@@ -71,14 +71,7 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 #undef PRINT_PARAM
 
 #include <gauge_tools.h>
-
-<<<<<<< HEAD
-#ifdef GPU_CONTRACT
 #include <contractQuda.h>
-#endif
-=======
-#include <contractQuda.h>
->>>>>>> origin/feature/contractions
 
 int numa_affinity_enabled = 1;
 
