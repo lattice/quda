@@ -5267,13 +5267,14 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   if (gaugeSmeared == NULL) {
 //    gaugeSmeared = new cudaGaugeField(gParamEx);
     gaugeSmeared = new cudaGaugeField(gParam);
-    #ifdef MULTI_GPU
-      copyExtendedGauge(*gaugeSmeared, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      gaugeSmeared->exchangeExtendedGhost(R,true);
-    #else
-      gaugeSmeared->copy(*gaugePrecise);
-    #endif
   }
+
+  #ifdef MULTI_GPU
+    copyExtendedGauge(*gaugeSmeared, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+    gaugeSmeared->exchangeExtendedGhost(R,true);
+  #else
+    gaugeSmeared->copy(*gaugePrecise);
+  #endif
 
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);
