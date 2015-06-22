@@ -290,7 +290,7 @@ namespace quda {
     if (in->Precision() != gauge.Precision())
       errorQuda("Mixing gauge and spinor precision not supported");
 
-#ifndef	DYNAMIC_CLOVER	
+#ifndef DYNAMIC_CLOVER
     if (clover->stride != cloverInv->stride) 
       errorQuda("clover and cloverInv must have matching strides (%d != %d)", clover->stride, cloverInv->stride);
 #endif
