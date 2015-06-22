@@ -272,6 +272,6 @@ copy_gauge_half.o: copy_gauge_half.cu copy_gauge_inc.cu $(HDRS)
 
 quda_fortran.o: quda_fortran.F90 ../include/enum_quda_fortran.h
 	$(CC) -Wall -E -I../include $< > $*.f90
-	$(F90) -c -fno-range-check $*.f90
+	$(F90) -c $*.f90
 
 .PHONY: all gen clean
