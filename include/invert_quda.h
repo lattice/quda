@@ -674,9 +674,13 @@ namespace quda {
     //
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
     // 
-    void CleanResources() {};//not implemented yet 
+    void CleanResources(); 
     //
-    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *defl_param);
+    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *dpar);
+    //GMRESDR method
+    void RunDeflatedCycles (cudaColorSpinorField *out, cudaColorSpinorField *in, GmresdrDeflationParam *dpar, const double tol_threshold);
+    //
+    void RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GmresdrDeflationParam *dpar, const double tol_threshold);
 
   };
 
