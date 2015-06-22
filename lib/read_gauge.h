@@ -359,6 +359,16 @@
   (G##6).x *= max; (G##6).y *= max; (G##7).x *= max; (G##7).y *= max;	\
   (G##8).x *= max; (G##8).y *= max;			
 
+#define RESCALE4(G, max)						\
+  (G##0).x *= max; (G##0).y *= max; (G##0).z *= max; (G##0).w *= max;	\
+  (G##1).x *= max; (G##1).y *= max; (G##1).z *= max; (G##1).w *= max;	\
+  (G##2).x *= max; (G##2).y *= max; (G##2).z *= max; (G##2).w *= max;	\
+  (G##3).x *= max; (G##3).y *= max; (G##3).z *= max; (G##3).w *= max;	\
+  (G##4).x *= max; (G##4).y *= max;
+
+
+
+
 // FIXME: merge staggered and Wilson reconstruct macros
 
 #define RECONSTRUCT_MATRIX_18_DOUBLE(dir) 
