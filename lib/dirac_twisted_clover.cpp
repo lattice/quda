@@ -201,7 +201,7 @@ namespace quda {
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
   
     FullClover *cs = new FullClover(clover);
-#ifndef	DYNAMIC_CLOVER
+#ifndef DYNAMIC_CLOVER
     FullClover *cI = new FullClover(cloverInv, false);
 #else
     FullClover *cI = NULL;
@@ -221,7 +221,7 @@ namespace quda {
       errorQuda("Non-degenerate DiracTwistedCloverPC is not implemented \n");
     }
     delete cs;
-#ifndef	DYNAMIC_CLOVER
+#ifndef DYNAMIC_CLOVER
     delete cI;
 #endif
   }
@@ -240,7 +240,7 @@ namespace quda {
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
   
     FullClover *cs = new FullClover(clover);
-#ifndef	DYNAMIC_CLOVER
+#ifndef DYNAMIC_CLOVER
     FullClover *cI = new FullClover(cloverInv, false);
 #else
     FullClover *cI = NULL;
@@ -261,7 +261,7 @@ namespace quda {
       errorQuda("Non-degenerate DiracTwistedCloverPC is not implemented \n");
     }
     delete cs;
-#ifndef	DYNAMIC_CLOVER
+#ifndef DYNAMIC_CLOVER
     delete cI;
 #endif
   }
@@ -273,7 +273,7 @@ namespace quda {
     bool reset = newTmp(&tmp1, in);
 
     FullClover *cs = new FullClover(clover);
-#ifndef	DYNAMIC_CLOVER
+#ifndef DYNAMIC_CLOVER
     FullClover *cI = new FullClover(cloverInv, false);
 #else
     FullClover *cI = NULL;
@@ -319,7 +319,7 @@ namespace quda {
     }
 
     delete cs;
-#ifndef	DYNAMIC_CLOVER
+#ifndef DYNAMIC_CLOVER
     delete cI;
 #endif
 
