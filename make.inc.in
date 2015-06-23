@@ -337,8 +337,8 @@ ifeq ($(strip $(NUMA_AFFINITY)), yes)
   NVCCOPT += -DNUMA_AFFINITY
   COPT += -DNUMA_AFFINITY
   NUMA_AFFINITY_OBJS=numa_affinity.o
-  ifneq ($(strp $(NVMLLIB_DIR)), )
-  	LIB+= -L$(NMVMLLIB_DIR)
+  ifneq ($(strip $(NVMLLIB_DIR)), )
+  	LIB+= -L$(NVMLLIB_DIR)
   endif
   ifeq ($(strip $(NVML)), yes)
 	  LIB+= -lnvidia-ml
