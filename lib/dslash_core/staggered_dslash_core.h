@@ -26,6 +26,8 @@
 #define t02_re T2.x
 #define t02_im T2.y
 
+#define time_boundary t_boundary
+
 #else
 
 #define spinorFloat float
@@ -47,6 +49,8 @@
 #define t01_im T1.y
 #define t02_re T2.x
 #define t02_im T2.y
+
+#define time_boundary t_boundary_f
 
 #endif
 
@@ -972,10 +976,10 @@ int long_sign = 1;
 {
   //direction: +T
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
-  int fat_sign = (y[3] >= (X4-1)) ? -1 : 1;
+  int fat_sign = (y[3] >= (X4-1)) ? time_boundary : 1;
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
-  int long_sign = (y[3] >= (X4-3)) ? -1 : 1;
+  int long_sign = (y[3] >= (X4-3)) ? time_boundary : 1;
 #endif
 
   int ga_idx = sid;
@@ -1059,10 +1063,10 @@ int long_sign = 1;
 {
   //direction: -T
 #if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
-  int fat_sign = ( ((y[3]+(X[3]-1))%X[3])>= (X[3]-1) ) ? -1 : 1;
+  int fat_sign = ( ((y[3]+(X[3]-1))%X[3])>= (X[3]-1) ) ? time_boundary : 1;
 #endif
 #if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
-  int long_sign = ( ((y[3]+(X[3]-3))%X[3])>= (X[3]-3) ) ? -1 : 1;
+  int long_sign = ( ((y[3]+(X[3]-3))%X[3])>= (X[3]-3) ) ? time_boundary : 1;
 #endif
 
   int dir = 7;
