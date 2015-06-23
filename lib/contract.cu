@@ -338,8 +338,8 @@ namespace quda {
      contraction. The function works only with parity spinors, and the parity must be specified.
   */
 
-  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type,
-			 const int nTSlice, const QudaParity parity, TimeProfile &profile)
+  void contractCuda(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type,
+		    const int nTSlice, const QudaParity parity, TimeProfile &profile)
   {
 #ifdef GPU_CONTRACT
     if	((contract_type != QUDA_CONTRACT_TSLICE) || (contract_type != QUDA_CONTRACT_TSLICE_PLUS) || (contract_type != QUDA_CONTRACT_TSLICE_MINUS)) {
@@ -354,16 +354,15 @@ namespace quda {
 
     Tunable *contract = 0;
 
-    if		(x.Precision() == QUDA_DOUBLE_PRECISION)
-      {
+    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
 #if (__COMPUTE_CAPABILITY__ >= 130)
-	contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type, nTSlice);
+      contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type, nTSlice);
 #else
-	errorQuda("Double precision not supported on this GPU");
+      errorQuda("Double precision not supported on this GPU");
 #endif
-      } else if	(x.Precision() == QUDA_SINGLE_PRECISION) {
+    } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       contract = new ContractCuda<float4,float2>(x, y, result, parity, contract_type, nTSlice);
-    } else if	(x.Precision() == QUDA_HALF_PRECISION) {
+    } else if (x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
     }
     profile.Stop(QUDA_PROFILE_INIT);
@@ -378,9 +377,10 @@ namespace quda {
 
     profile.Stop(QUDA_PROFILE_EPILOGUE);
     profile.Stop(QUDA_PROFILE_TOTAL);
-  }
 #else
     errorQuda("Contraction code has not been built");
 #endif
-}
+  }
+  
+} // namespace quda
 
