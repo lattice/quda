@@ -95,7 +95,7 @@ namespace quda {
 
          if(ldn != ld)                 errorQuda("Error: leading dimension of the source matrix must match that of the projection matrix.");
 
-         if(Vm->EigvDim() != (nevs+1)) errorQuda("Error: eigenvector content is inconsistent with the projection matrix dimensions.");
+         if(Vm->EigvDim() < (nevs+1))  errorQuda("Error: it seems that the provided eigenvector content is inconsistent with the projection matrix dimensions: %d vs %d", Vm->EigvDim(), (nevs+1));
 
          if(nevs != nv) nv = nevs;
 
@@ -610,6 +610,8 @@ namespace quda {
 
     profile.Start(QUDA_PROFILE_INIT);
 
+    DiracMatrix *sloppy_mat = &matSloppy;
+
     cudaColorSpinorField r(*in); //high precision residual 
     // 
     cudaColorSpinorField &x = *out;
@@ -734,7 +736,7 @@ namespace quda {
     {
       cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
 
-      matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);
+      (*sloppy_mat)(*Av, Vm->Eigenvec(j), tmp, tmp2);
 
       ///////////
       Complex h0 = cDotProductCuda(Vm->Eigenvec(0), *Av);//
@@ -841,9 +843,9 @@ namespace quda {
      {
        j = 0; //we will launch a normal GMRESDR cycle
 
-       if(defl_param->projType == QUDA_INVALID_PROJECTION) defl_param->projType = QUDA_GALERKIN_PROJECTION;
+       sloppy_mat = &matSloppy;//must be &matDefl
 
-       defl_param->LoadData(Vm, args->H, nev, ldH);
+       if(defl_param->projType == QUDA_INVALID_PROJECTION) defl_param->projType = QUDA_GALERKIN_PROJECTION;
 
        PerformProjection(*x_sloppy, *r_sloppy, defl_param);//note : full precision residual
 
@@ -877,7 +879,7 @@ namespace quda {
        //pointer aliasing:
        cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
 
-       matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);
+       (*sloppy_mat)(*Av, Vm->Eigenvec(j), tmp, tmp2);
        //
        Complex h0(0.0, 0.0);
        //
@@ -955,9 +957,16 @@ namespace quda {
      //
      double ext_r2 = xmyNormCuda(*in, r);//compute full precision residual
 
-     if(mixed_precision_gmresdr && ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold))
+     if(use_deflated_cycles && (mixed_precision_gmresdr && ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold)))
      {
        printfQuda("\nLaunch projection stage (%le)\n", sqrt(ext_r2 / r2));
+
+       args->ComputeHarmonicRitzPairs();
+
+       args->RestartVH( Vm );
+
+       defl_param->LoadData(Vm, args->H, nev, ldH);
+
        use_deflated_cycles = false;
      }
 
@@ -1190,7 +1199,7 @@ namespace quda {
       {
         cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
 
-        matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);
+        matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);//must be matDefl
 
         ///////////
         Complex h0 = cDotProductCuda(Vm->Eigenvec(0), *Av);//
@@ -1319,7 +1328,7 @@ namespace quda {
      defl_param = new GmresdrDeflationParam(args->ldm, args->nev);
    }
 
-   const double tol_threshold =2.0;//for mixed precision version only.
+   const double tol_threshold = 2.0;//for mixed precision version only.
 
    if(param.inv_type == QUDA_GMRESDR_INVERTER || (param.inv_type == QUDA_GMRESDR_PROJ_INVERTER && param.rhs_idx == 0))
    {
