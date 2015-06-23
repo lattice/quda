@@ -512,10 +512,8 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
   if (in->Precision() != clover_prec)
     errorQuda("ERROR: Clover precision and spinor precision do not match\n");
 
-#ifndef DYNAMIC_CLOVER
   if (clov->stride != clovInv->stride) 
     errorQuda("clover and cloverInv must have matching strides (%d != %d)", clov->stride, clovInv->stride);
-#endif
     
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
@@ -545,4 +543,6 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
 
 } // namespace quda
 
+#ifdef GPU_CONTRACT
 #include "contract.cu"
+#endif

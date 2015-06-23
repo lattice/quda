@@ -623,21 +623,13 @@ def gen(dir, pack_only=False):
 		load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
 		load_spinor += "#else\n"
 	    load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-	    load_spinor += "#ifndef DYNAMIC_CLOVER\n"
 	    load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-	    load_spinor += "#else\n"
-	    load_spinor += "APPLY_CLOVER_TWIST_DYN_INV(c, a, i);\n"
-	    load_spinor += "#endif\n"
 	else:
 	    if not pack_only:
 		load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
 	    else:
 		load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-		load_spinor += "#ifndef DYNAMIC_CLOVER\n"
 		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, i);\n"
-		load_spinor += "#else\n"
-		load_spinor += "APPLY_CLOVER_TWIST_DYN_INV(c, -a, i);\n"
-		load_spinor += "#endif\n"
 	if not pack_only and not dagger:
 	    load_spinor += "#endif\n"
     elif row_cnt[2] == 0:
@@ -647,46 +639,26 @@ def gen(dir, pack_only=False):
 		load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
 		load_spinor += "#else\n"
 	    load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-	    load_spinor += "#ifndef DYNAMIC_CLOVER\n"
 	    load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-	    load_spinor += "#else\n"
-	    load_spinor += "APPLY_CLOVER_TWIST_DYN_INV(c, a, i);\n"
-	    load_spinor += "#endif\n"
 	else:
 	    if not pack_only:
 		load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
 	    else:
 		load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-		load_spinor += "#ifndef DYNAMIC_CLOVER\n"
 		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, i);\n"
-		load_spinor += "#else\n"
-		load_spinor += "APPLY_CLOVER_TWIST_DYN_INV(c, -a, i);\n"
-		load_spinor += "#endif\n"
 	if not pack_only and not dagger:
 	    load_spinor += "#endif\n"
     else:
 	load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
 	if not dagger and not pack_only:
 	    load_spinor += "#ifdef CLOVER_TWIST_INV_DSLASH\n"
-	    load_spinor += "#ifndef DYNAMIC_CLOVER\n"
 	    load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-	    load_spinor += "#else\n"
-	    load_spinor += "APPLY_CLOVER_TWIST_DYN_INV(c, a, i);\n"
-	    load_spinor += "#endif\n"
 	    load_spinor += "#endif\n"
 	if pack_only:
 	    if not dagger:      # Was behind
-		load_spinor += "#ifndef DYNAMIC_CLOVER\n"
 		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-		load_spinor += "#else\n"
-		load_spinor += "APPLY_CLOVER_TWIST_DYN_INV(c, a, i);\n"
-		load_spinor += "#endif\n"
 	    else:
-		load_spinor += "#ifndef DYNAMIC_CLOVER\n"
 		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, i);\n"
-		load_spinor += "#else\n"
-		load_spinor += "APPLY_CLOVER_TWIST_DYN_INV(c, -a, i);\n"
-		load_spinor += "#endif\n"
     load_spinor += "\n"
 
     load_half = ""
@@ -894,11 +866,7 @@ def clover_twisted_xpay():
     if not dagger:
 	str += "#ifndef CLOVER_TWIST_XPAY\n"
 	str += "//perform invert twist first:\n"
-	str += "#ifndef DYNAMIC_CLOVER\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, a, o);\n"
-	str += "#else\n"
-	str += "APPLY_CLOVER_TWIST_DYN_INV(c, a, o);\n"
-	str += "#endif\n"
 	for s in range(0,4):
 	    for c in range(0,3):
 	        i = 3*s+c
@@ -913,21 +881,13 @@ def clover_twisted_xpay():
 		str += out_im(s,c) +" = b*"+out_im(s,c)+" + "+acc_im(s,c)+";\n"
 	str += "#endif//CLOVER_TWIST_XPAY\n"
 	str += "#else //no XPAY\n"
-	str += "#ifndef DYNAMIC_CLOVER\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, a, o);\n"
-	str += "#else\n"
-	str += "APPLY_CLOVER_TWIST_DYN_INV(c, a, o);\n"
-	str += "#endif\n"
 	str += "#endif\n"
     else:
 	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
 	str += "#ifndef CLOVER_TWIST_XPAY\n"
 	str += "//perform invert twist first:\n"
-	str += "#ifndef DYNAMIC_CLOVER\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);\n"
-	str += "#else\n"
-	str += "APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);\n"
-	str += "#endif\n"
 	str += "#else\n"
 	str += "APPLY_CLOVER_TWIST(c, -a, acc);\n"
 	str += "#endif\n"
@@ -939,11 +899,7 @@ def clover_twisted_xpay():
 		str += out_im(s,c) +" = b*"+out_im(s,c)+" + "+acc_im(s,c)+";\n"
 	str += "#else //no XPAY\n"
 	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
-	str += "#ifndef DYNAMIC_CLOVER\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);\n"
-	str += "#else\n"
-	str += "APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);\n"
-	str += "#endif\n"
 	str += "#endif\n"
 	str += "#endif\n"
     return str
