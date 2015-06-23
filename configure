@@ -590,6 +590,8 @@ MAGMA_HOME
 BUILD_MAGMA
 QDP_INSTALL_PATH
 USE_QDPJIT
+NVMLLIB_DIR
+NVML
 NUMA_AFFINITY
 FERMI_DBLE_TEX
 BLAS_TEX
@@ -738,6 +740,8 @@ with_magma
 enable_blas_tex
 enable_fermi_double_tex
 enable_numa_affinity
+enable_nvidia_ml
+with_nvidia_ml_lib
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1423,6 +1427,8 @@ Optional Features:
                           (default: enabled)
   --enable-numa-affinity  Enable NUMA affinity support (default: enabled,
                           always disabled on osx target)
+  --enable-nvidia-ml      Use the nvidia-ml library to set NUMA affinity
+                          (default: enabled)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1435,6 +1441,8 @@ Optional Packages:
   --with-qio=QIODIR       Specify QIO installation directory
   --with-qdp=QDPDIR       Specify QDP++ installation directory
   --with-magma=MAGMADIR   Specify MAGMA installation directory
+  --with-nvidia-ml-lib    Specify location of the nvidia-ml library if not in
+                          the default library locations (default: blank)
 
 Some influential environment variables:
   CC          C compiler command
@@ -3973,6 +3981,25 @@ else
 fi
 
 
+# Check whether --enable-nvidia-ml was given.
+if test "${enable_nvidia_ml+set}" = set; then :
+  enableval=$enable_nvidia_ml;  nvml=${enableval}
+else
+   nvml="yes"
+
+fi
+
+
+
+# Check whether --with-nvidia-ml-lib was given.
+if test "${with_nvidia_ml_lib+set}" = set; then :
+  withval=$with_nvidia_ml_lib;  nvmllibdir=${withval}
+else
+   nvmllibdir=""
+
+fi
+
+
 case ${cpu_arch} in
 x86 | x86_64 ) ;;
 *)
@@ -4491,6 +4518,16 @@ FERMI_DBLE_TEX=${fermi_double_tex}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting NUMA_AFFINITY= ${numa_affinity}" >&5
 $as_echo "$as_me: Setting NUMA_AFFINITY= ${numa_affinity}" >&6;}
 NUMA_AFFINITY=${numa_affinity}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting NVML = ${nvml}" >&5
+$as_echo "$as_me: Setting NVML = ${nvml}" >&6;}
+NVML=${nvml}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting NVMLLIB_DIR = ${nvmllibdir}" >&5
+$as_echo "$as_me: Setting NVMLLIB_DIR = ${nvmllibdir}" >&6;}
+NVMLLIB_DIR=${nvmllibdir}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting USE_QDPJIT = ${build_qdpjit} " >&5

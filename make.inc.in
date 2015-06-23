@@ -83,7 +83,9 @@ ATLAS_HOME=@ATLAS_HOME@
 LAPACK_HOME=@LAPACK_HOME@
 
 
-NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
+NUMA_AFFINITY= @NUMA_AFFINITY@   # enable NUMA affinity?
+NVML= @NVML@                     # Use the nvidia-ml library to set NUMA affinity
+NVMLLIB_DIR=@NVMLLIB_DIR@     # Location if nvidia-ml library not in default path
 
 ######
 
@@ -94,10 +96,10 @@ ifeq ($(strip $(CPU_ARCH)), x86_64)
     LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
     NVCCOPT = -m64
   else
-    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart -lnvidia-ml
+    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart 
   endif
 else
-  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32 -lnvidia-ml
+  LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32
   COPT = -malign-double -m32
   NVCCOPT = -m32
 endif
@@ -335,6 +337,14 @@ ifeq ($(strip $(NUMA_AFFINITY)), yes)
   NVCCOPT += -DNUMA_AFFINITY
   COPT += -DNUMA_AFFINITY
   NUMA_AFFINITY_OBJS=numa_affinity.o
+  ifneq ($(strp $(NVMLLIB_DIR)), )
+  	LIB+= -L$(NMVMLLIB_DIR)
+  endif
+  ifeq ($(strip $(NVML)), yes)
+	  LIB+= -lnvidia-ml
+	  NVCCOPT += -DNVML
+	  COPT+= -DNVML
+  endif
 endif
 
 ifeq ($(strip $(BUILD_CONTRACT)), yes)

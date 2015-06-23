@@ -12,7 +12,7 @@
 #include <string.h>
 #include <numa_affinity.h>
 #include <quda_internal.h>
-#if (CUDA_VERSION >= 6000)
+#if ((CUDA_VERSION >= 6000) && defined NVML)
 #include <nvml.h>
 #endif
 
@@ -211,7 +211,7 @@ int setNumaAffinity(int devid)
 
 int setNumaAffinityNVML(int devid)
 {
-#if (CUDA_VERSION >= 6000)
+#if ((CUDA_VERSION >= 6000) && defined NVML)
   nvmlReturn_t result;
 
   result = nvmlInit();
