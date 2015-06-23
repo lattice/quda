@@ -2023,11 +2023,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
 #ifndef CLOVER_TWIST_INV_DSLASH
 #ifndef CLOVER_TWIST_XPAY
   //perform invert twist first:
-#ifndef DYNAMIC_CLOVER
   APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);
-#else
-  APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);
-#endif
 #else
   APPLY_CLOVER_TWIST(c, -a, acc);
 #endif
@@ -2058,11 +2054,7 @@ if (isActive(dim,3,-1,x1,x2,x3,x4,param.commDim,param.X) && x4==0 )
   o32_im = b*o32_im + acc32_im;
 #else //no XPAY
 #ifndef CLOVER_TWIST_INV_DSLASH
-#ifndef DYNAMIC_CLOVER
   APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);
-#else
-  APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);
-#endif
 #endif
 #endif
 }

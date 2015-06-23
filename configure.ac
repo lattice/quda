@@ -179,12 +179,6 @@ AC_ARG_ENABLE(contract,
   [ build_contract="no" ]
 )
 
-AC_ARG_ENABLE(dynamic-clover,
-  AC_HELP_STRING([--enable-dynamic-clover], [ Invert dynamically the clover term for twisted-clover fermions (default: disabled)]),
-  [ dynamic_clover=${enableval} ],
-  [ dynamic_clover="no" ]
-)
-
 dnl Multi-GPU options
 dnl ==================
 
@@ -525,19 +519,11 @@ yes|no);;
   ;;
 esac
 
-dnl Build bilinear contraction
+dnl Build Hisq force
 case ${build_contract} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-contract ])
-  ;;
-esac
-
-dnl Use dynamic clover inversion
-case ${dynamic_clover} in
-yes|no);;
-*) 
-  AC_MSG_ERROR([ invalid value for --enable-dynamic-clover ])
   ;;
 esac
 
@@ -718,9 +704,6 @@ AC_SUBST( BUILD_SSTEP, [${build_sstep}])
 
 AC_MSG_NOTICE([Setting BUILD_CONTRACT = ${build_contract} ] )
 AC_SUBST( BUILD_CONTRACT, [${build_contract}])
-
-AC_MSG_NOTICE([Setting DYNAMIC_CLOVER = ${dynamic_clover} ] )
-AC_SUBST( DYNAMIC_CLOVER, [${dynamic_clover}])
 
 AC_MSG_NOTICE([Setting BUILD_MULTI_GPU = ${multi_gpu} ] )
 AC_SUBST( BUILD_MULTI_GPU, [${multi_gpu}])

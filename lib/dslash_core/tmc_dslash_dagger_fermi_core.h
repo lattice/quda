@@ -2467,11 +2467,7 @@ if (!incomplete)
 #ifndef CLOVER_TWIST_INV_DSLASH
 #ifndef CLOVER_TWIST_XPAY
   //perform invert twist first:
-#ifndef DYNAMIC_CLOVER
   APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);
-#else
-  APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);
-#endif
 #else
   APPLY_CLOVER_TWIST(c, -a, acc);
 #endif
@@ -2502,11 +2498,7 @@ if (!incomplete)
   o32_im = b*o32_im + acc32_im;
 #else //no XPAY
 #ifndef CLOVER_TWIST_INV_DSLASH
-#ifndef DYNAMIC_CLOVER
   APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);
-#else
-  APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);
-#endif
 #endif
 #endif
 }
