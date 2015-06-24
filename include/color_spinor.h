@@ -5,17 +5,24 @@
  *
  * The header file defines some helper structs for dealing with
  * ColorSpinors (e.g., a vector with both color and spin degrees of
- * freedom.
+ * freedom).
  */
 namespace quda {
 
+  /**
+     This is the generic declaration of ColorSpinor.
+   */
   template <typename Float, int Nc, int Ns>
     struct ColorSpinor {
 
       complex<Float> data[Nc*Ns];
 
     };
-  
+
+  /**
+     This is the specialization for Nspin=4.  For fields with four
+     spins we can define a spin projection operation.
+   */
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 4> {
     complex<Float> data[Nc*4];
@@ -106,9 +113,20 @@ namespace quda {
        @return Comlex number at this spin and color index
      */
     __device__ __host__ complex<Float> operator()(int s, int c) { return data[s*Nc + c]; }
-    
+
+    /**
+       Accessor functor
+       @param s Spin index
+       @paran c Color index
+       @return Complex number at this spin and color index
+     */
+    __device__ __host__ const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
   };
 
+  /**
+     This is the specialization for Nspin=2.  For fields with two
+     spins we can define a spin reconstruction operation.
+   */
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 2> {
     complex<Float> data[Nc*2];
@@ -121,7 +139,7 @@ namespace quda {
     */
     template<int dim, int sign>
     __device__ __host__ ColorSpinor<Float,Nc,4> reconstruct() {
-      ColorSpinor<Float,Nc,2> recon;
+      ColorSpinor<Float,Nc,4> recon;
       complex<Float> j(0.0,1.0);
       
       switch (dim) {
@@ -205,17 +223,26 @@ namespace quda {
 	  }
 	}
       }
-      return proj;
+      return recon;
     }
 
     /**
        Accessor functor
        @param s Spin index
        @paran c Color index
-       @return Comlex number at this spin and color index
+       @return Complex number at this spin and color index
      */
     __device__ __host__ complex<Float> operator()(int s, int c) { return data[s*Nc + c]; }
+
+    /**
+       Accessor functor
+       @param s Spin index
+       @paran c Color index
+       @return Complex number at this spin and color index
+     */
+    __device__ __host__ const complex<Float>& operator()(int s, int c) const { return data[s*Nc + c]; }
   };
+
 
   /**
      Compute the outer product over color and take the spin trace
@@ -224,22 +251,26 @@ namespace quda {
      @param b Right-hand side ColorSpinor
      @return The spin traced matrix
   */
-  template<typename Float, int Nc, int Ns>
-    __device__ __host__  Matrix<complex<Float>,Nc>
-    outerProdSpinTrace(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns>, &b) {
-    
-    Matrix<complex<Float>,Nc> out;
+  template<typename Float, int Nc, int Ns> __device__ __host__
+    Matrix< typename ComplexTypeId<Float>::Type ,Nc> outerProdSpinTrace(const ColorSpinor<Float,Nc,Ns> &a, const ColorSpinor<Float,Nc,Ns> &b) {
 
+    typedef typename ComplexTypeId<Float>::Type complex_type;
+    Matrix<complex_type,Nc> out;
+    
     // trace over spin
     for (int s=0; s<Ns; s++) {
       // outer product over color
       for (int i=0; i<Nc; i++) {
-	for (int j=0; j<Nc; j++) {
-	  out(j,i) += a(s,j) * conj(b(s,i));
+        for(int j=0; j<Nc; j++) {
+	  out(j,i) +=
+	    a(s,j) *
+	    conj(b(s,i));
 	}
       }
     }
     return out;
   }
 
+
+  
 } // namespace quda

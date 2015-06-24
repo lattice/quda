@@ -723,6 +723,21 @@ extern "C" {
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
 				   double coeff,
 				   QudaParity parity, QudaGaugeParam* param, int conjugate);
+  /**
+   * Compute the clover force contributions in each dimension mu given the solution fields
+
+   Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dagger  +  P_mu^- p(x+mu) x(x)^\dagger )
+
+   * @param force Force matrix
+   * @param x Array of solution vectors
+   * @param p Array of intermediate vectors
+   * @param coeff Array of coefficients for each contribution
+   * @param nvec Number of vectors
+   * @param gauge Gauge Field
+   * @param param Gauge field meta data
+   */
+  void computeCloverForceQuda(void *force, void **x, void **p, double *scale, int nvector, 
+			      void *gauge, QudaGaugeParam* param);
 
   /**
    * Compute the quark-field outer product needed for gauge generation

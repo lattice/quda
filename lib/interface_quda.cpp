@@ -184,6 +184,9 @@ static TimeProfile profileCloverDerivative("computeCloverDerivativeQuda");
 //!<Profiler for computeCloverSigmaTrace
 static TimeProfile profileCloverTrace("computeCloverTraceQuda");
 
+//!<Profiler for computeCloverForceQuda
+static TimeProfile profileCloverForce("computeCloverForceQuda");
+
 //!<Profiler for computeStaggeredOprodQuda
 static TimeProfile profileStaggeredOprod("computeStaggeredOprodQuda");
 
@@ -1113,6 +1116,7 @@ void endQuda(void)
     profileExtendedGauge.Print();
     profileCloverDerivative.Print();
     profileCloverTrace.Print();
+    profileCloverForce.Print();
     profileStaggeredOprod.Print();
     profileAsqtadForce.Print();
     profileHISQForce.Print();
@@ -4979,6 +4983,116 @@ return;
 */
 
 
+// let's just declare this here for now
+namespace quda {
+  void computeCloverForce(cudaGaugeField& force,
+			  const cudaGaugeField& U,
+			  cudaColorSpinorField& x,  
+			  cudaColorSpinorField& p,
+			  const unsigned int parity, const double coeff);
+}
+ 
+void computeCloverForceQuda(void *force, void **h_x, void **h_p, double *coeff, int nvector, 
+			    void *gauge, QudaGaugeParam* param) {
+
+
+  using namespace quda;
+  profileCloverForce.Start(QUDA_PROFILE_TOTAL);
+
+  checkGaugeParam(param);
+
+  if (!gaugePrecise) errorQuda("No resident gauge field");
+
+  profileCloverForce.Start(QUDA_PROFILE_INIT);
+  GaugeFieldParam fParam(0, *param);
+
+  fParam.nDim = 4;
+  fParam.nFace = 0; 
+  // create the host outer-product field
+  fParam.pad = 0;
+  fParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  fParam.link_type = QUDA_GENERAL_LINKS;
+  fParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  fParam.order = param->gauge_order;
+  fParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  fParam.gauge = force;
+  cpuGaugeField cpuForce(fParam);
+
+  // create the device outer-product field
+  fParam.create = QUDA_ZERO_FIELD_CREATE;
+  fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  cudaGaugeField cudaForce(fParam);
+  profileCloverForce.Stop(QUDA_PROFILE_INIT); 
+
+  profileCloverForce.Start(QUDA_PROFILE_H2D);
+  cudaForce.loadCPUField(cpuForce,QUDA_CPU_FIELD_LOCATION);
+  profileCloverForce.Stop(QUDA_PROFILE_H2D);
+
+
+  profileCloverForce.Start(QUDA_PROFILE_INIT);
+
+  ColorSpinorParam qParam;
+  qParam.nColor = 3;
+  qParam.nSpin = 4;
+  qParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  qParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  qParam.nDim = 4;
+  qParam.precision = fParam.precision;
+  qParam.pad = 0;
+  for(int dir=0; dir<4; ++dir) qParam.x[dir] = fParam.x[dir];
+
+  // create the device quark field
+  qParam.create = QUDA_NULL_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  cudaColorSpinorField cudaQuarkX(qParam); 
+  cudaColorSpinorField cudaQuarkP(qParam); 
+
+  // create the host quark field
+  qParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+  profileCloverForce.Stop(QUDA_PROFILE_INIT);
+
+  // loop over different quark fields
+  for(int i=0; i<nvector; ++i){
+
+    // Wrap the even-parity MILC quark field 
+    profileCloverForce.Start(QUDA_PROFILE_INIT);
+    qParam.v = h_x[i];
+    cpuColorSpinorField cpuQuarkX(qParam); // create host quark field
+    qParam.v = h_p[i];
+    cpuColorSpinorField cpuQuarkP(qParam); // create host quark field
+    profileCloverForce.Stop(QUDA_PROFILE_INIT);
+
+    profileCloverForce.Start(QUDA_PROFILE_H2D);
+    cudaQuarkX = cpuQuarkX;
+    cudaQuarkP = cpuQuarkP;
+    profileCloverForce.Stop(QUDA_PROFILE_H2D); 
+
+
+    profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
+
+    // Operate on even-parity sites
+    computeCloverForce(cudaForce, *gaugePrecise, cudaQuarkX, cudaQuarkP, 0, coeff[i]);
+
+    // Operate on odd-parity sites
+    computeCloverForce(cudaForce, *gaugePrecise, cudaQuarkX, cudaQuarkP, 1, coeff[i]);
+
+    profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
+  }
+
+
+  // copy the outer product field back to the host
+  profileCloverForce.Start(QUDA_PROFILE_D2H);
+  cudaForce.saveCPUField(cpuForce,QUDA_CPU_FIELD_LOCATION);
+  profileCloverForce.Stop(QUDA_PROFILE_D2H); 
+
+  profileCloverForce.Stop(QUDA_PROFILE_TOTAL);
+
+  checkCudaError();
+  return;
+
+}
 
 
 
