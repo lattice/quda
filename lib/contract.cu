@@ -1,9 +1,5 @@
-//
-// double2 contractCuda(float2 *x, float2 *y, float2 *result) {}
-//
-
-namespace quda
-{
+namespace quda {
+#ifdef GPU_CONTRACT
 #include <gamma5.h>		// g5 kernel
 
   /**
@@ -280,19 +276,26 @@ namespace quda
     long long flops() const { return 120ll * x.VolumeCB(); }
     long long bytes() const { return x.Bytes() + x.NormBytes() + y.Bytes() + y.NormBytes(); }
   };
+#endif
 
   /**
-     Contracts the x and y spinors (x is daggered) and stores the result in the array result. One must specify the contract type (time-sliced or volumed contract, and whether we should include
-     a gamma5 in the middle), as well as the time-slice (see overloaded version of the same function) in case we don't want a volume contraction. The function works only with parity spinors,
-     and the parity must be specified.
+     Contracts the x and y spinors (x is daggered) and stores the result in the array result.
+     One must specify the contract type (time-sliced or volumed contract, and whether we should
+     include a gamma5 in the middle), as well as the time-slice (see overloaded version of the
+     same function) in case we don't want a volume contraction. The function works only with
+     parity spinors, and the parity must be specified.
   */
 
-  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const QudaParity parity)
+  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const QudaParity parity, TimeProfile &profile)
   {
+#ifdef GPU_CONTRACT
     if	((contract_type == QUDA_CONTRACT_TSLICE) || (contract_type == QUDA_CONTRACT_TSLICE_PLUS) || (contract_type == QUDA_CONTRACT_TSLICE_MINUS)) {
       errorQuda("No time-slice specified for contraction\n");
       return;
     }
+
+    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.Start(QUDA_PROFILE_INIT);
 
     dslashParam.threads = x.Volume();
 
@@ -310,24 +313,42 @@ namespace quda
     } else if	(x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
     }
+    profile.Stop(QUDA_PROFILE_INIT);
 
+    profile.Start(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
+    profile.Stop(QUDA_PROFILE_COMPUTE);
+
+    profile.Start(QUDA_PROFILE_EPILOGUE);
     checkCudaError();
 
     delete contract;
+
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.Stop(QUDA_PROFILE_TOTAL);
+#else
+    errorQuda("Contraction code has not been built");
+#endif
   }
 
   /**
-     Contracts the x and y spinors (x is daggered) and stores the result in the array result. One must specify the contract type (time-sliced or volumed contract, and whether we should include
-     a gamma5 in the middle), as well as the time-slice in case we don't want a volume contraction. The function works only with parity spinors, and the parity must be specified.
+     Contracts the x and y spinors (x is daggered) and stores the result in the array result.
+     One must specify the contract type (time-sliced or volumed contract, and whether we should
+     include a gamma5 in the middle), as well as the time-slice in case we don't want a volume
+     contraction. The function works only with parity spinors, and the parity must be specified.
   */
 
-  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type, const int nTSlice, const QudaParity parity)
+  void	contractCuda	(const cudaColorSpinorField &x, const cudaColorSpinorField &y, void *result, const QudaContractType contract_type,
+			 const int nTSlice, const QudaParity parity, TimeProfile &profile)
   {
+#ifdef GPU_CONTRACT
     if	((contract_type != QUDA_CONTRACT_TSLICE) || (contract_type != QUDA_CONTRACT_TSLICE_PLUS) || (contract_type != QUDA_CONTRACT_TSLICE_MINUS)) {
       errorQuda("No time-slice input allowed for volume contractions\n");
       return;
     }
+
+    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.Start(QUDA_PROFILE_INIT);
 
     dslashParam.threads = x.X(0)*x.X(1)*x.X(2);
 
@@ -345,11 +366,21 @@ namespace quda
     } else if	(x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
     }
+    profile.Stop(QUDA_PROFILE_INIT);
 
+    profile.Start(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    checkCudaError();
+    profile.Stop(QUDA_PROFILE_COMPUTE);
 
+    profile.Start(QUDA_PROFILE_EPILOGUE);
+    checkCudaError();
     delete contract;
+
+    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.Stop(QUDA_PROFILE_TOTAL);
   }
+#else
+    errorQuda("Contraction code has not been built");
+#endif
 }
 
