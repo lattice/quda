@@ -344,7 +344,6 @@ namespace quda {
     return;
   } // interiorOprodKernel
   
-#ifdef MULTI_GPU
   template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB> 
   __global__ void exteriorOprodKernel(CloverForceArg<Complex, Output, Gauge, InputA, InputB> arg)
     {
@@ -352,10 +351,11 @@ namespace quda {
       const int gridSize = gridDim.x*blockDim.x;
 
       typedef typename RealTypeId<Complex>::Type real;
-      Complex A[12];
-      Complex A_shift[12];
-      Complex B[12];
-      Complex B_shift[12];
+
+      ColorSpinor<real,3,4> A;
+      ColorSpinor<real,3,4> A_shift;
+      ColorSpinor<real,3,4> B;
+      ColorSpinor<real,3,4> B_shift;
       Matrix<Complex,3> result;
       Matrix<Complex,3> temp;
       Matrix<Complex,3> U;
@@ -364,16 +364,15 @@ namespace quda {
       while(cb_idx<arg.length){
         coordsFromIndex<1>(x, cb_idx, arg.X, arg.dir, arg.displacement, arg.parity); 
         const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
-        arg.inA.load(A, bulk_cb_idx);
-        arg.inB.load(B, bulk_cb_idx);
+        arg.inA.load(static_cast<Complex*>(A.data), bulk_cb_idx);
+        arg.inB.load(static_cast<Complex*>(B.data), bulk_cb_idx);
 
         const unsigned int ghost_idx = arg.ghostOffset[arg.dir] + ghostIndexFromCoords<1,3>(x, arg.X, arg.dir, arg.displacement);
-        arg.inB.loadGhost(B_shift, ghost_idx, arg.dir);
-        outerProd(B_shift,A,&temp);
+        arg.inB.loadGhost(static_cast<Complex*>(B_shift.data), ghost_idx, arg.dir);
+        result = outerProdSpinTrace(B_shift,A);
 
-        arg.inA.loadGhost(A_shift, ghost_idx, arg.dir);
-        outerProd(A_shift,B,&result);
-	result += temp;
+        arg.inA.loadGhost(static_cast<Complex*>(A_shift.data), ghost_idx, arg.dir);
+        result += outerProdSpinTrace(A_shift,B);
 
         arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, arg.dir, arg.parity); 
         result = temp + result*arg.coeff; 
@@ -385,7 +384,6 @@ namespace quda {
       }
       return;
     }
-#endif // MULTI_GPU
   
   template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB> 
   class CloverForce : public Tunable {
@@ -420,9 +418,7 @@ namespace quda {
 	if(arg.kernelType == OPROD_INTERIOR_KERNEL){
 	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	} else if(arg.kernelType == OPROD_EXTERIOR_KERNEL) {
-#ifdef MULTI_GPU
 	  exteriorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-#endif
 	} else {
 	  errorQuda("Kernel type not supported\n");
 	}
