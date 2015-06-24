@@ -153,7 +153,7 @@ endif
 endif
 
 # limit maximum number of registers in BLAS routines to increase occupancy
-ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30))
+ifneq ($(TESLA_ARCH),true)
   MAXREG =
 else
   MAXREG = --maxrregcount=80
