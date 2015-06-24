@@ -33,8 +33,7 @@ namespace quda {
 	@param sign Positive or negative projector
 	@return The spin-projected Spinor
     */
-    template<int dim, int sign>
-    __device__ __host__ ColorSpinor<Float,Nc,2> project() {
+    __device__ __host__ ColorSpinor<Float,Nc,2> project(int dim, int sign) {
       ColorSpinor<Float,Nc,2> proj;
       complex<Float> j(0.0,1.0);
       
@@ -137,8 +136,7 @@ namespace quda {
 	@param sign Positive or negative projector
 	@return The spin-reconstructed Spinor
     */
-    template<int dim, int sign>
-    __device__ __host__ ColorSpinor<Float,Nc,4> reconstruct() {
+      __device__ __host__ ColorSpinor<Float,Nc,4> reconstruct(int dim, int sign) {
       ColorSpinor<Float,Nc,4> recon;
       complex<Float> j(0.0,1.0);
       
@@ -207,8 +205,8 @@ namespace quda {
 	switch (sign) {
 	case 1: // positive projector
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = *(*this)(0,i);
-	    recon(1,i) = *(*this)(1,i);
+	    recon(0,i) = (*this)(0,i);
+	    recon(1,i) = (*this)(1,i);
 	    recon(2,i) = 0;
 	    recon(3,i) = 0;
 	    break;

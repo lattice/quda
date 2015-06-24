@@ -415,9 +415,16 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       convert<RegType, InterType>(x, y, N);
     }
 
+  /**
+     Load the ghost spinor.  For Wilson fermions, we assume that the
+     ghost is spin projected
+   */
   __device__ inline void loadGhost(RegType x[], const int i, const int dim) {
     // load data into registers first using the storage order
-    const int M = (N * sizeof(RegType)) / sizeof(InterType);
+    const int Nspin = (REG_LENGTH * N) / (3 * 2);
+    // if Wilson, then load only half the number of components
+    const int M = ((N * sizeof(RegType)) / sizeof(InterType)) / ((Nspin == 4) ? 2 : 1);
+
     InterType y[M];
     
     // If we are using tex references, then we can only use the predeclared texture ids

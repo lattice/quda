@@ -325,9 +325,11 @@ namespace quda {
 	const int nbr_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity, arg.X);
 	if(nbr_idx >= 0){
 	  arg.inB.load(static_cast<Complex*>(B_shift.data), nbr_idx); // need to do reconstruct
+	  B_shift = (B_shift.project(dir,1)).reconstruct(dir,1);
 	  result = outerProdSpinTrace(B_shift,A);
 
 	  arg.inA.load(static_cast<Complex*>(A_shift.data), nbr_idx);
+	  A_shift = (A_shift.project(dir,-1)).reconstruct(dir,-1);
 	  result += outerProdSpinTrace(A_shift,B);
 
 	  arg.force.load(reinterpret_cast<real*>(temp.data), idx, dir, arg.parity); 
@@ -344,7 +346,7 @@ namespace quda {
     return;
   } // interiorOprodKernel
   
-  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB> 
+  template<int dim, typename Complex, typename Output, typename Gauge, typename InputA, typename InputB> 
   __global__ void exteriorOprodKernel(CloverForceArg<Complex, Output, Gauge, InputA, InputB> arg)
     {
       int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -362,23 +364,26 @@ namespace quda {
 
       int x[4];
       while(cb_idx<arg.length){
-        coordsFromIndex<1>(x, cb_idx, arg.X, arg.dir, arg.displacement, arg.parity); 
+        coordsFromIndex<1>(x, cb_idx, arg.X, dim, arg.displacement, arg.parity); 
         const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
         arg.inA.load(static_cast<Complex*>(A.data), bulk_cb_idx);
         arg.inB.load(static_cast<Complex*>(B.data), bulk_cb_idx);
 
-        const unsigned int ghost_idx = arg.ghostOffset[arg.dir] + ghostIndexFromCoords<1,3>(x, arg.X, arg.dir, arg.displacement);
-        arg.inB.loadGhost(static_cast<Complex*>(B_shift.data), ghost_idx, arg.dir);
+	ColorSpinor<real,3,2> tmp;
+        const unsigned int ghost_idx = arg.ghostOffset[dim] + ghostIndexFromCoords<1,3>(x, arg.X, dim, arg.displacement);
+        arg.inB.loadGhost(static_cast<Complex*>(tmp.data), ghost_idx, dim);
+	B_shift = tmp.reconstruct(dim, 1);
         result = outerProdSpinTrace(B_shift,A);
 
-        arg.inA.loadGhost(static_cast<Complex*>(A_shift.data), ghost_idx, arg.dir);
+        arg.inA.loadGhost(static_cast<Complex*>(tmp.data), ghost_idx, dim);
+	A_shift = tmp.reconstruct(dim,-1);
         result += outerProdSpinTrace(A_shift,B);
 
-        arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, arg.dir, arg.parity); 
+        arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
         result = temp + result*arg.coeff; 
-	arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, arg.dir, arg.parity); 
+	arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, dim, arg.parity); 
 	temp = U * result;
-        arg.force.save(reinterpret_cast<real*>(temp.data), bulk_cb_idx, arg.dir, arg.parity); 
+        arg.force.save(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
 
         cb_idx += gridSize;
       }
@@ -418,7 +423,10 @@ namespace quda {
 	if(arg.kernelType == OPROD_INTERIOR_KERNEL){
 	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	} else if(arg.kernelType == OPROD_EXTERIOR_KERNEL) {
-	  exteriorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  if (arg.dir == 0) exteriorOprodKernel<0><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  if (arg.dir == 1) exteriorOprodKernel<1><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  if (arg.dir == 2) exteriorOprodKernel<2><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  if (arg.dir == 3) exteriorOprodKernel<3><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	} else {
 	  errorQuda("Kernel type not supported\n");
 	}
