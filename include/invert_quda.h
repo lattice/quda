@@ -682,6 +682,8 @@ namespace quda {
     //
     void RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GmresdrDeflationParam *dpar, const double tol_threshold);
 
+    void AllocateKrylovSubspace(ColorSpinorParam &csParam);
+
   };
 
 

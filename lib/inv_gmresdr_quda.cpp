@@ -533,6 +533,27 @@ namespace quda {
 
  }
 
+ void GmresDR::AllocateKrylovSubspace(ColorSpinorParam &csParam)
+ {
+   if(gmres_alloc) errorQuda("\nKrylov subspace was allocated.\n");
+
+   printfQuda("\nAllocating resources for the GMRESDR solver...\n");
+
+   csParam.eigv_dim = param.m+1; // basis dimension (abusive notations!)
+
+   Vm = new cudaColorSpinorField(csParam); //search space for Ritz vectors
+//BUG ALLERT! if one sets csParam.eigv_dim = 1 then any other allocation of regular spinors with csParam hangs the program!
+   csParam.eigv_dim = 0;
+
+   checkCudaError();
+
+   printfQuda("\n..done.\n");
+
+   gmres_alloc = true;
+
+   return; 
+ }
+
  void GmresDR::PerformProjection(cudaColorSpinorField &x_sloppy,  cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *dpar)
  {
     if(dpar->projType == QUDA_INVALID_PROJECTION)
@@ -656,20 +677,7 @@ namespace quda {
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     //Allocate Vm array:
-    if(gmres_alloc == false)
-    {
-      printfQuda("\nAllocating resources for the GMRESDR solver...\n");
-
-      csParam.eigv_dim = param.m+1; // basis dimension (abusive notations!)
-
-      Vm = new cudaColorSpinorField(csParam); //search space for Ritz vectors
-
-      checkCudaError();
-
-      printfQuda("\n..done.\n");
-       
-      gmres_alloc = true;
-    }
+    if(gmres_alloc == false) AllocateKrylovSubspace(csParam);
 
     profile.Stop(QUDA_PROFILE_INIT);
     profile.Start(QUDA_PROFILE_PREAMBLE);
@@ -810,12 +818,19 @@ namespace quda {
    //
    PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res);
 
-//BEGIN RESTARTS:
+//****************BEGIN RESTARTS:
+
    const int max_cycles = param.deflation_grid;
 
    int cycle_idx = 1;
 
    bool last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop);
+
+   //For the deflated cycles: just pointer aliases, for the projected cycles: new (half precision) objects
+   cudaColorSpinorField *ctmp1_p = &tmp;
+   cudaColorSpinorField *ctmp2_p = tmp2_p;
+
+   cudaColorSpinorField *x_sloppy2 = x_sloppy;
 
    while(cycle_idx < max_cycles && !last_cycle)
    {
@@ -841,9 +856,7 @@ namespace quda {
      }
      else //use Galerkin projection instead: 
      {
-       j = 0; //we will launch a normal GMRESDR cycle
-
-       sloppy_mat = &matSloppy;//must be &matDefl
+       j = 0; //we will launch "projected" GMRES cycles
 
        if(defl_param->projType == QUDA_INVALID_PROJECTION) defl_param->projType = QUDA_GALERKIN_PROJECTION;
 
@@ -854,7 +867,7 @@ namespace quda {
          copyCuda(y, *x_sloppy);
          xpyCuda(y, x);
          zeroCuda(*x_sloppy);
-         copyCuda(r, *r_sloppy);
+         copyCuda(r, *r_sloppy);//ok
        }
 
        r2 = norm2(r);
@@ -879,7 +892,7 @@ namespace quda {
        //pointer aliasing:
        cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
 
-       (*sloppy_mat)(*Av, Vm->Eigenvec(j), tmp, tmp2);
+       (*sloppy_mat)(*Av, Vm->Eigenvec(j), *ctmp1_p, *ctmp2_p);
        //
        Complex h0(0.0, 0.0);
        //
@@ -944,13 +957,13 @@ namespace quda {
        PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res); 
      }//end of main loop.
 
-     args->UpdateSolution(x_sloppy, Vm, givensH, g, j);
+     args->UpdateSolution(x_sloppy2, Vm, givensH, g, j);
 
      if (mixed_precision_gmresdr)
      {
-       copyCuda(y, *x_sloppy);
+       copyCuda(y, *x_sloppy2);
        xpyCuda(y, x);//don't mind arguments;)
-       zeroCuda(*x_sloppy);
+       zeroCuda(*x_sloppy2);
      }
 
      mat(r, x, y);
@@ -966,6 +979,22 @@ namespace quda {
        args->RestartVH( Vm );
 
        defl_param->LoadData(Vm, args->H, nev, ldH);
+
+       //Allocate low precision fields:
+       csParam.setPrecision(QUDA_HALF_PRECISION);
+
+       delete Vm; 
+       gmres_alloc = false;
+
+       AllocateKrylovSubspace(csParam);
+
+       x_sloppy2 = new cudaColorSpinorField(x, csParam);
+
+       ctmp1_p   = new cudaColorSpinorField(csParam);
+
+       ctmp2_p   = new cudaColorSpinorField(csParam);
+
+       sloppy_mat = const_cast<DiracMatrix*> (&matDefl);
 
        use_deflated_cycles = false;
      }
@@ -1015,7 +1044,15 @@ namespace quda {
    if (mixed_precision_gmresdr)
    {
      delete r_sloppy;
-     delete x_sloppy; 
+     delete x_sloppy;
+
+     if(use_deflated_cycles == false)
+     {
+       printfQuda("\nDealocating resources from the projector cycles...\n");
+       delete x_sloppy2;
+       delete ctmp1_p;
+       delete ctmp2_p;
+     } 
    }
 
    delete tmp2_p;
@@ -1077,17 +1114,7 @@ namespace quda {
      //Allocate Vm array:
      if(gmres_alloc == false)
      {
-       printfQuda("\nAllocating resources for the GMRES solver...\n");
-
-       csParam.eigv_dim = param.m+1; // basis dimension (abusive notations!)
-
-       Vm = new cudaColorSpinorField(csParam); //search space for Ritz vectors
-
-       checkCudaError();
-
-       printfQuda("\n..done.\n");
-       
-       gmres_alloc = true;
+       AllocateKrylovSubspace(csParam);
      }
 
      profile.Stop(QUDA_PROFILE_INIT);
@@ -1328,7 +1355,7 @@ namespace quda {
      defl_param = new GmresdrDeflationParam(args->ldm, args->nev);
    }
 
-   const double tol_threshold = 2.0;//for mixed precision version only.
+   const double tol_threshold = 6.0;//for mixed precision version only.
 
    if(param.inv_type == QUDA_GMRESDR_INVERTER || (param.inv_type == QUDA_GMRESDR_PROJ_INVERTER && param.rhs_idx == 0))
    {

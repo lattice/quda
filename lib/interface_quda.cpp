@@ -3281,21 +3281,13 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     //DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);//use for tests only.
     SolverParam solverParam(*param);
 
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mDeflate, profileInvert);  
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mHalf, profileInvert);  //mDeflate - > mHalf
     
     (*solve)(out, in);//run solver
 
     solverParam.updateInvertParam(*param);//will update rhs_idx as well...
-    
-    if(last_rhs)
-    {
-      if(_h_u) solve->StoreRitzVecs(_h_u, inv_eigenvals, X, param, param->nev);; 
-      printfQuda("\nDelete GMRESDR solver resources...\n");
-      //clean resources:
-      solve->CleanResources();
-      // 
-      printfQuda("\n...done.\n");
-    }
+
+    solve->CleanResources();    
 
     delete solve;
 
