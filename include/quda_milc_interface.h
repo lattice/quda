@@ -569,6 +569,21 @@ extern "C" {
 		   double eps,
 		   void* momentum, 
 		   void* link);
+
+  /**
+   * Compute the clover force contributions in each dimension mu given the solution fields.
+   *
+   * Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
+   *
+   * @param force Force matrix
+   * @param x Array of solution vectors
+   * @param p Array of intermediate vectors
+   * @param coeff Array of coefficients for each contribution
+   * @param nvec Number of vectors
+   * @param gauge Gauge Field
+   * @param precision Precision of the fields
+   */
+  void qudaCloverForce(void *force, void **x, void **p, double *coeff, int nvec, void *gauge);
   
   /**
    * Compute the sigma trace field (part of clover force computation).

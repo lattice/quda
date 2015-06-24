@@ -934,6 +934,17 @@ void qudaDestroyGaugeField(void* gauge)
 }
 
 
+void qudaCloverForce(void *force, void **x, void **p, double *coeff, int nvec, void *gauge, int precision)
+{
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
+						(precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+						QUDA_GENERAL_LINKS);
+
+  computeCloverForceQuda(force, x, p, coeff, nvec, gauge, &gaugeParam);
+  return;
+}
+
+
 void qudaCloverTrace(void* out, void* clover, int mu, int nu)
 {
   computeCloverTraceQuda(out, clover, mu, nu, const_cast<int*>(localDim));

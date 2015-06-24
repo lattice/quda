@@ -725,9 +725,9 @@ extern "C" {
 				   QudaParity parity, QudaGaugeParam* param, int conjugate);
   /**
    * Compute the clover force contributions in each dimension mu given the solution fields
-
-   Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dagger  +  P_mu^- p(x+mu) x(x)^\dagger )
-
+   *
+   * Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
+   *
    * @param force Force matrix
    * @param x Array of solution vectors
    * @param p Array of intermediate vectors
