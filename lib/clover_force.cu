@@ -380,9 +380,9 @@ namespace quda {
         result += outerProdSpinTrace(A_shift,B);
 
         arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
-        result = temp + result*arg.coeff; 
+	// if we're externally looping over poles this is unnecessary work for the gauge multiply
+        result = temp + U*result*arg.coeff; 
 	arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, dim, arg.parity); 
-	temp = U * result;
         arg.force.save(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
 
         cb_idx += gridSize;
