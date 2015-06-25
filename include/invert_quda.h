@@ -689,10 +689,6 @@ namespace quda {
 
     void AllocateKrylovSubspace(ColorSpinorParam &csParam);
 
-    void LoadEigenvectors(DeflationParam *param, int max_nevs, double tol = 1e-3);
-
-    void ReportEigenvalueAccuracy(DeflationParam *param, int nevs_to_print);
-
   };
 
 
