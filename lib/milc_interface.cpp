@@ -14,6 +14,34 @@
 
 #ifdef BUILD_MILC_INTERFACE
 
+// code for NVTX taken from Jiri Kraus' blog post:
+// http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
+
+#ifdef MILC_NVTX
+#include "nvToolsExt.h"
+
+const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+const int num_colors = sizeof(colors)/sizeof(uint32_t);
+
+#define PUSH_RANGE(name,cid) { \
+  int color_id = cid; \
+  color_id = color_id%num_colors;\
+  nvtxEventAttributes_t eventAttrib = {0}; \
+  eventAttrib.version = NVTX_VERSION; \
+  eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = colors[color_id]; \
+  eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+  eventAttrib.message.ascii = name; \
+  nvtxRangePushEx(&eventAttrib); \
+}
+#define POP_RANGE nvtxRangePop();
+#else
+#define PUSH_RANGE(name,cid)
+#define POP_RANGE
+#endif
+
+
 static bool initialized = false;
 static int gridDim[4];
 static int localDim[4];
@@ -32,12 +60,17 @@ template <bool start>
 void  inline qudamilc_called(const char* func, QudaVerbosity verb){
 #ifdef QUDAMILC_VERBOSE
 if (verb >= QUDA_VERBOSE) {
-     if(start)
+     if(start){
        printf("QUDA_MILC_INTERFACE: %s (called) \n",func);
-     else
+       PUSH_RANGE(func,1)
+     }
+     else {
       printf("QUDA_MILC_INTERFACE: %s (return) \n",func);
+      POP_RANGE
+     }
    }
 #endif
+
 }
 
 template <bool start>
