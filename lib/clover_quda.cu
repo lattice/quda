@@ -227,6 +227,7 @@ namespace quda {
     CloverArg<Float,Clover,Fmunu> arg(clover, f, meta, cloverCoeff);
     CloverCompute<Float,Clover,Fmunu> cloverCompute(arg, meta, location);
     cloverCompute.apply(0);
+    checkCudaError();
     cudaDeviceSynchronize();
   }
 

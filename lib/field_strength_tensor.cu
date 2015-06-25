@@ -330,6 +330,7 @@ namespace quda {
     FmunuCompute<Float,Fmunu,Gauge> fmunuCompute(arg, meta, location);
     fmunuCompute.apply(0);
     cudaDeviceSynchronize();
+    checkCudaError();
   }
 
   template<typename Float>
@@ -338,11 +339,11 @@ namespace quda {
       if (gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 18>(gauge), gauge, location);  
+	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 18>(gauge), Fmunu, location);  
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 12>(gauge), gauge, location);
+	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 12>(gauge), Fmunu, location);
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 8>(gauge), gauge, location);
+	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 8>(gauge), Fmunu, location);
 	} else {
 	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
 	}
