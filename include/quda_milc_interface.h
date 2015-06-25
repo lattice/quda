@@ -583,8 +583,8 @@ extern "C" {
    * @param gauge Gauge Field
    * @param precision Precision of the fields
    */
-  void qudaCloverForce(void *force, void **x, void **p, double *coeff, int nvec, void *gauge);
-  
+  void qudaCloverForce(void *force, void **x, void **p, double *coeff, int nvec, void *gauge, int precision);
+
   /**
    * Compute the sigma trace field (part of clover force computation).
    * All the pointers here are for QUDA native device objects.  The
