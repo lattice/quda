@@ -118,6 +118,9 @@ extern "C" {
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
 
+    /**< After how many iterations shall the heavy quark residual be updated */
+    int heavy_quark_check;
+
     int pipeline; /**< Whether to use a pipelined solver with less global sums */
 
     int num_offset; /**< Number of offsets in the multi-shift solver */
@@ -799,8 +802,18 @@ extern "C" {
                       const void* const u_link,
                       const QudaGaugeParam* param);
 
-  void performAPEnStep(unsigned int nSteps, double alpha);
+  /**
+   * Computes the plaquette of the loaded gauge configuration.
+   */
   double plaqCuda();
+
+  /**
+   * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param alpha  Alpha coefficient for APE smearing.
+   */
+  void performAPEnStep(unsigned int nSteps, double alpha);
+
   /**
   * Open/Close MAGMA library
   *
@@ -808,7 +821,6 @@ extern "C" {
   void openMagma();
 
   void closeMagma();
-
 
 #ifdef __cplusplus
 }

@@ -34,8 +34,7 @@ namespace quda
     #include <dslash_quda.cuh>
 
     #include	"covDev.h"	//Covariant derivative definitions
-    #include <dslash_init.cuh>
-  } // end namespace wilson
+  } // end namespace covDev
 
   // declare the dslash events
   #include <dslash_events.cuh>
@@ -132,8 +131,6 @@ namespace quda
 
   void covDevCuda(DslashCuda &dslash, const size_t regSize, const int mu, TimeProfile &profile)
   {
-    profile.Start(QUDA_PROFILE_TOTAL);
-
     const int	dir = mu%4;
 
     dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -157,8 +154,6 @@ namespace quda
         dslashParam.commDim[dir] = 0; 
       }
     #endif // MULTI_GPU
-
-    profile.Stop(QUDA_PROFILE_TOTAL);
   }
 
   /**
@@ -595,7 +590,8 @@ namespace quda
         if(in->Precision() != gauge.Precision())
           errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
 
-        initConstants(gauge, profile);         // The covariant derivative doesn't have an associated dirac operator, so we need to initialize the dslash constants somewhere else
+        profile.Start(QUDA_PROFILE_TOTAL);
+        profile.Start(QUDA_PROFILE_INIT);
 
         if(in->Precision() == QUDA_SINGLE_PRECISION)
           covdev = new CovDevCuda<float, float4>(out, &gauge, in, parity, mu);
@@ -607,11 +603,15 @@ namespace quda
             errorQuda("Error: Double precision not supported by hardware");
           #endif
         }
+        profile.Stop(QUDA_PROFILE_INIT);
 
         covDevCuda(*covdev, regSize, mu, profile);
 
+        profile.Start(QUDA_PROFILE_EPILOGUE);
         delete covdev;
         checkCudaError();
+        profile.Stop(QUDA_PROFILE_EPILOGUE);
+        profile.Stop(QUDA_PROFILE_TOTAL);
       #else
         errorQuda("Contraction kernels have not been built");
       #endif
