@@ -454,11 +454,9 @@ namespace quda {
 			      const unsigned int parity, const int faceVolumeCB[4], 
 			      const unsigned int ghostOffset[4], const double coeff)
     {
-
       int dag = 1;
 
       cudaEventRecord(oprodStart, streams[Nstream-1]);
-
       // Create the arguments for the interior kernel 
       CloverForceArg<Complex,Output,Gauge,InputA,InputB> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, coeff, inA, inB, gauge, force, out);
       CloverForce<Complex,Output,Gauge,InputA,InputB> oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
@@ -475,8 +473,8 @@ namespace quda {
       // source, dir(+/-1), parity, dagger, stream_ptr
       // packing is all done in streams[Nstream-1]
       // always call pack since this also sets the stream pointer even if not packing
-      src1.pack(1, 1-parity, dag, Nstream-1);
-      src2.pack(1, 1-parity, !dag, Nstream-1);
+      src1.pack(1, 1-parity, dag, Nstream-1, 0);
+      src2.pack(1, 1-parity, !dag, Nstream-1, 0);
       if(pack){
         cudaEventRecord(packEnd, streams[Nstream-1]);
       }
@@ -495,6 +493,7 @@ namespace quda {
         } // comDim(i)
       } // i=3,..,0
 #endif
+
       oprod.apply(streams[Nstream-1]); 
 
 #ifdef MULTI_GPU
@@ -605,6 +604,8 @@ namespace quda {
 
     if(x.Precision() != force.Precision()) errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), force.Precision());
 
+    createCloverForceEvents();
+
     cudaColorSpinorField& inA = (parity&1) ? x.Odd() : x.Even();
     cudaColorSpinorField& inB = (parity&1) ? p.Even(): p.Odd();
 
@@ -644,9 +645,13 @@ namespace quda {
       errorQuda("Unsupported precision: %d\n", x.Precision());
     }
 
+    destroyCloverForceEvents();
+
 #else // GPU_CLOVER_DIRAC not defined
    errorQuda("Clover Dirac operator has not been built!"); 
 #endif
+
+   checkCudaError();
 
     return;
   } // computeCloverForce
