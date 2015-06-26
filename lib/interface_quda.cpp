@@ -2184,6 +2184,206 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
 
+void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_inv_param)//input/output => cpu fields!
+{
+   printfQuda("\nGenerate null vectors\n");
+   //Create spinor field parameters:
+
+   ColorSpinorParam csParam(*B[0]);//
+   csParam.create = QUDA_NULL_FIELD_CREATE;
+   //
+   csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+   //bParam.setPrecision(bParam.precision);
+   csParam.location = QUDA_CUDA_FIELD_LOCATION;
+   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;//UKQCD
+
+   //New invert parameter for the null vector generations:
+   QudaInvertParam inv_param = newQudaInvertParam();
+
+   inv_param.dslash_type = mg_inv_param->dslash_type;
+
+   inv_param.matpc_type  = QUDA_MATPC_EVEN_EVEN;
+   inv_param.verbosity   = QUDA_VERBOSE;
+
+   inv_param.gcrNkrylov  = 10;
+   inv_param.maxiter  = 35;
+   inv_param.tol      = 1e-3;
+   inv_param.use_init_guess  = QUDA_USE_INIT_GUESS_YES;
+   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+   inv_param.reliable_delta    = 1e-7;
+
+   inv_param.inv_type      = QUDA_BICGSTAB_INVERTER;//use bicgstab solver for null vector generation
+   inv_param.solve_type    = QUDA_DIRECT_SOLVE;
+   inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+   inv_param.dagger = QUDA_DAG_NO;
+   inv_param.mass_normalization   = QUDA_KAPPA_NORMALIZATION;
+   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
+   //
+   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
+   inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
+
+   inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
+
+   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+   inv_param.precondition_cycle = 1;
+   inv_param.tol_precondition = 1e-1;
+   inv_param.maxiter_precondition = 10;
+   inv_param.verbosity_precondition = QUDA_SILENT;
+   inv_param.cuda_prec_precondition = QUDA_INVALID_PRECISION;
+   inv_param.omega = 1.0;
+
+   inv_param.cpu_prec = csParam.precision;
+   inv_param.cuda_prec = csParam.precision;
+   inv_param.cuda_prec_sloppy = csParam.precision;
+   inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
+   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+   inv_param.tune = QUDA_TUNE_YES;
+
+   inv_param.sp_pad = 0; // 24*24*24/2;
+   inv_param.cl_pad = 0; // 24*24*24/2;
+
+   double anisotropy = 1.0;
+   double mass       = -0.4125; //?
+   inv_param.kappa   = mg_inv_param->kappa;//1.0 / (2.0 * (1 + 3/anisotropy + mass));
+///////////////////////////////////////////////////
+   pushVerbosity(inv_param.verbosity);
+//   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+   // check the gauge fields have been created
+   cudaGaugeField *cudaGauge = checkGauge(&inv_param);
+
+   checkInvertParam(&inv_param);
+
+   // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
+   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
+   // for now, though, so here we factorize everything for convenience.
+
+//   bool pc_solution = false;
+   bool pc_solve    = false;
+//   bool mat_solution = true;
+//   bool direct_solve = true;
+
+   inv_param.spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
+   if (!pc_solve) inv_param.spinorGiB *= 2;
+   inv_param.spinorGiB *= (inv_param.cuda_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float));
+   if (inv_param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+     inv_param.spinorGiB *= 7.0 /(double)(1<<30);
+   } else {
+     inv_param.spinorGiB *= 9.0 /(double)(1<<30);
+   }
+
+   inv_param.secs   = 0;
+   inv_param.gflops = 0;
+   inv_param.iter   = 0;
+
+   Dirac *d        = NULL;
+   Dirac *dSloppy  = NULL;
+   Dirac *dPre     = NULL;
+
+   // create the dirac operator: in fact, solo-precision defined by b[0]->Precision().
+   createDirac(d, dSloppy, dPre, inv_param, pc_solve);
+
+   Dirac &dirac       = *d;
+   Dirac &diracSloppy = *dSloppy;
+   Dirac &diracPre    = *dPre;
+
+   ColorSpinorField *b = NULL;
+   ColorSpinorField *x = NULL;
+   ColorSpinorField *in = NULL;
+   ColorSpinorField *out = NULL;
+
+   ColorSpinorParam bParam(csParam, inv_param);
+   bParam.create = QUDA_ZERO_FIELD_CREATE;
+
+   ColorSpinorParam xParam(csParam, inv_param);
+   xParam.create     = QUDA_COPY_FIELD_CREATE;
+
+   profileInvert.Start(QUDA_PROFILE_TOTAL);
+
+   // Generate sources and launch bicgstab for each source:
+   for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec)
+   {
+     cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*nullvec); 
+     curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
+
+     b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(bParam)); 
+     //copy fields:
+     x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, xParam)); 
+
+     setTuning(inv_param.tune);
+
+     dirac.prepare(in, out, *x, *b, inv_param.solution_type);
+
+     if (getVerbosity() >= QUDA_VERBOSE) 
+     {
+       double nin = blas::norm2(*out);
+       printfQuda("Prepared source = %g\n", nin);      
+     }
+
+
+     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+     SolverParam solverParam(inv_param);
+     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+     (*solve)(*out, *in);
+     solverParam.updateInvertParam(inv_param);
+     delete solve;
+
+     if (getVerbosity() >= QUDA_VERBOSE)
+     {
+       double nx = blas::norm2(*x);
+       printfQuda("Solution = %g\n",nx);
+     }
+     dirac.reconstruct(*x, *b, inv_param.solution_type);
+
+     *curr_nullvec = *x;
+
+//BEGIN orthogonalization:
+     Complex alpha = Complex(0.0, 0.0);
+
+     for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != nullvec; ++prevvec)//row id
+     {
+        cpuColorSpinorField *prev_nullvec = static_cast<cpuColorSpinorField*> (*prevvec);
+
+        alpha = blas::cDotProduct(*prev_nullvec, *curr_nullvec);//<j,i>
+        Complex scale = Complex(-alpha.real(), -alpha.imag());
+        blas::caxpy(scale, *prev_nullvec, *curr_nullvec); //i-<j,i>j
+     }
+
+     alpha = blas::norm2(*curr_nullvec);
+     if(alpha.real() > 1e-16)
+        blas::ax(1.0 /sqrt(alpha.real()), *curr_nullvec);  
+     else
+        errorQuda("\nCannot orthogonalize ??th vector\n");
+
+//END
+
+     delete b;
+     delete x;
+
+  }//stop for-loop:
+
+  delete d;
+  delete dSloppy;
+  delete dPre;
+
+  popVerbosity();
+
+  // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache(getVerbosity());
+
+  profileInvert.Stop(QUDA_PROFILE_TOTAL);
+
+  return;
+}
+
+
+#define LOAD_NVECS
+
 void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
@@ -2351,7 +2551,13 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     B[i] = new cpuColorSpinorField(cpuParam);
   }
 
+//!!NEW
+#ifdef LOAD_NVECS
   loadVectors(B);
+#else
+  generateNullVectors(B, param);
+#endif
+//!!END
 
   // fill out the MG parameters for the fine level
   MGParam mgParam(*param, B, mSloppy, mSloppy);  
