@@ -44,6 +44,31 @@
 #endif
 
 
+#define TIMER_NVTX
+#ifdef TIMER_NVTX
+#include "nvToolsExt.h"
+
+const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+const int num_colors = sizeof(colors)/sizeof(uint32_t);
+
+#define PUSH_RANGE(name,cid) { \
+  int color_id = cid; \
+  color_id = color_id%num_colors;\
+  nvtxEventAttributes_t eventAttrib = {0}; \
+  eventAttrib.version = NVTX_VERSION; \
+  eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = colors[color_id]; \
+  eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+  eventAttrib.message.ascii = name; \
+  nvtxRangePushEx(&eventAttrib); \
+}
+#define POP_RANGE nvtxRangePop();
+#else
+#define PUSH_RANGE(name,cid)
+#define POP_RANGE
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -188,11 +213,13 @@ namespace quda {
 	switchOff = true;
       }
 
-      profile[idx].Start(); 
+      profile[idx].Start();
+      PUSH_RANGE(fname.c_str(),idx)
     }
 
     void Stop(QudaProfileType idx) { 
       profile[idx].Stop(); 
+      POP_RANGE
 
       // switch off total timer if we need to
       if (switchOff && idx != QUDA_PROFILE_TOTAL) {
@@ -218,5 +245,8 @@ namespace quda {
 #endif
 
 } // namespace quda
+
+#undef PUSH_RANGE(name,cid)
+#undef POP_RANGE
 
 #endif // _QUDA_INTERNAL_H
