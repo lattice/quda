@@ -246,7 +246,7 @@ namespace quda {
 
 } // namespace quda
 
-#undef PUSH_RANGE(name,cid)
+#undef PUSH_RANGE
 #undef POP_RANGE
 
 #endif // _QUDA_INTERNAL_H
