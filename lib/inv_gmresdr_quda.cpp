@@ -569,7 +569,8 @@ namespace quda {
 
     BlasMagmaArgs magma_args(sizeof(double));
 
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("\nUsing projection method %d\n", static_cast<int>(dpar->projType));
+    //if(getVerbosity() >= QUDA_DEBUG_VERBOSE) 
+       printfQuda("\nUsing projection method %d\n", static_cast<int>(dpar->projType));
 
     if(dpar->projType == QUDA_GALERKIN_PROJECTION)
     {
@@ -646,26 +647,17 @@ namespace quda {
 
     csParam.setPrecision(gmres_space_prec);
 
-    cudaColorSpinorField *r_sloppy;
+    cudaColorSpinorField *r_sloppy, *x_sloppy;
 
     if (mixed_precision_gmresdr) 
     {
        r_sloppy = new cudaColorSpinorField(r, csParam);
+       x_sloppy = new cudaColorSpinorField(x, csParam);
     } 
     else 
     {
        r_sloppy = &r;
-    }
-
-    cudaColorSpinorField *x_sloppy;
-
-    if (mixed_precision_gmresdr) 
-    {
-      x_sloppy = new cudaColorSpinorField(x, csParam);
-    } 
-    else 
-    {
-      x_sloppy = &x;
+       x_sloppy = &x;
     }
 
     cudaColorSpinorField tmp(*in, csParam);
@@ -1062,11 +1054,13 @@ namespace quda {
    return;
  } 
 
- void GmresDR::RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GmresdrDeflationParam *dpar, const double tol_threshold)
+ void GmresDR::RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GmresdrDeflationParam *dpar, const bool enforce_mixed_precision)
  {
-     bool mixed_precision_gmres = (param.precision != param.precision_sloppy);
+     bool mixed_precision_gmres = enforce_mixed_precision || (param.precision != param.precision_sloppy);
 
      profile.Start(QUDA_PROFILE_INIT);
+
+     DiracMatrix *sloppy_mat;
 
      cudaColorSpinorField r(*in); //high precision residual 
      // 
@@ -1079,29 +1073,36 @@ namespace quda {
 
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     csParam.setPrecision(gmres_space_prec);
+     cudaColorSpinorField *r_sloppy = NULL, *x_sloppy = NULL;
 
-     cudaColorSpinorField *r_sloppy;
+     csParam.setPrecision(gmres_space_prec);//this is a solo precision solver
+
+     cudaColorSpinorField *r_sloppy_proj = NULL;
+     cudaColorSpinorField *x_sloppy_proj = NULL;
 
      if (mixed_precision_gmres) 
      {
+        if(gmres_space_prec != QUDA_HALF_PRECISION)
+        {
+           r_sloppy_proj = new cudaColorSpinorField(r, csParam);
+           x_sloppy_proj = new cudaColorSpinorField(x, csParam);
+        }
+
+        csParam.setPrecision(QUDA_HALF_PRECISION);
+
+        sloppy_mat = const_cast<DiracMatrix*>(&matDefl);
         r_sloppy = new cudaColorSpinorField(r, csParam);
+        x_sloppy = new cudaColorSpinorField(x, csParam);
      } 
      else 
      {
+        sloppy_mat = &matSloppy;
         r_sloppy = &r;
+        x_sloppy = &x;
      }
 
-     cudaColorSpinorField *x_sloppy;
-
-     if (mixed_precision_gmres) 
-     {
-       x_sloppy = new cudaColorSpinorField(x, csParam);
-     } 
-     else 
-     {
-       x_sloppy = &x;
-     }
+     if(!r_sloppy_proj) r_sloppy_proj = r_sloppy;
+     if(!x_sloppy_proj) x_sloppy_proj = x_sloppy;
 
      cudaColorSpinorField tmp(*in, csParam);
 
@@ -1147,20 +1148,11 @@ namespace quda {
 
      const double b2 = r2;
 
-     printfQuda("\nInitial residual squred: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
+     printfQuda("\nInitial residual: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
 
      //copy the first vector:
      double beta = sqrt(r2);
      //
-     double r2_inv = 1.0 / beta;//check beta!
-
-     axCuda(r2_inv, r);
-     //
-     copyCuda(Vm->Eigenvec(0), r);
-
-     //set g-vector:
-     g[0] = beta;
-
      const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
      double heavy_quark_res = 0.0; // heavy quark residual
@@ -1188,7 +1180,7 @@ namespace quda {
 
        cycle_idx += 1;
 
-       if (mixed_precision_gmres) copyCuda(*r_sloppy, r);
+       if (mixed_precision_gmres) copyCuda(*r_sloppy_proj, r);
 
        memset(givensH, 0, ldH*m*sizeof(Complex));
        memset(g, 0 , (m+1)*sizeof(Complex));
@@ -1198,14 +1190,14 @@ namespace quda {
 
        bool do_projection = defl_param->projFreq == 1 ? true : (cycle_idx % defl_param->projFreq) == 0 ? true : false; 
 
-       if(do_projection) PerformProjection(*x_sloppy, *r_sloppy, defl_param);//note : full precision residual
+       if(do_projection) PerformProjection(*x_sloppy_proj, *r_sloppy_proj, defl_param);//note : full precision residual
 
        if (mixed_precision_gmres)
        {
-         copyCuda(y, *x_sloppy);
+         copyCuda(y, *x_sloppy_proj);
          xpyCuda(y, x);
-         zeroCuda(*x_sloppy);
-         copyCuda(r, *r_sloppy);
+         zeroCuda(*x_sloppy_proj);
+         copyCuda(r, *r_sloppy_proj);
        }
 
        r2 = norm2(r);
@@ -1226,7 +1218,7 @@ namespace quda {
       {
         cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
 
-        matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);//must be matDefl
+        (*sloppy_mat)(*Av, Vm->Eigenvec(j), tmp, tmp2);//must be matDefl
 
         ///////////
         Complex h0 = cDotProductCuda(Vm->Eigenvec(0), *Av);//
@@ -1335,6 +1327,12 @@ namespace quda {
    {
      delete r_sloppy;
      delete x_sloppy; 
+
+     if(gmres_space_prec != QUDA_HALF_PRECISION)
+     {
+       delete r_sloppy_proj;
+       delete x_sloppy_proj;
+     }
    }
 
    delete tmp2_p;
@@ -1345,9 +1343,6 @@ namespace quda {
 
  }
 
-//Make this option available outside!
-//#define USE_PLAIN_GMRES
-
  void GmresDR::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in)
  {
    if(!defl_param)
@@ -1356,6 +1351,7 @@ namespace quda {
    }
 
    const double tol_threshold = 6.0;//for mixed precision version only.
+   const bool   use_gmresproj_mixed_precision = true;
 
    if(param.inv_type == QUDA_GMRESDR_INVERTER || (param.inv_type == QUDA_GMRESDR_PROJ_INVERTER && param.rhs_idx == 0))
    {
@@ -1367,12 +1363,18 @@ namespace quda {
    else
    {
      //run GMRES-Proj cycles:
-     RunProjectedCycles(out, in, defl_param, tol_threshold);
+     RunProjectedCycles(out, in, defl_param, use_gmresproj_mixed_precision); //last argument enforces mixed precision for this stage
    }
 
-   if(param.inv_type == QUDA_GMRESDR_PROJ_INVERTER && param.rhs_idx == 0) 
+   if(param.inv_type == QUDA_GMRESDR_PROJ_INVERTER && defl_param->init_flag == false) 
    {
-     defl_param->projType = QUDA_MINRES_PROJECTION;
+     printfQuda("\nLoad eigenvectors for the projection stage.\n");
+     defl_param->projType = QUDA_MINRES_PROJECTION;  
+//     defl_param->projType = QUDA_GALERKIN_PROJECTION;
+
+     args->ComputeHarmonicRitzPairs();
+     args->RestartVH( Vm );
+
      defl_param->LoadData(Vm, args->H, args->nev, args->ldm);
    }
 
@@ -1380,463 +1382,5 @@ namespace quda {
 
    return;
  }
-
-#if 0
- void GmresDR::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) 
- {
-     profile.Start(QUDA_PROFILE_INIT);
-
-     cudaColorSpinorField r(*in); //high precision residual 
-     // 
-     cudaColorSpinorField &x = *out;
-     //
-     cudaColorSpinorField y(*in); //high precision aux field 
-
-     //Sloppy precision fields:
-     ColorSpinorParam csParam(*in);//create spinor parameters
-
-     csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-     csParam.setPrecision(gmres_space_prec);
-
-     cudaColorSpinorField *r_sloppy;
-
-     if (args->mixed_precision_gmresdr) 
-     {
-        r_sloppy = new cudaColorSpinorField(r, csParam);
-     } 
-     else 
-     {
-        r_sloppy = &r;
-     }
-
-     cudaColorSpinorField *x_sloppy;
-
-     if (args->mixed_precision_gmresdr) 
-     {
-       x_sloppy = new cudaColorSpinorField(x, csParam);
-     } 
-     else 
-     {
-       x_sloppy = &x;
-     }
-
-     cudaColorSpinorField tmp(*in, csParam);
-
-     cudaColorSpinorField *tmp2_p;
-
-     tmp2_p = new cudaColorSpinorField(*in, csParam);
-
-     cudaColorSpinorField &tmp2 = *tmp2_p;
-
-     //Allocate Vm array:
-     if(gmres_alloc == false)
-     {
-       printfQuda("\nAllocating resources for the GMRESDR solver...\n");
-
-       csParam.eigv_dim = param.m+1; // basis dimension (abusive notations!)
-
-       Vm = new cudaColorSpinorField(csParam); //search space for Ritz vectors
-
-       checkCudaError();
-
-       printfQuda("\n..done.\n");
-       
-       gmres_alloc = true;
-     }
-
-    profile.Stop(QUDA_PROFILE_INIT);
-    profile.Start(QUDA_PROFILE_PREAMBLE);
-
-   const int m         = args->m;
-   const int ldH       = args->ldm;
-   const int nev       = args->nev;
-
-   const double tol_threshold = 2e+0;//think about other options: original value 4.0e+0, 2.0e+0 works better!
-
-   int tot_iters = 0;
-
-   //GMRES objects:
-   //Givens rotated matrix (m+1, m):
-   Complex *givensH = new Complex[ldH*m];//complex
-    
-   //Auxilary objects: 
-   Complex *g = new Complex[(m+1)];
-
-   //Givens coefficients:
-   Complex *Cn = new Complex[m];
-   //
-   double *Sn = (double *) calloc(m, sizeof(double));//in fact, it's real
-
-   //Compute initial residual:
-   const double normb = norm2(*in);  
-   double stop = param.tol*param.tol* normb;	/* Relative to b tolerance */
-
-   mat(r, *out, y);
-   //
-   double r2 = xmyNormCuda(*in, r);//compute residual
-
-   const double b2 = r2;
-
-   printfQuda("\nInitial residual squred: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
-
-   //copy the first vector:
-   double beta = sqrt(r2);
-   //
-   double r2_inv = 1.0 / beta;//check beta!
-
-   axCuda(r2_inv, r);
-   //
-   copyCuda(Vm->Eigenvec(0), r);
-
-   int j = 0;//here also a column index of H
-
-   //set g-vector:
-   g[0] = beta;
-
-   args->PrepareDeflatedRestart(givensH, g);
-
-   const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-
-   double heavy_quark_res = 0.0; // heavy quark residual
-   if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-   int heavy_quark_check = 10; // how often to check the heavy quark residual
-
-   PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res);
-
-   profile.Stop(QUDA_PROFILE_PREAMBLE);
-   profile.Start(QUDA_PROFILE_COMPUTE);
-   blas_flops = 0;
-
-//   while((j < m) && (r2 > stop))
-   while(j < m)//we allow full cycle
-   {
-     cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
-
-     matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);
-
-     ///////////
-     Complex h0 = cDotProductCuda(Vm->Eigenvec(0), *Av);//
-     args->SetHessenbergElement(0, j, h0);
-     //scale w:
-     caxpyCuda(-h0, Vm->Eigenvec(0), *Av);
-     //
-#if 0 //to unify this later like below:
-    //k = 0; //(nev = 0 for the first cycle)
-    Complex h0;
-    for (int i = 0; i <= k; i++)//i is a row index
-    {
-       h0 = cDotProductCuda(Vm->Eigenvec(i), *Av);//
-       //Warning: column major format!!! (m+1) size of a column.
-       //load columns:
-       H[ldH*j+i] = h0;
-       //
-       conjH[ldH*i+j] = conj(h0);
-       //
-       caxpyCuda(-h0, Vm->Eigenvec(i), *Av);
-    }
-
-    if(not first_cycle, i.e. k != 0 )   
-    {
-    //Let's do Givens rotation:
-       memcpy(&givensH[ldH*j], &H[ldH*j], (nev+1)*sizeof(Complex) );
-       //
-       leftConjZUNMQR(nev /*number of reflectors*/, 1 /*number of columns of mat*/, &givensH[ldH*j], (nev+1) /*number of rows*/, ldH, qrH, ldH, tauH);
-
-       h0 = givensH[ldH*j+nev];
-    }
-#endif
-     //
-     for (int i = 1; i <= j; i++)//i is a row index
-     {
-       Complex h1 = cDotProductCuda(Vm->Eigenvec(i), *Av);//
-       //load columns:
-       args->SetHessenbergElement(i, j, h1);
-       //scale:
-       caxpyCuda(-h1, Vm->Eigenvec(i), *Av);
-
-       //lets do Givens rotations:
-       givensH[ldH*j+(i-1)]   =  conj(Cn[i-1])*h0 + Sn[i-1]*h1;
-       //compute (j, i+1) element:
-       h0          = -Sn[i-1]*h0 + Cn[i-1]*h1;
-     }
-     //Compute h(j+1,j):
-     double h_jp1j = sqrt(norm2(*Av)); 
-
-     //Update H-matrix (j+1) element:
-     args->SetHessenbergElement((j+1), j, Complex(h_jp1j, 0.0));
-     //
-     axCuda(1. / h_jp1j, *Av);
-    
-     double inv_denom = 1.0 / sqrt(norm(h0)+h_jp1j*h_jp1j);
-     //
-     Cn[j] = h0 * inv_denom; 
-     //
-     Sn[j] = h_jp1j * inv_denom; 
-     //produce diagonal element in G:
-     givensH[ldH*j+j] = conj(Cn[j])*h0 + Sn[j]*h_jp1j; 
-   
-     //compute this in opposite direction:
-     g[j+1] = -Sn[j]*g[j];  
-     //
-     g[j]   =  g[j] * conj(Cn[j]);
-     //
-     r2 = norm(g[j+1]);//stopping criterio
-     //
-     j += 1;
-
-     tot_iters += 1;
-
-     //printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j); 
-     PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res);
-
-   }//end of GMRES loop
-
-   printfQuda("\nDone for: %d iters, %1.15e last residual squared.\n", j, r2); 
-
-   //j -> m+1
-   //update solution and final residual:
-   args->UpdateSolution(x_sloppy, Vm, givensH, g, j);
-
-   if (args->mixed_precision_gmresdr)
-   {
-     copyCuda(y, *x_sloppy);
-     xpyCuda(y, x);
-     zeroCuda(*x_sloppy);
-   }
-
-   mat(r, x, y);
-   //
-   r2 = xmyNormCuda(*in, r);//compute full precision residual
-
-   printfQuda("\nDone for cycle 0, true residual squared %1.15e\n", r2);
-   //
-   PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res);
-
-//BEGIN RESTARTS:
-   const int max_cycles = param.deflation_grid;
-
-   int cycle_idx = 1;
-
-#ifndef USE_PLAIN_GMRES
-   args->use_deflated_cycles = true;
-#else
-   args->use_deflated_cycles = false;
-#endif
-
-   bool last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop);
-
-   while(cycle_idx < max_cycles && !last_cycle)
-   {
-     printfQuda("\nRestart #%d\n", cycle_idx);
-
-     if (args->mixed_precision_gmresdr) copyCuda(*r_sloppy, r);
-
-     memset(givensH, 0, ldH*m*sizeof(Complex));
-     memset(g, 0 , (m+1)*sizeof(Complex));
-     //
-     memset(Cn, 0 , m*sizeof(Complex));
-     memset(Sn, 0 , m*sizeof(double));
-
-     int j = nev;//here also a column index of H
-#ifndef USE_PLAIN_GMRES
-     args->ComputeHarmonicRitzPairs();
-
-     args->RestartVH( Vm );
-#endif
-
-     if(args->use_deflated_cycles)
-     {
-       for(int i = 0; i <= nev ; i++ ) g[i] = cDotProductCuda(Vm->Eigenvec(i), *r_sloppy);//
-     }
-     else //use Galerkin projection instead: 
-     {
-       j = 0; //we will launch a normal GMRESDR cycle
-#ifndef USE_PLAIN_GMRES
-       if(!defl_param)
-       {
-         defl_param = new GmresdrDeflationParam(Vm, args->ldm, args->nev, QUDA_GALERKIN_PROJECTION);//WARNING: Projection type is currently not exposed!
-         //
-         args->StoreProjectionMatrix(defl_param->projMat);//merge this into the constructor..
-       }
-
-       PerformProjection(*x_sloppy, *r_sloppy, defl_param);//note : full precision residual
-
-       if (args->mixed_precision_gmresdr)
-       {
-         copyCuda(y, *x_sloppy);
-         xpyCuda(y, x);
-         zeroCuda(*x_sloppy);
-         copyCuda(r, *r_sloppy);
-       }
-#endif
-       r2 = norm2(r);
-       
-       beta = sqrt(r2);
-       //
-       axCuda(1.0 / beta, r);
-       //
-       copyCuda(Vm->Eigenvec(0), r);
-
-       g[0] = beta;
-
-       printfQuda("\nNew residual %1.15e\n", beta);
-     }
-
-     args->PrepareDeflatedRestart(givensH, g);
-
-     const int jlim = j;//=nev for deflated restarts and 0 for "projected" restarts (abused terminology!)
-
-//     while((j < m) && (r2 > stop))
-     while(j < m) //we allow full cycle
-     {
-       //pointer aliasing:
-       cudaColorSpinorField *Av = &Vm->Eigenvec(j+1);
-
-       matSloppy(*Av, Vm->Eigenvec(j), tmp, tmp2);
-       //
-       Complex h0(0.0, 0.0);
-       //
-       for (int i = 0; i <= jlim; i++)//i is a row index
-       {
-          h0 = cDotProductCuda(Vm->Eigenvec(i), *Av);//
-          //Warning: column major format!!! (m+1) size of a column.
-          //load columns:
-          args->SetHessenbergElement(i, j, h0);
-          //
-          caxpyCuda(-h0, Vm->Eigenvec(i), *Av);
-       }
-
-       //Let's do Givens rotation:
-       args->PrepareGivens(givensH, j);//check it! 
-
-       if(args->use_deflated_cycles) h0 = givensH[ldH*j+jlim];
-
-       for(int i = (jlim+1); i <= j; i++)
-       {
-          Complex h1 = cDotProductCuda(Vm->Eigenvec(i), *Av);//
-          //Warning: column major format!!! (m+1) size of a column.
-          //load columns:
-          args->SetHessenbergElement(i, j, h1);
-          //
-          caxpyCuda(-h1, Vm->Eigenvec(i), *Av);
-
-          //Lets do Givens rotations:
-          givensH[ldH*j+(i-1)]   =  conj(Cn[i-1])*h0 + Sn[i-1]*h1;
-          //compute (j, i+1) element:
-          h0  = -Sn[i-1]*h0 + Cn[i-1]*h1;//G[(m+1)*j+i+1]
-       }
-       //Compute h(j+1,j):
-       //
-       double h_jp1j = sqrt(norm2(*Av)); 
-
-       //Update H-matrix (j+1) element:
-       args->SetHessenbergElement((j+1), j, Complex(h_jp1j,0.0));
-       //
-       axCuda(1. / h_jp1j, *Av);
- 
-       double inv_denom = 1.0 / sqrt(norm(h0)+h_jp1j*h_jp1j);
-       //
-       Cn[j] = h0 * inv_denom; 
-       //
-       Sn[j] = h_jp1j * inv_denom; 
-       //produce diagonal element in G:
-       givensH[ldH*j+j] = conj(Cn[j])*h0 + Sn[j]*h_jp1j; 
-   
-       //compute this in opposite direction:
-       g[j+1] = -Sn[j]*g[j];  
-       //
-       g[j]   =  g[j] * conj(Cn[j]);
-       //
-       r2 = norm(g[j+1]);//stop criterio
-       //
-       j += 1;
-
-       tot_iters += 1;
- 
-       //printfQuda("GMRES residual: %1.15e ( iteration = %d)\n", sqrt(r2), j);
-       PrintStats("GMRESDR:", tot_iters, r2, b2, heavy_quark_res); 
-     }//end of main loop.
-
-     args->UpdateSolution(x_sloppy, Vm, givensH, g, j);
-
-     if (args->mixed_precision_gmresdr)
-     {
-       copyCuda(y, *x_sloppy);
-       xpyCuda(y, x);//don't mind arguments;)
-       zeroCuda(*x_sloppy);
-     }
-
-     mat(r, x, y);
-     //
-     double ext_r2 = xmyNormCuda(*in, r);//compute full precision residual
-
-     if(args->mixed_precision_gmresdr && ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold || (cycle_idx > 64)))
-     {
-       printfQuda("\nLaunch projection stage (%le)\n", sqrt(ext_r2 / r2));
-       args->use_deflated_cycles = false;
-     }
-
-     printfQuda("\nDone for cycle:  %d, true residual squared %1.15e\n", cycle_idx, ext_r2);
-
-     last_cycle = convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop);
-
-     cycle_idx += 1;
-
-   }//end of deflated restarts
-
-   profile.Stop(QUDA_PROFILE_COMPUTE);
-   profile.Start(QUDA_PROFILE_EPILOGUE);
-
-   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-   double gflops = (quda::blas_flops + mat.flops())*1e-9;
-   reduceDouble(gflops);
-   param.gflops = gflops;
-   param.iter += tot_iters;
-
-   // compute the true residuals
-   mat(r, x, y);
-   //matSloppy(r, x, tmp, tmp2);
-
-   param.true_res = sqrt(xmyNormCuda(*in, r) / b2);
-
-   PrintSummary("GMRESDR:", tot_iters, r2, b2);
-
-   // reset the flops counters
-   quda::blas_flops = 0;
-   mat.flops();
-
-   profile.Stop(QUDA_PROFILE_EPILOGUE);
-   profile.Start(QUDA_PROFILE_FREE);
-
-   if(defl_param) 
-   {
-     delete defl_param;
-     defl_param = 0;
-   }
-
-   delete [] givensH;
-
-   delete [] g;
-
-   delete [] Cn;
-
-   free(Sn);
-
-   printfQuda("\n..done.\n");
-
-   if (args->mixed_precision_gmresdr)
-   {
-     delete r_sloppy;
-     delete x_sloppy; 
-   }
-
-   delete tmp2_p;
-
-   profile.Stop(QUDA_PROFILE_FREE);
-
-   return;
- }//end of operator()
-#endif
 
 } // namespace quda

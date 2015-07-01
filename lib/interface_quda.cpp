@@ -3302,7 +3302,6 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   }
   else if (param->inv_type == QUDA_GMRESDR_INVERTER && direct_solve) 
   {
-
     DiracM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
     //DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);//use for tests only.
     SolverParam solverParam(*param);
@@ -3317,6 +3316,23 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
     delete solve;
 
+  }
+  else if (param->inv_type == QUDA_GMRESDR_PROJ_INVERTER && direct_solve)
+  {
+     DiracM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
+     SolverParam solverParam(*param);
+     DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mHalf, profileInvert);
+
+     (*solve)(out, in);//run solver
+     solverParam.updateInvertParam(*param);//will update rhs_idx as well...
+
+    if(last_rhs)
+    {
+      printfQuda("\nCleaning resources for the GMRES(DR)-Proj solver\n");
+      solve->CleanResources();
+    }
+   
+    delete solve;
   }
   else
   {

@@ -154,7 +154,7 @@ namespace quda {
     if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
       report("Incremental EIGCG");
       solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
-    }else if (param.inv_type == QUDA_GMRESDR_INVERTER){
+    }else if (param.inv_type == QUDA_GMRESDR_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ){
       report("GMRESDR");
       solver = new GmresDR(mat, matSloppy, matDeflate, param, profile);
     }else{
