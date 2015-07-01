@@ -2551,13 +2551,16 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     B[i] = new cpuColorSpinorField(cpuParam);
   }
 
-//!!NEW
-#ifdef LOAD_NVECS
-  loadVectors(B);
-#else
-  generateNullVectors(B, param);
-#endif
-//!!END
+  if(param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
+  {
+     generateNullVectors(B, param);
+  }
+  else
+  {
+     loadVectors(B);
+  }
+
+  param->compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;//just to be safe here
 
   // fill out the MG parameters for the fine level
   MGParam mgParam(*param, B, mSloppy, mSloppy);  
