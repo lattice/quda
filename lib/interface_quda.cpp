@@ -3901,20 +3901,31 @@ void createCloverQuda(QudaInvertParam* invertParam)
 #endif
   }
 
-  profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
 #ifdef MULTI_GPU
-  computeClover(*cloverPrecise, *cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+  GaugeField *gauge = cudaGaugeExtended;
 #else
-  computeClover(*cloverPrecise, *gaugePrecise, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+  GaugeField *gauge = gaugePrecise;
 #endif
 
+
+  profileCloverCreate.Start(QUDA_PROFILE_INIT);
+  // create the Fmunu field
+  GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, pad, QUDA_TENSOR_GEOMETRY);
+  tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaGaugeField Fmunu(tensorParam);
+  profileCloverCreate.Stop(QUDA_PROFILE_INIT);
+
+  profileCloverCreate.Start(QUDA_PROFILE_COMPUTE);
+
+  computeFmunu(Fmunu, *gauge, QUDA_CUDA_FIELD_LOCATION);
+  computeClover(*cloverPrecise, Fmunu, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
+
 #ifndef DYNAMIC_CLOVER
-  if (invertParam->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
-#ifdef MULTI_GPU
-    computeClover(*cloverInvPrecise, *cudaGaugeExtended, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
-#else
-    computeClover(*cloverInvPrecise, *gaugePrecise, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
-#endif
+  if (invertParam->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    computeClover(*cloverInvPrecise, Fmunu, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION); // FIXME only with tmClover
+  }
 #endif
 
   profileCloverCreate.Stop(QUDA_PROFILE_COMPUTE);
