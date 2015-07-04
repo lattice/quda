@@ -510,7 +510,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     void* V() { return (void*)spinor; }
     float* Norm() { return norm; }
 
-    QudaPrecision Precision() { 
+    QudaPrecision Precision() const { 
       QudaPrecision precision = QUDA_INVALID_PRECISION;
       if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
       else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
@@ -520,6 +520,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     }
 
     int Stride() const { return stride; }
+    int Bytes() const { return N*sizeof(RegType); }
   };
 
 //} // namespace quda
