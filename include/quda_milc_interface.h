@@ -571,19 +571,26 @@ extern "C" {
 		   void* link);
 
   /**
-   * Compute the clover force contributions in each dimension mu given the solution fields.
+   * Compute the clover force contributions in each dimension mu given
+   * the array solution fields, and compute the resulting momentum
+   * field.
    *
    * Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
    *
-   * @param force Force matrix
+   * @param mom Momentum matrix
+   * @param dt Integrating step size
    * @param x Array of solution vectors
    * @param p Array of intermediate vectors
-   * @param coeff Array of coefficients for each contribution
+   * @param coeff Array of residues for each contribution
+   * @param kappa2 -kappa*kappa parameter
+   * @param ck -clover_coefficient * kappa / 8
    * @param nvec Number of vectors
+   * @param multiplicity Number of fermions represented by this bilinear
    * @param gauge Gauge Field
    * @param precision Precision of the fields
    */
-  void qudaCloverForce(void *force, void **x, void **p, double *coeff, int nvec, void *gauge, int precision);
+  void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, 
+		       double ck, int nvec, double multiplicity, void *gauge, int precision);
 
   /**
    * Compute the sigma trace field (part of clover force computation).

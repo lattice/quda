@@ -4129,9 +4129,6 @@ void computeCloverDerivativeQuda(void* out,
   checkGaugeParam(param);
 
   profileCloverDerivative.Start(QUDA_PROFILE_INIT);
-#ifndef USE_EXTENDED_VOLUME
-#define USE_EXTENDED_VOLUME
-#endif
 
   // create host fields
   GaugeFieldParam gParam(0, *param);
@@ -4142,44 +4139,12 @@ void computeCloverDerivativeQuda(void* out,
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   //  gParam.gauge = out;
   //  cpuGaugeField cpuOut(gParam);
-#ifndef USE_EXTENDED_VOLUME
-  gParam.geometry = QUDA_SCALAR_GEOMETRY;
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.gauge = oprod;
-  cpuGaugeField cpuOprod(gParam);
 
-  gParam.geometry = QUDA_VECTOR_GEOMETRY;
-  gParam.link_type = QUDA_SU3_LINKS;
-  gParam.gauge = gauge;
-  cpuGaugeField cpuGauge(gParam);
-#endif
-
-  /*
-  // create device fields
-  gParam.geometry = QUDA_SCALAR_GEOMETRY;
-  gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.create = QUDA_NULL_FIELD_CREATE;
-  //  gParam.pad = getGaugePadding(gParam);
-  gParam.pad = 0;
-  gParam.ghostExchange  = QUDA_GHOST_EXCHANGE_NO;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  gParam.create = QUDA_ZERO_FIELD_CREATE;
-  //  cudaGaugeField cudaOut(gParam);
-  */
-
-#ifndef USE_EXTENDED_VOLUME
-  cudaGaugeField cudaOprod(gParam);
-
-  gParam.geometry = QUDA_VECTOR_GEOMETRY;
-  gParam.link_type = QUDA_SU3_LINKS;
-  cudaGaugeField cudaGauge(gParam);
-#endif
   profileCloverDerivative.Stop(QUDA_PROFILE_INIT);
 
   cudaGaugeField* cudaOut = reinterpret_cast<cudaGaugeField*>(out);
   cudaGaugeField* gPointer = reinterpret_cast<cudaGaugeField*>(gauge);
   cudaGaugeField* oPointer = reinterpret_cast<cudaGaugeField*>(oprod);
-
 
   profileCloverDerivative.Start(QUDA_PROFILE_COMPUTE);
   cloverDerivative(*cudaOut, *gPointer, *oPointer, mu, nu, coeff, parity, conjugate);
@@ -4188,12 +4153,9 @@ void computeCloverDerivativeQuda(void* out,
 
   profileCloverDerivative.Start(QUDA_PROFILE_D2H);
 
-  //  saveGaugeField(out, cudaOut, param);
-  //  cudaOut->saveCPUField(cpuOut, QUDA_CPU_FIELD_LOCATION);
   profileCloverDerivative.Stop(QUDA_PROFILE_D2H);
   checkCudaError();
 
-  //  delete cudaOut;
 
   profileCloverDerivative.Stop(QUDA_PROFILE_TOTAL);
 
@@ -4991,10 +4953,19 @@ namespace quda {
 			  cudaColorSpinorField& x,  
 			  cudaColorSpinorField& p,
 			  const unsigned int parity, const double coeff);
+
+  void computeCloverSigmaOprod(cudaGaugeField& oprod,
+			       cudaColorSpinorField& x,  
+			       cudaColorSpinorField& p,
+			       const double coeff, int mu, int nu, int shift);
+
+  void updateForce(cudaGaugeField &force, cudaGaugeField &out, int mu);
+  void updateMomentum(cudaGaugeField &mom, cudaGaugeField &force);
+
 }
  
-void computeCloverForceQuda(void *force, void **h_x, void **h_p, double *coeff, int nvector, 
-			    void *gauge, QudaGaugeParam* param) {
+void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p, double *coeff, double kappa2, double ck,
+			    int nvector, double multiplicity, void *gauge, QudaGaugeParam* param) {
 
 
   using namespace quda;
@@ -5006,29 +4977,28 @@ void computeCloverForceQuda(void *force, void **h_x, void **h_p, double *coeff, 
 
   profileCloverForce.Start(QUDA_PROFILE_INIT);
   GaugeFieldParam fParam(0, *param);
-
-  fParam.nDim = 4;
-  fParam.nFace = 0; 
-  // create the host outer-product field
-  fParam.pad = 0;
+  // create the host momentum field
   fParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  fParam.link_type = QUDA_GENERAL_LINKS;
-  fParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  fParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  fParam.reconstruct = QUDA_RECONSTRUCT_10;
   fParam.order = param->gauge_order;
   fParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  fParam.gauge = force;
-  cpuGaugeField cpuForce(fParam);
+  fParam.gauge = h_mom;
+  cpuGaugeField cpuMom(fParam);
 
-  // create the device outer-product field
+  // create the device momentum field
   fParam.create = QUDA_ZERO_FIELD_CREATE;
   fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  cudaGaugeField cudaMom(fParam);
+
+  // create the device force field
+  fParam.link_type = QUDA_GENERAL_LINKS;
+  fParam.create = QUDA_ZERO_FIELD_CREATE;
+  fParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  fParam.reconstruct = QUDA_RECONSTRUCT_NO;
   cudaGaugeField cudaForce(fParam);
+
   profileCloverForce.Stop(QUDA_PROFILE_INIT); 
-
-  profileCloverForce.Start(QUDA_PROFILE_H2D);
-  cudaForce.loadCPUField(cpuForce,QUDA_CPU_FIELD_LOCATION);
-  profileCloverForce.Stop(QUDA_PROFILE_H2D);
-
 
   profileCloverForce.Start(QUDA_PROFILE_INIT);
 
@@ -5045,18 +5015,24 @@ void computeCloverForceQuda(void *force, void **h_x, void **h_p, double *coeff, 
   // create the device quark field
   qParam.create = QUDA_NULL_FIELD_CREATE;
   qParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  cudaColorSpinorField cudaQuarkX(qParam); 
-  cudaColorSpinorField cudaQuarkP(qParam); 
+  qParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+  cudaColorSpinorField **cudaQuarkX = new cudaColorSpinorField*[nvector];
+  cudaColorSpinorField **cudaQuarkP = new cudaColorSpinorField*[nvector];
+  for (int i=0; i<nvector; i++) {
+    cudaQuarkX[i] = new cudaColorSpinorField(qParam);
+    cudaQuarkP[i] = new cudaColorSpinorField(qParam);
+  }
 
   // create the host quark field
   qParam.create = QUDA_REFERENCE_FIELD_CREATE;
   qParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  qParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // need expose this to interface
 
   profileCloverForce.Stop(QUDA_PROFILE_INIT);
 
   // loop over different quark fields
   for(int i=0; i<nvector; ++i){
-
     // Wrap the even-parity MILC quark field 
     profileCloverForce.Start(QUDA_PROFILE_INIT);
     qParam.v = h_x[i];
@@ -5066,33 +5042,100 @@ void computeCloverForceQuda(void *force, void **h_x, void **h_p, double *coeff, 
     profileCloverForce.Stop(QUDA_PROFILE_INIT);
 
     profileCloverForce.Start(QUDA_PROFILE_H2D);
-    cudaQuarkX = cpuQuarkX;
-    cudaQuarkP = cpuQuarkP;
+    *(cudaQuarkX[i]) = cpuQuarkX;
+    *(cudaQuarkP[i]) = cpuQuarkP;
     profileCloverForce.Stop(QUDA_PROFILE_H2D); 
 
-
+    checkCudaError();
     profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
 
     // Operate on even-parity sites
-    computeCloverForce(cudaForce, *gaugePrecise, cudaQuarkX, cudaQuarkP, 0, coeff[i]);
+    computeCloverForce(cudaForce, *gaugePrecise, *(cudaQuarkX[i]), *(cudaQuarkP[i]), 0, 2.0*dt*coeff[i]*kappa2);
 
     // Operate on odd-parity sites
-    computeCloverForce(cudaForce, *gaugePrecise, cudaQuarkX, cudaQuarkP, 1, coeff[i]);
+    computeCloverForce(cudaForce, *gaugePrecise, *(cudaQuarkX[i]), *(cudaQuarkP[i]), 1, 2.0*dt*coeff[i]*kappa2);
 
     profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
   }
 
+  cudaGaugeField &gaugeEx = *extendedGaugeResident;
+
+  // create oprod and trace fields
+  fParam.geometry = QUDA_SCALAR_GEOMETRY;
+  cudaGaugeField oprod(fParam);
+  cudaGaugeField &trace = oprod;
+
+  // create extended oprod field
+  int R[4] = {2,2,2,2};
+  for (int i=0; i<4; i++) fParam.x[i] += 2*R[i];
+  fParam.nFace = 1; // breaks with out this - why?
+
+  cudaGaugeField oprodEx(fParam);
+  cudaGaugeField &traceEx = oprodEx;
+
+  profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
+
+  for(int mu=0; mu<4; mu++) {
+    for(int nu=0;nu<4;nu++) 
+      if(nu!=mu) {
+	computeCloverSigmaTrace(trace, *cloverPrecise, mu, nu,  QUDA_CUDA_FIELD_LOCATION);
+
+	copyExtendedGauge(traceEx, trace, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to traceEx
+
+	profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
+	profileCloverForce.Start(QUDA_PROFILE_COMMS);
+
+	traceEx.exchangeExtendedGhost(R,true);
+
+	profileCloverForce.Stop(QUDA_PROFILE_COMMS);
+	profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
+
+	cloverDerivative(cudaForce, gaugeEx, traceEx, mu, nu, 2.0*ck*multiplicity*dt, QUDA_ODD_PARITY, 0);
+      }
+
+    /* Now the U dA/dU terms */
+    for(int nu=0;nu<4;nu++) 
+      if(nu!=mu) {
+	for(int shift = 0; shift < nvector; shift++){
+	  double ferm_epsilon = 2.0*dt*coeff[shift];
+	  computeCloverSigmaOprod(oprod, *(cudaQuarkX[shift]), *(cudaQuarkP[shift]), ferm_epsilon, mu, nu, shift);
+        }
+
+	copyExtendedGauge(oprodEx, oprod, QUDA_CUDA_FIELD_LOCATION); // FIXME this is unnecessary if we write directly to oprod
+
+	profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
+	profileCloverForce.Start(QUDA_PROFILE_COMMS);
+
+	oprodEx.exchangeExtendedGhost(R,true);
+
+	profileCloverForce.Stop(QUDA_PROFILE_COMMS);
+	profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
+
+	cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, -kappa2*ck, QUDA_ODD_PARITY, 1);
+	cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, ck, QUDA_EVEN_PARITY, 1);
+	} /* end loop over nu & endif( nu != mu )*/
+
+  } // end loop over mu
+
+  updateMomentum(cudaMom, cudaForce);
+  profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
 
   // copy the outer product field back to the host
   profileCloverForce.Start(QUDA_PROFILE_D2H);
-  cudaForce.saveCPUField(cpuForce,QUDA_CPU_FIELD_LOCATION);
+  cudaMom.saveCPUField(cpuMom,QUDA_CPU_FIELD_LOCATION);
   profileCloverForce.Stop(QUDA_PROFILE_D2H); 
 
   profileCloverForce.Stop(QUDA_PROFILE_TOTAL);
 
+  for (int i=0; i<nvector; i++) {
+    delete cudaQuarkX[i];
+    delete cudaQuarkP[i];
+  }
+  delete []cudaQuarkX;
+  delete []cudaQuarkP;
+
   checkCudaError();
   return;
-
 }
 
 

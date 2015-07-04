@@ -320,6 +320,7 @@ namespace quda {
     }else{
       errorQuda("Precision %d not supported", clover.Precision());
     }
+
 #else
     errorQuda("Clover has not been built");
 #endif

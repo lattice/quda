@@ -934,14 +934,15 @@ void qudaDestroyGaugeField(void* gauge)
 }
 
 
-void qudaCloverForce(void *force, void **x, void **p, double *coeff, int nvec, void *gauge, int precision)
+void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
+		     int nvec, double multiplicity, void *gauge, int precision)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
 						(precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
 						QUDA_GENERAL_LINKS);
-  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER; // refers to force order, gauge field is already on the device
-  computeCloverForceQuda(force, x, p, coeff, nvec, gauge, &gaugeParam);
+  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER; // refers to momentume gauge order
+  computeCloverForceQuda(mom, dt, x, p, coeff, kappa2, ck, nvec, multiplicity, gauge, &gaugeParam);
   qudamilc_called<false>(__func__);
   return;
 }

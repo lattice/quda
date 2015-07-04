@@ -259,20 +259,19 @@ namespace quda {
     thisForce *= arg.coeff;
     otherForce *= arg.coeff;
 
-
     // Write to array
     {
       Matrix<Cmplx, 3> F;
-      arg.force.load((real*)(F.data), index, 0, arg.parity);
+      arg.force.load((real*)(F.data), index, mu, arg.parity);
       F += thisForce;
-      arg.force.save((real*)(F.data), index, 0, arg.parity);
+      arg.force.save((real*)(F.data), index, mu, arg.parity);
     }
       
     {
       Matrix<Cmplx, 3> F;
-      arg.force.load((real*)(F.data), index, 0, otherparity);
+      arg.force.load((real*)(F.data), index, mu, otherparity);
       F += otherForce;
-      arg.force.save((real*)(F.data), index, 0, otherparity);
+      arg.force.save((real*)(F.data), index, mu, otherparity);
     }
       
     return;
@@ -327,7 +326,7 @@ namespace quda {
 
   
   template<typename Float>
-  void cloverDerivative(cudaGaugeField &out,
+  void cloverDerivative(cudaGaugeField &force,
 			cudaGaugeField &gauge,
 			cudaGaugeField &oprod,
 			int mu, int nu, double coeff, int parity,
@@ -336,15 +335,15 @@ namespace quda {
     if (oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Force field does not support reconstruction");
     
-    if (out.Order() != oprod.Order()) 
+    if (force.Order() != oprod.Order()) 
       errorQuda("Force and Oprod orders must match");
     
-    if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) 
+    if (force.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Force field does not support reconstruction");
   
     typedef typename ComplexTypeId<Float>::Type Complex;
 
-    if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER){
+    if (force.Order() == QUDA_FLOAT2_GAUGE_ORDER){
       typedef FloatNOrder<Float, 18, 2, 18> F;
       typedef FloatNOrder<Float, 18, 2, 18> O;
 
@@ -352,13 +351,13 @@ namespace quda {
 	if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
 	  typedef FloatNOrder<Float, 18, 2, 18> G;
 	  typedef CloverDerivArg<Complex,F,G,O> Arg;
-	  Arg arg(F(out), G(gauge), O(oprod), out.X(), mu, nu, coeff, parity, conjugate);
+	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
 	  CloverDerivative<Complex, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
 	}else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
 	  typedef FloatNOrder<Float, 18, 2, 12> G;
 	  typedef CloverDerivArg<Complex,F,G,O> Arg;
-	  Arg arg(F(out), G(gauge), O(oprod), out.X(), mu, nu, coeff, parity, conjugate);
+	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
 	  CloverDerivative<Complex, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
 	}else{
@@ -369,7 +368,7 @@ namespace quda {
 	if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
 	  typedef FloatNOrder<Float, 18, 4, 12> G;
 	  typedef CloverDerivArg<Complex,F,G,O> Arg;
-	  Arg arg(F(out), G(gauge), O(oprod), out.X(), mu, nu, coeff, parity, conjugate);
+	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
 	  CloverDerivative<Complex, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
 	}else{
@@ -382,24 +381,25 @@ namespace quda {
   }
 #endif // GPU_CLOVER
 
-void cloverDerivative(cudaGaugeField &out,   
-		      cudaGaugeField& gauge,
-		      cudaGaugeField& oprod,
+void cloverDerivative(cudaGaugeField &force,   
+		      cudaGaugeField &gauge,
+		      cudaGaugeField &oprod,
 		      int mu, int nu, double coeff, QudaParity parity, int conjugate)
 {
 #ifdef GPU_CLOVER_DIRAC
   assert(oprod.Geometry() == QUDA_SCALAR_GEOMETRY);
-  assert(out.Geometry() == QUDA_SCALAR_GEOMETRY);
+  assert(force.Geometry() == QUDA_VECTOR_GEOMETRY);
 
   int device_parity = (parity == QUDA_EVEN_PARITY) ? 0 : 1;
 
-  if(out.Precision() == QUDA_DOUBLE_PRECISION){
-    cloverDerivative<double>(out, gauge, oprod, mu, nu, coeff, device_parity, conjugate);   
-  } else if (out.Precision() == QUDA_SINGLE_PRECISION){
-    cloverDerivative<float>(out, gauge, oprod, mu, nu, coeff, device_parity, conjugate);
+  if(force.Precision() == QUDA_DOUBLE_PRECISION){
+    cloverDerivative<double>(force, gauge, oprod, mu, nu, coeff, device_parity, conjugate);   
+  } else if (force.Precision() == QUDA_SINGLE_PRECISION){
+    cloverDerivative<float>(force, gauge, oprod, mu, nu, coeff, device_parity, conjugate);
   } else {
-    errorQuda("Precision %d not supported", out.Precision());
+    errorQuda("Precision %d not supported", force.Precision());
   }
+
   return;
 #else
   errorQuda("Clover has not been built");

@@ -9,9 +9,9 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	inv_mre.o interface_quda.o util_quda.o color_spinor_field.o	\
 	color_spinor_util.o cpu_color_spinor_field.o			\
 	cuda_color_spinor_field.o dirac.o hw_quda.o blas_cpu.o		\
-	clover_field.o lattice_field.o gauge_field.o			\
-	cpu_gauge_field.o cuda_gauge_field.o extract_gauge_ghost.o	\
-	max_gauge.o gauge_update_quda.o dirac_clover.o dirac_wilson.o	\
+	clover_field.o lattice_field.o gauge_field.o cpu_gauge_field.o	\
+	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
+	gauge_update_quda.o dirac_clover.o dirac_wilson.o		\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
@@ -33,7 +33,8 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	unitarize_links_quda.o milc_interface.o				\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
-	inv_mpcg_quda.o inv_mpbicgstab_quda.o clover_force.o
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o clover_force.o		\
+	clover_sigma_outer_product.o
 
 
 # header files, found in include/
@@ -42,10 +43,10 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	gauge_update_quda.h invert_quda.h llfat_quda.h quda.h		\
 	quda_internal.h util_quda.h face_quda.h tune_quda.h		\
 	comm_quda.h lattice_field.h gauge_field.h double_single.h	\
-	texture.h eig_variables.h numa_affinity.h misc_helpers.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
-	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h
+	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h 	\
+	eig_variables.h numa_affinity.h misc_helpers.h texture.h
 
 
 # These are only inlined into blas_quda.cu

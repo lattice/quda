@@ -6,6 +6,7 @@
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <color_spinor.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
@@ -63,7 +64,7 @@ namespace quda {
 
   enum KernelType {OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL};
 
-  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB>
+  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
     struct CloverForceArg {
       unsigned int length;
       int X[4];
@@ -74,7 +75,9 @@ namespace quda {
       KernelType kernelType;
       bool partitioned[4];
       InputA inA;
-      InputB inB;
+      InputB inB_shift;
+      InputC inC;
+      InputD inD_shift;
       Gauge  gauge;
       Output force;
       typename RealTypeId<Complex>::Type coeff;
@@ -86,12 +89,16 @@ namespace quda {
 		   const KernelType kernelType, 
 		   const double coeff,
 		   InputA& inA,
-		   InputB& inB,
+		   InputB& inB_shift,
+		   InputC& inC,
+		   InputD& inD_shift,
 		   Gauge& gauge,
 		   Output& force,
-		   GaugeField &meta) : length(meta.VolumeCB()), parity(parity),
+		   GaugeField &meta) : length(meta.VolumeCB()), parity(parity), dir(5),
 				       displacement(displacement), kernelType(kernelType), 
-				       coeff(coeff), inA(inA), inB(inB), gauge(gauge), force(force)
+				       coeff(coeff), inA(inA), inB_shift(inB_shift), 
+				       inC(inC), inD_shift(inD_shift), 
+				       gauge(gauge), force(force)
       {
         for(int i=0; i<4; ++i) this->X[i] = meta.X()[i];
         for(int i=0; i<4; ++i) this->ghostOffset[i] = ghostOffset[i];
@@ -164,86 +171,68 @@ namespace quda {
 
 
 
-
   // Get the  coordinates for the exterior kernels
-  template<int Nspin>
-    __device__ void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
-    {
-
-      if(Nspin == 1){
-        unsigned int Xh[2] = {X[0]/2, X[1]/2};
-        switch(dir){
-          case 0:
-            x[2] = cb_idx/Xh[1] % X[2];
-            x[3] = cb_idx/(Xh[1]*X[2]) % X[3];
-            x[0] = cb_idx/(Xh[1]*X[2]*X[3]);
-            x[0] += (X[0] - displacement);
-            x[1] = 2*(cb_idx % Xh[1]) + ((x[0]+x[2]+x[3]+parity)&1);
-            break;
-
-          case 1:
-            x[2] = cb_idx/Xh[0] % X[2];
-            x[3] = cb_idx/(Xh[0]*X[2]) % X[3];
-            x[1] = cb_idx/(Xh[0]*X[2]*X[3]);
-            x[1] += (X[1] - displacement);
-            x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-
-            break;
-
-          case 2:
-            x[1] = cb_idx/Xh[0] % X[1];
-            x[3] = cb_idx/(Xh[0]*X[1]) % X[3];
-            x[2] = cb_idx/(Xh[0]*X[1]*X[3]);
-            x[2] += (X[2] - displacement);
-            x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-
-            break;
-
-          case 3:
-            x[1] = cb_idx/Xh[0] % X[1];
-            x[2] = cb_idx/(Xh[0]*X[1]) % X[2];
-            x[3] = cb_idx/(Xh[0]*X[1]*X[2]);
-            x[3] += (X[3] - displacement);
-            x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-
-            break;
-        }
-      }else if(Nspin == 3){
-        // currently unsupported
-      }
-      return;
+  __device__ void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
+  {
+    unsigned int Xh[2] = {X[0]/2, X[1]/2};
+    switch(dir){
+    case 0:
+      x[2] = cb_idx/Xh[1] % X[2];
+      x[3] = cb_idx/(Xh[1]*X[2]) % X[3];
+      x[0] = cb_idx/(Xh[1]*X[2]*X[3]);
+      x[0] += (X[0] - displacement);
+      x[1] = 2*(cb_idx % Xh[1]) + ((x[0]+x[2]+x[3]+parity)&1);
+      break;
+      
+    case 1:
+      x[2] = cb_idx/Xh[0] % X[2];
+      x[3] = cb_idx/(Xh[0]*X[2]) % X[3];
+      x[1] = cb_idx/(Xh[0]*X[2]*X[3]);
+      x[1] += (X[1] - displacement);
+      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
+      break;
+      
+    case 2:
+      x[1] = cb_idx/Xh[0] % X[1];
+      x[3] = cb_idx/(Xh[0]*X[1]) % X[3];
+      x[2] = cb_idx/(Xh[0]*X[1]*X[3]);
+      x[2] += (X[2] - displacement);
+      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
+      break;
+      
+    case 3:
+      x[1] = cb_idx/Xh[0] % X[1];
+      x[2] = cb_idx/(Xh[0]*X[1]) % X[2];
+      x[3] = cb_idx/(Xh[0]*X[1]*X[2]);
+      x[3] += (X[3] - displacement);
+      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);   
+      break;
     }
+    return;
+  }
 
 
-  template<int Nspin, int Nface> 
-    __device__  int ghostIndexFromCoords(const int x[4], const int X[4], const unsigned int dir, const int shift){
-      return 0;
-    }
-
-
-
-  template<>
-    __device__  int ghostIndexFromCoords<1,3>(
-        const int x[4],
-        const int X[4], 
-        unsigned int dir, 
-        const int shift)
+  __device__  int ghostIndexFromCoords(const int x[4], const int X[4], unsigned int dir, const int shift)
     {
       int ghost_idx;
       if(shift > 0){
         if((x[dir] + shift) >= X[dir]){
           switch(dir){
             case 0:
-              ghost_idx = (3*3 + (x[0]-X[0]+shift))*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
+              //ghost_idx = (3*3 + (x[0]-X[0]+shift))*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
+	      ghost_idx = 6*(X[3]*X[2]*X[1])/2;
               break;          
             case 1:
-              ghost_idx = (3*3 + (x[1]-X[1]+shift))*(X[3]*X[2]*X[0])/2 + (x[3]*X[2]*X[0] + x[2]*X[0] + x[0])/2;
+              //ghost_idx = (3*3 + (x[1]-X[1]+shift))*(X[3]*X[2]*X[0])/2 + (x[3]*X[2]*X[0] + x[2]*X[0] + x[0])/2;
+	      ghost_idx = 6*(X[3]*X[2]*X[0])/2;
               break;
             case 2:
-              ghost_idx = (3*3 + (x[2]-X[2]+shift))*(X[3]*X[1]*X[0])/2 + (x[3]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
+              //ghost_idx = (3*3 + (x[2]-X[2]+shift))*(X[3]*X[1]*X[0])/2 + (x[3]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
+	      ghost_idx = 6*(X[3]*X[1]*X[0])/2;
               break;
             case 3:
-              ghost_idx = (3*3 + (x[3]-X[3]+shift))*(X[2]*X[1]*X[0])/2 + (x[2]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
+              //ghost_idx = (3*3 + (x[3]-X[3]+shift))*(X[2]*X[1]*X[0])/2 + (x[2]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
+	      ghost_idx = 6*(X[2]*X[1]*X[0])/2;
               break;
             default:
               break;
@@ -276,12 +265,9 @@ namespace quda {
 
   __device__ __forceinline__
   int neighborIndex(const unsigned int& cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int& parity, 
-		    const int X[4]){
-    
+		    const int X[4]){    
     int  full_idx;
     int x[4]; 
-    
-    
     coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
     
 #ifdef MULTI_GPU
@@ -299,102 +285,84 @@ namespace quda {
 
 
 
-  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB>
-  __global__ void interiorOprodKernel(CloverForceArg<Complex, Output, Gauge, InputA, InputB> arg)
-  {
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    const int gridSize = gridDim.x*blockDim.x;
-    
+  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
+  __global__ void interiorOprodKernel(CloverForceArg<Complex, Output, Gauge, InputA, InputB, InputC, InputD> arg) {
     typedef typename RealTypeId<Complex>::Type real;
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
-    ColorSpinor<real,3,4> A;
-    ColorSpinor<real,3,4> A_shift;
-    ColorSpinor<real,3,4> B;
-    ColorSpinor<real,3,4> B_shift;
-    
-    Matrix<Complex,3> result;
-    Matrix<Complex,3> U;
-    Matrix<Complex,3> temp;
+    ColorSpinor<real,3,4> A, B_shift, C, D_shift;
+    Matrix<Complex,3> U, result, temp;
 
     while(idx<arg.length){
       arg.inA.load(static_cast<Complex*>(A.data), idx);
-      arg.inB.load(static_cast<Complex*>(B.data), idx);
-      for(int dir=0; dir<4; ++dir){
+      arg.inC.load(static_cast<Complex*>(C.data), idx);
+      
+      for(int dim=0; dim<4; ++dim){
 	int shift[4] = {0,0,0,0};
-	shift[dir] = 1;
+	shift[dim] = 1;
 	const int nbr_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity, arg.X);
+
 	if(nbr_idx >= 0){
-	  arg.inB.load(static_cast<Complex*>(B_shift.data), nbr_idx); // need to do reconstruct
-	  B_shift = (B_shift.project(dir,1)).reconstruct(dir,1);
+	  arg.inB_shift.load(static_cast<Complex*>(B_shift.data), nbr_idx);
+	  arg.inD_shift.load(static_cast<Complex*>(D_shift.data), nbr_idx);
+
+	  B_shift = (B_shift.project(dim,1)).reconstruct(dim,1);	  
 	  result = outerProdSpinTrace(B_shift,A);
 
-	  arg.inA.load(static_cast<Complex*>(A_shift.data), nbr_idx);
-	  A_shift = (A_shift.project(dir,-1)).reconstruct(dir,-1);
-	  result += outerProdSpinTrace(A_shift,B);
-
-	  arg.force.load(reinterpret_cast<real*>(temp.data), idx, dir, arg.parity); 
-	  result = temp + result*arg.coeff;
-	  arg.gauge.load(reinterpret_cast<real*>(U.data), idx, dir, arg.parity); 
-	  temp = U * result;
-	  arg.force.save(reinterpret_cast<real*>(temp.data), idx, dir, arg.parity); 
+	  D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
+	  result += outerProdSpinTrace(D_shift,C);
+	  
+	  arg.force.load(reinterpret_cast<real*>(temp.data), idx, dim, arg.parity); 
+	  arg.gauge.load(reinterpret_cast<real*>(U.data), idx, dim, arg.parity); 
+	  result = temp + U*result*arg.coeff;
+	  arg.force.save(reinterpret_cast<real*>(result.data), idx, dim, arg.parity); 
 	}
-
-
       } // dir
-      idx += gridSize;
+      idx += gridDim.x*blockDim.x;
     }
     return;
   } // interiorOprodKernel
-  
-  template<int dim, typename Complex, typename Output, typename Gauge, typename InputA, typename InputB> 
-  __global__ void exteriorOprodKernel(CloverForceArg<Complex, Output, Gauge, InputA, InputB> arg)
-    {
-      int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
-      const int gridSize = gridDim.x*blockDim.x;
 
-      typedef typename RealTypeId<Complex>::Type real;
-
-      ColorSpinor<real,3,4> A;
-      ColorSpinor<real,3,4> A_shift;
-      ColorSpinor<real,3,4> B;
-      ColorSpinor<real,3,4> B_shift;
-      Matrix<Complex,3> result;
-      Matrix<Complex,3> temp;
-      Matrix<Complex,3> U;
-
-      int x[4];
-      while(cb_idx<arg.length){
-        coordsFromIndex<1>(x, cb_idx, arg.X, dim, arg.displacement, arg.parity); 
-        const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
-        arg.inA.load(static_cast<Complex*>(A.data), bulk_cb_idx);
-        arg.inB.load(static_cast<Complex*>(B.data), bulk_cb_idx);
-
-	ColorSpinor<real,3,2> tmp;
-        const unsigned int ghost_idx = arg.ghostOffset[dim] + ghostIndexFromCoords<1,3>(x, arg.X, dim, arg.displacement);
-        arg.inB.loadGhost(static_cast<Complex*>(tmp.data), ghost_idx, dim);
-	B_shift = tmp.reconstruct(dim, 1);
-        result = outerProdSpinTrace(B_shift,A);
-
-        arg.inA.loadGhost(static_cast<Complex*>(tmp.data), ghost_idx, dim);
-	A_shift = tmp.reconstruct(dim,-1);
-        result += outerProdSpinTrace(A_shift,B);
-
-        arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
-	// if we're externally looping over poles this is unnecessary work for the gauge multiply
-        result = temp + U*result*arg.coeff; 
-	arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, dim, arg.parity); 
-        arg.force.save(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
-
-        cb_idx += gridSize;
-      }
-      return;
+  template<int dim, typename Complex, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD> 
+  __global__ void exteriorOprodKernel(CloverForceArg<Complex, Output, Gauge, InputA, InputB, InputC, InputD> arg) {
+    typedef typename RealTypeId<Complex>::Type real;
+    int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
+    
+    ColorSpinor<real,3,4> A, B_shift, C, D_shift;
+    ColorSpinor<real,3,2> projected_tmp;
+    Matrix<Complex,3> U, result, temp;
+    
+    int x[4];
+    while(cb_idx<arg.length){
+      coordsFromIndex(x, cb_idx, arg.X, dim, arg.displacement, arg.parity); 
+      const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
+      arg.inA.load(static_cast<Complex*>(A.data), bulk_cb_idx);
+      arg.inC.load(static_cast<Complex*>(C.data), bulk_cb_idx);
+      
+      const unsigned int ghost_idx = arg.ghostOffset[dim] + ghostIndexFromCoords(x, arg.X, dim, arg.displacement) + cb_idx;
+      arg.inB_shift.loadGhost(static_cast<Complex*>(projected_tmp.data), ghost_idx, dim);
+      B_shift = projected_tmp.reconstruct(dim, 1);
+      result = outerProdSpinTrace(B_shift,A);
+      
+      arg.inD_shift.loadGhost(static_cast<Complex*>(projected_tmp.data), ghost_idx, dim);
+      D_shift = projected_tmp.reconstruct(dim,-1);
+      result += outerProdSpinTrace(D_shift,C);
+      
+      arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity); 
+      arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, dim, arg.parity); 
+      result = temp + U*result*arg.coeff;
+      arg.force.save(reinterpret_cast<real*>(result.data), bulk_cb_idx, dim, arg.parity); 
+      
+      cb_idx += gridDim.x*blockDim.x;
     }
+    return;
+  } // exteriorOprodKernel
   
-  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB> 
+  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD> 
   class CloverForce : public Tunable {
     
   private:
-    CloverForceArg<Complex,Output,Gauge,InputA,InputB> &arg;
+    CloverForceArg<Complex,Output,Gauge,InputA,InputB,InputC,InputD> &arg;
     const GaugeField &meta;
     QudaFieldLocation location; // location of the lattice fields
     
@@ -402,13 +370,13 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
     
     unsigned int minThreads() const { return arg.length; }
-    bool tunedGridDim() const { return false; }
+    bool tuneGridDim() const { return false; }
     
   public:
-    CloverForce(CloverForceArg<Complex,Output,Gauge,InputA,InputB> &arg,
+    CloverForce(CloverForceArg<Complex,Output,Gauge,InputA,InputB,InputC,InputD> &arg,
 		const GaugeField &meta, QudaFieldLocation location)
       : arg(arg), meta(meta), location(location) {
-      writeAuxString("threads=%d,prec=%lu,stride=%d",arg.length,sizeof(Complex)/2,arg.inA.Stride());
+      writeAuxString("prec=%lu,stride=%d", sizeof(Complex)/2, arg.inA.Stride());
       // this sets the communications pattern for the packing kernel
       int comms[QUDA_MAX_DIM] = { commDimPartitioned(0), commDimPartitioned(1), commDimPartitioned(2), commDimPartitioned(3) };
       setPackComms(comms);
@@ -419,9 +387,10 @@ namespace quda {
     void apply(const cudaStream_t &stream){
       if(location == QUDA_CUDA_FIELD_LOCATION){
 	// Disable tuning for the time being
-	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());
+	
 	if(arg.kernelType == OPROD_INTERIOR_KERNEL){
-	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
+	  interiorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
 	} else if(arg.kernelType == OPROD_EXTERIOR_KERNEL) {
 	  if (arg.dir == 0) exteriorOprodKernel<0><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
 	  if (arg.dir == 1) exteriorOprodKernel<1><<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
@@ -442,141 +411,106 @@ namespace quda {
       this->arg.force.load();
     }
   
-    long long flops() const { return 0; }
-    long long bytes() const { return 0; }
+    long long flops() const { 
+      if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
+	((long long)arg.length)*4*(24 + 144 + 234); // spin project + spin trace + multiply-add
+      } else {
+	((long long)arg.length)*(144 + 234); // spin trace + multiply-add
+      }
+    }
+    long long bytes() const { 
+      if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
+	((long long)arg.length)*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB_shift.Bytes() + arg.inD_shift.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes())); 
+      } else {
+	((long long)arg.length)*(arg.inA.Bytes() + arg.inB_shift.Bytes()/2 + arg.inC.Bytes() + arg.inD_shift.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes()); 
+      }
+    }
   
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux);}
+    TuneKey tuneKey() const { 
+      char new_aux[TuneKey::aux_n];
+      strcpy(new_aux, aux);
+      if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
+	strcat(new_aux, ",interior");
+      } else {
+	strcat(new_aux, ",exterior");
+	if (arg.dir==0) strcat(new_aux, ",dir=0");
+	else if (arg.dir==1) strcat(new_aux, ",dir=1");
+	else if (arg.dir==2) strcat(new_aux, ",dir=2");
+	else if (arg.dir==3) strcat(new_aux, ",dir=3");
+      }
+      return TuneKey(meta.VolString(), typeid(*this).name(), new_aux);
+    }
   }; // CloverForce
   
-  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB>
-  void computeCloverForceCuda(Output force, Gauge gauge, cudaGaugeField& out, InputA& inA, InputB& inB, 
+  void exchangeGhost(cudaColorSpinorField &a, int parity, int dag) {
+    // need to enable packing in temporal direction to get spin-projector correct
+    bool pack_old = getKernelPackT();
+    setKernelPackT(true);
+
+    // first transfer src1
+    cudaDeviceSynchronize();
+
+    a.pack(1, 1-parity, dag, Nstream-1, 0);
+
+    cudaDeviceSynchronize();
+
+    for(int i=3; i>=0; i--){
+      if(commDimPartitioned(i)){
+	// Initialize the host transfer from the source spinor
+	a.gather(1, dag, 2*i); 
+      } // commDim(i)
+    } // i=3,..,0
+    
+    cudaDeviceSynchronize();
+    
+    for (int i=3; i>=0; i--) {
+      if(commDimPartitioned(i)) {
+	a.commsStart(1, 2*i, dag);
+      }
+    }
+    
+    for (int i=3; i>=0; i--) {
+      if(commDimPartitioned(i)) {
+	a.commsWait(1, 2*i, dag);
+	a.scatter(1, dag, 2*i);
+      }
+    }
+    
+    cudaDeviceSynchronize();
+    setKernelPackT(pack_old); // restore packing state
+  }
+
+  template<typename Complex, typename Output, typename Gauge, typename InputA, typename InputB, typename InputC, typename InputD>
+  void computeCloverForceCuda(Output force, Gauge gauge, cudaGaugeField& out, 
+			      InputA& inA, InputB& inB, InputC &inC, InputD &inD,
 			      cudaColorSpinorField& src1, cudaColorSpinorField& src2,
 			      const unsigned int parity, const int faceVolumeCB[4], 
 			      const unsigned int ghostOffset[4], const double coeff)
     {
-      int dag = 1;
-
       cudaEventRecord(oprodStart, streams[Nstream-1]);
       // Create the arguments for the interior kernel 
-      CloverForceArg<Complex,Output,Gauge,InputA,InputB> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, coeff, inA, inB, gauge, force, out);
-      CloverForce<Complex,Output,Gauge,InputA,InputB> oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
+      CloverForceArg<Complex,Output,Gauge,InputA,InputB,InputC,InputD> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, coeff, inA, inB, inC, inD, gauge, force, out);
+      CloverForce<Complex,Output,Gauge,InputA,InputB,InputC,InputD> oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
+
+      int dag = 1;
+      exchangeGhost(src1, parity, dag);
+      exchangeGhost(src2, parity, 1-dag);
+
+      arg.kernelType = OPROD_INTERIOR_KERNEL;
+      arg.length = src1.VolumeCB();
+      oprod.apply(0); 
 
 #ifdef MULTI_GPU
-      bool pack=false;
-      for(int i=3; i>=0; i--){
-        if(commDimPartitioned(i) && (i!=3 || getKernelPackT())){
-          pack = true;
-          break;
-        }
-      } // i=3,..,0
-
-      // source, dir(+/-1), parity, dagger, stream_ptr
-      // packing is all done in streams[Nstream-1]
-      // always call pack since this also sets the stream pointer even if not packing
-      src1.pack(1, 1-parity, dag, Nstream-1, 0);
-      src2.pack(1, 1-parity, !dag, Nstream-1, 0);
-      if(pack){
-        cudaEventRecord(packEnd, streams[Nstream-1]);
-      }
-
-      for(int i=3; i>=0; i--){
-        if(commDimPartitioned(i)){
-
-          cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd : oprodStart;
-          cudaStreamWaitEvent(streams[2*i], event, 0); // wait in stream 2*i for event to complete
-
-          // Initialize the host transfer from the source spinor
-          src1.gather(1, dag, 2*i); 
-          src2.gather(1, !dag, 2*i); 
-          // record the end of the gathering 
-          cudaEventRecord(gatherEnd[i], streams[2*i]);
-        } // comDim(i)
-      } // i=3,..,0
-#endif
-
-      oprod.apply(streams[Nstream-1]); 
-
-#ifdef MULTI_GPU
-      // compute gather completed 
-      int gatherCompleted[5];
-      int commsCompleted[5];
-      int oprodCompleted[4];
-
-      for(int i=0; i<4; ++i){
-        gatherCompleted[i] = commsCompleted[i] = oprodCompleted[i] = 0;
-      }
-      gatherCompleted[4] = commsCompleted[4] = 1;
-
-      // initialize commDimTotal 
-      int commDimTotal = 0;
-      for(int i=0; i<4; ++i){
-        commDimTotal += commDimPartitioned(i);
-      }
-      commDimTotal *= 2;
-
-      // initialize previousDir
-      int previousDir[4];
-      for(int i=3; i>=0; i--){
-        if(commDimPartitioned(i)){
-          int prev = 4;
-          for(int j=3; j>i; j--){
-            if(commDimPartitioned(j)){
-              prev = j;
-            }
-          }
-          previousDir[i] = prev;
-        }
-      } // set previous directions
-
-
-      if(commDimTotal){
-        unsigned int completeSum=0;
-        while(completeSum < commDimTotal){
-
-          for(int i=3; i>=0; i--){
-            if(!commDimPartitioned(i)) continue;
-
-            if(!gatherCompleted[i] && gatherCompleted[previousDir[i]]){
-              cudaError_t event_test = cudaEventQuery(gatherEnd[i]);
-
-              if(event_test == cudaSuccess){
-                gatherCompleted[i] = 1;
-                completeSum++;
-                src1.commsStart(1, 2*i, dag);
-                src2.commsStart(1, 2*i, !dag);
-              }
-            }
-
-            // Query if comms has finished 
-            if(!commsCompleted[i] && commsCompleted[previousDir[i]] && gatherCompleted[i]){
-              int comms_test = (src1.commsQuery(2*i, dag) && src2.commsQuery(2*i, !dag));
-              if(comms_test){
-                commsCompleted[i] = 1;
-                completeSum++;
-                src1.scatter(1, dag, 2*i);
-                src2.scatter(1, !dag, 2*i);
-              }
-            }
-
-            // enqueue the boundary oprod kernel as soon as the scatters have been enqueud
-            if(!oprodCompleted[i] && commsCompleted[i]){
-              cudaEventRecord(scatterEnd[i], streams[2*i]);
-              cudaStreamWaitEvent(streams[Nstream-1], scatterEnd[i],0);
-
-	      // update parameters for this exterior kernel
-	      arg.kernelType = OPROD_EXTERIOR_KERNEL;
-              arg.dir = i;
-	      arg.length = faceVolumeCB[i];
-	      arg.displacement = 1;
-
-	      oprod.apply(streams[Nstream-1]); 
-
-              oprodCompleted[i] = 1;
-            }
-
-          } // i=3,..,0 
-        } // completeSum < commDimTotal
-      } // if commDimTotal
+      for (int i=3; i>=0; i--) {
+	if (commDimPartitioned(i)) {
+	  // update parameters for this exterior kernel
+	  arg.kernelType = OPROD_EXTERIOR_KERNEL;
+	  arg.dir = i;
+	  arg.length = faceVolumeCB[i];
+	  arg.displacement = 1;
+	  oprod.apply(0); 
+	}
+      } // i=3,..,0 
 #endif
     } // computeCloverForceCuda
 
@@ -606,21 +540,25 @@ namespace quda {
 
     createCloverForceEvents();
 
-    cudaColorSpinorField& inA = (parity&1) ? x.Odd() : x.Even();
-    cudaColorSpinorField& inB = (parity&1) ? p.Even(): p.Odd();
+    cudaColorSpinorField& inA = (parity&1) ? p.Odd() : p.Even();
+    cudaColorSpinorField& inB = (parity&1) ? x.Even(): x.Odd();
+    cudaColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
+    cudaColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
 
     if(x.Precision() == QUDA_DOUBLE_PRECISION){
       Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
       Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
+      Spinor<double2, double2, double2, 12, 0, 0> spinorC(inC);
+      Spinor<double2, double2, double2, 12, 0, 1> spinorD(inD);
       if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
 					FloatNOrder<double,18, 2, 18>(U),
-					force, spinorA, spinorB, inA, inB, parity, 
+					force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
 					inB.GhostFace(), ghostOffset, coeff);
       } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
 					FloatNOrder<double,18, 2, 12>(U),
-					force, spinorA, spinorB, inA, inB, parity, 
+					force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
 					inB.GhostFace(), ghostOffset, coeff);
       } else {
 	errorQuda("Unsupported recontruction type");
@@ -632,12 +570,12 @@ namespace quda {
       if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
 				       FloatNOrder<float, 18, 2, 18>(U), 
-				       force, spinorA, spinorB, inA, inB, parity, 
+				       force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
 				       inB.GhostFace(), ghostOffset, coeff);
       } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
 				       FloatNOrder<float, 18, 4, 12>(U), 
-				       force, spinorA, spinorB, inA, inB, parity, 
+				       force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
 				       inB.GhostFace(), ghostOffset, coeff);
       }
 #endif
@@ -652,8 +590,7 @@ namespace quda {
 #endif
 
    checkCudaError();
-
-    return;
+   return;
   } // computeCloverForce
 
 
