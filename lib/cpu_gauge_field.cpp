@@ -200,6 +200,10 @@ namespace quda {
     gauge = gauge_;
   }
 
+  void cpuGaugeField::zero() {
+    memset(gauge, 0, bytes);
+  }
+
 /*template <typename Float>
 void print_matrix(const Float &m, unsigned int x) {
 
