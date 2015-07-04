@@ -575,8 +575,6 @@ extern "C" {
    * the array solution fields, and compute the resulting momentum
    * field.
    *
-   * Force(x, mu) = U(x, mu) * sum_i=1^nvec ( P_mu^+ x(x+mu) p(x)^\dag  +  P_mu^- p(x+mu) x(x)^\dag )
-   *
    * @param mom Momentum matrix
    * @param dt Integrating step size
    * @param x Array of solution vectors

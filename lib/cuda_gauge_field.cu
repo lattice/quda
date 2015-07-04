@@ -521,7 +521,7 @@ namespace quda {
 
     ColorSpinorParam spinor_param;
     spinor_param.nColor = a.Reconstruct()/2;
-    spinor_param.nSpin = npsin;
+    spinor_param.nSpin = spin;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
     spinor_param.precision = a.Precision();

@@ -520,7 +520,7 @@ namespace quda {
 			  const cudaGaugeField& U,
 			  cudaColorSpinorField& x,  
 			  cudaColorSpinorField& p,
-			  const unsigned int parity, const double coeff)
+			  const double coeff)
   {
 
 #ifdef GPU_CLOVER_DIRAC
@@ -538,52 +538,55 @@ namespace quda {
 
     if(x.Precision() != force.Precision()) errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), force.Precision());
 
-    createCloverForceEvents();
+    createCloverForceEvents(); // FIXME not actually used
 
-    cudaColorSpinorField& inA = (parity&1) ? p.Odd() : p.Even();
-    cudaColorSpinorField& inB = (parity&1) ? x.Even(): x.Odd();
-    cudaColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
-    cudaColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
-
-    if(x.Precision() == QUDA_DOUBLE_PRECISION){
-      Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
-      Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
-      Spinor<double2, double2, double2, 12, 0, 0> spinorC(inC);
-      Spinor<double2, double2, double2, 12, 0, 1> spinorD(inD);
-      if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
-					FloatNOrder<double,18, 2, 18>(U),
-					force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-					inB.GhostFace(), ghostOffset, coeff);
-      } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
-					FloatNOrder<double,18, 2, 12>(U),
-					force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-					inB.GhostFace(), ghostOffset, coeff);
-      } else {
-	errorQuda("Unsupported recontruction type");
-      }
-    }else if(x.Precision() == QUDA_SINGLE_PRECISION){
+    for (int parity=0; parity<2; parity++) {
+      
+      cudaColorSpinorField& inA = (parity&1) ? p.Odd() : p.Even();
+      cudaColorSpinorField& inB = (parity&1) ? x.Even(): x.Odd();
+      cudaColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
+      cudaColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
+      
+      if(x.Precision() == QUDA_DOUBLE_PRECISION){
+	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
+	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
+	Spinor<double2, double2, double2, 12, 0, 0> spinorC(inC);
+	Spinor<double2, double2, double2, 12, 0, 1> spinorD(inD);
+	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	  computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
+					  FloatNOrder<double,18, 2, 18>(U),
+					  force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
+					  inB.GhostFace(), ghostOffset, coeff);
+	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	  computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
+					  FloatNOrder<double,18, 2, 12>(U),
+					  force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
+					  inB.GhostFace(), ghostOffset, coeff);
+	} else {
+	  errorQuda("Unsupported recontruction type");
+	}
+      }else if(x.Precision() == QUDA_SINGLE_PRECISION){
 #if 0
-      Spinor<float4, float4, float4, 6, 0, 0> spinorA(inA);
-      Spinor<float4, float4, float4, 6, 0, 1> spinorB(inB);
-      if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
-				       FloatNOrder<float, 18, 2, 18>(U), 
-				       force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-				       inB.GhostFace(), ghostOffset, coeff);
-      } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
-				       FloatNOrder<float, 18, 4, 12>(U), 
-				       force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-				       inB.GhostFace(), ghostOffset, coeff);
-      }
+	Spinor<float4, float4, float4, 6, 0, 0> spinorA(inA);
+	Spinor<float4, float4, float4, 6, 0, 1> spinorB(inB);
+	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	  computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
+					 FloatNOrder<float, 18, 2, 18>(U), 
+					 force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
+					 inB.GhostFace(), ghostOffset, coeff);
+	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	  computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
+					 FloatNOrder<float, 18, 4, 12>(U), 
+					 force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
+					 inB.GhostFace(), ghostOffset, coeff);
+	}
 #endif
-    } else {
-      errorQuda("Unsupported precision: %d\n", x.Precision());
+      } else {
+	errorQuda("Unsupported precision: %d\n", x.Precision());
+      }
     }
 
-    destroyCloverForceEvents();
+    destroyCloverForceEvents(); // not actually used
 
 #else // GPU_CLOVER_DIRAC not defined
    errorQuda("Clover Dirac operator has not been built!"); 

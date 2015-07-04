@@ -4946,24 +4946,6 @@ return;
 */
 
 
-// let's just declare this here for now
-namespace quda {
-  void computeCloverForce(cudaGaugeField& force,
-			  const cudaGaugeField& U,
-			  cudaColorSpinorField& x,  
-			  cudaColorSpinorField& p,
-			  const unsigned int parity, const double coeff);
-
-  void computeCloverSigmaOprod(cudaGaugeField& oprod,
-			       cudaColorSpinorField& x,  
-			       cudaColorSpinorField& p,
-			       const double coeff, int mu, int nu, int shift);
-
-  void updateForce(cudaGaugeField &force, cudaGaugeField &out, int mu);
-  void updateMomentum(cudaGaugeField &mom, cudaGaugeField &force);
-
-}
- 
 void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p, double *coeff, double kappa2, double ck,
 			    int nvector, double multiplicity, void *gauge, QudaGaugeParam* param) {
 
@@ -5047,14 +5029,9 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p, doub
     profileCloverForce.Stop(QUDA_PROFILE_H2D); 
 
     checkCudaError();
+
     profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
-
-    // Operate on even-parity sites
-    computeCloverForce(cudaForce, *gaugePrecise, *(cudaQuarkX[i]), *(cudaQuarkP[i]), 0, 2.0*dt*coeff[i]*kappa2);
-
-    // Operate on odd-parity sites
-    computeCloverForce(cudaForce, *gaugePrecise, *(cudaQuarkX[i]), *(cudaQuarkP[i]), 1, 2.0*dt*coeff[i]*kappa2);
-
+    computeCloverForce(cudaForce, *gaugePrecise, *(cudaQuarkX[i]), *(cudaQuarkP[i]), 2.0*dt*coeff[i]*kappa2);
     profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
   }
 
@@ -5106,7 +5083,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p, doub
 	profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
 	profileCloverForce.Start(QUDA_PROFILE_COMMS);
 
-	oprodEx.exchangeExtendedGhost(R,true);
+	oprodEx.exchangeExtendedGhost(R,true); 
 
 	profileCloverForce.Stop(QUDA_PROFILE_COMMS);
 	profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
