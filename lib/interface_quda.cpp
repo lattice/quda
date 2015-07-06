@@ -4716,6 +4716,11 @@ void computeStaggeredOprodQuda(void** oprod,
     double** coeff,
     QudaGaugeParam* param)
 {
+
+#ifdef  GPU_STAGGERED_OPROD
+#ifndef BUILD_QDP_INTERFACE
+#error "Staggerd oprod requires BUILD_QDP_INTERFACE";
+#endif
   using namespace quda;
   profileStaggeredOprod.Start(QUDA_PROFILE_TOTAL);
 
@@ -4825,6 +4830,9 @@ void computeStaggeredOprodQuda(void** oprod,
 
   checkCudaError();
   return;
+#else
+  errorQuda("Staggered oprod has not been built");
+#endif
 }
 
 
@@ -5181,7 +5189,7 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-double plaqCuda ()
+void plaqCuda (double &plq1, double &plq2)
 {
   cudaGaugeField *data = NULL;
   #ifndef MULTI_GPU
@@ -5212,7 +5220,9 @@ double plaqCuda ()
     }
 //    return quda::plaquette(*extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
   #endif
-  return quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION);
+  quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION, plq1, plq2);
+
+  return;
 }
 
 void performAPEnStep(unsigned int nSteps, double alpha)
@@ -5267,18 +5277,23 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   if (gaugeSmeared == NULL) {
 //    gaugeSmeared = new cudaGaugeField(gParamEx);
     gaugeSmeared = new cudaGaugeField(gParam);
-    #ifdef MULTI_GPU
-      copyExtendedGauge(*gaugeSmeared, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      gaugeSmeared->exchangeExtendedGhost(R,true);
-    #else
-      gaugeSmeared->copy(*gaugePrecise);
-    #endif
   }
+
+  #ifdef MULTI_GPU
+    copyExtendedGauge(*gaugeSmeared, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+    gaugeSmeared->exchangeExtendedGhost(R,true);
+  #else
+    gaugeSmeared->copy(*gaugePrecise);
+  #endif
 
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  printfQuda("Plaquette after 0 APE steps: %le\n", plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
+    double plq1 = 0., plq2 = 0.;
+    plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION, plq1, plq2);
+    printfQuda("Plaquette after 0 APE steps: %le\n", plq1+plq2);
+  }
 
   for (unsigned int i=0; i<nSteps; i++) {
     #ifdef MULTI_GPU
@@ -5298,7 +5313,11 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     gaugeSmeared->exchangeExtendedGhost(R,true);
   #endif
 
-  printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
+    double plq1 = 0., plq2 = 0.;
+    plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION, plq1, plq2);
+    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq1+plq2);
+  }
 
   profileAPE.Stop(QUDA_PROFILE_TOTAL);
 }
