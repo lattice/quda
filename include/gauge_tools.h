@@ -1,4 +1,4 @@
 namespace quda {
-  double	plaquette	(const GaugeField& data, QudaFieldLocation location);
-  void		APEStep		(GaugeField &dataDs, const GaugeField& dataOr, double alpha, QudaFieldLocation location);
+  void plaquette (const GaugeField& data, QudaFieldLocation location, double &plqS, double &plqT);
+  void APEStep   (GaugeField &dataDs, const GaugeField& dataOr, double alpha, QudaFieldLocation location);
 }
