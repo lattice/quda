@@ -113,6 +113,10 @@ void SU3Test(int argc, char **argv) {
   loadGaugeQuda(gauge, &param);
   saveGaugeQuda(new_gauge, &param);
 
+  double plaq[3];
+  plaqQuda(plaq);
+  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
   check_gauge(gauge, new_gauge, 1e-3, param.cpu_prec);
 
   end();
