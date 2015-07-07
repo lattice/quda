@@ -607,6 +607,7 @@ BUILD_QDPJIT_INTERFACE
 BUILD_CPS_INTERFACE
 BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
+MILC_NVTX
 MPI_NVTX
 GPU_COMMS
 GPU_DIRECT
@@ -729,6 +730,7 @@ enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
 enable_mpi_nvtx
+enable_milc_nvtx
 enable_device_pack
 with_mpi
 enable_pthreads
@@ -1415,6 +1417,8 @@ Optional Features:
                           default: disabled)
   --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
                           the visual profiler (default: disabled)
+  --enable-milc-nvtx      Enable NVTX markup for profiling MILC interface
+                          calls in the visual profiler (default: disabled)
   --enable-device-pack    Enable the packing / unpacking of fields on the
                           device (default: disabled)
   --enable-pthreads       Enable pthreads in the multi-GPU dslash build
@@ -2303,6 +2307,15 @@ if test "${enable_mpi_nvtx+set}" = set; then :
   enableval=$enable_mpi_nvtx;  mpi_nvtx=${enableval}
 else
    mpi_nvtx="no"
+
+fi
+
+
+# Check whether --enable-milc-nvtx was given.
+if test "${enable_milc_nvtx+set}" = set; then :
+  enableval=$enable_milc_nvtx;  milc_nvtx=${enableval}
+else
+   milc_nvtx="no"
 
 fi
 
@@ -4210,6 +4223,14 @@ yes|no);;
   ;;
 esac
 
+case ${milc_nvtx} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-milc-nvtx " "$LINENO" 5
+  ;;
+esac
+
+
 case ${build_qdpjit} in
 yes|no);;
 *)
@@ -4431,6 +4452,11 @@ GPU_COMMS=${gpu_comms}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_NVTXS= ${mpi_nvtx}" >&5
 $as_echo "$as_me: Setting MPI_NVTXS= ${mpi_nvtx}" >&6;}
 MPI_NVTX=${mpi_nvtx}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MILC_NVTXS= ${milc_nvtx}" >&5
+$as_echo "$as_me: Setting MILC_NVTXS= ${milc_nvtx}" >&6;}
+MILC_NVTX=${milc_nvtx}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}" >&5
