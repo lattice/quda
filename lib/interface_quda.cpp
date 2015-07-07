@@ -5189,6 +5189,14 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
+/*
+ * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+ */
+void plaq_quda_(double plaq[3]) {
+  plaqQuda(plaq);
+}
+
+
 void plaqQuda (double plq[3])
 {
   if (!gaugePrecise) 
