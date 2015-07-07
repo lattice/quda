@@ -34,13 +34,7 @@ namespace quda {
         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
 	threads = X[0]*X[1]*X[2]*X[3];
-/*	if ((cudaMallocHost(&plaq_h, sizeof(double))) == cudaErrorMemoryAllocation)
-	   errorQuda	("Error allocating memory for plaquette.\n");
-	if ((cudaMalloc(&plaq, sizeof(double))) == cudaErrorMemoryAllocation)
-	   errorQuda	("Error allocating memory for plaquette.\n");
-*/
 	cudaHostGetDevicePointer(&plaq, plaq_h, 0);
-
     }
   };
 
@@ -202,15 +196,10 @@ namespace quda {
 
 	  cudaDeviceSynchronize();
 
-	  #ifdef MULTI_GPU
-	    comm_allreduce_array((double*) arg.plaq_h, 2);
-	    const int nNodes = comm_dim(0)*comm_dim(1)*comm_dim(2)*comm_dim(3);
-            arg.plaq_h[0].x /= 18.*(arg.threads*nNodes);
-            arg.plaq_h[0].y /= 18.*(arg.threads*nNodes);
-	  #else
-            arg.plaq_h[0].x /= 18.*arg.threads;
-            arg.plaq_h[0].y /= 18.*arg.threads;
-	  #endif
+	  comm_allreduce_array((double*) arg.plaq_h, 2);
+	  const int nNodes = comm_dim(0)*comm_dim(1)*comm_dim(2)*comm_dim(3);
+	  arg.plaq_h[0].x /= 9.*(arg.threads*nNodes);
+	  arg.plaq_h[0].y /= 9.*(arg.threads*nNodes);
         } else {
           errorQuda("CPU not supported yet\n");
           //computePlaqCPU(arg);
@@ -237,8 +226,8 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return (1)*6*arg.threads; }
-      long long bytes() const { return (1)*6*arg.threads*sizeof(Float); } // Only correct if there is no link reconstruction
+      long long flops() const { return 6*arg.threads*(3*198+3); }
+      long long bytes() const { return 6*arg.threads*arg.dataOr.Bytes(); } 
 
     }; 
 
@@ -253,44 +242,42 @@ namespace quda {
       plq.y = arg.plaq_h[0].y;
     }
 
+
+  // Use traits to reduce the template explosion
+  template<typename,QudaReconstructType> struct gauge_mapper { };
+  template<> struct gauge_mapper<double,QUDA_RECONSTRUCT_NO> { typedef FloatNOrder<double, 18, 2, 18> type; };
+  template<> struct gauge_mapper<double,QUDA_RECONSTRUCT_12> { typedef FloatNOrder<double, 18, 2, 12> type; };
+  template<> struct gauge_mapper<double,QUDA_RECONSTRUCT_8> { typedef FloatNOrder<double, 18, 2, 8> type; };
+
+  template<> struct gauge_mapper<float,QUDA_RECONSTRUCT_NO> { typedef FloatNOrder<float, 18, 2, 18> type; };
+  template<> struct gauge_mapper<float,QUDA_RECONSTRUCT_12> { typedef FloatNOrder<float, 18, 4, 12> type; };
+  template<> struct gauge_mapper<float,QUDA_RECONSTRUCT_8> { typedef FloatNOrder<float, 18, 4, 8> type; };
+
+
   template<typename Float>
     double2 plaquette(const GaugeField& data, QudaFieldLocation location) {
-
-      // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-      // Need to fix this!!
-
       double2 res;
+      if (!data.isNative()) errorQuda("Plaquette computation only supported on native ordered fields");
 
-      if(data.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-        if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          plaquette<Float>(FloatNOrder<Float, 18, 2, 18>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
-          plaquette<Float>(FloatNOrder<Float, 18, 2, 12>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
-          plaquette<Float>(FloatNOrder<Float, 18, 2,  8>(data), data, location, res);
-        } else {
-          errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-        }
-      } else if(data.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-        if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          plaquette<Float>(FloatNOrder<Float, 18, 4, 18>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
-          plaquette<Float>(FloatNOrder<Float, 18, 4, 12>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
-          plaquette<Float>(FloatNOrder<Float, 18, 4,  8>(data), data, location, res);
-        } else {
-          errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-        }
+      if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+	plaquette<Float>(Gauge(data), data, location, res);
+      } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+	plaquette<Float>(Gauge(data), data, location, res);
+      } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+	plaquette<Float>(Gauge(data), data, location, res);
       } else {
-        errorQuda("Invalid Gauge Order\n");
+	errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
 
       return res;
     }
 #endif
 
-  void plaquette(const GaugeField& data, QudaFieldLocation location, double &plq1, double &plq2) {
-
+  double3 plaquette(const GaugeField& data, QudaFieldLocation location) {
+    
 #ifdef GPU_GAUGE_TOOLS
     double2 plq;
     if(data.Precision() == QUDA_HALF_PRECISION) {
@@ -304,12 +291,10 @@ namespace quda {
       errorQuda("Precision %d not supported", data.Precision());
     }
 #else
-  errorQuda("Gauge tools are not build");
+    errorQuda("Gauge tools are not build");
 #endif
-
-    plq1 = plq.x;
-    plq2 = plq.y;
-
-    return;
+    
+    double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
+    return plaq;
   }
 }

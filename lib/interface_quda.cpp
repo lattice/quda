@@ -5189,39 +5189,44 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-void plaqCuda (double &plq1, double &plq2)
+void plaqQuda (double plq[3])
 {
+  if (!gaugePrecise) 
+    errorQuda("Cannot compute plaquette as there is no resident gauge field");
+
   cudaGaugeField *data = NULL;
-  #ifndef MULTI_GPU
-//    return quda::plaquette(*gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    data = gaugePrecise;
-  #else
-    if (extendedGaugeResident) {
-      data = extendedGaugeResident;
-    } else {
-      int y[4];
-      for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
-      int pad = 0;
-      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-      gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-      gParamEx.order = gaugePrecise->Order();
-      gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-      gParamEx.t_boundary = gaugePrecise->TBoundary();
-      gParamEx.nFace = 1;
-
-      data = new cudaGaugeField(gParamEx);
-
-      copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
-      data->exchangeExtendedGhost(R,true);
-      extendedGaugeResident = data;
-      cudaDeviceSynchronize();
-    }
-//    return quda::plaquette(*extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-  #endif
-  quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION, plq1, plq2);
-
+#ifndef MULTI_GPU
+  data = gaugePrecise;
+#else
+  if (extendedGaugeResident) {
+    data = extendedGaugeResident;
+  } else {
+    int y[4];
+    for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
+    int pad = 0;
+    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+			     pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.order = gaugePrecise->Order();
+    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParamEx.t_boundary = gaugePrecise->TBoundary();
+    gParamEx.nFace = 1;
+    
+    data = new cudaGaugeField(gParamEx);
+    
+    copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+    data->exchangeExtendedGhost(R,true);
+    extendedGaugeResident = data;
+    cudaDeviceSynchronize();
+  }
+#endif
+  
+  double3 plaq = quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION);
+  plq[0] = plaq.x;
+  plq[1] = plaq.y;
+  plq[2] = plaq.z;
+  
   return;
 }
 
@@ -5290,9 +5295,8 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   cudaGaugeTemp = new cudaGaugeField(gParam);
 
   if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-    double plq1 = 0., plq2 = 0.;
-    plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION, plq1, plq2);
-    printfQuda("Plaquette after 0 APE steps: %le\n", plq1+plq2);
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after 0 APE steps: %le\n", plq.x);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
@@ -5314,9 +5318,8 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   #endif
 
   if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-    double plq1 = 0., plq2 = 0.;
-    plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION, plq1, plq2);
-    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq1+plq2);
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq.x);
   }
 
   profileAPE.Stop(QUDA_PROFILE_TOTAL);

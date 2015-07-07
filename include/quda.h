@@ -800,9 +800,10 @@ extern "C" {
                       const QudaGaugeParam* param);
 
   /**
-   * Computes the spatial and temporal plaquette of the loaded gauge configuration.
+   * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+   * @param Array for storing the averages (total, spatial, temporal)
    */
-  void plaqCuda(double&, double&);
+  void plaqQuda(double plaq[3]);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
