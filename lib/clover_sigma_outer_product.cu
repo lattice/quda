@@ -52,7 +52,12 @@ namespace quda {
     ColorSpinor<real,3,4> A, B;
     Matrix<Complex,3> result, temp;
 
+    // workaround for code that hangs generated with CUDA 5.x
+#if (CUDA_VERSION < 6000)
+    if (idx >= arg.length) idx = arg.length - 1;
+#else
     while(idx<arg.length){
+#endif // CUDA_VERSION
       arg.inA.load(static_cast<Complex*>(A.data), idx);
       arg.inB.load(static_cast<Complex*>(B.data), idx);
 
@@ -67,9 +72,10 @@ namespace quda {
 	temp = arg.coeff*result;
       }
       arg.oprod.save(reinterpret_cast<real*>(temp.data), idx, 0, arg.parity); 
-      
+#if (CUDA_VERSION >= 6000)
       idx += gridDim.x*blockDim.x;
     }
+#endif // CUDA_VERSION
     return;
   } // sigmaOprodKernel
 
