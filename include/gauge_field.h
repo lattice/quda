@@ -153,12 +153,6 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
-    /**
-       This function returns true if the field is stored in an
-       internal field order for the given precision.
-    */ 
-    bool isNative() const;
-
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
@@ -178,7 +172,6 @@ namespace quda {
     const int* R() const { return r; }
     QudaGhostExchange GhostExchange() const { return ghostExchange; }
     QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
-
     /**
        Apply the staggered phase factors to the gauge field.
      */
@@ -193,6 +186,12 @@ namespace quda {
     int Nface() const { return nFace; }
   
     void checkField(const GaugeField &);
+
+    /**
+       This function returns true if the field is stored in an
+       internal field order for the given precision.
+    */ 
+    bool isNative() const;
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }

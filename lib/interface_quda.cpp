@@ -195,6 +195,9 @@ static TimeProfile profileHISQForce("computeHISQForceQuda");
 //!<Profiler for computeHISQForceCompleteQuda
 static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 
+//!<Profiler for computeCloverSigmaTrace
+static TimeProfile profilePlaq("plaqQuda");
+
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
@@ -1093,6 +1096,7 @@ void endQuda(void)
     profileHISQForce.Print();
     profileContract.Print();
     profileCovDev.Print();
+    profilePlaq.Print();
     profileEnd.Print();
 
     printLaunchTimer();
@@ -3687,7 +3691,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
 
   profileGaugeForce.Start(QUDA_PROFILE_COMMS);
-  cudaGauge->exchangeExtendedGhost(R);
+  // do extended fill so we can reuse this extended gauge field
+  bool no_comms_fill =  (qudaGaugeParam->make_resident_gauge) ? true : false;
+  cudaGauge->exchangeExtendedGhost(R, no_comms_fill); 
   profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
   profileGaugeForce.Start(QUDA_PROFILE_INIT); 
 #endif
@@ -3762,7 +3768,12 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   delete cpuMom;
 
 #ifdef MULTI_GPU
-  delete cudaGauge;
+  if (qudaGaugeParam->make_resident_gauge) {
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaGauge;
+  } else {
+    delete cudaGauge;
+  }
 #endif
   profileGaugeForce.Stop(QUDA_PROFILE_FREE);
 
@@ -5189,38 +5200,66 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-double plaqCuda ()
+/*
+ * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+ */
+void plaq_quda_(double plaq[3]) {
+  plaqQuda(plaq);
+}
+
+
+void plaqQuda (double plq[3])
 {
+  profilePlaq.Start(QUDA_PROFILE_TOTAL);
+
+  profilePlaq.Start(QUDA_PROFILE_INIT);
+  if (!gaugePrecise) 
+    errorQuda("Cannot compute plaquette as there is no resident gauge field");
+
   cudaGaugeField *data = NULL;
-  #ifndef MULTI_GPU
-//    return quda::plaquette(*gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    data = gaugePrecise;
-  #else
-    if (extendedGaugeResident) {
-      data = extendedGaugeResident;
-    } else {
-      int y[4];
-      for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
-      int pad = 0;
-      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-      gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-      gParamEx.order = gaugePrecise->Order();
-      gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-      gParamEx.t_boundary = gaugePrecise->TBoundary();
-      gParamEx.nFace = 1;
+#ifndef MULTI_GPU
+  data = gaugePrecise;
+#else
+  if (extendedGaugeResident) {
+    data = extendedGaugeResident;
+  } else {
+    int y[4];
+    for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
+    int pad = 0;
+    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+			     pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.order = gaugePrecise->Order();
+    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParamEx.t_boundary = gaugePrecise->TBoundary();
+    gParamEx.nFace = 1;
+    
+    data = new cudaGaugeField(gParamEx);
+    
+    copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+    profilePlaq.Stop(QUDA_PROFILE_INIT);  
 
-      data = new cudaGaugeField(gParamEx);
+    profilePlaq.Start(QUDA_PROFILE_COMMS);
+    data->exchangeExtendedGhost(R,true);
+    profilePlaq.Stop(QUDA_PROFILE_COMMS);
 
-      copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
-      data->exchangeExtendedGhost(R,true);
-      extendedGaugeResident = data;
-      cudaDeviceSynchronize();
-    }
-//    return quda::plaquette(*extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-  #endif
-  return quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION);
+    profilePlaq.Start(QUDA_PROFILE_INIT);  
+    extendedGaugeResident = data;
+  }
+#endif
+
+  profilePlaq.Stop(QUDA_PROFILE_INIT);  
+
+  profilePlaq.Start(QUDA_PROFILE_COMPUTE);  
+  double3 plaq = quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION);
+  plq[0] = plaq.x;
+  plq[1] = plaq.y;
+  plq[2] = plaq.z;
+  profilePlaq.Stop(QUDA_PROFILE_COMPUTE);  
+  
+  profilePlaq.Stop(QUDA_PROFILE_TOTAL);
+  return;
 }
 
 void performAPEnStep(unsigned int nSteps, double alpha)
@@ -5287,7 +5326,10 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  printfQuda("Plaquette after 0 APE steps: %le\n", plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after 0 APE steps: %le\n", plq.x);
+  }
 
   for (unsigned int i=0; i<nSteps; i++) {
     #ifdef MULTI_GPU
@@ -5307,7 +5349,10 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     gaugeSmeared->exchangeExtendedGhost(R,true);
   #endif
 
-  printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq.x);
+  }
 
   profileAPE.Stop(QUDA_PROFILE_TOTAL);
 }
