@@ -8,6 +8,8 @@
 
 #include <device_functions.h>
 
+#include <hisq_links_quda.h> //reunit gauge links!!!!!
+
 #include <cufft.h>
 
 #ifdef GPU_GAUGE_ALG
@@ -1427,6 +1429,32 @@ namespace quda {
     }
     if ((iter % verbose_interval) != 0 )
       printf("Step: %d\tAction: %.16e\ttheta: %.16e\tDelta: %.16e\n", iter, argQ.getAction(), argQ.getTheta(), diff);
+
+    // Reunitarize at end
+    const double unitarize_eps = 1e-14;
+    const double max_error = 1e-10;
+    const int reunit_allow_svd = 1;
+    const int reunit_svd_only  = 0;
+    const double svd_rel_error = 1e-6;
+    const double svd_abs_error = 1e-6;
+    setUnitarizeLinksConstants(unitarize_eps, max_error,
+                               reunit_allow_svd, reunit_svd_only,
+                               svd_rel_error, svd_abs_error);
+    int num_failures = 0;
+    int* num_failures_dev;
+    cudaMalloc((void**)&num_failures_dev, sizeof(int));
+    cudaMemset(num_failures_dev, 0, sizeof(int));
+    if ( num_failures_dev == NULL ) errorQuda("cudaMalloc failed for dev_pointer\n");
+    unitarizeLinksQuda(data, num_failures_dev);
+    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    if ( num_failures > 0 ) {
+      cudaFree(num_failures_dev);
+      errorQuda("Error in the unitarization\n");
+      exit(1);
+    }
+    cudaMemset(num_failures_dev, 0, sizeof(int));
+    // end reunitarize
+
 
     arg.free();
     CUFFT_SAFE_CALL(cufftDestroy(plan_zt));
