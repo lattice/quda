@@ -212,6 +212,11 @@ namespace quda {
 
 
 
+static bool checkDimsPartitioned(){
+  if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
+  return false;
+}
+
   template<class T>
   __device__ __host__ inline Matrix<T,3> getSubTraceUnit(const Matrix<T,3>& a){
     T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
@@ -1101,7 +1106,7 @@ namespace quda {
         faceVolume[dir] = faceVolume_[dir];
         faceVolumeCB[dir] = faceVolumeCB_[dir];
       }
-      if ( comm_size() != 1 ) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
+      if ( checkDimsPartitioned() ) PreCalculateLatticeIndices(faceVolume, faceVolumeCB, X, border, threads, borderpoints);
     }
   };
 
@@ -1288,7 +1293,7 @@ namespace quda {
       int parity = 0;
     }
     ~GaugeFixBorderPoints () {
-      if ( comm_size() != 1 ) for ( int i = 0; i < 2; i++ ) cudaFree(arg.borderpoints[i]);
+      if ( checkDimsPartitioned() ) for ( int i = 0; i < 2; i++ ) cudaFree(arg.borderpoints[i]);
     }
     void setParity(const int par){
       parity = par;
@@ -1598,7 +1603,7 @@ namespace quda {
     dim3 block[4];
     dim3 grid[4];
 
-    if ( comm_size() != 1 ) {
+    if ( checkDimsPartitioned() ) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -1681,7 +1686,7 @@ namespace quda {
         flop += (double)gaugeFix.flops();
         byte += (double)gaugeFix.bytes();
       #else
-        if ( comm_size() == 1 ) {
+        if ( !checkDimsPartitioned() ) {
           gaugeFix.setParity(p);
           gaugeFix.apply(0);
           flop += (double)gaugeFix.flops();
@@ -1778,7 +1783,7 @@ namespace quda {
            flop += (double)gaugeFix.flops();
            byte += (double)gaugeFix.bytes();
            #ifdef MULTI_GPU
-           if(comm_size() != 1){//exchange updated top face links in current parity
+           if(checkDimsPartitioned()){//exchange updated top face links in current parity
            for (int d=0; d<4; d++) {
             if (!commDimPartitioned(d)) continue;
             comm_start(mh_recv_back[d]);
@@ -1868,7 +1873,7 @@ namespace quda {
     }
     cudaFree(num_failures_dev);
   #ifdef MULTI_GPU
-    if ( comm_size() != 1 ) {
+    if ( checkDimsPartitioned() ) {
       for ( int d = 0; d < 4; d++ ) {
         if ( commDimPartitioned(d)) {
           comm_free(mh_send_fwd[d]);
