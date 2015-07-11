@@ -29,10 +29,14 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern char latfile[];
 
+int num_failures=0;
+int *num_failures_dev;
+
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#define DABS(a) ((a)<(0.)?(-(a)):(a))
 
 
-int* SetReunitarizationConsts(){
+void SetReunitarizationConsts(){
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
   const int reunit_allow_svd = 1;
@@ -42,14 +46,39 @@ int* SetReunitarizationConsts(){
   setUnitarizeLinksConstants(unitarize_eps, max_error,
       reunit_allow_svd, reunit_svd_only,
       svd_rel_error, svd_abs_error);
-  int* num_failures_dev;
   cudaMalloc((void**)&num_failures_dev, sizeof(int));
   cudaMemset(num_failures_dev, 0, sizeof(int));
   if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
-  return num_failures_dev;
+}
+
+bool compareDoube2(double2 a, double2 b){
+  double a0,a1;
+  a0 = DABS(a.x - b.x);
+  a1=DABS(a.y - b.y);
+  double prec_val = 1.0e-5;
+  if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+  if( (a0 < prec_val) && (a1  < prec_val) ) return true;
+  return false;
+}
+
+bool CheckDeterminant(double2 detu){
+  double prec_val = 1.0e-8;
+  if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
+  if(DABS(1.0 - detu.x) < prec_val && DABS(detu.y) < prec_val) return true;
+  return false;
 }
 
 
+void CallUnitarizeLinks(cudaGaugeField *cudaInGauge){
+    unitarizeLinksQuda(*cudaInGauge, num_failures_dev);
+    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    if(num_failures>0){
+      cudaFree(num_failures_dev); 
+      errorQuda("Error in the unitarization\n"); 
+      exit(1);
+    }
+    cudaMemset(num_failures_dev, 0, sizeof(int));
+}
 void RunTest(int argc, char **argv) {
 
 
@@ -112,10 +141,11 @@ void RunTest(int argc, char **argv) {
 #endif
 
 
-  int nsteps = 1;
-  int nhbsteps = 1;
-  int novrsteps = 1;
+  int nsteps = 10;
+  int nhbsteps = 4;
+  int novrsteps = 4;
   bool coldstart = false;
+  double beta_value = 6.2;
 
 
   Timer a0,a1;
@@ -128,8 +158,7 @@ void RunTest(int argc, char **argv) {
   RNG randstates(halfvolume, 1234, param.X);
   randstates.Init();
   // Reunitarization setup
-  int num_failures=0;
-  int *num_failures_dev = SetReunitarizationConsts();
+  SetReunitarizationConsts();
 
 
   if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
@@ -140,31 +169,63 @@ void RunTest(int argc, char **argv) {
 
   for(int step=1; step<=nsteps; ++step){
     printfQuda("Step %d\n",step);
-    Monte( *cudaInGauge, randstates.State(), (double)6.2, nhbsteps, novrsteps);
+    Monte( *cudaInGauge, randstates.State(), beta_value, nhbsteps, novrsteps);
     //Reunitarize gauge links...
-    unitarizeLinksQuda(*cudaInGauge, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-    if(num_failures>0){
-      cudaFree(num_failures_dev); 
-      errorQuda("Error in the unitarization\n"); 
-      exit(1);
-    }
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    CallUnitarizeLinks(cudaInGauge);
     Plaquette( *cudaInGauge) ;
   }
   a1.Stop();
   printfQuda("Time Monte -> %.6f s\n", a1.Last());
 
+  double2 detu = getLinkDeterminant(*cudaInGauge);
+  double2 plaq = Plaquette( *cudaInGauge) ;
+  bool testgen = false;
+  //check plaquette value for beta = 6.2
+  if(plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
+  printf("-----------------------------------------------------------------------\n");
+  printf("Test for gauge generation: %s\n", (( testgen && CheckDeterminant(detu)) ? "PASSED" : "FAILED") );
+  printf("-----------------------------------------------------------------------\n");
 
-  int reunit_interval = 1000;
+  int reunit_interval = 10;
+
   printfQuda("Landau gauge fixing with overrelaxation\n");
+  plaq = Plaquette( *cudaInGauge) ;
   gaugefixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
+  printf("-----------------------------------------------------------------------\n");
+  printf("Test for Landau gauge fixing with overrrelaxation: %s\n", \
+    compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
+  printf("-----------------------------------------------------------------------\n");
+
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
+  plaq =  Plaquette( *cudaInGauge);
   gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-  printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-  if(comm_size() == 1) gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-  printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-  if(comm_size() == 1) gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
+  printf("-----------------------------------------------------------------------\n");
+  printf("Test for Coulomb gauge fixing with overrrelaxation: %s\n", \
+    compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
+  printf("-----------------------------------------------------------------------\n");
+  
+  if(comm_size() == 1){
+    printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
+    plaq = Plaquette( *cudaInGauge) ;
+    gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
+    printf("-----------------------------------------------------------------------\n");
+    printf("Test for Landau gauge fixing with SDM with FFT: %s\n", \
+      compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
+    printf("-----------------------------------------------------------------------\n");
+
+    printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
+    plaq = Plaquette( *cudaInGauge) ;
+    gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
+    printf("-----------------------------------------------------------------------\n");
+    printf("Test for Coulomb gauge fixing with SDM with FFT: %s\n", \
+      compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
+    printf("-----------------------------------------------------------------------\n");
+  }
+
+  detu = getLinkDeterminant(*cudaInGauge);
+  double2 tru = getLinkTrace(*cudaInGauge);
+  printf("Det: %.16e:%.16e\n", detu.x, detu.y);
+  printf("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
 
   randstates.Release();
   delete cudaInGauge;
@@ -207,4 +268,3 @@ int main(int argc, char **argv){
 
   return EXIT_SUCCESS;
 }
-
