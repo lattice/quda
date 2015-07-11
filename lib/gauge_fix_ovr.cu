@@ -1887,7 +1887,7 @@ static bool checkDimsPartitioned(){
           cudaStreamDestroy(GFStream[d]);
           cudaStreamDestroy(GFStream[4 + d]);
         #ifndef GPU_COMMS
-          free(hostbuffer_h[d]);
+          host_free(hostbuffer_h[d]);
         #endif
         }
       }
