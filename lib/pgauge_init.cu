@@ -18,7 +18,6 @@
 #include <random.h>
 
 
-#define BORDER_RADIUS 2
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
@@ -264,7 +263,7 @@ namespace quda {
       : dataOr(dataOr), rngstate(rngstate) {
 #ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
-        if ( comm_dim_partitioned(dir)) border[dir] = BORDER_RADIUS;
+        if ( comm_dim_partitioned(dir)) border[dir] = data.R();
         else border[dir] = 0;
       }
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir] - border[dir] * 2;
@@ -533,10 +532,8 @@ namespace quda {
     init.apply(0);
     checkCudaError();
     cudaDeviceSynchronize();
-    int R[4] = { 0,0,0,0 };
-    for ( int dir = 0; dir < 4; ++dir ) if ( comm_dim_partitioned(dir)) R[dir] = BORDER_RADIUS;
 
-    data.exchangeExtendedGhost(R,false);
+    data.exchangeExtendedGhost(data.R(),false);
     /*cudaDeviceSynchronize();
        const double unitarize_eps = 1e-14;
        const double max_error = 1e-10;
