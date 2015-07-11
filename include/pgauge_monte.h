@@ -60,6 +60,22 @@ namespace quda {
    * @brief Release all allocated memory used to exchange data between nodes
    */
   void PGaugeExchangeFree();
+  
+  
+
+  /** @brief Calculate the Determinant
+  * 
+  * @param[in] data Gauge field
+  * @returns double2 complex Determinant value
+  */
+  double2 getLinkDeterminant( cudaGaugeField& data);
+
+  /** @brief Calculate the Trace
+  * 
+  * @param[in] data Gauge field
+  * @returns double2 complex trace value
+  */
+  double2 getLinkTrace( cudaGaugeField& data);
 
 }
 
