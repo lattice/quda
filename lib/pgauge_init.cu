@@ -263,7 +263,7 @@ namespace quda {
       : dataOr(dataOr), rngstate(rngstate) {
 #ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
-        if ( comm_dim_partitioned(dir)) border[dir] = data.R();
+        if ( comm_dim_partitioned(dir)) border[dir] = data.R()[dir];
         else border[dir] = 0;
       }
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir] - border[dir] * 2;
