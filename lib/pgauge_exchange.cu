@@ -175,7 +175,7 @@ namespace quda {
    */
   void PGaugeExchangeFree(){
 #ifdef MULTI_GPU
-    if ( comm_size() > 1 ) {
+    if ( comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3) ) {
       cudaStreamDestroy(GFStream[0]);
       cudaStreamDestroy(GFStream[1]);
       for ( int d = 0; d < 4; d++ ) {
@@ -375,7 +375,7 @@ namespace quda {
 
 #ifdef GPU_GAUGE_ALG
 #ifdef MULTI_GPU
-    if ( comm_size() > 1 ) {
+    if ( comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3) ) {
       if ( data.Precision() == QUDA_HALF_PRECISION ) {
         errorQuda("Half precision not supported\n");
       }
