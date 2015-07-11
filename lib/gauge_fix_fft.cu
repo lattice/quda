@@ -1569,7 +1569,7 @@ namespace quda {
 
 #ifdef GPU_GAUGE_ALG
 #ifdef MULTI_GPU
-    if ( comm_size() > 1 )
+    if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3))
       errorQuda("Gauge Fixing with FFTs in multi-GPU support NOT implemented yet!\n");
 #endif
     if ( data.Precision() == QUDA_HALF_PRECISION ) {
