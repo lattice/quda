@@ -189,7 +189,7 @@ namespace quda {
           device_free(sendg_d[d]);
           device_free(recvg_d[d]);
         #ifndef GPU_COMMS
-          free(hostbuffer_h[d]);
+          host_free(hostbuffer_h[d]);
         #endif
         }
       }
@@ -239,7 +239,7 @@ namespace quda {
         sendg_d[d] = device_malloc(bytes[d]);
         recvg_d[d] = device_malloc(bytes[d]);
       #ifndef GPU_COMMS
-        hostbuffer_h[d] = (void*)malloc(4 * bytes[d]);
+        hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
       #endif
         block[d] = make_uint3(128, 1, 1);
         grid[d] = make_uint3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
