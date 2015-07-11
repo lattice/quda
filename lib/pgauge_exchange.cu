@@ -8,12 +8,9 @@
 
 #include <device_functions.h>
 
-#include <hisq_links_quda.h> //reunit gauge links!!!!!
 
 #include <comm_quda.h>
 
-
-#define BORDER_RADIUS 2
 
 namespace quda {
 
@@ -82,21 +79,7 @@ namespace quda {
     Gauge dataOr;
     GaugeFixUnPackArg(Gauge & dataOr, cudaGaugeField & data)
       : dataOr(dataOr) {
-/*#ifdef MULTI_GPU
-    if(comm_size() == 1){
-      for(int dir=0; dir<4; ++dir) border[dir] = 0;
-      for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
-    }
-    else{
-      for(int dir=0; dir<4; ++dir){
-        if(comm_dim_partitioned(dir)) border[dir] = BORDER_RADIUS;
-        else border[dir] = 0;
-      }
-      for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;
-    }
- #else*/
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-//#endif
     }
   };
 
@@ -293,10 +276,10 @@ namespace quda {
 
       //extract top face
       Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[0] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(send_d[d]), parity, d, dir, X[d] - 3);
+        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(send_d[d]), parity, d, dir, X[d] -  data.R()[d] - 1);
       //extract bottom
       Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[1] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(sendg_d[d]), parity, d, dir, 2);
+        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
       cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[0]);
@@ -316,7 +299,7 @@ namespace quda {
       comm_wait(mh_recv_back[d]);
       #endif
       Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[0] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recv_d[d]), parity, d, dir, 1);
+        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recv_d[d]), parity, d, dir, data.R()[d] - 1);
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
@@ -327,7 +310,7 @@ namespace quda {
       comm_wait(mh_recv_fwd[d]);
       #endif
       Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[1] >> > ( \
-        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recvg_d[d]), parity, d, dir, X[d] - 2);
+        faceVolumeCB[d], dataexarg, reinterpret_cast<typename ComplexTypeId<Float>::Type*>(recvg_d[d]), parity, d, dir, X[d] - data.R()[d]);
 
       comm_wait(mh_send_back[d]);
       comm_wait(mh_send_fwd[d]);
