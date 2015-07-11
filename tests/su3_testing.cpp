@@ -51,6 +51,11 @@ void SetReunitarizationConsts(){
   if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
 }
 
+bool checkDimsPartitioned(){
+  if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
+  return false;
+}
+
 bool compareDoube2(double2 a, double2 b){
   double a0,a1;
   a0 = DABS(a.x - b.x);
@@ -204,7 +209,7 @@ void RunTest(int argc, char **argv) {
     compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
   printf("-----------------------------------------------------------------------\n");
   
-  if(comm_size() == 1){
+  if(!checkDimsPartitioned()){
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
     plaq = Plaquette( *cudaInGauge) ;
     gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
