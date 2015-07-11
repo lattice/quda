@@ -1874,6 +1874,7 @@ static bool checkDimsPartitioned(){
     cudaFree(num_failures_dev);
   #ifdef MULTI_GPU
     if ( checkDimsPartitioned() ) {
+      data.exchangeExtendedGhost(data.R(),false);
       for ( int d = 0; d < 4; d++ ) {
         if ( commDimPartitioned(d)) {
           comm_free(mh_send_fwd[d]);
