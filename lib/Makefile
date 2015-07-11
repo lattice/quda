@@ -35,7 +35,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
 	inv_mpcg_quda.o inv_mpbicgstab_quda.o pgauge_exchange.o		\
 	pgauge_init.o pgauge_plaquette.o pgauge_heatbath.o random.o	\
-	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o 
+	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o pgauge_det_trace.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
