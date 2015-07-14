@@ -5090,7 +5090,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p, doub
 
 	cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, -kappa2*ck, QUDA_ODD_PARITY, 1);
 	cloverDerivative(cudaForce, gaugeEx, oprodEx, mu, nu, ck, QUDA_EVEN_PARITY, 1);
-	} /* end loop over nu & endif( nu != mu )*/
+      } /* end loop over nu & endif( nu != mu )*/
 
   } // end loop over mu
 
