@@ -126,7 +126,7 @@ namespace quda {
   /**
      Return the L2 norm of x
   */
-  __device__ double norm2_(const double2 &a) { return (double)a.x*(double)a.x + (double)a.y*(double)a.y; }
+  __device__ double norm2_(const double2 &a) { return a.x*a.x + a.y*a.y; }
   __device__ float norm2_(const float2 &a) { return (double)a.x*(double)a.x + (double)a.y*(double)a.y; }
   __device__ float norm2_(const float4 &a) { return (double)a.x*(double)a.x + (double)a.y*(double)a.y +
       (double)a.z*(double)a.z + (double)a.w*(double)a.w; }
@@ -152,7 +152,7 @@ namespace quda {
   /**
      Return the real dot product of x and y
   */
-    __device__ double dot_(const double2 &a, const double2 &b) { return (double)a.x*(double)b.x + (double)a.y*(double)b.y; }
+    __device__ double dot_(const double2 &a, const double2 &b) { return a.x*b.x + a.y*b.y; }
     __device__ float dot_(const float2 &a, const float2 &b) { return (double)a.x*(double)b.x + (double)a.y*(double)b.y; }
     __device__ float dot_(const float4 &a, const float4 &b) { return (double)a.x*(double)b.x + (double)a.y*(double)b.y + (double)a.z*(double)b.z + (double)a.w*(double)b.w; }
 
