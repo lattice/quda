@@ -678,6 +678,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #endif
 }
 
+#ifdef MULTI_GPU
 template <>
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
   (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
@@ -685,6 +686,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
   #include "staggered_fused_exterior_dslash_core.h"
 #endif
 }
+#endif // MULTI_GPU
 
 #else // naive staggered kernel
 
@@ -702,6 +704,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)
 #endif
 }
 
+#ifdef MULTI_GPU
 template <>
 __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
   (DD_PARAM_OUT, DD_PARAM_GAUGE, DD_PARAM_IN, DD_PARAM_AXPY) {
@@ -709,6 +712,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL>
   #include "staggered_fused_exterior_dslash_core.h"
 #endif
 }
+#endif // MULTI_GPU
 
 #endif
 
