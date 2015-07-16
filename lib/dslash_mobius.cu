@@ -228,6 +228,29 @@ namespace quda {
       }
       return flops;
     }
+
+    long long bytes() const {
+      bool isHalf = in->Precision() == sizeof(short) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      long long Ls = in->X(4);
+      long long bytes;
+
+      switch(DS_type){
+      case 0:
+	bytes = DslashCuda::bytes();
+	break;
+      case 1:
+      case 2:
+	bytes = (x ? 5ll : 4ll) * spinor_bytes * in->VolumeCB();
+	break;
+      case 3:
+	bytes = (x ? Ls + 2 : Ls + 1) * spinor_bytes * in->VolumeCB();
+	break;
+      default:
+	errorQuda("invalid Dslash type");
+      }
+      return bytes;
+    }
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
 
