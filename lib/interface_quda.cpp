@@ -1099,6 +1099,8 @@ void endQuda(void)
     profilePlaq.Print();
     profileEnd.Print();
 
+    TimeProfile::PrintGlobal();
+
     printLaunchTimer();
 
     printfQuda("\n");

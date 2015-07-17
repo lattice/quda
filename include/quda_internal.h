@@ -175,35 +175,79 @@ namespace quda {
     static std::string pname[];
 
     bool switchOff;
-    
+
+    // global timer
+    static Timer global_profile[QUDA_PROFILE_COUNT];
+    static bool global_switchOff;
+    static int global_total_level;
+
+
     TimeProfile(std::string fname) : fname(fname), switchOff(false) { ; }
 
     /**< Print out the profile information */
     void Print();
 
+    static void StopGlobal(QudaProfileType idx) {
+
+      if (idx==QUDA_PROFILE_TOTAL){
+        global_total_level--;
+        if (global_total_level ==0) global_profile[idx].Stop();
+      }
+      else
+        global_profile[idx].Stop();
+
+      // switch off total timer if we need to
+      if (global_switchOff && idx != QUDA_PROFILE_TOTAL) {
+        global_profile[QUDA_PROFILE_TOTAL].Stop();
+        global_switchOff = false;
+      }
+    }
+
+    static void StartGlobal(QudaProfileType idx) {
+      // if total timer isn't running, then start it running
+      if (!global_profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
+        global_profile[QUDA_PROFILE_TOTAL].Start();
+        global_switchOff = true;
+      }
+
+      if (idx==QUDA_PROFILE_TOTAL){
+        if (global_total_level ==0) global_profile[idx].Start();
+        global_total_level++;
+      }
+      else
+        global_profile[idx].Start();
+    }
+
     void Start(QudaProfileType idx) { 
       // if total timer isn't running, then start it running
       if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
-	profile[QUDA_PROFILE_TOTAL].Start(); 
-	switchOff = true;
+        profile[QUDA_PROFILE_TOTAL].Start();
+        switchOff = true;
       }
 
       profile[idx].Start(); 
+      StartGlobal(idx);
     }
+
 
     void Stop(QudaProfileType idx) { 
       profile[idx].Stop(); 
 
       // switch off total timer if we need to
       if (switchOff && idx != QUDA_PROFILE_TOTAL) {
-	profile[QUDA_PROFILE_TOTAL].Stop(); 
-	switchOff = false;
+        profile[QUDA_PROFILE_TOTAL].Stop();
+        switchOff = false;
       }
+      StopGlobal(idx);
     }
 
     double Last(QudaProfileType idx) { 
       return profile[idx].last;
     }
+
+
+
+    static void PrintGlobal();
 
   };
 
