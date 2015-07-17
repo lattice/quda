@@ -61,6 +61,12 @@ namespace quda {
     const void* V(bool inverse=false) const { return inverse ? cloverInv : clover; }
     const void* Norm(bool inverse=false) const { return inverse ? invNorm : norm; }
 
+    /**
+       This function returns true if the field is stored in an
+       internal field order for the given precision.
+    */
+    bool isNative() const;
+
     double* TrLog() const { return trlog; }
     
     QudaCloverFieldOrder Order() const { return order; }

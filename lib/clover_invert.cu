@@ -278,14 +278,11 @@ namespace quda {
 
   template <typename Float>
   void cloverInvert(const CloverField &clover, bool computeTraceLog, QudaFieldLocation location) {
-    if (clover.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
-      cloverInvert<Float>(FloatNOrder<Float,72,2>(clover, 1), 
-			  FloatNOrder<Float,72,2>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), clover, location);
-    } else if (clover.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
-      cloverInvert<Float>(FloatNOrder<Float,72,4>(clover, 1), 
-			  FloatNOrder<Float,72,4>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), clover, location);
+
+    if (clover.isNative()) {
+      typedef typename clover_mapper<Float>::type C;
+      cloverInvert<Float>(C(clover, 1), C(clover, 0), computeTraceLog,
+			  clover.TrLog(), clover, location);
     } else {
       errorQuda("Clover field %d order not supported", clover.Order());
     }
