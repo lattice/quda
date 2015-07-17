@@ -43,7 +43,7 @@ namespace quda {
       if (order  == QUDA_FLOAT2_CLOVER_ORDER) return true;
     } else if (precision == QUDA_SINGLE_PRECISION || 
 	       precision == QUDA_HALF_PRECISION) {
-      if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+      if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
     }
     return false;
   }
