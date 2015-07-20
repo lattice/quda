@@ -40,6 +40,9 @@ namespace quda {
 				       "event query", "stream wait event", 
 				       "comms", "comms start", "comms query", "constant", 
 				       "total" };
+
+  const uint32_t TimeProfile::nvtx_colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+  const int TimeProfile::nvtx_num_colors = sizeof(nvtx_colors)/sizeof(uint32_t);
   
 }
 
