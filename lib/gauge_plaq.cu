@@ -242,18 +242,6 @@ namespace quda {
       plq.y = arg.plaq_h[0].y;
     }
 
-
-  // Use traits to reduce the template explosion
-  template<typename,QudaReconstructType> struct gauge_mapper { };
-  template<> struct gauge_mapper<double,QUDA_RECONSTRUCT_NO> { typedef FloatNOrder<double, 18, 2, 18> type; };
-  template<> struct gauge_mapper<double,QUDA_RECONSTRUCT_12> { typedef FloatNOrder<double, 18, 2, 12> type; };
-  template<> struct gauge_mapper<double,QUDA_RECONSTRUCT_8> { typedef FloatNOrder<double, 18, 2, 8> type; };
-
-  template<> struct gauge_mapper<float,QUDA_RECONSTRUCT_NO> { typedef FloatNOrder<float, 18, 2, 18> type; };
-  template<> struct gauge_mapper<float,QUDA_RECONSTRUCT_12> { typedef FloatNOrder<float, 18, 4, 12> type; };
-  template<> struct gauge_mapper<float,QUDA_RECONSTRUCT_8> { typedef FloatNOrder<float, 18, 4, 8> type; };
-
-
   template<typename Float>
     double2 plaquette(const GaugeField& data, QudaFieldLocation location) {
       double2 res;

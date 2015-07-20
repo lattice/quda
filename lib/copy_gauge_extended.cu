@@ -154,51 +154,37 @@ namespace quda {
     int faceVolumeCB[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
 
-    if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (out.isNative()) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGaugeEx<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,2,19>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
+	  copyGaugeEx<short,FloatIn,length>
+	    (FloatNOrder<short,length,2,19>(out, (short*)Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 	} else {
+	  typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO>::type G;
 	  copyGaugeEx<FloatOut,FloatIn,length>
-	    (FloatNOrder<FloatOut,length,2,18>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
+	    (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 	}
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,2,12>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
+	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
+	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
 	copyGaugeEx<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,2,8>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
+	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
+	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
         copyGaugeEx<FloatOut,FloatIn,length>
-	  (FloatNOrder<FloatOut,length,2,13>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
+	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
+	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_9>::type G;
         copyGaugeEx<FloatOut,FloatIn,length>
-	  (FloatNOrder<FloatOut,length,2,9>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
+	  (G(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
-    } else if (out.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	copyGaugeEx<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,12>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
-      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	copyGaugeEx<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,8>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
-#ifdef GPU_STAGGERED_DIRAC
-      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	copyGaugeEx<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,13>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
-      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	copyGaugeEx<FloatOut,FloatIn,length> 
-	  (FloatNOrder<FloatOut,length,4,9>(out, Out), inOrder, out.X(), X, faceVolumeCB, out, location);
-#endif
-      } else {
-	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
-      }
-
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
@@ -236,51 +222,32 @@ namespace quda {
   void copyGaugeEx(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
 		   FloatOut *Out, FloatIn *In) {
 
-    if (in.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (in.isNative()) {
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,19>(in, In), 
+	  copyGaugeEx<FloatOut,short,length> (FloatNOrder<short,length,2,19>(in, (short*)In), 
 					      in.X(), out, location, Out);
 	} else {
-	  copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,18>(in, In),
-					      in.X(), out, location, Out);
+	  typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
+	  copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
 	}
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,12>(in, In),
-					    in.X(), out, location, Out);
+	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
+	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,8>(in, In), 
-					    in.X(), out, location, Out);
+	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
+	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
 #ifdef GPU_STAGGERED_DIRAC
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,13>(in, In), 
-					    in.X(), out, location, Out);
+	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
+	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,2,9>(in, In), 
-					    in.X(), out, location, Out);
+	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_9>::type G;
+	copyGaugeEx<FloatOut,FloatIn,length> (G(in, In), in.X(), out, location, Out);
 #endif
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
-    } else if (in.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,12>(in, In), 
-					    in.X(), out, location, Out);
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,8>(in, In), 
-					    in.X(), out, location, Out);
-#ifdef GPU_STAGGERED_DIRAC
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,13>(in, In), 
-					    in.X(), out, location, Out);
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	copyGaugeEx<FloatOut,FloatIn,length> (FloatNOrder<FloatIn,length,4,9>(in, In), 
-					      in.X(), out, location, Out);
-#endif
-      } else {
-	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
-      }
-
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
