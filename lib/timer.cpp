@@ -52,9 +52,11 @@ namespace quda {
     }
 
     double accounted = 0.0;
+    bool print_timer = true;
     for (int i=0; i<QUDA_PROFILE_COUNT-1; i++) {
+      if (i==QUDA_PROFILE_LOWER_LEVEL) print_timer=false;
       if (global_profile[i].count > 0) {
-        printfQuda("     %17s     = %f secs (%6.3g%%), with %8d calls at %e us per call\n",
+        if (print_timer) printfQuda("     %17s     = %f secs (%6.3g%%), with %8d calls at %e us per call\n",
                    (const char*)&pname[i][0],  global_profile[i].time,
                    100*global_profile[i].time/global_profile[QUDA_PROFILE_TOTAL].time,
                    global_profile[i].count, 1e6*global_profile[i].time/global_profile[i].count);

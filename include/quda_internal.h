@@ -150,6 +150,7 @@ namespace quda {
     QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
 
     // lower level counters used in the dslash
+    QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers */
     QUDA_PROFILE_PACK_KERNEL, /**< face packing kernel */
     QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
     QUDA_PROFILE_GATHER, /**< gather (device -> host) */
