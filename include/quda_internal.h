@@ -175,6 +175,7 @@ namespace quda {
     static std::string pname[];
 
     bool switchOff;
+    bool use_global;
 
     // global timer
     static Timer global_profile[QUDA_PROFILE_COUNT];
@@ -182,7 +183,9 @@ namespace quda {
     static int global_total_level;
 
 
-    TimeProfile(std::string fname) : fname(fname), switchOff(false) { ; }
+    TimeProfile(std::string fname) : fname(fname), switchOff(false), use_global(true) { ; }
+
+    TimeProfile(std::string fname, bool use_global) : fname(fname), switchOff(false), use_global(use_global) { ; }
 
     /**< Print out the profile information */
     void Print();
@@ -226,7 +229,7 @@ namespace quda {
       }
 
       profile[idx].Start(); 
-      StartGlobal(idx);
+      if (use_global) StartGlobal(idx);
     }
 
 
@@ -238,7 +241,7 @@ namespace quda {
         profile[QUDA_PROFILE_TOTAL].Stop();
         switchOff = false;
       }
-      StopGlobal(idx);
+      if (use_global) StopGlobal(idx);
     }
 
     double Last(QudaProfileType idx) { 
