@@ -19,8 +19,23 @@
 
 
 struct MsgHandle_s {
+  /**
+     The persistant MPI communicator handle that is created with
+     MPI_Send_init / MPI_Recv_init.
+   */
   MPI_Request request;
+
+  /**
+     To create a strided communicator, a MPI_Vector datatype has to be
+     created.  This is where it is stored.
+   */
   MPI_Datatype datatype;
+
+  /**
+     Whether a custom datatype has been created or not.  Used to
+     determine whether we need to free the datatype or not.
+   */
+  bool custom;
 };
 
 static int rank = -1;
@@ -106,6 +121,7 @@ MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], s
   int tag = comm_rank();
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Send_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+  mh->custom = false;
 
   return mh;
 }
@@ -122,6 +138,7 @@ MsgHandle *comm_declare_receive_displaced(void *buffer, const int displacement[]
   int tag = rank;
   MsgHandle *mh = (MsgHandle *)safe_malloc(sizeof(MsgHandle));
   MPI_CHECK( MPI_Recv_init(buffer, nbytes, MPI_BYTE, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
+  mh->custom = false;
 
   return mh;
 }
@@ -142,6 +159,7 @@ MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacem
   // create a new strided MPI type
   MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
   MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+  mh->custom = true;
 
   MPI_CHECK( MPI_Send_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
 
@@ -164,6 +182,7 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
   // create a new strided MPI type
   MPI_CHECK( MPI_Type_vector(nblocks, blksize, stride, MPI_BYTE, &(mh->datatype)) );
   MPI_CHECK( MPI_Type_commit(&(mh->datatype)) );
+  mh->custom = true;
 
   MPI_CHECK( MPI_Recv_init(buffer, 1, mh->datatype, rank, tag, MPI_COMM_WORLD, &(mh->request)) );
 
@@ -173,6 +192,8 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 
 void comm_free(MsgHandle *mh)
 {
+  MPI_Request_free(&(mh->request));
+  if (mh->custom) MPI_Type_free(&(mh->datatype));
   host_free(mh);
 }
 
