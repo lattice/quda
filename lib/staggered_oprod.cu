@@ -235,6 +235,18 @@ namespace quda {
         unsigned int dir, 
         const int shift)
     {
+      /*
+	FIXME the below can be extremely simplified.  Each of these
+	essentially return cb_idx, and for the case the positive
+	shift, there is an offset of size surfaceCB[dim]*nFace to
+	start at the forward face instead of the backward face.
+
+	The factors of 3 confused me when first reading this.  One
+	factor comes from 3 colors, the other comes from the fact that
+	the ghost zone is depth nFace=3 since this is for improved
+	staggered fermions.  Float2 indexing is assumed here.
+      */
+
       int ghost_idx;
       if(shift > 0){
         if((x[dir] + shift) >= X[dir]){
@@ -375,7 +387,7 @@ namespace quda {
         arg.inA.load(a, bulk_cb_idx);
 
         const unsigned int ghost_idx = arg.ghostOffset + ghostIndexFromCoords<1,3>(x, arg.X, arg.dir, arg.displacement);
-        arg.inB.load(b, ghost_idx);
+        arg.inB.loadGhost(b, ghost_idx, arg.dir);
 
         outerProd(b,a,&result);
         result = inmatrix + result*coeff; 
@@ -435,9 +447,7 @@ namespace quda {
             //  interiorOprodKernel<<<gridDim,blockDim,0, stream>>>(arg);
            // }else if(arg.kernelType == OPROD_EXTERIOR_KERNEL){
            //   const unsigned int volume = arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3];
-           //   arg.inB.setStride(3*volume/(2*arg.X[arg.dir]));
            //   exteriorOprodKernel<<<tp.grid,tp.block,tp.shared_bytes, stream>>>(arg);
-           //   arg.inB.setStride(arg.inA.Stride());
            // }else{
            //   errorQuda("Kernel type not supported\n");
            // }
@@ -596,7 +606,6 @@ namespace quda {
               arg.dir = i;
               arg.ghostOffset = ghostOffset[i];
               const unsigned int volume = arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3];
-              arg.inB.setStride(3*volume/(2*arg.X[arg.dir]));
               // First, do the one hop term
               {
 
@@ -617,7 +626,6 @@ namespace quda {
                 dim3 gridDim(gridSize, 1, 1);               
 		exteriorOprodKernel<<<gridDim, blockDim, 0, streams[Nstream-1]>>>(arg);
               } 
-              arg.inB.setStride(arg.inA.Stride());
 
               oprodCompleted[i] = 1;
             }
@@ -662,16 +670,16 @@ namespace quda {
 
 #if (__COMPUTE_CAPABILITY__ >= 200)
     if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
-
-      Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA);
-      Spinor<double2, double2, double2, 3, 0, 1> spinorB(inB);
+      // 3 sets number of faces in ghost_stride - we need to set this to 1 for naive staggered
+      Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA, 3); 
+      Spinor<double2, double2, double2, 3, 0, 1> spinorB(inB, 3);
       computeStaggeredOprodCuda<double2>(FloatNOrder<double, 18, 2, 18>(outA), FloatNOrder<double, 18, 2, 18>(outB), 
           outA, outB, 
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);
     }else if(inEven.Precision() == QUDA_SINGLE_PRECISION){
 
-      Spinor<float2, float2, float2, 3, 0, 0> spinorA(inA);
-      Spinor<float2, float2, float2, 3, 0, 1> spinorB(inB);
+      Spinor<float2, float2, float2, 3, 0, 0> spinorA(inA, 3);
+      Spinor<float2, float2, float2, 3, 0, 1> spinorB(inB, 3);
       computeStaggeredOprodCuda<float2>(FloatNOrder<float, 18, 2, 18>(outA), FloatNOrder<float, 18, 2, 18>(outB), 
           outA, outB,
           spinorA, spinorB, inB, faceBuffer, parity, inB.GhostFace(), ghostOffset, coeff);

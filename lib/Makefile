@@ -33,7 +33,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	unitarize_links_quda.o milc_interface.o				\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
-	inv_mpcg_quda.o inv_mpbicgstab_quda.o clover_force.o		\
+	inv_mpcg_quda.o inv_mpbicgstab_quda.o clover_outer_product.o	\
 	clover_sigma_outer_product.o
 
 

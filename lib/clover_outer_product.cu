@@ -215,23 +215,28 @@ namespace quda {
   __device__  int ghostIndexFromCoords(const int x[4], const int X[4], unsigned int dir, const int shift)
     {
       int ghost_idx;
+      /*
+	FIXME The below could be absorbed into the ghost offset values as
+	all they are just offsets to get to the forward face from
+	starting at the backward face.
+
+	The factor of 6 comes from being spin projected, with Float2
+	indexing assumed.  This needs to be fixed for single precision
+	(Float4) indexing.
+       */
       if(shift > 0){
         if((x[dir] + shift) >= X[dir]){
           switch(dir){
             case 0:
-              //ghost_idx = (3*3 + (x[0]-X[0]+shift))*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
 	      ghost_idx = 6*(X[3]*X[2]*X[1])/2;
               break;          
             case 1:
-              //ghost_idx = (3*3 + (x[1]-X[1]+shift))*(X[3]*X[2]*X[0])/2 + (x[3]*X[2]*X[0] + x[2]*X[0] + x[0])/2;
 	      ghost_idx = 6*(X[3]*X[2]*X[0])/2;
               break;
             case 2:
-              //ghost_idx = (3*3 + (x[2]-X[2]+shift))*(X[3]*X[1]*X[0])/2 + (x[3]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
 	      ghost_idx = 6*(X[3]*X[1]*X[0])/2;
               break;
             case 3:
-              //ghost_idx = (3*3 + (x[3]-X[3]+shift))*(X[2]*X[1]*X[0])/2 + (x[2]*X[1]*X[0] + x[1]*X[0] + x[0])/2;
 	      ghost_idx = 6*(X[2]*X[1]*X[0])/2;
               break;
             default:
@@ -239,22 +244,7 @@ namespace quda {
           } // switch
         } // x[dir] + shift[dir] >= X[dir]
       }else{ // shift < 0
-        if(static_cast<int>(x[dir]) + shift < 0){
-          switch(dir){
-            case 0:
-              ghost_idx = (3 + shift)*(X[3]*X[2]*X[1])/2 + ((x[3]*X[2] + x[2])*X[1] + x[1])/2;
-              break;
-            case 1:
-              ghost_idx = (3 + shift)*(X[3]*X[2]*X[0])/2 + ((x[3]*X[2] + x[2])*X[0] + x[0])/2;
-              break;
-            case 2:
-              ghost_idx = (3 + shift)*(X[3]*X[1]*X[0])/2 + ((x[3]*X[1] + x[1])*X[0]  + x[0])/2;
-              break;
-            case 3:
-              ghost_idx = (3 + shift)*(X[2]*X[1]*X[0])/2 + ((x[2]*X[1] + x[1])*X[0] + x[0])/2;
-              break;
-          } // switch(dir)
-        }
+	ghost_idx = 0;
       } // shift < 0
 
       return ghost_idx;
