@@ -3581,10 +3581,8 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   if(ulink){
     profileFatLink.Start(QUDA_PROFILE_INIT);
     int num_failures=0;
-    int* num_failures_dev;
-    cudaMalloc((void**)&num_failures_dev, sizeof(int));
+    int* num_failures_dev = (int*)device_malloc(sizeof(int));
     cudaMemset(num_failures_dev, 0, sizeof(int));
-    if(num_failures_dev == NULL) errorQuda("cudaMalloc fialed for dev_pointer\n");
     profileFatLink.Stop(QUDA_PROFILE_INIT);
 
     profileFatLink.Start(QUDA_PROFILE_COMPUTE);
@@ -3595,7 +3593,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     profileFatLink.Start(QUDA_PROFILE_D2H); 
     cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     profileFatLink.Stop(QUDA_PROFILE_D2H); 
-    cudaFree(num_failures_dev); 
+    device_free(num_failures_dev); 
     if(num_failures>0){
       errorQuda("Error in the unitarization component of the hisq fattening\n"); 
     }
@@ -4644,11 +4642,7 @@ computeHISQForceQuda(void* const milc_momentum,
   // Done with cudaInForce. It becomes the output force. Oops!
   profileHISQForce.Start(QUDA_PROFILE_INIT);
   int numFailures = 0;
-  int* numFailuresDev;
-
-  if(cudaMalloc((void**)&numFailuresDev, sizeof(int)) == cudaErrorMemoryAllocation){
-    errorQuda("cudaMalloc failed for numFailuresDev\n");
-  }
+  int* numFailuresDev = (int*)device_malloc(sizeof(int));
   cudaMemset(numFailuresDev, 0, sizeof(int));
   profileHISQForce.Stop(QUDA_PROFILE_INIT);
 
@@ -4660,7 +4654,7 @@ computeHISQForceQuda(void* const milc_momentum,
   profileHISQForce.Start(QUDA_PROFILE_D2H);
   cudaMemcpy(&numFailures, numFailuresDev, sizeof(int), cudaMemcpyDeviceToHost);
   profileHISQForce.Stop(QUDA_PROFILE_D2H);
-  cudaFree(numFailuresDev); 
+  device_free(numFailuresDev); 
 
   if(numFailures>0){
     errorQuda("Error in the unitarization component of the hisq fermion force\n"); 
