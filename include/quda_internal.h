@@ -202,7 +202,8 @@ namespace quda {
 
       // switch off total timer if we need to
       if (global_switchOff && idx != QUDA_PROFILE_TOTAL) {
-        global_profile[QUDA_PROFILE_TOTAL].Stop();
+        global_total_level--;
+        if (global_total_level ==0) global_profile[QUDA_PROFILE_TOTAL].Stop();
         global_switchOff = false;
       }
     }
@@ -211,6 +212,7 @@ namespace quda {
       // if total timer isn't running, then start it running
       if (!global_profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
         global_profile[QUDA_PROFILE_TOTAL].Start();
+        global_total_level++;
         global_switchOff = true;
       }
 
