@@ -336,11 +336,13 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor() 
   : spinor(0), tex(), norm(0), stride(0) { } // default constructor
 
-    Spinor(const cudaColorSpinorField &x) 
+    Spinor(const cudaColorSpinorField &x, int nFace = 1) 
       : spinor((StoreType*)x.V()), tex(&x), norm((float*)x.Norm()),
       stride(x.Length()/(N*REG_LENGTH)) { 
       checkTypes<RegType,InterType,StoreType>(); 
-      for (int d=0; d<4; d++) ghost_stride[d] = x.SurfaceCB(d);
+      for (int d=0; d<4; d++) {
+	ghost_stride[d] = nFace*x.SurfaceCB(d);
+      }
     }
 
     Spinor(const Spinor &st) 
