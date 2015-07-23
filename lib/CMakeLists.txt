@@ -1,4 +1,7 @@
 
+#temporary workaround
+set (COMM_OBJS comm_single.cpp)
+
 set (QUDA_OBJS
   gauge_phase.cu timer.cpp malloc.cpp solver.cpp
 	inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_multi_cg_quda.cpp

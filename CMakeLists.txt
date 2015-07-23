@@ -82,13 +82,13 @@ set(BUILD_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
 set(BUILD_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 
 # Multi-GPU options
-#BUILD_MULTI_GPU = yes  # set to 'yes' to build the multi-GPU code
-#BUILD_QMP = no              # set to 'yes' to build the QMP multi-GPU code
-#BUILD_MPI = yes              # set to 'yes' to build the MPI multi-GPU code
-#POSIX_THREADS = no     # set to 'yes' to build pthread-enabled dslash
+set(BUILD_MULTI_GPU OFF CACHE BOOL "set to 'yes' to build the multi-GPU code")
+set(BUILD_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
+set(BUILD_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
+set(POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
 
 #BLAS library
-#BUILD_MAGMA = no 	# build magma interface
+set(BUILD_MAGMA OFF CACHE BOOL "build magma interface")
 
 # GPUdirect options
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
@@ -126,6 +126,10 @@ if (BUILD_MILC_INTERFACE)
   add_definitions(-DBUILD_MILC_INTERFACE)
 endif(BUILD_MILC_INTERFACE)
 
+if (BUILD_QDP_INTERFACE)
+  add_definitions(-DBUILD_QDP_INTERFACE)
+endif(BUILD_QDP_INTERFACE)
+
 if (BUILD_STAGGERED_DIRAC)
   add_definitions(-DGPU_STAGGERED_DIRAC)
 endif(BUILD_STAGGERED_DIRAC)
@@ -133,3 +137,5 @@ endif(BUILD_STAGGERED_DIRAC)
 
 # build quda in the lib subdirectory
 add_subdirectory(lib)
+
+add_subdirectory(tests)
