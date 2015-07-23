@@ -25,6 +25,8 @@ extern "C" {
     QudaParity evenodd; /** Which parity are we working on ? (options are QUDA_EVEN_PARITY, QUDA_ODD_PARITY, QUDA_INVALID_PARITY */
     int mixed_precision; /** Whether to use mixed precision or not (1 - yes, 0 - no) */
     double boundary_phase[4]; /** Boundary conditions */
+    int make_resident_solution; /** Make the solution resident and don't copy back */
+    int use_resident_solution; /** Use the resident solution */
   } QudaInvertArgs_t;
 
 
@@ -404,7 +406,6 @@ extern "C" {
    * @param solutionArray Array of solution spinor fields
    * @param final_residual Array of true residuals
    * @param num_iters Number of iterations taken
-   * @param make_resident Whether to keep the solution vector resident or copy back
    */
   void qudaCloverMultishiftInvert(int external_precision, 
       int quda_precision,
@@ -420,8 +421,7 @@ extern "C" {
       void* source,
       void** solutionArray,
       double* const final_residual, 
-      int* num_iters,
-      int make_resident
+      int* num_iters
       );
 
   /**
@@ -538,11 +538,10 @@ extern "C" {
    * @param gauge Gauge Field
    * @param precision Precision of the fields
    * @param inv_args Struct setting some solver metadata
-   * @param use_resident Whether to use the resident solution vectors
    */
   void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa, 
 		       double ck, int nvec, double multiplicity, void *gauge, int precision,
-		       QudaInvertArgs_t inv_args, int use_resident);
+		       QudaInvertArgs_t inv_args);
 
   /**
    * Compute the sigma trace field (part of clover force computation).

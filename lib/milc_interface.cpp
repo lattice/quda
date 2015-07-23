@@ -938,8 +938,7 @@ void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args,
 		    int external_precision, int quda_precision, double kappa, double reliable_delta);
 
 void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa, double ck,
-		     int nvec, double multiplicity, void *gauge, int precision, QudaInvertArgs_t inv_args,
-		     int use_resident)
+		     int nvec, double multiplicity, void *gauge, int precision, QudaInvertArgs_t inv_args)
 {
   qudamilc_called<true>(__func__);
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
@@ -961,7 +960,7 @@ void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, do
 
   invertParam.verbosity = getVerbosity();
   invertParam.verbosity_precondition = QUDA_SILENT;
-  invertParam.use_resident_solution = use_resident;
+  invertParam.use_resident_solution = inv_args.use_resident_solution;
 
   computeCloverForceQuda(mom, dt, x, p, coeff, -kappa*kappa, ck, nvec, multiplicity, 
 			 gauge, &gaugeParam, &invertParam);
@@ -1225,8 +1224,7 @@ void qudaCloverMultishiftInvert(int external_precision,
     void* source,
     void** solutionArray,
     double* const final_residual, 
-    int* num_iters,
-    int make_resident)
+    int* num_iters)
 {
 
   static const QudaVerbosity verbosity = getVerbosity();
@@ -1261,7 +1259,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   invertParam.verbosity = verbosity;
   invertParam.verbosity_precondition = QUDA_SILENT;
 
-  invertParam.make_resident_solution = make_resident;
+  invertParam.make_resident_solution = inv_args.make_resident_solution;
 
   invertMultiShiftQuda(solutionArray, source, &invertParam); 
 
