@@ -265,7 +265,7 @@ namespace quda {
 #endif
 
   double3 plaquette(const GaugeField& data, QudaFieldLocation location) {
-    
+
 #ifdef GPU_GAUGE_TOOLS
     double2 plq;
     if(data.Precision() == QUDA_HALF_PRECISION) {
@@ -278,11 +278,11 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", data.Precision());
     }
+    double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
 #else
     errorQuda("Gauge tools are not build");
+    double3 plaq = make_double3(0., 0., 0.);
 #endif
-    
-    double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
     return plaq;
   }
 }
