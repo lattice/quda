@@ -489,21 +489,6 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
-   * Solve for multiple shifts (e.g., masses).  This is a special
-   * variant of the multi-shift solver where the additional vectors
-   * required for force computation are also returned.
-   * @param _hp_xe   Array of solution spinor fields
-   * @param _hp_xo   Array of fields with A_oo^{-1} D_oe * x 
-   * @param _hp_ye   Array of fields with M_ee * x
-   * @param _hp_yo   Array of fields with A_oo^{-1} D_oe * M_ee * x
-   * @param _hp_b    Array of source spinor fields
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
-   */
-  void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, 
-      void **_hp_yo, void *_hp_b, QudaInvertParam *param);
-
-  /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
    * @param _hp_b    Array of source spinor fields
@@ -738,10 +723,12 @@ extern "C" {
    * @param nvec Number of vectors
    * @param multiplicity Number fermions this bilinear reresents
    * @param gauge Gauge Field
-   * @param param Gauge field meta data
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
    */
   void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
-			      int nvector, double multiplicity, void *gauge, QudaGaugeParam* param);
+			      int nvector, double multiplicity, void *gauge, 
+			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**
    * Compute the quark-field outer product needed for gauge generation
