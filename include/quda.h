@@ -248,6 +248,12 @@ extern "C" {
 
     int deflation_grid;//total deflation space is nev*deflation_grid
 
+    /** Whether to make the solution vector(s) after the solve */
+    int make_resident_solution;
+
+    /** Whether to use the resident solution vector(s) */
+    int use_resident_solution;
+
   } QudaInvertParam;
 
 

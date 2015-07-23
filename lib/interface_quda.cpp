@@ -134,7 +134,7 @@ cudaCloverField *cloverInvPrecondition = NULL;
 cudaGaugeField *momResident = NULL;
 cudaGaugeField *extendedGaugeResident = NULL;
 
-cudaColorSpinorField *solutionResident = NULL;
+std::vector<cudaColorSpinorField*> solutionResident;
 
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
@@ -1071,7 +1071,10 @@ void endQuda(void)
   if(cudaStapleField) delete cudaStapleField; cudaStapleField=NULL;
   if(cudaStapleField1) delete cudaStapleField1; cudaStapleField1=NULL;
 
-  if(solutionResident) delete solutionResident;
+  for (unsigned int i=0; i<solutionResident.size(); i++) {
+    if(solutionResident[i]) delete solutionResident[i];
+  }
+  solutionResident.clear();
   if(momResident) delete momResident;
 
   endBlas();
@@ -2464,14 +2467,17 @@ void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     axCuda(sqrt(nb), *x);
   }
 
-  if (solutionResident) delete solutionResident;
-  //errorQuda("solutionResident already allocated");
+  for (unsigned int i=0; i<solutionResident.size(); i++) {
+    if (solutionResident[i]) delete solutionResident[i];
+  }
+  solutionResident.resize(1);
+
   cudaParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   cudaParam.x[0] *= 2;
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
-  solutionResident = new cudaColorSpinorField(cudaParam);
+  solutionResident[0] = new cudaColorSpinorField(cudaParam);
 
-  dirac.Dslash(solutionResident->Odd(), solutionResident->Even(), QUDA_ODD_PARITY);
+  dirac.Dslash(solutionResident[0]->Odd(), solutionResident[0]->Even(), QUDA_ODD_PARITY);
 
   profileInvert.Start(QUDA_PROFILE_D2H);
   *h_x = *x;
@@ -2769,13 +2775,24 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       printfQuda("Solution %d = %g\n", i, nx);
     }
 
-    *h_x[i] = *x[i];
+    if (!param->make_resident_solution) *h_x[i] = *x[i];
   }
   profileMulti.Stop(QUDA_PROFILE_D2H);
 
+  if (param->make_resident_solution) {
+    for (unsigned int i=0; i<solutionResident.size(); i++) {
+      if (solutionResident[i]) delete solutionResident[i];
+    }
+    
+    solutionResident.resize(param->num_offset);
+    for (unsigned int i=0; i<solutionResident.size(); i++) {
+      solutionResident[i] = x[i];
+    }
+  }
+
   for(int i=0; i < param->num_offset; i++){ 
     delete h_x[i];
-    delete x[i];
+    if (!param->make_resident_solution) delete x[i];
   }
 
   delete h_b;
@@ -3891,8 +3908,8 @@ void computeKSOprodQuda(void* oprod,
 void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
 {
   bool use_resident_solution = false;
-  if (solutionResident) {
-    qudaQuark = solutionResident;
+  if (solutionResident[0]) {
+    qudaQuark = solutionResident[0];
     use_resident_solution = true;
   } else {
     errorQuda("No input quark field defined");
@@ -3930,8 +3947,8 @@ void computeStaggeredForceQuda(void* cudaMom, void* qudaQuark, double coeff)
   completeKSForce(*mom, cudaOprod, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
 
   if (use_resident_solution) {
-    delete solutionResident;
-    solutionResident = NULL;
+    delete solutionResident[0];
+    solutionResident.clear();
   }
 
   return;
@@ -4711,23 +4728,33 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   qParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   qParam.x[0] /= 2;
 
+  if (inv_param->use_resident_solution) {
+    if (solutionResident.size() != (unsigned int)nvector)
+      errorQuda("solutionResident.size() %lu does not match number of shifts %d",
+		solutionResident.size(), nvector);
+  }
+
   // loop over different quark fields
   for(int i=0; i<nvector; ++i){
     cudaColorSpinorField &x = *(cudaQuarkX[i]);
     cudaColorSpinorField &p = *(cudaQuarkP[i]);
 
-    // Wrap the even-parity MILC quark field 
-    profileCloverForce.Start(QUDA_PROFILE_INIT);
-    qParam.v = h_x[i];
-    cpuColorSpinorField cpuQuarkX(qParam); // create host quark field
-    profileCloverForce.Stop(QUDA_PROFILE_INIT);
+    if (!inv_param->use_resident_solution) {
+      // Wrap the even-parity MILC quark field 
+      profileCloverForce.Start(QUDA_PROFILE_INIT);
+      qParam.v = h_x[i];
+      cpuColorSpinorField cpuQuarkX(qParam); // create host quark field
+      profileCloverForce.Stop(QUDA_PROFILE_INIT);
 
-    profileCloverForce.Start(QUDA_PROFILE_H2D);
-    x.Even() = cpuQuarkX;
-    profileCloverForce.Stop(QUDA_PROFILE_H2D);
+      profileCloverForce.Start(QUDA_PROFILE_H2D);
+      x.Even() = cpuQuarkX;
+      profileCloverForce.Stop(QUDA_PROFILE_H2D);
 
-    gamma5Cuda(&(x.Even()), &(x.Even()));
-
+      gamma5Cuda(&(x.Even()), &(x.Even()));
+    } else {
+      x.Even() = *(solutionResident[i]);
+      delete solutionResident[i];
+    }
     profileCloverForce.Start(QUDA_PROFILE_COMPUTE);
     dirac->Dslash(x.Odd(), x.Even(), QUDA_ODD_PARITY);
     dirac->M(p.Even(), x.Even());
@@ -4749,6 +4776,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
     profileCloverForce.Stop(QUDA_PROFILE_COMPUTE);
   }
 
+  if (inv_param->use_resident_solution) solutionResident.clear();
   delete dirac;
 
   cudaGaugeField &gaugeEx = *extendedGaugeResident;

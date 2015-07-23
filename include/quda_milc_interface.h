@@ -404,6 +404,7 @@ extern "C" {
    * @param solutionArray Array of solution spinor fields
    * @param final_residual Array of true residuals
    * @param num_iters Number of iterations taken
+   * @param make_resident Whether to keep the solution vector resident or copy back
    */
   void qudaCloverMultishiftInvert(int external_precision, 
       int quda_precision,
@@ -419,7 +420,8 @@ extern "C" {
       void* source,
       void** solutionArray,
       double* const final_residual, 
-      int* num_iters
+      int* num_iters,
+      int make_resident
       );
 
   /**
@@ -535,11 +537,12 @@ extern "C" {
    * @param multiplicity Number of fermions represented by this bilinear
    * @param gauge Gauge Field
    * @param precision Precision of the fields
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
+   * @param use_resident Whether to use the resident solution vectors
    */
   void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa, 
 		       double ck, int nvec, double multiplicity, void *gauge, int precision,
-		       QudaInvertArgs_t inv_args);
+		       QudaInvertArgs_t inv_args, int use_resident);
 
   /**
    * Compute the sigma trace field (part of clover force computation).
