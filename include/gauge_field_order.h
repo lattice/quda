@@ -457,8 +457,8 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
       Float *gauge;
       size_t offset;
       Float *ghost[4];
-      int faceVolumeCB[4];
       const int volumeCB;
+      int faceVolumeCB[4];
       const int stride;
       const int geometry;
 #if __COMPUTE_CAPABILITY__ >= 200
