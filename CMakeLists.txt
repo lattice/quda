@@ -27,18 +27,10 @@ project("QUDA")
 #CPU_ARCH = x86_64  	  # x86 or x86_64
 
 ##CMAKE we need to support this
-#GPU_ARCH = sm_35	  # sm_13, sm_20, sm_21, sm_30, or sm_35
+set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
 
 
-##CMAKE We can do it this way but also use ${APPLE} right away
-#OS       = linux	  # linux or osx
-if(${UNIX})
-  if(${APPLE})
-    set(OS "osx")
-  else(${APPLE})
-    set(OS "linux")
-  endif(${APPLE})
-endif(${UNIX})
+
 
 message ("os is ${OS}")
 
@@ -105,6 +97,17 @@ set(BUILD_TIFR_INTERFACE OFF CACHE BOOL "build tifr interface")
 # Packing option
 set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
 
+# QDPJIT
+set(QUDA_USE_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
+
+set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
+set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
+
+#########################################################
+# everything below here is processing the setup
+#
+
+
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
@@ -114,14 +117,33 @@ include_directories(lib)
 add_definitions(-D__COMPUTE_CAPABILITY__=350)
 add_definitions(-DQUDA_HASH="123")
 
+STRING(REGEX REPLACE sm_ "" COMP_CAP ${GPU_ARCH})
+SET(COMP_CAP "${COMP_CAP}0")
 
 
+
+message("gpu arch " ${GPU_ARCH})
+message("comp cap " ${COMP_CAP})
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
     -gencode arch=compute_35,code=sm_35 )
+
+add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
 # do all the build definitions
 #
+
+if (${BUILD_QIO})
+  add_definitions(-DHAVE_QIO)
+  set(QIO_UTIL qio_util.cpp layout_hyper.c gauge_qio.cpp)
+  message("BUILD with QIO")
+  FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
+  FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
+endif()
+  #TARGET_LINK_LIBRARIES(testOVAS ${TOURTRE_LIBRARY})
+
+
+
 if (BUILD_MILC_INTERFACE)
   add_definitions(-DBUILD_MILC_INTERFACE)
 endif(BUILD_MILC_INTERFACE)
@@ -134,8 +156,7 @@ if (BUILD_STAGGERED_DIRAC)
   add_definitions(-DGPU_STAGGERED_DIRAC)
 endif(BUILD_STAGGERED_DIRAC)
 
-
-# build quda in the lib subdirectory
+### add tests and quda library
 add_subdirectory(lib)
 
 add_subdirectory(tests)
