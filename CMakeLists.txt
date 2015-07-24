@@ -44,6 +44,7 @@ find_package(PythonInterp)
 
 # we need to check for some packages
 find_package(CUDA REQUIRED)
+find_package( Threads REQUIRED )
 
 # compilation options
 # HOST_DEBUG = no			# compile host debug code
@@ -133,6 +134,25 @@ add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 # do all the build definitions
 #
 
+if(${BUILD_MULTI_GPU})
+  add_definitions(-DMULTI_GPU)
+  if(NOT (${BUILD_MPI} OR ${BUILD_QMP}) )
+    message(FATAL_ERROR "Multi GPU build requires either MPI or QMP")
+  endif()
+else(${BUILD_MULTI_GPU})
+  set(COMM_OBJS comm_single.cpp)
+endif()
+
+if(${BUILD_MPI})
+  add_definitions(-DMPI_COMMS)
+  message(WARNING "MPI not yet implemented in CMakeLists")
+endif()
+
+if ($(BUILD_QMP))
+  add_definitions(-DQMP_COMMS)
+  message(WARNING "QMP not yet implemented in CMakeLists")
+endif()
+
 if (${BUILD_QIO})
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp layout_hyper.c gauge_qio.cpp)
@@ -140,21 +160,143 @@ if (${BUILD_QIO})
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
   FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
 endif()
-  #TARGET_LINK_LIBRARIES(testOVAS ${TOURTRE_LIBRARY})
+
+if(${MPI_NVTX})
+  LIST(APPEND $(COMM_OBJS) nvtx_pmpi.c)
+  message(WARNING "NVTX library not yet added")
+endif()
+
+if(${MILC_NVTX})
+  add_definitions(-DMPI_NVTX)
+  message(WARNING "NVTX library not yet added")
+endif(${MILC_NVTX})
+
+if(BUILD_MAGMA)
+  message(WARNING "Magma might be a pain")
+else(BUILD_MAGMA)
+  #do we need these
+  # MAGMA_INCLUDE
+  # MAGMA_FLAGS
+endif(BUILD_MAGMA)
+
+if(BUILD_SSTEP)
+  add_definitions(-DBUILD_SSTEP)
+endif()
+
+if(POSIX_THREADS)
+  add_definitions(-DPTHREADS)
+endif()
 
 
+if(BUILD_WILSON_DIRAC)
+  add_definitions(-DGPU_WILSON_DIRAC)
+endif(BUILD_WILSON_DIRAC)
 
-if (BUILD_MILC_INTERFACE)
-  add_definitions(-DBUILD_MILC_INTERFACE)
-endif(BUILD_MILC_INTERFACE)
-
-if (BUILD_QDP_INTERFACE)
-  add_definitions(-DBUILD_QDP_INTERFACE)
-endif(BUILD_QDP_INTERFACE)
+if(BUILD_DOMAIN_WALL_DIRAC)
+  add_definitions(-DDGPU_DOMAIN_WALL_DIRAC)
+endif(BUILD_DOMAIN_WALL_DIRAC)
 
 if (BUILD_STAGGERED_DIRAC)
   add_definitions(-DGPU_STAGGERED_DIRAC)
 endif(BUILD_STAGGERED_DIRAC)
+
+if(BUILD_CLOVER_DIRAC)
+  add_definitions(-DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
+endif(BUILD_CLOVER_DIRAC)
+
+if(BUILD_TWISTED_MASS_DIRAC)
+  add_definitions(-DGPU_TWISTED_MASS_DIRAC)
+endif(BUILD_TWISTED_MASS_DIRAC)
+
+
+if(BUILD_TWISTED_CLOVER_DIRAC)
+  add_definitions(-DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
+endif(BUILD_TWISTED_CLOVER_DIRAC)
+
+if(BUILD_NDEG_TWISTED_MASS_DIRAC)
+  add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
+endif(BUILD_NDEG_TWISTED_MASS_DIRAC)
+
+if(BUILD_FATLINK)
+  add_definitions(-DGPU_FATLINK -DGPU_GAUGE_TOOLS)
+endif(BUILD_FATLINK)
+
+if(BUILD_HISQLINK)
+  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS)
+endif(BUILD_HISQLINK)
+
+if(BUILD_GAUGE_FORCE)
+  add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
+endif(BUILD_GAUGE_FORCE)
+
+if(BUILD_FERMION_FORCE)
+  add_definitions(-DGPU_FERMION_FORCE -DGPU_GAUGE_TOOLS)
+endif(BUILD_FERMION_FORCE)
+
+if(BUILD_HISQ_FORCE)
+  add_definitions(-DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS)
+endif(BUILD_HISQ_FORCE)
+
+if(BUILD_GAUGE_TOOLS)
+  add_definitions(-DGPU_GAUGE_TOOLS)
+endif(BUILD_GAUGE_TOOLS)
+
+if(NOT QUDA_BLAS_TEX)
+  add_definitions(-DDIRECT_ACCESS_BLAS)
+endif(NOT QUDA_BLAS_TEX)
+
+if(NOT QUDA_FERMI_DBLE_TEX)
+  add_definitions(-DFERMI_NO_DBLE_TEX)
+endif(NOT QUDA_FERMI_DBLE_TEX)
+
+if(GPU_DIRECT)
+  add_definitions(-DGPU_DIRECT)
+endif(GPU_DIRECT)
+
+if(GPU_COMMS)
+  add_definitions(-DGPU_COMMS)
+endif(GPU_COMMS)
+
+if(BUILD_QDP_INTERFACE)
+  add_definitions(-DBUILD_QDP_INTERFACE)
+endif(BUILD_QDP_INTERFACE)
+
+if(BUILD_MILC_INTERFACE)
+  add_definitions(-DBUILD_MILC_INTERFACE)
+endif(BUILD_MILC_INTERFACE)
+
+if(BUILD_CPS_INTERFACE)
+  add_definitions(-DBUILD_CPS_INTERFACE)
+endif(BUILD_CPS_INTERFACE)
+
+if(BUILD_QDPJIT_INTERFACE)
+add_definitions(-DBUILD_QDPJIT_INTERFACE)
+endif(BUILD_QDPJIT_INTERFACE)
+
+if(BUILD_BQCD_INTERFACE)
+  add_definitions(-DBUILD_BQCD_INTERFACE)
+endif(BUILD_BQCD_INTERFACE)
+
+if(BUILD_TIFR_INTERFACE)
+  add_definitions(-DBUILD_TIFR_INTERFACE)
+endif(BUILD_TIFR_INTERFACE)
+
+if(DEVICE_PACK)
+  add_definitions(-DDEVICE_PACK)
+endif(DEVICE_PACK)
+
+if(NOT ${APPLE})
+  if(QUDA_NUMA_AFFINITY)
+    add_definitions(-DNUMA_AFFINITY)
+    set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
+  endif(QUDA_NUMA_AFFINITY)
+endif(NOT ${APPLE})
+
+if(BUILD_CONTRACT)
+  add_definitions(-DGPU_CONTRACT)
+endif(BUILD_CONTRACT)
+
+
 
 ### add tests and quda library
 add_subdirectory(lib)

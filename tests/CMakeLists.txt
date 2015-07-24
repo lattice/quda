@@ -9,7 +9,11 @@ set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 
-set(TEST_LIBS quda quda_test ${QIO_LIB} ${LIME_LIB} ${QMP_LIB})
+set(TEST_LIBS quda quda_test)
+
+if($BUILD_QIO)
+  LIST(APPEND ${TEST_LIBS} {QIO_LIB} ${LIME_LIB} ${QMP_LIB})
+endif()
 
 if(${BUILD_WILSON_DIRAC} OR ${BUILD_DOMAIN_WALL_DIRAC})
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp ${QIO_UTIL})
