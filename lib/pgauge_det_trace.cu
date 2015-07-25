@@ -228,7 +228,7 @@ class CalcFunc : Tunable {
     vol << arg.X[1] << "x";
     vol << arg.X[2] << "x";
     vol << arg.X[3];
-    sprintf(aux_string,"threads=%d,prec=%d,gaugedir=%d",arg.threads, sizeof(Float));
+    sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
     return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     
   }
