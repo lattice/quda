@@ -19,7 +19,6 @@
 #include <random.h>
 
 
-#define BORDER_RADIUS 2
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
@@ -702,7 +701,7 @@ namespace quda {
       BetaOverNc = Beta / NCOLORS;
 #ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
-        if ( comm_dim_partitioned(dir)) border[dir] = BORDER_RADIUS;
+        if ( comm_dim_partitioned(dir)) border[dir] = data.R()[dir];
         else border[dir] = 0;
       }
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir] - border[dir] * 2;
