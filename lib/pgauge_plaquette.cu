@@ -19,8 +19,6 @@
 #include <random.h>
 
 
-#define BORDER_RADIUS 2
-
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
 #endif
@@ -146,10 +144,7 @@ struct PlaquetteArg {
   PlaquetteArg(const Gauge &dataOr, const cudaGaugeField &data)
     : dataOr(dataOr), plaq_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
 #ifdef MULTI_GPU
-    for(int dir=0; dir<4; ++dir){
-      if(comm_dim_partitioned(dir)) border[dir] = BORDER_RADIUS;
-      else border[dir] = 0;
-    }
+    for(int dir=0; dir<4; ++dir) border[dir] = data.R()[dir];
     for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;
 #else
     for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
