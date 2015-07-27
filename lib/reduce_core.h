@@ -408,6 +408,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
       Spinor<double2,double2,double2,M,writeX> X(x);
       Spinor<double2,double2,double2,M,writeY> Y(y);
@@ -421,7 +422,11 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
 	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else if (x.Nspin() == 1){ //staggered
+#ifdef GPU_STAGGERED_DIRAC
       const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
       Spinor<double2,double2,double2,M,writeX> X(x);
       Spinor<double2,double2,double2,M,writeY> Y(y);
@@ -435,6 +440,9 @@ doubleN reduceCuda(const double2 &a, const double2 &b, cudaColorSpinorField &x,
 	Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
 	reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
       reduce.apply(*getBlasStream());
+#else
+      errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
     } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     if (x.Nspin() == 4){ //wilson
