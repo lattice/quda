@@ -30,21 +30,13 @@ project("QUDA")
 set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
 
 
-
-
-message ("os is ${OS}")
-
 ##CMAKE use Find
 #GIT      = git
-find_package(Git)
 
 ##CMAKE use Find
-#PYTHON = python	  # python 2.5 or later required for 'make gen'
-find_package(PythonInterp)
 
-# we need to check for some packages
-find_package(CUDA REQUIRED)
-find_package( Threads REQUIRED )
+
+
 
 # compilation options
 # HOST_DEBUG = no			# compile host debug code
@@ -145,12 +137,34 @@ endif()
 
 if(${BUILD_MPI})
   add_definitions(-DMPI_COMMS)
+  set(COMM_OBJS comm_mpi.cpp)
+  #ifeq ($(strip $(BUILD_MPI)), yes)
+  #  MPI_CFLAGS =
+  #  MPI_LDFLAGS =
+  #  MPI_LIBS =
+  #  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include
+  #  LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
+  #  COMM_OBJS = comm_mpi.o
+  # endif
   message(WARNING "MPI not yet implemented in CMakeLists")
 endif()
 
-if ($(BUILD_QMP))
+if (${BUILD_QMP})
   add_definitions(-DQMP_COMMS)
-  message(WARNING "QMP not yet implemented in CMakeLists")
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message ("QMP related info " ${QMP_CFLAGS} ${QMP_LDFLAGS} ${QMP_LIBS})
+  ## we might need to get rid of the
+  #QMP_CFLAGS = $(shell $(QUDA_QMPHOME)/bin/qmp-config --cflags )
+  #QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
+  #QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
+  #INC += $(QMP_CFLAGS)
+  #LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
+  FIND_LIBRARY(QMP_LIB ${QUDA_QMPHOME}/lib)
+  include_directories(${QUDA_QMPHOME}/include)
+  set(COMM_OBJS comm_qmp.cpp)
+  message(WARNING "QMP not yet fully tested in CMakeLists")
 endif()
 
 if (${BUILD_QIO})
@@ -297,6 +311,14 @@ if(BUILD_CONTRACT)
 endif(BUILD_CONTRACT)
 
 
+# we need to check for some packages
+find_package(PythonInterp)
+find_package(Git)
+find_package(CUDA REQUIRED)
+find_package(Threads REQUIRED)
+if(BUILD_MPI)
+  find_package(MPI)
+endif(BUILD_MPI)
 
 ### add tests and quda library
 add_subdirectory(lib)

@@ -9,15 +9,18 @@ set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 
-set(TEST_LIBS quda quda_test)
+set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT})
 
-if($BUILD_QIO)
-  LIST(APPEND ${TEST_LIBS} {QIO_LIB} ${LIME_LIB} ${QMP_LIB})
+if(BUILD_QIO)
+  message(need to append QIO_LIB)
+  LIST(APPEND TEST_LIBS ${QIO_LIB} ${LIME_LIB} ${QMP_LIB})
 endif()
+
+message("Test woth libs" ${TEST_LIBS})
 
 if(${BUILD_WILSON_DIRAC} OR ${BUILD_DOMAIN_WALL_DIRAC})
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp ${QIO_UTIL})
-  target_link_libraries(dslash_test ${TEST_LIBS})
+  target_link_libraries(dslash_test ${TEST_LIBS} )
 
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp ${QIO_UTIL})
   target_link_libraries(invert_test ${TEST_LIBS})
