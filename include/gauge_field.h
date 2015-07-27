@@ -111,6 +111,19 @@ namespace quda {
 	    else errorQuda("Error: invalid link type(%d)\n", link_type);
 	    for (int d=0; d<nDim; d++) r[d] = 0;
 	  }
+
+    /**
+       Helper function for setting the precision and corresponding
+       field order for QUDA internal fields.
+       @param precision The precision to use 
+     */
+    void setPrecision(QudaPrecision precision) {
+      this->precision = precision;
+      order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
+	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
+    }
+
+
   };
   
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
