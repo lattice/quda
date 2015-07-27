@@ -231,22 +231,17 @@ TEST_F(GaugeAlgTest,Generation){
   bool testgen = false;
   //check plaquette value for beta = 6.2
   if(plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
-  printfQuda("-----------------------------------------------------------------------\n");
-  printfQuda("Test for gauge generation: %s\n", (( testgen && CheckDeterminant(detu)) ? "PASSED" : "FAILED") );
-  printfQuda("-----------------------------------------------------------------------\n");
   randstates.Release();
+  if(testgen){
+    ASSERT_TRUE(CheckDeterminant(detu));
+  }
 }
 
 TEST_F(GaugeAlgTest,Landau_Overrelaxation){
   int reunit_interval = 10;
-
   printfQuda("Landau gauge fixing with overrelaxation\n");
   plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
   gaugefixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
-//  printfQuda("-----------------------------------------------------------------------\n");
-//  printfQuda("Test for Landau gauge fixing with overrrelaxation: %s\n", \
-             comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
-//  printfQuda("-----------------------------------------------------------------------\n");
   ASSERT_TRUE(comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)));
 }
 
@@ -255,39 +250,24 @@ TEST_F(GaugeAlgTest,Coulomb_Overrelaxation){
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
   plaq =  plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION);
   gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-//  printfQuda("-----------------------------------------------------------------------\n");
-//  printfQuda("Test for Coulomb gauge fixing with overrrelaxation: %s\n", \
-             comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
-//  printfQuda("-----------------------------------------------------------------------\n");
   ASSERT_TRUE(comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)));
 }
 
 TEST_F(GaugeAlgTest,Coulomb_FFT){
-  int reunit_interval = 10;
   if(!checkDimsPartitioned()){
-
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
     plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
     gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-    //printfQuda("-----------------------------------------------------------------------\n");
-    //printfQuda("Test for Landau gauge fixing with SDM with FFT: %s\n", \
-               comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
-    //printfQuda("-----------------------------------------------------------------------\n");
     ASSERT_TRUE(comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)));
   }
 }
 
 TEST_F(GaugeAlgTest,Landau_FFT){
-  int reunit_interval = 10;
   if(!checkDimsPartitioned()){
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
     plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
     gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
-    //printfQuda("-----------------------------------------------------------------------\n");
-    //printfQuda("Test for Coulomb gauge fixing with SDM with FFT: %s\n", \
-               comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
-    //printfQuda("-----------------------------------------------------------------------\n");
-    ASSERT_TRUE(comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)));
+     ASSERT_TRUE(comparePlaquette(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)));
   }
 }
 
