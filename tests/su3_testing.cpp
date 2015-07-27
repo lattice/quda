@@ -263,7 +263,7 @@ int main(int argc, char **argv){
       continue;
     }
 
-    fprintfQuda(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
