@@ -170,67 +170,67 @@ void RunTest(int argc, char **argv) {
   else{
     InitGaugeField( *cudaInGauge, randstates.State());
   }
-  Plaquette( *cudaInGauge) ;
+  plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
 
   for(int step=1; step<=nsteps; ++step){
     printfQuda("Step %d\n",step);
     Monte( *cudaInGauge, randstates.State(), beta_value, nhbsteps, novrsteps);
     //Reunitarize gauge links...
     CallUnitarizeLinks(cudaInGauge);
-    Plaquette( *cudaInGauge) ;
+    plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
   }
   a1.Stop();
   printfQuda("Time Monte -> %.6f s\n", a1.Last());
 
   double2 detu = getLinkDeterminant(*cudaInGauge);
-  double2 plaq = Plaquette( *cudaInGauge) ;
+  double3 plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
   bool testgen = false;
   //check plaquette value for beta = 6.2
   if(plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
-  printf("-----------------------------------------------------------------------\n");
-  printf("Test for gauge generation: %s\n", (( testgen && CheckDeterminant(detu)) ? "PASSED" : "FAILED") );
-  printf("-----------------------------------------------------------------------\n");
+  printfQuda("-----------------------------------------------------------------------\n");
+  printfQuda("Test for gauge generation: %s\n", (( testgen && CheckDeterminant(detu)) ? "PASSED" : "FAILED") );
+  printfQuda("-----------------------------------------------------------------------\n");
 
   int reunit_interval = 10;
 
   printfQuda("Landau gauge fixing with overrelaxation\n");
-  plaq = Plaquette( *cudaInGauge) ;
+  plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
   gaugefixingOVR(*cudaInGauge, 4, 100, 10, 1.5, 0, reunit_interval, 1);
-  printf("-----------------------------------------------------------------------\n");
-  printf("Test for Landau gauge fixing with overrrelaxation: %s\n", \
-    compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
-  printf("-----------------------------------------------------------------------\n");
+  printfQuda("-----------------------------------------------------------------------\n");
+  printfQuda("Test for Landau gauge fixing with overrrelaxation: %s\n", \
+    compareDoube2(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
+  printfQuda("-----------------------------------------------------------------------\n");
 
   printfQuda("Coulomb gauge fixing with overrelaxation\n");
-  plaq =  Plaquette( *cudaInGauge);
+  plaq =  plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION);
   gaugefixingOVR(*cudaInGauge, 3, 100, 10, 1.5, 0, reunit_interval, 1);
-  printf("-----------------------------------------------------------------------\n");
-  printf("Test for Coulomb gauge fixing with overrrelaxation: %s\n", \
-    compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
-  printf("-----------------------------------------------------------------------\n");
+  printfQuda("-----------------------------------------------------------------------\n");
+  printfQuda("Test for Coulomb gauge fixing with overrrelaxation: %s\n", \
+    compareDoube2(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
+  printfQuda("-----------------------------------------------------------------------\n");
   
   if(!checkDimsPartitioned()){
     printfQuda("Landau gauge fixing with steepest descent method with FFTs\n");
-    plaq = Plaquette( *cudaInGauge) ;
+    plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
     gaugefixingFFT(*cudaInGauge, 4, 100, 10, 0.08, 0, 0, 1);
-    printf("-----------------------------------------------------------------------\n");
-    printf("Test for Landau gauge fixing with SDM with FFT: %s\n", \
-      compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
-    printf("-----------------------------------------------------------------------\n");
+    printfQuda("-----------------------------------------------------------------------\n");
+    printfQuda("Test for Landau gauge fixing with SDM with FFT: %s\n", \
+      compareDoube2(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
+    printfQuda("-----------------------------------------------------------------------\n");
 
     printfQuda("Coulomb gauge fixing with steepest descent method with FFTs\n");
-    plaq = Plaquette( *cudaInGauge) ;
+    plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
     gaugefixingFFT(*cudaInGauge, 3, 100, 10, 0.08, 0, 0, 1);
-    printf("-----------------------------------------------------------------------\n");
-    printf("Test for Coulomb gauge fixing with SDM with FFT: %s\n", \
-      compareDoube2(plaq, Plaquette( *cudaInGauge)) ? "PASSED" : "FAILED");
-    printf("-----------------------------------------------------------------------\n");
+    printfQuda("-----------------------------------------------------------------------\n");
+    printfQuda("Test for Coulomb gauge fixing with SDM with FFT: %s\n", \
+      compareDoube2(plaq, plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION)) ? "PASSED" : "FAILED");
+    printfQuda("-----------------------------------------------------------------------\n");
   }
 
   detu = getLinkDeterminant(*cudaInGauge);
   double2 tru = getLinkTrace(*cudaInGauge);
-  printf("Det: %.16e:%.16e\n", detu.x, detu.y);
-  printf("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
+  printfQuda("Det: %.16e:%.16e\n", detu.x, detu.y);
+  printfQuda("Tr: %.16e:%.16e\n", tru.x/3.0, tru.y/3.0);
 
   randstates.Release();
   delete cudaInGauge;
@@ -245,7 +245,7 @@ void RunTest(int argc, char **argv) {
 
 void SU3GaugeFixTest(int argc, char **argv) {
 
-  initQuda(-1);
+  initQuda(device);
   prec = QUDA_DOUBLE_PRECISION;
   link_recon = QUDA_RECONSTRUCT_NO;
   RunTest(argc, argv);
@@ -262,7 +262,7 @@ int main(int argc, char **argv){
       continue;
     }
 
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+    fprintfQuda(stderr, "ERROR: Invalid option:%s\n", argv[i]);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
