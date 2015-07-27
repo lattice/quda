@@ -44,7 +44,7 @@ ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
 endif
 
 ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
-  GAUGE_ALG_TEST=su3_testing
+  GAUGE_ALG_TEST=su3_testing gauge_alg_test
 endif
 
 TESTS = su3_test pack_test blas_test dslash_test invert_test	\
@@ -75,6 +75,9 @@ su3_test: su3_test.o test_util.o misc.o $(QIO_UTIL) $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 su3_testing: su3_testing.o test_util.o misc.o $(QIO_UTIL)  $(QUDA)
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
+
+gauge_alg_test: gauge_alg_test.o test_util.o misc.o gtest-all.o $(QIO_UTIL)  $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 pack_test: pack_test.o test_util.o misc.o $(QUDA)
