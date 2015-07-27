@@ -802,10 +802,18 @@ extern "C" {
                       const void* const u_link,
                       const QudaGaugeParam* param);
 
+  /**
+   * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+   * @param Array for storing the averages (total, spatial, temporal)
+   */
+  void plaqQuda(double plaq[3]);
+
+  /**
+   * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param alpha  Alpha coefficient for APE smearing.
+   */
   void performAPEnStep(unsigned int nSteps, double alpha);
-  double plaqCuda();
-
-
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -853,7 +861,6 @@ extern "C" {
                       const unsigned int stopWtheta, 
                       QudaGaugeParam* param, 
                       double* timeinfo);
-
 
   /**
   * Open/Close MAGMA library

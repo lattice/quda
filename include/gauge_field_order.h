@@ -972,4 +972,29 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
   };
 
 
-}
+  
+  // Use traits to reduce the template explosion
+  template<typename ,QudaReconstructType,int N=18> struct gauge_mapper { };
+
+  // double precision
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_NO,N> { typedef FloatNOrder<double, N, 2, N> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_13,N> { typedef FloatNOrder<double, N, 2, 13> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_12,N> { typedef FloatNOrder<double, N, 2, 12> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_9,N> { typedef FloatNOrder<double, N, 2, 9> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_8,N> { typedef FloatNOrder<double, N, 2, 8> type; };
+
+  // single precision
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_NO,N> { typedef FloatNOrder<float, N, 2, N> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_13,N> { typedef FloatNOrder<float, N, 4, 13> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_12,N> { typedef FloatNOrder<float, N, 4, 12> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_9,N> { typedef FloatNOrder<float, N, 4, 9> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_8,N> { typedef FloatNOrder<float, N, 4, 8> type; };
+
+  // half precision
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_NO,N> { typedef FloatNOrder<short, N, 2, N> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_13,N> { typedef FloatNOrder<short, N, 4, 13> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N> { typedef FloatNOrder<short, N, 4, 12> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N> { typedef FloatNOrder<short, N, 4, 9> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N> { typedef FloatNOrder<short, N, 4, 8> type; };
+
+} // namespace quda

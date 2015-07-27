@@ -213,6 +213,12 @@ extern "C" {
   void remove_staggered_phase_quda_();
 
   /**
+   * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+   * @param Array for storing the averages (total, spatial, temporal)
+   */
+  void plaq_quda_(double plaq[3]);
+
+  /**
    * Temporary function exposed for TIFR benchmarking
    */
   void set_kernel_pack_t_(int *pack);

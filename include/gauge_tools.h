@@ -1,6 +1,29 @@
 namespace quda {
-  double        plaquette       (const GaugeField& data, QudaFieldLocation location);
-  void          APEStep         (GaugeField &dataDs, const GaugeField& dataOr, double alpha, QudaFieldLocation location);
+  /**
+     Compute the plaquette of the gauge field
+
+     @param U The gauge field upon which to compute the plaquette
+     @param location The locaiton where to do the computation 
+     @return double3 variable returning (plaquette, spatial plaquette,
+     temporal plaquette) site averages normalized such that each
+     plaquette is in the range [0,1]
+   */
+  double3 plaquette(const GaugeField& U,
+		    QudaFieldLocation location);
+
+  
+  /**
+     Apply APE smearing to the gauge field
+
+     @param dataDs Output smeared field
+     @param dataOr Input gauge field
+     @param alpha smearing parameter
+     @param location Location of the computation
+  */
+  void APEStep (GaugeField &dataDs,
+		const GaugeField& dataOr,
+		double alpha,
+		QudaFieldLocation location);
 
 
   /**
@@ -10,13 +33,20 @@ namespace quda {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this
+   * value is zero then the method stops when iteration reachs the
+   * maximum number of steps defined by Nsteps
    * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingOVR( cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const double relax_boost, \
-                       const double tolerance, const unsigned int reunit_interval, const unsigned int stopWtheta);
+  void gaugefixingOVR( cudaGaugeField& data,
+		       const unsigned int gauge_dir,
+                       const unsigned int Nsteps,
+		       const unsigned int verbose_interval,
+		       const double relax_boost,
+                       const double tolerance,
+		       const unsigned int reunit_interval,
+		       const unsigned int stopWtheta);
 
 
   /**
@@ -27,10 +57,16 @@ namespace quda {
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
    * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value 
-   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] tolerance, torelance value to stop the method, if this
+   * value is zero then the method stops when iteration reachs the
+   * maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const double alpha, const unsigned int autotune, \
-                       const double tolerance, const unsigned int stopWtheta);
+  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir,
+		       const unsigned int Nsteps,
+		       const unsigned int verbose_interval,
+		       const double alpha,
+		       const unsigned int autotune,
+                       const double tolerance,
+		       const unsigned int stopWtheta);
 }

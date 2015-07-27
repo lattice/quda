@@ -341,156 +341,53 @@ namespace quda {
   template<typename Float>
     void APEStep(GaugeField &dataDs, const GaugeField& dataOr, Float alpha, QudaFieldLocation location) {
 
-      // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-      // Need to fix this!!
+    if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GDs;
 
-      if(dataDs.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-        if(dataOr.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-          if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-              APEStep(FloatNOrder<Float, 18, 2, 18>(dataOr), FloatNOrder<Float, 18, 2, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 2, 12>(dataOr), FloatNOrder<Float, 18, 2, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 2,  8>(dataOr), FloatNOrder<Float, 18, 2, 18>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 2, 18>(dataOr), FloatNOrder<Float, 18, 2, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 2, 12>(dataOr), FloatNOrder<Float, 18, 2, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 2,  8>(dataOr), FloatNOrder<Float, 18, 2, 12>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 2, 18>(dataOr), FloatNOrder<Float, 18, 2,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 2, 12>(dataOr), FloatNOrder<Float, 18, 2,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 2,  8>(dataOr), FloatNOrder<Float, 18, 2,  8>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else {
-            errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
-          }
-        } else if(dataOr.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-          if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-              APEStep(FloatNOrder<Float, 18, 4, 18>(dataOr), FloatNOrder<Float, 18, 2, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 4, 12>(dataOr), FloatNOrder<Float, 18, 2, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 4,  8>(dataOr), FloatNOrder<Float, 18, 2, 18>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 4, 18>(dataOr), FloatNOrder<Float, 18, 2, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 4, 12>(dataOr), FloatNOrder<Float, 18, 2, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 4,  8>(dataOr), FloatNOrder<Float, 18, 2, 12>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 4, 18>(dataOr), FloatNOrder<Float, 18, 2,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 4, 12>(dataOr), FloatNOrder<Float, 18, 2,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 4,  8>(dataOr), FloatNOrder<Float, 18, 2,  8>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else {
-            errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
-          }
-        } else {
-	  errorQuda("Invalid Gauge Order origin field\n");
-        }
-      } else if(dataDs.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-        if(dataOr.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-          if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-              APEStep(FloatNOrder<Float, 18, 2, 18>(dataOr), FloatNOrder<Float, 18, 4, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 2, 12>(dataOr), FloatNOrder<Float, 18, 4, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 2,  8>(dataOr), FloatNOrder<Float, 18, 4, 18>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 2, 18>(dataOr), FloatNOrder<Float, 18, 4, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 2, 12>(dataOr), FloatNOrder<Float, 18, 4, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 2,  8>(dataOr), FloatNOrder<Float, 18, 4, 12>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 2, 18>(dataOr), FloatNOrder<Float, 18, 4,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 2, 12>(dataOr), FloatNOrder<Float, 18, 4,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 2,  8>(dataOr), FloatNOrder<Float, 18, 4,  8>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else {
-            errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
-          }
-        } else if(dataOr.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-          if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-              APEStep(FloatNOrder<Float, 18, 4, 18>(dataOr), FloatNOrder<Float, 18, 4, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 4, 12>(dataOr), FloatNOrder<Float, 18, 4, 18>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 4,  8>(dataOr), FloatNOrder<Float, 18, 4, 18>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 4, 18>(dataOr), FloatNOrder<Float, 18, 4, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 4, 12>(dataOr), FloatNOrder<Float, 18, 4, 12>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 4,  8>(dataOr), FloatNOrder<Float, 18, 4, 12>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
-            if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-              APEStep(FloatNOrder<Float, 18, 4, 18>(dataOr), FloatNOrder<Float, 18, 4,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-              APEStep(FloatNOrder<Float, 18, 4, 12>(dataOr), FloatNOrder<Float, 18, 4,  8>(dataDs), dataOr, alpha, location);
-            }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-              APEStep(FloatNOrder<Float, 18, 4,  8>(dataOr), FloatNOrder<Float, 18, 4,  8>(dataDs), dataOr, alpha, location);
-            }else{
-              errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-          } else {
-            errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
-          }
-        } else {
-	  errorQuda("Invalid Gauge Order origin field\n");
-        }
-      } else {
-        errorQuda("Invalid Gauge Order destination field\n");
+      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else{
+	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
       }
+    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GDs;
+      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else{
+	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
+      }
+    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GDs;
+      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
+	APEStep(GOr(dataOr), GDs(dataDs), dataOr, alpha, location);
+      }else{
+	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
+            }
+    } else {
+      errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
+    }
+
   }
 #endif
 
@@ -505,6 +402,12 @@ namespace quda {
     if(dataDs.Precision() == QUDA_HALF_PRECISION){
       errorQuda("Half precision not supported\n");
     }
+
+    if (!dataOr.isNative())
+      errorQuda("Order %d with %d reconstruct not supported", dataOr.Order(), dataOr.Reconstruct());
+
+    if (!dataDs.isNative())
+      errorQuda("Order %d with %d reconstruct not supported", dataDs.Order(), dataDs.Reconstruct());
 
     if (dataDs.Precision() == QUDA_SINGLE_PRECISION){
       APEStep<float>(dataDs, dataOr, (float) alpha, location);
