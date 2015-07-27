@@ -291,35 +291,23 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
 
 
 template<typename Float, int functiontype>
-double2 computeValue( cudaGaugeField& data) {
+double2 computeValue(cudaGaugeField& data) {
 
   // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
   // Need to fix this!!
-  if(data.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+  if(data.isNative()) {
     if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
     //printfQuda("QUDA_RECONSTRUCT_NO\n");
-    return  computeValue<Float, 3, functiontype>(FloatNOrder<Float, 18, 2, 18>(data), data);
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+      return  computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
     //printfQuda("QUDA_RECONSTRUCT_12\n");
-      return computeValue<Float, 3, functiontype>(FloatNOrder<Float, 18, 2, 12>(data), data);
-    
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+      return computeValue<Float, 3, functiontype>(Gauge(data), data);
     } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
     //printfQuda("QUDA_RECONSTRUCT_8\n");
-      return computeValue<Float, 3, functiontype>(FloatNOrder<Float, 18, 2,  8>(data), data);
-    
-    } else {
-      errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-    }
-  } else if(data.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-    if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-    //printfQuda("QUDA_RECONSTRUCT_NO\n");
-      return computeValue<Float, 3, functiontype>(FloatNOrder<Float, 18, 4, 18>(data), data);
-    } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
-    //printfQuda("QUDA_RECONSTRUCT_12\n");
-      return computeValue<Float, 3, functiontype>(FloatNOrder<Float, 18, 4, 12>(data), data);
-    } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
-    //printfQuda("QUDA_RECONSTRUCT_8\n");
-      return computeValue<Float, 3, functiontype>(FloatNOrder<Float, 18, 4,  8>(data), data);
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+      return computeValue<Float, 3, functiontype>(Gauge(data), data);    
     } else {
       errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
     }

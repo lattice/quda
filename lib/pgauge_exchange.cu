@@ -330,37 +330,24 @@ namespace quda {
 
     // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
     // Need to fix this!!
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
         //printfQuda("QUDA_RECONSTRUCT_NO\n");
         numParams = 18;
-        PGaugeExchange<Float, 18>(FloatNOrder<Float, 18, 2, 18>(data), data, dir, parity);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	PGaugeExchange<Float, 18>(G(data), data, dir, parity);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
         //printfQuda("QUDA_RECONSTRUCT_12\n");
         numParams = 12;
-        PGaugeExchange<Float, 12>(FloatNOrder<Float, 18, 2, 12>(data), data, dir, parity);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+        PGaugeExchange<Float, 12>(G(data), data, dir, parity);
 
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
         //printfQuda("QUDA_RECONSTRUCT_8\n");
         numParams = 8;
-        PGaugeExchange<Float, 8>(FloatNOrder<Float, 18, 2,  8>(data), data, dir, parity);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
+        PGaugeExchange<Float, 8>(G(data), data, dir, parity);
 
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        numParams = 18;
-        PGaugeExchange<Float, 18>(FloatNOrder<Float, 18, 4, 18>(data), data, dir, parity);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        numParams = 12;
-        PGaugeExchange<Float, 12>(FloatNOrder<Float, 18, 4, 12>(data), data, dir, parity);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        numParams = 8;
-        PGaugeExchange<Float, 8>(FloatNOrder<Float, 18, 4,  8>(data), data, dir, parity);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }

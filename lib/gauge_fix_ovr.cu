@@ -1933,7 +1933,7 @@ static bool checkDimsPartitioned(){
                        const unsigned int reunit_interval, const unsigned int stopWtheta) {
 
     // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
         printfQuda("QUDA_RECONSTRUCT_NO\n");
         numParams = 18;
