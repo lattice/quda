@@ -270,7 +270,6 @@ ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
   NVCCOPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
   COPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
   LIB += -lcufft -lcurand
-  GAUGE_ALG_TEST=su3_testing
 endif
 
 ifeq ($(strip $(HOST_DEBUG)), yes)
