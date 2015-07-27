@@ -43,6 +43,9 @@ ifeq ($(strip $(BUILD_HISQ_FORCE)), yes)
   HISQ_UNITARIZE_FORCE_TEST=hisq_unitarize_force_test
 endif
 
+ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
+  GAUGE_ALG_TEST=su3_testing
+endif
 
 TESTS = su3_test pack_test blas_test dslash_test invert_test	\
 	deflation_test						\
