@@ -10,12 +10,6 @@
 
 namespace quda {
   
-  /** @brief Calculate the plaquette
-   *
-   * @param[in] data Gauge field
-   * @returns double2 .x stores the space-space plaquette value and .y stores the space-time plaquette value
-   */
-  double2 Plaquette( cudaGaugeField& data);
 
   /** @brief Perform heatbath and overrelaxation. Performs nhb heatbath steps followed by nover overrelaxation steps.
    *
