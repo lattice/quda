@@ -622,37 +622,24 @@ void unitarizeLinksQuda( Gauge links,  cudaGaugeField& data, int* fails) {
 template<typename Float>
 void unitarizeLinksQuda( cudaGaugeField& links, int* fails) {
 
-        if(links.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-        if(links.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        //printf("QUDA_RECONSTRUCT_NO\n");
-          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 2, 18>(links), links, fails) ;
-        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_12){
-        //printf("QUDA_RECONSTRUCT_12\n");
-          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 2, 12>(links), links, fails) ;
-        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_8){
-        //printf("QUDA_RECONSTRUCT_8\n");
-          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 2, 8>(links), links, fails) ;
-        
-        } else {
-          errorQuda("Reconstruction type %d of gauge field not supported", links.Reconstruct());
-        }
-      } else if(links.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-        if(links.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-        //printf("QUDA_RECONSTRUCT_NO\n");
-          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 4, 18>(links), links, fails) ;
-        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_12){
-        //printf("QUDA_RECONSTRUCT_12\n");
-          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 4, 12>(links), links, fails) ;
-        } else if(links.Reconstruct() == QUDA_RECONSTRUCT_8){
-        //printf("QUDA_RECONSTRUCT_8\n");
-          unitarizeLinksQuda<Float>(FloatNOrder<Float, 18, 4, 8>(links), links, fails) ;
-        } else {
-          errorQuda("Reconstruction type %d of gauge field not supported", links.Reconstruct());
-        }
-      } else {
-        errorQuda("Invalid Gauge Order\n");
-      }
+  if(links.isNative()) {
+    if(links.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+      unitarizeLinksQuda<Float>(Gauge(links), links, fails) ;
+    } else if(links.Reconstruct() == QUDA_RECONSTRUCT_12){
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+      unitarizeLinksQuda<Float>(Gauge(links), links, fails) ;
+    } else if(links.Reconstruct() == QUDA_RECONSTRUCT_8){
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+      unitarizeLinksQuda<Float>(Gauge(links), links, fails) ;
+    } else {
+      errorQuda("Reconstruction type %d of gauge field not supported", links.Reconstruct());
     }
+  } else {
+    errorQuda("Invalid Gauge Order\n");
+  }
+}
+  
 #endif
   
   void unitarizeLinksQuda(cudaGaugeField& links, int* fails) {
