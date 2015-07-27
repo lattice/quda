@@ -1516,31 +1516,20 @@ namespace quda {
     // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
     // Need to fix this!!
     //9 and 6 means the number of complex elements used to store g(x) and Delta(x)
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        printf("QUDA_RECONSTRUCT_NO\n");
-        gaugefixingFFT<9, Float>(FloatNOrder<Float, 18, 2, 18>(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+        printfQuda("QUDA_RECONSTRUCT_NO\n");
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+        gaugefixingFFT<9, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        printf("QUDA_RECONSTRUCT_12\n");
-        gaugefixingFFT<6, Float>(FloatNOrder<Float, 18, 2, 12>(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-
+        printfQuda("QUDA_RECONSTRUCT_12\n");
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+        gaugefixingFFT<6, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        printf("QUDA_RECONSTRUCT_8\n");
-        gaugefixingFFT<6, Float>(FloatNOrder<Float, 18, 2,  8>(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+        printfQuda("QUDA_RECONSTRUCT_8\n");
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+        gaugefixingFFT<6, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
 
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        printf("QUDA_RECONSTRUCT_NO\n");
-        gaugefixingFFT<9, Float>(FloatNOrder<Float, 18, 4, 18>(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        printf("QUDA_RECONSTRUCT_12\n");
-        gaugefixingFFT<6, Float>(FloatNOrder<Float, 18, 4, 12>(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        printf("QUDA_RECONSTRUCT_8\n");
-        gaugefixingFFT<6, Float>(FloatNOrder<Float, 18, 4,  8>(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }

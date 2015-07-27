@@ -1937,33 +1937,18 @@ static bool checkDimsPartitioned(){
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
         printfQuda("QUDA_RECONSTRUCT_NO\n");
         numParams = 18;
-        gaugefixingOVR<Float, 18>(FloatNOrder<Float, 18, 2, 18>(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+        gaugefixingOVR<Float, 18>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
         printfQuda("QUDA_RECONSTRUCT_12\n");
         numParams = 12;
-        gaugefixingOVR<Float, 12>(FloatNOrder<Float, 18, 2, 12>(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+        gaugefixingOVR<Float, 12>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
         printfQuda("QUDA_RECONSTRUCT_8\n");
         numParams = 8;
-        gaugefixingOVR<Float, 8>(FloatNOrder<Float, 18, 2,  8>(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        printfQuda("QUDA_RECONSTRUCT_NO\n");
-        numParams = 18;
-        gaugefixingOVR<Float, 18>(FloatNOrder<Float, 18, 4, 18>(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        printfQuda("QUDA_RECONSTRUCT_12\n");
-        numParams = 12;
-        gaugefixingOVR<Float, 12>(FloatNOrder<Float, 18, 4, 12>(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        printfQuda("QUDA_RECONSTRUCT_8\n");
-        numParams = 8;
-        gaugefixingOVR<Float, 8>(FloatNOrder<Float, 18, 4,  8>(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+        gaugefixingOVR<Float, 8>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
