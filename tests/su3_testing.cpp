@@ -247,8 +247,6 @@ void RunTest(int argc, char **argv) {
 void SU3GaugeFixTest(int argc, char **argv) {
 
   initQuda(device);
-  prec = QUDA_DOUBLE_PRECISION;
-  link_recon = QUDA_RECONSTRUCT_NO;
   RunTest(argc, argv);
   endQuda();
 

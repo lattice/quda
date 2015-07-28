@@ -226,8 +226,8 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return 6*arg.threads*(3*198+3); }
-      long long bytes() const { return 6*arg.threads*arg.dataOr.Bytes(); } 
+      long long flops() const { return 6ll*arg.threads*(3*198+3); }
+      long long bytes() const { return 6ll*arg.threads*arg.dataOr.Bytes(); } 
 
     }; 
 

@@ -604,7 +604,7 @@ template<typename Float, typename Gauge>
       vol << arg.X[0] << "x";
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
-      vol << arg.X[3] << "x";
+      vol << arg.X[3];
       aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
     }  
