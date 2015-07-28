@@ -8,7 +8,7 @@
 
 #include <device_functions.h>
 
-#include <hisq_links_quda.h> //reunit gauge links!!!!!
+#include <unitarization_links.h>
 
 #include <comm_quda.h>
 
@@ -1668,7 +1668,7 @@ static bool checkDimsPartitioned(){
     printfQuda("Step: %d\tAction: %.16e\ttheta: %.16e\n", 0, argQ.getAction(), argQ.getTheta());
 
 
-    unitarizeLinksQuda(data, num_failures_dev);
+    unitarizeLinksQuda(data, data, num_failures_dev);
     cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
       cudaFree(num_failures_dev);
@@ -1825,7 +1825,7 @@ static bool checkDimsPartitioned(){
          #endif*/
       }
       if ((iter % reunit_interval) == (reunit_interval - 1)) {
-        unitarizeLinksQuda(data, num_failures_dev);
+        unitarizeLinksQuda(data, data, num_failures_dev);
         cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) {
           cudaFree(num_failures_dev);
@@ -1852,7 +1852,7 @@ static bool checkDimsPartitioned(){
       action0 = action;
     }
     if ((iter % reunit_interval) != 0 )  {
-      unitarizeLinksQuda(data, num_failures_dev);
+      unitarizeLinksQuda(data, data, num_failures_dev);
       cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) {
         cudaFree(num_failures_dev);

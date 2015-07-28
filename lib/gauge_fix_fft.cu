@@ -8,7 +8,7 @@
 
 #include <device_functions.h>
 
-#include <hisq_links_quda.h> //reunit gauge links!!!!!
+#include <unitarization_links.h>
 
 #include <cufft.h>
 
@@ -1445,7 +1445,7 @@ namespace quda {
     cudaMalloc((void**)&num_failures_dev, sizeof(int));
     cudaMemset(num_failures_dev, 0, sizeof(int));
     if ( num_failures_dev == NULL ) errorQuda("cudaMalloc failed for dev_pointer\n");
-    unitarizeLinksQuda(data, num_failures_dev);
+    unitarizeLinksQuda(data, data, num_failures_dev);
     cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
     if ( num_failures > 0 ) {
       cudaFree(num_failures_dev);

@@ -22,7 +22,7 @@
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
-#include <hisq_links_quda.h>
+#include <unitarization_links.h>
 #include <algorithm>
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
@@ -3500,7 +3500,6 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   if(longlink) cudaLongLink = new cudaGaugeField(gParam);
   if(ulink){
     cudaUnitarizedLink = new cudaGaugeField(gParam);
-    quda::setUnitarizeLinksPadding(param->llfat_ga_pad,param->llfat_ga_pad);
   }
   // create the host sitelink  
   gParam.pad = 0; 
@@ -3565,7 +3564,8 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     profileFatLink.Stop(QUDA_PROFILE_INIT);
 
     profileFatLink.Start(QUDA_PROFILE_COMPUTE);
-    quda::unitarizeLinksCuda(*param, *cudaFatLink, cudaUnitarizedLink, num_failures_dev); // unitarize on the gpu
+    //quda::unitarizeLinksCuda(*param, *cudaFatLink, cudaUnitarizedLink, num_failures_dev); // unitarize on the gpu
+    quda::unitarizeLinksQuda(*cudaUnitarizedLink, *cudaFatLink, num_failures_dev); // unitarize on the gpu
     profileFatLink.Stop(QUDA_PROFILE_COMPUTE);
 
 
