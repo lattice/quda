@@ -163,8 +163,10 @@ endif
 
 ifeq ($(strip $(MPI_NVTX)), yes)
   COMM_OBJS += nvtx_pmpi.o
-  LIB += -lnvToolsExt
+
 endif
+
+LIB += -lnvToolsExt
 
 ifeq ($(strip $(MILC_NVTX)), yes)
   NVCCOPT += -DMILC_NVTX
