@@ -295,8 +295,6 @@ int main(int argc, char **argv){
   initComms(argc, argv, gridsize_from_cmdline);
 
   initQuda(device);
-  prec = QUDA_DOUBLE_PRECISION;
-  link_recon = QUDA_RECONSTRUCT_NO;
   test_rc = RUN_ALL_TESTS();
   endQuda();
 
