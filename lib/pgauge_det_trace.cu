@@ -170,11 +170,12 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   #ifdef MULTI_GPU
     #pragma unroll
     for(int dr=0; dr<4; ++dr) {
-         x[dr] += arg.border[dr];
-         X[dr] += 2*arg.border[dr];
+      x[dr] += arg.border[dr];
+      X[dr] += 2*arg.border[dr];
     }
     idx = linkIndex(x,X);
   #endif
+#pragma unroll
     for (int mu = 0; mu < 4; mu++) {
       Matrix<Cmplx,NCOLORS> U;
       arg.dataOr.load((Float*)(U.data), idx, mu, parity);
@@ -203,23 +204,18 @@ class CalcFunc : Tunable {
   public:
   CalcFunc(KernelArg<Gauge> &arg) : arg(arg) {}
   ~CalcFunc () { 
-      host_free(arg.value_h); device_free(arg.value);
-    }
+    host_free(arg.value_h); device_free(arg.value);
+  }
 
   void apply(const cudaStream_t &stream){
-      tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      cudaMemset(arg.value, 0, sizeof(double2));
-      LAUNCH_KERNEL(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
-      cudaMemcpy(arg.value_h, arg.value, sizeof(double2), cudaMemcpyDeviceToHost);
-      #ifdef MULTI_GPU
-        comm_allreduce_array((double*)arg.value_h, 2);
-        const int nNodes = comm_dim(0)*comm_dim(1)*comm_dim(2)*comm_dim(3);
-        arg.value_h[0].x  /= (double)(4*arg.threads*nNodes);
-        arg.value_h[0].y  /= (double)(4*arg.threads*nNodes);
-      #else
-        arg.value_h[0].x  /= (double)(4*arg.threads);
-        arg.value_h[0].y  /= (double)(4*arg.threads);
-      #endif
+    tp = tuneLaunch(*this, getTuning(), getVerbosity());
+    cudaMemset(arg.value, 0, sizeof(double2));
+    LAUNCH_KERNEL(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
+    cudaMemcpy(arg.value_h, arg.value, sizeof(double2), cudaMemcpyDeviceToHost);
+    comm_allreduce_array((double*)arg.value_h, 2);
+    const int nNodes = comm_size();
+    arg.value_h[0].x  /= (double)(4*arg.threads*nNodes);
+    arg.value_h[0].y  /= (double)(4*arg.threads*nNodes);
   }
 
   TuneKey tuneKey() const {
