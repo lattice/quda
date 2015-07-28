@@ -147,7 +147,11 @@ class GaugeAlgTest : public ::testing::Test {
 #else
     cudaInGauge = new cudaGaugeField(gParam);
 #endif
-
+    int halfvolume = xdim*ydim*zdim*tdim >> 1;
+    printfQuda("xdim=%d\tydim=%d\tzdim=%d\ttdim=%d\trng_size=%d\n",xdim,ydim,zdim,tdim,halfvolume);
+    // CURAND random generator initialization
+    randstates = new RNG(halfvolume, 1234, param.X);
+    randstates->Init();
 
     nsteps = 10;
     nhbsteps = 4;
@@ -163,7 +167,10 @@ class GaugeAlgTest : public ::testing::Test {
     cudaMalloc((void**)&num_failures_dev, sizeof(int));
     cudaMemset(num_failures_dev, 0, sizeof(int));
     if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
-
+    if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
+     else{
+       InitGaugeField( *cudaInGauge, randstates->State());
+     }
     // Reunitarization setup
     SetReunitarizationConsts();
   }
@@ -178,9 +185,11 @@ class GaugeAlgTest : public ::testing::Test {
     delete cudaInGauge;
     cudaFree(num_failures_dev);
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
-    PGaugeExchangeFree();
+
     a0.Stop();
     printfQuda("Time -> %.6f s\n", a0.Last());
+    randstates->Release();
+    delete randstates;
   }
 
 
@@ -195,29 +204,24 @@ class GaugeAlgTest : public ::testing::Test {
   int novrsteps;
   bool coldstart;
   double beta_value;
+  RNG * randstates;
 
 };
 
 
 TEST_F(GaugeAlgTest,Generation){
-  int halfvolume = xdim*ydim*zdim*tdim >> 1;
-  printfQuda("xdim=%d\tydim=%d\tzdim=%d\ttdim=%d\trng_size=%d\n",xdim,ydim,zdim,tdim,halfvolume);
+//  int halfvolume = xdim*ydim*zdim*tdim >> 1;
+//  printfQuda("xdim=%d\tydim=%d\tzdim=%d\ttdim=%d\trng_size=%d\n",xdim,ydim,zdim,tdim,halfvolume);
   // CURAND random generator initialization
-  RNG randstates(halfvolume, 1234, param.X);
-  randstates.Init();
+//  RNG randstates(halfvolume, 1234, param.X);
+//  randstates.Init();
 
 
-
-
-  if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
-  else{
-    InitGaugeField( *cudaInGauge, randstates.State());
-  }
   plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
 
   for(int step=1; step<=nsteps; ++step){
     printfQuda("Step %d\n",step);
-    Monte( *cudaInGauge, randstates.State(), beta_value, nhbsteps, novrsteps);
+    Monte( *cudaInGauge, randstates->State(), beta_value, nhbsteps, novrsteps);
     //Reunitarize gauge links...
     CallUnitarizeLinks(cudaInGauge);
     plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
@@ -231,10 +235,11 @@ TEST_F(GaugeAlgTest,Generation){
   bool testgen = false;
   //check plaquette value for beta = 6.2
   if(plaq.x < 0.614 && plaq.x > 0.611 && plaq.y < 0.614 && plaq.y > 0.611) testgen = true;
-  randstates.Release();
+
   if(testgen){
     ASSERT_TRUE(CheckDeterminant(detu));
   }
+  PGaugeExchangeFree();
 }
 
 TEST_F(GaugeAlgTest,Landau_Overrelaxation){
