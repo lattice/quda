@@ -51,16 +51,6 @@ namespace quda {
   }
 
 
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 200
-//CUDA 6.5 NOT DETECTING ATOMICADD FOR FLOAT TYPE!!!!!!!
-  static __inline__ __device__ float atomicAdd(float *address, float val)
-  {
-    return __fAtomicAdd(address, val);
-  }
-#endif /* !__CUDA_ARCH__ || __CUDA_ARCH__ >= 200 */
-
-
-
   template <typename T>
   struct Summ {
     __host__ __device__ __forceinline__ T operator() (const T &a, const T &b){
@@ -951,32 +941,16 @@ namespace quda {
   template<typename Float>
   void Monte( cudaGaugeField& data, cuRNGState *rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
 
-    // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    // Need to fix this!!
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        Monte<Float, 18, 3>(FloatNOrder<Float, 18, 2, 18>(data), data, rngstate, Beta, nhb, nover);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;	
+        Monte<Float, 18, 3>(Gauge(data), data, rngstate, Beta, nhb, nover);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        Monte<Float, 12, 3>(FloatNOrder<Float, 18, 2, 12>(data), data, rngstate, Beta, nhb, nover);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;	
+        Monte<Float, 12, 3>(Gauge(data), data, rngstate, Beta, nhb, nover);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        Monte<Float, 8, 3>(FloatNOrder<Float, 18, 2,  8>(data), data, rngstate, Beta, nhb, nover);
-
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        Monte<Float, 18, 3>(FloatNOrder<Float, 18, 4, 18>(data), data, rngstate, Beta, nhb, nover);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        Monte<Float, 12, 3>(FloatNOrder<Float, 18, 4, 12>(data), data, rngstate, Beta, nhb, nover);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        Monte<Float, 8, 3>(FloatNOrder<Float, 18, 4,  8>(data), data, rngstate, Beta, nhb, nover);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;	
+        Monte<Float, 8, 3>(Gauge(data), data, rngstate, Beta, nhb, nover);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
@@ -996,9 +970,6 @@ namespace quda {
  */
   void Monte( cudaGaugeField& data, cuRNGState *rngstate, double Beta, unsigned int nhb, unsigned int nover) {
 #ifdef GPU_GAUGE_ALG
-    if ( data.Precision() == QUDA_HALF_PRECISION ) {
-      errorQuda("Half precision not supported\n");
-    }
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       Monte<float> (data, rngstate, (float)Beta, nhb, nover);
     } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
