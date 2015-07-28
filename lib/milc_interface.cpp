@@ -6,7 +6,7 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <string.h>
-#include <hisq_links_quda.h>
+#include <unitarization_links.h>
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
 

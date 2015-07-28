@@ -12,7 +12,8 @@
 
 #include <pgauge_monte.h>
 #include <random.h>
-#include <hisq_links_quda.h>
+#include <unitarization_links.h>
+
 
 #include <gtest.h>
 
