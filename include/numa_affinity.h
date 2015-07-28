@@ -6,7 +6,7 @@
 #endif
 	  
 	  int setNumaAffinity(int);
-	  
+    int setNumaAffinityNVML(int);
 #ifdef __cplusplus 
 }
 #endif
