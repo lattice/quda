@@ -484,7 +484,7 @@ namespace quda {
     //double r2 = xmyNormCuda(b, r);//compute residual
 
     // tmp2 only needed for multi-gpu Wilson-like kernels
-    cudaColorSpinorField *tmp2_p = ((param.precision != param.precision_sloppy) && !mat.isStaggered()) ? new cudaColorSpinorField(x, csParam) : &tmp;
+    cudaColorSpinorField *tmp2_p = (!mat.isStaggered()) ? new cudaColorSpinorField(x, csParam) : &tmp;
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     matSloppy(r, x, tmp, tmp2);
