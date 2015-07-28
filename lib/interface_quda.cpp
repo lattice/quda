@@ -205,10 +205,14 @@ static TimeProfile profileAPE("APEQuda");
 static TimeProfile profileContract("contractQuda");
 
 //!< Profiler for contractions
-static TimeProfile profileCovDev("covDevCuda");
+static TimeProfile profileCovDev("covDevQuda");
 
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
+
+
+//!< Profiler for toal time spend between init and end
+static TimeProfile profileInit2End("init2endQuda",false);
 
 namespace quda {
   void printLaunchTimer();
@@ -432,7 +436,9 @@ extern char* gitversion;
 
 void initQuda(int dev)
 {
+  profileInit2End.Start(QUDA_PROFILE_TOTAL);
   profileInit.Start(QUDA_PROFILE_TOTAL);
+
 
   if (getVerbosity() >= QUDA_SUMMARIZE) {
 #ifdef GITVERSION
@@ -1075,7 +1081,7 @@ void endQuda(void)
   comms_initialized = false;
 
   profileEnd.Stop(QUDA_PROFILE_TOTAL);
-
+  profileInit2End.Stop(QUDA_PROFILE_TOTAL);
   // print out the profile information of the lifetime of the library
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     profileInit.Print();
@@ -1098,6 +1104,9 @@ void endQuda(void)
     profileCovDev.Print();
     profilePlaq.Print();
     profileEnd.Print();
+
+    profileInit2End.Print();
+    TimeProfile::PrintGlobal();
 
     printLaunchTimer();
 
