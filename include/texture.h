@@ -330,20 +330,28 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 #endif
     float *norm; // direct reads for norm
     int stride;
+    int ghost_stride[4];
 
   public:
     Spinor() 
-      : spinor(0), tex(), norm(0), stride(0) { } // default constructor
+  : spinor(0), tex(), norm(0), stride(0) { } // default constructor
 
-    Spinor(const cudaColorSpinorField &x) 
+    Spinor(const cudaColorSpinorField &x, int nFace = 1) 
       : spinor((StoreType*)x.V()), tex(&x), norm((float*)x.Norm()),
-      stride(x.Length()/(N*REG_LENGTH)) { checkTypes<RegType,InterType,StoreType>(); }
+      stride(x.Length()/(N*REG_LENGTH)) { 
+      checkTypes<RegType,InterType,StoreType>(); 
+      for (int d=0; d<4; d++) {
+	ghost_stride[d] = nFace*x.SurfaceCB(d);
+      }
+    }
 
     Spinor(const Spinor &st) 
-      : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { }
+  : spinor(st.spinor), tex(st.tex), norm(st.norm), stride(st.stride) { 
+      for (int d=0; d<4; d++) ghost_stride[d] = st.ghost_stride[d];
+    }
 
-    Spinor(StoreType* spinor, float* norm, int stride) 
-      : spinor(spinor), norm(norm), stride(stride) { checkTypes<RegType, InterType, StoreType>(); }
+  /*Spinor(StoreType* spinor, float* norm, int stride) 
+    : spinor(spinor), norm(norm), stride(stride), ghost_stride({}) { checkTypes<RegType, InterType, StoreType>(); }*/
 
     Spinor& operator=(const Spinor &src) {
       if (&src != this) {
@@ -351,6 +359,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 	tex = src.tex;
 	norm = src.norm;
 	stride = src.stride;
+	for (int d=0; d<4; d++) ghost_stride[d] = src.ghost_stride[d];
       }
       return *this;
     }
@@ -404,10 +413,55 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
 	}
       }
 #endif
-
       // now convert into desired register order
       convert<RegType, InterType>(x, y, N);
     }
+
+  /**
+     Load the ghost spinor.  For Wilson fermions, we assume that the
+     ghost is spin projected
+   */
+  __device__ inline void loadGhost(RegType x[], const int i, const int dim) {
+    // load data into registers first using the storage order
+    const int Nspin = (REG_LENGTH * N) / (3 * 2);
+    // if Wilson, then load only half the number of components
+    const int M = ((N * sizeof(RegType)) / sizeof(InterType)) / ((Nspin == 4) ? 2 : 1);
+
+    InterType y[M];
+    
+    // If we are using tex references, then we can only use the predeclared texture ids
+#ifndef USE_TEXTURE_OBJECTS
+    if (tex_id >= 0 && tex_id <= MAX_TEX_ID) {
+#endif
+      // half precision types
+      if ( IS_SHORT(StoreType) ) { 
+	float xN = norm[i];
+#pragma unroll
+	for (int j=0; j<M; j++) y[j] = xN*tex[i + j*ghost_stride[dim]];
+      } else { // other types
+#pragma unroll 
+	for (int j=0; j<M; j++) copyFloatN(y[j], tex[i + j*ghost_stride[dim]]);
+      }
+#ifndef USE_TEXTURE_OBJECTS
+    } else { // default load when out of tex_id range
+      
+      if ( IS_SHORT(StoreType) ) { 
+	float xN = norm[i];
+#pragma unroll
+	for (int j=0; j<M; j++) {
+	  copyFloatN(y[j], spinor[i + j*ghost_stride[dim]]);
+	  y[j] *= xN;
+	}
+      } else { // other types
+#pragma unroll
+	for (int j=0; j<M; j++) copyFloatN(y[j],spinor[i + j*ghost_stride[dim]]);
+      }
+    }
+#endif
+    
+    // now convert into desired register order
+    convert<RegType, InterType>(x, y, N);
+  }
 
     // default store used for simple fields
     __device__ inline void save(RegType x[], int i) {
@@ -458,7 +512,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     void* V() { return (void*)spinor; }
     float* Norm() { return norm; }
 
-    QudaPrecision Precision() { 
+    QudaPrecision Precision() const { 
       QudaPrecision precision = QUDA_INVALID_PRECISION;
       if (sizeof(((StoreType*)0)->x) == sizeof(double)) precision = QUDA_DOUBLE_PRECISION;
       else if (sizeof(((StoreType*)0)->x) == sizeof(float)) precision = QUDA_SINGLE_PRECISION;
@@ -468,8 +522,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     }
 
     int Stride() const { return stride; }
-
-    void setStride(int stride_) { stride = stride_; }
+    int Bytes() const { return N*sizeof(RegType); }
   };
 
 //} // namespace quda

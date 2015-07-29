@@ -66,7 +66,7 @@ namespace quda {
 
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
       staggeredPhaseApplied(false)
-        {
+	{
 	  // variables declared in LatticeFieldParam
 	  precision = QUDA_INVALID_PRECISION;
 	  nDim = 4;
@@ -76,43 +76,43 @@ namespace quda {
 	    r[dir] = 0;
 	  }
 	}
-	
+
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry, 
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
     : LatticeFieldParam(), nColor(3), nFace(0), reconstruct(reconstruct), 
-	order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
-	link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
-	tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
-	pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
-	staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false)
-	{
-	  // variables declared in LatticeFieldParam
-	  this->precision = precision;
-	  this->nDim = 4;
-	  this->pad = pad;
-	  for(int dir=0; dir<nDim; ++dir) {
-	    this->x[dir] = x[dir];
-	    this->r[dir] = 0;
-	  }
+      order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO), 
+      link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
+      tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
+      pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false)
+      {
+	// variables declared in LatticeFieldParam
+	this->precision = precision;
+	this->nDim = 4;
+	this->pad = pad;
+	for(int dir=0; dir<nDim; ++dir) {
+	  this->x[dir] = x[dir];
+	  this->r[dir] = 0;
 	}
-      
+      }
+
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
       nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order), 
-	fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
-	anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
-	create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
-	compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
-	staggeredPhaseType(param.staggered_phase_type), 
-	staggeredPhaseApplied(param.staggered_phase_applied) 
-	  {
-	    if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
-	    else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
-	    else errorQuda("Error: invalid link type(%d)\n", link_type);
-	    for (int d=0; d<nDim; d++) r[d] = 0;
-	  }
+      fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
+      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
+      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
+      compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
+      staggeredPhaseType(param.staggered_phase_type), 
+      staggeredPhaseApplied(param.staggered_phase_applied) 
+	{
+	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
+	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
+	  else errorQuda("Error: invalid link type(%d)\n", link_type);
+	  for (int d=0; d<nDim; d++) r[d] = 0;
+	}
   };
-  
+
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
 
   class GaugeField : public LatticeField {
@@ -137,8 +137,8 @@ namespace quda {
     double tadpole;
     double fat_link_max;
     double scale;
-  
-    
+
+
     QudaFieldCreate create; // used to determine the type of field created
 
     /** Array storing the length of dimension */
@@ -181,17 +181,17 @@ namespace quda {
 
     /**
        Apply the staggered phase factors to the gauge field.
-     */
+    */
     void applyStaggeredPhase();
 
     /**
        Remove the staggered phase factors from the gauge field.
-     */
+    */
     void removeStaggeredPhase();
 
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
-  
+
     void checkField(const GaugeField &);
 
     size_t Bytes() const { return bytes; }
@@ -210,7 +210,11 @@ namespace quda {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
       return (const void**)ghost; 
     }
-    
+
+    /**
+       Set all field elements to zero (virtual)
+    */
+    virtual void zero() = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -242,7 +246,7 @@ namespace quda {
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
-     */
+    */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     void copy(const GaugeField &);     // generic gauge field copy
@@ -273,6 +277,11 @@ namespace quda {
     void restore();
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
+
+    /**
+       Set all field elements to zero
+    */
+    void zero();
   };
 
   class cpuGaugeField : public GaugeField {
@@ -284,7 +293,7 @@ namespace quda {
   private:
     void **gauge; // the actual gauge field
     int pinned;
-  
+
   public:
     cpuGaugeField(const GaugeFieldParam &);
     virtual ~cpuGaugeField();
@@ -298,12 +307,17 @@ namespace quda {
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimenions
-     */
+    */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
+
+    /**
+       Set all field elements to zero
+    */
+    void zero();
   };
 
   /**

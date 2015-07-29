@@ -385,6 +385,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(deflation_grid, INVALID_INT);
 #endif
 
+#if defined INIT_PARAM
+  P(use_resident_solution, 0);
+  P(make_resident_solution, 0);
+#else
+  P(use_resident_solution, INVALID_INT);
+  P(make_resident_solution, INVALID_INT);
+#endif
 
 
 #ifdef INIT_PARAM

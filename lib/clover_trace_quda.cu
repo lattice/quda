@@ -254,8 +254,6 @@ namespace quda {
     return;
   }
 
-
-
   template<typename Float>
     void computeCloverSigmaTrace(GaugeField& gauge, const CloverField& clover, int dir1, int dir2,
         QudaFieldLocation location){
@@ -305,7 +303,7 @@ namespace quda {
 
 #endif
 
-  void computeCloverSigmaTrace(GaugeField& gauge, const CloverField& clover, int dir1, int dir2, 
+  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, int dir1, int dir2, 
       QudaFieldLocation location){
 
 #ifdef GPU_CLOVER_DIRAC
@@ -314,12 +312,13 @@ namespace quda {
     }  
 
     if(clover.Precision() == QUDA_SINGLE_PRECISION){
-      computeCloverSigmaTrace<float>(gauge, clover, dir1, dir2, location);
+      computeCloverSigmaTrace<float>(output, clover, dir1, dir2, location);
     }else if(clover.Precision() == QUDA_DOUBLE_PRECISION){
-      computeCloverSigmaTrace<double>(gauge, clover, dir1, dir2, location);
+      computeCloverSigmaTrace<double>(output, clover, dir1, dir2, location);
     }else{
       errorQuda("Precision %d not supported", clover.Precision());
     }
+
 #else
     errorQuda("Clover has not been built");
 #endif
