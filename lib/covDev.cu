@@ -234,13 +234,9 @@ namespace quda
         /**
            Allocates ghosts for multi-GPU
         */
-
         void allocateGhosts()
         {
-          if(cudaMalloc(&ghostBuffer, ghostBytes) != cudaSuccess) {
-            printf("Error in rank %d: Unable to allocate %d bytes for GPU ghosts\n", comm_rank(), ghostBytes);
-            exit(-1);
-          }
+          ghostBuffer = (Float*)device_malloc(ghostBytes);
         }
 
         /**
@@ -253,20 +249,11 @@ namespace quda
         {
           const int rel = (mu < 4) ? 1 : -1;
 
-          void *send = 0;
-          void *recv = 0;
-
           // Send buffers:
-          if(cudaHostAlloc(&send, ghostBytes, 0) != cudaSuccess) {
-            printf("Error in rank %d: Unable to allocate %d bytes for MPI requests (send)\n", comm_rank(), ghostBytes);
-            exit(-1);
-          }
+          void *send = pinned_malloc(ghostBytes);
 
           // Receive buffers:
-          if(cudaHostAlloc(&recv, ghostBytes, 0) != cudaSuccess) {
-            printf("Error in rank %d: Unable to allocate %d bytes for MPI requests (recv)\n", comm_rank(), ghostBytes);
-            exit(-1);
-          }
+          void *recv = pinned_malloc(ghostBytes);
 
           switch(mu) {
             default:
@@ -402,12 +389,12 @@ namespace quda
           cudaMemcpy(ghostBuffer, recv, ghostBytes, cudaMemcpyHostToDevice);
           cudaDeviceSynchronize();
 
-          cudaFreeHost(send);
-          cudaFreeHost(recv);
+          host_free(send);
+          host_free(recv);
         }
 
 
-        void freeGhosts() { cudaFree(ghostBuffer); }
+        void freeGhosts() { device_free(ghostBuffer); }
 
         void bindGhosts()
         {

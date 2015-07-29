@@ -962,7 +962,42 @@ void qudaDestroyGaugeField(void* gauge)
 {
   qudamilc_called<true>(__func__);
   destroyGaugeFieldQuda(gauge);
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+
+void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args, 
+		    int external_precision, int quda_precision, double kappa, double reliable_delta);
+
+void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa, double ck,
+		     int nvec, double multiplicity, void *gauge, int precision, QudaInvertArgs_t inv_args)
+{
+  qudamilc_called<true>(__func__);
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
+						(precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+						QUDA_GENERAL_LINKS);
+  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER; // refers to momentume gauge order
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParam(invertParam, inv_args, precision, precision, kappa, 0);
+  invertParam.num_offset = nvec;
+  for (int i=0; i<nvec; ++i) invertParam.offset[i] = 0.0; // not needed
+  invertParam.clover_coeff = 0.0; // not needed
+
+  // solution types
+  invertParam.solution_type      = QUDA_MATPCDAG_MATPC_SOLUTION;
+  invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
+  invertParam.inv_type           = QUDA_CG_INVERTER;
+  invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+
+  invertParam.verbosity = getVerbosity();
+  invertParam.verbosity_precondition = QUDA_SILENT;
+  invertParam.use_resident_solution = inv_args.use_resident_solution;
+
+  computeCloverForceQuda(mom, dt, x, p, coeff, -kappa*kappa, ck, nvec, multiplicity, 
+			 gauge, &gaugeParam, &invertParam);
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -1155,7 +1190,6 @@ void qudaFreeCloverField() {
 } // qudaFreeCloverField
 
 
-
 void qudaCloverInvert(int external_precision, 
     int quda_precision,
     double kappa,
@@ -1253,7 +1287,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   }
   invertParam.tol = target_residual_offset[0];
   invertParam.clover_coeff = clover_coeff;
-
+  
   // solution types
   invertParam.solution_type      = QUDA_MATPCDAG_MATPC_SOLUTION;
   invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
@@ -1262,6 +1296,8 @@ void qudaCloverMultishiftInvert(int external_precision,
 
   invertParam.verbosity = verbosity;
   invertParam.verbosity_precondition = QUDA_SILENT;
+
+  invertParam.make_resident_solution = inv_args.make_resident_solution;
 
   invertMultiShiftQuda(solutionArray, source, &invertParam); 
 
@@ -1271,71 +1307,6 @@ void qudaCloverMultishiftInvert(int external_precision,
   qudamilc_called<false>(__func__, verbosity);
   return;
 } // qudaCloverMultishiftInvert
-
-
-
-
-
-void qudaCloverMultishiftMDInvert(int external_precision, 
-    int quda_precision,
-    int num_offsets,
-    double* const offset,
-    double kappa,
-    double clover_coeff,
-    QudaInvertArgs_t inv_args,
-    const double* target_residual_offset,
-    const void* milc_link,
-    void* milc_clover, 
-    void* milc_clover_inv,
-    void* source,
-    void** psiEven,
-    void** psiOdd,
-    void** pEven,
-    void** pOdd,
-    double* const final_residual, 
-    int* num_iters)
-{
-  static const QudaVerbosity verbosity = getVerbosity();
-  qudamilc_called<true>(__func__, verbosity);
-
-  for(int i=0; i<num_offsets; ++i){
-    if(target_residual_offset[i] == 0){
-      errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
-      exit(1);
-    }
-  }
-
-  // if doing a pure double-precision multi-shift solve don't use reliable updates
-  double reliable_delta = (inv_args.mixed_precision == 1 || quda_precision == 1) ? 1e-1 : 0.0;
-
-  QudaInvertParam invertParam = newQudaInvertParam();
-  setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
-  invertParam.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-  invertParam.num_offset = num_offsets;
-  for(int i=0; i<num_offsets; ++i){
-    invertParam.offset[i] = offset[i];
-    invertParam.tol_offset[i] = target_residual_offset[i];
-  }
-  invertParam.tol = target_residual_offset[0];
-  invertParam.clover_coeff = clover_coeff;
-
-  // solution types
-  invertParam.solution_type      = QUDA_MATPCDAG_MATPC_SOLUTION;
-  invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
-  invertParam.inv_type           = QUDA_CG_INVERTER;
-  invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
-
-  invertParam.verbosity = verbosity;
-  invertParam.verbosity_precondition = QUDA_SILENT;
-
-  invertMultiShiftMDQuda(psiEven, psiOdd, pEven, pOdd, source, &invertParam); 
-
-  // return the number of iterations taken by the inverter
-  *num_iters = invertParam.iter;
-  for(int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];
-  qudamilc_called<false>(__func__, verbosity);
-  return;
-} // qudaCloverMultishiftMDInvert
 
 #endif // GPU_CLOVER_DIRAC
 

@@ -248,6 +248,12 @@ extern "C" {
 
     int deflation_grid;//total deflation space is nev*deflation_grid
 
+    /** Whether to make the solution vector(s) after the solve */
+    int make_resident_solution;
+
+    /** Whether to use the resident solution vector(s) */
+    int use_resident_solution;
+
   } QudaInvertParam;
 
 
@@ -489,21 +495,6 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
-   * Solve for multiple shifts (e.g., masses).  This is a special
-   * variant of the multi-shift solver where the additional vectors
-   * required for force computation are also returned.
-   * @param _hp_xe   Array of solution spinor fields
-   * @param _hp_xo   Array of fields with A_oo^{-1} D_oe * x 
-   * @param _hp_ye   Array of fields with M_ee * x
-   * @param _hp_yo   Array of fields with A_oo^{-1} D_oe * M_ee * x
-   * @param _hp_b    Array of source spinor fields
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
-   */
-  void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, 
-      void **_hp_yo, void *_hp_b, QudaInvertParam *param);
-
-  /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
    * @param _hp_b    Array of source spinor fields
@@ -723,6 +714,27 @@ extern "C" {
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
 				   double coeff,
 				   QudaParity parity, QudaGaugeParam* param, int conjugate);
+  /**
+   * Compute the clover force contributions in each dimension mu given
+   * the array of solution fields, and compute the resulting momentum
+   * field.
+   *
+   * @param mom Force matrix
+   * @param dt Integrating step size
+   * @param x Array of solution vectors
+   * @param p Array of intermediate vectors
+   * @param coeff Array of residues for each contribution (multiplied by stepsize)
+   * @param kappa2 -kappa*kappa parameter
+   * @param ck -clover_coefficient * kappa / 8
+   * @param nvec Number of vectors
+   * @param multiplicity Number fermions this bilinear reresents
+   * @param gauge Gauge Field
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
+   */
+  void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
+			      int nvector, double multiplicity, void *gauge, 
+			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**
    * Compute the quark-field outer product needed for gauge generation

@@ -34,8 +34,10 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
 	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
 	inv_mpcg_quda.o inv_mpbicgstab_quda.o pgauge_exchange.o		\
-	pgauge_init.o pgauge_heatbath.o random.o	\
-	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o pgauge_det_trace.o
+	pgauge_init.o pgauge_heatbath.o random.o			\
+	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
+	pgauge_det_trace.o clover_outer_product.o			\
+	clover_sigma_outer_product.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -43,13 +45,12 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	gauge_update_quda.h invert_quda.h llfat_quda.h quda.h		\
 	quda_internal.h util_quda.h face_quda.h tune_quda.h		\
 	comm_quda.h lattice_field.h gauge_field.h double_single.h	\
-	texture.h eig_variables.h numa_affinity.h misc_helpers.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
 	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h	\
-	random.h pgauge_monte.h unitarization_links.h index_helper.cuh	\
-	atomic.cuh cub_helper.cuh
-
+	random.h pgauge_monte.h unitarization_links.h			\
+	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
+	numa_affinity.h misc_helpers.h texture.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
