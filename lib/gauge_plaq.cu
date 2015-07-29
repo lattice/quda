@@ -3,8 +3,10 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub/cub.cuh> 
 #include <launch_kernel.cuh>
+#include <atomic.cuh>
+#include <cub_helper.cuh>
+#include <index_helper.cuh>
 
 namespace quda {
 
@@ -19,11 +21,11 @@ namespace quda {
     int border[4]; 
 #endif
     Gauge dataOr;
-    double *plaq;
-    double *plaq_h;
+    double2 *plaq;
+    double2 *plaq_h;
 
     GaugePlaqArg(const Gauge &dataOr, const GaugeField &data)
-      : dataOr(dataOr), plaq_h(static_cast<double*>(pinned_malloc(sizeof(double)))) {
+      : dataOr(dataOr), plaq_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
 #ifdef MULTI_GPU
         for(int dir=0; dir<4; ++dir){
           border[dir] = 2;
@@ -34,53 +36,18 @@ namespace quda {
         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
 	threads = X[0]*X[1]*X[2]*X[3];
-/*	if ((cudaMallocHost(&plaq_h, sizeof(double))) == cudaErrorMemoryAllocation)
-	   errorQuda	("Error allocating memory for plaquette.\n");
-	if ((cudaMalloc(&plaq, sizeof(double))) == cudaErrorMemoryAllocation)
-	   errorQuda	("Error allocating memory for plaquette.\n");
-*/
 	cudaHostGetDevicePointer(&plaq, plaq_h, 0);
-
     }
   };
-
-  static __inline__ __device__ double atomicAdd(double *addr, double val)
-  {
-    double old=*addr, assumed;
-    
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-					    __double_as_longlong(assumed),
-					    __double_as_longlong(val+assumed)));
-    } while( __double_as_longlong(assumed)!=__double_as_longlong(old) );
-    
-    return old;
-  }
-
-  __device__ __host__ inline int linkIndex3(int x[], int dx[], const int X[4]) {
-    int y[4];
-    for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-    int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-    return idx;
-  }
-
-
-  __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) 
-  {
-    x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    x[1] = (cb_index/(X[0]/2)) % X[1];
-    x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-    return;
-  }
 
   template<int blockSize, typename Float, typename Gauge>
     __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
 
-      double plaq = 0.;
+      double2 plaq;
+
+      plaq.x = 0.;
+      plaq.y = 0.;
 
       if(idx < arg.threads) {
         typedef typename ComplexTypeId<Float>::Type Cmplx;
@@ -94,7 +61,7 @@ namespace quda {
         for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
         int x[4];
-        getCoords3(x, idx, X, parity);
+        getCoords(x, idx, X, parity);
 #ifdef MULTI_GPU
         for(int dr=0; dr<4; ++dr) {
           x[dr] += arg.border[dr];
@@ -104,32 +71,50 @@ namespace quda {
 
         int dx[4] = {0, 0, 0, 0};
         for (int mu = 0; mu < 3; mu++) {
-          for (int nu = (mu+1); nu < 4; nu++) {
+          for (int nu = (mu+1); nu < 3; nu++) {
             Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
 
-            arg.dataOr.load((Float*)(U1.data),linkIndex3(x,dx,X), mu, parity);
+            arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
 	    dx[mu]++;
-            arg.dataOr.load((Float*)(U2.data),linkIndex3(x,dx,X), nu, 1-parity);
+            arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
             dx[mu]--;
             dx[nu]++;
-            arg.dataOr.load((Float*)(U3.data),linkIndex3(x,dx,X), mu, 1-parity);
+            arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
 	    dx[nu]--;
-            arg.dataOr.load((Float*)(U4.data),linkIndex3(x,dx,X), nu, parity);
+            arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity);
 
 	    tmpM = U1 * U2;
 	    tmpM = tmpM * conj(U3);
 	    tmpM = tmpM * conj(U4);
 
-	    plaq += getTrace(tmpM).x;
+	    plaq.x += getTrace(tmpM).x;
           }
+
+          Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
+
+          arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
+          dx[mu]++;
+          arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), 3, 1-parity);
+          dx[mu]--;
+          dx[3]++;
+          arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
+          dx[3]--;
+          arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), 3, parity);
+
+          tmpM = U1 * U2;
+          tmpM = tmpM * conj(U3);
+          tmpM = tmpM * conj(U4);
+
+          plaq.y += getTrace(tmpM).x;
         }
       }
 
-      typedef cub::BlockReduce<double, blockSize> BlockReduce;
+      typedef cub::BlockReduce<double2, blockSize> BlockReduce;
       __shared__ typename BlockReduce::TempStorage temp_storage;
-      double aggregate = BlockReduce(temp_storage).Sum(plaq);
+//      double2 aggregate = BlockReduce(temp_storage).Sum(plaq);
+      double2 aggregate = BlockReduce(temp_storage).Reduce(plaq, Summ<double2>());
 
-      if (threadIdx.x == 0) atomicAdd((double *) arg.plaq, aggregate);
+      if (threadIdx.x == 0) atomicAdd(arg.plaq, aggregate);
   }
 
   template<typename Float, typename Gauge>
@@ -138,7 +123,7 @@ namespace quda {
       const QudaFieldLocation location;
 
       private:
-      unsigned int sharedBytesPerThread() const { return sizeof(Float); }
+      unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       bool tuneSharedBytes() const { return false; } // Don't tune shared memory
@@ -152,20 +137,17 @@ namespace quda {
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
-          ((double *) arg.plaq_h)[0]    = 0.;
+          arg.plaq_h[0] = make_double2(0.,0.);
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	  LAUNCH_KERNEL(computePlaq, tp, stream, arg, Float, Gauge);
 
 	  cudaDeviceSynchronize();
 
-	  #ifdef MULTI_GPU
-	    comm_allreduce((double*) arg.plaq_h);
-	    const int nNodes = comm_dim(0)*comm_dim(1)*comm_dim(2)*comm_dim(3);
-            ((double *) arg.plaq_h)[0]	/= 18.*(arg.threads*nNodes);
-	  #else
-            ((double *) arg.plaq_h)[0]	/= 18.*arg.threads;
-	  #endif
+	  comm_allreduce_array((double*) arg.plaq_h, 2);
+	  const int nNodes = comm_dim(0)*comm_dim(1)*comm_dim(2)*comm_dim(3);
+	  arg.plaq_h[0].x /= 9.*(arg.threads*nNodes);
+	  arg.plaq_h[0].y /= 9.*(arg.threads*nNodes);
         } else {
           errorQuda("CPU not supported yet\n");
           //computePlaqCPU(arg);
@@ -192,72 +174,63 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return (1)*6*arg.threads; }
-      long long bytes() const { return (1)*6*arg.threads*sizeof(Float); } // Only correct if there is no link reconstruction
+      long long flops() const { return 6ll*arg.threads*(3*198+3); }
+      long long bytes() const { return 6ll*arg.threads*arg.dataOr.Bytes(); } 
 
     }; 
 
   template<typename Float, typename Gauge>
-    void plaquette(const Gauge dataOr, const GaugeField& data, QudaFieldLocation location, Float &plq) {
+    void plaquette(const Gauge dataOr, const GaugeField& data, QudaFieldLocation location, double2 &plq) {
       GaugePlaqArg<Gauge> arg(dataOr, data);
       GaugePlaq<Float,Gauge> gaugePlaq(arg, location);
       gaugePlaq.apply(0);
       cudaDeviceSynchronize();
-      plq = ((double *) arg.plaq_h)[0];
+
+      plq.x = arg.plaq_h[0].x;
+      plq.y = arg.plaq_h[0].y;
     }
 
   template<typename Float>
-    Float plaquette(const GaugeField& data, QudaFieldLocation location) {
+    double2 plaquette(const GaugeField& data, QudaFieldLocation location) {
+      double2 res;
+      if (!data.isNative()) errorQuda("Plaquette computation only supported on native ordered fields");
 
-      // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-      // Need to fix this!!
-
-      Float res;
-
-      if(data.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-        if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          plaquette(FloatNOrder<Float, 18, 2, 18>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
-          plaquette(FloatNOrder<Float, 18, 2, 12>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
-          plaquette(FloatNOrder<Float, 18, 2,  8>(data), data, location, res);
-        } else {
-          errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-        }
-      } else if(data.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-        if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          plaquette(FloatNOrder<Float, 18, 4, 18>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
-          plaquette(FloatNOrder<Float, 18, 4, 12>(data), data, location, res);
-        } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
-          plaquette(FloatNOrder<Float, 18, 4,  8>(data), data, location, res);
-        } else {
-          errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-        }
+      if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+	plaquette<Float>(Gauge(data), data, location, res);
+      } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+	plaquette<Float>(Gauge(data), data, location, res);
+      } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+	plaquette<Float>(Gauge(data), data, location, res);
       } else {
-        errorQuda("Invalid Gauge Order\n");
+	errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
 
       return res;
     }
 #endif
 
-  double plaquette(const GaugeField& data, QudaFieldLocation location) {
+  double3 plaquette(const GaugeField& data, QudaFieldLocation location) {
 
 #ifdef GPU_GAUGE_TOOLS
+    double2 plq;
     if(data.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported\n");
     }
     if (data.Precision() == QUDA_SINGLE_PRECISION) {
-      return plaquette<float> (data, location);
+      plq = plaquette<float> (data, location);
     } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
-      return plaquette<double>(data, location);
+      plq = plaquette<double>(data, location);
     } else {
       errorQuda("Precision %d not supported", data.Precision());
     }
+    double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
 #else
-  errorQuda("Gauge tools are not build");
+    errorQuda("Gauge tools are not build");
+    double3 plaq = make_double3(0., 0., 0.);
 #endif
-
+    return plaq;
   }
 }

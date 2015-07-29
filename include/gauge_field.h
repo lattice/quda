@@ -111,6 +111,18 @@ namespace quda {
 	  else errorQuda("Error: invalid link type(%d)\n", link_type);
 	  for (int d=0; d<nDim; d++) r[d] = 0;
 	}
+    
+    /**
+       Helper function for setting the precision and corresponding
+       field order for QUDA internal fields.
+       @param precision The precision to use 
+     */
+    void setPrecision(QudaPrecision precision) {
+      this->precision = precision;
+      order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
+	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
+    }
+
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
@@ -153,12 +165,6 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
-    /**
-       This function returns true if the field is stored in an
-       internal field order for the given precision.
-    */ 
-    bool isNative() const;
-
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
@@ -178,7 +184,6 @@ namespace quda {
     const int* R() const { return r; }
     QudaGhostExchange GhostExchange() const { return ghostExchange; }
     QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
-
     /**
        Apply the staggered phase factors to the gauge field.
     */
@@ -193,6 +198,12 @@ namespace quda {
     int Nface() const { return nFace; }
 
     void checkField(const GaugeField &);
+
+    /**
+       This function returns true if the field is stored in an
+       internal field order for the given precision.
+    */ 
+    bool isNative() const;
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }

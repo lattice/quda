@@ -234,10 +234,9 @@ namespace quda {
   template<typename Float>
   void computeClover(CloverField &clover, const GaugeField &f, Float cloverCoeff, QudaFieldLocation location){
     if (f.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      if(clover.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
-	computeClover(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), FloatNOrder<Float,18,2,18>(f), f, cloverCoeff, location);  
-      } else if(clover.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
-	computeClover(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0), FloatNOrder<Float,18,2,18>(f), f, cloverCoeff, location);
+      if (clover.isNative()) {
+	typedef typename CloverOrder::quda::clover_mapper<Float>::type C;
+	computeClover(C(clover,0), FloatNOrder<Float,18,2,18>(f), f, cloverCoeff, location);  
       } else {
 	errorQuda("Clover field order %d not supported", clover.Order());
       } // clover order
