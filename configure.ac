@@ -167,6 +167,12 @@ AC_ARG_ENABLE(gauge-tools,
   [ build_gauge_tools="no" ]
 )
 
+AC_ARG_ENABLE(gauge-alg,
+  AC_HELP_STRING([--enable-gauge-alg], [ Build gauge fixing and pure gauge algorithms (default: disabled)]),
+  [ build_gauge_alg=${enableval} ],
+  [ build_gauge_alg="no" ]
+)
+
 AC_ARG_ENABLE(sstep,
   AC_HELP_STRING([--enable-sstep], [ Build s-step linear solvers (default: disabled)]),
   [ build_sstep=${enableval} ],
@@ -177,6 +183,12 @@ AC_ARG_ENABLE(contract,
   AC_HELP_STRING([--enable-contract], [ Build bilinear contraction code (default: disabled)]),
   [ build_contract=${enableval} ],
   [ build_contract="no" ]
+)
+
+AC_ARG_ENABLE(dynamic-clover,
+  AC_HELP_STRING([--enable-dynamic-clover], [ Invert dynamically the clover term for twisted-clover fermions (default: disabled)]),
+  [ dynamic_clover=${enableval} ],
+  [ dynamic_clover="no" ]
 )
 
 dnl Multi-GPU options
@@ -522,11 +534,19 @@ yes|no);;
   ;;
 esac
 
-dnl Build Hisq force
+dnl Build gauge tools
 case ${build_gauge_tools} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-gauge-tools ])
+  ;;
+esac
+
+dnl Build gauge algorithms
+case ${build_gauge_alg} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-gauge-alg ])
   ;;
 esac
 
@@ -538,11 +558,19 @@ yes|no);;
   ;;
 esac
 
-dnl Build Hisq force
+dnl Build bilinear contraction
 case ${build_contract} in
 yes|no);;
 *) 
   AC_MSG_ERROR([ invalid value for --enable-contract ])
+  ;;
+esac
+
+dnl Use dynamic clover inversion
+case ${dynamic_clover} in
+yes|no);;
+*) 
+  AC_MSG_ERROR([ invalid value for --enable-dynamic-clover ])
   ;;
 esac
 
@@ -617,6 +645,10 @@ then
   
   AC_MSG_NOTICE([Asqtad fermion force doesn't support multi-GPU yet: disabling ])
   build_staggered_force="no";
+  
+  if test "X${build_gauge_alg}X" = "XyesX"; then
+  AC_MSG_WARN([Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. ])
+  fi
 
 
   if test "X${qmp_home}X" = "XX"; then
@@ -727,11 +759,17 @@ AC_SUBST( BUILD_HISQ_FORCE, [${build_hisq_force}])
 AC_MSG_NOTICE([Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools} ] )
 AC_SUBST( BUILD_GAUGE_TOOLS, [${build_gauge_tools}])
 
+AC_MSG_NOTICE([Setting BUILD_GAUGE_ALG = ${build_gauge_alg} ] )
+AC_SUBST( BUILD_GAUGE_ALG, [${build_gauge_alg}])
+
 AC_MSG_NOTICE([Setting BUILD_SSTEP = ${build_sstep} ] )
 AC_SUBST( BUILD_SSTEP, [${build_sstep}])
 
 AC_MSG_NOTICE([Setting BUILD_CONTRACT = ${build_contract} ] )
 AC_SUBST( BUILD_CONTRACT, [${build_contract}])
+
+AC_MSG_NOTICE([Setting DYNAMIC_CLOVER = ${dynamic_clover} ] )
+AC_SUBST( DYNAMIC_CLOVER, [${dynamic_clover}])
 
 AC_MSG_NOTICE([Setting BUILD_MULTI_GPU = ${multi_gpu} ] )
 AC_SUBST( BUILD_MULTI_GPU, [${multi_gpu}])

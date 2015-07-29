@@ -617,8 +617,10 @@ POSIX_THREADS
 BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
+DYNAMIC_CLOVER
 BUILD_CONTRACT
 BUILD_SSTEP
+BUILD_GAUGE_ALG
 BUILD_GAUGE_TOOLS
 BUILD_HISQ_FORCE
 BUILD_FERMION_FORCE
@@ -724,8 +726,10 @@ enable_gauge_force
 enable_staggered_force
 enable_hisq_force
 enable_gauge_tools
+enable_gauge_alg
 enable_sstep
 enable_contract
+enable_dynamic_clover
 enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
@@ -1408,8 +1412,12 @@ Optional Features:
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
                           evolver, APE, extended gauge routines (default:
                           disabled)
+  --enable-gauge-alg      Build gauge fixing and pure gauge algorithms
+                          (default: disabled)
   --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
+  --enable-dynamic-clover Invert dynamically the clover term for
+                          twisted-clover fermions (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
@@ -2251,6 +2259,15 @@ else
 fi
 
 
+# Check whether --enable-gauge-alg was given.
+if test "${enable_gauge_alg+set}" = set; then :
+  enableval=$enable_gauge_alg;  build_gauge_alg=${enableval}
+else
+   build_gauge_alg="no"
+
+fi
+
+
 # Check whether --enable-sstep was given.
 if test "${enable_sstep+set}" = set; then :
   enableval=$enable_sstep;  build_sstep=${enableval}
@@ -2265,6 +2282,15 @@ if test "${enable_contract+set}" = set; then :
   enableval=$enable_contract;  build_contract=${enableval}
 else
    build_contract="no"
+
+fi
+
+
+# Check whether --enable-dynamic-clover was given.
+if test "${enable_dynamic_clover+set}" = set; then :
+  enableval=$enable_dynamic_clover;  dynamic_clover=${enableval}
+else
+   dynamic_clover="no"
 
 fi
 
@@ -4188,6 +4214,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_gauge_alg} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-gauge-alg " "$LINENO" 5
+  ;;
+esac
+
 case ${build_sstep} in
 yes|no);;
 *)
@@ -4199,6 +4232,13 @@ case ${build_contract} in
 yes|no);;
 *)
   as_fn_error $? " invalid value for --enable-contract " "$LINENO" 5
+  ;;
+esac
+
+case ${dynamic_clover} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-dynamic-clover " "$LINENO" 5
   ;;
 esac
 
@@ -4261,6 +4301,11 @@ $as_echo "$as_me: Enabling Multi-GPU" >&6;}
   { $as_echo "$as_me:${as_lineno-$LINENO}: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&5
 $as_echo "$as_me: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&6;}
   build_staggered_force="no";
+
+  if test "X${build_gauge_alg}X" = "XyesX"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&5
+$as_echo "$as_me: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&2;}
+  fi
 
 
   if test "X${qmp_home}X" = "XX"; then
@@ -4411,6 +4456,11 @@ $as_echo "$as_me: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&6;}
 BUILD_GAUGE_TOOLS=${build_gauge_tools}
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&5
+$as_echo "$as_me: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&6;}
+BUILD_GAUGE_ALG=${build_gauge_alg}
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_SSTEP = ${build_sstep}  " >&5
 $as_echo "$as_me: Setting BUILD_SSTEP = ${build_sstep}  " >&6;}
 BUILD_SSTEP=${build_sstep}
@@ -4419,6 +4469,11 @@ BUILD_SSTEP=${build_sstep}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CONTRACT = ${build_contract}  " >&5
 $as_echo "$as_me: Setting BUILD_CONTRACT = ${build_contract}  " >&6;}
 BUILD_CONTRACT=${build_contract}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&5
+$as_echo "$as_me: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&6;}
+DYNAMIC_CLOVER=${dynamic_clover}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MULTI_GPU = ${multi_gpu}  " >&5
@@ -5732,4 +5787,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-

@@ -33,7 +33,11 @@ BUILD_GAUGE_FORCE = @BUILD_GAUGE_FORCE@				# build code for (1-loop Symanzik) ga
 BUILD_FERMION_FORCE = @BUILD_FERMION_FORCE@			# build code for asqtad fermion force?
 BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
+BUILD_GAUGE_ALG = @BUILD_GAUGE_ALG@				# build gauge-fixing and pure-gauge algorithms?
 BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
+
+#Dynamically invert the clover term for twisted-clover?
+DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases the flops
 
 # Multi-GPU options
 BUILD_MULTI_GPU = @BUILD_MULTI_GPU@  # set to 'yes' to build the multi-GPU code
@@ -94,7 +98,7 @@ INC = -I$(CUDA_INSTALL_PATH)/include
 
 ifeq ($(strip $(CPU_ARCH)), x86_64)
   ifeq ($(strip $(OS)), osx)
-    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
+    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart 
     NVCCOPT = -m64
   else
     LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart 
@@ -188,6 +192,11 @@ else
   MAGMA_FLAGS   = 
 endif
 
+ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
+  NVCCOPT += -DDYNAMIC_CLOVER
+  COPT += -DDYNAMIC_CLOVER
+endif
+
 ifeq ($(strip $(BUILD_SSTEP)), yes)
   NVCCOPT += -DSSTEP
   COPT += -DSSTEP
@@ -267,6 +276,12 @@ endif
 ifeq ($(strip $(BUILD_GAUGE_TOOLS)), yes)
   NVCCOPT += -DGPU_GAUGE_TOOLS
   COPT += -DGPU_GAUGE_TOOLS
+endif
+
+ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
+  NVCCOPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
+  COPT += -DGPU_GAUGE_ALG -DGPU_GAUGE_TOOLS -DGPU_UNITARIZE
+  LIB += -lcufft -lcurand
 endif
 
 ifeq ($(strip $(HOST_DEBUG)), yes)

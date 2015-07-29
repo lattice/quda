@@ -646,6 +646,7 @@ namespace quda {
 	(dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[bufferIndex][dim] : this->fwdGhostFaceBuffer[bufferIndex][dim];
 
       cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
+
     } else if(this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET){ // do multiple cudaMemcpys
 
       int Npad = Nint / Nvec; // number Nvec buffers we have
@@ -1282,7 +1283,6 @@ namespace quda {
       comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
     }
 #ifdef GPU_COMMS
-
     if(precision != QUDA_HALF_PRECISION) return;		
 
     if (dir%2 == 0) { // sending backwards
@@ -1331,6 +1331,38 @@ namespace quda {
     return 0;
   }
 
+  void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger) {
+    int dim = dir / 2;
+    if(!commDimPartitioned(dim)) return;
+
+#ifdef GPU_COMMS
+    if(precision != QUDA_HALF_PRECISION){
+#endif
+    if (dir%2==0) {
+      comm_wait(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+      comm_wait(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+    } else {
+      comm_wait(mh_recv_back[bufferIndex][nFace-1][dim]);
+      comm_wait(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+    }
+#ifdef GPU_COMMS
+   } else { // half precision
+      if (dir%2==0) {
+	comm_wait(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+	comm_wait(mh_recv_norm_fwd[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_norm_back[bufferIndex][nFace-1][2*dim+dagger]);
+      } else {
+	comm_wait(mh_recv_back[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+	comm_wait(mh_recv_norm_back[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_norm_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+      }
+    } // half precision
+#endif
+
+    return;
+  }
 
   void cudaColorSpinorField::scatter(int nFace, int dagger, int dir, cudaStream_t* stream_p)
   {

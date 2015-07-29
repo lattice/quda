@@ -674,6 +674,20 @@ namespace quda{
     }
 
 
+  template<typename Complex,int N>
+    __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {
+    typedef typename RealTypeId<Complex>::Type real;
+    // first make the matrix anti-hermitian
+    Matrix<Complex,N> am = m - conj(m);
+
+    // second make it traceless
+    real imag_trace = 0.0;
+    for (int i=0; i<N; i++) imag_trace += am(i,i).y;
+    for (int i=0; i<N; i++) {
+      am(i,i).y -= imag_trace/N;
+    }
+    m = 0.5*am;
+  }
 
 
 

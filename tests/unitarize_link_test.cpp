@@ -14,7 +14,7 @@
 #include "util_quda.h"
 #include "llfat_quda.h"
 #include "fat_force_quda.h"
-#include "hisq_links_quda.h"
+#include <unitarization_links.h>
 #include "dslash_quda.h"
 #include "ks_improved_force.h"
 
@@ -201,8 +201,6 @@ unitarize_link_test()
 			     svd_rel_error,
 			     svd_abs_error);
 
-  setUnitarizeLinksPadding(0,0);
-
   int* num_failures_dev;
   if(cudaMalloc(&num_failures_dev, sizeof(int)) != cudaSuccess){
     errorQuda("cudaMalloc failed for num_failures_dev\n");
@@ -212,7 +210,7 @@ unitarize_link_test()
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
-  unitarizeLinksCuda(qudaGaugeParam,*cudaFatLink, cudaULink, num_failures_dev);
+  unitarizeLinksQuda(*cudaULink, *cudaFatLink, num_failures_dev);
   cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 

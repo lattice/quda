@@ -3,8 +3,10 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub/cub.cuh> 
 #include <launch_kernel.cuh>
+#include <atomic.cuh>
+#include <cub_helper.cuh>
+#include <index_helper.cuh>
 
 namespace quda {
 
@@ -37,60 +39,6 @@ namespace quda {
 	cudaHostGetDevicePointer(&plaq, plaq_h, 0);
     }
   };
-
-  static __inline__ __device__ double atomicAdd(double *addr, double val)
-  {
-    double old=*addr, assumed;
-    
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-					    __double_as_longlong(assumed),
-					    __double_as_longlong(val+assumed)));
-    } while( __double_as_longlong(assumed)!=__double_as_longlong(old) );
-    
-    return old;
-  }
-
-  static  __inline__ __device__ double2 atomicAdd(double2 *addr, double2 val){
-    double2 old=*addr;
-    old.x = atomicAdd((double*)addr, val.x);
-    old.y = atomicAdd((double*)addr+1, val.y);
-    return old;
-  }
-
-  __device__ __host__ inline int linkIndex3(int x[], int dx[], const int X[4]) {
-    int y[4];
-    for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-    int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-    return idx;
-  }
-
-
-  __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) 
-  {
-    x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    x[1] = (cb_index/(X[0]/2)) % X[1];
-    x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-    return;
-  }
-
-  template <typename T>
-  struct Summ {
-    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b){
-        return a + b;
-    }
-  };
-
-  template <>
-  struct Summ<double2>{
-    __host__ __device__ __forceinline__ double2 operator()(const double2 &a, const double2 &b){
-        return make_double2(a.x+b.x, a.y+b.y);
-    }
-  };
-
 
   template<int blockSize, typename Float, typename Gauge>
     __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
@@ -126,14 +74,14 @@ namespace quda {
           for (int nu = (mu+1); nu < 3; nu++) {
             Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
 
-            arg.dataOr.load((Float*)(U1.data),linkIndex3(x,dx,X), mu, parity);
+            arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
 	    dx[mu]++;
-            arg.dataOr.load((Float*)(U2.data),linkIndex3(x,dx,X), nu, 1-parity);
+            arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity);
             dx[mu]--;
             dx[nu]++;
-            arg.dataOr.load((Float*)(U3.data),linkIndex3(x,dx,X), mu, 1-parity);
+            arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
 	    dx[nu]--;
-            arg.dataOr.load((Float*)(U4.data),linkIndex3(x,dx,X), nu, parity);
+            arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity);
 
 	    tmpM = U1 * U2;
 	    tmpM = tmpM * conj(U3);
@@ -144,14 +92,14 @@ namespace quda {
 
           Matrix<Cmplx,3> U1, U2, U3, U4, tmpM;
 
-          arg.dataOr.load((Float*)(U1.data),linkIndex3(x,dx,X), mu, parity);
+          arg.dataOr.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity);
           dx[mu]++;
-          arg.dataOr.load((Float*)(U2.data),linkIndex3(x,dx,X), 3, 1-parity);
+          arg.dataOr.load((Float*)(U2.data),linkIndexShift(x,dx,X), 3, 1-parity);
           dx[mu]--;
           dx[3]++;
-          arg.dataOr.load((Float*)(U3.data),linkIndex3(x,dx,X), mu, 1-parity);
+          arg.dataOr.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity);
           dx[3]--;
-          arg.dataOr.load((Float*)(U4.data),linkIndex3(x,dx,X), 3, parity);
+          arg.dataOr.load((Float*)(U4.data),linkIndexShift(x,dx,X), 3, parity);
 
           tmpM = U1 * U2;
           tmpM = tmpM * conj(U3);
@@ -226,8 +174,8 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return 6*arg.threads*(3*198+3); }
-      long long bytes() const { return 6*arg.threads*arg.dataOr.Bytes(); } 
+      long long flops() const { return 6ll*arg.threads*(3*198+3); }
+      long long bytes() const { return 6ll*arg.threads*arg.dataOr.Bytes(); } 
 
     }; 
 

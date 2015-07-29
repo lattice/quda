@@ -185,9 +185,9 @@ namespace quda {
    * should only be called via the pinned_malloc() macro, defined in
    * malloc_quda.h
    *
-   * Note that we do rely on cudaHostAlloc(), since buffers allocated
-   * in this way have been observed to cause problems when shared with
-   * MPI via GPU Direct on some systems.
+   * Note that we do not rely on cudaHostAlloc(), since buffers
+   * allocated in this way have been observed to cause problems when
+   * shared with MPI via GPU Direct on some systems.
    */
   void *pinned_malloc_(const char *func, const char *file, int line, size_t size)
   {
