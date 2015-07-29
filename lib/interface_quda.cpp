@@ -4427,6 +4427,11 @@ void computeStaggeredOprodQuda(void** oprod,
     double** coeff,
     QudaGaugeParam* param)
 {
+
+#ifdef  GPU_STAGGERED_OPROD
+#ifndef BUILD_QDP_INTERFACE
+#error "Staggerd oprod requires BUILD_QDP_INTERFACE";
+#endif
   using namespace quda;
   profileStaggeredOprod.Start(QUDA_PROFILE_TOTAL);
 
@@ -4536,6 +4541,9 @@ void computeStaggeredOprodQuda(void** oprod,
 
   checkCudaError();
   return;
+#else
+  errorQuda("Staggered oprod has not been built");
+#endif
 }
 
 
@@ -5187,13 +5195,14 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   if (gaugeSmeared == NULL) {
 //    gaugeSmeared = new cudaGaugeField(gParamEx);
     gaugeSmeared = new cudaGaugeField(gParam);
-    #ifdef MULTI_GPU
-      copyExtendedGauge(*gaugeSmeared, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      gaugeSmeared->exchangeExtendedGhost(R,true);
-    #else
-      gaugeSmeared->copy(*gaugePrecise);
-    #endif
   }
+
+  #ifdef MULTI_GPU
+    copyExtendedGauge(*gaugeSmeared, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
+    gaugeSmeared->exchangeExtendedGhost(R,true);
+  #else
+    gaugeSmeared->copy(*gaugePrecise);
+  #endif
 
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);

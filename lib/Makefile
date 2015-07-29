@@ -154,7 +154,7 @@ endif
 endif
 
 # limit maximum number of registers in BLAS routines to increase occupancy
-ifneq (,$(filter $(strip $(GPU_ARCH)),sm_20 sm_21 sm_30))
+ifneq ($(TESLA_ARCH),true)
   MAXREG =
 else
   MAXREG = --maxrregcount=80
@@ -273,6 +273,6 @@ copy_gauge_half.o: copy_gauge_half.cu copy_gauge_inc.cu $(HDRS)
 
 quda_fortran.o: quda_fortran.F90 ../include/enum_quda_fortran.h
 	$(CC) -Wall -E -I../include $< > $*.f90
-	$(F90) -c -fno-range-check $*.f90
+	$(F90) -c $*.f90
 
 .PHONY: all gen clean
