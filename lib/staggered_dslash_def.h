@@ -963,7 +963,8 @@ __global__ void	DD_FUNC(DD_FNAME, DD_FAT_RECON_F, DD_LONG_RECON_F, DD_AXPY_F)<EX
   #include "staggered_fused_exterior_dslash_core.h"
 #endif
 }
-#endif
+
+#endif // MULTI_GPU
 
 #else // naive staggered kernel
 
@@ -997,6 +998,7 @@ __global__ void	DD_FUNC(DD_FNAME, DD_FAT_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL
 #endif // MULTI_GPU
 
 #endif
+
 
 #endif
 

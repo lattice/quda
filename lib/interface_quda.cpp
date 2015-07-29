@@ -22,7 +22,7 @@
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <fat_force_quda.h>
-#include <hisq_links_quda.h>
+#include <unitarization_links.h>
 #include <algorithm>
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
@@ -199,6 +199,9 @@ static TimeProfile profileHISQForce("computeHISQForceQuda");
 //!<Profiler for computeHISQForceCompleteQuda
 static TimeProfile profileHISQForceComplete("computeHISQForceCompleteQuda");
 
+//!<Profiler for computeCloverSigmaTrace
+static TimeProfile profilePlaq("plaqQuda");
+
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
@@ -210,6 +213,9 @@ static TimeProfile profileCovDev("covDevCuda");
 
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
+
+//!< Profiler for GaugeFixing
+static TimeProfile profileGaugeFix("GaugeFixCuda");
 
 namespace quda {
   void printLaunchTimer();
@@ -1125,6 +1131,7 @@ void endQuda(void)
     profileHISQForce.Print();
     profileContract.Print();
     profileCovDev.Print();
+    profilePlaq.Print();
     profileAPE.Print();
     profileEnd.Print();
 
@@ -3232,7 +3239,6 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   if(longlink) cudaLongLink = new cudaGaugeField(gParam);
   if(ulink){
     cudaUnitarizedLink = new cudaGaugeField(gParam);
-    quda::setUnitarizeLinksPadding(param->llfat_ga_pad,param->llfat_ga_pad);
   }
   // create the host sitelink  
   gParam.pad = 0; 
@@ -3295,7 +3301,8 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     profileFatLink.Stop(QUDA_PROFILE_INIT);
 
     profileFatLink.Start(QUDA_PROFILE_COMPUTE);
-    quda::unitarizeLinksCuda(*param, *cudaFatLink, cudaUnitarizedLink, num_failures_dev); // unitarize on the gpu
+    //quda::unitarizeLinksCuda(*param, *cudaFatLink, cudaUnitarizedLink, num_failures_dev); // unitarize on the gpu
+    quda::unitarizeLinksQuda(*cudaUnitarizedLink, *cudaFatLink, num_failures_dev); // unitarize on the gpu
     profileFatLink.Stop(QUDA_PROFILE_COMPUTE);
 
 
@@ -3424,7 +3431,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   profileGaugeForce.Stop(QUDA_PROFILE_INIT); 
 
   profileGaugeForce.Start(QUDA_PROFILE_COMMS);
-  cudaGauge->exchangeExtendedGhost(R);
+  // do extended fill so we can reuse this extended gauge field
+  bool no_comms_fill =  (qudaGaugeParam->make_resident_gauge) ? true : false;
+  cudaGauge->exchangeExtendedGhost(R, no_comms_fill); 
   profileGaugeForce.Stop(QUDA_PROFILE_COMMS);
   profileGaugeForce.Start(QUDA_PROFILE_INIT); 
 #endif
@@ -3499,7 +3508,12 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   delete cpuMom;
 
 #ifdef MULTI_GPU
-  delete cudaGauge;
+  if (qudaGaugeParam->make_resident_gauge) {
+    if (extendedGaugeResident) delete extendedGaugeResident;
+    extendedGaugeResident = cudaGauge;
+  } else {
+    delete cudaGauge;
+  }
 #endif
   profileGaugeForce.Stop(QUDA_PROFILE_FREE);
 
@@ -5109,38 +5123,66 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-double plaqCuda ()
+/*
+ * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+ */
+void plaq_quda_(double plaq[3]) {
+  plaqQuda(plaq);
+}
+
+
+void plaqQuda (double plq[3])
 {
+  profilePlaq.Start(QUDA_PROFILE_TOTAL);
+
+  profilePlaq.Start(QUDA_PROFILE_INIT);
+  if (!gaugePrecise) 
+    errorQuda("Cannot compute plaquette as there is no resident gauge field");
+
   cudaGaugeField *data = NULL;
-  #ifndef MULTI_GPU
-//    return quda::plaquette(*gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    data = gaugePrecise;
-  #else
-    if (extendedGaugeResident) {
-      data = extendedGaugeResident;
-    } else {
-      int y[4];
-      for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
-      int pad = 0;
-      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
-      gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-      gParamEx.order = gaugePrecise->Order();
-      gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-      gParamEx.t_boundary = gaugePrecise->TBoundary();
-      gParamEx.nFace = 1;
+#ifndef MULTI_GPU
+  data = gaugePrecise;
+#else
+  if (extendedGaugeResident) {
+    data = extendedGaugeResident;
+  } else {
+    int y[4];
+    for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
+    int pad = 0;
+    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+			     pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.order = gaugePrecise->Order();
+    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParamEx.t_boundary = gaugePrecise->TBoundary();
+    gParamEx.nFace = 1;
+    
+    data = new cudaGaugeField(gParamEx);
+    
+    copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+    profilePlaq.Stop(QUDA_PROFILE_INIT);  
 
-      data = new cudaGaugeField(gParamEx);
+    profilePlaq.Start(QUDA_PROFILE_COMMS);
+    data->exchangeExtendedGhost(R,true);
+    profilePlaq.Stop(QUDA_PROFILE_COMMS);
 
-      copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
-      data->exchangeExtendedGhost(R,true);
-      extendedGaugeResident = data;
-      cudaDeviceSynchronize();
-    }
-//    return quda::plaquette(*extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-  #endif
-  return quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION);
+    profilePlaq.Start(QUDA_PROFILE_INIT);  
+    extendedGaugeResident = data;
+  }
+#endif
+
+  profilePlaq.Stop(QUDA_PROFILE_INIT);  
+
+  profilePlaq.Start(QUDA_PROFILE_COMPUTE);  
+  double3 plaq = quda::plaquette(*data, QUDA_CUDA_FIELD_LOCATION);
+  plq[0] = plaq.x;
+  plq[1] = plaq.y;
+  plq[2] = plaq.z;
+  profilePlaq.Stop(QUDA_PROFILE_COMPUTE);  
+  
+  profilePlaq.Stop(QUDA_PROFILE_TOTAL);
+  return;
 }
 
 void performAPEnStep(unsigned int nSteps, double alpha)
@@ -5207,8 +5249,9 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Plaquette after 0 APE steps: %le\n", plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after 0 APE steps: %le\n", plq.x);
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
@@ -5229,22 +5272,228 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     gaugeSmeared->exchangeExtendedGhost(R,true);
   #endif
 
-  if (getVerbosity() >= QUDA_VERBOSE) {
-    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION));
+  if (getVerbosity() == QUDA_VERBOSE) {
+    double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    printfQuda("Plaquette after %d APE steps: %le\n", nSteps, plq.x);
   }
 
   profileAPE.Stop(QUDA_PROFILE_TOTAL);
 }
 
-  /**
-   * Compute a volume or time-slice contraction of two spinors.
-   * @param x     Spinor to contract. This is conjugated before contraction.
-   * @param y     Spinor to contract.
-   * @param ctrn  Contraction output. The size must be Volume*16
-   * @param cType Contraction type, allows for volume or time-slice contractions.
-   * @param tC    Time-slice to contract in case the contraction is in a single time-slice.
-   */
 
+int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
+  const unsigned int verbose_interval, const double relax_boost, const double tolerance, const unsigned int reunit_interval, \
+  const unsigned int  stopWtheta, QudaGaugeParam* param , double* timeinfo)
+{
+
+  profileGaugeFix.Start(QUDA_PROFILE_TOTAL);
+
+  checkGaugeParam(param);
+
+  profileGaugeFix.Start(QUDA_PROFILE_INIT);  
+  GaugeFieldParam gParam(0, *param);
+  // create the host sitelink  
+  gParam.pad = 0; 
+  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = param->type;
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.gauge     = gauge;
+  cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
+
+  //gParam.pad = getFatLinkPadding(param->X);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
+  gParam.link_type   = param->type;
+  gParam.reconstruct = param->reconstruct;    
+  gParam.order       = (gParam.precision == QUDA_DOUBLE_PRECISION || gParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+  cudaGaugeField *cudaInGauge = new cudaGaugeField(gParam);
+
+  profileGaugeFix.Stop(QUDA_PROFILE_INIT);  
+
+  profileGaugeFix.Start(QUDA_PROFILE_H2D);
+
+
+  ///if (!param->use_resident_gauge) {   // load fields onto the device
+    cudaInGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+ /* } else { // or use resident fields already present
+    if (!gaugePrecise) errorQuda("No resident gauge field allocated");
+    cudaInGauge = gaugePrecise;
+    gaugePrecise = NULL;
+  } */
+
+  profileGaugeFix.Stop(QUDA_PROFILE_H2D);
+  
+  checkCudaError();
+
+#ifdef MULTI_GPU
+  if(comm_size() == 1){
+    // perform the update
+    profileGaugeFix.Start(QUDA_PROFILE_COMPUTE);
+    gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
+      reunit_interval, stopWtheta);
+    profileGaugeFix.Stop(QUDA_PROFILE_COMPUTE);
+    checkCudaError();
+    // copy the gauge field back to the host
+    profileGaugeFix.Start(QUDA_PROFILE_D2H);
+  }
+  else{
+
+    int y[4];
+    int R[4] = {0,0,0,0};
+    for(int dir=0; dir<4; ++dir) if(comm_dim_partitioned(dir)) R[dir] = 2;
+    for(int dir=0; dir<4; ++dir) y[dir] = cudaInGauge->X()[dir] + 2 * R[dir];
+    int pad = 0;
+    GaugeFieldParam gParamEx(y, cudaInGauge->Precision(), gParam.reconstruct,
+        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.order = cudaInGauge->Order();
+    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParamEx.t_boundary = cudaInGauge->TBoundary();
+    gParamEx.nFace = 1;
+    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
+    cudaGaugeField *cudaInGaugeEx = new cudaGaugeField(gParamEx);
+
+    copyExtendedGauge(*cudaInGaugeEx, *cudaInGauge, QUDA_CUDA_FIELD_LOCATION);
+    cudaInGaugeEx->exchangeExtendedGhost(R,false);
+    // perform the update
+    profileGaugeFix.Start(QUDA_PROFILE_COMPUTE);
+    gaugefixingOVR(*cudaInGaugeEx, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
+      reunit_interval, stopWtheta);
+    profileGaugeFix.Stop(QUDA_PROFILE_COMPUTE);
+
+    checkCudaError();
+    // copy the gauge field back to the host
+    profileGaugeFix.Start(QUDA_PROFILE_D2H);
+    //HOW TO COPY BACK TO CPU: cudaInGaugeEx->cpuGauge
+    copyExtendedGauge(*cudaInGauge, *cudaInGaugeEx, QUDA_CUDA_FIELD_LOCATION);
+  }
+#else
+  // perform the update
+  profileGaugeFix.Start(QUDA_PROFILE_COMPUTE);
+  gaugefixingOVR(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, \
+    reunit_interval, stopWtheta);
+  profileGaugeFix.Stop(QUDA_PROFILE_COMPUTE);
+  // copy the gauge field back to the host
+  profileGaugeFix.Start(QUDA_PROFILE_D2H);
+#endif
+
+  checkCudaError();
+  cudaInGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  profileGaugeFix.Stop(QUDA_PROFILE_D2H);
+
+  profileGaugeFix.Stop(QUDA_PROFILE_TOTAL);
+
+  if (param->make_resident_gauge) {
+    if (gaugePrecise != NULL) delete gaugePrecise;
+    gaugePrecise = cudaInGauge;
+  } else {
+    delete cudaInGauge;
+  }
+
+  if(timeinfo){
+    timeinfo[0] = profileGaugeFix.Last(QUDA_PROFILE_H2D);
+    timeinfo[1] = profileGaugeFix.Last(QUDA_PROFILE_COMPUTE);
+    timeinfo[2] = profileGaugeFix.Last(QUDA_PROFILE_D2H);
+  }
+
+  checkCudaError();
+  return 0;
+}
+
+
+
+
+int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
+  const unsigned int verbose_interval, const double alpha, const unsigned int autotune, const double tolerance, \
+  const unsigned int  stopWtheta, QudaGaugeParam* param , double* timeinfo)
+{
+
+  profileGaugeFix.Start(QUDA_PROFILE_TOTAL);
+
+  checkGaugeParam(param);
+
+  profileGaugeFix.Start(QUDA_PROFILE_INIT);  
+
+ 
+  GaugeFieldParam gParam(0, *param);
+  // create the host sitelink  
+  gParam.pad = 0; 
+  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.link_type = param->type;
+  gParam.order = QUDA_MILC_GAUGE_ORDER;
+  gParam.gauge     = gauge;
+  cpuGaugeField *cpuGauge = new cpuGaugeField(gParam);
+
+  //gParam.pad = getFatLinkPadding(param->X);
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.create      = QUDA_NULL_FIELD_CREATE;
+  gParam.link_type   = param->type;
+  gParam.reconstruct = param->reconstruct;    
+  gParam.order       = (gParam.precision == QUDA_DOUBLE_PRECISION || gParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
+    QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+
+  cudaGaugeField *cudaInGauge = new cudaGaugeField(gParam);
+
+
+  profileGaugeFix.Stop(QUDA_PROFILE_INIT);  
+
+  profileGaugeFix.Start(QUDA_PROFILE_H2D);
+
+  //if (!param->use_resident_gauge) {   // load fields onto the device
+    cudaInGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  /*} else { // or use resident fields already present
+    if (!gaugePrecise) errorQuda("No resident gauge field allocated");
+    cudaInGauge = gaugePrecise;
+    gaugePrecise = NULL;
+  } */
+
+
+  profileGaugeFix.Stop(QUDA_PROFILE_H2D);
+  
+  // perform the update
+  profileGaugeFix.Start(QUDA_PROFILE_COMPUTE);
+  checkCudaError();
+
+  gaugefixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
+
+  profileGaugeFix.Stop(QUDA_PROFILE_COMPUTE);
+
+  checkCudaError();
+  // copy the gauge field back to the host
+  profileGaugeFix.Start(QUDA_PROFILE_D2H);
+  checkCudaError();
+  cudaInGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+  profileGaugeFix.Stop(QUDA_PROFILE_D2H);
+  checkCudaError();
+
+  profileGaugeFix.Stop(QUDA_PROFILE_TOTAL);
+
+  if (param->make_resident_gauge) {
+    if (gaugePrecise != NULL) delete gaugePrecise;
+    gaugePrecise = cudaInGauge;
+  } else {
+    delete cudaInGauge;
+  }
+
+  if(timeinfo){
+    timeinfo[0] = profileGaugeFix.Last(QUDA_PROFILE_H2D);
+    timeinfo[1] = profileGaugeFix.Last(QUDA_PROFILE_COMPUTE);
+    timeinfo[2] = profileGaugeFix.Last(QUDA_PROFILE_D2H);
+  }
+
+  checkCudaError();
+  return 0;
+}
+
+/**
+ * Compute a volume or time-slice contraction of two spinors.
+ * @param x     Spinor to contract. This is conjugated before contraction.
+ * @param y     Spinor to contract.
+ * @param ctrn  Contraction output. The size must be Volume*16
+ * @param cType Contraction type, allows for volume or time-slice contractions.
+ * @param tC    Time-slice to contract in case the contraction is in a single time-slice.
+ */
 void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *ctrn, const QudaContractType cType)
 {
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -5270,4 +5519,5 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
     errorQuda("Precision not supported for contractions\n");
   }
 }
+
 

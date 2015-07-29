@@ -218,37 +218,27 @@ namespace quda {
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
-    if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<Float,length>(FloatNOrder<Float,length,2,19>(u, 0, Ghost), u, location);
+	  extractGhost<short,length>(FloatNOrder<short,length,2,19>
+				     (u, 0, (short**)Ghost), u, location);
 	} else {
-	  extractGhost<Float,length>(FloatNOrder<Float,length,2,18>(u, 0, Ghost), u, location);
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	  extractGhost<Float,length>(G(u, 0, Ghost), u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhost<Float,length>(FloatNOrder<Float,length,2,12>(u, 0, Ghost), u, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+	extractGhost<Float,length>(G(u, 0, Ghost), u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	extractGhost<Float,length>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), u, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
+	extractGhost<Float,length>(G(u, 0, Ghost), u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	extractGhost<Float,length>(FloatNOrder<Float,length,2,13>(u, 0, Ghost), u, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+	extractGhost<Float,length>(G(u, 0, Ghost), u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	extractGhost<Float,length>(FloatNOrder<Float,length,2,9>(u, 0, Ghost), u, location);
-      }
-    } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhost<Float,length>(FloatNOrder<Float,length,1,19>(u, 0, Ghost), u, location);
-	} else {
-	  extractGhost<Float,length>(FloatNOrder<Float,length,1,18>(u, 0, Ghost), u, location);
-	}
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhost<Float,length>(FloatNOrder<Float,length,4,12>(u, 0, Ghost), u, location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) { 
-	extractGhost<Float,length>(FloatNOrder<Float,length,4,8>(u, 0, Ghost), u, location);
-      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_13){
-	extractGhost<Float,length>(FloatNOrder<Float,length,4,13>(u, 0, Ghost), u, location);
-      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_9){
-	extractGhost<Float,length>(FloatNOrder<Float,length,4,9>(u, 0, Ghost), u, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type G;
+	extractGhost<Float,length>(G(u, 0, Ghost), u, location);
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       

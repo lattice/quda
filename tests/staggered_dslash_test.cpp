@@ -103,8 +103,8 @@ void init()
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
 
     // ensure that the default is improved staggered
-  if (inv_param.dslash_type != QUDA_STAGGERED_DSLASH &&
-      inv_param.dslash_type != QUDA_ASQTAD_DSLASH)
+  if (dslash_type != QUDA_STAGGERED_DSLASH &&
+      dslash_type != QUDA_ASQTAD_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
 
   gaugeParam.anisotropy = 1.0;
@@ -173,10 +173,12 @@ void init()
   for (int dir = 0; dir < 4; dir++) {
     fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
     longlink[dir] = malloc(V*gaugeSiteSize*gSize);
+
+    if (fatlink[dir] == NULL || longlink[dir] == NULL){
+      errorQuda("ERROR: malloc failed for fatlink/longlink");
+    }  
   }
-  if (fatlink == NULL || longlink == NULL){
-    errorQuda("ERROR: malloc failed for fatlink/longlink");
-  }
+
   construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam, dslash_type);
 
 #ifdef MULTI_GPU
@@ -489,8 +491,7 @@ int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  int i;
-  for (i =1;i < argc; i++){
+  for (int i=1 ;i < argc; i++){
 
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;

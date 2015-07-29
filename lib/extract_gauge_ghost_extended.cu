@@ -333,48 +333,31 @@ namespace quda {
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
-    if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,19>(u, 0, Ghost), 
+	  extractGhostEx<short,length>(FloatNOrder<short,length,2,19>(u, 0, (short**)Ghost), 
 				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	} else {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,18>(u, 0, Ghost),
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	  extractGhostEx<Float,length>(G(u, 0, Ghost),
 				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,12>(u, 0, Ghost),
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), 
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost), 
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,13>(u, 0, Ghost),
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,9>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      }
-    } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,19>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-	} else {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,18>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-	}
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,12>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) { 
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,8>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_13){
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,13>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_9){
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,9>(u, 0, Ghost),
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
