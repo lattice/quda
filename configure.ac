@@ -279,6 +279,17 @@ AC_ARG_WITH(magma,
   [ magma_home="" ; build_magma="no" ]
 )
 
+AC_ARG_WITH(atlas,
+  AC_HELP_STRING([--with-atlas=ATLASDIR], [ Specify ATLAS installation directory]),
+  [ atlas_home=${withval} ],
+  [ atlas_home="" ]
+)
+
+AC_ARG_WITH(lapack,
+  AC_HELP_STRING([--with-lapack=LAPACKDIR], [ Specify LAPACK installation directory]),
+  [ lapack_home=${withval} ],
+  [ lapack_home="" ]
+)
 
 AC_ARG_VAR(NVCCFLAGS, [ Extra flags for NVCC ])
 AC_MSG_NOTICE([User supplied NVCCFLAGS: ${NVCCFLAGS} ])
@@ -824,6 +835,12 @@ AC_SUBST( BUILD_MAGMA, [${build_magma}])
 
 AC_MSG_NOTICE([Setting MAGMA_HOME = ${magma_home}])
 AC_SUBST( MAGMA_HOME, [${magma_home}])
+
+AC_MSG_NOTICE([Setting ATLAS_HOME = ${atlas_home}])
+AC_SUBST( ATLAS_HOME, [${atlas_home}])
+
+AC_MSG_NOTICE([Setting LAPACK_HOME = ${lapack_home}])
+AC_SUBST( LAPACK_HOME, [${lapack_home}])
 
 AC_CONFIG_FILES(make.inc)
 AC_OUTPUT
