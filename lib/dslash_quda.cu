@@ -56,6 +56,7 @@ namespace quda {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
+#include <io_spinor.h>
 
 #include <tm_core.h>              // solo twisted mass kernel
 #include <tmc_core.h>              // solo twisted mass kernel
