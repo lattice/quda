@@ -200,12 +200,12 @@ namespace quda {
     eigcg_magma_args = new BlasMagmaArgs(m, 2*nev, ldm, prec);
 
     hTm     = new std::complex<Float>[ldm*m];//VH A V
-    hTvalm  = (Float*)malloc(m*sizeof(Float));   //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
+    hTvalm  = (Float*)safe_malloc(m*sizeof(Float));//eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
 
     //allocate dTm etc. buffers on GPU:
-    cudaMalloc(&dTm, ldm*m*sizeof(CudaComplex));//  
-    cudaMalloc(&dTvecm, ldm*m*sizeof(CudaComplex));  
-    cudaMalloc(&dTvecm1, ldm*m*sizeof(CudaComplex));  
+    dTm     = (CudaComplex*)device_malloc(ldm*m*sizeof(CudaComplex));
+    dTvecm  = (CudaComplex*)device_malloc(ldm*m*sizeof(CudaComplex));
+    dTvecm1 = (CudaComplex*)device_malloc(ldm*m*sizeof(CudaComplex));
 
     //set everything to zero:
     cudaMemset(dTm, 0, ldm*m*sizeof(CudaComplex));//?
@@ -224,9 +224,9 @@ namespace quda {
 
     free(hTvalm);
 
-    cudaFree(dTm);
-    cudaFree(dTvecm);
-    cudaFree(dTvecm1);
+    device_free(dTm);
+    device_free(dTvecm);
+    device_free(dTvecm1);
 
     delete eigcg_magma_args;
 
@@ -311,7 +311,8 @@ namespace quda {
   {
     printfQuda("\nPrint eigenvalue accuracy after %d restart.\n", restart_num);
 
-    Complex *hproj = new Complex[nev*nev];
+    Complex *hproj = (Complex*)mapped_malloc(nev*nev*sizeof(Complex));
+    memset(hproj, 0, nev*nev*sizeof(Complex));
 
     ColorSpinorParam csParam(Vm->Eigenvec(0));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -350,8 +351,6 @@ namespace quda {
 
     double *evals   = (double*)calloc(nev, sizeof(double));
 
-    cudaHostRegister(hproj, nev*nev*sizeof(Complex), cudaHostRegisterMapped);
-
     BlasMagmaArgs magma_args2(nev, nev, sizeof(double));//change precision..
 
     magma_args2.MagmaHEEVD(hproj, evals, nev, true);
@@ -386,9 +385,7 @@ namespace quda {
     //
     delete W2;
     //
-    cudaHostUnregister(hproj);
-    //
-    delete [] hproj; 
+    host_free(hproj);
 
     delete evals;
 
@@ -834,9 +831,8 @@ namespace quda {
 
      double *evals   = (double*)calloc(curr_evals,sizeof(double));
 
-     Complex *projm  =  new Complex[dpar->ld*dpar->tot_dim];
-
-     cudaHostRegister(projm, dpar->ld*dpar->tot_dim*sizeof(Complex), cudaHostRegisterMapped);
+     Complex *projm  = (Complex*)mapped_malloc(dpar->ld*dpar->tot_dim*sizeof(Complex));
+     memset(projm, 0, dpar->ld*dpar->tot_dim*sizeof(Complex));
 
      memcpy(projm, dpar->proj_matrix, dpar->ld*curr_evals*sizeof(Complex));
 
@@ -891,9 +887,7 @@ namespace quda {
 
      free(evals);
 
-     cudaHostUnregister(projm);
-
-     delete projm;
+     host_free(projm);
 
      return;
   }
@@ -909,9 +903,8 @@ namespace quda {
 
      double *evals   = (double*)calloc(dpar->cur_dim, sizeof(double));//WARNING: Ritz values always in double.
 
-     Complex *projm  =  new Complex[dpar->ld*dpar->tot_dim];
-
-     cudaHostRegister(projm, dpar->ld*dpar->tot_dim*sizeof(Complex), cudaHostRegisterMapped);
+     Complex *projm  = (Complex*)mapped_malloc(dpar->ld*dpar->tot_dim * sizeof(Complex));
+     memset( projm, 0, dpar->ld*dpar->tot_dim * sizeof(Complex));
 
      memcpy(projm, dpar->proj_matrix, dpar->ld*dpar->cur_dim*sizeof(Complex));
 
@@ -1015,9 +1008,7 @@ namespace quda {
 
      free(evals);
 
-     cudaHostUnregister(projm);
-
-     delete projm;
+     host_free(projm);
 
      return;
   }
