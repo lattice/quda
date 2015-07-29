@@ -336,21 +336,18 @@ namespace quda {
   template<typename Float>
   void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge, QudaFieldLocation location) {
     if (Fmunu.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      if (gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+      if (gauge.isNative()) {
+	typedef FloatNOrder<Float, 18, 2, 18> F;
 
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 18>(gauge), Fmunu, location);  
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);  
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 12>(gauge), Fmunu, location);
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);
 	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float, 18, 2, 8>(gauge), Fmunu, location);
-	} else {
-	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
-	}
-	
-      } else if(gauge.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  computeFmunu<Float>(FloatNOrder<Float, 18, 2, 18>(Fmunu), FloatNOrder<Float,18,4,12>(gauge), gauge, location);
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
+	  computeFmunu<Float>(F(Fmunu), G(gauge), Fmunu, location);
 	} else {
 	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
 	}
