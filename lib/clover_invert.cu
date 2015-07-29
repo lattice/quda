@@ -1,9 +1,10 @@
 #include <tune_quda.h>
 #include <clover_field_order.h>
 #include <complex_quda.h>
-#include <cub/cub.cuh> 
 #include <launch_kernel.cuh>
 #include <face_quda.h>
+#include <atomic.cuh>
+#include <cub/cub.cuh> 
 
 namespace quda {
 
@@ -24,20 +25,6 @@ namespace quda {
       cudaHostGetDevicePointer(&trlogA_d, trlogA_h, 0); // set the matching device pointer
     }
   };
-
-  static __inline__ __device__ double atomicAdd(double *addr, double val)
-  {
-    double old=*addr, assumed;
-    
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-					    __double_as_longlong(assumed),
-					    __double_as_longlong(val+assumed)));
-    } while( __double_as_longlong(assumed)!=__double_as_longlong(old) );
-    
-    return old;
-  }
 
   /**
      Use a Cholesky decomposition to invert the clover matrix

@@ -3,21 +3,12 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub/cub.cuh>
 #include <launch_kernel.cuh>
-
-#include <device_functions.h>
-
 #include <unitarization_links.h>
-
 #include <comm_quda.h>
-
-
 #include <gauge_fix_ovr_extra.h>
-
-
 #include <gauge_fix_ovr_hit_devf.cuh>
-
+#include <cub/cub.cuh>
 
 namespace quda {
 

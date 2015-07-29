@@ -3,8 +3,9 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub/cub.cuh> 
 #include <launch_kernel.cuh>
+#include <atomic.cuh>
+#include <cub/cub.cuh> 
 
 namespace quda {
 
@@ -38,26 +39,6 @@ namespace quda {
     }
   };
 
-  static __inline__ __device__ double atomicAdd(double *addr, double val)
-  {
-    double old=*addr, assumed;
-    
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-					    __double_as_longlong(assumed),
-					    __double_as_longlong(val+assumed)));
-    } while( __double_as_longlong(assumed)!=__double_as_longlong(old) );
-    
-    return old;
-  }
-
-  static  __inline__ __device__ double2 atomicAdd(double2 *addr, double2 val){
-    double2 old=*addr;
-    old.x = atomicAdd((double*)addr, val.x);
-    old.y = atomicAdd((double*)addr+1, val.y);
-    return old;
-  }
 
   __device__ __host__ inline int linkIndex3(int x[], int dx[], const int X[4]) {
     int y[4];

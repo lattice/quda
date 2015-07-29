@@ -3,13 +3,10 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub/cub.cuh>
 #include <launch_kernel.cuh>
-
-#include <device_functions.h>
-
 #include <unitarization_links.h>
-
+#include <atomic.cuh>
+#include <cub/cub.cuh>
 #include <cufft.h>
 
 #ifdef GPU_GAUGE_ALG
@@ -33,7 +30,7 @@ namespace quda {
 
 
 #ifdef GAUGEFIXING_DONT_USE_GX
-#warning Don't use precalculated g(x)
+#warning Do not use precalculated g(x)
 #else
 #warning Using precalculated g(x)
 #endif
@@ -146,36 +143,6 @@ namespace quda {
   }
 
 
-  static __inline__ __device__ double atomicAdd(double *addr, double val){
-    double old = *addr, assumed;
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-                                            __double_as_longlong(assumed),
-                                            __double_as_longlong(val + assumed)));
-    } while ( __double_as_longlong(assumed) != __double_as_longlong(old) );
-
-    return old;
-  }
-
-  static __inline__ __device__ double2 atomicAdd(double2 *addr, double2 val){
-    double2 old = *addr;
-    old.x = atomicAdd((double*)addr, val.x);
-    old.y = atomicAdd((double*)addr + 1, val.y);
-    return old;
-  }
-
-
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 200
-  //CUDA 6.5 NOT DETECTING ATOMICADD FOR FLOAT TYPE!!!!!!!
-  static __inline__ __device__ float atomicAdd(float *address, float val)
-  {
-    return __fAtomicAdd(address, val);
-  }
-#endif /* !__CUDA_ARCH__ || __CUDA_ARCH__ >= 200 */
-
-
-
   template <typename T>
   struct Summ {
     __host__ __device__ __forceinline__ T operator() (const T &a, const T &b){
@@ -188,8 +155,6 @@ namespace quda {
       return make_double2(a.x + b.x, a.y + b.y);
     }
   };
-
-
 
 
   static __device__ __host__ inline int linkIndex3(int x[], int dx[], const int X[4]) {
