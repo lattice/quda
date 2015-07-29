@@ -3,12 +3,11 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub/cub.cuh>
 #include <launch_kernel.cuh>
-
-#include <device_functions.h>
-
 #include <unitarization_links.h>
+#include <atomic.cuh>
+#include <cub_helper.cuh>
+#include <index_helper.cuh>
 
 #include <cufft.h>
 
@@ -146,119 +145,6 @@ namespace quda {
   }
 
 
-  static __inline__ __device__ double atomicAdd(double *addr, double val){
-    double old = *addr, assumed;
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-                                            __double_as_longlong(assumed),
-                                            __double_as_longlong(val + assumed)));
-    } while ( __double_as_longlong(assumed) != __double_as_longlong(old) );
-
-    return old;
-  }
-
-  static __inline__ __device__ double2 atomicAdd(double2 *addr, double2 val){
-    double2 old = *addr;
-    old.x = atomicAdd((double*)addr, val.x);
-    old.y = atomicAdd((double*)addr + 1, val.y);
-    return old;
-  }
-
-
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 200
-  //CUDA 6.5 NOT DETECTING ATOMICADD FOR FLOAT TYPE!!!!!!!
-  static __inline__ __device__ float atomicAdd(float *address, float val)
-  {
-    return __fAtomicAdd(address, val);
-  }
-#endif /* !__CUDA_ARCH__ || __CUDA_ARCH__ >= 200 */
-
-
-
-  template <typename T>
-  struct Summ {
-    __host__ __device__ __forceinline__ T operator() (const T &a, const T &b){
-      return a + b;
-    }
-  };
-  template <>
-  struct Summ<double2>{
-    __host__ __device__ __forceinline__ double2 operator() (const double2 &a, const double2 &b){
-      return make_double2(a.x + b.x, a.y + b.y);
-    }
-  };
-
-
-
-
-  static __device__ __host__ inline int linkIndex3(int x[], int dx[], const int X[4]) {
-    int y[4];
-    for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-    return idx;
-  }
-  static __device__ __host__ inline int linkIndex(int x[], const int X[4]) {
-    int idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-    return idx;
-  }
-  static __device__ __host__ inline int linkIndexM1(int x[], const int X[4], const int mu) {
-    int y[4];
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    y[mu] = (y[mu] - 1 + X[mu]) % X[mu];
-    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-    return idx;
-  }
-
-  static __device__ __host__ inline int linkIndexP1(int x[], const int X[4], const int mu) {
-    int y[4];
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
-    int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
-    return idx;
-  }
-
-
-  static __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) {
-    /*x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-       x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-       x[1] = (cb_index/(X[0]/2)) % X[1];
-       x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);*/
-    int za = (cb_index / (X[0] / 2));
-    int zb =  (za / X[1]);
-    x[1] = za - zb * X[1];
-    x[3] = (zb / X[2]);
-    x[2] = zb - x[3] * X[2];
-    int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-    x[0] = (2 * cb_index + x1odd)  - za * X[0];
-    return;
-  }
-
-
-  static __device__ __host__ inline int getCoords(int cb_index, const int X[4], int parity) {
-    int za = (cb_index / (X[0] / 2));
-    int zb =  (za / X[1]);
-    int x1 = za - zb * X[1];
-    int x3 = (zb / X[2]);
-    int x2 = zb - x3 * X[2];
-    int x1odd = (x1 + x2 + x3 + parity) & 1;
-    return 2 * cb_index + x1odd;
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   template <typename Cmplx>
   struct GaugeFixFFTRotateArg {
@@ -385,14 +271,6 @@ namespace quda {
     }
 
   };
-
-
-
-
-
-
-
-
 
 
   template <typename Cmplx, typename Gauge>
@@ -799,21 +677,7 @@ namespace quda {
     //T=130
   }
 
-
-
-
-
-
-
-
 #ifdef GAUGEFIXING_DONT_USE_GX
-  static __device__ __host__ inline int linkNormalIndexP1(int x[], const int X[4], const int mu) {
-    int y[4];
-    for ( int i = 0; i < 4; i++ ) y[i] = x[i];
-    y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
-    int idx = ((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0];
-    return idx;
-  }
 
   template <typename Float, typename Gauge>
   __global__ void kernel_gauge_fix_U_EO_NEW( GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha){

@@ -7,82 +7,12 @@
 #include <comm_quda.h>
 #include <pgauge_monte.h> 
 #include <atomic.cuh>
-#include <cub/cub.cuh> 
+#include <cub_helper.cuh> 
+#include <index_helper.cuh> 
 
 namespace quda {
 
 #ifdef GPU_GAUGE_ALG
-
-
-template <typename T>
-struct Summ {
-    __host__ __device__ __forceinline__ T operator()(const T &a, const T &b){
-        return a + b;
-    }
-};
-template <>
-struct Summ<double2>{
-    __host__ __device__ __forceinline__ double2 operator()(const double2 &a, const double2 &b){
-        return make_double2(a.x+b.x, a.y+b.y);
-    }
-};
-
-
-
-__device__ __host__ inline int linkIndex2(int x[], int dx[], const int X[4]) {
-  int y[4];
-  for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-  int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-  return idx;
-}
-
-
-
-static __device__ __host__ inline int linkIndex3(int x[], int dx[], const int X[4]) {
-  int y[4];
-  for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-  int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-  return idx;
-}
-static __device__ __host__ inline int linkIndex(int x[], const int X[4]) {
-  int idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
-  return idx;
-}
-static __device__ __host__ inline int linkIndexM1(int x[], const int X[4], const int mu) {
-  int y[4];
-  for (int i=0; i<4; i++) y[i] = x[i];
-  y[mu] = (y[mu] -1 + X[mu]) % X[mu];
-  int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-  return idx;
-}
-
-
-
-static __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) {
-  /*x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-  x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-  x[1] = (cb_index/(X[0]/2)) % X[1];
-  x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);*/
-  int za = (cb_index / (X[0]/2));
-  int zb =  (za / X[1]);
-  x[1] = za - zb * X[1];
-  x[3] = (zb / X[2]);
-  x[2] = zb - x[3] * X[2];
-  int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-  x[0] = (2 * cb_index + x1odd)  - za * X[0];
-  return;
-}
-
-
-
-
-
-
-
-
-
-
-
 
 template <typename Gauge>
 struct KernelArg {
