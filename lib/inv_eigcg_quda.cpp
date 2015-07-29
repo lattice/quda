@@ -222,7 +222,7 @@ namespace quda {
   EigCGArgs<Float, CudaComplex>::~EigCGArgs() {
     delete[] hTm;
 
-    free(hTvalm);
+    host_free(hTvalm);
 
     device_free(dTm);
     device_free(dTvecm);
