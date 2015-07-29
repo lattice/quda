@@ -46,8 +46,9 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	texture.h eig_variables.h numa_affinity.h misc_helpers.h	\
 	fermion_force_quda.h malloc_quda.h gauge_field_order.h		\
 	clover_field_order.h color_spinor_field_order.h			\
-	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h \
-	random.h pgauge_monte.h unitarization_links.h
+	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h	\
+	random.h pgauge_monte.h unitarization_links.h index_helper.cuh	\
+	atomic.cuh cub_helper.cuh
 
 
 # These are only inlined into blas_quda.cu
