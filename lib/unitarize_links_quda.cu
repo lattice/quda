@@ -456,7 +456,11 @@ __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4
     void preTune() { ; }
     void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
     
-    long long flops() const { return 0; } // FIXME: add flops counter
+    long long flops() const { 
+	  // Accounted only the minimum flops for the case FL_REUNIT_SVD_ONLY=0
+      return 4588LL*arg.threads; 
+    }
+    long long bytes() const { return 4ll * arg.threads * (arg.input.Bytes() + arg.output.Bytes()); }
     
     TuneKey tuneKey() const {
       std::stringstream vol, aux;
