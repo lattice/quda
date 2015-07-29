@@ -219,7 +219,7 @@ static TimeProfile profileGaugeFix("GaugeFixCuda");
 
 
 //!< Profiler for toal time spend between init and end
-static TimeProfile profileInit2End("init2endQuda",false);
+static TimeProfile profileInit2End("initQuda-endQuda",false);
 
 namespace quda {
   void printLaunchTimer();
