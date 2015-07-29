@@ -114,7 +114,7 @@ namespace quda {
       heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x, r).z);
       heavy_quark_res_old = heavy_quark_res; // heavy quark residual
     }
-    const int heavy_quark_check = 1; // how often to check the heavy quark residual
+    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double alpha=0.0, beta=0.0;
     double pAp;

@@ -38,6 +38,16 @@ namespace quda {
     host_free(trlog);
   }
 
+  bool CloverField::isNative() const {
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if (order  == QUDA_FLOAT2_CLOVER_ORDER) return true;
+    } else if (precision == QUDA_SINGLE_PRECISION || 
+	       precision == QUDA_HALF_PRECISION) {
+      if (order == QUDA_FLOAT4_CLOVER_ORDER) return true;
+    }
+    return false;
+  }
+
   cudaCloverField::cudaCloverField(const CloverFieldParam &param) : CloverField(param) {
     
     if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_REFERENCE_FIELD_CREATE) 

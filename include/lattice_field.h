@@ -61,7 +61,7 @@ namespace quda {
 
   std::ostream& operator<<(std::ostream& output, const LatticeFieldParam& param);
 
-  class LatticeField {
+  class LatticeField : public Object {
 
   protected:
     int volume; // lattice volume

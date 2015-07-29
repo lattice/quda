@@ -35,6 +35,7 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <malloc_quda.h>
+#include <object.h>
 
 #include <vector>
 
