@@ -126,7 +126,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
-  int new_sid = linkIndex(x,dx,E);
+  int new_sid = linkIndexShift(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 
 #else
@@ -140,7 +140,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
 
-  point_d = linkIndex(y, dx, E);
+  point_d = linkIndexShift(y, dx, E);
 
   if (mu_positive){
     ad_link_nbr_idx = point_d;
@@ -150,7 +150,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   int mysig = posDir(sig);
   updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
-  point_c = linkIndex(y, dx, E);
+  point_c = linkIndexShift(y, dx, E);
 
   if (mu_positive){
     bc_link_nbr_idx = point_c;	
@@ -159,7 +159,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 
   for(int dir=0; dir<4; ++dir) y[dir] = x[dir];
   updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
-  point_b = linkIndex(y, dx, E);
+  point_b = linkIndexShift(y, dx, E);
 
   if (!mu_positive){
     bc_link_nbr_idx = point_b;
@@ -291,7 +291,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
-  int new_sid = linkIndex(x,dx,E);
+  int new_sid = linkIndexShift(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
@@ -302,7 +302,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   mymu = posDir(mu);
   int y[4] = {x[0], x[1], x[2], x[3]};
   updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
-  point_d = linkIndex(y, dx, E);
+  point_d = linkIndexShift(y, dx, E);
 
 
 
@@ -314,7 +314,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 
   int mysig = posDir(sig);
   updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
-  point_c = linkIndex(y, dx, E);
+  point_c = linkIndexShift(y, dx, E);
 
 
 
@@ -325,7 +325,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 
   for(int dir=0; dir<4; ++dir) y[dir] = x[dir];
   updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
-  point_b = linkIndex(y, dx, E);
+  point_b = linkIndexShift(y, dx, E);
 
   if (!mu_positive){
     bc_link_nbr_idx = point_b;
@@ -461,7 +461,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
-  int new_sid = linkIndex(x,dx,E);
+  int new_sid = linkIndexShift(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
@@ -498,7 +498,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   int ad_link_nbr_idx;
   int mymu = posDir(mu);
   updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
-  point_d = linkIndex(y,dx,E);
+  point_d = linkIndexShift(y,dx,E);
 
 
 
@@ -565,7 +565,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   x[1] = x[1] + kparam.base_idx[1];
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
-  int new_sid = linkIndex(x,dx,E);
+  int new_sid = linkIndexShift(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
@@ -594,7 +594,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   int y[4] = {x[0], x[1], x[2], x[3]};  
 
   updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
-  point_d = linkIndex(y,dx,E);
+  point_d = linkIndexShift(y,dx,E);
   mycoeff = CoeffSign<sig_positive,_oddBit ^ oddness_change>::result*coeff;
 
   if(mu_positive){
@@ -692,7 +692,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   x[3] = x[3] + kparam.base_idx[3];
 
   int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
-  int new_sid = linkIndex(x,dx,E);
+  int new_sid = linkIndexShift(x,dx,E);
   oddBit = _oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
@@ -702,7 +702,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   int y[4] = {x[0], x[1], x[2], x[3]};
   int mysig = posDir(sig);
   updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
-  point_b = linkIndex(y,dx,E);
+  point_b = linkIndexShift(y,dx,E);
 
   ab_link_nbr_idx = (sig_positive) ? new_sid : point_b;
 
@@ -713,10 +713,10 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   if(mu_positive){ //positive mu
 
     updateCoords(y, mu, -1, kparam.X, kparam.ghostDim[mu]);
-    point_d = linkIndex(y,dx,E);
+    point_d = linkIndexShift(y,dx,E);
 
     updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
-    point_c = linkIndex(y,dx,E);
+    point_c = linkIndexShift(y,dx,E);
 
     loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, kparam.color_matrix_stride);	   // COLOR_MAT_X
     loadLink<18>(linkEven, linkOdd, mu, point_d, Uad.data, 1-oddBit, kparam.thin_link_stride); 
@@ -751,9 +751,9 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
     mu = OPP_DIR(mu);
     updateCoords(y, mu, 1, kparam.X, kparam.ghostDim[mu]);
-    point_d = linkIndex(y,dx,E);
+    point_d = linkIndexShift(y,dx,E);
     updateCoords(y, mysig, (sig_positive ? 1 : -1), kparam.X, kparam.ghostDim[mysig]);
-    point_c = linkIndex(y,dx,E);
+    point_c = linkIndexShift(y,dx,E);
   
     loadMatrixFromField(QprevEven, QprevOdd, point_d, Ox.data, 1-oddBit, kparam.color_matrix_stride);         // COLOR_MAT_X used!
 
@@ -817,7 +817,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
 #ifdef MULTI_GPU
   int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   for(int i=0; i<4; ++i) x[i] += 2;
-  int new_sid = linkIndex(x,dx,E);
+  int new_sid = linkIndexShift(x,dx,E);
 #else
   int E[4] = {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -848,16 +848,16 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
   for(int sig=0; sig<4; ++sig){
 
     dx[sig]++;
-    point_d = linkIndex(x,dx,E);
+    point_d = linkIndexShift(x,dx,E);
 
     dx[sig]++;
-    point_e = linkIndex(x,dx,E);	  
+    point_e = linkIndexShift(x,dx,E);	  
 
     dx[sig] = -1;
-    point_b = linkIndex(x,dx,E);	  
+    point_b = linkIndexShift(x,dx,E);	  
 
     dx[sig]--;
-    point_a = linkIndex(x,dx,E);	  
+    point_a = linkIndexShift(x,dx,E);	  
     dx[sig]=0;
 
 
@@ -902,7 +902,7 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
   x[2] = x[2]+2;
   x[3] = x[3]+2;
   int E[4] = {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
-  new_sid = linkIndex(x,dx,E);
+  new_sid = linkIndexShift(x,dx,E);
 #endif
 
   for(int sig=0; sig<4; ++sig){

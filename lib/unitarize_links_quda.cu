@@ -9,6 +9,7 @@
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <unitarization_links.h>
+#include <index_helper.cuh>
 
 namespace quda{
 #ifdef GPU_UNITARIZE
@@ -366,21 +367,6 @@ namespace{
   };
 
 
-__device__ __host__ inline int linkIndex(int x[], const int X[4]) {
-  int idx = (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
-  return idx;
-}
-
-__device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) {
-  x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-  x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-  x[1] = (cb_index/(X[0]/2)) % X[1];
-  x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-  return;
-}
-
-
   template<typename Float, typename Out, typename In>
   __global__ void DoUnitarizedLink(UnitarizeLinksQudaArg<Out,In> arg){
   int idx = threadIdx.x + blockIdx.x*blockDim.x;
@@ -394,7 +380,7 @@ __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4
   int X[4]; 
   for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
   int x[4];
-  getCoords3(x, idx, X, parity);
+  getCoords(x, idx, X, parity);
  
   idx = linkIndex(x,X);
   Matrix<double2,3> v, result;
