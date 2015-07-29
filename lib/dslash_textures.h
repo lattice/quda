@@ -495,39 +495,51 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
 	{
 		*cloverP	 = clover.odd;
 		*cloverNormP	 = clover.oddNorm;
+#ifndef DYNAMIC_CLOVER
 		*cloverInvP	 = cloverInv.odd;
 		*cloverInvNormP	 = cloverInv.oddNorm;
+#endif
 	}
 	else
 	{
 		*cloverP	 = clover.even;
 		*cloverNormP	 = clover.evenNorm;
+#ifndef DYNAMIC_CLOVER
 		*cloverInvP	 = cloverInv.even;
 		*cloverInvNormP	 = cloverInv.evenNorm;
+#endif
 	}
 
 #ifdef USE_TEXTURE_OBJECTS
 	dslashParam.cloverTex   = oddBit ? clover.OddTex() : clover.EvenTex();
 	if (clover.precision == QUDA_HALF_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
+#ifndef DYNAMIC_CLOVER
 	dslashParam.cloverInvTex = oddBit ? cloverInv.OddTex() : cloverInv.EvenTex();
 	if (cloverInv.precision == QUDA_HALF_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
+#endif
 #else
 	if (clover.precision == QUDA_DOUBLE_PRECISION)    //I assume that the clover and cloverInv fields have the same precision
 	{
 	  cudaBindTexture(0, cloverTexDouble, *cloverP, clover.bytes); 
+#ifndef DYNAMIC_CLOVER
 	  cudaBindTexture(0, cloverInvTexDouble, *cloverInvP, cloverInv.bytes); 
+#endif
 	}
 	else if (clover.precision == QUDA_SINGLE_PRECISION)
 	{
 	  cudaBindTexture(0, cloverTexSingle, *cloverP, clover.bytes); 
+#ifndef DYNAMIC_CLOVER
 	  cudaBindTexture(0, cloverInvTexSingle, *cloverInvP, cloverInv.bytes); 
+#endif
 	}
 	else
 	{
 	  cudaBindTexture(0, cloverTexHalf, *cloverP, clover.bytes); 
 	  cudaBindTexture(0, cloverTexNorm, *cloverNormP, clover.norm_bytes);
+#ifndef DYNAMIC_CLOVER
 	  cudaBindTexture(0, cloverInvTexHalf, *cloverInvP, cloverInv.bytes); 
 	  cudaBindTexture(0, cloverInvTexNorm, *cloverInvNormP, cloverInv.norm_bytes);
+#endif
 	}
 #endif // USE_TEXTURE_OBJECTS
 
@@ -540,19 +552,25 @@ void unbindTwistedCloverTex(const FullClover clover)  //We don't really need thi
 	if (clover.precision == QUDA_DOUBLE_PRECISION)  //Again we assume that the precision of the clover and cloverInv are the same
 	{
 		cudaUnbindTexture(cloverTexDouble);
+#ifndef DYNAMIC_CLOVER
 		cudaUnbindTexture(cloverInvTexDouble);
+#endif
 	}
 	else if (clover.precision == QUDA_SINGLE_PRECISION)
 	{
 		cudaUnbindTexture(cloverTexSingle);
+#ifndef DYNAMIC_CLOVER
 		cudaUnbindTexture(cloverInvTexSingle);
+#endif
 	}
 	else
 	{
 		cudaUnbindTexture(cloverTexHalf);
 		cudaUnbindTexture(cloverTexNorm);
+#ifndef DYNAMIC_CLOVER
 		cudaUnbindTexture(cloverInvTexHalf);
 		cudaUnbindTexture(cloverInvTexNorm);
+#endif
 	}
 #endif // not defined USE_TEXTURE_OBJECTS
 }

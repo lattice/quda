@@ -1,5 +1,5 @@
-#ifndef _HISQ_LINKS_QUDA_H
-#define _HISQ_LINKS_QUDA_H
+#ifndef _UNITARIZATION_LINKS_QUDA_H
+#define _UNITARIZATION_LINKS_QUDA_H
 
 #include <gauge_field.h>
 
@@ -29,27 +29,19 @@
 
 namespace quda {
 
-void setUnitarizeLinksPadding(int input_padding, 
-			     int output_padding);
+  void setUnitarizeLinksConstants(double unitarize_eps, double max_error, 
+				  bool allow_svd, bool svd_only,
+				  double svd_rel_error, double svd_abs_error,
+				  bool check_unitarization=true);
 
-void setUnitarizeLinksConstants(double unitarize_eps, double max_error, 
-				bool allow_svd, bool svd_only,
-				double svd_rel_error, double svd_abs_error,
-				bool check_unitarization=true);
+  void unitarizeLinksCPU(cpuGaugeField& outfield, const cpuGaugeField &infield);
 
-
-void unitarizeLinksCuda(const QudaGaugeParam& param,
-			cudaGaugeField& infield,
-			cudaGaugeField* outfield, 
-			int* num_failures);
-
-void unitarizeLinksCPU(const QudaGaugeParam& param,
-		       cpuGaugeField& infield,
-		       cpuGaugeField* outfield);
-
-bool isUnitary(const QudaGaugeParam& param, cpuGaugeField& field, double max_error);
-
+  void unitarizeLinksQuda(cudaGaugeField& outfield, const cudaGaugeField &infield, int *fails);
+  void unitarizeLinksQuda(cudaGaugeField& outfield, int *fails);
+  
+  bool isUnitary(const cpuGaugeField& field, double max_error);
+  
 } // namespace quda
 
 
-#endif // _HISQ_LINKS_H
+#endif // _UNITARIZATION_LINKS_H

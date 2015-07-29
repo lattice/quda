@@ -31,9 +31,38 @@ namespace quda {
   template<> struct isHalf<short>{ static const bool value = true; };
 
   template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
-  template<> __host__ __device__ inline void copy(float &a, const short &b) { a = (float)b/MAX_SHORT; }
-  template<> __host__ __device__ inline void copy(short &a, const float &b) { a = (short)(b*MAX_SHORT); }
 
+  // specializations for short-float conversion
+  template<> __host__ __device__ inline void copy(float &a, const short &b) {
+    a = (float)b/MAX_SHORT;
+  }
+  template<> __host__ __device__ inline void copy(short &a, const float &b) {
+    a = (short)(b*MAX_SHORT);
+  }
+
+  template<> __host__ __device__ inline void copy(float2 &a, const short2 &b) {
+    a.x = (float)b.x/MAX_SHORT;
+    a.y = (float)b.y/MAX_SHORT;
+  }
+  template<> __host__ __device__ inline void copy(short2 &a, const float2 &b) {
+    a.x = (short)(b.x*MAX_SHORT);
+    a.y = (short)(b.y*MAX_SHORT);
+  }
+
+  template<> __host__ __device__ inline void copy(float4 &a, const short4 &b) {
+    a.x = (float)b.x/MAX_SHORT;
+    a.y = (float)b.y/MAX_SHORT;
+    a.z = (float)b.z/MAX_SHORT;
+    a.w = (float)b.w/MAX_SHORT;
+  }
+  template<> __host__ __device__ inline void copy(short4 &a, const float4 &b) {
+    a.x = (short)(b.x*MAX_SHORT);
+    a.y = (short)(b.y*MAX_SHORT);
+    a.z = (short)(b.z*MAX_SHORT);
+    a.w = (short)(b.w*MAX_SHORT);
+  }
+
+  
   /**
      Generic wrapper for Trig functions
   */

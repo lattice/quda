@@ -137,6 +137,12 @@ namespace quda {
 		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
 		const cudaStream_t &stream, const double a=0.0);
 
+  /**
+     out = gamma_5 in
+     @param out Output field
+     @param in Input field
+   */
+  void gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in);
 }
 
 #endif // _DSLASH_QUDA_H

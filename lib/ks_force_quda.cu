@@ -4,7 +4,7 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <ks_force_quda.h>
-
+#include <index_helper.cuh>
 
 namespace quda {
 
@@ -37,23 +37,6 @@ namespace quda {
 
     };
 
-  __device__ __host__ inline int linkIndex(int x[], int dx[], const int X[4]) {
-    int y[4];
-    for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-    int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-    return idx;
-  }
-
-
-  __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity)
-  {
-    x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    x[1] = (cb_index/(X[0]/2)) % X[1];
-    x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-    return;
-  }
 
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
     __host__ __device__ void completeKSForceCore(KSForceArg<Oprod,Gauge,Mom>& arg, int idx){
@@ -87,8 +70,8 @@ namespace quda {
 
       int dx[4] = {0,0,0,0};
       for(int dir=0; dir<4; ++dir){
-        arg.gauge.load((Float*)(G.data), linkIndex(x,dx,X), dir, parity); 
-        arg.oprod.load((Float*)(O.data), linkIndex(x,dx,X), dir, parity); 
+        arg.gauge.load((Float*)(G.data), linkIndexShift(x,dx,X), dir, parity); 
+        arg.oprod.load((Float*)(O.data), linkIndexShift(x,dx,X), dir, parity); 
         if(parity==0){
           M = G*O; 
         }else{
@@ -305,8 +288,8 @@ Matrix<Cmplx,3> M;
 
 int dx[4] = {0,0,0,0};
 for(int dir=0; dir<4; ++dir){
-arg.gauge.load((Float*)(G.data), linkIndex(x,dx,X), dir, parity); 
-arg.oprod.load((Float*)(O.data), linkIndex(x,dx,X), dir, parity); 
+arg.gauge.load((Float*)(G.data), linkIndexShift(x,dx,X), dir, parity); 
+arg.oprod.load((Float*)(O.data), linkIndexShift(x,dx,X), dir, parity); 
 if(parity==0){
 M = G*O; 
 }else{

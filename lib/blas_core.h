@@ -144,6 +144,7 @@ inline void blasCuda(const double2 &a, const double2 &b, const double2 &c,
   size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
 
   if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
     const int M = 1;
     Spinor<double2,double2,double2,M,writeX,0> X(x);
     Spinor<double2,double2,double2,M,writeY,1> Y(y);
@@ -155,6 +156,9 @@ inline void blasCuda(const double2 &a, const double2 &b, const double2 &c,
       Spinor<double2,double2,double2,M,writeZ,2>, Spinor<double2,double2,double2,M,writeW,3>,
       Functor<double2, double2> > blas(X, Y, Z, W, f, x.Length()/(2*M), bytes, norm_bytes);
     blas.apply(*blasStream);
+#else
+    errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
   } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
     const int M = 1;
     if (x.Nspin() == 4) {
