@@ -3,6 +3,7 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
+#include <index_helper.cuh>
 
 namespace quda {
 
@@ -29,25 +30,6 @@ namespace quda {
 #endif
     }
   };
-
-  __device__ __host__ inline int linkIndex(int x[], int dx[], const int X[4]) {
-    int y[4];
-    for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-    int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-    return idx;
-  }
-
-
-  __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity)
-  {
-    x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    x[1] = (cb_index/(X[0]/2)) % X[1];
-    x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
-    return;
-  }
-
 
   template <typename Float, typename Fmunu, typename GaugeOrder>
     __host__ __device__ void computeFmunuCore(FmunuArg<Float,Fmunu,GaugeOrder>& arg, int idx) {
@@ -82,11 +64,11 @@ namespace quda {
             // load U(x)_(+mu)
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
-            arg.gauge.load((Float*)(U1.data),linkIndex(x,dx,X), mu, parity); 
+            arg.gauge.load((Float*)(U1.data),linkIndexShift(x,dx,X), mu, parity); 
             // load U(x+mu)_(+nu)
             Matrix<Cmplx,3> U2;
             dx[mu]++;
-            arg.gauge.load((Float*)(U2.data),linkIndex(x,dx,X), nu, 1-parity); 
+            arg.gauge.load((Float*)(U2.data),linkIndexShift(x,dx,X), nu, 1-parity); 
             dx[mu]--;
    
 
@@ -95,14 +77,14 @@ namespace quda {
             // load U(x+nu)_(+mu)
             Matrix<Cmplx,3> U3;
             dx[nu]++;
-            arg.gauge.load((Float*)(U3.data),linkIndex(x,dx,X), mu, 1-parity); 
+            arg.gauge.load((Float*)(U3.data),linkIndexShift(x,dx,X), mu, 1-parity); 
             dx[nu]--;
 
             Ftmp = Ftmp * conj(U3) ;
 
             // load U(x)_(+nu)
             Matrix<Cmplx,3> U4;
-            arg.gauge.load((Float*)(U4.data),linkIndex(x,dx,X), nu, parity); 
+            arg.gauge.load((Float*)(U4.data),linkIndexShift(x,dx,X), nu, parity); 
 
             // complete the plaquette
             F = Ftmp * conj(U4);
@@ -114,13 +96,13 @@ namespace quda {
             // load U(x)_(+nu)
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
-            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, parity);
+            arg.gauge.load((Float*)(U1.data), linkIndexShift(x,dx,X), nu, parity);
 
             // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
             Matrix<Cmplx,3> U2;
             dx[nu]++;
             dx[mu]--;
-            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, parity);
+            arg.gauge.load((Float*)(U2.data), linkIndexShift(x,dx,X), mu, parity);
             dx[mu]++;
             dx[nu]--;
 
@@ -129,7 +111,7 @@ namespace quda {
             // load U(x-mu)_nu
             Matrix<Cmplx,3> U3;
             dx[mu]--;
-            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, 1-parity);
+            arg.gauge.load((Float*)(U3.data), linkIndexShift(x,dx,X), nu, 1-parity);
             dx[mu]++;
 
             Ftmp =  Ftmp * conj(U3);
@@ -137,7 +119,7 @@ namespace quda {
             // load U(x)_(-mu) = U(x-mu)_(+mu)
             Matrix<Cmplx,3> U4;
             dx[mu]--;
-            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, 1-parity);
+            arg.gauge.load((Float*)(U4.data), linkIndexShift(x,dx,X), mu, 1-parity);
             dx[mu]++;
 
             // complete the plaquette
@@ -154,13 +136,13 @@ namespace quda {
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
             dx[nu]--;
-            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), nu, 1-parity);
+            arg.gauge.load((Float*)(U1.data), linkIndexShift(x,dx,X), nu, 1-parity);
             dx[nu]++;
 
             // load U(x-nu)_(+mu)
             Matrix<Cmplx,3> U2;
             dx[nu]--;
-            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), mu, 1-parity);
+            arg.gauge.load((Float*)(U2.data), linkIndexShift(x,dx,X), mu, 1-parity);
             dx[nu]++;
 
             Matrix<Cmplx,3> Ftmp = conj(U1) * U2;
@@ -169,7 +151,7 @@ namespace quda {
             Matrix<Cmplx,3> U3;
             dx[mu]++;
             dx[nu]--;
-            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), nu, parity);
+            arg.gauge.load((Float*)(U3.data), linkIndexShift(x,dx,X), nu, parity);
             dx[nu]++;
             dx[mu]--;
 
@@ -177,7 +159,7 @@ namespace quda {
 
             // load U(x)_(+mu)
             Matrix<Cmplx,3> U4;
-            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), mu, parity);
+            arg.gauge.load((Float*)(U4.data), linkIndexShift(x,dx,X), mu, parity);
 
             Ftmp = Ftmp * conj(U4);
 
@@ -192,7 +174,7 @@ namespace quda {
             Matrix<Cmplx,3> U1;
             int dx[4] = {0, 0, 0, 0};
             dx[mu]--;
-            arg.gauge.load((Float*)(U1.data), linkIndex(x,dx,X), mu, 1-parity);
+            arg.gauge.load((Float*)(U1.data), linkIndexShift(x,dx,X), mu, 1-parity);
             dx[mu]++;
 
 
@@ -201,7 +183,7 @@ namespace quda {
             Matrix<Cmplx,3> U2;
             dx[mu]--;
             dx[nu]--;
-            arg.gauge.load((Float*)(U2.data), linkIndex(x,dx,X), nu, parity);
+            arg.gauge.load((Float*)(U2.data), linkIndexShift(x,dx,X), nu, parity);
             dx[nu]++;
             dx[mu]++;
 
@@ -211,7 +193,7 @@ namespace quda {
             Matrix<Cmplx,3> U3;
             dx[mu]--;
             dx[nu]--;
-            arg.gauge.load((Float*)(U3.data), linkIndex(x,dx,X), mu, parity);
+            arg.gauge.load((Float*)(U3.data), linkIndexShift(x,dx,X), mu, parity);
             dx[nu]++;
             dx[mu]++;
 
@@ -220,7 +202,7 @@ namespace quda {
             // load U(x)_(-nu) = U(x-nu)_(+nu)
             Matrix<Cmplx,3> U4;
             dx[nu]--;
-            arg.gauge.load((Float*)(U4.data), linkIndex(x,dx,X), nu, 1-parity);
+            arg.gauge.load((Float*)(U4.data), linkIndexShift(x,dx,X), nu, 1-parity);
             dx[nu]++;
 
             // complete the plaquette

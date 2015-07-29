@@ -61,7 +61,7 @@ namespace quda {
         for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
         int x[4];
-        getCoords3(x, idx, X, parity);
+        getCoords(x, idx, X, parity);
 #ifdef MULTI_GPU
         for(int dr=0; dr<4; ++dr) {
           x[dr] += arg.border[dr];

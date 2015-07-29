@@ -321,7 +321,7 @@ namespace quda {
       //int X[4];
       //for(int dr=0; dr<4; ++dr) X[dr] = argQ.X[dr];
       int x[4];
-      getCoords3(x, idx, argQ.X, parity);
+      getCoords(x, idx, argQ.X, parity);
       Matrix<Cmplx,3> delta;
       setZero(&delta);
       //idx = linkIndex(x,X);
@@ -343,7 +343,7 @@ namespace quda {
       //18
       //SAVE DELTA!!!!!
       SubTraceUnit(delta);
-      idx = getCoords(idx, argQ.X, parity);
+      idx = getIndexFull(idx, argQ.X, parity);
       //Saving Delta
       argQ.delta[idx] = delta(0,0);
       argQ.delta[idx + argQ.threads] = delta(0,1);
@@ -694,7 +694,7 @@ namespace quda {
     typedef typename ComplexTypeId<Float>::Type Cmplx;
 
     int x[4];
-    getCoords3(x, id, arg.X, parity);
+    getCoords(x, id, arg.X, parity);
     int idx = ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
     Matrix<Cmplx,3> de;
     //Read Delta
@@ -998,7 +998,7 @@ namespace quda {
       //42
     }
     int x[4];
-    getCoords3(x, id, arg.X, parity);
+    getCoords(x, id, arg.X, parity);
     for ( int mu = 0; mu < 4; mu++ ) {
       Matrix<Cmplx,3> U;
       Matrix<Cmplx,3> g0;

@@ -55,8 +55,8 @@ namespace quda {
     int x[4];
     int y[4];
     int otherparity = (1-arg.parity);
-    getCoords3(x, index, arg.X, arg.parity);
-    getCoords3(y, index, arg.X, otherparity);
+    getCoords(x, index, arg.X, arg.parity);
+    getCoords(y, index, arg.X, otherparity);
     int X[4]; 
     for(int dir=0; dir<4; ++dir) X[dir] = arg.X[dir];
 

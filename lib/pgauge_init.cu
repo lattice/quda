@@ -383,7 +383,7 @@ namespace quda {
   #endif
     for ( int parity = 0; parity < 2; parity++ ) {
     #ifdef MULTI_GPU
-      getCoords3(x, id, arg.X, parity);
+      getCoords(x, id, arg.X, parity);
       for ( int dr = 0; dr < 4; ++dr ) x[dr] += arg.border[dr];
       idx = linkIndex(x,X);
     #endif

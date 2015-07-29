@@ -9,7 +9,7 @@ namespace quda {
      @param dx 4-d shift index
      @param X Full lattice dimensions
    */
-  __device__ __host__ inline int linkIndexShift(int x[], int dx[], const int X[4]) {
+  static __device__ __host__ inline int linkIndexShift(int x[], int dx[], const int X[4]) {
     int y[4];
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -83,7 +83,7 @@ namespace quda {
      @param X Full lattice dimensions
      @param parity Site parity
    */
-  static __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) {
+  static __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity) {
     //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
     //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
     //x[1] = (cb_index/(X[0]/2)) % X[1];
@@ -108,7 +108,7 @@ namespace quda {
      @param X lattice dimensions
      @param parity Site parity
    */
-  static __device__ __host__ inline int getCoords(int cb_index, const int X[4], int parity) {
+  static __device__ __host__ inline int getIndexFull(int cb_index, const int X[4], int parity) {
     int za = (cb_index / (X[0] / 2));
     int zb =  (za / X[1]);
     int x1 = za - zb * X[1];

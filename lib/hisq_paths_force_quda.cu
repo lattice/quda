@@ -10,8 +10,8 @@
 #include <force_common.h>
 #include <tune_quda.h>
 #include <color_spinor_field.h>
-
 #include <face_quda.h>
+#include <index_helper.cuh>
 
 #ifdef GPU_HISQ_FORCE
 
@@ -107,14 +107,6 @@ namespace quda {
     texture<float2, 1, cudaReadModeElementType> newOprod1TexSingle;
 
 
-
-    inline __device__  __host__ int linkIndex(int x[], int dx[], const int X[4]) {
-      int y[4];
-      for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-      int idx = (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0]) >> 1;
-      return idx;
-    }
-
     inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned){
 #ifdef MULTI_GPU
       if(shift == 1){
@@ -125,17 +117,6 @@ namespace quda {
 #else 
       x[dir] = (x[dir]+shift + X[dir])%X[dir];
 #endif
-      return;
-    }
-
-
-    __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity)
-    {
-      x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-      x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-      x[1] = (cb_index/(X[0]/2)) % X[1];
-      x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-
       return;
     }
 
@@ -564,7 +545,7 @@ namespace quda {
         getCoords(x, sid, kparam.X, oddBit);
         int E[4] = {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
         for(int dir=0; dir<4; ++dir) x[dir] += 2; 
-        int new_sid = linkIndex(x,dx,E);
+        int new_sid = linkIndexShift(x,dx,E);
 #else
         int new_sid = sid;
 #endif

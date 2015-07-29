@@ -73,7 +73,7 @@ struct rngArg{
 };
 
 
-static __device__ __host__ inline void getCoords3(int x[4], int cb_index, const int X[4], int parity) {
+static __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity) {
   /*x[3] = cb_index/(X[2]*X[1]*X[0]/2);
   x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
   x[1] = (cb_index/(X[0]/2)) % X[1];
@@ -104,7 +104,7 @@ kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset, rngArg
     #else
 
     int x[4];
-    getCoords3(x, id, arg.X, 0);
+    getCoords(x, id, arg.X, 0);
     for(int i=0; i<4;i++) x[i] += arg.comm_coord[i] * arg.X[i];
     int idd = ((((x[3] * arg.comm_dim[2] * arg.X[2] + x[2]) * arg.comm_dim[1] * arg.X[1]) + x[1] ) * arg.comm_dim[0] * arg.X[0] + x[0]) >> 1 ;
     curand_init(seed, idd, 0, &state[id]);
