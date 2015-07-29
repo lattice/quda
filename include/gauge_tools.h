@@ -69,4 +69,14 @@ namespace quda {
 		       const unsigned int autotune,
                        const double tolerance,
 		       const unsigned int stopWtheta);
+  /**
+     Compute the Fmunu tensor
+     @param Fmunu The Fmunu tensor
+     @param gauge The gauge field upon which to compute the Fmnu tensor
+     @param location The location of where to do the computation
+   */
+  void computeFmunu(GaugeField &Fmunu, 
+		    const GaugeField& gauge, 
+		    QudaFieldLocation location);
+
 }

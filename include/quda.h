@@ -870,7 +870,6 @@ extern "C" {
 
   void closeMagma();
 
-
 #ifdef __cplusplus
 }
 #endif

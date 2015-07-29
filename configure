@@ -615,6 +615,7 @@ POSIX_THREADS
 BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
+DYNAMIC_CLOVER
 BUILD_CONTRACT
 BUILD_SSTEP
 BUILD_GAUGE_ALG
@@ -726,6 +727,7 @@ enable_gauge_tools
 enable_gauge_alg
 enable_sstep
 enable_contract
+enable_dynamic_clover
 enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
@@ -1410,6 +1412,8 @@ Optional Features:
                           (default: disabled)
   --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
+  --enable-dynamic-clover Invert dynamically the clover term for
+                          twisted-clover fermions (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
@@ -2270,6 +2274,15 @@ if test "${enable_contract+set}" = set; then :
   enableval=$enable_contract;  build_contract=${enableval}
 else
    build_contract="no"
+
+fi
+
+
+# Check whether --enable-dynamic-clover was given.
+if test "${enable_dynamic_clover+set}" = set; then :
+  enableval=$enable_dynamic_clover;  dynamic_clover=${enableval}
+else
+   dynamic_clover="no"
 
 fi
 
@@ -4195,6 +4208,13 @@ yes|no);;
   ;;
 esac
 
+case ${dynamic_clover} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-dynamic-clover " "$LINENO" 5
+  ;;
+esac
+
 case ${multi_gpu} in
 yes|no);;
 *)
@@ -4422,6 +4442,11 @@ BUILD_SSTEP=${build_sstep}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CONTRACT = ${build_contract}  " >&5
 $as_echo "$as_me: Setting BUILD_CONTRACT = ${build_contract}  " >&6;}
 BUILD_CONTRACT=${build_contract}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&5
+$as_echo "$as_me: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&6;}
+DYNAMIC_CLOVER=${dynamic_clover}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MULTI_GPU = ${multi_gpu}  " >&5

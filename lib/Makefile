@@ -12,18 +12,18 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	clover_field.o lattice_field.o gauge_field.o			\
 	cpu_gauge_field.o cuda_gauge_field.o extract_gauge_ghost.o	\
 	max_gauge.o gauge_update_quda.o dirac_clover.o dirac_wilson.o	\
-	dirac_staggered.o dirac_improved_staggered.o			\
+	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
 	fat_force_quda.o llfat_quda_itf.o llfat_quda.o			\
-	gauge_force_quda.o clover_quda.o dslash_quda.o covDev.o		\
-	dslash_wilson.o dslash_clover.o dslash_clover_asym.o		\
-	dslash_twisted_mass.o dslash_ndeg_twisted_mass.o		\
-	dslash_twisted_clover.o dslash_domain_wall.o			\
-	dslash_domain_wall_4d.o dslash_mobius.o dslash_staggered.o	\
-	dslash_improved_staggered.o dslash_pack.o blas_quda.o		\
-	copy_quda.o reduce_quda.o face_buffer.o face_gauge.o		\
-	comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}		\
+	gauge_force_quda.o field_strength_tensor.o clover_quda.o	\
+	dslash_quda.o covDev.o dslash_wilson.o dslash_clover.o		\
+	dslash_clover_asym.o dslash_twisted_mass.o			\
+	dslash_ndeg_twisted_mass.o dslash_twisted_clover.o		\
+	dslash_domain_wall.o dslash_domain_wall_4d.o dslash_mobius.o	\
+	dslash_staggered.o dslash_improved_staggered.o dslash_pack.o	\
+	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
+	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
 	extract_gauge_ghost_extended.o copy_color_spinor.o		\
 	copy_gauge_double.o copy_gauge_single.o copy_gauge_half.o	\
