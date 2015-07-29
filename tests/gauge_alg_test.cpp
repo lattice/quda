@@ -201,6 +201,7 @@ class GaugeAlgTest : public ::testing::Test {
     delete cudaInGauge;
     cudaFree(num_failures_dev);
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    PGaugeExchangeFree();
 
     a0.Stop();
     printfQuda("Time -> %.6f s\n", a0.Last());
@@ -235,7 +236,6 @@ TEST_F(GaugeAlgTest,Generation){
   if(testgen){
     ASSERT_TRUE(CheckDeterminant(detu));
   }
-  PGaugeExchangeFree();
 }
 
 TEST_F(GaugeAlgTest,Landau_Overrelaxation){
