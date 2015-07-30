@@ -45,8 +45,8 @@
 #endif
 
 
-#define TIMER_NVTX
-#ifdef TIMER_NVTX
+
+#ifdef INTERFACE_NVTX
 #include "nvToolsExt.h"
 #endif
 
@@ -176,7 +176,7 @@ namespace quda {
     QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
   };
 
-#ifdef TIMER_NVTX
+#ifdef INTERFACE_NVTX
 
 
 
