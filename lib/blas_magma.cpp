@@ -450,6 +450,7 @@ void BlasMagmaArgs::SpinorMatVec
 
 void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn)
 {
+#ifdef MAGMA_LIB
 
      magma_int_t m = clen; 
      magma_int_t n = qrlen; 
@@ -457,7 +458,6 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
 
      magma_int_t lwork = -1;
 
-#ifdef MAGMA_LIB
      if(prec == 4)
      {
 
