@@ -6,6 +6,7 @@
 #include <dslash_util.h>
 
 #include <gauge_qio.h>
+#include <util_quda.h>
 
 #ifdef QMP_COMMS
 #include <qmp.h>
@@ -14,6 +15,7 @@
 QudaGaugeParam param;
 void *gauge[4], *new_gauge[4];
 
+extern bool tune;
 extern int device;
 extern int xdim;
 extern int ydim;
@@ -69,6 +71,8 @@ void init() {
   }
 
   initQuda(device);
+  if (tune) setTuning(QUDA_TUNE_YES);
+
 }
 
 void end() {

@@ -254,58 +254,34 @@ namespace quda {
     return;
   }
 
-
-
   template<typename Float>
     void computeCloverSigmaTrace(GaugeField& gauge, const CloverField& clover, int dir1, int dir2,
         QudaFieldLocation location){
 
-      if(clover.Order() == QUDA_FLOAT2_CLOVER_ORDER){
-        if(gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER){
-          if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0),
-					   CloverOrder::quda::FloatNOrder<Float,72,2>(clover,1),
-					   FloatNOrder<Float, 18, 2, 18>(gauge), dir1, dir2, gauge, location);
-          }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0), 
-					   CloverOrder::quda::FloatNOrder<Float,72,2>(clover,1),
-					   FloatNOrder<Float, 18, 2, 12>(gauge), dir1, dir2, gauge, location);
+    if(clover.isNative()) {
+      typedef typename CloverOrder::quda::clover_mapper<Float>::type C;
+      if (gauge.isNative()) {
+	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	  computeCloverSigmaTrace<Float>( C(clover,0), C(clover,1), G(gauge), dir1, dir2, gauge, location);
+	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	  computeCloverSigmaTrace<Float>( C(clover,0), C(clover,1), G(gauge), dir1, dir2, gauge, location);
+	} else {
+	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
+	}
+      } else {
+	errorQuda("Gauge order %d not supported", gauge.Order());
+      }
+    } else {
+      errorQuda("clover order %d not supported", clover.Order());
+    } // clover order
 
-          }else{
-            errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
-          }
-
-        }else if(gauge.Order() == QUDA_FLOAT4_GAUGE_ORDER){
-          if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,2>(clover,0),
-					   CloverOrder::quda::FloatNOrder<Float,72,2>(clover,1),
-					   FloatNOrder<Float,18,4,12>(gauge),  dir1, dir2, gauge, location);
-          }else{
-            errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
-          }
-        }
-      }else if(clover.Order() == QUDA_FLOAT4_CLOVER_ORDER){
-        if(gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER){
-          if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0),
-					   CloverOrder::quda::FloatNOrder<Float,72,4>(clover,1),
-					   FloatNOrder<Float,18,2,18>(gauge),  dir1, dir2, gauge, location);
-          }else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-            computeCloverSigmaTrace<Float>(CloverOrder::quda::FloatNOrder<Float,72,4>(clover,0),
-					   CloverOrder::quda::FloatNOrder<Float,72,4>(clover,1),
-					   FloatNOrder<Float,18,2,12>(gauge),  dir1, dir2, gauge, location);
-          }else{
-            errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
-          }
-        }else if(gauge.Order() == QUDA_FLOAT4_GAUGE_ORDER){
-          errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
-        }
-      } // clover order
-    }
+  }
 
 #endif
 
-  void computeCloverSigmaTrace(GaugeField& gauge, const CloverField& clover, int dir1, int dir2, 
+  void computeCloverSigmaTrace(GaugeField& output, const CloverField& clover, int dir1, int dir2, 
       QudaFieldLocation location){
 
 #ifdef GPU_CLOVER_DIRAC
@@ -314,12 +290,13 @@ namespace quda {
     }  
 
     if(clover.Precision() == QUDA_SINGLE_PRECISION){
-      computeCloverSigmaTrace<float>(gauge, clover, dir1, dir2, location);
+      computeCloverSigmaTrace<float>(output, clover, dir1, dir2, location);
     }else if(clover.Precision() == QUDA_DOUBLE_PRECISION){
-      computeCloverSigmaTrace<double>(gauge, clover, dir1, dir2, location);
+      computeCloverSigmaTrace<double>(output, clover, dir1, dir2, location);
     }else{
       errorQuda("Precision %d not supported", clover.Precision());
     }
+
 #else
     errorQuda("Clover has not been built");
 #endif

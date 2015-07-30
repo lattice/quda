@@ -437,6 +437,13 @@ void initDslashConstants(TimeProfile &profile)
   float tProjScale_fh = (float)tProjScale_h;
   cudaMemcpyToSymbol(tProjScale_f, &tProjScale_fh, sizeof(float));
 
+  // set these for naive staggered
+  float coeff_fh = 1.0;
+  cudaMemcpyToSymbol(coeff_f, &(coeff_fh), sizeof(float));
+
+  double coeff_h = 1.0;
+  cudaMemcpyToSymbol(coeff, &(coeff_h), sizeof(double));
+  
   checkCudaError();
 
   profile.Stop(QUDA_PROFILE_CONSTANT);

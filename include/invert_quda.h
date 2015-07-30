@@ -53,6 +53,9 @@ namespace quda {
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
 
+    /**< After how many iterations shall the heavy quark residual be updated */
+    int heavy_quark_check;
+
     /**< Enable pipeline solver */
     int pipeline;
 
@@ -160,7 +163,8 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition), 
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
-      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), pipeline(param.pipeline), tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq), 
+      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
+      tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
@@ -181,7 +185,7 @@ namespace quda {
         m = (m / 16) * 16 + 16;
         warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
       }
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_EIGCG_INVERTER)){
+      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
     }

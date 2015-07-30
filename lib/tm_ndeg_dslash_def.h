@@ -413,7 +413,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_TWIST_F, DD_XPAY_F)
 
 }
 
-
+#ifdef MULTI_GPU
 template <>
 __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_TWIST_F, DD_XPAY_F)<EXTERIOR_KERNEL_ALL>
      (DD_PARAM1, DD_PARAM2, DD_PARAM3, DD_PARAM4) {
@@ -427,7 +427,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_TWIST_F, DD_XPAY_F)<
 #endif
 
 }
-
+#endif // MULTI_GPU
 
 #endif
 

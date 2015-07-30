@@ -140,6 +140,10 @@ namespace quda {
 		gauge.Precision(), in->Precision());
     }
 
+    if (gauge.Reconstruct() == QUDA_RECONSTRUCT_9 || gauge.Reconstruct() == QUDA_RECONSTRUCT_13) {
+      errorQuda("Reconstruct %d not supported", gauge.Reconstruct());
+    }
+
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);
 

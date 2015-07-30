@@ -25,6 +25,8 @@ extern "C" {
     QudaParity evenodd; /** Which parity are we working on ? (options are QUDA_EVEN_PARITY, QUDA_ODD_PARITY, QUDA_INVALID_PARITY */
     int mixed_precision; /** Whether to use mixed precision or not (1 - yes, 0 - no) */
     double boundary_phase[4]; /** Boundary conditions */
+    int make_resident_solution; /** Make the solution resident and don't copy back */
+    int use_resident_solution; /** Use the resident solution */
   } QudaInvertArgs_t;
 
 
@@ -423,57 +425,6 @@ extern "C" {
       );
 
   /**
-   * Solve for multiple shifts (e.g., masses) using a Wilson-Clover
-   * operator with multi-shift CG.  This is a special variant of the
-   * multi-shift solver where the additional vectors required for
-   * force computation are also returned.  All fields are fields
-   * passed and returned are host (CPU) field in MILC order.  This
-   * function requires that persistent gauge and clover fields have
-   * been created prior.  When a pure double-precision solver is
-   * requested no reliable updates are used, else reliable updates are
-   * used with a reliable_delta parameter of 0.1.
-   *
-   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
-   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
-   * @param num_offsets Number of shifts to solve for
-   * @param offset Array of shift offset values
-   * @param kappa Kappa value
-   * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
-   * @param target_residual Array of target residuals per shift
-   * @param milc_link Ignored
-   * @param milc_clover Ignored
-   * @param milc_clover_inv Ignored
-   * @param clover_coeff Clover coefficient
-   * @param source Right-hand side source field
-   * @param psiEven Array of solution spinor fields
-   * @param psiOdd Array of fields with A_oo^{-1} D_oe * x 
-   * @param pEven Array of fields with M_ee * x
-   * @param pOdd Array of fields with A_oo^{-1} D_oe * M_ee * x
-   * @param final_residual Array of true residuals
-   * @param num_iters Number of iterations taken
-   */
-  void qudaCloverMultishiftMDInvert(int external_precision, 
-      int quda_precision,
-      int num_offsets,
-      double* const offset,
-      double kappa,
-      double clover_coeff,
-      QudaInvertArgs_t inv_args,
-      const double* target_residual,
-      const void* milc_link,
-      void* milc_clover, 
-      void* milc_clover_inv,
-      void* source,
-      void** psiEven,
-      void** psiOdd,
-      void** pEven,
-      void** pOdd,
-      double* const final_residual, 
-      int* num_iters
-      );
-
-  /**
    * Compute the fermion force for the HISQ quark action.  All fields
    * are host fields in MILC order, and the precision of these fields
    * must match.
@@ -569,7 +520,29 @@ extern "C" {
 		   double eps,
 		   void* momentum, 
 		   void* link);
-  
+
+  /**
+   * Compute the clover force contributions in each dimension mu given
+   * the array solution fields, and compute the resulting momentum
+   * field.
+   *
+   * @param mom Momentum matrix
+   * @param dt Integrating step size
+   * @param x Array of solution vectors
+   * @param p Array of intermediate vectors
+   * @param coeff Array of residues for each contribution
+   * @param kappa kappa parameter
+   * @param ck -clover_coefficient * kappa / 8
+   * @param nvec Number of vectors
+   * @param multiplicity Number of fermions represented by this bilinear
+   * @param gauge Gauge Field
+   * @param precision Precision of the fields
+   * @param inv_args Struct setting some solver metadata
+   */
+  void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa, 
+		       double ck, int nvec, double multiplicity, void *gauge, int precision,
+		       QudaInvertArgs_t inv_args);
+
   /**
    * Compute the sigma trace field (part of clover force computation).
    * All the pointers here are for QUDA native device objects.  The
@@ -666,6 +639,54 @@ extern "C" {
    * @param gauge Gauge field to be freed
    */
   void qudaDestroyGaugeField(void* gauge);
+
+
+  /**
+   * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
+   * @param[in] precision, 1 for single precision else for double precision
+   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
+   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
+   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
+   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in,out] milc_sitelink, MILC gauge field to be fixed
+   */
+  void qudaGaugeFixingOVR( const int precision,
+    const unsigned int gauge_dir, 
+    const int Nsteps,
+    const int verbose_interval,
+    const double relax_boost,
+    const double tolerance,
+    const unsigned int reunit_interval,
+    const unsigned int stopWtheta,
+    void* milc_sitelink
+    );
+
+
+  /**
+   * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
+   * @param[in] precision, 1 for single precision else for double precision
+   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
+   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
+   * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
+   * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value 
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in,out] milc_sitelink, MILC gauge field to be fixed
+   */
+  void qudaGaugeFixingFFT( int precision,
+    unsigned int gauge_dir, 
+    int Nsteps,
+    int verbose_interval,
+    double alpha,
+    unsigned int autotune,
+    double tolerance,
+    unsigned int stopWtheta,
+    void* milc_sitelink
+    );
 
   
 #ifdef __cplusplus
