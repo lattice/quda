@@ -586,9 +586,9 @@ PACKAGE_URL=''
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
-MAGMA_HOME
-ATLAS_HOME
 LAPACK_HOME
+ATLAS_HOME
+MAGMA_HOME
 BUILD_MAGMA
 QDP_INSTALL_PATH
 USE_QDPJIT
@@ -609,7 +609,7 @@ BUILD_QDPJIT_INTERFACE
 BUILD_CPS_INTERFACE
 BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
-MILC_NVTX
+INTERFACE_NVTX
 MPI_NVTX
 GPU_COMMS
 GPU_DIRECT
@@ -734,7 +734,7 @@ enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
 enable_mpi_nvtx
-enable_milc_nvtx
+enable_interface_nvtx
 enable_device_pack
 with_mpi
 enable_pthreads
@@ -1425,8 +1425,8 @@ Optional Features:
                           default: disabled)
   --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
                           the visual profiler (default: disabled)
-  --enable-milc-nvtx      Enable NVTX markup for profiling MILC interface
-                          calls in the visual profiler (default: disabled)
+  --enable-interface-nvtx Enable NVTX markup for profiling interface calls in
+                          the visual profiler (default: disabled)
   --enable-device-pack    Enable the packing / unpacking of fields on the
                           device (default: disabled)
   --enable-pthreads       Enable pthreads in the multi-GPU dslash build
@@ -1451,8 +1451,8 @@ Optional Packages:
   --with-qio=QIODIR       Specify QIO installation directory
   --with-qdp=QDPDIR       Specify QDP++ installation directory
   --with-magma=MAGMADIR   Specify MAGMA installation directory
-  --with-atlas=ATLASDIR   Specify ATLAS installation directory 
-  --with-lapack=LAPACKDIR Specify LAPACK installation directory     
+  --with-atlas=ATLASDIR   Specify ATLAS installation directory
+  --with-lapack=LAPACKDIR Specify LAPACK installation directory
 
 Some influential environment variables:
   CC          C compiler command
@@ -2330,11 +2330,11 @@ else
 fi
 
 
-# Check whether --enable-milc-nvtx was given.
-if test "${enable_milc_nvtx+set}" = set; then :
-  enableval=$enable_milc_nvtx;  milc_nvtx=${enableval}
+# Check whether --enable-interface-nvtx was given.
+if test "${enable_interface_nvtx+set}" = set; then :
+  enableval=$enable_interface_nvtx;  interface_nvtx=${enableval}
 else
-   milc_nvtx="no"
+   interface_nvtx="no"
 
 fi
 
@@ -3877,23 +3877,30 @@ fi
 if test "${with_magma+set}" = set; then :
   withval=$with_magma;  magma_home=${withval}; build_magma="yes"
 else
-   magma_home="" ; build_magma="no"; atlas_home=""; lapack_home=""
+   magma_home="" ; build_magma="no"
 
 fi
 
+
+
+# Check whether --with-atlas was given.
 if test "${with_atlas+set}" = set; then :
-    withval=$with_atlas;  atlas_home=${withval}
+  withval=$with_atlas;  atlas_home=${withval}
 else
-    atlas_home=""
+   atlas_home=""
 
 fi
 
+
+
+# Check whether --with-lapack was given.
 if test "${with_lapack+set}" = set; then :
-    withval=$with_lapack;  lapack_home=${withval}
+  withval=$with_lapack;  lapack_home=${withval}
 else
-    lapack_home="" 
+   lapack_home=""
 
 fi
+
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: User supplied NVCCFLAGS: ${NVCCFLAGS} " >&5
@@ -4261,10 +4268,10 @@ yes|no);;
   ;;
 esac
 
-case ${milc_nvtx} in
+case ${interface_nvtx} in
 yes|no);;
 *)
-  as_fn_error $? " invalid value for --enable-milc-nvtx " "$LINENO" 5
+  as_fn_error $? " invalid value for --enable-interface-nvtx " "$LINENO" 5
   ;;
 esac
 
@@ -4502,9 +4509,9 @@ $as_echo "$as_me: Setting MPI_NVTXS= ${mpi_nvtx}" >&6;}
 MPI_NVTX=${mpi_nvtx}
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MILC_NVTXS= ${milc_nvtx}" >&5
-$as_echo "$as_me: Setting MILC_NVTXS= ${milc_nvtx}" >&6;}
-MILC_NVTX=${milc_nvtx}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MILC_NVTXS= ${interface_nvtx}" >&5
+$as_echo "$as_me: Setting MILC_NVTXS= ${interface_nvtx}" >&6;}
+INTERFACE_NVTX=${interface_nvtx}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}" >&5
@@ -4611,13 +4618,16 @@ BUILD_MAGMA=${build_magma}
 $as_echo "$as_me: Setting MAGMA_HOME = ${magma_home}" >&6;}
 MAGMA_HOME=${magma_home}
 
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting ATLAS_HOME = ${atlas_home}" >&5
 $as_echo "$as_me: Setting ATLAS_HOME = ${atlas_home}" >&6;}
 ATLAS_HOME=${atlas_home}
 
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting LAPACK_HOME = ${lapack_home}" >&5
 $as_echo "$as_me: Setting LAPACK_HOME = ${lapack_home}" >&6;}
 LAPACK_HOME=${lapack_home}
+
 
 ac_config_files="$ac_config_files make.inc"
 
@@ -5775,3 +5785,4 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
+

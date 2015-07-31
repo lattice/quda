@@ -55,7 +55,7 @@ GPU_COMMS = @GPU_COMMS@            # set to 'yes' to allow GPU and NIC to commun
 
 # Profiling options
 MPI_NVTX = @MPI_NVTX@              # set to 'yes' to add nvtx markup to MPI API calls for the visual profiler
-MILC_NVTX = @MILC_NVTX@            # set to 'yes' to add nvtx markup to MILC interface calls for the visual profiler
+INTERFACE_NVTX = @INTERFACE_NVTX@            # set to 'yes' to add nvtx markup to interface calls for the visual profiler
 
 # Interface options
 BUILD_QDP_INTERFACE = @BUILD_QDP_INTERFACE@                     # build qdp interface
@@ -168,9 +168,12 @@ ifeq ($(strip $(MPI_NVTX)), yes)
   LIB += -lnvToolsExt
 endif
 
-ifeq ($(strip $(MILC_NVTX)), yes)
-  NVCCOPT += -DMILC_NVTX
-  COPT += -DMILC_NVTX
+ifeq ($(strip $(INTERFACE_NVTX)), yes)
+  NVCCOPT += -DMILC_NVTX -DINTERFACE_NVTX
+  COPT += -DMILC_NVTX -DINTERFACE_NVTX
+  ifneq ($(strip $(MPI_NVTX)), yes)
+    LIB += -lnvToolsExt
+  endif 
 endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)

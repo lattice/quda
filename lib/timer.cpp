@@ -41,8 +41,10 @@ namespace quda {
 				       "comms", "comms start", "comms query", "constant", 
 				       "total" };
 
+#ifdef INTERFACE_NVTX
   const uint32_t TimeProfile::nvtx_colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
   const int TimeProfile::nvtx_num_colors = sizeof(nvtx_colors)/sizeof(uint32_t);
+#endif
   
   Timer TimeProfile::global_profile[QUDA_PROFILE_COUNT];
   bool TimeProfile::global_switchOff=false;

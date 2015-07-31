@@ -201,8 +201,10 @@ namespace quda {
 
   struct TimeProfile {
     std::string fname;  /**< Which function are we profiling */
+#ifdef INTERFACE_NVTX
     static const uint32_t nvtx_colors[];// = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
     static const int nvtx_num_colors;// = sizeof(nvtx_colors)/sizeof(uint32_t);
+#endif
     Timer profile[QUDA_PROFILE_COUNT];
     static std::string pname[];
 

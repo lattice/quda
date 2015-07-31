@@ -222,11 +222,11 @@ AC_ARG_ENABLE(mpi-nvtx,
   [ mpi_nvtx="no" ]
 )
 
-dnl enable NVTX mark up for the MILC interface in the visual profiler
-AC_ARG_ENABLE(milc-nvtx,
-  AC_HELP_STRING([--enable-milc-nvtx], [ Enable NVTX markup for profiling MILC interface calls in the visual profiler (default: disabled)]),
-  [ milc_nvtx=${enableval}],
-  [ milc_nvtx="no" ]
+dnl enable NVTX mark up for the interface in the visual profiler
+AC_ARG_ENABLE(interface-nvtx,
+  AC_HELP_STRING([--enable-interface-nvtx], [ Enable NVTX markup for profiling interface calls in the visual profiler (default: disabled)]),
+  [ interface_nvtx=${enableval}],
+  [ interface_nvtx="no" ]
 )
 
 dnl enable packing and unpacking on the device
@@ -605,11 +605,11 @@ yes|no);;
   ;;
 esac
 
-dnl enable NVTX mark up for the MILC interface in the visual profiler
-case ${milc_nvtx} in
+dnl enable NVTX mark up for the interface in the visual profiler
+case ${interface_nvtx} in
 yes|no);;
 *) 
-  AC_MSG_ERROR([ invalid value for --enable-milc-nvtx ])
+  AC_MSG_ERROR([ invalid value for --enable-interface-nvtx ])
   ;;
 esac
 
@@ -791,8 +791,8 @@ AC_SUBST( GPU_COMMS, [${gpu_comms}])
 AC_MSG_NOTICE([Setting MPI_NVTXS= ${mpi_nvtx}])
 AC_SUBST( MPI_NVTX, [${mpi_nvtx}])
 
-AC_MSG_NOTICE([Setting MILC_NVTXS= ${milc_nvtx}])
-AC_SUBST( MILC_NVTX, [${milc_nvtx}])
+AC_MSG_NOTICE([Setting MILC_NVTXS= ${interface_nvtx}])
+AC_SUBST( INTERFACE_NVTX, [${interface_nvtx}])
 
 AC_MSG_NOTICE([Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}])
 AC_SUBST( BUILD_QDP_INTERFACE, [${build_qdp_interface}])
