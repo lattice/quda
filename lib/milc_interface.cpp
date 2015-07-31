@@ -61,11 +61,11 @@ void  inline qudamilc_called(const char* func, QudaVerbosity verb){
 #ifdef QUDAMILC_VERBOSE
 if (verb >= QUDA_VERBOSE) {
      if(start){
-       printf("QUDA_MILC_INTERFACE: %s (called) \n",func);
+       printfQuda("QUDA_MILC_INTERFACE: %s (called) \n",func);
        PUSH_RANGE(func,1)
      }
      else {
-      printf("QUDA_MILC_INTERFACE: %s (return) \n",func);
+      printfQuda("QUDA_MILC_INTERFACE: %s (return) \n",func);
       POP_RANGE
      }
    }
@@ -769,12 +769,15 @@ void qudaMultishiftInvert(int external_precision,
     const int fat_pad  = getFatLinkPadding(localDim);
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;  // don't know if this is correct
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
 
     const int long_pad = 3*fat_pad;
     gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad; 
+    gaugeParam.ga_pad = long_pad;
+    gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
 
    // invalidate_quda_gauge = false;
@@ -882,12 +885,14 @@ void qudaInvert(int external_precision,
 //  if(invalidate_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad; 
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(fatlink), &gaugeParam); 
 
     gaugeParam.type = QUDA_THREE_LINKS;
     gaugeParam.ga_pad = long_pad; 
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+    gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
 
     invalidate_quda_gauge = false;
