@@ -6,6 +6,7 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
+#include <index_helper.cuh>
 #include <cassert>
 
 namespace quda {
@@ -40,22 +41,6 @@ namespace quda {
     }
   };
 
-  __device__ void getCoords(int x[4], int cb_index, const int X[4], int parity)
-  {
-    x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-    x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-    x[1] = (cb_index/(X[0]/2)) % X[1];
-    x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
-    return;
-  }
-
-  __device__ int linkIndex(const int x[4], const int dx[4], const int X[4])
-  {
-    int y[4];
-    for (int i=0; i<4; i++) y[i] = (x[i] + dx[i] + X[i]) % X[i];
-    return (((y[3]*X[2] + y[2])*X[1] + y[1])*X[0] + y[0])/2;
-  }
-  
   
   template<typename Cmplx, bool isConjugate, typename Arg>
   __global__ void 
@@ -93,35 +78,35 @@ namespace quda {
 
       // load U(x)_(+mu)
       Matrix<Cmplx,3> U1;
-      arg.gauge.load((real*)(U1.data), linkIndex(x, d, X), mu, arg.parity);
+      arg.gauge.load((real*)(U1.data), linkIndexShift(x, d, X), mu, arg.parity);
 
       // load U(x+mu)_(+nu)
       Matrix<Cmplx,3> U2;
       d[mu]++;
-      arg.gauge.load((real*)(U2.data), linkIndex(x, d, X), nu, otherparity);
+      arg.gauge.load((real*)(U2.data), linkIndexShift(x, d, X), nu, otherparity);
       d[mu]--;
 
 
       // load U(x+nu)_(+mu) 
       Matrix<Cmplx,3> U3;
       d[nu]++;
-      arg.gauge.load((real*)(U3.data), linkIndex(x, d, X), mu, otherparity);
+      arg.gauge.load((real*)(U3.data), linkIndexShift(x, d, X), mu, otherparity);
       d[nu]--;
       
       // load U(x)_(+nu)
       Matrix<Cmplx,3> U4;
-      arg.gauge.load((real*)(U4.data), linkIndex(x, d, X), nu, arg.parity);
+      arg.gauge.load((real*)(U4.data), linkIndexShift(x, d, X), nu, arg.parity);
 
       // load Oprod
       Matrix<Cmplx,3> Oprod1;
-      arg.oprod.load((real*)(Oprod1.data), linkIndex(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), 0, arg.parity);
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
       thisForce = U1*U2*conj(U3)*conj(U4)*Oprod1;
 
       Matrix<Cmplx,3> Oprod2;
       d[mu]++; d[nu]++;
-      arg.oprod.load((real*)(Oprod2.data), linkIndex(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod2.data), linkIndexShift(x, d, X), 0, arg.parity);
       d[mu]--; d[nu]--;
 
       if(isConjugate) Oprod2 -= conj(Oprod2);
@@ -133,28 +118,28 @@ namespace quda {
       int d[4] = {0, 0, 0, 0};
       // load U(x)_(+mu)
       Matrix<Cmplx,3> U1;
-      arg.gauge.load((real*)(U1.data), linkIndex(y, d, X), mu, otherparity);
+      arg.gauge.load((real*)(U1.data), linkIndexShift(y, d, X), mu, otherparity);
 
       // load U(x+mu)_(+nu)
       Matrix<Cmplx,3> U2;
       d[mu]++;
-      arg.gauge.load((real*)(U2.data), linkIndex(y, d, X), nu, arg.parity);
+      arg.gauge.load((real*)(U2.data), linkIndexShift(y, d, X), nu, arg.parity);
       d[mu]--;
 
       // load U(x+nu)_(+mu) 
       Matrix<Cmplx,3> U3;
       d[nu]++;
-      arg.gauge.load((real*)(U3.data), linkIndex(y, d, X), mu, arg.parity);
+      arg.gauge.load((real*)(U3.data), linkIndexShift(y, d, X), mu, arg.parity);
       d[nu]--;
 
       // load U(x)_(+nu)
       Matrix<Cmplx,3> U4;
-      arg.gauge.load((real*)(U4.data), linkIndex(y, d, X), nu, otherparity);
+      arg.gauge.load((real*)(U4.data), linkIndexShift(y, d, X), nu, otherparity);
 
       // load opposite parity Oprod
       Matrix<Cmplx,3> Oprod3;
       d[nu]++;
-      arg.oprod.load((real*)(Oprod3.data), linkIndex(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod3.data), linkIndexShift(y, d, X), 0, arg.parity);
       d[nu]--;
 
       if(isConjugate) Oprod3 -= conj(Oprod3);
@@ -163,7 +148,7 @@ namespace quda {
       // load Oprod(x+mu)
       Matrix<Cmplx, 3> Oprod4;
       d[mu]++;
-      arg.oprod.load((real*)(Oprod4.data), linkIndex(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod4.data), linkIndexShift(y, d, X), 0, arg.parity);
       d[mu]--;
 
       if(isConjugate) Oprod4 -= conj(Oprod4);
@@ -179,29 +164,29 @@ namespace quda {
       // load U(x-nu)(+nu)
       Matrix<Cmplx,3> U1;
       d[nu]--;
-      arg.gauge.load((real*)(U1.data), linkIndex(y, d, X), nu, arg.parity);
+      arg.gauge.load((real*)(U1.data), linkIndexShift(y, d, X), nu, arg.parity);
       d[nu]++;
 
       // load U(x-nu)(+mu) 
       Matrix<Cmplx, 3> U2;
       d[nu]--;
-      arg.gauge.load((real*)(U2.data), linkIndex(y, d, X), mu, arg.parity);
+      arg.gauge.load((real*)(U2.data), linkIndexShift(y, d, X), mu, arg.parity);
       d[nu]++;
 
       // load U(x+mu-nu)(nu)
       Matrix<Cmplx, 3> U3;
       d[mu]++; d[nu]--;
-      arg.gauge.load((real*)(U3.data), linkIndex(y, d, X), nu, otherparity);
+      arg.gauge.load((real*)(U3.data), linkIndexShift(y, d, X), nu, otherparity);
       d[mu]--; d[nu]++;
 
       // load U(x)_(+mu)
       Matrix<Cmplx,3> U4;
-      arg.gauge.load((real*)(U4.data), linkIndex(y, d, X), mu, otherparity);
+      arg.gauge.load((real*)(U4.data), linkIndexShift(y, d, X), mu, otherparity);
 
       // load Oprod(x+mu)
       Matrix<Cmplx, 3> Oprod1;
       d[mu]++;
-      arg.oprod.load((real*)(Oprod1.data), linkIndex(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(y, d, X), 0, arg.parity);
       d[mu]--;    
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
@@ -210,7 +195,7 @@ namespace quda {
 
       Matrix<Cmplx,3> Oprod2;
       d[nu]--;
-      arg.oprod.load((real*)(Oprod2.data), linkIndex(y, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod2.data), linkIndexShift(y, d, X), 0, arg.parity);
       d[nu]++;
 
       if(isConjugate) Oprod2 -= conj(Oprod2);
@@ -222,35 +207,35 @@ namespace quda {
       // load U(x-nu)(+nu)
       Matrix<Cmplx,3> U1;
       d[nu]--;
-      arg.gauge.load((real*)(U1.data), linkIndex(x, d, X), nu, otherparity);
+      arg.gauge.load((real*)(U1.data), linkIndexShift(x, d, X), nu, otherparity);
       d[nu]++;
 	
       // load U(x-nu)(+mu) 
       Matrix<Cmplx, 3> U2;
       d[nu]--;
-      arg.gauge.load((real*)(U2.data), linkIndex(x, d, X), mu, otherparity);
+      arg.gauge.load((real*)(U2.data), linkIndexShift(x, d, X), mu, otherparity);
       d[nu]++;
 
       // load U(x+mu-nu)(nu)
       Matrix<Cmplx, 3> U3;
       d[mu]++; d[nu]--;
-      arg.gauge.load((real*)(U3.data), linkIndex(x, d, X), nu, arg.parity);
+      arg.gauge.load((real*)(U3.data), linkIndexShift(x, d, X), nu, arg.parity);
       d[mu]--; d[nu]++;
 
       // load U(x)_(+mu)
       Matrix<Cmplx,3> U4;
-      arg.gauge.load((real*)(U4.data), linkIndex(x, d, X), mu, arg.parity);
+      arg.gauge.load((real*)(U4.data), linkIndexShift(x, d, X), mu, arg.parity);
 
       Matrix<Cmplx,3> Oprod1;
       d[mu]++; d[nu]--;
-      arg.oprod.load((real*)(Oprod1.data), linkIndex(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod1.data), linkIndexShift(x, d, X), 0, arg.parity);
       d[mu]--; d[nu]++;
 
       if(isConjugate) Oprod1 -= conj(Oprod1);
       thisForce -= conj(U1)*U2*Oprod1*U3*conj(U4);
 
       Matrix<Cmplx, 3> Oprod4;
-      arg.oprod.load((real*)(Oprod4.data), linkIndex(x, d, X), 0, arg.parity);
+      arg.oprod.load((real*)(Oprod4.data), linkIndexShift(x, d, X), 0, arg.parity);
 
       if(isConjugate) Oprod4 -= conj(Oprod4);
       thisForce -= Oprod4*conj(U1)*U2*U3*conj(U4);
@@ -347,26 +332,15 @@ namespace quda {
       typedef FloatNOrder<Float, 18, 2, 18> F;
       typedef FloatNOrder<Float, 18, 2, 18> O;
 
-      if(gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER){
-	if(gauge.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	  typedef FloatNOrder<Float, 18, 2, 18> G;
+      if (gauge.isNative()) {
+	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
 	  typedef CloverDerivArg<Complex,F,G,O> Arg;
 	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
 	  CloverDerivative<Complex, Arg> deriv(arg, gauge);
 	  deriv.apply(0);
-	}else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-	  typedef FloatNOrder<Float, 18, 2, 12> G;
-	  typedef CloverDerivArg<Complex,F,G,O> Arg;
-	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
-	  CloverDerivative<Complex, Arg> deriv(arg, gauge);
-	  deriv.apply(0);
-	}else{
-	  errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
-	}
-	
-      }else if(gauge.Order() == QUDA_FLOAT4_GAUGE_ORDER){
-	if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12){
-	  typedef FloatNOrder<Float, 18, 4, 12> G;
+	} else if(gauge.Reconstruct() == QUDA_RECONSTRUCT_12) {
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	  typedef CloverDerivArg<Complex,F,G,O> Arg;
 	  Arg arg(F(force), G(gauge), O(oprod), force.X(), mu, nu, coeff, parity, conjugate);
 	  CloverDerivative<Complex, Arg> deriv(arg, gauge);
@@ -374,9 +348,11 @@ namespace quda {
 	}else{
 	  errorQuda("Reconstruction type %d not supported",gauge.Reconstruct());
 	}
+      } else {
+	errorQuda("Gauge order %d not supported", gauge.Order());
       }
     } else {
-      errorQuda("Force order %d not supported");
+      errorQuda("Force order %d not supported", force.Order());
     } // force / oprod order
   }
 #endif // GPU_CLOVER

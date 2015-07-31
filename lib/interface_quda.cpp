@@ -219,7 +219,7 @@ static TimeProfile profileGaugeFix("GaugeFixCuda");
 
 
 //!< Profiler for toal time spend between init and end
-static TimeProfile profileInit2End("init2endQuda",false);
+static TimeProfile profileInit2End("initQuda-endQuda",false);
 
 namespace quda {
   void printLaunchTimer();
@@ -2921,8 +2921,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   //Dirac &diracSloppy   = param->rhs_idx < param->deflation_grid ? *dSloppy : *dHalfPrec;
   Dirac &diracSloppy   = *dSloppy;
   Dirac &diracHalf     = *dHalfPrec;  
-  Dirac &diracDeflate  = *d;//full precision deflation
-  //Dirac &diracHalfPrec = *dHalfPrec;  
+  Dirac &diracDeflate  = (param->cuda_prec_ritz == param->cuda_prec) ? *d : *dSloppy;
 
   profileInvert.Start(QUDA_PROFILE_H2D);
 

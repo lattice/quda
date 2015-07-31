@@ -301,7 +301,7 @@ static bool checkDimsPartitioned(){
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
 
       int x[4];
-      getCoords3(x, idx, X, parity);
+      getCoords(x, idx, X, parity);
 #ifdef MULTI_GPU
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) {
@@ -473,7 +473,7 @@ static bool checkDimsPartitioned(){
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
 
       int x[4];
-      getCoords3(x, idx, X, parity);
+      getCoords(x, idx, X, parity);
   #ifdef MULTI_GPU
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) {
@@ -508,7 +508,7 @@ static bool checkDimsPartitioned(){
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
 
       int x[4];
-      getCoords3(x, idx, X, parity);
+      getCoords(x, idx, X, parity);
   #ifdef MULTI_GPU
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) {
@@ -774,7 +774,7 @@ static bool checkDimsPartitioned(){
       X[dr] += 2 * arg.border[dr];
     }
 #else
-    getCoords3(x, idx, X, parity);
+    getCoords(x, idx, X, parity);
 #endif
     int mu = (threadIdx.x / blockSize);
 

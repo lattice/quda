@@ -70,7 +70,7 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
     for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
     int x[4];
-    getCoords3(x, idx, X, parity);
+    getCoords(x, idx, X, parity);
   #ifdef MULTI_GPU
     #pragma unroll
     for(int dr=0; dr<4; ++dr) {
