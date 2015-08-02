@@ -122,7 +122,7 @@ void SU3Test(int argc, char **argv) {
   plaqQuda(plaq);
   printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 #else
-  printf("Skipping plaquette computation since gauge tools have not been compiled");
+  printf("Skipping plaquette computation since gauge tools have not been compiled\n");
 #endif
 
   check_gauge(gauge, new_gauge, 1e-3, param.cpu_prec);
