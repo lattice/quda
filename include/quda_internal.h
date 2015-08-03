@@ -45,6 +45,12 @@
 #endif
 
 
+
+#ifdef INTERFACE_NVTX
+#include "nvToolsExt.h"
+#endif
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -170,9 +176,35 @@ namespace quda {
     QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
   };
 
+#ifdef INTERFACE_NVTX
+
+
+
+#define PUSH_RANGE(name,cid) { \
+    int color_id = cid; \
+    color_id = color_id%nvtx_num_colors;\
+    nvtxEventAttributes_t eventAttrib = {0}; \
+    eventAttrib.version = NVTX_VERSION; \
+    eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+    eventAttrib.colorType = NVTX_COLOR_ARGB; \
+    eventAttrib.color = nvtx_colors[color_id]; \
+    eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+    eventAttrib.message.ascii = name; \
+    eventAttrib.category = cid;\
+    nvtxRangePushEx(&eventAttrib); \
+}
+#define POP_RANGE nvtxRangePop();
+#else
+#define PUSH_RANGE(name,cid)
+#define POP_RANGE
+#endif
+
   struct TimeProfile {
     std::string fname;  /**< Which function are we profiling */
-
+#ifdef INTERFACE_NVTX
+    static const uint32_t nvtx_colors[];// = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+    static const int nvtx_num_colors;// = sizeof(nvtx_colors)/sizeof(uint32_t);
+#endif
     Timer profile[QUDA_PROFILE_COUNT];
     static std::string pname[];
 
@@ -228,17 +260,21 @@ namespace quda {
     void Start(QudaProfileType idx) { 
       // if total timer isn't running, then start it running
       if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
+	profile[QUDA_PROFILE_TOTAL].Start(); 
+	switchOff = true;
         profile[QUDA_PROFILE_TOTAL].Start();
         switchOff = true;
       }
 
       profile[idx].Start(); 
+      PUSH_RANGE(fname.c_str(),idx)
       if (use_global) StartGlobal(idx);
     }
 
 
     void Stop(QudaProfileType idx) { 
       profile[idx].Stop(); 
+      POP_RANGE
 
       // switch off total timer if we need to
       if (switchOff && idx != QUDA_PROFILE_TOTAL) {
@@ -258,6 +294,9 @@ namespace quda {
 
   };
 
+#undef PUSH_RANGE
+#undef POP_RANGE
+
 #ifdef MULTI_GPU
 #ifdef PTHREADS
   const int Nstream = 10;
@@ -269,5 +308,7 @@ namespace quda {
 #endif
 
 } // namespace quda
+
+
 
 #endif // _QUDA_INTERNAL_H
