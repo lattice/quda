@@ -4509,8 +4509,8 @@ $as_echo "$as_me: Setting MPI_NVTXS= ${mpi_nvtx}" >&6;}
 MPI_NVTX=${mpi_nvtx}
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MILC_NVTXS= ${interface_nvtx}" >&5
-$as_echo "$as_me: Setting MILC_NVTXS= ${interface_nvtx}" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting INTERFACE_NVTXS= ${interface_nvtx}" >&5
+$as_echo "$as_me: Setting INTERFACE_NVTXS= ${interface_nvtx}" >&6;}
 INTERFACE_NVTX=${interface_nvtx}
 
 

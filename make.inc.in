@@ -169,8 +169,8 @@ ifeq ($(strip $(MPI_NVTX)), yes)
 endif
 
 ifeq ($(strip $(INTERFACE_NVTX)), yes)
-  NVCCOPT += -DMILC_NVTX -DINTERFACE_NVTX
-  COPT += -DMILC_NVTX -DINTERFACE_NVTX
+  NVCCOPT += -DINTERFACE_NVTX
+  COPT += -DINTERFACE_NVTX
   ifneq ($(strip $(MPI_NVTX)), yes)
     LIB += -lnvToolsExt
   endif 
