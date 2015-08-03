@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,6 +35,7 @@
 
 #include "../../block/block_radix_sort.cuh"
 #include "../../block/block_discontinuity.cuh"
+#include "../../util_ptx.cuh"
 #include "../../util_namespace.cuh"
 
 /// Optional outer namespace(s)
@@ -49,19 +50,47 @@ namespace cub {
  * \brief The BlockHistogramSort class provides sorting-based methods for constructing block-wide histograms from data samples partitioned across a CUDA thread block.
  */
 template <
-    typename                T,
-    int                     BLOCK_THREADS,
-    int                     ITEMS_PER_THREAD,
-    int                     BINS>
+    typename    T,                  ///< Sample type
+    int         BLOCK_DIM_X,        ///< The thread block length in threads along the X dimension
+    int         ITEMS_PER_THREAD,   ///< The number of samples per thread
+    int         BINS,               ///< The number of bins into which histogram samples may fall
+    int         BLOCK_DIM_Y,        ///< The thread block length in threads along the Y dimension
+    int         BLOCK_DIM_Z,        ///< The thread block length in threads along the Z dimension
+    int         PTX_ARCH>           ///< The PTX compute capability for which to to specialize this collective
 struct BlockHistogramSort
 {
+    /// Constants
+    enum
+    {
+        /// The thread block size in threads
+        BLOCK_THREADS = BLOCK_DIM_X * BLOCK_DIM_Y * BLOCK_DIM_Z,
+    };
+
     // Parameterize BlockRadixSort type for our thread block
-    typedef BlockRadixSort<T, BLOCK_THREADS, ITEMS_PER_THREAD> BlockRadixSortT;
+    typedef BlockRadixSort<
+            T,
+            BLOCK_DIM_X,
+            ITEMS_PER_THREAD,
+            NullType,
+            4,
+            (PTX_ARCH >= 350) ? true : false,
+            BLOCK_SCAN_WARP_SCANS,
+            cudaSharedMemBankSizeFourByte,
+            BLOCK_DIM_Y,
+            BLOCK_DIM_Z,
+            PTX_ARCH>
+        BlockRadixSortT;
 
     // Parameterize BlockDiscontinuity type for our thread block
-    typedef BlockDiscontinuity<T, BLOCK_THREADS> BlockDiscontinuityT;
+    typedef BlockDiscontinuity<
+            T,
+            BLOCK_DIM_X,
+            BLOCK_DIM_Y,
+            BLOCK_DIM_Z,
+            PTX_ARCH>
+        BlockDiscontinuityT;
 
-    // Shared memory
+    /// Shared memory
     union _TempStorage
     {
         // Storage for sorting bin values
@@ -90,11 +119,10 @@ struct BlockHistogramSort
 
     /// Constructor
     __device__ __forceinline__ BlockHistogramSort(
-        TempStorage     &temp_storage,
-        int             linear_tid)
+        TempStorage     &temp_storage)
     :
         temp_storage(temp_storage.Alias()),
-        linear_tid(linear_tid)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
 
 
@@ -110,7 +138,7 @@ struct BlockHistogramSort
         {}
 
         // Discontinuity predicate
-        __device__ __forceinline__ bool operator()(const T &a, const T &b, unsigned int b_index)
+        __device__ __forceinline__ bool operator()(const T &a, const T &b, int b_index)
         {
             if (a != b)
             {
@@ -130,15 +158,15 @@ struct BlockHistogramSort
 
     // Composite data onto an existing histogram
     template <
-        typename            HistoCounter>
+        typename            CounterT     >
     __device__ __forceinline__ void Composite(
         T                   (&items)[ITEMS_PER_THREAD],     ///< [in] Calling thread's input values to histogram
-        HistoCounter        histogram[BINS])                 ///< [out] Reference to shared/global memory histogram
+        CounterT            histogram[BINS])                 ///< [out] Reference to shared/global memory histogram
     {
         enum { TILE_SIZE = BLOCK_THREADS * ITEMS_PER_THREAD };
 
         // Sort bytes in blocked arrangement
-        BlockRadixSortT(temp_storage.sort, linear_tid).Sort(items);
+        BlockRadixSortT(temp_storage.sort).Sort(items);
 
         __syncthreads();
 
@@ -164,7 +192,7 @@ struct BlockHistogramSort
 
         // Compute head flags to demarcate contiguous runs of the same bin in the sorted tile
         DiscontinuityOp flag_op(temp_storage);
-        BlockDiscontinuityT(temp_storage.flag, linear_tid).FlagHeads(flags, items, flag_op);
+        BlockDiscontinuityT(temp_storage.flag).FlagHeads(flags, items, flag_op);
 
         // Update begin for first item
         if (linear_tid == 0) temp_storage.run_begin[items[0]] = 0;
@@ -178,14 +206,15 @@ struct BlockHistogramSort
         for(; histo_offset + BLOCK_THREADS <= BINS; histo_offset += BLOCK_THREADS)
         {
             int thread_offset = histo_offset + linear_tid;
-            HistoCounter count = temp_storage.run_end[thread_offset] - temp_storage.run_begin[thread_offset];
+            CounterT      count = temp_storage.run_end[thread_offset] - temp_storage.run_begin[thread_offset];
             histogram[thread_offset] += count;
         }
+
         // Finish up with guarded composition if necessary
         if ((BINS % BLOCK_THREADS != 0) && (histo_offset + linear_tid < BINS))
         {
             int thread_offset = histo_offset + linear_tid;
-            HistoCounter count = temp_storage.run_end[thread_offset] - temp_storage.run_begin[thread_offset];
+            CounterT      count = temp_storage.run_end[thread_offset] - temp_storage.run_begin[thread_offset];
             histogram[thread_offset] += count;
         }
     }

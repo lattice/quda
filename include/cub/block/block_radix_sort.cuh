@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -34,11 +34,12 @@
 
 #pragma once
 
-#include "../util_namespace.cuh"
-#include "../util_arch.cuh"
-#include "../util_type.cuh"
 #include "block_exchange.cuh"
 #include "block_radix_rank.cuh"
+#include "../util_ptx.cuh"
+#include "../util_arch.cuh"
+#include "../util_type.cuh"
+#include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
 CUB_NS_PREFIX
@@ -50,14 +51,17 @@ namespace cub {
  * \brief The BlockRadixSort class provides [<em>collective</em>](index.html#sec0) methods for sorting items partitioned across a CUDA thread block using a radix sorting method.  ![](sorting_logo.png)
  * \ingroup BlockModule
  *
- * \tparam Key                  Key type
- * \tparam BLOCK_THREADS        The thread block size in threads
+ * \tparam KeyT                  KeyT type
+ * \tparam BLOCK_DIM_X          The thread block length in threads along the X dimension
  * \tparam ITEMS_PER_THREAD     The number of items per thread
- * \tparam Value                <b>[optional]</b> Value type (default: cub::NullType, which indicates a keys-only sort)
+ * \tparam ValueT                <b>[optional]</b> ValueT type (default: cub::NullType, which indicates a keys-only sort)
  * \tparam RADIX_BITS           <b>[optional]</b> The number of radix bits per digit place (default: 4 bits)
  * \tparam MEMOIZE_OUTER_SCAN   <b>[optional]</b> Whether or not to buffer outer raking scan partials to incur fewer shared memory reads at the expense of higher register pressure (default: true for architectures SM35 and newer, false otherwise).
  * \tparam INNER_SCAN_ALGORITHM <b>[optional]</b> The cub::BlockScanAlgorithm algorithm to use (default: cub::BLOCK_SCAN_WARP_SCANS)
  * \tparam SMEM_CONFIG          <b>[optional]</b> Shared memory bank mode (default: \p cudaSharedMemBankSizeFourByte)
+ * \tparam BLOCK_DIM_Y          <b>[optional]</b> The thread block length in threads along the Y dimension (default: 1)
+ * \tparam BLOCK_DIM_Z          <b>[optional]</b> The thread block length in threads along the Z dimension (default: 1)
+ * \tparam PTX_ARCH             <b>[optional]</b> \ptxversion
  *
  * \par Overview
  * - The [<em>radix sorting method</em>](http://en.wikipedia.org/wiki/Radix_sort) arranges
@@ -73,6 +77,7 @@ namespace cub {
  *   method can only be applied to unsigned integral types, BlockRadixSort
  *   is able to sort signed and floating-point types via simple bit-wise transformations
  *   that ensure lexicographic key ordering.
+ * - \rowmajor
  *
  * \par Performance Considerations
  * - \granularity
@@ -89,7 +94,7 @@ namespace cub {
  *
  * __global__ void ExampleKernel(...)
  * {
- *     // Specialize BlockRadixSort for 128 threads owning 4 integer items each
+ *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer items each
  *     typedef cub::BlockRadixSort<int, 128, 4> BlockRadixSort;
  *
  *     // Allocate shared memory for BlockRadixSort
@@ -112,14 +117,17 @@ namespace cub {
  *
  */
 template <
-    typename                Key,
-    int                     BLOCK_THREADS,
+    typename                KeyT,
+    int                     BLOCK_DIM_X,
     int                     ITEMS_PER_THREAD,
-    typename                Value                   = NullType,
+    typename                ValueT                   = NullType,
     int                     RADIX_BITS              = 4,
-    bool                    MEMOIZE_OUTER_SCAN      = (CUB_PTX_VERSION >= 350) ? true : false,
+    bool                    MEMOIZE_OUTER_SCAN      = (CUB_PTX_ARCH >= 350) ? true : false,
     BlockScanAlgorithm      INNER_SCAN_ALGORITHM    = BLOCK_SCAN_WARP_SCANS,
-    cudaSharedMemConfig     SMEM_CONFIG             = cudaSharedMemBankSizeFourByte>
+    cudaSharedMemConfig     SMEM_CONFIG             = cudaSharedMemBankSizeFourByte,
+    int                     BLOCK_DIM_Y             = 1,
+    int                     BLOCK_DIM_Z             = 1,
+    int                     PTX_ARCH                = CUB_PTX_ARCH>
 class BlockRadixSort
 {
 private:
@@ -130,38 +138,48 @@ private:
 
     enum
     {
-        KEYS_ONLY = Equals<Value, NullType>::VALUE,
+        // The thread block size in threads
+        BLOCK_THREADS               = BLOCK_DIM_X * BLOCK_DIM_Y * BLOCK_DIM_Z,
+
+        // Whether or not there are values to be trucked along with keys
+        KEYS_ONLY                   = Equals<ValueT, NullType>::VALUE,
     };
 
-    // Key traits and unsigned bits type
-    typedef NumericTraits<Key>                  KeyTraits;
+    // KeyT traits and unsigned bits type
+    typedef NumericTraits<KeyT>                  KeyTraits;
     typedef typename KeyTraits::UnsignedBits    UnsignedBits;
 
     /// Ascending BlockRadixRank utility type
     typedef BlockRadixRank<
-            BLOCK_THREADS,
+            BLOCK_DIM_X,
             RADIX_BITS,
             false,
             MEMOIZE_OUTER_SCAN,
             INNER_SCAN_ALGORITHM,
-            SMEM_CONFIG>
+            SMEM_CONFIG,
+            BLOCK_DIM_Y,
+            BLOCK_DIM_Z,
+            PTX_ARCH>
         AscendingBlockRadixRank;
 
     /// Descending BlockRadixRank utility type
     typedef BlockRadixRank<
-            BLOCK_THREADS,
+            BLOCK_DIM_X,
             RADIX_BITS,
             true,
             MEMOIZE_OUTER_SCAN,
             INNER_SCAN_ALGORITHM,
-            SMEM_CONFIG>
+            SMEM_CONFIG,
+            BLOCK_DIM_Y,
+            BLOCK_DIM_Z,
+            PTX_ARCH>
         DescendingBlockRadixRank;
 
     /// BlockExchange utility type for keys
-    typedef BlockExchange<Key, BLOCK_THREADS, ITEMS_PER_THREAD> BlockExchangeKeys;
+    typedef BlockExchange<KeyT, BLOCK_DIM_X, ITEMS_PER_THREAD, false, BLOCK_DIM_Y, BLOCK_DIM_Z, PTX_ARCH> BlockExchangeKeys;
 
     /// BlockExchange utility type for values
-    typedef BlockExchange<Value, BLOCK_THREADS, ITEMS_PER_THREAD> BlockExchangeValues;
+    typedef BlockExchange<ValueT, BLOCK_DIM_X, ITEMS_PER_THREAD, false, BLOCK_DIM_Y, BLOCK_DIM_Z, PTX_ARCH> BlockExchangeValues;
 
     /// Shared memory storage layout type
     struct _TempStorage
@@ -202,12 +220,14 @@ private:
         UnsignedBits    (&unsigned_keys)[ITEMS_PER_THREAD],
         int             (&ranks)[ITEMS_PER_THREAD],
         int             begin_bit,
+        int             pass_bits,
         Int2Type<false> is_descending)
     {
-        AscendingBlockRadixRank(temp_storage.asending_ranking_storage, linear_tid).RankKeys(
+        AscendingBlockRadixRank(temp_storage.asending_ranking_storage).RankKeys(
             unsigned_keys,
             ranks,
-            begin_bit);
+            begin_bit,
+            pass_bits);
     }
 
     /// Rank keys (specialized for descending sort)
@@ -215,17 +235,19 @@ private:
         UnsignedBits    (&unsigned_keys)[ITEMS_PER_THREAD],
         int             (&ranks)[ITEMS_PER_THREAD],
         int             begin_bit,
+        int             pass_bits,
         Int2Type<true>  is_descending)
     {
-        DescendingBlockRadixRank(temp_storage.descending_ranking_storage, linear_tid).RankKeys(
+        DescendingBlockRadixRank(temp_storage.descending_ranking_storage).RankKeys(
             unsigned_keys,
             ranks,
-            begin_bit);
+            begin_bit,
+            pass_bits);
     }
 
     /// ExchangeValues (specialized for key-value sort, to-blocked arrangement)
     __device__ __forceinline__ void ExchangeValues(
-        Value           (&values)[ITEMS_PER_THREAD],
+        ValueT          (&values)[ITEMS_PER_THREAD],
         int             (&ranks)[ITEMS_PER_THREAD],
         Int2Type<false> is_keys_only,
         Int2Type<true>  is_blocked)
@@ -233,12 +255,12 @@ private:
         __syncthreads();
 
         // Exchange values through shared memory in blocked arrangement
-        BlockExchangeValues(temp_storage.exchange_values, linear_tid).ScatterToBlocked(values, ranks);
+        BlockExchangeValues(temp_storage.exchange_values).ScatterToBlocked(values, ranks);
     }
 
     /// ExchangeValues (specialized for key-value sort, to-striped arrangement)
     __device__ __forceinline__ void ExchangeValues(
-        Value           (&values)[ITEMS_PER_THREAD],
+        ValueT          (&values)[ITEMS_PER_THREAD],
         int             (&ranks)[ITEMS_PER_THREAD],
         Int2Type<false> is_keys_only,
         Int2Type<false> is_blocked)
@@ -246,13 +268,13 @@ private:
         __syncthreads();
 
         // Exchange values through shared memory in blocked arrangement
-        BlockExchangeValues(temp_storage.exchange_values, linear_tid).ScatterToStriped(values, ranks);
+        BlockExchangeValues(temp_storage.exchange_values).ScatterToStriped(values, ranks);
     }
 
     /// ExchangeValues (specialized for keys-only sort)
     template <int IS_BLOCKED>
     __device__ __forceinline__ void ExchangeValues(
-        Value                   (&values)[ITEMS_PER_THREAD],
+        ValueT                  (&values)[ITEMS_PER_THREAD],
         int                     (&ranks)[ITEMS_PER_THREAD],
         Int2Type<true>          is_keys_only,
         Int2Type<IS_BLOCKED>    is_blocked)
@@ -261,8 +283,8 @@ private:
     /// Sort blocked arrangement
     template <int DESCENDING, int KEYS_ONLY>
     __device__ __forceinline__ void SortBlocked(
-        Key                     (&keys)[ITEMS_PER_THREAD],          ///< Keys to sort
-        Value                   (&values)[ITEMS_PER_THREAD],        ///< Values to sort
+        KeyT                    (&keys)[ITEMS_PER_THREAD],          ///< Keys to sort
+        ValueT                  (&values)[ITEMS_PER_THREAD],        ///< Values to sort
         int                     begin_bit,                          ///< The beginning (least-significant) bit index needed for key comparison
         int                     end_bit,                            ///< The past-the-end (most-significant) bit index needed for key comparison
         Int2Type<DESCENDING>    is_descending,                      ///< Tag whether is a descending-order sort
@@ -281,15 +303,17 @@ private:
         // Radix sorting passes
         while (true)
         {
+            int pass_bits = CUB_MIN(RADIX_BITS, end_bit - begin_bit);
+
             // Rank the blocked keys
             int ranks[ITEMS_PER_THREAD];
-            RankKeys(unsigned_keys, ranks, begin_bit, is_descending);
+            RankKeys(unsigned_keys, ranks, begin_bit, pass_bits, is_descending);
             begin_bit += RADIX_BITS;
 
             __syncthreads();
 
             // Exchange keys through shared memory in blocked arrangement
-            BlockExchangeKeys(temp_storage.exchange_keys, linear_tid).ScatterToBlocked(keys, ranks);
+            BlockExchangeKeys(temp_storage.exchange_keys).ScatterToBlocked(keys, ranks);
 
             // Exchange values through shared memory in blocked arrangement
             ExchangeValues(values, ranks, is_keys_only, Int2Type<true>());
@@ -308,11 +332,15 @@ private:
         }
     }
 
+public:
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
+
     /// Sort blocked -> striped arrangement
     template <int DESCENDING, int KEYS_ONLY>
     __device__ __forceinline__ void SortBlockedToStriped(
-        Key                     (&keys)[ITEMS_PER_THREAD],          ///< Keys to sort
-        Value                   (&values)[ITEMS_PER_THREAD],        ///< Values to sort
+        KeyT                    (&keys)[ITEMS_PER_THREAD],          ///< Keys to sort
+        ValueT                  (&values)[ITEMS_PER_THREAD],        ///< Values to sort
         int                     begin_bit,                          ///< The beginning (least-significant) bit index needed for key comparison
         int                     end_bit,                            ///< The past-the-end (most-significant) bit index needed for key comparison
         Int2Type<DESCENDING>    is_descending,                      ///< Tag whether is a descending-order sort
@@ -331,9 +359,11 @@ private:
         // Radix sorting passes
         while (true)
         {
+            int pass_bits = CUB_MIN(RADIX_BITS, end_bit - begin_bit);
+
             // Rank the blocked keys
             int ranks[ITEMS_PER_THREAD];
-            RankKeys(unsigned_keys, ranks, begin_bit, is_descending);
+            RankKeys(unsigned_keys, ranks, begin_bit, pass_bits, is_descending);
             begin_bit += RADIX_BITS;
 
             __syncthreads();
@@ -342,7 +372,7 @@ private:
             if (begin_bit >= end_bit)
             {
                 // Last pass exchanges keys through shared memory in striped arrangement
-                BlockExchangeKeys(temp_storage.exchange_keys, linear_tid).ScatterToStriped(keys, ranks);
+                BlockExchangeKeys(temp_storage.exchange_keys).ScatterToStriped(keys, ranks);
 
                 // Last pass exchanges through shared memory in striped arrangement
                 ExchangeValues(values, ranks, is_keys_only, Int2Type<false>());
@@ -352,7 +382,7 @@ private:
             }
 
             // Exchange keys through shared memory in blocked arrangement
-            BlockExchangeKeys(temp_storage.exchange_keys, linear_tid).ScatterToBlocked(keys, ranks);
+            BlockExchangeKeys(temp_storage.exchange_keys).ScatterToBlocked(keys, ranks);
 
             // Exchange values through shared memory in blocked arrangement
             ExchangeValues(values, ranks, is_keys_only, Int2Type<true>());
@@ -368,9 +398,7 @@ private:
         }
     }
 
-
-
-public:
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
     /// \smemstorage{BlockScan}
     struct TempStorage : Uninitialized<_TempStorage> {};
@@ -382,48 +410,24 @@ public:
     //@{
 
     /**
-     * \brief Collective constructor for 1D thread blocks using a private static allocation of shared memory as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.
      */
     __device__ __forceinline__ BlockRadixSort()
     :
         temp_storage(PrivateStorage()),
-        linear_tid(threadIdx.x)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
 
 
     /**
-     * \brief Collective constructor for 1D thread blocks using the specified memory allocation as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using the specified memory allocation as temporary storage.
      */
     __device__ __forceinline__ BlockRadixSort(
         TempStorage &temp_storage)             ///< [in] Reference to memory allocation having layout type TempStorage
     :
         temp_storage(temp_storage.Alias()),
-        linear_tid(threadIdx.x)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
-
-
-    /**
-     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.  Each thread is identified using the supplied linear thread identifier
-     */
-    __device__ __forceinline__ BlockRadixSort(
-        int linear_tid)                        ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(PrivateStorage()),
-        linear_tid(linear_tid)
-    {}
-
-
-    /**
-     * \brief Collective constructor using the specified memory allocation as temporary storage.  Each thread is identified using the supplied linear thread identifier.
-     */
-    __device__ __forceinline__ BlockRadixSort(
-        TempStorage &temp_storage,             ///< [in] Reference to memory allocation having layout type TempStorage
-        int linear_tid)                        ///< [in] <b>[optional]</b> A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(temp_storage.Alias()),
-        linear_tid(linear_tid)
-    {}
-
 
 
     //@}  end member group
@@ -439,7 +443,7 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys that
      * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive keys.
@@ -449,7 +453,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys each
      *     typedef cub::BlockRadixSort<int, 128, 4> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -470,9 +474,9 @@ public:
      * <tt>{ [0,1,2,3], [4,5,6,7], [8,9,10,11], ..., [508,509,510,511] }</tt>.
      */
     __device__ __forceinline__ void Sort(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         NullType values[ITEMS_PER_THREAD];
 
@@ -492,7 +496,7 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys and values that
      * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive pairs.
@@ -502,7 +506,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys and values each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys and values each
      *     typedef cub::BlockRadixSort<int, 128, 4, int> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -525,10 +529,10 @@ public:
      *
      */
     __device__ __forceinline__ void Sort(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
-        Value   (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        ValueT  (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         SortBlocked(keys, values, begin_bit, end_bit, Int2Type<false>(), Int2Type<KEYS_ONLY>());
     }
@@ -540,7 +544,7 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys that
      * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive keys.
@@ -550,7 +554,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys each
      *     typedef cub::BlockRadixSort<int, 128, 4> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -571,9 +575,9 @@ public:
      * <tt>{ [511,510,509,508], [11,10,9,8], [7,6,5,4], ..., [3,2,1,0] }</tt>.
      */
     __device__ __forceinline__ void SortDescending(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         NullType values[ITEMS_PER_THREAD];
 
@@ -593,7 +597,7 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys and values that
      * are partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive pairs.
@@ -603,7 +607,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys and values each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys and values each
      *     typedef cub::BlockRadixSort<int, 128, 4, int> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -626,10 +630,10 @@ public:
      *
      */
     __device__ __forceinline__ void SortDescending(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
-        Value   (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        ValueT  (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         SortBlocked(keys, values, begin_bit, end_bit, Int2Type<true>(), Int2Type<KEYS_ONLY>());
     }
@@ -649,7 +653,7 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys that
      * are initially partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive keys.  The final partitioning is striped.
@@ -659,7 +663,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys each
      *     typedef cub::BlockRadixSort<int, 128, 4> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -681,9 +685,9 @@ public:
      *
      */
     __device__ __forceinline__ void SortBlockedToStriped(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         NullType values[ITEMS_PER_THREAD];
 
@@ -699,11 +703,11 @@ public:
      *   more than one tile of values, simply perform a key-value sort of the keys paired
      *   with a temporary value array that enumerates the key indices.  The reordered indices
      *   can then be used as a gather-vector for exchanging other associated tile data through
-     *  shared memory.
+     *   shared memory.
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys and values that
      * are initially partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive pairs.  The final partitioning is striped.
@@ -713,7 +717,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys and values each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys and values each
      *     typedef cub::BlockRadixSort<int, 128, 4, int> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -736,10 +740,10 @@ public:
      *
      */
     __device__ __forceinline__ void SortBlockedToStriped(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
-        Value   (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        ValueT  (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         SortBlockedToStriped(keys, values, begin_bit, end_bit, Int2Type<false>(), Int2Type<KEYS_ONLY>());
     }
@@ -752,7 +756,7 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys that
      * are initially partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive keys.  The final partitioning is striped.
@@ -762,7 +766,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys each
      *     typedef cub::BlockRadixSort<int, 128, 4> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -784,9 +788,9 @@ public:
      *
      */
     __device__ __forceinline__ void SortDescendingBlockedToStriped(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         NullType values[ITEMS_PER_THREAD];
 
@@ -806,7 +810,7 @@ public:
      * - \granularity
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates a sort of 512 integer keys and values that
      * are initially partitioned in a [<em>blocked arrangement</em>](index.html#sec5sec3) across 128 threads
      * where each thread owns 4 consecutive pairs.  The final partitioning is striped.
@@ -816,7 +820,7 @@ public:
      *
      * __global__ void ExampleKernel(...)
      * {
-     *     // Specialize BlockRadixSort for 128 threads owning 4 integer keys and values each
+     *     // Specialize BlockRadixSort for a 1D block of 128 threads owning 4 integer keys and values each
      *     typedef cub::BlockRadixSort<int, 128, 4, int> BlockRadixSort;
      *
      *     // Allocate shared memory for BlockRadixSort
@@ -839,10 +843,10 @@ public:
      *
      */
     __device__ __forceinline__ void SortDescendingBlockedToStriped(
-        Key     (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
-        Value   (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
+        KeyT    (&keys)[ITEMS_PER_THREAD],          ///< [in-out] Keys to sort
+        ValueT  (&values)[ITEMS_PER_THREAD],        ///< [in-out] Values to sort
         int     begin_bit   = 0,                    ///< [in] <b>[optional]</b> The beginning (least-significant) bit index needed for key comparison
-        int     end_bit     = sizeof(Key) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
+        int     end_bit     = sizeof(KeyT) * 8)      ///< [in] <b>[optional]</b> The past-the-end (most-significant) bit index needed for key comparison
     {
         SortBlockedToStriped(keys, values, begin_bit, end_bit, Int2Type<true>(), Int2Type<KEYS_ONLY>());
     }

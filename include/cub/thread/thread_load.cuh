@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -102,12 +102,12 @@ enum CacheLoadModifier
  * \endcode
  *
  * \tparam MODIFIER             <b>[inferred]</b> CacheLoadModifier enumeration
- * \tparam InputIterator        <b>[inferred]</b> Input iterator type \iterator
+ * \tparam InputIteratorT       <b>[inferred]</b> Input iterator type \iterator
  */
 template <
     CacheLoadModifier MODIFIER,
-    typename InputIterator>
-__device__ __forceinline__ typename std::iterator_traits<InputIterator>::value_type ThreadLoad(InputIterator itr);
+    typename InputIteratorT>
+__device__ __forceinline__ typename std::iterator_traits<InputIteratorT>::value_type ThreadLoad(InputIteratorT itr);
 
 
 //@}  end member group
@@ -127,8 +127,8 @@ struct IterateThreadLoad
         IterateThreadLoad<COUNT + 1, MAX>::template Load<MODIFIER>(ptr, vals);
     }
 
-    template <typename InputIterator, typename T>
-    static __device__ __forceinline__ void Dereference(InputIterator ptr, T *vals)
+    template <typename InputIteratorT, typename T>
+    static __device__ __forceinline__ void Dereference(InputIteratorT ptr, T *vals)
     {
         vals[COUNT] = ptr[COUNT];
         IterateThreadLoad<COUNT + 1, MAX>::Dereference(ptr, vals);
@@ -143,8 +143,8 @@ struct IterateThreadLoad<MAX, MAX>
     template <CacheLoadModifier MODIFIER, typename T>
     static __device__ __forceinline__ void Load(T *ptr, T *vals) {}
 
-    template <typename InputIterator, typename T>
-    static __device__ __forceinline__ void Dereference(InputIterator ptr, T *vals) {}
+    template <typename InputIteratorT, typename T>
+    static __device__ __forceinline__ void Dereference(InputIteratorT ptr, T *vals) {}
 };
 
 
@@ -275,7 +275,7 @@ struct IterateThreadLoad<MAX, MAX>
 /**
  * Define powers-of-two ThreadLoad specializations for the various Cache load modifiers
  */
-#if CUB_PTX_VERSION >= 200
+#if CUB_PTX_ARCH >= 200
     CUB_LOAD_ALL(LOAD_CA, ca)
     CUB_LOAD_ALL(LOAD_CG, cg)
     CUB_LOAD_ALL(LOAD_CS, cs)
@@ -288,19 +288,29 @@ struct IterateThreadLoad<MAX, MAX>
     CUB_LOAD_ALL(LOAD_CV, volatile.global)
 #endif
 
-#if CUB_PTX_VERSION >= 350
+#if CUB_PTX_ARCH >= 350
     CUB_LOAD_ALL(LOAD_LDG, global.nc)
 #else
     CUB_LOAD_ALL(LOAD_LDG, global)
 #endif
 
 
+// Macro cleanup
+#undef CUB_LOAD_ALL
+#undef CUB_LOAD_1
+#undef CUB_LOAD_2
+#undef CUB_LOAD_4
+#undef CUB_LOAD_8
+#undef CUB_LOAD_16
+
+
+
 /**
  * ThreadLoad definition for LOAD_DEFAULT modifier on iterator types
  */
-template <typename InputIterator>
-__device__ __forceinline__ typename std::iterator_traits<InputIterator>::value_type ThreadLoad(
-    InputIterator           itr,
+template <typename InputIteratorT>
+__device__ __forceinline__ typename std::iterator_traits<InputIteratorT>::value_type ThreadLoad(
+    InputIteratorT          itr,
     Int2Type<LOAD_DEFAULT>  modifier,
     Int2Type<false>         is_pointer)
 {
@@ -331,7 +341,7 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
 {
     T retval = *reinterpret_cast<volatile T*>(ptr);
 
-#if (CUB_PTX_VERSION <= 130)
+#if (CUB_PTX_ARCH <= 130)
     if (sizeof(T) == 1) __threadfence_block();
 #endif
 
@@ -348,7 +358,7 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
     Int2Type<false>          is_primitive)
 {
 
-#if CUB_PTX_VERSION <= 130
+#if CUB_PTX_ARCH <= 130
 
     T retval = *ptr;
     __threadfence_block();
@@ -359,7 +369,7 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
     typedef typename UnitWord<T>::VolatileWord VolatileWord;   // Word type for memcopying
 
     const int VOLATILE_MULTIPLE = sizeof(T) / sizeof(VolatileWord);
-
+/*
     VolatileWord words[VOLATILE_MULTIPLE];
 
     IterateThreadLoad<0, VOLATILE_MULTIPLE>::Dereference(
@@ -367,8 +377,16 @@ __device__ __forceinline__ T ThreadLoadVolatilePointer(
         words);
 
     return *reinterpret_cast<T*>(words);
+*/
 
-#endif  // CUB_PTX_VERSION <= 130
+    T retval;
+    VolatileWord *words = reinterpret_cast<VolatileWord*>(&retval);
+    IterateThreadLoad<0, VOLATILE_MULTIPLE>::Dereference(
+        reinterpret_cast<volatile VolatileWord*>(ptr),
+        words);
+    return retval;
+
+#endif  // CUB_PTX_ARCH <= 130
 }
 
 
@@ -414,14 +432,14 @@ __device__ __forceinline__ T ThreadLoad(
  */
 template <
     CacheLoadModifier MODIFIER,
-    typename InputIterator>
-__device__ __forceinline__ typename std::iterator_traits<InputIterator>::value_type ThreadLoad(InputIterator itr)
+    typename InputIteratorT>
+__device__ __forceinline__ typename std::iterator_traits<InputIteratorT>::value_type ThreadLoad(InputIteratorT itr)
 {
     // Apply tags for partial-specialization
     return ThreadLoad(
         itr,
         Int2Type<MODIFIER>(),
-        Int2Type<IsPointer<InputIterator>::VALUE>());
+        Int2Type<IsPointer<InputIteratorT>::VALUE>());
 }
 
 
