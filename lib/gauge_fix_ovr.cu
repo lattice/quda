@@ -357,9 +357,7 @@ static bool checkDimsPartitioned(){
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                            // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                        // Don't tune the grid dimensions.
@@ -1471,9 +1469,9 @@ static bool checkDimsPartitioned(){
                        const unsigned int stopWtheta) {
 
 
-    TimeProfile profileGaugeFix("GaugeFixCuda");
+    TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR");
 
-    profileGaugeFix.Start(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixOVR.Start(QUDA_PROFILE_COMPUTE);
     double flop = 0;
     double byte = 0;
 
@@ -1832,9 +1830,9 @@ static bool checkDimsPartitioned(){
   #endif
     checkCudaError();
     cudaDeviceSynchronize();
-    profileGaugeFix.Stop(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixOVR.Stop(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
-      double secs = profileGaugeFix.Last(QUDA_PROFILE_COMPUTE);
+      double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);
 	  double gflops = (flop * 1e-9) / (secs);
 	  double gbytes = byte / (secs * 1e9);
 	  #ifdef MULTI_GPU
@@ -1869,17 +1867,17 @@ static bool checkDimsPartitioned(){
     // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
     if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        printfQuda("QUDA_RECONSTRUCT_NO\n");
+        //printfQuda("QUDA_RECONSTRUCT_NO\n");
         numParams = 18;
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
         gaugefixingOVR<Float, 18>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        printfQuda("QUDA_RECONSTRUCT_12\n");
+        //printfQuda("QUDA_RECONSTRUCT_12\n");
         numParams = 12;
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
         gaugefixingOVR<Float, 12>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        printfQuda("QUDA_RECONSTRUCT_8\n");
+        //printfQuda("QUDA_RECONSTRUCT_8\n");
         numParams = 8;
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
         gaugefixingOVR<Float, 8>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta);

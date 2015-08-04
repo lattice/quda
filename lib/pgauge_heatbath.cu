@@ -677,9 +677,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                            // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false;  } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                        // Don't tune the grid dimensions.

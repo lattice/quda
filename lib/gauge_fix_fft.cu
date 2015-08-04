@@ -210,9 +210,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                                  // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                              // Don't tune the grid dimensions.
@@ -373,9 +371,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                                  // Don't tune shared memory
+    //bool tuneSharedBytes() const {return false;}  // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                              // Don't tune the grid dimensions.
@@ -565,9 +561,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                                  // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                              // Don't tune the grid dimensions.
@@ -777,9 +771,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                                  // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                              // Don't tune the grid dimensions.
@@ -908,9 +900,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                                  // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                              // Don't tune the grid dimensions.
@@ -1043,9 +1033,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                                  // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                              // Don't tune the grid dimensions.
@@ -1156,9 +1144,9 @@ namespace quda {
                        const Float alpha0, const unsigned int autotune, const double tolerance, \
                        const unsigned int stopWtheta) {
 
-    TimeProfile profileGaugeFix("GaugeFixCuda");
+    TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT");
 
-    profileGaugeFix.Start(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixFFT.Start(QUDA_PROFILE_COMPUTE);
 
     Float alpha = alpha0;
     std::cout << "\tAlpha parameter of the Steepest Descent Method: " << alpha << std::endl;
@@ -1325,10 +1313,10 @@ namespace quda {
     CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
     checkCudaError();
     cudaDeviceSynchronize();
-    profileGaugeFix.Stop(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixFFT.Stop(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() > QUDA_SUMMARIZE){
-      double secs = profileGaugeFix.Last(QUDA_PROFILE_COMPUTE);
+      double secs = profileInternalGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);
       double fftflop = 5.0 * (log2((double)( data.X()[0] * data.X()[1]) ) + log2( (double)(data.X()[2] * data.X()[3] )));
       fftflop *= (double)( data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3] );
       double gflops = setinvpsp.flops() + gfixquality.flops();
@@ -1385,15 +1373,15 @@ namespace quda {
     //9 and 6 means the number of complex elements used to store g(x) and Delta(x)
     if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        printfQuda("QUDA_RECONSTRUCT_NO\n");
+        //printfQuda("QUDA_RECONSTRUCT_NO\n");
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
         gaugefixingFFT<9, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        printfQuda("QUDA_RECONSTRUCT_12\n");
+        //printfQuda("QUDA_RECONSTRUCT_12\n");
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
         gaugefixingFFT<6, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        printfQuda("QUDA_RECONSTRUCT_8\n");
+        //printfQuda("QUDA_RECONSTRUCT_8\n");
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
         gaugefixingFFT<6, Float>(Gauge(data), data, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
 
