@@ -366,6 +366,12 @@ extern "C" {
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
 
+  typedef enum QudaComputeNullVector_s {
+    QUDA_COMPUTE_NULL_VECTOR_NO,    
+    QUDA_COMPUTE_NULL_VECTOR_YES,
+    QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
+  } QudaComputeNullVector;
+
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
     QUDA_FORWARDS = +1,

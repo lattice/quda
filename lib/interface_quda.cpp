@@ -2184,119 +2184,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   profileInvert.Stop(QUDA_PROFILE_TOTAL);
 }
 
-#if 0
-void generateKSNULLVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *inv_param)
-{
-  if ( ! (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
-       inv_param->dslash_type == QUDA_ASQTAD_DSLASH) ) errorQuda("Incorrect dslash type");
-
-  if (gaugeFatPrecise == NULL)      errorQuda("gaugeFatPrecise field not allocated");
-  if (gaugeFatSloppy == NULL)       errorQuda("gaugeFatSloppy field not allocated");
-  if (gaugeFatPrecondition == NULL) errorQuda("gaugeFatPrecondition field not allocated");
-
-  if (gaugeLongPrecise == NULL)      errorQuda("gaugeLongPrecise field not allocated");
-  if (gaugeLongloppy == NULL)       errorQuda("gaugeLongSloppy field not allocated");
-  if (gaugeLongPrecondition == NULL) errorQuda("gaugeLongPrecondition field not allocated");
-
-  QudaParity parity = QUDA_EVEN_PARITY;
-
-  ColorSpinorParam csParam(*B[0]);//
-  csParam.create = QUDA_NULL_FIELD_CREATE;
-  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-  csParam.location = QUDA_CUDA_FIELD_LOCATION;
-
-  ColorSpinorField *eV  = NULL;
-  ColorSpinorField *oV  = NULL;
-  ColorSpinorField *fV  = NULL;
-
-  pushVerbosity(inv_param->verbosity);
-  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
-
-  bool pc = true;
-
-  DiracParam diracParam;
-  setDiracParam(diracParam, inv_param, pc);
-  Dirac *dirac = Dirac::create(diracParam); // create the Dirac operator  
-
-  csParam.create = QUDA_COPY_FIELD_CREATE;
-  ColorSpinorParam cudaParam(csParam, *inv_param);
-
-  inv_param.maxiter  = 16;
-
-  std::vector<ColorSpinorField*> gpuB;
-
-  gpuB.reserve(B.size());
-
-  cpuColorSpinorField *curr_nullvec  = static_cast<cpuColorSpinorField*> (B[0]); //Full order
-
-  for(unsigned int nullvec = 0 ; nullvec < B.size(); nullvec++)
-  {
-     //cpuColorSpinorField *curr_nullvec  = static_cast<cpuColorSpinorField*> (B[nullvec]); //Full order
-     curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
-
-     fV = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, cudaParam)); 
-     //copy fields:
-     cudaColorSpinorField tmp1(fV, cudaParam); 
-
-     eV = static_cast<ColorSpinorField*>((static_cast<cudaColorSpinorField*>fV)->Even());
-     oV = static_cast<ColorSpinorField*>((static_cast<cudaColorSpinorField*>fV)->Odd());
-
-     //do power method:
-     for(int n = 0; n < inv_param.maxiter; n++)
-     {
-       dirac->Dslash(tmp1.Odd(), eV, QUDA_ODD_PARITY);
-       dirac->Dslash(eV, tmp1.Odd(), QUDA_EVEN_PARITY);
-       //
-       dirac->Dslash(tmp1.Even(), oV, QUDA_EVEN_PARITY);
-       dirac->Dslash(oV, tmp1.Even(), QUDA_ODD_PARITY);
-     }
-
-//BEGIN orthogonalization:
-     Complex alpha = Complex(0.0, 0.0);
-
-     for (unsigned int prevvec = 0; prevvec < nullvec; prevvec++)//row id
-     {
-        ColorSpinorField *prev_nullvec = static_cast<ColorSpinorField*> (gpuB[prevvec]);
-
-        alpha = blas::cDotProduct(prev_nullvec->Even(), *eV);//<j,i>
-        Complex scale = Complex(-alpha.real(), -alpha.imag());
-        blas::caxpy(scale, prev_nullvec->Even(), *eV); //i-<j,i>j
-
-        alpha = blas::cDotProduct(prev_nullvec->Odd(), *oV);//<j,i>
-        scale = Complex(-alpha.real(), -alpha.imag());
-        blas::caxpy(scale, prev_nullvec->Odd(), *oV); //i-<j,i>j
-     }
-
-     alpha = blas::norm2(*eV);
-     if(alpha.real() > 1e-16)
-        blas::ax(1.0 /sqrt(alpha.real()), *eV);  
-     else
-        errorQuda("\nCannot orthogonalize ??th vector\n");
-
-     alpha = blas::norm2(*oV);
-     if(alpha.real() > 1e-16)
-        blas::ax(1.0 /sqrt(alpha.real()), *oV);  
-     else
-        errorQuda("\nCannot orthogonalize ??th vector\n");
-
-     gpuB[nullvec] = fV;//copy fields
-//END ORTHOGONALIZATION
-
-  }
-
-  for(unsigned int vec = 0; vec < B.size(); vec++) B[vec] = gpuB[vec];  
-
-  delete dirac; // clean up
-
-  delete fV;
-
-  popVerbosity();
-}
-#endif
-
-#include "contractQuda.h"
-
-void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_inv_param)//input/output => currently cpu fields!
+void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_inv_param)//input/output => cpu fields!
 {
    printfQuda("\nGenerate null vectors\n");
    //Create spinor field parameters:
@@ -2304,7 +2192,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    ColorSpinorParam csParam(*B[0]);//
    csParam.create = QUDA_NULL_FIELD_CREATE;
    //
-   csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+   csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
    //bParam.setPrecision(bParam.precision);
    csParam.location = QUDA_CUDA_FIELD_LOCATION;
    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;//UKQCD
@@ -2410,37 +2298,26 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    ColorSpinorField *out = NULL;
 
    ColorSpinorParam bParam(csParam, inv_param);
-//   bParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
    bParam.create = QUDA_ZERO_FIELD_CREATE;
 
    ColorSpinorParam xParam(csParam, inv_param);
-//   xParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
    xParam.create     = QUDA_COPY_FIELD_CREATE;
 
    profileInvert.Start(QUDA_PROFILE_TOTAL);
 
    // Generate sources and launch bicgstab for each source:
-   const int tot_num = B.size();
-
-   std::vector<ColorSpinorField*> gpuB;//CUDA fields 
-   B.resize(tot_num);
-
-   cpuColorSpinorField *rndm_src  = static_cast<cpuColorSpinorField*> (B[0]); //use as a random source
- 
-   for(unsigned int nullvec = 0 ; nullvec < (tot_num / 2); nullvec++)
+   for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec)
    {
-     rndm_src->Source(QUDA_RANDOM_SOURCE);//random initial guess
-
-     ColorSpinorField *curr_gpunullvec_plus  = static_cast<ColorSpinorField*>(new cudaColorSpinorField(bParam)); 
-     ColorSpinorField *curr_gpunullvec_minus = static_cast<ColorSpinorField*>(new cudaColorSpinorField(bParam)); 
+     cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*nullvec); 
+     curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
 
      b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(bParam)); 
      //copy fields:
-     x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*rndm_src, xParam));
+     x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, xParam)); 
 
      setTuning(inv_param.tune);
 
-     dirac.prepare(in, out, *x, *b, inv_param.solution_type);//???
+     dirac.prepare(in, out, *x, *b, inv_param.solution_type);
 
      if (getVerbosity() >= QUDA_VERBOSE) 
      {
@@ -2463,65 +2340,32 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
      }
      dirac.reconstruct(*x, *b, inv_param.solution_type);
 
-     //apply projectors:
-     //(1+g5) / 2 * x: 
-     cudaColorSpinorField *tmp1 = static_cast<cudaColorSpinorField*>( curr_gpunullvec_plus);
-     cudaColorSpinorField *tmp2 = static_cast<cudaColorSpinorField*>(  x);
-     gamma5Cuda(tmp1 , tmp2);
-     *curr_gpunullvec_minus = *curr_gpunullvec_plus;//copy for the opposite chirality
-
-     blas::xpy(*x, *curr_gpunullvec_plus);  
-
-     blas::ax(0.5, *curr_gpunullvec_plus);  
-
-     //(1-g5) / 2 * x: 
-     blas::mxpy(*x, *curr_gpunullvec_minus);  
-
-     blas::ax(-0.5, *curr_gpunullvec_minus);  
+     *curr_nullvec = *x;
 
 //BEGIN orthogonalization:
      Complex alpha = Complex(0.0, 0.0);
 
-     for (unsigned int prevvec = 0; prevvec < 2*nullvec; prevvec++)//row id
+     for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != nullvec; ++prevvec)//row id
      {
-        ColorSpinorField *prev_gpunullvec = gpuB[prevvec];
+        cpuColorSpinorField *prev_nullvec = static_cast<cpuColorSpinorField*> (*prevvec);
 
-        alpha = blas::cDotProduct(*prev_gpunullvec, *curr_gpunullvec_plus);//<j,i>
+        alpha = blas::cDotProduct(*prev_nullvec, *curr_nullvec);//<j,i>
         Complex scale = Complex(-alpha.real(), -alpha.imag());
-        blas::caxpy(scale, *prev_gpunullvec, *curr_gpunullvec_plus); //i-<j,i>j
-
-        alpha = blas::cDotProduct(*prev_gpunullvec, *curr_gpunullvec_minus);//<j,i>
-        scale = Complex(-alpha.real(), -alpha.imag());
-        blas::caxpy(scale, *prev_gpunullvec, *curr_gpunullvec_minus); //i-<j,i>j
+        blas::caxpy(scale, *prev_nullvec, *curr_nullvec); //i-<j,i>j
      }
 
-     alpha = blas::norm2(*curr_gpunullvec_plus);
+     alpha = blas::norm2(*curr_nullvec);
      if(alpha.real() > 1e-16)
-        blas::ax(1.0 /sqrt(alpha.real()), *curr_gpunullvec_plus);  
+        blas::ax(1.0 /sqrt(alpha.real()), *curr_nullvec);  
      else
         errorQuda("\nCannot orthogonalize ??th vector\n");
 
-     alpha = blas::cDotProduct(*curr_gpunullvec_plus, *curr_gpunullvec_minus);//<j,i>
-     Complex scale = Complex(-alpha.real(), -alpha.imag());
-     blas::caxpy(scale, *curr_gpunullvec_plus, *curr_gpunullvec_minus); //i-<j,i>j
-
-     alpha = blas::norm2(*curr_gpunullvec_minus);
-     if(alpha.real() > 1e-16)
-        blas::ax(1.0 /sqrt(alpha.real()), *curr_gpunullvec_minus);  
-     else
-        errorQuda("\nCannot orthogonalize ??th vector\n");
-
-     gpuB.push_back(curr_gpunullvec_plus);
-     gpuB.push_back(curr_gpunullvec_minus);
 //END
 
-     delete x;
      delete b;
+     delete x;
 
   }//stop for-loop:
-
-  //load gpu null vectors on the host:
-  for (unsigned int vec = 0 ; vec < tot_num; vec++) B[vec] = gpuB[vec];
 
   delete d;
   delete dSloppy;
@@ -2537,6 +2381,8 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
   return;
 }
 
+
+#define LOAD_NVECS
 
 void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
@@ -2705,13 +2551,16 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     B[i] = new cpuColorSpinorField(cpuParam);
   }
 
-//!!NEW
-#ifdef LOAD_NVECS
-  loadVectors(B);
-#else
-  generateNullVectors(B, param);
-#endif
-//!!END
+  if(param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
+  {
+     generateNullVectors(B, param);
+  }
+  else
+  {
+     loadVectors(B);
+  }
+
+  param->compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;//just to be safe here
 
   // fill out the MG parameters for the fine level
   MGParam mgParam(*param, B, mSloppy, mSloppy);  

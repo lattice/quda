@@ -147,11 +147,9 @@ namespace quda {
 
   };
 
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, QudaFieldOrder order>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  const int *fine_to_coarse, const int *spin_map) {
-    if (in.Nspin() != 2 || in.Nspin() != 1) errorQuda("coarseSpin != 2 not supported");
-    const int coarseSpin = in.Nspin() == 1 ? 1 : 2;
 
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
@@ -170,18 +168,31 @@ namespace quda {
   }
 
 
-  template <typename Float, int fineSpin, int fineColor, QudaFieldOrder order>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int nVec, const int *fine_to_coarse, const int *spin_map) {
 
     if (nVec == 2) {
-      Prolongate<Float,fineSpin,fineColor,2,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, spin_map);
     } else if (nVec == 24) {
-      Prolongate<Float,fineSpin,fineColor,24,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, spin_map);
     } else if (nVec == 48) {
-      Prolongate<Float,fineSpin,fineColor,48,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nVec %d", nVec);
+    }
+  }
+
+  template <typename Float, int fineSpin, int fineColor, QudaFieldOrder order>
+  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
+                  int nVec, const int *fine_to_coarse, const int *spin_map) {
+
+    if (in.Nspin() == 1) {
+      Prolongate<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, spin_map);
+    } else if (in.Nspin() == 2) {
+      Prolongate<Float,fineSpin,fineColor,2,order>(out, in, v, nVec, fine_to_coarse, spin_map);
+    } else {
+      errorQuda("Coarse spin > 2 is not supported (%d)", in.Nspin());
     }
   }
 

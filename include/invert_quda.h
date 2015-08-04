@@ -36,7 +36,10 @@ namespace quda {
     QudaResidualType residual_type;
     
     /**< Whether to use an initial guess in the solver or not */
-    QudaUseInitGuess use_init_guess;       
+    QudaUseInitGuess use_init_guess; 
+
+    /**< Whether to solve linear system with zero RHS */
+    QudaComputeNullVector compute_null_vector;      
 
     /**< Reliable update tolerance */
     double delta;           
@@ -165,7 +168,7 @@ namespace quda {
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type), 
       inv_type_precondition(param.inv_type_precondition), 
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess), compute_null_vector(param.compute_null_vector),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), pipeline(param.pipeline), tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq), 
       true_res(param.true_res), true_res_hq(param.true_res_hq),

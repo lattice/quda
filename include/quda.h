@@ -165,6 +165,7 @@ extern "C" {
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
+    QudaComputeNullVector compute_null_vector;       /**< Whether to solve linear system with zero RHS (use_init_guess must be 'yes'!) */
 
     double clover_coeff;                   /**< Coefficient of the clover term */
 

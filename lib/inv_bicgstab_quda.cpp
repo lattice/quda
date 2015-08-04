@@ -83,29 +83,54 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      warningQuda("using init guess...");
       mat(r, x, y);
       r2 = blas::xmyNorm(b, r);
       blas::copy(y, x);
     } else {
       blas::copy(r, b);
       r2 = b2;
-      blas::zero(x); // defensive measure in case solution isn't already zero
+      blas::zero(x);
     }
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
       profile.Stop(QUDA_PROFILE_PREAMBLE);
       warningQuda("inverting on zero-field source\n");
-      x = b;
-      param.true_res = 0.0;
-      param.true_res_hq = 0.0;
-      return;
+      if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
+      {
+        warningQuda("inverting on zero-field source\n");
+        x = b;
+        param.true_res = 0.0;
+        param.true_res_hq = 0.0;
+        return;
+      }
+      else if(param.use_init_guess == QUDA_USE_INIT_GUESS_YES)
+      {
+        warningQuda("Computing null vector\n");
+        b2 = r2;
+      }
+      else
+      {
+        errorQuda("Null vector computing requires non-zero guess!\n");
+      }
     }
 
     // set field aliasing according to whether we are doing mixed precision or not
     if (param.precision_sloppy == x.Precision()) {
       r_sloppy = &r;
-      r_0 = &b;
+
+      if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
+      {
+        r_0 = &b;
+      }
+      else
+      {
+        ColorSpinorParam csParam(r);
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        r_0 = ColorSpinorField::Create(csParam);//remember to delete this pointer.
+        *r_0 = r;
+      }
     } else {
       ColorSpinorParam csParam(x);
       csParam.setPrecision(param.precision_sloppy);
@@ -116,16 +141,17 @@ namespace quda {
       *r_0 = r;
     }
 
-    // set field aliasing according to whether we are doing mixed precision or not
-    if (param.precision_sloppy == x.Precision() ||
-	!param.use_sloppy_partial_accumulator) {
+    if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) 
+    {
       x_sloppy = &x;
       blas::zero(*x_sloppy);
-    } else {
+    } 
+    else 
+    {
       ColorSpinorParam csParam(x);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy = new cudaColorSpinorField(x, csParam);
+      x_sloppy = ColorSpinorField::Create(csParam);
     }
 
     // Syntatic sugar
@@ -137,6 +163,8 @@ namespace quda {
     fillInnerSolveParam(solve_param_inner, param);
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
+
+    printfQuda("\nStopping criterio : %le\n", stop);
 
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -234,14 +262,14 @@ namespace quda {
 	r2 = rho_r2.z;
       }
 
-      if (use_heavy_quark_res && k%heavy_quark_check==0) { 
-	if (&x != &xSloppy) {
-	  blas::copy(tmp,y);
-	  heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
-	} else {
-	  blas::copy(r, rSloppy);
-	  heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);	  
-	}
+      if (use_heavy_quark_res && k%heavy_quark_check==0) {
+        if (&x != &xSloppy) {
+           blas::copy(tmp,y);
+           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
+        } else {
+           blas::copy(r, rSloppy);
+           heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
+        }
       }
 
       if (!param.pipeline) updateR = reliable(rNorm, maxrx, maxrr, r2, delta);
@@ -326,6 +354,10 @@ namespace quda {
     if (param.precision_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
+    }
+    else if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) 
+    {
+      delete r_0;
     }
 
     if (&x != &xSloppy) delete x_sloppy;
