@@ -19,6 +19,9 @@
 
 using   namespace quda;
 
+#undef Start
+#undef Stop
+
 
 extern int device;
 extern int xdim;
@@ -162,8 +165,8 @@ class GaugeAlgTest : public ::testing::Test {
 
 
 
-    a0.Start();
-    a1.Start();
+    a0.Start(__func__, __FILE__, __LINE__);
+    a1.Start(__func__, __FILE__, __LINE__);
 
     cudaMalloc((void**)&num_failures_dev, sizeof(int));
     cudaMemset(num_failures_dev, 0, sizeof(int));
@@ -183,7 +186,7 @@ class GaugeAlgTest : public ::testing::Test {
       CallUnitarizeLinks(cudaInGauge);
       plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
     }
-    a1.Stop();
+    a1.Stop(__func__, __FILE__, __LINE__);
 
     printfQuda("Time Monte -> %.6f s\n", a1.Last());
     plaq = plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
@@ -203,7 +206,7 @@ class GaugeAlgTest : public ::testing::Test {
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 
-    a0.Stop();
+    a0.Stop(__func__, __FILE__, __LINE__);
     printfQuda("Time -> %.6f s\n", a0.Last());
     randstates->Release();
     delete randstates;
