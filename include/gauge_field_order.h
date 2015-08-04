@@ -311,7 +311,7 @@ namespace quda {
 	timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
       RegType diff = 1.0/(u0*u0) - row_sum;
-      RegType U00_mag = sqrt(diff >= 0 ? diff : 0.0);
+      RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
       out[0] = U00_mag * Trig<isHalf<Float>::value>::Cos(in[0]);
       out[1] = U00_mag * Trig<isHalf<Float>::value>::Sin(in[0]);
@@ -324,7 +324,7 @@ namespace quda {
 	column_sum += in[i]*in[i];
       }
       diff = 1.f/(u0*u0) - column_sum;
-      RegType U20_mag = sqrt(diff >= 0 ? diff : 0.0);
+      RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
       out[12] = U20_mag * Trig<isHalf<Float>::value>::Cos(in[1]);
       out[13] = U20_mag * Trig<isHalf<Float>::value>::Sin(in[1]);
