@@ -577,8 +577,8 @@ namespace quda
         if(in->Precision() != gauge.Precision())
           errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
 
-        profile.Start(QUDA_PROFILE_TOTAL);
-        profile.Start(QUDA_PROFILE_INIT);
+        profile.TPSTART(QUDA_PROFILE_TOTAL);
+        profile.TPSTART(QUDA_PROFILE_INIT);
 
         if(in->Precision() == QUDA_SINGLE_PRECISION)
           covdev = new CovDevCuda<float, float4>(out, &gauge, in, parity, mu);
@@ -590,15 +590,15 @@ namespace quda
             errorQuda("Error: Double precision not supported by hardware");
           #endif
         }
-        profile.Stop(QUDA_PROFILE_INIT);
+        profile.TPSTOP(QUDA_PROFILE_INIT);
 
         covDevCuda(*covdev, regSize, mu, profile);
 
-        profile.Start(QUDA_PROFILE_EPILOGUE);
+        profile.TPSTART(QUDA_PROFILE_EPILOGUE);
         delete covdev;
         checkCudaError();
-        profile.Stop(QUDA_PROFILE_EPILOGUE);
-        profile.Stop(QUDA_PROFILE_TOTAL);
+        profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+        profile.TPSTOP(QUDA_PROFILE_TOTAL);
       #else
         errorQuda("Contraction kernels have not been built");
       #endif

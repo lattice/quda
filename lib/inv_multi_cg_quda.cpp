@@ -66,7 +66,7 @@ namespace quda {
 
   void MultiShiftCG::operator()(cudaColorSpinorField **x, cudaColorSpinorField &b)
   {
-    profile.Start(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     int num_offset = param.num_offset;
     double *offset = param.offset;
@@ -76,7 +76,7 @@ namespace quda {
     const double b2 = normCuda(b);
     // Check to see that we're not trying to invert on a zero-field source
     if(b2 == 0){
-      profile.Stop(QUDA_PROFILE_INIT);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       for(int i=0; i<num_offset; ++i){
         *(x[i]) = b;
@@ -155,8 +155,8 @@ namespace quda {
       new cudaColorSpinorField(*r, csParam) : &tmp1;
     cudaColorSpinorField &tmp3 = *tmp3_p;
 
-    profile.Stop(QUDA_PROFILE_INIT);
-    profile.Start(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
@@ -197,8 +197,8 @@ namespace quda {
     int rUpdate = 0;
     quda::blas_flops = 0;
 
-    profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
@@ -325,8 +325,8 @@ namespace quda {
       if (reliable) xpyCuda(*y[i], *x[i]);
     }
 
-    profile.Stop(QUDA_PROFILE_COMPUTE);
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("MultiShift CG: Reliable updates = %d\n", rUpdate);
@@ -368,8 +368,8 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
     if (&tmp3 != &tmp1) delete tmp3_p;
     if (&tmp2 != &tmp1) delete tmp2_p;
@@ -395,7 +395,7 @@ namespace quda {
     delete []alpha;
     delete []beta;
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }

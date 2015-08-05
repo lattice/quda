@@ -192,8 +192,8 @@ namespace quda {
       return;
     }
 
-    profile.Start(QUDA_PROFILE_TOTAL);
-    profile.Start(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     dslashParam.threads = x.Volume();
 
@@ -211,19 +211,19 @@ namespace quda {
     } else if	(x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
     }
-    profile.Stop(QUDA_PROFILE_INIT);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
 
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
     checkCudaError();
 
     delete contract;
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
 #else
     errorQuda("Contraction code has not been built");
 #endif
@@ -245,8 +245,8 @@ namespace quda {
       return;
     }
 
-    profile.Start(QUDA_PROFILE_TOTAL);
-    profile.Start(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     dslashParam.threads = x.X(0)*x.X(1)*x.X(2);
 
@@ -263,18 +263,18 @@ namespace quda {
     } else if (x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
     }
-    profile.Stop(QUDA_PROFILE_INIT);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
 
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     contract->apply(streams[Nstream-1]);
-    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
     checkCudaError();
     delete contract;
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
 #else
     errorQuda("Contraction code has not been built");
 #endif
