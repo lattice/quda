@@ -238,13 +238,13 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                 int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
 
+    if (out.Nspin() != 2 || out.Nspin() != 1) errorQuda("coarseSpin is not supported");
+
     if (in.Nspin() == 1) {
       Restrict<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, coarse_to_fine, spin_map);
-    } else if (in.Nspin() == 2) {
-      Restrict<Float,fineSpin,fineColor,2,order>(out, in, v, nVec, fine_to_coarse, coarse_to_fine, spin_map);
     } else {
-      errorQuda("Coarse spin > 2 is not supported (%d)", in.Nspin());
-    }
+      Restrict<Float,fineSpin,fineColor,2,order>(out, in, v, nVec, fine_to_coarse, coarse_to_fine, spin_map);
+    } 
   }
 
   template <typename Float, int fineSpin, QudaFieldOrder order>
