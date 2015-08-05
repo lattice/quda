@@ -156,7 +156,7 @@ class CalcFunc : Tunable {
 
 template<typename Float, int NCOLORS, int functiontype, typename Gauge>
 double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
-  TimeProfile profileGenericFunc("GenericFunc");
+  TimeProfile profileGenericFunc("GenericFunc", false);
   if (getVerbosity() >= QUDA_SUMMARIZE) profileGenericFunc.TPSTART(QUDA_PROFILE_COMPUTE);
   KernelArg<Gauge> arg(dataOr, data);
   CalcFunc<Float, Gauge, NCOLORS, functiontype> func(arg);
