@@ -780,7 +780,7 @@ namespace quda {
   template<typename Float, int NElems, int NCOLORS, typename Gauge>
   void Monte( Gauge dataOr,  cudaGaugeField& data, cuRNGState *rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
 
-    TimeProfile profileHBOVR("HeatBath_OR_Relax");
+    TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
     MonteArg<Gauge, Float, NCOLORS> montearg(dataOr, data, Beta, rngstate);
     if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     GaugeHB<Float, Gauge, NCOLORS, NElems, true> hb(montearg);
