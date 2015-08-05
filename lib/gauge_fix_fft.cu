@@ -1144,7 +1144,7 @@ namespace quda {
                        const Float alpha0, const unsigned int autotune, const double tolerance, \
                        const unsigned int stopWtheta) {
 
-    TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT");
+    TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
 
     profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
