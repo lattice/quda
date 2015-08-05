@@ -2208,7 +2208,10 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.gcrNkrylov  = 10;
    inv_param.maxiter  = 35;
    inv_param.tol      = 1e-3;
-   inv_param.use_init_guess  = QUDA_USE_INIT_GUESS_YES;
+
+   inv_param.use_init_guess      = QUDA_USE_INIT_GUESS_YES;
+   inv_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+
    inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
    inv_param.reliable_delta    = 1e-7;
 
