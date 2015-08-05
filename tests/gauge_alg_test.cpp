@@ -19,10 +19,6 @@
 
 using   namespace quda;
 
-#undef Start
-#undef Stop
-
-
 extern int device;
 extern int xdim;
 extern int ydim;

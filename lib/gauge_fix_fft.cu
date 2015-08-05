@@ -1146,7 +1146,7 @@ namespace quda {
 
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT");
 
-    profileInternalGaugeFixFFT.Start(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixFFT.TPSTART(QUDA_PROFILE_COMPUTE);
 
     Float alpha = alpha0;
     std::cout << "\tAlpha parameter of the Steepest Descent Method: " << alpha << std::endl;
@@ -1313,7 +1313,7 @@ namespace quda {
     CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
     checkCudaError();
     cudaDeviceSynchronize();
-    profileInternalGaugeFixFFT.Stop(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() > QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixFFT.Last(QUDA_PROFILE_COMPUTE);

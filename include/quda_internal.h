@@ -298,8 +298,8 @@ namespace quda {
 
   };
 
-#define Start(idx) Start_(__func__, __FILE__, __LINE__, idx)
-#define Stop(idx) Stop_(__func__, __FILE__, __LINE__, idx)
+#define TPSTART(idx) Start_(__func__, __FILE__, __LINE__, idx)
+#define TPSTOP(idx) Stop_(__func__, __FILE__, __LINE__, idx)
 
 #undef PUSH_RANGE
 #undef POP_RANGE

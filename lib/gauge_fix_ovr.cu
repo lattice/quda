@@ -1471,7 +1471,7 @@ static bool checkDimsPartitioned(){
 
     TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR");
 
-    profileInternalGaugeFixOVR.Start(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     double flop = 0;
     double byte = 0;
 
@@ -1830,7 +1830,7 @@ static bool checkDimsPartitioned(){
   #endif
     checkCudaError();
     cudaDeviceSynchronize();
-    profileInternalGaugeFixOVR.Stop(QUDA_PROFILE_COMPUTE);
+    profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){
       double secs = profileInternalGaugeFixOVR.Last(QUDA_PROFILE_COMPUTE);
 	  double gflops = (flop * 1e-9) / (secs);

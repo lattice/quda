@@ -782,7 +782,7 @@ namespace quda {
 
     TimeProfile profileHBOVR("HeatBath_OR_Relax");
     MonteArg<Gauge, Float, NCOLORS> montearg(dataOr, data, Beta, rngstate);
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.Start(QUDA_PROFILE_COMPUTE);
+    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     GaugeHB<Float, Gauge, NCOLORS, NElems, true> hb(montearg);
     for ( int step = 0; step < nhb; ++step ) {
       for ( int parity = 0; parity < 2; ++parity ) {
@@ -797,7 +797,7 @@ namespace quda {
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
       cudaDeviceSynchronize();
-      profileHBOVR.Stop(QUDA_PROFILE_COMPUTE);
+      profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
       double gbytes = hb.bytes() * 8 * nhb / (secs * 1e9);
@@ -808,7 +808,7 @@ namespace quda {
     #endif
     }
 
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.Start(QUDA_PROFILE_COMPUTE);
+    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     GaugeHB<Float, Gauge, NCOLORS, NElems, false> relax(montearg);
     for ( int step = 0; step < nover; ++step ) {
       for ( int parity = 0; parity < 2; ++parity ) {
@@ -823,7 +823,7 @@ namespace quda {
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
       cudaDeviceSynchronize();
-      profileHBOVR.Stop(QUDA_PROFILE_COMPUTE);
+      profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);
       double gbytes = relax.bytes() * 8 * nover / (secs * 1e9);

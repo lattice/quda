@@ -70,9 +70,9 @@ struct DslashCommsPattern {
 
 
 #define PROFILE(f, profile, idx)		\
-  profile.Start(idx);				\
+  profile.TPSTART(idx);				\
   f;						\
-  profile.Stop(idx); 
+  profile.TPSTOP(idx); 
 
 
 
@@ -80,7 +80,7 @@ struct DslashCommsPattern {
 void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		const int volume, const int *faceVolumeCB, TimeProfile &profile) {
   using namespace dslash;
-  profile.Start(QUDA_PROFILE_TOTAL);
+  profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   dslashParam.parity = parity;
   dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -203,7 +203,7 @@ void dslashCuda(DslashCuda &dslash, const size_t regSize, const int parity, cons
   it = (it^1);
 #endif // MULTI_GPU
 
-  profile.Stop(QUDA_PROFILE_TOTAL);
+  profile.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 #ifdef PTHREADS
@@ -269,7 +269,7 @@ struct DslashCuda2 : DslashPolicyImp {
 
     using namespace dslash;
 
-    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   
     dslashParam.parity = parity;
@@ -391,7 +391,7 @@ struct DslashCuda2 : DslashPolicyImp {
     }
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 
 };
@@ -403,7 +403,7 @@ struct DslashPthreads : DslashPolicyImp {
 #ifdef PTHREADS
     using namespace dslash;
 
-    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   
     dslashParam.parity = parity;
@@ -554,7 +554,7 @@ struct DslashPthreads : DslashPolicyImp {
     }
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
 #else // !PTHREADS
     errorQuda("Pthreads has not been built\n"); 
 #endif
@@ -568,7 +568,7 @@ struct DslashGPUComms : DslashPolicyImp {
 #ifdef GPU_COMMS
     using namespace dslash;
 
-    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   
     dslashParam.parity = parity;
@@ -670,7 +670,7 @@ struct DslashGPUComms : DslashPolicyImp {
     }
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
 #else 
     errorQuda("GPU_COMMS has not been built\n");
 #endif // GPU_COMMS
@@ -685,7 +685,7 @@ struct DslashFusedGPUComms : DslashPolicyImp {
 #ifdef GPU_COMMS
     using namespace dslash;
 
-    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   
     dslashParam.parity = parity;
@@ -791,7 +791,7 @@ struct DslashFusedGPUComms : DslashPolicyImp {
 
     inputSpinor->bufferIndex = (1 - inputSpinor->bufferIndex);
 #endif // MULTI_GPU
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
 #else 
     errorQuda("GPU_COMMS has not been built\n");
 #endif // GPU_COMMS
@@ -804,7 +804,7 @@ struct DslashFaceBuffer : DslashPolicyImp {
 		const int volume, const int *faceVolumeCB, TimeProfile &profile) {
   
     using namespace dslash;
-    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
 
     dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -926,7 +926,7 @@ struct DslashFaceBuffer : DslashPolicyImp {
     }
     it = (it^1);
 #endif // MULTI_GPU
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 
 };
@@ -939,7 +939,7 @@ struct DslashFusedExterior : DslashPolicyImp {
 
     using namespace dslash;
 
-    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   
     dslashParam.parity = parity;
@@ -1072,7 +1072,7 @@ struct DslashFusedExterior : DslashPolicyImp {
 #endif // MULTI_GPU
 
 
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 };
 
@@ -1081,7 +1081,7 @@ struct DslashNC : DslashPolicyImp {
   void operator()(DslashCuda &dslash, cudaColorSpinorField* inputSpinor, const size_t regSize, const int parity, const int dagger, 
 		    const int volume, const int *faceVolumeCB, TimeProfile &profile) {
 
-    profile.Start(QUDA_PROFILE_TOTAL);
+    profile.TPSTART(QUDA_PROFILE_TOTAL);
     
     dslashParam.parity = parity;
     dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1089,7 +1089,7 @@ struct DslashNC : DslashPolicyImp {
 
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
-    profile.Stop(QUDA_PROFILE_TOTAL);
+    profile.TPSTOP(QUDA_PROFILE_TOTAL);
   }
 
 };
@@ -1136,7 +1136,7 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
 
   using namespace dslash;
 
-  profile.Start(QUDA_PROFILE_TOTAL);
+  profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   
   dslashParam.parity = parity;
@@ -1335,7 +1335,7 @@ void dslashCuda2(DslashCuda &dslash, const size_t regSize, const int parity, con
   inSpinor->bufferIndex = (1 - inSpinor->bufferIndex);
   //	inSpinor->switchBufferPinned(); // Use a different pinned memory buffer for the next application
 #endif // MULTI_GPU
-  profile.Stop(QUDA_PROFILE_TOTAL);
+  profile.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 /**
@@ -1346,7 +1346,7 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
 			const int volume, const int *faceVolumeCB, TimeProfile &profile) {
   using namespace dslash;
 
-  profile.Start(QUDA_PROFILE_TOTAL);
+  profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   dslashParam.parity = parity;
   dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1451,12 +1451,12 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
   it = (it^1);
 #endif // MULTI_GPU
 
-  profile.Stop(QUDA_PROFILE_TOTAL);
+  profile.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void dslashCudaNC(DslashCuda &dslash, const size_t regSize, const int parity, const int dagger, 
 		  const int volume, const int *faceVolumeCB, TimeProfile &profile) {
-  profile.Start(QUDA_PROFILE_TOTAL);
+  profile.TPSTART(QUDA_PROFILE_TOTAL);
 
   dslashParam.parity = parity;
   dslashParam.kernel_type = INTERIOR_KERNEL;
@@ -1464,5 +1464,5 @@ void dslashCudaNC(DslashCuda &dslash, const size_t regSize, const int parity, co
 
   PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
-  profile.Stop(QUDA_PROFILE_TOTAL);
+  profile.TPSTOP(QUDA_PROFILE_TOTAL);
 }
