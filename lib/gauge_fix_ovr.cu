@@ -1469,7 +1469,7 @@ static bool checkDimsPartitioned(){
                        const unsigned int stopWtheta) {
 
 
-    TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR");
+    TimeProfile profileInternalGaugeFixOVR("InternalGaugeFixQudaOVR", false);
 
     profileInternalGaugeFixOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     double flop = 0;
