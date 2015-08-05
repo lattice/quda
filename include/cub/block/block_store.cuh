@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,10 +35,11 @@
 
 #include <iterator>
 
-#include "../util_namespace.cuh"
+#include "block_exchange.cuh"
+#include "../util_ptx.cuh"
 #include "../util_macro.cuh"
 #include "../util_type.cuh"
-#include "block_exchange.cuh"
+#include "../util_namespace.cuh"
 
 /// Optional outer namespace(s)
 CUB_NS_PREFIX
@@ -64,15 +65,15 @@ namespace cub {
  *
  * \tparam T                    <b>[inferred]</b> The data type to store.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam OutputIterator       <b>[inferred]</b> The random-access iterator type for output \iterator.
+ * \tparam OutputIteratorT      <b>[inferred]</b> The random-access iterator type for output \iterator.
  */
 template <
     typename            T,
     int                 ITEMS_PER_THREAD,
-    typename            OutputIterator>
+    typename            OutputIteratorT>
 __device__ __forceinline__ void StoreDirectBlocked(
     int                 linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+    OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
     T                   (&items)[ITEMS_PER_THREAD]) ///< [in] Data to store
 {
     // Store directly in thread-blocked order
@@ -91,15 +92,15 @@ __device__ __forceinline__ void StoreDirectBlocked(
  *
  * \tparam T                    <b>[inferred]</b> The data type to store.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam OutputIterator       <b>[inferred]</b> The random-access iterator type for output \iterator.
+ * \tparam OutputIteratorT      <b>[inferred]</b> The random-access iterator type for output \iterator.
  */
 template <
     typename            T,
     int                 ITEMS_PER_THREAD,
-    typename            OutputIterator>
+    typename            OutputIteratorT>
 __device__ __forceinline__ void StoreDirectBlocked(
     int                 linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+    OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
     T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
     int                 valid_items)                ///< [in] Number of valid items to write
 {
@@ -157,7 +158,7 @@ __device__ __forceinline__ void StoreDirectBlockedVectorized(
     typedef typename CubVector<T, VEC_SIZE>::Type Vector;
 
     // Alias global pointer
-    Vector *block_ptr_vectors = reinterpret_cast<Vector *>(block_ptr);
+    Vector *block_ptr_vectors = reinterpret_cast<Vector*>(const_cast<T*>(block_ptr));
 
     // Alias pointers (use "raw" array here which should get optimized away to prevent conservative PTXAS lmem spilling)
     Vector raw_vector[VECTORS_PER_THREAD];
@@ -191,16 +192,16 @@ __device__ __forceinline__ void StoreDirectBlockedVectorized(
  * \tparam BLOCK_THREADS        The thread block size in threads
  * \tparam T                    <b>[inferred]</b> The data type to store.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam OutputIterator       <b>[inferred]</b> The random-access iterator type for output \iterator.
+ * \tparam OutputIteratorT      <b>[inferred]</b> The random-access iterator type for output \iterator.
  */
 template <
     int                 BLOCK_THREADS,
     typename            T,
     int                 ITEMS_PER_THREAD,
-    typename            OutputIterator>
+    typename            OutputIteratorT>
 __device__ __forceinline__ void StoreDirectStriped(
     int                 linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+    OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
     T                   (&items)[ITEMS_PER_THREAD]) ///< [in] Data to store
 {
     // Store directly in striped order
@@ -220,16 +221,16 @@ __device__ __forceinline__ void StoreDirectStriped(
  * \tparam BLOCK_THREADS        The thread block size in threads
  * \tparam T                    <b>[inferred]</b> The data type to store.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam OutputIterator       <b>[inferred]</b> The random-access iterator type for output \iterator.
+ * \tparam OutputIteratorT      <b>[inferred]</b> The random-access iterator type for output \iterator.
  */
 template <
     int                 BLOCK_THREADS,
     typename            T,
     int                 ITEMS_PER_THREAD,
-    typename            OutputIterator>
+    typename            OutputIteratorT>
 __device__ __forceinline__ void StoreDirectStriped(
     int                 linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+    OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
     T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
     int                 valid_items)                ///< [in] Number of valid items to write
 {
@@ -263,15 +264,15 @@ __device__ __forceinline__ void StoreDirectStriped(
  *
  * \tparam T                    <b>[inferred]</b> The data type to store.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam OutputIterator       <b>[inferred]</b> The random-access iterator type for output \iterator.
+ * \tparam OutputIteratorT      <b>[inferred]</b> The random-access iterator type for output \iterator.
  */
 template <
     typename            T,
     int                 ITEMS_PER_THREAD,
-    typename            OutputIterator>
+    typename            OutputIteratorT>
 __device__ __forceinline__ void StoreDirectWarpStriped(
     int                 linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+    OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
     T                   (&items)[ITEMS_PER_THREAD]) ///< [out] Data to load
 {
     int tid         = linear_tid & (CUB_PTX_WARP_THREADS - 1);
@@ -297,15 +298,15 @@ __device__ __forceinline__ void StoreDirectWarpStriped(
  *
  * \tparam T                    <b>[inferred]</b> The data type to store.
  * \tparam ITEMS_PER_THREAD     <b>[inferred]</b> The number of consecutive items partitioned onto each thread.
- * \tparam OutputIterator       <b>[inferred]</b> The random-access iterator type for output \iterator.
+ * \tparam OutputIteratorT      <b>[inferred]</b> The random-access iterator type for output \iterator.
  */
 template <
     typename            T,
     int                 ITEMS_PER_THREAD,
-    typename            OutputIterator>
+    typename            OutputIteratorT>
 __device__ __forceinline__ void StoreDirectWarpStriped(
     int                 linear_tid,                 ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+    OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
     T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
     int                 valid_items)                ///< [in] Number of valid items to write
 {
@@ -344,8 +345,7 @@ enum BlockStoreAlgorithm
      * \par Overview
      *
      * A [<em>blocked arrangement</em>](index.html#sec5sec3) of data is written
-     * directly to memory.  The thread block writes items in a parallel "raking" fashion:
-     * thread<sub><em>i</em></sub> writes the <em>i</em><sup>th</sup> segment of consecutive elements.
+     * directly to memory.
      *
      * \par Performance Considerations
      * - The utilization of memory transactions (coalescing) decreases as the
@@ -358,10 +358,8 @@ enum BlockStoreAlgorithm
      *
      * A [<em>blocked arrangement</em>](index.html#sec5sec3) of data is written directly
      * to memory using CUDA's built-in vectorized stores as a coalescing optimization.
-     * The thread block writes items in a parallel "raking" fashion: thread<sub><em>i</em></sub> uses vector stores to
-     * write the <em>i</em><sup>th</sup> segment of consecutive elements.
-     *
-     * For example, <tt>st.global.v4.s32</tt> instructions will be generated when \p T = \p int and \p ITEMS_PER_THREAD > 4.
+     * For example, <tt>st.global.v4.s32</tt> instructions will be generated
+     * when \p T = \p int and \p ITEMS_PER_THREAD % 4 == 0.
      *
      * \par Performance Considerations
      * - The utilization of memory transactions (coalescing) remains high until the the
@@ -369,7 +367,7 @@ enum BlockStoreAlgorithm
      *   maximum vector store width (typically 4 items or 64B, whichever is lower).
      * - The following conditions will prevent vectorization and writing will fall back to cub::BLOCK_STORE_DIRECT:
      *   - \p ITEMS_PER_THREAD is odd
-     *   - The \p OutputIterator is not a simple pointer type
+     *   - The \p OutputIteratorT is not a simple pointer type
      *   - The block output offset is not quadword-aligned
      *   - The data type \p T is not a built-in primitive or CUDA vector type (e.g., \p short, \p int2, \p double, \p float2, etc.)
      */
@@ -378,13 +376,7 @@ enum BlockStoreAlgorithm
     /**
      * \par Overview
      * A [<em>blocked arrangement</em>](index.html#sec5sec3) is locally
-     * transposed into a [<em>striped arrangement</em>](index.html#sec5sec3)
-     * which is then written to memory.  More specifically, cub::BlockExchange
-     * used to locally reorder the items into a
-     * [<em>striped arrangement</em>](index.html#sec5sec3), after which the
-     * thread block writes items in a parallel "strip-mining" fashion: consecutive
-     * items owned by thread<sub><em>i</em></sub> are written to memory with
-     * stride \p BLOCK_THREADS between them.
+     * transposed and then efficiently written to memory as a [<em>striped arrangement</em>](index.html#sec5sec3).
      *
      * \par Performance Considerations
      * - The utilization of memory transactions (coalescing) remains high regardless
@@ -397,13 +389,11 @@ enum BlockStoreAlgorithm
     /**
      * \par Overview
      * A [<em>blocked arrangement</em>](index.html#sec5sec3) is locally
-     * transposed into a [<em>warp-striped arrangement</em>](index.html#sec5sec3)
-     * which is then written to memory.  More specifically, cub::BlockExchange used
-     * to locally reorder the items into a
-     * [<em>warp-striped arrangement</em>](index.html#sec5sec3), after which
-     * each warp writes its own contiguous segment in a parallel "strip-mining" fashion:
-     * consecutive items owned by lane<sub><em>i</em></sub> are written to memory
-     * with stride \p WARP_THREADS between them.
+     * transposed and then efficiently written to memory as a
+     * [<em>warp-striped arrangement</em>](index.html#sec5sec3)
+     *
+     * \par Usage Considerations
+     * - BLOCK_THREADS must be a multiple of WARP_THREADS
      *
      * \par Performance Considerations
      * - The utilization of memory transactions (coalescing) remains high regardless
@@ -412,6 +402,26 @@ enum BlockStoreAlgorithm
      *   direct cub::BLOCK_STORE_DIRECT and cub::BLOCK_STORE_VECTORIZE alternatives.
      */
     BLOCK_STORE_WARP_TRANSPOSE,
+
+    /**
+     * \par Overview
+     * A [<em>blocked arrangement</em>](index.html#sec5sec3) is locally
+     * transposed and then efficiently written to memory as a
+     * [<em>warp-striped arrangement</em>](index.html#sec5sec3)
+     * To reduce the shared memory requirement, only one warp's worth of shared
+     * memory is provisioned and is subsequently time-sliced among warps.
+     *
+     * \par Usage Considerations
+     * - BLOCK_THREADS must be a multiple of WARP_THREADS
+     *
+     * \par Performance Considerations
+     * - The utilization of memory transactions (coalescing) remains high regardless
+     *   of items written per thread.
+     * - Provisions less shared memory temporary storage, but incurs larger
+     *   latencies than the BLOCK_STORE_WARP_TRANSPOSE alternative.
+     */
+    BLOCK_STORE_WARP_TRANSPOSE_TIMESLICED,
+
 };
 
 
@@ -420,11 +430,14 @@ enum BlockStoreAlgorithm
  * \ingroup BlockModule
  * \ingroup UtilIo
  *
- * \tparam OutputIterator     The input iterator type \iterator.
- * \tparam BLOCK_THREADS        The thread block size in threads.
+ * \tparam OutputIteratorT      The input iterator type \iterator.
+ * \tparam BLOCK_DIM_X          The thread block length in threads along the X dimension
  * \tparam ITEMS_PER_THREAD     The number of consecutive items partitioned onto each thread.
  * \tparam ALGORITHM            <b>[optional]</b> cub::BlockStoreAlgorithm tuning policy enumeration.  default: cub::BLOCK_STORE_DIRECT.
  * \tparam WARP_TIME_SLICING    <b>[optional]</b> Whether or not only one warp's worth of shared memory should be allocated and time-sliced among block-warps during any load-related data transpositions (versus each warp having its own storage). (default: false)
+ * \tparam BLOCK_DIM_Y          <b>[optional]</b> The thread block length in threads along the Y dimension (default: 1)
+ * \tparam BLOCK_DIM_Z          <b>[optional]</b> The thread block length in threads along the Z dimension (default: 1)
+ * \tparam PTX_ARCH             <b>[optional]</b> \ptxversion
  *
  * \par Overview
  * - The BlockStore class provides a single data movement abstraction that can be specialized
@@ -442,6 +455,7 @@ enum BlockStoreAlgorithm
  *   -# <b>cub::BLOCK_STORE_WARP_TRANSPOSE</b>.  A [<em>blocked arrangement</em>](index.html#sec5sec3)
  *      is locally transposed into a [<em>warp-striped arrangement</em>](index.html#sec5sec3) which is
  *      then written to memory.  [More...](\ref cub::BlockStoreAlgorithm)
+ * - \rowmajor
  *
  * \par A Simple Example
  * \blockcollective{BlockStore}
@@ -457,7 +471,7 @@ enum BlockStoreAlgorithm
  *
  * __global__ void ExampleKernel(int *d_data, ...)
  * {
- *     // Specialize BlockStore for 128 threads owning 4 integer items each
+ *     // Specialize BlockStore for a 1D block of 128 threads owning 4 integer items each
  *     typedef cub::BlockStore<int*, 128, 4, BLOCK_STORE_WARP_TRANSPOSE> BlockStore;
  *
  *     // Allocate shared memory for BlockStore
@@ -479,11 +493,13 @@ enum BlockStoreAlgorithm
  *
  */
 template <
-    typename                OutputIterator,
-    int                     BLOCK_THREADS,
+    typename                OutputIteratorT,
+    int                     BLOCK_DIM_X,
     int                     ITEMS_PER_THREAD,
     BlockStoreAlgorithm     ALGORITHM           = BLOCK_STORE_DIRECT,
-    bool                    WARP_TIME_SLICING   = false>
+    int                     BLOCK_DIM_Y         = 1,
+    int                     BLOCK_DIM_Z         = 1,
+    int                     PTX_ARCH            = CUB_PTX_ARCH>
 class BlockStore
 {
 private:
@@ -491,8 +507,15 @@ private:
      * Constants and typed definitions
      ******************************************************************************/
 
+    /// Constants
+    enum
+    {
+        /// The thread block size in threads
+        BLOCK_THREADS = BLOCK_DIM_X * BLOCK_DIM_Y * BLOCK_DIM_Z,
+    };
+
     // Data type of input iterator
-    typedef typename std::iterator_traits<OutputIterator>::value_type T;
+    typedef typename std::iterator_traits<OutputIteratorT>::value_type T;
 
 
     /******************************************************************************
@@ -500,7 +523,7 @@ private:
      ******************************************************************************/
 
     /// Store helper
-    template <BlockStoreAlgorithm _POLICY, int DUMMY = 0>
+    template <BlockStoreAlgorithm _POLICY, int DUMMY>
     struct StoreInternal;
 
 
@@ -526,7 +549,7 @@ private:
 
         /// Store items into a linear segment of memory
         __device__ __forceinline__ void Store(
-            OutputIterator    block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD]) ///< [in] Data to store
         {
             StoreDirectBlocked(linear_tid, block_itr, items);
@@ -534,7 +557,7 @@ private:
 
         /// Store items into a linear segment of memory, guarded by range
         __device__ __forceinline__ void Store(
-            OutputIterator    block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
             int                 valid_items)                ///< [in] Number of valid items to write
         {
@@ -572,9 +595,9 @@ private:
         }
 
         /// Store items into a linear segment of memory, specialized for opaque input iterators (skips vectorization)
-        template <typename _OutputIterator>
+        template <typename _OutputIteratorT>
         __device__ __forceinline__ void Store(
-            _OutputIterator   block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            _OutputIteratorT    block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD]) ///< [in] Data to store
         {
             StoreDirectBlocked(linear_tid, block_itr, items);
@@ -582,7 +605,7 @@ private:
 
         /// Store items into a linear segment of memory, guarded by range
         __device__ __forceinline__ void Store(
-            OutputIterator    block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
             int                 valid_items)                ///< [in] Number of valid items to write
         {
@@ -598,7 +621,7 @@ private:
     struct StoreInternal<BLOCK_STORE_TRANSPOSE, DUMMY>
     {
         // BlockExchange utility type for keys
-        typedef BlockExchange<T, BLOCK_THREADS, ITEMS_PER_THREAD, WARP_TIME_SLICING> BlockExchange;
+        typedef BlockExchange<T, BLOCK_DIM_X, ITEMS_PER_THREAD, false, BLOCK_DIM_Y, BLOCK_DIM_Z, PTX_ARCH> BlockExchange;
 
         /// Shared memory storage layout type
         typedef typename BlockExchange::TempStorage _TempStorage;
@@ -623,7 +646,7 @@ private:
 
         /// Store items into a linear segment of memory
         __device__ __forceinline__ void Store(
-            OutputIterator    block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD]) ///< [in] Data to store
         {
             BlockExchange(temp_storage).BlockedToStriped(items);
@@ -632,7 +655,7 @@ private:
 
         /// Store items into a linear segment of memory, guarded by range
         __device__ __forceinline__ void Store(
-            OutputIterator    block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            OutputIteratorT   block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
             int                 valid_items)                ///< [in] Number of valid items to write
         {
@@ -650,14 +673,14 @@ private:
     {
         enum
         {
-            WARP_THREADS = CUB_PTX_WARP_THREADS
+            WARP_THREADS = CUB_WARP_THREADS(PTX_ARCH)
         };
 
         // Assert BLOCK_THREADS must be a multiple of WARP_THREADS
         CUB_STATIC_ASSERT((BLOCK_THREADS % WARP_THREADS == 0), "BLOCK_THREADS must be a multiple of WARP_THREADS");
 
         // BlockExchange utility type for keys
-        typedef BlockExchange<T, BLOCK_THREADS, ITEMS_PER_THREAD, WARP_TIME_SLICING> BlockExchange;
+        typedef BlockExchange<T, BLOCK_DIM_X, ITEMS_PER_THREAD, false, BLOCK_DIM_Y, BLOCK_DIM_Z, PTX_ARCH> BlockExchange;
 
         /// Shared memory storage layout type
         typedef typename BlockExchange::TempStorage _TempStorage;
@@ -682,7 +705,66 @@ private:
 
         /// Store items into a linear segment of memory
         __device__ __forceinline__ void Store(
-            OutputIterator    block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            OutputIteratorT   block_itr,                    ///< [in] The thread block's base output iterator for storing to
+            T                 (&items)[ITEMS_PER_THREAD])   ///< [in] Data to store
+        {
+            BlockExchange(temp_storage).BlockedToWarpStriped(items);
+            StoreDirectWarpStriped(linear_tid, block_itr, items);
+        }
+
+        /// Store items into a linear segment of memory, guarded by range
+        __device__ __forceinline__ void Store(
+            OutputIteratorT   block_itr,                    ///< [in] The thread block's base output iterator for storing to
+            T                 (&items)[ITEMS_PER_THREAD],   ///< [in] Data to store
+            int               valid_items)                  ///< [in] Number of valid items to write
+        {
+            BlockExchange(temp_storage).BlockedToWarpStriped(items);
+            StoreDirectWarpStriped(linear_tid, block_itr, items, valid_items);
+        }
+    };
+
+
+    /**
+     * BLOCK_STORE_WARP_TRANSPOSE_TIMESLICED specialization of store helper
+     */
+    template <int DUMMY>
+    struct StoreInternal<BLOCK_STORE_WARP_TRANSPOSE_TIMESLICED, DUMMY>
+    {
+        enum
+        {
+            WARP_THREADS = CUB_WARP_THREADS(PTX_ARCH)
+        };
+
+        // Assert BLOCK_THREADS must be a multiple of WARP_THREADS
+        CUB_STATIC_ASSERT((BLOCK_THREADS % WARP_THREADS == 0), "BLOCK_THREADS must be a multiple of WARP_THREADS");
+
+        // BlockExchange utility type for keys
+        typedef BlockExchange<T, BLOCK_DIM_X, ITEMS_PER_THREAD, true, BLOCK_DIM_Y, BLOCK_DIM_Z, PTX_ARCH> BlockExchange;
+
+        /// Shared memory storage layout type
+        typedef typename BlockExchange::TempStorage _TempStorage;
+
+        /// Alias wrapper allowing storage to be unioned
+        struct TempStorage : Uninitialized<_TempStorage> {};
+
+        /// Thread reference to shared storage
+        _TempStorage &temp_storage;
+
+        /// Linear thread-id
+        int linear_tid;
+
+        /// Constructor
+        __device__ __forceinline__ StoreInternal(
+            TempStorage &temp_storage,
+            int linear_tid)
+        :
+            temp_storage(temp_storage.Alias()),
+            linear_tid(linear_tid)
+        {}
+
+        /// Store items into a linear segment of memory
+        __device__ __forceinline__ void Store(
+            OutputIteratorT   block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD]) ///< [in] Data to store
         {
             BlockExchange(temp_storage).BlockedToWarpStriped(items);
@@ -691,7 +773,7 @@ private:
 
         /// Store items into a linear segment of memory, guarded by range
         __device__ __forceinline__ void Store(
-            OutputIterator    block_itr,                  ///< [in] The thread block's base output iterator for storing to
+            OutputIteratorT   block_itr,                  ///< [in] The thread block's base output iterator for storing to
             T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
             int                 valid_items)                ///< [in] Number of valid items to write
         {
@@ -705,7 +787,7 @@ private:
      ******************************************************************************/
 
     /// Internal load implementation to use
-    typedef StoreInternal<ALGORITHM> InternalStore;
+    typedef StoreInternal<ALGORITHM, 0> InternalStore;
 
 
     /// Shared memory storage layout type
@@ -747,46 +829,23 @@ public:
     //@{
 
     /**
-     * \brief Collective constructor for 1D thread blocks using a private static allocation of shared memory as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.
      */
     __device__ __forceinline__ BlockStore()
     :
         temp_storage(PrivateStorage()),
-        linear_tid(threadIdx.x)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
 
 
     /**
-     * \brief Collective constructor for 1D thread blocks using the specified memory allocation as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using the specified memory allocation as temporary storage.
      */
     __device__ __forceinline__ BlockStore(
         TempStorage &temp_storage)             ///< [in] Reference to memory allocation having layout type TempStorage
     :
         temp_storage(temp_storage.Alias()),
-        linear_tid(threadIdx.x)
-    {}
-
-
-    /**
-     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.  Each thread is identified using the supplied linear thread identifier
-     */
-    __device__ __forceinline__ BlockStore(
-        int linear_tid)                        ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(PrivateStorage()),
-        linear_tid(linear_tid)
-    {}
-
-
-    /**
-     * \brief Collective constructor using the specified memory allocation as temporary storage.  Each thread is identified using the supplied linear thread identifier.
-     */
-    __device__ __forceinline__ BlockStore(
-        TempStorage &temp_storage,             ///< [in] Reference to memory allocation having layout type TempStorage
-        int linear_tid)                        ///< [in] <b>[optional]</b> A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(temp_storage.Alias()),
-        linear_tid(linear_tid)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z))
     {}
 
 
@@ -804,7 +863,7 @@ public:
      * - \blocked
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates the storing of a "blocked" arrangement
      * of 512 integers across 128 threads (where each thread owns 4 consecutive items)
      * into a linear segment of memory.  The store is specialized for \p BLOCK_STORE_WARP_TRANSPOSE,
@@ -816,7 +875,7 @@ public:
      *
      * __global__ void ExampleKernel(int *d_data, ...)
      * {
-     *     // Specialize BlockStore for 128 threads owning 4 integer items each
+     *     // Specialize BlockStore for a 1D block of 128 threads owning 4 integer items each
      *     typedef cub::BlockStore<int*, 128, 4, BLOCK_STORE_WARP_TRANSPOSE> BlockStore;
      *
      *     // Allocate shared memory for BlockStore
@@ -838,7 +897,7 @@ public:
      *
      */
     __device__ __forceinline__ void Store(
-        OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+        OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
         T                   (&items)[ITEMS_PER_THREAD]) ///< [in] Data to store
     {
         InternalStore(temp_storage, linear_tid).Store(block_itr, items);
@@ -851,7 +910,7 @@ public:
      * - \blocked
      * - \smemreuse
      *
-     * \par
+     * \par Snippet
      * The code snippet below illustrates the guarded storing of a "blocked" arrangement
      * of 512 integers across 128 threads (where each thread owns 4 consecutive items)
      * into a linear segment of memory.  The store is specialized for \p BLOCK_STORE_WARP_TRANSPOSE,
@@ -863,7 +922,7 @@ public:
      *
      * __global__ void ExampleKernel(int *d_data, int valid_items, ...)
      * {
-     *     // Specialize BlockStore for 128 threads owning 4 integer items each
+     *     // Specialize BlockStore for a 1D block of 128 threads owning 4 integer items each
      *     typedef cub::BlockStore<int*, 128, 4, BLOCK_STORE_WARP_TRANSPOSE> BlockStore;
      *
      *     // Allocate shared memory for BlockStore
@@ -886,7 +945,7 @@ public:
      *
      */
     __device__ __forceinline__ void Store(
-        OutputIterator      block_itr,                  ///< [in] The thread block's base output iterator for storing to
+        OutputIteratorT     block_itr,                  ///< [in] The thread block's base output iterator for storing to
         T                   (&items)[ITEMS_PER_THREAD], ///< [in] Data to store
         int                 valid_items)                ///< [in] Number of valid items to write
     {
