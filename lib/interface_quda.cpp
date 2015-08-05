@@ -215,8 +215,8 @@ static TimeProfile profileCovDev("covDevQuda");
 static TimeProfile profileEnd("endQuda");
 
 //!< Profiler for GaugeFixing
-static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda",false);
-static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda",false);
+static TimeProfile GaugeFixFFTQuda("GaugeFixFFTQuda");
+static TimeProfile GaugeFixOVRQuda("GaugeFixOVRQuda");
 
 
 
