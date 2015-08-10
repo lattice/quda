@@ -71,7 +71,7 @@ class GaugeAlgTest : public ::testing::Test {
   }
 
   bool CheckDeterminant(double2 detu){
-    double prec_val = 1.0e-8;
+    double prec_val = 5e-8;
     if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
     if(DABS(1.0 - detu.x) < prec_val && DABS(detu.y) < prec_val) return true;
     return false;
