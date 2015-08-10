@@ -49,6 +49,10 @@ namespace quda {
 
   cudaStream_t* getBlasStream();
     
+  void* getDeviceReduceBuffer() { return d_reduce; }
+  void* getMappedHostReduceBuffer() { return hd_reduce; }
+  void* getHostReduceBuffer() { return h_reduce; }
+
   void initReduce()
   { 
 
