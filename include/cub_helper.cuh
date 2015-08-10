@@ -31,4 +31,54 @@ namespace quda {
     }
   };
 
-}
+
+  __device__ inline void zero(double2 &a) {
+    a.x = 0.0;
+    a.y = 0.0;
+  }
+
+  __device__ unsigned int count = 0;
+  __shared__ bool isLastBlockDone;
+
+  template <int block_size_x, int block_size_y, typename T>
+  __device__ inline void reduce2d(T *result, T *partial, const T &in) {
+
+    typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+    __shared__ typename BlockReduce::TempStorage cub_tmp;
+
+    T aggregate = BlockReduce(cub_tmp).Reduce(in, Summ<T>());
+
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      partial[blockIdx.x] = aggregate;
+      __threadfence(); // flush result
+
+      // increment global block counter
+      unsigned int value = atomicInc(&count, gridDim.x);
+
+      // determine if last block
+      isLastBlockDone = (value == (gridDim.x-1));
+    }
+
+    __syncthreads();
+
+    // finish the reduction if last block
+    if (isLastBlockDone) {
+      unsigned int i = threadIdx.y*block_size_x + threadIdx.x;
+      T sum;
+      zero(sum);
+      while (i<gridDim.x) {
+	sum += partial[i];
+	i += block_size_x*block_size_y;
+      }
+
+      sum = BlockReduce(cub_tmp).Reduce(sum, Summ<T>());
+
+      // write out the final reduced value
+      if (threadIdx.y*block_size_x + threadIdx.x == 0) {
+	*result = sum;
+	count = 0; // set to zero for next time
+      }
+    }
+  }
+
+} // namespace quda

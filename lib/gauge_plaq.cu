@@ -20,22 +20,27 @@ namespace quda {
     int border[4]; 
 #endif
     Gauge dataOr;
+    
+    double2 *partial;
     double2 *plaq;
     double2 *plaq_h;
 
     GaugePlaqArg(const Gauge &dataOr, const GaugeField &data)
-      : dataOr(dataOr), plaq_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
+      : dataOr(dataOr), 
+	partial(static_cast<double2*>(getDeviceReduceBuffer())),
+	plaq(static_cast<double2*>(getMappedHostReduceBuffer())),
+	plaq_h(static_cast<double2*>(getHostReduceBuffer())) 
+    {
+
 #ifdef MULTI_GPU
         for(int dir=0; dir<4; ++dir){
           border[dir] = 2;
+	  X[dir] = data.X()[dir] - border[dir]*2;
         }
-
-        for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;
 #else
         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
 	threads = X[0]*X[1]*X[2]*X[3]/2;
-	cudaHostGetDevicePointer(&plaq, plaq_h, 0);
     }
   };
 
@@ -100,10 +105,8 @@ namespace quda {
         }
       }
 
-      typedef cub::BlockReduce<double2, blockSize, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
-      __shared__ typename BlockReduce::TempStorage cub_tmp;
-      double2 aggregate = BlockReduce(cub_tmp).Reduce(plaq, Summ<double2>());
-      if (threadIdx.x == 0 && threadIdx.y == 0) atomicAdd(arg.plaq, aggregate);
+      // perform final inter-block reduction and write out result
+      reduce2d<blockSize,2>(arg.plaq, arg.partial, plaq);
   }
 
   template<typename Float, typename Gauge>
@@ -121,11 +124,12 @@ namespace quda {
       public:
       GaugePlaq(GaugePlaqArg<Gauge> &arg, QudaFieldLocation location)
         : arg(arg), location(location) {}
-      ~GaugePlaq () { host_free(arg.plaq_h); }
+      ~GaugePlaq () { }
 
       bool advanceBlockDim(TuneParam &param) const {
-	Tunable::advanceBlockDim(param);
+      	bool rtn = Tunable::advanceBlockDim(param);
 	param.block.y = 2;
+	return rtn;
       }
 
       void initTuneParam(TuneParam &param) const {
