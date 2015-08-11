@@ -129,39 +129,23 @@ namespace quda {
   template<typename Float>
   void InitGaugeField( cudaGaugeField& data) {
 
-    // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    // Need to fix this!!
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 18>(data), data);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 12>(data), data);
-
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2,  8>(data), data);
-
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 18>(data), data);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 12>(data), data);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4,  8>(data), data);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
     } else {
       errorQuda("Invalid Gauge Order\n");
     }
+
   }
 
 /** @brief Perform a cold start to the gauge field, identity SU(3) matrix, also fills the ghost links in multi-GPU case (no need to exchange data)
@@ -170,12 +154,6 @@ namespace quda {
  */
   void InitGaugeField( cudaGaugeField& data) {
 
-/*#ifdef MULTI_GPU
-   errorQuda("Gauge Fixing with multi-GPU support NOT implemented yet!\n");
- #else*/
-    if ( data.Precision() == QUDA_HALF_PRECISION ) {
-      errorQuda("Half precision not supported\n");
-    }
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       InitGaugeField<float> (data);
     } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
@@ -183,7 +161,7 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", data.Precision());
     }
-//#endif
+    
   }
 
 
@@ -508,33 +486,16 @@ namespace quda {
   template<typename Float>
   void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
 
-    // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    // Need to fix this!!
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 18>(data), data, rngstate);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 12>(data), data, rngstate);
-
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2,  8>(data), data, rngstate);
-
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 18>(data), data, rngstate);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 12>(data), data, rngstate);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4,  8>(data), data, rngstate);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
@@ -551,9 +512,6 @@ namespace quda {
  */
   void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
 #ifdef GPU_GAUGE_ALG
-    if ( data.Precision() == QUDA_HALF_PRECISION ) {
-      errorQuda("Half precision not supported\n");
-    }
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       InitGaugeField<float> (data, rngstate);
     } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
