@@ -311,7 +311,7 @@ namespace quda {
 	timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
       RegType diff = 1.0/(u0*u0) - row_sum;
-      RegType U00_mag = sqrt(diff >= 0 ? diff : 0.0);
+      RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
       out[0] = U00_mag * Trig<isHalf<Float>::value>::Cos(in[0]);
       out[1] = U00_mag * Trig<isHalf<Float>::value>::Sin(in[0]);
@@ -324,7 +324,7 @@ namespace quda {
 	column_sum += in[i]*in[i];
       }
       diff = 1.f/(u0*u0) - column_sum;
-      RegType U20_mag = sqrt(diff >= 0 ? diff : 0.0);
+      RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
       out[12] = U20_mag * Trig<isHalf<Float>::value>::Cos(in[1]);
       out[13] = U20_mag * Trig<isHalf<Float>::value>::Sin(in[1]);
@@ -515,12 +515,14 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
         const int M = reconLen / N;
         RegType tmp[reconLen];
 	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
 #pragma unroll
         for (int i=0; i<M; i++){
 	  // first do vectorized copy from memory
 	  Vector vecTmp = vector_load<Vector>(gauge + parity*offset, x + dir*stride*M + stride*i);
 	  // second do vectorized copy converting into register type
-          copy(reinterpret_cast< Vector* >(tmp)[i], vecTmp);
+          copy(reinterpret_cast<RegVector*>(tmp)[i], vecTmp);
         }
 	
         RegType phase = 0.;
@@ -536,11 +538,13 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
         RegType tmp[reconLen];
         reconstruct.Pack(tmp, v, x);
 	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
 #pragma unroll
         for (int i=0; i<M; i++){
 	  Vector vecTmp;
 	  // first do vectorized copy converting into storage type
-	  copy(vecTmp, reinterpret_cast< Vector* >(tmp)[i]);
+	  copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
 	  // second do vectorized copy into memory
 	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
         }
@@ -561,6 +565,8 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
           const int M = reconLen / N;
           RegType tmp[reconLen];
 	  typedef typename VectorType<Float,N>::type Vector;
+	  typedef typename VectorType<RegType,N>::type RegVector;
+
 #pragma unroll
           for (int i=0; i<M; i++) {
 #if __COMPUTE_CAPABILITY__ < 200
@@ -570,7 +576,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	    Vector vecTmp = vector_load<Vector>(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), 
 						i*faceVolumeCB[dir]+x);
 	    // second do vectorized copy converting into register type
-	    copy(reinterpret_cast< Vector* >(tmp)[i], vecTmp);
+	    copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
           }
           RegType phase=0.; 
 #if __COMPUTE_CAPABILITY__ >= 200
@@ -588,6 +594,8 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
           RegType tmp[reconLen];
           reconstruct.Pack(tmp, v, x);
 	  typedef typename VectorType<Float,N>::type Vector;
+	  typedef typename VectorType<RegType,N>::type RegVector;
+
 #pragma unroll
           for (int i=0; i<M; i++) {
 #if __COMPUTE_CAPABILITY__ < 200
@@ -595,7 +603,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 #endif
 	    Vector vecTmp;
 	    // first do vectorized copy converting into storage type
-	    copy(vecTmp, reinterpret_cast< Vector* >(tmp)[i]);
+	    copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
 	    // second do vectorized copy into memory
 	    reinterpret_cast< Vector*>
 	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
@@ -619,13 +627,15 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
 #pragma unroll
 	for (int i=0; i<M; i++) {
 	  // first do vectorized copy from memory
 	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
 					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
 	  // second do vectorized copy converting into register type
-	  copy(reinterpret_cast< Vector* >(tmp)[i], vecTmp);
+	  copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
 	}
 	RegType phase=0.; 
 	if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1)
@@ -645,11 +655,13 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	// use the extended_idx to determine the boundary condition
 	reconstruct.Pack(tmp, v, extended_idx);
 	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
 #pragma unroll
 	for (int i=0; i<M; i++) {
 	  Vector vecTmp;
 	  // first do vectorized copy converting into storage type
-	  copy(vecTmp, reinterpret_cast< Vector* >(tmp)[i]);
+	  copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
 	  // second do vectorized copy to memory
 	  reinterpret_cast< Vector* >
 	    (ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase))

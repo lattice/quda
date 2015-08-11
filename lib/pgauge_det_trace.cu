@@ -101,7 +101,7 @@ class CalcFunc : Tunable {
   private:
   unsigned int sharedBytesPerThread() const { return 0; }
   unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-  bool tuneSharedBytes() const { return false; } // Don't tune shared memory
+  //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
   bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
   unsigned int minThreads() const { return arg.threads; }
 
@@ -156,8 +156,8 @@ class CalcFunc : Tunable {
 
 template<typename Float, int NCOLORS, int functiontype, typename Gauge>
 double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
-  TimeProfile profileGenericFunc("GenericFunc");
-  if (getVerbosity() >= QUDA_SUMMARIZE) profileGenericFunc.Start(QUDA_PROFILE_COMPUTE);
+  TimeProfile profileGenericFunc("GenericFunc", false);
+  if (getVerbosity() >= QUDA_SUMMARIZE) profileGenericFunc.TPSTART(QUDA_PROFILE_COMPUTE);
   KernelArg<Gauge> arg(dataOr, data);
   CalcFunc<Float, Gauge, NCOLORS, functiontype> func(arg);
   func.apply(0);
@@ -166,7 +166,7 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   checkCudaError();
   cudaDeviceSynchronize();
   if (getVerbosity() >= QUDA_SUMMARIZE){
-    profileGenericFunc.Stop(QUDA_PROFILE_COMPUTE);
+    profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);
     double secs = profileGenericFunc.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (func.flops()*1e-9)/(secs);
     double gbytes = func.bytes()/(secs*1e9);

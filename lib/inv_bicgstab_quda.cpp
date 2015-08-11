@@ -30,7 +30,7 @@ namespace quda {
   }
 
   BiCGstab::~BiCGstab() {
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
     if(init) {
       delete yp;
@@ -41,7 +41,7 @@ namespace quda {
       delete tp;
     }
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
@@ -60,7 +60,7 @@ namespace quda {
 
   void BiCGstab::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
-    profile.Start(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     if (!init) {
       ColorSpinorParam csParam(x);
@@ -101,7 +101,7 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      profile.Stop(QUDA_PROFILE_INIT);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       warningQuda("inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -173,8 +173,8 @@ namespace quda {
       quda::blas_flops = 0;    
     }
 
-    profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     
     rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
     copyCuda(p, rSloppy);
@@ -286,8 +286,8 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) copyCuda(x, xSloppy);
     xpyCuda(y, x);
 
-    profile.Stop(QUDA_PROFILE_COMPUTE);
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
@@ -319,9 +319,9 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
     if (param.precision_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
@@ -329,7 +329,7 @@ namespace quda {
 
     if (&x != &xSloppy) delete x_sloppy;
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
     
     return;
   }

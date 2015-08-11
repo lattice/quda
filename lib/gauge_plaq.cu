@@ -12,7 +12,6 @@ namespace quda {
 
 #ifdef GPU_GAUGE_TOOLS
 
-//  template <typename Float, typename Gauge>
   template <typename Gauge>
   struct GaugePlaqArg {
     int threads; // number of active threads required
@@ -35,7 +34,7 @@ namespace quda {
 #else
         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
-	threads = X[0]*X[1]*X[2]*X[3];
+	threads = X[0]*X[1]*X[2]*X[3]/2;
 	cudaHostGetDevicePointer(&plaq, plaq_h, 0);
     }
   };
@@ -43,20 +42,12 @@ namespace quda {
   template<int blockSize, typename Float, typename Gauge>
     __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
+      int parity = threadIdx.y;
 
-      double2 plaq;
-
-      plaq.x = 0.;
-      plaq.y = 0.;
+      double2 plaq = make_double2(0.0,0.0);
 
       if(idx < arg.threads) {
         typedef typename ComplexTypeId<Float>::Type Cmplx;
-        int parity = 0;
-        if(idx >= arg.threads/2) {
-          parity = 1;
-          idx -= arg.threads/2;
-        }
-
         int X[4]; 
         for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
 
@@ -109,12 +100,10 @@ namespace quda {
         }
       }
 
-      typedef cub::BlockReduce<double2, blockSize> BlockReduce;
-      __shared__ typename BlockReduce::TempStorage temp_storage;
-//      double2 aggregate = BlockReduce(temp_storage).Sum(plaq);
-      double2 aggregate = BlockReduce(temp_storage).Reduce(plaq, Summ<double2>());
-
-      if (threadIdx.x == 0) atomicAdd(arg.plaq, aggregate);
+      typedef cub::BlockReduce<double2, blockSize, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
+      __shared__ typename BlockReduce::TempStorage cub_tmp;
+      double2 aggregate = BlockReduce(cub_tmp).Reduce(plaq, Summ<double2>());
+      if (threadIdx.x == 0 && threadIdx.y == 0) atomicAdd(arg.plaq, aggregate);
   }
 
   template<typename Float, typename Gauge>
@@ -126,7 +115,6 @@ namespace quda {
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-      bool tuneSharedBytes() const { return false; } // Don't tune shared memory
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
       unsigned int minThreads() const { return arg.threads; }
 
@@ -135,22 +123,25 @@ namespace quda {
         : arg(arg), location(location) {}
       ~GaugePlaq () { host_free(arg.plaq_h); }
 
+      bool advanceBlockDim(TuneParam &param) const {
+	Tunable::advanceBlockDim(param);
+	param.block.y = 2;
+      }
+
+      void initTuneParam(TuneParam &param) const {
+	Tunable::initTuneParam(param);
+	param.block.y = 2;
+      }
+
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
           arg.plaq_h[0] = make_double2(0.,0.);
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	  LAUNCH_KERNEL(computePlaq, tp, stream, arg, Float, Gauge);
-
 	  cudaDeviceSynchronize();
-
-	  comm_allreduce_array((double*) arg.plaq_h, 2);
-	  const int nNodes = comm_dim(0)*comm_dim(1)*comm_dim(2)*comm_dim(3);
-	  arg.plaq_h[0].x /= 9.*(arg.threads*nNodes);
-	  arg.plaq_h[0].y /= 9.*(arg.threads*nNodes);
         } else {
           errorQuda("CPU not supported yet\n");
-          //computePlaqCPU(arg);
         }
       }
 
@@ -159,11 +150,10 @@ namespace quda {
         vol << arg.X[0] << "x";
         vol << arg.X[1] << "x";
         vol << arg.X[2] << "x";
-        vol << arg.X[3];
-        aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
+	vol << arg.X[3];
+	aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
         return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
       }
-
 
       std::string paramString(const TuneParam &param) const {
         std::stringstream ps;
@@ -174,8 +164,8 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return 6ll*arg.threads*(3*198+3); }
-      long long bytes() const { return 6ll*arg.threads*arg.dataOr.Bytes(); } 
+      long long flops() const { return 6ll*2*arg.threads*(3*198+3); }
+      long long bytes() const { return 6ll*4*2*arg.threads*arg.dataOr.Bytes(); } 
 
     }; 
 
@@ -184,7 +174,10 @@ namespace quda {
       GaugePlaqArg<Gauge> arg(dataOr, data);
       GaugePlaq<Float,Gauge> gaugePlaq(arg, location);
       gaugePlaq.apply(0);
-      cudaDeviceSynchronize();
+
+      comm_allreduce_array((double*) arg.plaq_h, 2);
+      arg.plaq_h[0].x /= 9.*(2*arg.threads*comm_size());
+      arg.plaq_h[0].y /= 9.*(2*arg.threads*comm_size());
 
       plq.x = arg.plaq_h[0].x;
       plq.y = arg.plaq_h[0].y;

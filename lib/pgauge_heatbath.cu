@@ -677,9 +677,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
       return 0;
     }
-    bool tuneSharedBytes() const {
-      return false;
-    }                                            // Don't tune shared memory
+    //bool tuneSharedBytes() const { return false;  } // Don't tune shared memory
     bool tuneGridDim() const {
       return false;
     }                                        // Don't tune the grid dimensions.
@@ -782,9 +780,9 @@ namespace quda {
   template<typename Float, int NElems, int NCOLORS, typename Gauge>
   void Monte( Gauge dataOr,  cudaGaugeField& data, cuRNGState *rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
 
-    TimeProfile profileHBOVR("HeatBath_OR_Relax");
+    TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
     MonteArg<Gauge, Float, NCOLORS> montearg(dataOr, data, Beta, rngstate);
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.Start(QUDA_PROFILE_COMPUTE);
+    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     GaugeHB<Float, Gauge, NCOLORS, NElems, true> hb(montearg);
     for ( int step = 0; step < nhb; ++step ) {
       for ( int parity = 0; parity < 2; ++parity ) {
@@ -799,7 +797,7 @@ namespace quda {
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
       cudaDeviceSynchronize();
-      profileHBOVR.Stop(QUDA_PROFILE_COMPUTE);
+      profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (hb.flops() * 8 * nhb * 1e-9) / (secs);
       double gbytes = hb.bytes() * 8 * nhb / (secs * 1e9);
@@ -810,7 +808,7 @@ namespace quda {
     #endif
     }
 
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.Start(QUDA_PROFILE_COMPUTE);
+    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     GaugeHB<Float, Gauge, NCOLORS, NElems, false> relax(montearg);
     for ( int step = 0; step < nover; ++step ) {
       for ( int parity = 0; parity < 2; ++parity ) {
@@ -825,7 +823,7 @@ namespace quda {
     }
     if ( getVerbosity() >= QUDA_SUMMARIZE ) {
       cudaDeviceSynchronize();
-      profileHBOVR.Stop(QUDA_PROFILE_COMPUTE);
+      profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
       double gflops = (relax.flops() * 8 * nover * 1e-9) / (secs);
       double gbytes = relax.bytes() * 8 * nover / (secs * 1e9);
