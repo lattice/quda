@@ -32,6 +32,19 @@ namespace quda {
   };
 
 
+  template <typename T>
+  struct ReduceArg {
+    T *partial;
+    T *result_d;
+    T *result_h;
+    ReduceArg() :
+      partial(static_cast<T*>(getDeviceReduceBuffer())),
+      result_d(static_cast<T*>(getMappedHostReduceBuffer())),
+      result_h(static_cast<T*>(getHostReduceBuffer())) 
+    { }
+
+  };
+
   __device__ inline void zero(double2 &a) {
     a.x = 0.0;
     a.y = 0.0;
@@ -41,7 +54,7 @@ namespace quda {
   __shared__ bool isLastBlockDone;
 
   template <int block_size_x, int block_size_y, typename T>
-  __device__ inline void reduce2d(T *result, T *partial, const T &in) {
+  __device__ inline void reduce2d(ReduceArg<T> arg, const T &in) {
 
     typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
@@ -49,7 +62,7 @@ namespace quda {
     T aggregate = BlockReduce(cub_tmp).Reduce(in, Summ<T>());
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
-      partial[blockIdx.x] = aggregate;
+      arg.partial[blockIdx.x] = aggregate;
       __threadfence(); // flush result
 
       // increment global block counter
@@ -67,7 +80,7 @@ namespace quda {
       T sum;
       zero(sum);
       while (i<gridDim.x) {
-	sum += partial[i];
+	sum += arg.partial[i];
 	i += block_size_x*block_size_y;
       }
 
@@ -75,10 +88,15 @@ namespace quda {
 
       // write out the final reduced value
       if (threadIdx.y*block_size_x + threadIdx.x == 0) {
-	*result = sum;
+	*arg.result_d = sum;
 	count = 0; // set to zero for next time
       }
     }
+  }
+
+  template <int block_size, typename T>
+  __device__ inline void reduce(ReduceArg<T> arg, const T &in) {
+    reduce2d<block_size, 1, T>(arg, in);
   }
 
 } // namespace quda

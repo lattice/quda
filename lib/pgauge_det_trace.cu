@@ -15,17 +15,16 @@ namespace quda {
 #ifdef GPU_GAUGE_ALG
 
 template <typename Gauge>
-struct KernelArg {
+struct KernelArg : public ReduceArg<double2> {
   int threads; // number of active threads required
   int X[4]; // grid dimensions
 #ifdef MULTI_GPU
   int border[4]; 
 #endif
   Gauge dataOr;
-  double2 *value;
-  double2 *value_h;
+
   KernelArg(const Gauge &dataOr, const cudaGaugeField &data)
-    : dataOr(dataOr) {
+    : ReduceArg<double2>(), dataOr(dataOr) {
 #ifdef MULTI_GPU
     for(int dir=0; dir<4; ++dir){
       if(comm_dim_partitioned(dir)) border[dir] = data.R()[dir];
@@ -36,10 +35,8 @@ struct KernelArg {
     for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
     threads = X[0]*X[1]*X[2]*X[3];
-    value = (double2*)device_malloc(sizeof(double2));
-    value_h = (double2*)safe_malloc(sizeof(double2));
   }
-  double2 getValue(){return value_h[0];}
+  double2 getValue(){return result_h[0];}
 };
 
 template<class Cmplx>
@@ -87,8 +84,8 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
       if(functiontype == 1) val += CmplxToDouble2(getTrace(U));
     }
   }
-  double2 aggregate = BlockReduce(temp_storage).Reduce(val, Summ<double2>());
-  if (threadIdx.x == 0) atomicAdd(arg.value, aggregate);
+
+  reduce<blockSize>(arg, val);
 }
 
 
@@ -107,19 +104,17 @@ class CalcFunc : Tunable {
 
   public:
   CalcFunc(KernelArg<Gauge> &arg) : arg(arg) {}
-  ~CalcFunc () { 
-    host_free(arg.value_h); device_free(arg.value);
-  }
+  ~CalcFunc () { }
 
   void apply(const cudaStream_t &stream){
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
-    cudaMemset(arg.value, 0, sizeof(double2));
+    arg.result_h[0] = make_double2(0.0, 0.0);
     LAUNCH_KERNEL(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
-    cudaMemcpy(arg.value_h, arg.value, sizeof(double2), cudaMemcpyDeviceToHost);
-    comm_allreduce_array((double*)arg.value_h, 2);
-    const int nNodes = comm_size();
-    arg.value_h[0].x  /= (double)(4*arg.threads*nNodes);
-    arg.value_h[0].y  /= (double)(4*arg.threads*nNodes);
+    cudaDeviceSynchronize();
+
+    comm_allreduce_array((double*)arg.result_h, 2);
+    arg.result_h[0].x  /= (double)(4*arg.threads*comm_size());
+    arg.result_h[0].y  /= (double)(4*arg.threads*comm_size());
   }
 
   TuneKey tuneKey() const {

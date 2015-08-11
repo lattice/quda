@@ -13,7 +13,7 @@ namespace quda {
 #ifdef GPU_GAUGE_TOOLS
 
   template <typename Gauge>
-  struct GaugePlaqArg {
+  struct GaugePlaqArg : public ReduceArg<double2> {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
 #ifdef MULTI_GPU
@@ -21,15 +21,8 @@ namespace quda {
 #endif
     Gauge dataOr;
     
-    double2 *partial;
-    double2 *plaq;
-    double2 *plaq_h;
-
     GaugePlaqArg(const Gauge &dataOr, const GaugeField &data)
-      : dataOr(dataOr), 
-	partial(static_cast<double2*>(getDeviceReduceBuffer())),
-	plaq(static_cast<double2*>(getMappedHostReduceBuffer())),
-	plaq_h(static_cast<double2*>(getHostReduceBuffer())) 
+      : ReduceArg<double2>(), dataOr(dataOr)
     {
 
 #ifdef MULTI_GPU
@@ -45,7 +38,7 @@ namespace quda {
   };
 
   template<int blockSize, typename Float, typename Gauge>
-    __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
+  __global__ void computePlaq(GaugePlaqArg<Gauge> arg){
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
       int parity = threadIdx.y;
 
@@ -106,7 +99,7 @@ namespace quda {
       }
 
       // perform final inter-block reduction and write out result
-      reduce2d<blockSize,2>(arg.plaq, arg.partial, plaq);
+      reduce2d<blockSize,2>(arg, plaq);
   }
 
   template<typename Float, typename Gauge>
@@ -139,7 +132,7 @@ namespace quda {
 
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
-          arg.plaq_h[0] = make_double2(0.,0.);
+          arg.result_h[0] = make_double2(0.,0.);
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
 	  LAUNCH_KERNEL(computePlaq, tp, stream, arg, Float, Gauge);
@@ -179,12 +172,12 @@ namespace quda {
       GaugePlaq<Float,Gauge> gaugePlaq(arg, location);
       gaugePlaq.apply(0);
 
-      comm_allreduce_array((double*) arg.plaq_h, 2);
-      arg.plaq_h[0].x /= 9.*(2*arg.threads*comm_size());
-      arg.plaq_h[0].y /= 9.*(2*arg.threads*comm_size());
+      comm_allreduce_array((double*) arg.result_h, 2);
+      arg.result_h[0].x /= 9.*(2*arg.threads*comm_size());
+      arg.result_h[0].y /= 9.*(2*arg.threads*comm_size());
 
-      plq.x = arg.plaq_h[0].x;
-      plq.y = arg.plaq_h[0].y;
+      plq.x = arg.result_h[0].x;
+      plq.y = arg.result_h[0].y;
     }
 
   template<typename Float>
