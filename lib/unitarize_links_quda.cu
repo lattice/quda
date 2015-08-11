@@ -125,20 +125,23 @@ namespace{
 
     Matrix<Cmplx,3> qsq, tempq;
 
-
     typename RealTypeId<Cmplx>::Type c[3];
     typename RealTypeId<Cmplx>::Type g[3];
+
+    const typename RealTypeId<Cmplx>::Type one_third = 0.333333333333333333333;
+    const typename RealTypeId<Cmplx>::Type one_ninth = 0.111111111111111111111;
+    const typename RealTypeId<Cmplx>::Type one_eighteenth = 0.055555555555555555555;
 
     qsq = q*q;
     tempq = qsq*q;
 
     c[0] = getTrace(q).x;
-    c[1] = getTrace(qsq).x/2.0;
-    c[2] = getTrace(tempq).x/3.0;
+    c[1] = getTrace(qsq).x * 0.5;
+    c[2] = getTrace(tempq).x * one_third;;
 
-    g[0] = g[1] = g[2] = c[0]/3.;
+    g[0] = g[1] = g[2] = c[0] * one_third;
     typename RealTypeId<Cmplx>::Type r,s,theta;
-    s = c[1]/3. - c[0]*c[0]/18;
+    s = c[1]*one_third - c[0]*c[0]*one_eighteenth;
 
 #ifdef __CUDA_ARCH__
 #define FL_UNITARIZE_EPS DEV_FL_UNITARIZE_EPS
@@ -158,29 +161,26 @@ namespace{
 
     typename RealTypeId<Cmplx>::Type cosTheta; 
     if(fabs(s) >= FL_UNITARIZE_EPS){
-      const typename RealTypeId<Cmplx>::Type sqrt_s = sqrt(s);
-      r = c[2]/2. - (c[0]/3.)*(c[1] - c[0]*c[0]/9.);
-      cosTheta = r/(sqrt_s*sqrt_s*sqrt_s);
+      const typename RealTypeId<Cmplx>::Type rsqrt_s = rsqrt(s);
+      r = c[2]*0.5 - (c[0]*one_third)*(c[1] - c[0]*c[0]*one_ninth);
+      cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
+
       if(fabs(cosTheta) >= 1.0){
-	if( r > 0 ){ 
-	  theta = 0.0;
-	}else{
-	  theta = FL_UNITARIZE_PI;
-	}
+	theta = (r > 0) ? 0.0 : FL_UNITARIZE_PI;
       }else{ 
 	theta = acos(cosTheta);
       }
-      g[0] = c[0]/3 + 2*sqrt_s*cos( theta/3 );
-      g[1] = c[0]/3 + 2*sqrt_s*cos( theta/3 + FL_UNITARIZE_PI23 );
-      g[2] = c[0]/3 + 2*sqrt_s*cos( theta/3 + 2*FL_UNITARIZE_PI23 );
+
+      const typename RealTypeId<Cmplx>::Type sqrt_s = s*rsqrt_s;
+      g[0] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third );
+      g[1] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + FL_UNITARIZE_PI23 );
+      g[2] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + 2*FL_UNITARIZE_PI23 );
     }
                 
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
     // return false. Then call SVD instead.
     typename RealTypeId<Cmplx>::Type det = getDeterminant(q).x;
-    if( fabs(det) < FL_REUNIT_SVD_ABS_ERROR ){ 
-      return false;
-    }
+    if( fabs(det) < FL_REUNIT_SVD_ABS_ERROR ) return false;
     if( checkRelativeError(g[0]*g[1]*g[2],det,FL_REUNIT_SVD_REL_ERROR) == false ) return false;
 
 
@@ -193,10 +193,10 @@ namespace{
     g[1] = c[0]*c[1] + c[0]*c[2] + c[1]*c[2];
     g[2] = c[0]*c[1]*c[2];
         
-    const typename RealTypeId<Cmplx>::Type & denominator  = g[2]*(g[0]*g[1]-g[2]); 
-    c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1]))/denominator;
-    c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1])/denominator;
-    c[2] =  g[0]/denominator;
+    const typename RealTypeId<Cmplx>::Type & denominator  = 1.0 / ( g[2]*(g[0]*g[1]-g[2]) ); 
+    c[0] = (g[0]*g[1]*g[1] - g[2]*(g[0]*g[0]+g[1])) * denominator;
+    c[1] = (-g[0]*g[0]*g[0] - g[2] + 2.*g[0]*g[1]) * denominator;
+    c[2] =  g[0] * denominator;
 
     tempq = c[1]*q + c[2]*qsq;
     // Add a real scalar
@@ -361,32 +361,32 @@ namespace{
     int *fails;
     UnitarizeLinksQudaArg(Out &output, const In &input, const GaugeField &data,  int* fails) 
       : output(output), input(input), fails(fails) {
-    for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];  
-    threads = X[0]*X[1]*X[2]*X[3];
+      for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
+      threads = X[0]*X[1]*X[2]*X[3];
     }
   };
 
 
   template<typename Float, typename Out, typename In>
   __global__ void DoUnitarizedLink(UnitarizeLinksQudaArg<Out,In> arg){
-  int idx = threadIdx.x + blockIdx.x*blockDim.x;
-  if(idx >= arg.threads) return;
-  typedef typename ComplexTypeId<Float>::Type Cmplx;
-  int parity = 0;
-  if(idx >= arg.threads/2) {
-    parity = 1;
-    idx -= arg.threads/2;
-  }
-  int X[4]; 
-  for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
-  int x[4];
-  getCoords(x, idx, X, parity);
- 
-  idx = linkIndex(x,X);
-  Matrix<double2,3> v, result;
-  Matrix<Cmplx,3> tmp;
-  for (int mu = 0; mu < 4; mu++) { 
-    arg.input.load((Float*)(tmp.data),idx, mu, parity);
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    if(idx >= arg.threads) return;
+    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    int parity = 0;
+    if(idx >= arg.threads/2) {
+      parity = 1;
+      idx -= arg.threads/2;
+    }
+    int X[4]; 
+    for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
+    int x[4];
+    getCoords(x, idx, X, parity);
+    
+    idx = linkIndex(x,X);
+    Matrix<double2,3> v, result;
+    Matrix<Cmplx,3> tmp;
+    for (int mu = 0; mu < 4; mu++) { 
+      arg.input.load((Float*)(tmp.data),idx, mu, parity);
       for(int i = 0; i < 9;i++) {
         v.data[i].x = (double)tmp.data[i].x;
         v.data[i].y = (double)tmp.data[i].y;
@@ -401,22 +401,22 @@ namespace{
 #endif
       if(FL_CHECK_UNITARIZATION){
         if(isUnitary(result,FL_MAX_ERROR) == false)
-    {
+	  {
 #ifdef __CUDA_ARCH__
-      atomicAdd(arg.fails, 1);
+	    atomicAdd(arg.fails, 1);
 #else 
-      (*arg.fails)++;
+	    (*arg.fails)++;
 #endif
-    }
+	  }
       }
-        //WRITE BACK IF FAIL??????????
-        for(int i = 0; i < 9;i++) {
-          tmp.data[i].x = (Float)result.data[i].x;
-          tmp.data[i].y = (Float)result.data[i].y;
-        }
-        arg.output.save((Float*)(tmp.data),idx, mu, parity); 
+      //WRITE BACK IF FAIL??????????
+      for(int i = 0; i < 9;i++) {
+	tmp.data[i].x = (Float)result.data[i].x;
+	tmp.data[i].y = (Float)result.data[i].y;
+      }
+      arg.output.save((Float*)(tmp.data),idx, mu, parity); 
+    }
   }
-}
 
 
 
@@ -461,13 +461,12 @@ namespace{
   
   
   template<typename Float, typename Out, typename In>
-void unitarizeLinksQuda(Out output,  const In input, const cudaGaugeField& meta, int* fails) {
-
+  void unitarizeLinksQuda(Out output,  const In input, const cudaGaugeField& meta, int* fails) {
     UnitarizeLinksQudaArg<Out,In> arg(output, input, meta, fails);
     UnitarizeLinksQuda<Float, Out, In> unitlinks(arg) ;
-  unitlinks.apply(0);
-}
-
+    unitlinks.apply(0);
+  }
+  
 template<typename Float>
 void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int* fails) {
 
