@@ -22,7 +22,7 @@ namespace{
 #define FL_UNITARIZE_PI 3.14159265358979323846
 #endif
 #ifndef FL_UNITARIZE_PI23
-#define FL_UNITARIZE_PI23 FL_UNITARIZE_PI*2.0/3.0
+#define FL_UNITARIZE_PI23 FL_UNITARIZE_PI*0.66666666666666666666
 #endif 
  
   __constant__ int DEV_MAX_ITER = 20;
@@ -160,7 +160,7 @@ namespace{
 
 
     typename RealTypeId<Cmplx>::Type cosTheta; 
-    if(fabs(s) >= FL_UNITARIZE_EPS){
+    if(fabs(s) >= FL_UNITARIZE_EPS){ // faster when this conditional is removed?
       const typename RealTypeId<Cmplx>::Type rsqrt_s = rsqrt(s);
       r = c[2]*0.5 - (c[0]*one_third)*(c[1] - c[0]*c[0]*one_ninth);
       cosTheta = r*rsqrt_s*rsqrt_s*rsqrt_s;
@@ -168,13 +168,24 @@ namespace{
       if(fabs(cosTheta) >= 1.0){
 	theta = (r > 0) ? 0.0 : FL_UNITARIZE_PI;
       }else{ 
-	theta = acos(cosTheta);
+	theta = acos(cosTheta); // this is the primary performance limiter
       }
 
       const typename RealTypeId<Cmplx>::Type sqrt_s = s*rsqrt_s;
+
+#if 0 // experimental version
+      typename RealTypeId<Cmplx>::Type as, ac;
+      sincos( theta*one_third, &as, &ac );
+      g[0] = c[0]*one_third + 2*sqrt_s*ac;
+      //g[1] = c[0]*one_third + 2*sqrt_s*(ac*cos(1*FL_UNITARIZE_PI23) - as*sin(1*FL_UNITARIZE_PI23));
+      g[1] = c[0]*one_third - 2*sqrt_s*(0.5*ac + as*0.8660254037844386467637);
+      //g[2] = c[0]*one_third + 2*sqrt_s*(ac*cos(2*FL_UNITARIZE_PI23) - as*sin(2*FL_UNITARIZE_PI23));
+      g[2] = c[0]*one_third + 2*sqrt_s*(-0.5*ac + as*0.8660254037844386467637);
+#else
       g[0] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third );
       g[1] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + FL_UNITARIZE_PI23 );
       g[2] = c[0]*one_third + 2*sqrt_s*cos( theta*one_third + 2*FL_UNITARIZE_PI23 );
+#endif
     }
                 
     // Check the eigenvalues, if the determinant does not match the product of the eigenvalues
@@ -439,8 +450,11 @@ namespace{
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DoUnitarizedLink<Float,Out,In><<<tp.grid, tp.block, 0, stream>>>(arg);
     }
-    void preTune() { ; }
-    void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
+    void preTune() { if (arg.input.gauge == arg.output.gauge) arg.output.save(); }
+    void postTune() {
+      if (arg.input.gauge == arg.output.gauge) arg.output.load();
+      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+    }
     
     long long flops() const { 
 	  // Accounted only the minimum flops for the case FL_REUNIT_SVD_ONLY=0
