@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
-#include "random.h"
+#include <random_quda.h>
 #include <cuda.h>
 #include <quda_internal.h>
 

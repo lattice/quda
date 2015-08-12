@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <pgauge_monte.h>
 #include <gauge_tools.h>
-#include <random.h>
+#include <random_quda.h>
 #include <index_helper.cuh>
 #include <atomic.cuh>
 #include <cub/cub.cuh>

@@ -3,7 +3,7 @@
 
 
 
-#include <random.h>
+#include <random_quda.h>
 #include <quda.h>
 
 
