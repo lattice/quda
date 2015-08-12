@@ -47,8 +47,8 @@ namespace quda {
 #endif
   
   Timer TimeProfile::global_profile[QUDA_PROFILE_COUNT];
-  bool TimeProfile::global_switchOff=false;
-  int TimeProfile::global_total_level=0;
+  bool TimeProfile::global_switchOff[QUDA_PROFILE_COUNT] = {};
+  int TimeProfile::global_total_level[QUDA_PROFILE_COUNT] = {};
 
   void TimeProfile::PrintGlobal() {
     if (global_profile[QUDA_PROFILE_TOTAL].time > 0.0) {

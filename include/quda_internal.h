@@ -219,40 +219,32 @@ namespace quda {
 
     // global timer
     static Timer global_profile[QUDA_PROFILE_COUNT];
-    static bool global_switchOff;
-    static int global_total_level;
+    static bool global_switchOff[QUDA_PROFILE_COUNT];
+    static int global_total_level[QUDA_PROFILE_COUNT]; // zero initialize
 
     static void StopGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
 
-      if (idx==QUDA_PROFILE_TOTAL){
-        global_total_level--;
-        if (global_total_level ==0) global_profile[idx].Stop(func,file,line);
-      }
-      else
-        global_profile[idx].Stop(func,file,line);
+      global_total_level[idx]--;
+      if (global_total_level[idx]==0) global_profile[idx].Stop(func,file,line);
 
       // switch off total timer if we need to
-      if (global_switchOff && idx != QUDA_PROFILE_TOTAL) {
-        global_total_level--;
-        if (global_total_level ==0) global_profile[QUDA_PROFILE_TOTAL].Stop(func,file,line);
-        global_switchOff = false;
+      if (global_switchOff[idx]) {
+        global_total_level[idx]--;
+        if (global_total_level[idx]==0) global_profile[idx].Stop(func,file,line);
+        global_switchOff[idx] = false;
       }
     }
 
     static void StartGlobal(const char *func, const char *file, int line, QudaProfileType idx) {
       // if total timer isn't running, then start it running
-      if (!global_profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
-        global_profile[QUDA_PROFILE_TOTAL].Start(func,file,line);
-        global_total_level++;
-        global_switchOff = true;
+      if (!global_profile[idx].running) {
+        global_profile[idx].Start(func,file,line);
+        global_total_level[idx]++;
+        global_switchOff[idx] = true;
       }
 
-      if (idx==QUDA_PROFILE_TOTAL){
-        if (global_total_level ==0) global_profile[idx].Start(func,file,line);
-        global_total_level++;
-      }
-      else
-        global_profile[idx].Start(func,file,line);
+      if (global_total_level[idx]==0) global_profile[idx].Start(func,file,line);
+      global_total_level[idx]++;
     }
 
   public:
@@ -266,7 +258,7 @@ namespace quda {
     void Start_(const char *func, const char *file, int line, QudaProfileType idx) { 
       // if total timer isn't running, then start it running
       if (!profile[QUDA_PROFILE_TOTAL].running && idx != QUDA_PROFILE_TOTAL) {
-        profile[QUDA_PROFILE_TOTAL].Start(func,file,line);
+	profile[QUDA_PROFILE_TOTAL].Start(func,file,line);
         switchOff = true;
       }
 
