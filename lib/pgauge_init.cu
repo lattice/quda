@@ -175,12 +175,12 @@ namespace quda {
   struct InitGaugeHotArg {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
-    cuRNGState *rngstate;
+    RNG rngstate;
 #ifdef MULTI_GPU
     int border[4];
 #endif
     Gauge dataOr;
-    InitGaugeHotArg(const Gauge &dataOr, const cudaGaugeField &data, cuRNGState * rngstate)
+    InitGaugeHotArg(const Gauge &dataOr, const cudaGaugeField &data, RNG &rngstate)
       : dataOr(dataOr), rngstate(rngstate) {
 #ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
@@ -353,9 +353,9 @@ namespace quda {
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] += 2 * arg.border[dr];
     int id = idx;
-    cuRNGState localState = arg.rngstate[ id ];
+    cuRNGState localState = arg.rngstate.State()[ id ];
   #else
-    cuRNGState localState = arg.rngstate[ idx ];
+    cuRNGState localState = arg.rngstate.State()[ idx ];
   #endif
     for ( int parity = 0; parity < 2; parity++ ) {
     #ifdef MULTI_GPU
@@ -370,9 +370,9 @@ namespace quda {
       }
     }
   #ifdef MULTI_GPU
-    arg.rngstate[ id ] = localState;
+    arg.rngstate.State()[ id ] = localState;
   #else
-    arg.rngstate[ idx ] = localState;
+    arg.rngstate.State()[ idx ] = localState;
   #endif
   }
 
@@ -429,10 +429,8 @@ namespace quda {
       ps << "shared=" << param.shared_bytes;
       return ps.str();
     }
-    void preTune(){
-    }
-    void postTune(){
-    }
+    void preTune(){ arg.rngstate.backup(); }
+    void postTune(){ arg.rngstate.restore(); }
     long long flops() const {
       return 0;
     }                                  // Only correct if there is no link reconstruction, no cub reduction accounted also
@@ -447,7 +445,7 @@ namespace quda {
 
 
   template<typename Float, int NCOLORS, typename Gauge>
-  void InitGaugeField( Gauge dataOr,  cudaGaugeField& data, cuRNGState *rngstate) {
+  void InitGaugeField( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate) {
     InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
@@ -484,7 +482,7 @@ namespace quda {
 
 
   template<typename Float>
-  void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
+  void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {
 
     if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
@@ -510,7 +508,7 @@ namespace quda {
  * @param[in,out] data Gauge field
  * @param[in,out] rngstate state of the CURAND random number generator
  */
-  void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
+  void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {
 #ifdef GPU_GAUGE_ALG
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       InitGaugeField<float> (data, rngstate);
