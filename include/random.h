@@ -32,10 +32,16 @@ public:
     int Size(){ return rng_size;};
     int Node_Offset(){ return node_offset;};
     int Seed(){ return seed;};
-    cuRNGState* State(){ return state;};
+    __host__ __device__ __inline__ cuRNGState* State(){ return state;};
+    /*! @brief Restore CURAND array states initialization */
+    void restore();
+    /*! @brief Backup CURAND array states initialization */
+    void backup();
 private:
     /*! array with current curand rng state */
     cuRNGState *state;
+    /*! array for backup of current curand rng state */
+    cuRNGState *backup_state;
     /*! initial rng seed */
     int seed;
     /*! @brief number of curand states */
