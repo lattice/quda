@@ -2,12 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
-//#include "cuda_common.h"
 #include "random.h"
 #include <cuda.h>
 #include <quda_internal.h>
 
 #include <comm_quda.h>
+#include <index_helper.cuh>
 
 
 namespace quda {
@@ -18,15 +18,6 @@ namespace quda {
 
 
 dim3 GetBlockDim(size_t threads, size_t size){
-    /*uint blockx = BLOCKSDIVUP(size, threads);
-    uint blocky = 1;
-    if(blockx > PARAMS::GPUGridDimX){
-        blocky = BLOCKSDIVUP(blockx, PARAMS::GPUGridDimX);
-        blockx = PARAMS::GPUGridDimX;
-    }
-    dim3 blocks(blockx,blocky,1);
-    return blocks;*/
-
     int blockx = BLOCKSDIVUP(size, threads);
     dim3 blocks(blockx,1,1);
     return blocks;
@@ -54,12 +45,7 @@ dim3 GetBlockDim(size_t threads, size_t size){
 */
 __global__ void 
 kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset ){
-//#if (__CUDA_ARCH__ >= 300)
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-/*#else
-    int id = gridDim.x * blockIdx.y + blockIdx.x;
-    id = blockDim.x * id + threadIdx.x; 
-#endif*/
     if(id < rng_size){
         /* Each thread gets same seed, a different sequence number, no offset */
         curand_init(seed, id + node_offset, 0, &state[id]);
@@ -73,30 +59,9 @@ struct rngArg{
 };
 
 
-static __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity) {
-  /*x[3] = cb_index/(X[2]*X[1]*X[0]/2);
-  x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
-  x[1] = (cb_index/(X[0]/2)) % X[1];
-  x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);*/
-  int za = (cb_index / (X[0]/2));
-  int zb =  (za / X[1]);
-  x[1] = za - zb * X[1];
-  x[3] = (zb / X[2]);
-  x[2] = zb - x[3] * X[2];
-  int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
-  x[0] = (2 * cb_index + x1odd)  - za * X[0];
-  return;
-}
-
-
 __global__ void 
 kernel_random(cuRNGState *state, int seed, int rng_size, int node_offset, rngArg arg ){
-//#if (__CUDA_ARCH__ >= 300)
     int id = blockIdx.x * blockDim.x + threadIdx.x;
-/*#else
-    int id = gridDim.x * blockIdx.y + blockIdx.x;
-    id = blockDim.x * id + threadIdx.x; 
-#endif*/
     if(id < rng_size){
         /* Each thread gets same seed, a different sequence number, no offset */
     #ifndef MULTI_GPU
@@ -189,7 +154,6 @@ void RNG::Init(){
 */
 void RNG::AllocateRNG(){
     if(rng_size>0 && state == NULL){
-        //CUDA_SAFE_CALL(cudaMalloc((void **)&state, rng_size * sizeof(cuRNGState)));
         state = (cuRNGState*)device_malloc(rng_size * sizeof(cuRNGState));
         CUDA_SAFE_CALL(cudaMemset( state , 0 , rng_size * sizeof(cuRNGState) ));
         printfQuda("Allocated array of random numbers with rng_size: %.2f MB\n", rng_size * sizeof(cuRNGState)/(float)(1048576));
@@ -203,13 +167,35 @@ void RNG::AllocateRNG(){
 */
 void RNG::Release(){
     if(rng_size>0 && state != NULL){
-        //cudaFree(state);
         device_free(state);
         printfQuda("Free array of random numbers with rng_size: %.2f MB\n", rng_size * sizeof(cuRNGState)/(float)(1048576));
         rng_size = 0;
         state = NULL;
     }
 }
+
+
+/*! @brief Restore CURAND array states initialization */
+void RNG::restore(){    
+  cudaError_t err = cudaMemcpy(state, backup_state, rng_size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
+  if (err != cudaSuccess) {
+    host_free(backup_state);
+    printfQuda("ERROR: Failed to restore curand rng states array\n");
+    errorQuda("Aborting");
+  }
+  host_free(backup_state);
+}
+/*! @brief Backup CURAND array states initialization */
+void RNG::backup(){ 
+  backup_state = (cuRNGState*) safe_malloc(rng_size * sizeof(cuRNGState));   
+  cudaError_t err = cudaMemcpy(backup_state, state, rng_size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
+  if (err != cudaSuccess) {
+    host_free(backup_state);
+    printfQuda("ERROR: Failed to backup curand rng states array\n");
+    errorQuda("Aborting");
+  }
+}
+
 #endif // GPU_GAUGE_ALG
 
 }
