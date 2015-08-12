@@ -169,7 +169,7 @@ class GaugeAlgTest : public ::testing::Test {
     if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
     if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
      else{
-       InitGaugeField( *cudaInGauge, randstates->State());
+       InitGaugeField( *cudaInGauge, *randstates );
      }
     // Reunitarization setup
     SetReunitarizationConsts();
@@ -177,7 +177,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     for(int step=1; step<=nsteps; ++step){
       printfQuda("Step %d\n",step);
-      Monte( *cudaInGauge, randstates->State(), beta_value, nhbsteps, novrsteps);
+      Monte( *cudaInGauge, *randstates, beta_value, nhbsteps, novrsteps);
       //Reunitarize gauge links...
       CallUnitarizeLinks(cudaInGauge);
       plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;
