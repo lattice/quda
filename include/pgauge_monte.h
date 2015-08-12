@@ -19,7 +19,7 @@ namespace quda {
    * @param[in] nhb number of heatbath steps
    * @param[in] nover number of overrelaxation steps
    */
-  void Monte( cudaGaugeField& data, cuRNGState *rngstate, double Beta, unsigned int nhb, unsigned int nover);
+  void Monte( cudaGaugeField& data, RNG &rngstate, double Beta, unsigned int nhb, unsigned int nover);
 
   /** @brief Perform a cold start to the gauge field, identity SU(3) matrix, also fills the ghost links in multi-GPU case (no need to exchange data)
    *
@@ -32,7 +32,7 @@ namespace quda {
    * @param[in,out] data Gauge field
    * @param[in,out] rngstate state of the CURAND random number generator
    */
-  void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate);
+  void InitGaugeField( cudaGaugeField& data, RNG &rngstate);
 
   /** @brief Perform heatbath and overrelaxation. Performs nhb heatbath steps followed by nover overrelaxation steps.
    *
