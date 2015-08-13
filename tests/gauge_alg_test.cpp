@@ -11,7 +11,7 @@
 #include <gauge_tools.h>
 
 #include <pgauge_monte.h>
-#include <random.h>
+#include <random_quda.h>
 #include <unitarization_links.h>
 
 
@@ -71,7 +71,7 @@ class GaugeAlgTest : public ::testing::Test {
   }
 
   bool CheckDeterminant(double2 detu){
-    double prec_val = 1.0e-8;
+    double prec_val = 5e-8;
     if(prec == QUDA_DOUBLE_PRECISION) prec_val = 1.0e-15;
     if(DABS(1.0 - detu.x) < prec_val && DABS(detu.y) < prec_val) return true;
     return false;
@@ -169,7 +169,7 @@ class GaugeAlgTest : public ::testing::Test {
     if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
     if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
      else{
-       InitGaugeField( *cudaInGauge, randstates->State());
+       InitGaugeField( *cudaInGauge, *randstates );
      }
     // Reunitarization setup
     SetReunitarizationConsts();
@@ -177,7 +177,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     for(int step=1; step<=nsteps; ++step){
       printfQuda("Step %d\n",step);
-      Monte( *cudaInGauge, randstates->State(), beta_value, nhbsteps, novrsteps);
+      Monte( *cudaInGauge, *randstates, beta_value, nhbsteps, novrsteps);
       //Reunitarize gauge links...
       CallUnitarizeLinks(cudaInGauge);
       plaquette( *cudaInGauge, QUDA_CUDA_FIELD_LOCATION) ;

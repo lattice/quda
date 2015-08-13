@@ -244,7 +244,7 @@ namespace quda {
 
       // Multiply the third row by exp(I*3*phase)
       RegType cos_sin[2];
-      Trig<isHalf<RegType>::value>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);     
+      Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
       RegType tmp[2];
       complexProduct(tmp, cos_sin, &out[12]); out[12] = tmp[0]; out[13] = tmp[1];
       complexProduct(tmp, cos_sin, &out[14]); out[14] = tmp[0]; out[15] = tmp[1];
@@ -264,7 +264,7 @@ namespace quda {
       // numerator = U[2][2]
       complexQuotient(expI3Phase, in+16, denom);
 
-      *phase = Trig<isHalf<RegType>::value>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
+      *phase = Trig<isHalf<RegType>::value,RegType>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
       return;
     }
 
@@ -293,8 +293,8 @@ namespace quda {
     }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
-      out[0] = Trig<isHalf<Float>::value>::Atan2(in[1], in[0]);
-      out[1] = Trig<isHalf<Float>::value>::Atan2(in[13], in[12]);
+      out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
+      out[1] = Trig<isHalf<Float>::value,RegType>::Atan2(in[13], in[12]);
       for (int i=2; i<8; i++) out[i] = in[i];
     }
 
@@ -310,11 +310,11 @@ namespace quda {
       RegType u0 = dir < 3 ? anisotropy : 
 	timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
-      RegType diff = 1.0/(u0*u0) - row_sum;
+      RegType diff = static_cast<RegType>(1.0)/(u0*u0) - row_sum;
       RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      out[0] = U00_mag * Trig<isHalf<Float>::value>::Cos(in[0]);
-      out[1] = U00_mag * Trig<isHalf<Float>::value>::Sin(in[0]);
+      out[0] = U00_mag * Trig<isHalf<Float>::value,RegType>::Cos(in[0]);
+      out[1] = U00_mag * Trig<isHalf<Float>::value,RegType>::Sin(in[0]);
 
       // Now reconstruct first column
       RegType column_sum = 0.0;
@@ -326,12 +326,12 @@ namespace quda {
       diff = 1.f/(u0*u0) - column_sum;
       RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      out[12] = U20_mag * Trig<isHalf<Float>::value>::Cos(in[1]);
-      out[13] = U20_mag * Trig<isHalf<Float>::value>::Sin(in[1]);
+      out[12] = U20_mag * Trig<isHalf<Float>::value,RegType>::Cos(in[1]);
+      out[13] = U20_mag * Trig<isHalf<Float>::value,RegType>::Sin(in[1]);
       // First column now restored
 
       // finally reconstruct last elements from SU(2) rotation
-      RegType r_inv2 = 1.0/(u0*row_sum);
+      RegType r_inv2 = static_cast<RegType>(1.0)/(u0*row_sum);
 
       // U11
       RegType A[2];
@@ -387,7 +387,7 @@ namespace quda {
       // numerator = U[2][2]
       complexQuotient(expI3Phase, in+16, denom);
 
-      *phase = Trig<isHalf<RegType>::value>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
+      *phase = Trig<isHalf<RegType>::value,RegType>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
     }
 
 
@@ -412,7 +412,7 @@ namespace quda {
     __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase) const {
       reconstruct_8.Unpack(out, in, idx, dir, phase);
       RegType cos_sin[2];
-      Trig<isHalf<RegType>::value>::SinCos(phase, &cos_sin[1], &cos_sin[0]);     
+      Trig<isHalf<RegType>::value,RegType>::SinCos(phase, &cos_sin[1], &cos_sin[0]);
       RegType tmp[2];
       cos_sin[0] *= scale;
       cos_sin[1] *= scale;

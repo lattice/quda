@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <pgauge_monte.h>
 #include <gauge_tools.h>
-#include <random.h>
+#include <random_quda.h>
 #include <index_helper.cuh>
 #include <atomic.cuh>
 #include <cub/cub.cuh>
@@ -586,10 +586,10 @@ namespace quda {
     Gauge dataOr;
     cudaGaugeField &data;
     Float BetaOverNc;
-    cuRNGState *rngstate;
-    MonteArg(const Gauge &dataOr, cudaGaugeField & data, Float Beta, cuRNGState * rngstate)
+    RNG rngstate;
+    MonteArg(const Gauge &dataOr, cudaGaugeField & data, Float Beta, RNG &rngstate)
       : dataOr(dataOr), data(data), rngstate(rngstate) {
-      BetaOverNc = Beta / NCOLORS;
+      BetaOverNc = Beta / (Float)NCOLORS;
 #ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
         if ( comm_dim_partitioned(dir)) border[dir] = data.R()[dir];
@@ -653,9 +653,9 @@ namespace quda {
       }
     arg.dataOr.load((Float*)(U.data), idx, mu, parity);
     if ( HeatbathOrRelax ) {
-      cuRNGState localState = arg.rngstate[ id ];
+      cuRNGState localState = arg.rngstate.State()[ id ];
       heatBathSUN<Float, NCOLORS>( U, conj(staple), localState, arg.BetaOverNc );
-      arg.rngstate[ id ] = localState;
+      arg.rngstate.State()[ id ] = localState;
     }
     else{
       overrelaxationSUN<Float, NCOLORS>( U, conj(staple) );
@@ -689,11 +689,6 @@ namespace quda {
     GaugeHB(MonteArg<Gauge, Float, NCOLORS> &arg)
       : arg(arg), mu(0), parity(0) {
     }
-    /*GaugeHB(MonteArg<Gauge, Float, NCOLORS> &arg, int _mu, int _parity)
-       : arg(arg) {
-       mu = _mu;
-       parity = _parity;
-       }*/
     ~GaugeHB () {
     }
     void SetParam(int _mu, int _parity){
@@ -702,7 +697,7 @@ namespace quda {
     }
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax ><< < tp.grid,tp.block, 0, stream >> > (arg, mu, parity);
+      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax ><< < tp.grid,tp.block, tp.shared_bytes, stream >> > (arg, mu, parity);
     }
 
     TuneKey tuneKey() const {
@@ -722,9 +717,11 @@ namespace quda {
     }
     void preTune() {
       arg.data.backup();
+      if(HeatbathOrRelax) arg.rngstate.backup();
     }
     void postTune() {
       arg.data.restore();
+      if(HeatbathOrRelax) arg.rngstate.restore();
     }
     long long flops() const {
 
@@ -778,7 +775,7 @@ namespace quda {
 
 
   template<typename Float, int NElems, int NCOLORS, typename Gauge>
-  void Monte( Gauge dataOr,  cudaGaugeField& data, cuRNGState *rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
 
     TimeProfile profileHBOVR("HeatBath_OR_Relax", false);
     MonteArg<Gauge, Float, NCOLORS> montearg(dataOr, data, Beta, rngstate);
@@ -838,7 +835,7 @@ namespace quda {
 
 
   template<typename Float>
-  void Monte( cudaGaugeField& data, cuRNGState *rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( cudaGaugeField& data, RNG &rngstate, Float Beta, unsigned int nhb, unsigned int nover) {
 
     if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
@@ -867,7 +864,7 @@ namespace quda {
  * @param[in] nhb number of heatbath steps
  * @param[in] nover number of overrelaxation steps
  */
-  void Monte( cudaGaugeField& data, cuRNGState *rngstate, double Beta, unsigned int nhb, unsigned int nover) {
+  void Monte( cudaGaugeField& data, RNG &rngstate, double Beta, unsigned int nhb, unsigned int nover) {
 #ifdef GPU_GAUGE_ALG
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       Monte<float> (data, rngstate, (float)Beta, nhb, nover);

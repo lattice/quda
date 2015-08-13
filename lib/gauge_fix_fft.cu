@@ -114,38 +114,6 @@ namespace quda {
   }
 
 
-  template<class T>
-  __device__ __host__ inline Matrix<T,3> getSubTraceUnit(const Matrix<T,3>& a){
-    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
-    Matrix<T,3> res;
-    res(0,0) = a(0,0) - tr; res(0,1) = a(0,1); res(0,2) = a(0,2);
-    res(1,0) = a(1,0); res(1,1) = a(1,1) - tr; res(1,2) = a(1,2);
-    res(2,0) = a(2,0); res(2,1) = a(2,1); res(2,2) = a(2,2) - tr;
-    return res;
-  }
-
-  template<class T>
-  __device__ __host__ inline void SubTraceUnit(Matrix<T,3>& a){
-    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
-    a(0,0) -= tr; a(1,1) -= tr; a(2,2) -= tr;
-  }
-
-  template<class T>
-  __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
-    double sum = (double)(a(0,0).x * b(0,0).x  + a(0,0).y * b(0,0).y);
-    sum += (double)(a(0,1).x * b(0,1).x  + a(0,1).y * b(0,1).y);
-    sum += (double)(a(0,2).x * b(0,2).x  + a(0,2).y * b(0,2).y);
-    sum += (double)(a(1,0).x * b(1,0).x  + a(1,0).y * b(1,0).y);
-    sum += (double)(a(1,1).x * b(1,1).x  + a(1,1).y * b(1,1).y);
-    sum += (double)(a(1,2).x * b(1,2).x  + a(1,2).y * b(1,2).y);
-    sum += (double)(a(2,0).x * b(2,0).x  + a(2,0).y * b(2,0).y);
-    sum += (double)(a(2,1).x * b(2,1).x  + a(2,1).y * b(2,1).y);
-    sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
-    return sum;
-  }
-
-
-
   template <typename Cmplx>
   struct GaugeFixFFTRotateArg {
     int threads;     // number of active threads required
@@ -272,31 +240,19 @@ namespace quda {
 
 
   template <typename Cmplx, typename Gauge>
-  struct GaugeFixQualityArg {
+  struct GaugeFixQualityArg : public ReduceArg<double2> {
     int threads;     // number of active threads required
     int X[4];     // grid dimensions
     Gauge dataOr;
     Cmplx *delta;
-    double2 *quality;
-    double2 *quality_h;
 
     GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data, Cmplx * delta)
-      : dataOr(dataOr), delta(delta) {
-      //: dataOr(dataOr), delta(delta), quality_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
-
+      : ReduceArg<double2>(), dataOr(dataOr), delta(delta) {
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-
       threads = X[0] * X[1] * X[2] * X[3];
-      //cudaHostGetDevicePointer(&quality, quality_h, 0);
-      quality = (double2*)device_malloc(sizeof(double2));
-      quality_h = (double2*)safe_malloc(sizeof(double2));
     }
-    double getAction(){
-      return quality_h[0].x;
-    }
-    double getTheta(){
-      return quality_h[0].y;
-    }
+    double getAction(){ return result_h[0].x; }
+    double getTheta(){ return result_h[0].y; }
   };
 
 
@@ -304,9 +260,6 @@ namespace quda {
   template<int blockSize, unsigned int Elems, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix_quality(GaugeFixQualityArg<typename ComplexTypeId<Float>::Type, Gauge> argQ){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
-
-    typedef cub::BlockReduce<double2, blockSize> BlockReduce;
-    __shared__ typename BlockReduce::TempStorage temp_storage;
 
     double2 data = make_double2(0.0,0.0);
     if ( idx < argQ.threads ) {
@@ -354,8 +307,8 @@ namespace quda {
       //35
       //T=36*gauge_dir+65
     }
-    double2 aggregate = BlockReduce(temp_storage).Reduce(data, Summ<double2>());
-    if ( threadIdx.x == 0 ) atomicAdd(argQ.quality, aggregate);
+
+    reduce<blockSize>(argQ, data);
   }
 
 
@@ -383,19 +336,15 @@ namespace quda {
     GaugeFixQuality(GaugeFixQualityArg<typename ComplexTypeId<Float>::Type, Gauge> &argQ)
       : argQ(argQ) {
     }
-    ~GaugeFixQuality () {
-      host_free(argQ.quality_h); device_free(argQ.quality);
-    }
+    ~GaugeFixQuality () { }
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      //argQ.quality_h[0] = make_double2(0.0,0.0);
-      cudaMemset(argQ.quality, 0, sizeof(double2));
+      argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL(computeFix_quality, tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
-      cudaMemcpy(argQ.quality_h, argQ.quality, sizeof(double2), cudaMemcpyDeviceToHost);
-      //cudaDeviceSynchronize();
-      argQ.quality_h[0].x  /= (double)(3 * gauge_dir * argQ.threads);
-      argQ.quality_h[0].y  /= (double)(3 * argQ.threads);
+      cudaDeviceSynchronize();
+      argQ.result_h[0].x  /= (double)(3 * gauge_dir * argQ.threads);
+      argQ.result_h[0].y  /= (double)(3 * argQ.threads);
     }
 
     TuneKey tuneKey() const {
@@ -443,11 +392,11 @@ namespace quda {
       threads = X[0] * X[1] * X[2] * X[3];
       invpsq = (Float*)device_malloc(sizeof(Float) * threads);
       delta = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads * 6);
-                #ifdef GAUGEFIXING_DONT_USE_GX
+#ifdef GAUGEFIXING_DONT_USE_GX
       gx = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads);
-                #else
+#else
       gx = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
-                #endif
+#endif
       BindTex(delta, gx, sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
     }
     void free(){

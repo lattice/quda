@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/time.h>
 
- #include <cuda.h>
+#include <cuda.h>
 #include <cuda_runtime.h>
 
 #include "quda.h"
@@ -36,7 +36,7 @@ static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
 static bool reunit_svd_only  = false;
 static double svd_rel_error  = 1e-4;
-static double svd_abs_error  = 1e-5;
+static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
 extern int xdim, ydim, zdim, tdim;
@@ -63,6 +63,7 @@ unitarize_link_test()
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
   initQuda(device);
+  setTuning(QUDA_TUNE_YES);
 
   cpu_prec = prec;
   gSize = cpu_prec;  
