@@ -223,13 +223,15 @@ namespace quda {
       for (int j=1; j<num_offset_now; j++) rNorm[j] = rNorm[0] * zeta[j];
 
       int updateX=0, updateR=0;
+      //fixme: with the current implementation of the reliable update it is sufficient to trigger it only for shift 0
+      //fixme: The loop below is unnecessary but I don't want to delete it as we still might find a better reliable update
       int reliable_shift = -1; // this is the shift that sets the reliable_shift
-      for (int j=num_offset_now-1; j>=0; j--) {
-	if (rNorm[j] > maxrx[j]) maxrx[j] = rNorm[j];
-	if (rNorm[j] > maxrr[j]) maxrr[j] = rNorm[j];
-	updateX = (rNorm[j] < delta*r0Norm[j] && r0Norm[j] <= maxrx[j]) ? 1 : updateX;
-	updateR = ((rNorm[j] < delta*maxrr[j] && r0Norm[j] <= maxrr[j]) || updateX) ? 1 : updateR;
-	if ((updateX || updateR) && reliable_shift == -1) reliable_shift = j;
+      for (int j=0; j>=0; j--) {
+	      if (rNorm[j] > maxrx[j]) maxrx[j] = rNorm[j];
+	      if (rNorm[j] > maxrr[j]) maxrr[j] = rNorm[j];
+	      updateX = (rNorm[j] < delta*r0Norm[j] && r0Norm[j] <= maxrx[j]) ? 1 : updateX;
+	      updateR = ((rNorm[j] < delta*maxrr[j] && r0Norm[j] <= maxrr[j]) || updateX) ? 1 : updateR;
+	      if ((updateX || updateR) && reliable_shift == -1) reliable_shift = j;
       }
 
       if ( !(updateR || updateX) || !reliable) {
