@@ -139,6 +139,8 @@ extern "C" {
     /** Actual L2 residual norm achieved in solver for each offset */
     double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
 
+    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
+
     /** Actual heavy quark residual norm achieved in solver for each offset */
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 

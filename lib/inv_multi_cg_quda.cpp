@@ -350,6 +350,7 @@ namespace quda {
       }
       double true_res = xmyNormCuda(b, *r);
       param.true_res_offset[i] = sqrt(true_res/b2);
+      param.iter_res_offset[i] = sqrt(r2[i]/b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
       param.true_res_hq_offset[i] = sqrt(HeavyQuarkResidualNormCuda(*x[i], *r).z);
 #else
@@ -363,7 +364,8 @@ namespace quda {
 	printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n", 
 		   i, sqrt(r2[i]/b2), param.true_res_offset[i]);
       }
-    }      
+    }
+
   
     // reset the flops counters
     quda::blas_flops = 0;

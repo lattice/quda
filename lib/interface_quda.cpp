@@ -2735,7 +2735,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       param->tol_hq_offset[i] : 0;
 
     // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0    
-    if (param->tol_offset[i] > 0 && (param->true_res_offset[i] > param->tol_offset[i] || rsd_hq > tol_hq)) {
+    if ((param->true_res_offset[i] > param->tol_offset[i] || rsd_hq > tol_hq)) {
       if (getVerbosity() >= QUDA_VERBOSE) 
         printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
             i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
@@ -2759,7 +2759,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       SolverParam solverParam(*param);
       solverParam.iter = 0;
       solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      solverParam.tol = param->tol_offset[i]; // set L2 tolerance
+      solverParam.tol = (param->tol_offset[i] >0 ?  param->tol_offset[i] : param->iter_res_offset[i]); // set L2 tolerance
       solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
 
       CG cg(m, mSloppy, solverParam, profileMulti);
