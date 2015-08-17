@@ -121,9 +121,9 @@ namespace quda
     }
 
   #define PROFILE(f, profile, idx)		\
-    profile.Start(idx);				\
+    profile.TPSTART(idx);			\
     f;						\
-    profile.Stop(idx); 
+    profile.TPSTOP(idx); 
 
   /**
      This is a simpler version of the dslashCuda function to call the right kernels
