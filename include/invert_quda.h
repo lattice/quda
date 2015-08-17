@@ -112,7 +112,7 @@ namespace quda {
     /** Actual L2 residual norm achieved in solver for each offset */
     double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
 
-    /** Actual L2 residual norm achieved in solver for each offset */
+    /** Iterated L2 residual norm achieved in multi shift solver for each offset */
     double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
@@ -211,7 +211,7 @@ namespace quda {
       } else {
 	for (int i=0; i<num_offset; i++) {
 	  param.true_res_offset[i] = true_res_offset[i];
-	  param.iter_res_offset[offset] = iter_res_offset[offset];
+	  param.iter_res_offset[i] = iter_res_offset[i];
 	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
 	}
       }
