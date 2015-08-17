@@ -259,7 +259,7 @@ blas_magma.o: blas_magma.cpp $(HDRS)
 	$(CXX) $(MAGMA_INCLUDE) $(CXXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
 
 blas_magma_gpu.o: blas_magma.cu $(HDRS)
-	$(NVCC) -DMAGMA_LIB $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $(MAGMA_FLAGS) $(MAXREG) $< -c -o $@
 
 copy_gauge_double.o: copy_gauge_double.cu copy_gauge_inc.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
