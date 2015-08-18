@@ -66,30 +66,65 @@ namespace quda {
   /**
      Generic wrapper for Trig functions
   */
-  template <bool isHalf>
+  template <bool isHalf, typename T>
     struct Trig {
-      template<typename T> 
       __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b); }
-      template<typename T> 
       __device__ __host__ static T Sin( const T &a ) { return sin(a); }
-      template<typename T> 
       __device__ __host__ static T Cos( const T &a ) { return cos(a); }
-
-      template<typename T>
       __device__ __host__ static void SinCos(const T& a, T *s, T *c) { *s = sin(a); *c = cos(a); }
     };
   
   /**
+     Specialization of Trig functions using floats
+   */
+  template <>
+    struct Trig<false,float> {
+    __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b); }
+    __device__ __host__ static float Sin( const float &a ) { 
+#ifdef __CUDA_ARCH__
+      return __sinf(a); 
+#else
+      return sinf(a);
+#endif
+    }
+    __device__ __host__ static float Cos( const float &a ) { 
+#ifdef __CUDA_ARCH__
+      return __cosf(a); 
+#else
+      return cosf(a); 
+#endif
+    }
+
+    __device__ __host__ static void SinCos(const float& a, float *s, float *c) { 
+#ifdef __CUDA_ARCH__
+       __sincosf(a, s, c);
+#else
+       sincosf(a, s, c);
+#endif
+    }
+
+  };
+
+  /**
      Specialization of Trig functions using shorts
    */
   template <>
-    struct Trig<true> {
-    template<typename T> 
-      __device__ __host__ static T Atan2( const T &a, const T &b) { return atan2(a,b)/M_PI; }
-    template<typename T> 
-      __device__ __host__ static T Sin( const T &a ) { return sin(a*M_PI); }
-    template<typename T> 
-      __device__ __host__ static T Cos( const T &a ) { return cos(a*M_PI); }
+    struct Trig<true,float> {
+    __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b)/M_PI; }
+    __device__ __host__ static float Sin( const float &a ) { 
+#ifdef __CUDA_ARCH__
+      return __sinf(a*M_PI); 
+#else
+      return sinf(a*M_PI); 
+#endif
+    }
+    __device__ __host__ static float Cos( const float &a ) { 
+#ifdef __CUDA_ARCH__
+      return __cosf(a*M_PI); 
+#else
+      return cosf(a*M_PI); 
+#endif
+    }
   };
 
   

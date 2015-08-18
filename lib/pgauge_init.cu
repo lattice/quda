@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <unitarization_links.h>
 #include <pgauge_monte.h>
-#include <random.h>
+#include <random_quda.h>
 #include <cub/cub.cuh>
 #include <index_helper.cuh>
 
@@ -129,39 +129,23 @@ namespace quda {
   template<typename Float>
   void InitGaugeField( cudaGaugeField& data) {
 
-    // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    // Need to fix this!!
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 18>(data), data);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 12>(data), data);
-
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2,  8>(data), data);
-
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 18>(data), data);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 12>(data), data);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4,  8>(data), data);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
     } else {
       errorQuda("Invalid Gauge Order\n");
     }
+
   }
 
 /** @brief Perform a cold start to the gauge field, identity SU(3) matrix, also fills the ghost links in multi-GPU case (no need to exchange data)
@@ -170,12 +154,6 @@ namespace quda {
  */
   void InitGaugeField( cudaGaugeField& data) {
 
-/*#ifdef MULTI_GPU
-   errorQuda("Gauge Fixing with multi-GPU support NOT implemented yet!\n");
- #else*/
-    if ( data.Precision() == QUDA_HALF_PRECISION ) {
-      errorQuda("Half precision not supported\n");
-    }
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       InitGaugeField<float> (data);
     } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {
@@ -183,7 +161,7 @@ namespace quda {
     } else {
       errorQuda("Precision %d not supported", data.Precision());
     }
-//#endif
+    
   }
 
 
@@ -197,12 +175,12 @@ namespace quda {
   struct InitGaugeHotArg {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
-    cuRNGState *rngstate;
+    RNG rngstate;
 #ifdef MULTI_GPU
     int border[4];
 #endif
     Gauge dataOr;
-    InitGaugeHotArg(const Gauge &dataOr, const cudaGaugeField &data, cuRNGState * rngstate)
+    InitGaugeHotArg(const Gauge &dataOr, const cudaGaugeField &data, RNG &rngstate)
       : dataOr(dataOr), rngstate(rngstate) {
 #ifdef MULTI_GPU
       for ( int dir = 0; dir < 4; ++dir ) {
@@ -375,9 +353,9 @@ namespace quda {
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] += 2 * arg.border[dr];
     int id = idx;
-    cuRNGState localState = arg.rngstate[ id ];
+    cuRNGState localState = arg.rngstate.State()[ id ];
   #else
-    cuRNGState localState = arg.rngstate[ idx ];
+    cuRNGState localState = arg.rngstate.State()[ idx ];
   #endif
     for ( int parity = 0; parity < 2; parity++ ) {
     #ifdef MULTI_GPU
@@ -392,9 +370,9 @@ namespace quda {
       }
     }
   #ifdef MULTI_GPU
-    arg.rngstate[ id ] = localState;
+    arg.rngstate.State()[ id ] = localState;
   #else
-    arg.rngstate[ idx ] = localState;
+    arg.rngstate.State()[ idx ] = localState;
   #endif
   }
 
@@ -451,10 +429,8 @@ namespace quda {
       ps << "shared=" << param.shared_bytes;
       return ps.str();
     }
-    void preTune(){
-    }
-    void postTune(){
-    }
+    void preTune(){ arg.rngstate.backup(); }
+    void postTune(){ arg.rngstate.restore(); }
     long long flops() const {
       return 0;
     }                                  // Only correct if there is no link reconstruction, no cub reduction accounted also
@@ -469,7 +445,7 @@ namespace quda {
 
 
   template<typename Float, int NCOLORS, typename Gauge>
-  void InitGaugeField( Gauge dataOr,  cudaGaugeField& data, cuRNGState *rngstate) {
+  void InitGaugeField( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate) {
     InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
@@ -506,35 +482,18 @@ namespace quda {
 
 
   template<typename Float>
-  void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
+  void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {
 
-    // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
-    // Need to fix this!!
-    if ( data.Order() == QUDA_FLOAT2_GAUGE_ORDER ) {
+    if ( data.isNative() ) {
       if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 18>(data), data, rngstate);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2, 12>(data), data, rngstate);
-
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
       } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 2,  8>(data), data, rngstate);
-
-      } else {
-        errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-    } else if ( data.Order() == QUDA_FLOAT4_GAUGE_ORDER ) {
-      if ( data.Reconstruct() == QUDA_RECONSTRUCT_NO ) {
-        //printfQuda("QUDA_RECONSTRUCT_NO\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 18>(data), data, rngstate);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_12 ) {
-        //printfQuda("QUDA_RECONSTRUCT_12\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4, 12>(data), data, rngstate);
-      } else if ( data.Reconstruct() == QUDA_RECONSTRUCT_8 ) {
-        //printfQuda("QUDA_RECONSTRUCT_8\n");
-        InitGaugeField<Float, 3>(FloatNOrder<Float, 18, 4,  8>(data), data, rngstate);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+        InitGaugeField<Float, 3>(Gauge(data), data, rngstate);
       } else {
         errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
       }
@@ -549,11 +508,8 @@ namespace quda {
  * @param[in,out] data Gauge field
  * @param[in,out] rngstate state of the CURAND random number generator
  */
-  void InitGaugeField( cudaGaugeField& data, cuRNGState *rngstate) {
+  void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {
 #ifdef GPU_GAUGE_ALG
-    if ( data.Precision() == QUDA_HALF_PRECISION ) {
-      errorQuda("Half precision not supported\n");
-    }
     if ( data.Precision() == QUDA_SINGLE_PRECISION ) {
       InitGaugeField<float> (data, rngstate);
     } else if ( data.Precision() == QUDA_DOUBLE_PRECISION ) {

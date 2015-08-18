@@ -204,58 +204,24 @@ namespace quda {
 
 
 
-static bool checkDimsPartitioned(){
-  if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
-  return false;
-}
-
-  template<class T>
-  __device__ __host__ inline Matrix<T,3> getSubTraceUnit(const Matrix<T,3>& a){
-    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
-    Matrix<T,3> res;
-    res(0,0) = a(0,0) - tr; res(0,1) = a(0,1); res(0,2) = a(0,2);
-    res(1,0) = a(1,0); res(1,1) = a(1,1) - tr; res(1,2) = a(1,2);
-    res(2,0) = a(2,0); res(2,1) = a(2,1); res(2,2) = a(2,2) - tr;
-    return res;
+  static bool checkDimsPartitioned(){
+    if(comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3)) return true;
+    return false;
   }
-
-  template<class T>
-  __device__ __host__ inline void SubTraceUnit(Matrix<T,3>& a){
-    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
-    a(0,0) -= tr; a(1,1) -= tr; a(2,2) -= tr;
-  }
-
-  template<class T>
-  __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
-    double sum = (double)(a(0,0).x * b(0,0).x  + a(0,0).y * b(0,0).y);
-    sum += (double)(a(0,1).x * b(0,1).x  + a(0,1).y * b(0,1).y);
-    sum += (double)(a(0,2).x * b(0,2).x  + a(0,2).y * b(0,2).y);
-    sum += (double)(a(1,0).x * b(1,0).x  + a(1,0).y * b(1,0).y);
-    sum += (double)(a(1,1).x * b(1,1).x  + a(1,1).y * b(1,1).y);
-    sum += (double)(a(1,2).x * b(1,2).x  + a(1,2).y * b(1,2).y);
-    sum += (double)(a(2,0).x * b(2,0).x  + a(2,0).y * b(2,0).y);
-    sum += (double)(a(2,1).x * b(2,1).x  + a(2,1).y * b(2,1).y);
-    sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
-    return sum;
-  }
-
 
   /**
    * @brief container to pass parameters for the gauge fixing quality kernel
    */
   template <typename Gauge>
-  struct GaugeFixQualityArg {
+  struct GaugeFixQualityArg : public ReduceArg<double2> {
     int threads; // number of active threads required
     int X[4]; // grid dimensions
 #ifdef MULTI_GPU
     int border[4];
 #endif
     Gauge dataOr;
-    double2 *quality;
-    double2 *quality_h;
     GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data)
-      : dataOr(dataOr) {
-      //: dataOr(dataOr), quality_h(static_cast<double2*>(pinned_malloc(sizeof(double2)))) {
+      : ReduceArg<double2>(), dataOr(dataOr) {
 
       for ( int dir = 0; dir < 4; ++dir ) {
         X[dir] = data.X()[dir] - data.R()[dir] * 2;
@@ -264,16 +230,9 @@ static bool checkDimsPartitioned(){
       #endif
       }
       threads = X[0] * X[1] * X[2] * X[3];
-      quality = (double2*)device_malloc(sizeof(double2));
-      quality_h = (double2*)safe_malloc(sizeof(double2));
-      //cudaHostGetDevicePointer(&quality, quality_h, 0);
     }
-    double getAction(){
-      return quality_h[0].x;
-    }
-    double getTheta(){
-      return quality_h[0].y;
-    }
+    double getAction(){ return result_h[0].x; }
+    double getTheta(){ return result_h[0].y; }
   };
 
 
@@ -284,10 +243,6 @@ static bool checkDimsPartitioned(){
   __global__ void computeFix_quality(GaugeFixQualityArg<Gauge> argQ){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
 
-    typedef cub::BlockReduce<double2, blockSize> BlockReduce;
-    __shared__ typename BlockReduce::TempStorage temp_storage;
-
-    //AVOID SHAREDMEM PROBLEMS!!!!!!! cub::BlockReduce<double2, blockSize> not initialize memory with 0?
     double2 data = make_double2(0.0,0.0);
     if ( idx < argQ.threads ) {
       typedef typename ComplexTypeId<Float>::Type Cmplx;
@@ -336,10 +291,7 @@ static bool checkDimsPartitioned(){
       //35
       //T=36*gauge_dir+65
     }
-    //This must be here for the case when the total number of threads is not multiple of blocksize!!!!
-    //HOW TO pre-initialize temp_storage to 0?
-    double2 aggregate = BlockReduce(temp_storage).Reduce(data, Summ<double2>());
-    if ( threadIdx.x == 0 ) atomicAdd(argQ.quality, aggregate);
+    reduce<blockSize>(argQ, data);
   }
 
 
@@ -366,29 +318,17 @@ static bool checkDimsPartitioned(){
     }
 
     public:
-    GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ)
-      : argQ(argQ) {
-    }
-    ~GaugeFixQuality () {
-      host_free(argQ.quality_h); device_free(argQ.quality);
-    }
+    GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
+    ~GaugeFixQuality () { }
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      //argQ.quality_h[0] = make_double2(0.0,0.0);
-      cudaMemset(argQ.quality, 0, sizeof(double2));
+      argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
-      cudaMemcpy(argQ.quality_h, argQ.quality, sizeof(double2), cudaMemcpyDeviceToHost);
-      //cudaDeviceSynchronize();
-      #ifdef MULTI_GPU
-      if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.quality_h, 2);
-      const int nNodes = comm_dim(0) * comm_dim(1) * comm_dim(2) * comm_dim(3);
-      argQ.quality_h[0].x  /= (double)(3 * gauge_dir * argQ.threads * nNodes);
-      argQ.quality_h[0].y  /= (double)(3 * argQ.threads * nNodes);
-      #else
-      argQ.quality_h[0].x  /= (double)(3 * gauge_dir * argQ.threads);
-      argQ.quality_h[0].y  /= (double)(3 * argQ.threads);
-      #endif
+      cudaDeviceSynchronize();
+      if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
+      argQ.result_h[0].x  /= (double)(3 * gauge_dir * argQ.threads * comm_size());
+      argQ.result_h[0].y  /= (double)(3 * argQ.threads * comm_size());
     }
 
     TuneKey tuneKey() const {
