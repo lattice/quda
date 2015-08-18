@@ -1,271 +1,56 @@
+#include <blas_magma.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+#include <vector>
+#include <algorithm>
 
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include <sm_30_intrinsics.h>
-#include <sm_35_intrinsics.h>
-
 #include <cuComplex.h>
 
-////////////////////////////////////////////
+#ifndef MAX
+#define MAX(a, b) (a > b) ? a : b;
+#endif
 
-__device__ inline double dshfl(double x, int lane)
-{
-  int lo, hi;
+#define MAGMA_15 //version of the MAGMA library
 
-  asm volatile( "mov.b64 {%0,%1}, %2;" : "=r"(lo), "=r"(hi) : "d"(x));
+#ifdef MAGMA_LIB
+#include <magma.h>
 
-  lo = __shfl(lo, lane);
-  hi = __shfl(hi, lane);
+#if (defined MAGMA_14)
 
-  asm volatile( "mov.b64 %0, {%1,%2};" : "=d"(x) : "r"(lo), "r"(hi));
+#define _cV 'V' 
+#define _cU 'U'
 
-  return x;
-}
+#define _cR 'R'
+#define _cL 'L'
 
-__device__ inline cuDoubleComplex zshfl(cuDoubleComplex x, int lane)
-{
-  int lo, hi;// Split the double number into 2 32b registers.
+#define _cC 'C'
+#define _cN 'N'
 
-  double xre = cuCreal(x);
-  
-  asm volatile( "mov.b64 {%0,%1}, %2;" : "=r"(lo), "=r"(hi) : "d"(xre));
+#elif (defined MAGMA_15)
 
-  lo = __shfl(lo, lane);
-  hi = __shfl(hi, lane);
+#define _cV MagmaVec 
+#define _cU MagmaUpper
 
-  asm volatile( "mov.b64 %0, {%1,%2};" : "=d"(xre) : "r"(lo), "r"(hi));
+#define _cR MagmaRight
+#define _cL MagmaLeft
 
-  double xim = cuCimag(x);
+#define _cC MagmaConjTrans
+#define _cN MagmaNoTrans
 
-  asm volatile( "mov.b64 {%0,%1}, %2;" : "=r"(lo), "=r"(hi) : "d"(xim));
+#endif
 
-  lo = __shfl(lo, lane);
-  hi = __shfl(hi, lane);
+#endif
 
-  asm volatile( "mov.b64 %0, {%1,%2};" : "=d"(xim) : "r"(lo), "r"(hi));
 
-  return make_cuDoubleComplex(xre, xim);
-}
+//Column major format: Big matrix times Little matrix.
 
-__device__ __noinline__ void warp_reduce_complex_32x16(double *real, double *imag, const int ltid, const int wrp_idx)
-{
-   if(ltid < (warpSize*8)) real[0] += real[warpSize*8], imag[0] += imag[warpSize*8];
-   __syncthreads();
-   if(ltid < (warpSize*4)) real[0] += real[warpSize*4], imag[0] += imag[warpSize*4];
-   __syncthreads();
-   if(ltid < (warpSize*2)) real[0] += real[warpSize*2], imag[0] += imag[warpSize*2];
-   __syncthreads();
-
-   if(ltid < warpSize /*the last warp*/)
-   {
-      real[0] += real[warpSize ];       imag[0] += imag[warpSize ];
-      real[warpSize*wrp_idx] = real[0]; imag[warpSize*wrp_idx] = imag[0];
-   }
-
-   return;
-}
-
-
-
-
-//__global__ void SpinorMM(ReduceArg<ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg) 
-//WARNING: all matrices in column-major format
-//block configuration: 32x16
-
-/*
-<----32----->                   <-16->
-[|| || '' '' ......] |          [|| || .......]
-[|| || '' '' ......] 16         [|| || .......]
-[|| || '' '' ......] |    x     [|| || .......]
-[|| || '' '' ......] 16         [|| || .......] 
-<-16->               .
- 
-[.. .. .. .. ......]            [.. .. .......]
-[.. .. .. .. ......]            [.. .. .......]
-[.. .. .. .. ......]            [.. .. .......]
-[..          ......]            [.. ..        ]
-[..          ......]            [.. ..        ] 
-
-*/
-//__global__ void __launch_bounds__(MAX_THREADS_PER_BLOCK, MIN_BLOCKS_PER_SM) 
-#define CHUNK_NUM 2
-__global__ void  
-SpinorMM_32x16(cuFloatComplex *outBuff, const int bldm, cuFloatComplex *sMat, const int srows, const int scols, const int sldm, cuDoubleComplex *cMat, const int crows, const int ccols, const int cldm) 
-{
-  //Note assignment due to FORTRAN data format!
-  unsigned int tidY      = threadIdx.x;
-  unsigned int blkY      = blockDim.x;
-  unsigned int y         = blockIdx.x*(blockDim.x) + threadIdx.x;//global coordinate in spinor field length:[0 ... sldm)
-  unsigned int gridSizeY = gridDim.x*blockDim.x;//total size => sldm
-
-  unsigned int tidX      = threadIdx.y;
-  unsigned int blkX      = blockDim.y;
-  unsigned int x         = blockIdx.y*(blockDim.y) + threadIdx.y;//global coordinate in (restarted) search space: [0 ... max_nev = 2nev for eigCG or nev+1 for GMRESDR)
-  unsigned int gridSizeX = gridDim.y*blockDim.y;//total size => max_nev
-
-  unsigned int ltid      = threadIdx.x + blockDim.x * threadIdx.y;//linear thread index within a thread block
-
-  if(blkY != warpSize) return;
-
-  const int halfWarpSize = warpSize / 2; 
-
-  cuDoubleComplex smat_accum = make_cuDoubleComplex (0.0, 0.0);//final result!
-
-  extern __shared__ double sm_buffer[];//2*blkY*blkX*2*sizeof(double) to keep chunk of 32x16 block (currently 2 hard-coded chunks!)
-
-  double *relem  = sm_buffer + 0*blkY*blkX;
-  double *ielem  = sm_buffer + 1*blkY*blkX;
-
-  cuDoubleComplex smat_chnk1, smat_chnk2;//in X direction two chunks
-
-  int idy = tidY;//Y-coordinate of the "little" matrix
-  int idx = tidX;//X-coordinate of a single chunk of the "big" matrix
-
-//Start Loop in Y direction of cmat (we loop in X direction of sMat but load 2 chunks per iteration)
-  while(idy < crows)
-  {
-
-    cuDoubleComplex tmp1, tmp2;
-
-    //Load little matrix element (no textures for now):
-    cuDoubleComplex cmat = cMat[idy+x*cldm];
-    
-    //load this to shared memory:
-    relem[tidY+tidX*blkY] = cuCreal(cmat);
-    ielem[tidY+tidX*blkY] = cuCimag(cmat);
-   
-    {
-      //Load big matrix elements (mind of 2 chunks) via a texture object:
-      int l = y + idx * sldm;//coordinate of the first chunk
-      //cuFloatComplex smatf = tex1Dfetch<float2>(sMatTex, l); 
-      //smat_chnk1 = cuComplexFloatToDouble( smatf );       
-      smat_chnk1 = cuComplexFloatToDouble( sMat[l] );
-
-      //Load the second chunk:
-      //smatf   = tex1Dfetch<float2>(sMatTex, (l+blkX * sldm));        
-      //smat_chnk2 = cuComplexFloatToDouble( smatf );       
-      smat_chnk2 = cuComplexFloatToDouble( sMat[l] );
-    }
-    //Now do transposition:
-    __syncthreads();
-
-    const int locY = tidY % blkX ; //note blkY = 2*blkX = (CHUNK_NUM*blkX) in this version
-    const int z    = (tidY / blkX);
-    const int offs = z*(blkY / CHUNK_NUM);  
- 
-    tmp1 = make_cuDoubleComplex(relem[tidX+locY*blkY+offs], ielem[tidX+locY*blkY+offs]); 
-
-    //Now exchange elements for the second chunk:
-    int lane = tidY + (1-2*z)*halfWarpSize;
-
-    tmp2 = zshfl(tmp1, lane);
-
-    cuDoubleComplex cmatT_chnk1, cmatT_chnk2; 
-
-    if(tidY < halfWarpSize)
-    {
-       cmatT_chnk1 = make_cuDoubleComplex(cuCreal(tmp1), cuCimag(tmp1));
-       cmatT_chnk2 = make_cuDoubleComplex(cuCreal(tmp2), cuCimag(tmp2));
-    }
-    else
-    {
-       cmatT_chnk1 = make_cuDoubleComplex(cuCreal(tmp2), cuCimag(tmp2));
-       cmatT_chnk2 = make_cuDoubleComplex(cuCreal(tmp1), cuCimag(tmp1));
-    }
-
-    //pointers for the local reductions below:
-    double *reducr = sm_buffer + tidX*blkY+tidY;
-    double *reduci = reducr + blkY*blkX;
-
-#pragma unroll 
-    for(int i = 0; i < 16; i++)
-    {
-      //Do broadcast within the warp:
-      tmp1 = zshfl(cmatT_chnk1, i);//broadcast form ith lane 
-      tmp2 = zshfl(cmatT_chnk2, i);//broadcast form ith lane 
-
-      //Do complex fma:
-      smat_accum = cuCfma(smat_chnk1, tmp1, smat_accum);
-      smat_accum = cuCfma(smat_chnk2, tmp2, smat_accum);
-
-      //Load smat_accum to shared memory:
-      reducr[0] = cuCreal(smat_accum);
-      reduci[0] = cuCimag(smat_accum); 
-
-      warp_reduce_complex_32x16(reducr, reduci, ltid, i);//wrp_idx = i
-
-      __syncthreads();
-
-      if(ltid == (warpSize*i))
-      {
-         tmp1       = make_cuDoubleComplex(reducr[0], reduci[0]); 
-         smat_accum = cuCfma(smat_accum, tmp1, smat_accum);
-      }
-    }
- 
-    idx += CHUNK_NUM*blkX; //offset for two chunks of the "big" matrix (note: blkY = CHUNK_NUM*blkX)
-    idy += blkY;//continue loop in Y-direction of the little matrix (or X-direction of the big matix)
-  }
-
-  outBuff[y+x*bldm] = cuComplexDoubleToFloat( smat_accum ); //cache avoiding loads to the output buffer
-
-  return;
-
-}
-
-#undef CHUNK_NUM
-
-void sMM(void *outBuff, const int bldm,  void *sMat, const int srows, const int scols, const int sldm, void *cMat, const int crows, const int ccols, const int cldm)
-{
-
-  if(crows != scols) printf("\nError: wrong matrix dimensions\n"), exit(-1);
-
-  const int blk_sizex = 32;
-  const int blk_sizey = 16; 
-
-  const int grid_sizex = (srows + 31) / blk_sizex;
-  const int grid_sizey = ccols / blk_sizey; 
-
-  dim3 blck_dim(blk_sizex, blk_sizey, 1);
-  dim3 grid_dim(grid_sizex, grid_sizey, 1);
-	
-  ///For reduction operation:
-  int reduce_bytes = blk_sizex * blk_sizey * sizeof(cuDoubleComplex);  
-
-  //cudaTextureObject_t sMatTex = 0;
-
-  //cudaChannelFormatDesc desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
-
-  //cudaResourceDesc resDesc;
-  //memset(&resDesc, 0, sizeof(resDesc));
-  //resDesc.resType                = cudaResourceTypeLinear;
-  //resDesc.res.linear.devPtr      = sMat;
-  //resDesc.res.linear.desc        = desc;
-  //resDesc.res.linear.sizeInBytes = scols*sldm*sizeof(cuFloatComplex);//sldm: physical array length (including padding)
-      
-  //cudaTextureDesc texDesc;
-  //memset(&texDesc, 0, sizeof(texDesc));
-  //texDesc.readMode = cudaReadModeElementType;
-      
-  //cudaCreateTextureObject(&sMatTex, &resDesc, &texDesc, NULL);
-
-  cudaFuncSetCacheConfig( SpinorMM_32x16, cudaFuncCachePreferL1 );
-
-  SpinorMM_32x16 <<< grid_dim, blck_dim, reduce_bytes, 0 >>>((cuFloatComplex *)outBuff, bldm, (cuFloatComplex*)sMat, srows, scols, sldm, (cuDoubleComplex *)cMat, crows, ccols, cldm);
-
-  //cudaDestroyTextureObject(sMatTex);
-
-  return;
-}
+#ifdef MAGMA_LIB
 
 //Simplified version for the above:
 #define BLOCK_SIZE 16
-
-//Column major format: Big matrix times Little matrix.
 
 __global__ void SMatCMatCuda_16x16(cuFloatComplex *outBuff, const int bldm, cuFloatComplex *sMat, const int sldm, cuDoubleComplex *cMat, const int cldm, const int scols)
 {
@@ -334,9 +119,11 @@ __global__ void SMatCMatCuda_16x16(cuFloatComplex *outBuff, const int bldm, cuFl
 
     return;
 }
+#endif
 
 void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const int scols, const int sldm, void *cMat, const int crows, const int ccols, const int cldm)
 {
+#ifdef MAGMA_LIB
     // for test only:
     if(scols != crows) printf("\nError: wrong dimensions\n"), exit(-1);
 
@@ -351,6 +138,429 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
     cudaFuncSetCacheConfig( SMatCMatCuda_16x16, cudaFuncCachePreferShared );
 
     SMatCMatCuda_16x16<<< grid, threads >>>((cuFloatComplex*)outBuff, bldm, (cuFloatComplex*)sMat, sldm, (cuDoubleComplex*)cMat, cldm, scols);
+#endif
 }
+
+#undef BLOCK_SIZE
+
+void BlasMagmaArgs::OpenMagma(){ 
+
+#ifdef MAGMA_LIB
+    magma_int_t err = magma_init(); 
+
+    if(err != MAGMA_SUCCESS) printf("\nError: cannot initialize MAGMA library\n");
+
+    int major, minor, micro;
+
+    magma_version( &major, &minor, &micro);
+    printf("\nMAGMA library version: %d.%d\n\n", major,  minor);
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
+
+    return;
+}
+
+void BlasMagmaArgs::CloseMagma(){  
+
+#ifdef MAGMA_LIB
+    if(magma_finalize() != MAGMA_SUCCESS) printf("\nError: cannot close MAGMA library\n");
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
+
+    return;
+}
+
+ BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), max_nev(0), prec(prec), ldm(0), info(-1), llwork(0), 
+  lrwork(0), liwork(0), sideLR(0), htsize(0), dtsize(0), lwork_max(0), W(0), W2(0), 
+  hTau(0), dTau(0), lwork(0), rwork(0), iwork(0)
+{
+
+#ifdef MAGMA_LIB
+    magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+    if(dev_info == 0)  exit(-1);
+
+    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+
+    alloc = false;
+    init  = true;
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
+
+    return;
+}
+
+
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec) 
+  : m(m), max_nev(0),  prec(prec), ldm(ldm), info(-1), sideLR(0), htsize(0), dtsize(0), 
+  W(0), hTau(0), dTau(0)
+{
+
+#ifdef MAGMA_LIB
+
+    magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+
+    if(dev_info == 0)  exit(-1);
+
+    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+
+    const int complex_prec = 2*prec;
+
+    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(m) : magma_get_zhetrd_nb(m);//ldm
+
+    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm 
+    lrwork = 1 + 5*m + 2*m*m;//ldm
+    liwork = 3 + 5*m;//ldm
+
+    magma_malloc_pinned((void**)&W2,   ldm*m*complex_prec);
+    magma_malloc_pinned((void**)&lwork, llwork*complex_prec);
+    magma_malloc_cpu((void**)&rwork,    lrwork*prec);
+    magma_malloc_cpu((void**)&iwork,    liwork*sizeof(magma_int_t));
+
+    init  = true;
+    alloc = true;
+
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
+
+    return;
+}
+
+
+
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, const int prec) 
+  : m(m), max_nev(max_nev),  prec(prec), ldm(ldm), info(-1)
+{
+
+#ifdef MAGMA_LIB
+
+    magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
+
+    if(dev_info == 0)  exit(-1);
+
+    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+
+    const int complex_prec = 2*prec;
+
+    magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(ldm) : magma_get_zhetrd_nb(ldm);//ldm<-m
+    magma_int_t nbqrf = prec == 4 ? magma_get_cgeqrf_nb(ldm) : magma_get_zgeqrf_nb(ldm);//ldm
+
+    htsize   = max_nev;//MIN(l,k)-number of Householder vectors, but we always have k <= MIN(m,n)
+    dtsize   = ( 2*htsize + ((htsize + 31)/32)*32 )*nbqrf;//in general: MIN(m,k) for side = 'L' and MIN(n,k) for side = 'R'
+
+    magma_malloc_pinned((void**)&hTau, htsize*complex_prec);
+    magma_malloc((void**)&dTau,        dtsize*complex_prec);
+
+//these are needed for the eigCG solver only.
+    sideLR = (m - max_nev + nbqrf)*(m + nbqrf) + m*nbqrf;//ldm
+
+    magma_malloc_pinned((void**)&W,    sideLR*complex_prec);
+    magma_malloc_pinned((void**)&W2,   ldm*m*complex_prec);
+
+    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm 
+    lrwork = 1 + 5*m + 2*m*m;//ldm
+    liwork = 3 + 5*m;//ldm
+
+    magma_malloc_pinned((void**)&lwork, llwork*complex_prec);
+    magma_malloc_cpu((void**)&rwork,    lrwork*prec);
+    magma_malloc_cpu((void**)&iwork,    liwork*sizeof(magma_int_t));
+
+    init  = true;
+    alloc = true;
+
+#else
+    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    exit(-1);
+#endif    
+
+    return;
+}
+
+BlasMagmaArgs::~BlasMagmaArgs()
+{
+#ifdef MAGMA_LIB
+
+   if(alloc == true)
+   {
+     if(dTau) magma_free(dTau);
+     if(hTau) magma_free_pinned(hTau);
+
+     if(W) magma_free_pinned(W);
+     if(W2) magma_free_pinned(W2);
+     if(lwork) magma_free_pinned(lwork);
+
+     if(rwork) magma_free_cpu(rwork);
+     if(iwork) magma_free_cpu(iwork);
+
+     alloc = false;
+   }
+
+   init  = false;
+
+#endif
+
+   return;
+}
+
+void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, bool host)
+{
+     if(prob_size > m) printf("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m), exit(-1);
+   
+#ifdef MAGMA_LIB
+     cudaPointerAttributes ptr_attr;
+
+     if(!host)
+     {
+       //check if dTvecm is a device pointer..
+       cudaPointerGetAttributes(&ptr_attr, dTvecm);
+
+       if(ptr_attr.memoryType != cudaMemoryTypeDevice || ptr_attr.devicePointer == NULL ) printf("Error in MagmaHEEVD, no device pointer found."), exit(-1);
+
+       if(prec == 4)
+       {
+         magma_cheevd_gpu(_cV, _cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)W2, ldm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
+       }
+       else
+       {
+         magma_zheevd_gpu(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)W2, ldm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
+       }
+     }
+     else
+     {
+       //check if dTvecm is a device pointer..
+       cudaPointerGetAttributes(&ptr_attr, dTvecm);
+
+       if(ptr_attr.memoryType != cudaMemoryTypeHost || ptr_attr.hostPointer == NULL ) printf("Error in MagmaHEEVD, no host pointer found."), exit(-1);
+
+       if(prec == 4)
+       {
+         magma_cheevd(_cV, _cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
+       }
+       else
+       {
+         magma_zheevd(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
+         if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
+       }
+     }   
+#endif
+  return;
+}  
+
+int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
+{
+     const int l = max_nev;
+
+#ifdef MAGMA_LIB
+     if(prec == 4)
+     {
+        magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
+
+        magma_cgeqrf_gpu(m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTau, &info);
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cgeqrf_gpu), exit ...\n"), exit(-1);
+
+        //compute dTevecm0=QHTmQ
+        //get TQ product:
+        magma_cunmqr_gpu(_cR, _cN, m, m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info); 
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n"), exit(-1);
+             	
+        //get QHT product:
+        magma_cunmqr_gpu(_cL, _cC, m, l, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n"), exit(-1);  
+     }
+     else
+     {
+        magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
+
+        magma_zgeqrf_gpu(m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTau, &info);
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zgeqrf_gpu), exit ...\n"), exit(-1);
+
+        //compute dTevecm0=QHTmQ
+        //get TQ product:
+        magma_zunmqr_gpu(_cR, _cN, m, m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info); 
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
+             	
+        //get QHT product:
+        magma_zunmqr_gpu(_cL, _cC, m, l, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);  
+
+     }
+#endif
+
+  return l;
+}
+
+void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm)
+{
+#ifdef MAGMA_LIB 
+       if( (vld % 32) != 0) printf("\nError: leading dimension must be multiple of the warp size\n"), exit(-1);
+
+       const int cvprec = 2*vprec;
+
+       const int l     = max_nev;
+
+       //int bufferSize =  2*vld+l*l;
+       //int bufferBlock = bufferSize / l;
+
+       int bufferBlock = (2*vld) / l;
+       bufferBlock     = (bufferBlock / 32) * 32;//corrected bufferBlock to be multiple of the warp size
+       int bufferSize  = (bufferBlock * l);
+
+       void  *buffer = 0;
+       magma_malloc(&buffer, bufferSize*cvprec);
+       cudaMemset(buffer, 0, bufferSize*cvprec);
+
+
+       if(prec == 4)
+       {
+         magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
+         magma_cunmqr_gpu(_cL, _cN, m, l, l, (magmaFloatComplex*)dTevecm, ldm, (magmaFloatComplex*)hTau, (magmaFloatComplex*)dTm, ldm, (magmaFloatComplex*)W, sideLR, (magmaFloatComplex*)dTau, nb, &info);
+        
+         if(info != 0) printf("\nError in RestartV (magma_cunmqr_gpu), exit ...\n"), exit(-1); 
+       }
+       else
+       {
+         magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
+         magma_zunmqr_gpu(_cL, _cN, m, l, l, (magmaDoubleComplex*)dTevecm, ldm, (magmaDoubleComplex*)hTau, (magmaDoubleComplex*)dTm, ldm, (magmaDoubleComplex*)W, sideLR, (magmaDoubleComplex*)dTau, nb, &info);
+
+         if(info != 0) printf("\nError in RestartV (magma_zunmqr_gpu), exit ...\n"), exit(-1); 
+       }
+
+       if(vprec == 4)
+       {
+         if(prec == vprec) printf("\nError: option is not currently supported, exit ...\n"), exit(-1);
+
+         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+         {
+           if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+           magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[blockOffset]);
+
+           sMM_v2(buffer, bufferBlock, ptrV, bufferBlock, m, vld, dTm, m, l, ldm);
+
+           cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
+         }
+       }
+       else
+       {
+         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+         {
+           if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+           magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
+
+           magmablas_zgemm(_cN, _cN, bufferBlock, l, m, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dTm, ldm, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
+
+           cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
+	 }
+       }
+
+       magma_free(buffer);
+#endif
+       return;
+}
+
+
+void BlasMagmaArgs::SolveProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH)
+{
+#ifdef MAGMA_LIB
+       const int complex_prec = 2*prec;
+       void *tmp; 
+       magma_int_t *ipiv;
+       magma_int_t err;
+
+       magma_malloc_pinned((void**)&tmp, ldH*n*complex_prec);
+       magma_malloc_pinned((void**)&ipiv, n*sizeof(magma_int_t));
+
+       memcpy(tmp, H, ldH*n*complex_prec);
+
+       if (prec == 4)
+       {
+          err = magma_cgesv(n, 1, (magmaFloatComplex*)tmp, ldH, ipiv, (magmaFloatComplex*)rhs, ldn, &info);
+          if(err != 0) printf("\nError in SolveProjMatrix (magma_cgesv), exit ...\n"), exit(-1);
+       }
+       else
+       {
+          err = magma_zgesv(n, 1, (magmaDoubleComplex*)tmp, ldH, ipiv, (magmaDoubleComplex*)rhs, ldn, &info);
+          if(err != 0) printf("\nError in SolveProjMatrix (magma_zgesv), exit ...\n"), exit(-1);
+       }
+
+       magma_free_pinned(tmp);
+       magma_free_pinned(ipiv);
+#endif
+       return;
+}
+
+void BlasMagmaArgs::SolveGPUProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH)
+{
+#ifdef MAGMA_LIB
+       const int complex_prec = 2*prec;
+       void *tmp; 
+       magma_int_t *ipiv;
+       magma_int_t err;
+
+       magma_malloc((void**)&tmp, ldH*n*complex_prec);
+       magma_malloc_pinned((void**)&ipiv, n*sizeof(magma_int_t));
+
+       cudaMemcpy(tmp, H, ldH*n*complex_prec, cudaMemcpyDefault);
+
+       if (prec == 4)
+       {
+          err = magma_cgesv_gpu(n, 1, (magmaFloatComplex*)tmp, ldH, ipiv, (magmaFloatComplex*)rhs, ldn, &info);
+          if(err != 0) printf("\nError in SolveGPUProjMatrix (magma_cgesv), exit ...\n"), exit(-1);
+       }
+       else
+       {
+          err = magma_zgesv_gpu(n, 1, (magmaDoubleComplex*)tmp, ldH, ipiv, (magmaDoubleComplex*)rhs, ldn, &info);
+          if(err != 0) printf("\nError in SolveGPUProjMatrix (magma_zgesv), exit ...\n"), exit(-1);
+       }
+
+       magma_free(tmp);
+       magma_free_pinned(ipiv);
+#endif
+       return;
+}
+
+void BlasMagmaArgs::SpinorMatVec
+(void *spinorOut, const void *spinorSetIn, const int sld, const int slen, const void *vec, const int vlen)
+{
+#ifdef MAGMA_LIB
+       if (prec == 4)
+       {
+           magmaFloatComplex *spmat = (magmaFloatComplex*)spinorSetIn; 
+           magmaFloatComplex *spout = (magmaFloatComplex*)spinorOut; 
+
+           magmablas_cgemv(_cN, slen, vlen, MAGMA_C_ONE, spmat, sld, (magmaFloatComplex*)vec, 1, MAGMA_C_ZERO, spout, 1);//in colour-major format
+       }
+       else
+       {
+           magmaDoubleComplex *spmat = (magmaDoubleComplex*)spinorSetIn; 
+           magmaDoubleComplex *spout = (magmaDoubleComplex*)spinorOut; 
+
+           magmablas_zgemv(_cN, slen, vlen, MAGMA_Z_ONE, spmat, sld, (magmaDoubleComplex*)vec, 1, MAGMA_Z_ZERO, spout, 1);//in colour-major format
+       }
+#endif
+       return;
+}
+
+#ifdef MAGMA_LIB
+
+#undef _cV
+#undef _cU
+#undef _cR
+#undef _cL
+#undef _cC
+#undef _cN
+
+#endif
 
 
