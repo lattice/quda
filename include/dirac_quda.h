@@ -146,6 +146,8 @@ namespace quda {
   protected:
     void initConstants();
     FaceBuffer face1, face2; // multi-gpu communication buffers
+//NEW:
+    int Ls; // length of the fifth dimension, Ls = 1 for normal Wilson
 
   public:
     DiracWilson(const DiracParam &param);

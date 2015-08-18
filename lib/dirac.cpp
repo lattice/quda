@@ -134,11 +134,21 @@ namespace quda {
   Dirac* Dirac::create(const DiracParam &param)
   {
     if (param.type == QUDA_WILSON_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator\n");
-      return new DiracWilson(param);
+      if(param.Ls == 1){
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracWilson operator\n");
+        return new DiracWilson(param);
+      }else{
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a multi-source DiracWilson operator for %d source vectors\n", param.Ls);
+        return new DiracWilson(param, 5);
+      }
     } else if (param.type == QUDA_WILSONPC_DIRAC) {
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracWilsonPC operator\n");
-      return new DiracWilsonPC(param);
+      if(param.Ls == 1){
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracWilsonPC operator\n");
+        return new DiracWilsonPC(param);
+      }else{
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a multi-source DiracWilsonOC operator for %d source vectors\n", param.Ls);
+        return new DiracWilsonPC(param, 5);
+      }
     } else if (param.type == QUDA_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a DiracClover operator\n");
       return new DiracClover(param);
