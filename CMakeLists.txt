@@ -10,11 +10,6 @@ set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
-## MW TODO
-# * dynamic clover
-# * nvtx MPI
-# * nvtx Interface
-# * gauge_alg
 
 #
 # PROJECT is QUDA
@@ -34,12 +29,8 @@ project("QUDA")
 
 ##CMAKE we need to support this
 set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
+set(CPU_ARCH x86_64 CACHE STRING "set the CPU architecture (currently only x86_64 supported)")
 
-
-##CMAKE use Find
-#GIT      = git
-
-##CMAKE use Find
 
 
 
@@ -47,12 +38,18 @@ set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, 
 # compilation options
 # HOST_DEBUG = no			# compile host debug code
 # DEVICE_DEBUG = no		# compile device debug code for cuda-gdb
-# VERBOSE = no			# display kernel register useage
+# CMAKE build types: DEBUG, RELEASE, '', MINSIZEREL, RELWITHDEBINFO
+# we need HOST_DEBUG, DEVICE_DEBUG, RELEASE, '',
+# DEVICE_DEBUG adds -G to NVCC
+# VERBOSE adds --ptxas-options-v
+# HOST_DEBUG adds -g -fno_inline -DHOST_DEBUG
+
 
 
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
 set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
 set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
+set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 
 # build options
 set(BUILD_WILSON_DIRAC ON CACHE BOOL "build Wilson Dirac operators")
@@ -112,28 +109,6 @@ set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 #########################################################
 # everything below here is processing the setup
 #
-
-
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
-include_directories(include)
-include_directories(lib)
-
-add_definitions(-D__COMPUTE_CAPABILITY__=350)
-add_definitions(-DQUDA_HASH="123")
-
-STRING(REGEX REPLACE sm_ "" COMP_CAP ${GPU_ARCH})
-SET(COMP_CAP "${COMP_CAP}0")
-
-
-
-message("gpu arch " ${GPU_ARCH})
-message("comp cap " ${COMP_CAP})
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
-    -gencode arch=compute_35,code=sm_35 )
-
-add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
 # do all the build definitions
@@ -353,6 +328,40 @@ endif(NOT ${APPLE})
 if(BUILD_CONTRACT)
   add_definitions(-DGPU_CONTRACT)
 endif(BUILD_CONTRACT)
+
+
+# COMPILER OPTIONS and BUILD types
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
+include_directories(include)
+include_directories(lib)
+
+# QUDA_HASH for tunecache
+file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
+STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
+STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
+set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
+add_definitions(-DQUDA_HASH=${HASH})
+
+# GPU ARCH
+STRING(REGEX REPLACE sm_ "" COMP_CAP ${GPU_ARCH})
+SET(COMP_CAP "${COMP_CAP}0")
+add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
+
+message("gpu arch " ${GPU_ARCH})
+message("comp cap " ${COMP_CAP})
+
+
+
+# NVCC FLAGS independet off build type
+set(QUDA_NVCC_FLAGS -gencode arch=compute_35,code=sm_35)
+
+if(QUDA_VERBOSE_BUILD)
+  LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
+endif(QUDA_VERBOSE_BUILD)
+
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS})
+
 
 
 # we need to check for some packages
