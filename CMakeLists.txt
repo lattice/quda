@@ -10,6 +10,12 @@ set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
+## MW TODO
+# * dynamic clover
+# * nvtx MPI
+# * nvtx Interface
+# * gauge_alg
+
 #
 # PROJECT is QUDA
 #
@@ -62,8 +68,11 @@ set(BUILD_GAUGE_FORCE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge for
 set(BUILD_FERMION_FORCE OFF CACHE BOOL "build code for asqtad fermion force")
 set(BUILD_HISQ_FORCE OFF CACHE BOOL "build code for hisq fermion force")
 set(BUILD_GAUGE_TOOLS OFF CACHE BOOL "build auxilary gauge-field tools")
+set(BUILD_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
 set(BUILD_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(BUILD_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
+# Dynamic inversion saves memory but decreases the flops
+set(BUILD_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
 set(BUILD_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 
 # Multi-GPU options
@@ -78,6 +87,10 @@ set(BUILD_MAGMA OFF CACHE BOOL "build magma interface")
 # GPUdirect options
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
 set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
+
+# NVTX options
+set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
+set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
 
 # Interface options
 set(BUILD_QDP_INTERFACE ON CACHE BOOL "build qdp interface")
@@ -146,7 +159,7 @@ if(${BUILD_MPI})
   #  LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
   #  COMM_OBJS = comm_mpi.o
   # endif
-  message(WARNING "MPI not yet implemented in CMakeLists")
+  message(WARNING "MPI not yet fully implemented in CMakeLists")
 endif()
 
 if (${BUILD_QMP})
@@ -254,6 +267,37 @@ endif(BUILD_HISQ_FORCE)
 if(BUILD_GAUGE_TOOLS)
   add_definitions(-DGPU_GAUGE_TOOLS)
 endif(BUILD_GAUGE_TOOLS)
+
+if(BUILD_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_TOOLS)
+  add_definitions(-DGPU_UNITARIZE)
+  LIST(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
+#TODO: CUDARAND, CUFFT
+endif(BUILD_GAUGE_ALG)
+
+if(BUILD_DYNAMIC_CLOVER)
+  add_definitions(-DDYNAMIC_CLOVER)
+endif(BUILD_DYNAMIC_CLOVER)
+
+
+
+if(QUDA_MPI_NVTX)
+  LIST(APPEND COMM_OBJS nvtx_pmpi.c)
+  set(QUDA_NVTX ON)
+endif(QUDA_MPI_NVTX)
+
+if(QUDA_INTERFACE_NVTX)
+  add_definitions(-DINTERFACE_NVTX)
+  set(QUDA_NVTX ON)
+endif(QUDA_INTERFACE_NVTX)
+
+#TODO: move to tests, check lib64
+if(QUDA_NVTX)
+  FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
+  LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
+endif(QUDA_NVTX)
+
 
 if(NOT QUDA_BLAS_TEX)
   add_definitions(-DDIRECT_ACCESS_BLAS)

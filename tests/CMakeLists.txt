@@ -9,7 +9,7 @@ set(QUDA_TEST_COMMON gtest-all.cc test_util.cpp misc.cpp)
 
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 
-set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT})
+set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(BUILD_QIO)
   message(need to append QIO_LIB)
