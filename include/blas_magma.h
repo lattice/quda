@@ -118,10 +118,4 @@
       void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv); 
    };
 
-//experimental functions for spinor matrix complex matrix multiplications:
-extern void sMM(void *outBuff, const int bldm,  void *sMat, const int srows, const int scols, const int sldm, void *cMat, const int crows, const int ccols, const int cldm);
-
-extern void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const int scols, const int sldm, void *cMat, const int crows, const int ccols, const int cldm);
-
-
 #endif // _BLAS_MAGMA_H

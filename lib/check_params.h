@@ -236,6 +236,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 	P(tol_hq_offset[i], INVALID_DOUBLE);
 #ifndef CHECK_PARAM
       P(true_res_offset[i], INVALID_DOUBLE); 
+      P(iter_res_offset[i], INVALID_DOUBLE);
 #endif
     }
   }

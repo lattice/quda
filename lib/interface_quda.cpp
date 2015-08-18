@@ -2694,48 +2694,25 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   }
 
-  // experimenting with Minimum residual extrapolation
-  /*
-     cudaColorSpinorField **q = new cudaColorSpinorField* [ param->num_offset ];
-     cudaColorSpinorField **z = new cudaColorSpinorField* [ param->num_offset ];
-     cudaColorSpinorField tmp(cudaParam);
-
-     for(int i=0; i < param->num_offset; i++) {
-     cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-     q[i] = new cudaColorSpinorField(cudaParam);
-     cudaParam.create = QUDA_COPY_FIELD_CREATE;
-     z[i] = new cudaColorSpinorField(*x[i], cudaParam);
-     }
-
-     for(int i=0; i < param->num_offset; i++) {
-     dirac.setMass(sqrt(param->offset[i]/4));  
-     DiracMdagM m(dirac);
-     MinResExt mre(m, profileMulti);
-     copyCuda(tmp, *b);
-     mre(*x[i], tmp, z, q, param -> num_offset);
-     dirac.setMass(sqrt(param->offset[0]/4));  
-     }
-
-     for(int i=0; i < param->num_offset; i++) {
-     delete q[i];
-     delete z[i];
-     }
-     delete []q;
-     delete []z;
-     */
-
   // check each shift has the desired tolerance and use sequential CG to refine
 
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaColorSpinorField r(*b, cudaParam);
+#define REFINE_INCREASING_MASS
+#ifdef REFINE_INCREASING_MASS
   for(int i=0; i < param->num_offset; i++) { 
+#else
+  for(int i=param->num_offset-1; i >= 0; i--) {
+#endif
     double rsd_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
       param->true_res_hq_offset[i] : 0;
     double tol_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
       param->tol_hq_offset[i] : 0;
 
+    const double prec_tol = pow(10.,(-2*(int)param->cuda_prec+1));
+    const double refine_tol = (param->tol_offset[i] ==0 ? prec_tol : param->tol_offset[i]);
     // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0    
-    if (param->tol_offset[i] > 0 && (param->true_res_offset[i] > param->tol_offset[i] || rsd_hq > tol_hq)) {
+    if ((param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq)) {
       if (getVerbosity() >= QUDA_VERBOSE) 
         printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
             i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
@@ -2756,10 +2733,48 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         mSloppy.shift = param->offset[i];
       }
 
+      if (0) { // experimenting with Minimum residual extrapolation
+	// only perform MRE using current and previously refined solutions
+#ifdef REFINE_INCREASING_MASS
+	const int nRefine = i+1;
+#else
+	const int nRefine = param->num_offset - i + 1;
+#endif
+
+	cudaColorSpinorField **q = new cudaColorSpinorField* [ nRefine ];
+	cudaColorSpinorField **z = new cudaColorSpinorField* [ nRefine ];
+	cudaParam.create = QUDA_NULL_FIELD_CREATE;
+	cudaColorSpinorField tmp(cudaParam);
+
+	for(int j=0; j < nRefine; j++) {
+	  q[j] = new cudaColorSpinorField(cudaParam);
+	  z[j] = new cudaColorSpinorField(cudaParam);
+	}
+
+	*z[0] = *x[0]; // zero solution already solved
+#ifdef REFINE_INCREASING_MASS
+	for (int j=1; j<nRefine; j++) *z[j] = *x[j];
+#else
+	for (int j=1; j<nRefine; j++) *z[j] = *x[param->num_offset-j];
+#endif
+
+	MinResExt mre(m, profileMulti);
+	copyCuda(tmp, *b);
+	mre(*x[i], tmp, z, q, nRefine);
+
+	for(int j=0; j < nRefine; j++) {
+	  delete q[j];
+	  delete z[j];
+	}
+	delete []q;
+	delete []z;
+      }
+
       SolverParam solverParam(*param);
       solverParam.iter = 0;
       solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      solverParam.tol = param->tol_offset[i]; // set L2 tolerance
+      const double itertol = (param->iter_res_offset[i] < prec_tol ? prec_tol : param->iter_res_offset[i] );
+      solverParam.tol = (param->tol_offset[i] >0 ?  param->tol_offset[i] : itertol); // set L2 tolerance
       solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
 
       CG cg(m, mSloppy, solverParam, profileMulti);
@@ -2774,6 +2789,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
         diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
       }
+
     }
   }
 
