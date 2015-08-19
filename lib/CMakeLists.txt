@@ -9,14 +9,15 @@ set (QUDA_OBJS
 	inv_mre.cpp interface_quda.cpp util_quda.cpp color_spinor_field.cpp
 	color_spinor_util.cu cpu_color_spinor_field.cpp
 	cuda_color_spinor_field.cu dirac.cpp hw_quda.cpp blas_cpu.cpp
-	clover_field.cpp lattice_field.cpp gauge_field.cpp
+	clover_field.cpp covd.cpp lattice_field.cpp gauge_field.cpp
 	cpu_gauge_field.cpp cuda_gauge_field.cu extract_gauge_ghost.cu
 	max_gauge.cu gauge_update_quda.cu dirac_clover.cpp dirac_wilson.cpp
 	dirac_staggered.cpp dirac_improved_staggered.cpp
 	dirac_domain_wall.cpp dirac_domain_wall_4d.cpp dirac_mobius.cpp
 	dirac_twisted_clover.cpp dirac_twisted_mass.cpp tune.cpp
 	fat_force_quda.cpp llfat_quda_itf.cpp llfat_quda.cu
-	gauge_force_quda.cu clover_quda.cu dslash_quda.cu covDev.cu
+	gauge_force_quda.cu field_strength_tensor.cu clover_quda.cu
+  dslash_quda.cu covDev.cu
 	dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
 	dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
 	dslash_twisted_clover.cu dslash_domain_wall.cu
@@ -33,7 +34,12 @@ set (QUDA_OBJS
 	unitarize_links_quda.cu milc_interface.cpp
 	extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
 	ritz_quda.cpp eig_solver.cpp blas_magma.cu misc_helpers.cu
-	inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp
+  inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp pgauge_exchange.cu
+	pgauge_init.cu pgauge_heatbath.cu random.cu
+	gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
+	pgauge_det_trace.cu clover_outer_product.cu
+	clover_sigma_outer_product.cu
+
 )
 
 include_directories(dslash_core)
