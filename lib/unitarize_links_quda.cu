@@ -60,6 +60,13 @@ namespace{
 	}
       }
     }
+
+    for (int i=0; i<3; i++) {
+      for (int j=0; j<3; j++) {
+	if (isnan(matrix(i,j).x) || isnan(matrix(i,j).y)) return false;
+      }
+    }
+
     return true;
   }
 
@@ -248,7 +255,7 @@ namespace{
 
     Matrix<Cmplx,3> v;
     typename RealTypeId<Cmplx>::Type singular_values[3];
-    computeSVD<Cmplx>(in, u, v, singular_values); // should pass pointers to u, v I guess
+    computeSVD<Cmplx>(in, u, v, singular_values);
     *result = u*conj(v);
     return true;
   } // unitarizeMILC
@@ -413,6 +420,7 @@ namespace{
       if(FL_CHECK_UNITARIZATION){
         if(isUnitary(result,FL_MAX_ERROR) == false)
 	  {
+
 #ifdef __CUDA_ARCH__
 	    atomicAdd(arg.fails, 1);
 #else 
