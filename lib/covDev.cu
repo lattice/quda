@@ -154,6 +154,7 @@ namespace quda
         dslashParam.commDim[dir] = 0; 
       }
     #endif // MULTI_GPU
+    cudaStreamSynchronize(streams[Nstream-1]);
   }
 
   /**
