@@ -32,7 +32,7 @@ set (QUDA_OBJS
 	fermion_force_quda.cu unitarize_force_quda.cu
 	unitarize_links_quda.cu milc_interface.cpp
 	extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
-	ritz_quda.cpp eig_solver.cpp blas_magma.cpp misc_helpers.cu
+	ritz_quda.cpp eig_solver.cpp blas_magma.cu misc_helpers.cu
 	inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp
 )
 

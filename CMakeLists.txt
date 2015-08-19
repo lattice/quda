@@ -31,6 +31,14 @@ project("QUDA")
 set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
 set(CPU_ARCH x86_64 CACHE STRING "set the CPU architecture (currently only x86_64 supported)")
 
+# we need to check for some packages
+find_package(PythonInterp)
+find_package(Git)
+find_package(CUDA REQUIRED)
+find_package(Threads REQUIRED)
+if(BUILD_MPI)
+  find_package(MPI)  
+endif(BUILD_MPI)
 
 
 
@@ -364,14 +372,6 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS})
 
 
 
-# we need to check for some packages
-find_package(PythonInterp)
-find_package(Git)
-find_package(CUDA REQUIRED)
-find_package(Threads REQUIRED)
-if(BUILD_MPI)
-  find_package(MPI)
-endif(BUILD_MPI)
 
 ### add tests and quda library
 add_subdirectory(lib)
