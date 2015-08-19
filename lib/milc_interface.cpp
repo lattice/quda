@@ -737,12 +737,11 @@ void qudaMultishiftInvert(int external_precision,
   invertParam.residual_type = static_cast<QudaResidualType_s>(0);
   invertParam.residual_type = (target_residual[0] != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
   invertParam.residual_type = (target_fermilab_residual[0] != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
-  if (invertParam.residual_type ==QUDA_L2_RELATIVE_RESIDUAL) 
-    printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL only");
-  else{
-    if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+
+  if (verbosity >= QUDA_VERBOSE) {
+    if (invertParam.residual_type & QUDA_L2_RELATIVE_RESIDUAL) 
       printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL");      
-     if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+    if (invertParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) 
       printfQuda("Using QUDA_HEAVY_QUARK_RESIDUAL"); 
   }
 
