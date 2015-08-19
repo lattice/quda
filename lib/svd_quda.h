@@ -389,7 +389,7 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   }
 
   // unit matrix
-  if (u(0,0).x = -2.0 && v(0,0).x == -2.0) {
+  if (u(0,0).x == -2.0 && v(0,0).x == -2.0) {
     u = mat;
     v = mat;
   }
@@ -634,6 +634,7 @@ void computeSVD(const Matrix<Cmplx,3> & m,
     Matrix<Cmplx,3>&  v,
     typename RealTypeId<Cmplx>::Type singular_values[3])
 {
+
   getRealBidiagMatrix<Cmplx>(m, u, v);
 
   Matrix<typename RealTypeId<Cmplx>::Type,3> bd, u_real, v_real;
