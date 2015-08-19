@@ -37,7 +37,7 @@ find_package(Git)
 find_package(CUDA REQUIRED)
 find_package(Threads REQUIRED)
 if(BUILD_MPI)
-  find_package(MPI)  
+  find_package(MPI)
 endif(BUILD_MPI)
 
 
@@ -356,22 +356,38 @@ STRING(REGEX REPLACE sm_ "" COMP_CAP ${GPU_ARCH})
 SET(COMP_CAP "${COMP_CAP}0")
 add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
-message("gpu arch " ${GPU_ARCH})
-message("comp cap " ${COMP_CAP})
-
-
 
 # NVCC FLAGS independet off build type
-set(QUDA_NVCC_FLAGS -gencode arch=compute_35,code=sm_35)
+set(QUDA_NVCC_FLAGS -arch=${GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
 endif(QUDA_VERBOSE_BUILD)
 
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS})
 
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -O3 -lineinfo CACHE STRING
+    "Flags used by the CUDA compiler during regular builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
+    "Flags used by the C++ compiler during release builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -g CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds."
+    FORCE )
+set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds."
+    FORCE )
 
+SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING  "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug" FORCE )
 
+IF(NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE Devel CACHE STRING
+      "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug"
+        FORCE)
+ENDIF(NOT CMAKE_BUILD_TYPE)
 
 ### add tests and quda library
 add_subdirectory(lib)

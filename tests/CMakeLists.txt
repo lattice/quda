@@ -16,8 +16,6 @@ if(BUILD_QIO)
   LIST(APPEND TEST_LIBS ${QIO_LIB} ${LIME_LIB} ${QMP_LIB})
 endif()
 
-message("Test woth libs" ${TEST_LIBS})
-
 if(${BUILD_WILSON_DIRAC} OR ${BUILD_DOMAIN_WALL_DIRAC})
   cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp ${QIO_UTIL})
   target_link_libraries(dslash_test ${TEST_LIBS} )
@@ -57,13 +55,18 @@ if(${BUILD_HISQLINK})
 endif()
 
 if(${BUILD_GAUGE_FORCE})
-  cuda_add_executable(gauge_force_test gauge_force_test.cpp gauge_force_reference.cpp   )
+  cuda_add_executable(gauge_force_test gauge_force_test.cpp gauge_force_reference.cpp)
   target_link_libraries(gauge_force_test ${TEST_LIBS})
 endif()
 
 if(${BUILD_FERMION_FORCE})
-  cuda_add_executable(fermion_force_test fermion_force_test.cpp fermion_force_reference.cpp   )
+  cuda_add_executable(fermion_force_test fermion_force_test.cpp fermion_force_reference.cpp)
   target_link_libraries(fermion_force_test ${TEST_LIBS})
+endif()
+
+if(BUILD_GAUGE_ALG)
+  cuda_add_executable(gauge_alg_test gauge_alg_test.cpp)
+  target_link_libraries(gauge_alg_test ${TEST_LIBS})
 endif()
 
 if(${BUILD_HISQ_FORCE})
