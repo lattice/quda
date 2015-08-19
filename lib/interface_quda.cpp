@@ -3344,7 +3344,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     profileFatLink.TPSTOP(QUDA_PROFILE_D2H); 
     device_free(num_failures_dev); 
     if(num_failures>0){
-      errorQuda("Error in the unitarization component of the hisq fattening\n"); 
+      errorQuda("Error in the unitarization component of the hisq fattening: %d failures\n", num_failures);
     }
     profileFatLink.TPSTART(QUDA_PROFILE_D2H);
     cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink, QUDA_CPU_FIELD_LOCATION);
