@@ -2709,8 +2709,16 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     double tol_hq = param->residual_type & QUDA_HEAVY_QUARK_RESIDUAL ?
       param->tol_hq_offset[i] : 0;
 
-    const double prec_tol = pow(10.,(-2*(int)param->cuda_prec+1));
-    const double refine_tol = (param->tol_offset[i] ==0 ? prec_tol : param->tol_offset[i]);
+    /*
+      In the case where the shifted systems have zero tolerance
+      specified, we refine these systems until either the limit of
+      precision is reached (prec_tol) or until the tolerance reaches
+      the iterated residual tolerance of the previous multi-shift
+      solver (iter_res_offset[i]), which ever is greater.
+     */
+    const double prec_tol = pow(10.,(-2*(int)param->cuda_prec+2));
+    const double iter_tol = (param->iter_res_offset[i] < prec_tol ? prec_tol : (param->iter_res_offset[i] *1.1));
+    const double refine_tol = (param->tol_offset[i] == 0.0 ? iter_tol : param->tol_offset[i]);
     // refine if either L2 or heavy quark residual tolerances have not been met, only if desired residual is > 0    
     if ((param->true_res_offset[i] > refine_tol || rsd_hq > tol_hq)) {
       if (getVerbosity() >= QUDA_VERBOSE) 
@@ -2773,8 +2781,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       SolverParam solverParam(*param);
       solverParam.iter = 0;
       solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      const double itertol = (param->iter_res_offset[i] < prec_tol ? prec_tol : param->iter_res_offset[i] );
-      solverParam.tol = (param->tol_offset[i] >0 ?  param->tol_offset[i] : itertol); // set L2 tolerance
+      solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
       solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
 
       CG cg(m, mSloppy, solverParam, profileMulti);
@@ -4432,8 +4439,6 @@ computeHISQForceQuda(void* const milc_momentum,
   // Close the paths, make anti-hermitian, and store in compressed format
   cudaMom->saveCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
   profileHISQForce.TPSTOP(QUDA_PROFILE_D2H);
-
-
 
   profileHISQForce.TPSTART(QUDA_PROFILE_FREE);
 
