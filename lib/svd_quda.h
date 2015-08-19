@@ -14,7 +14,7 @@ typename RealTypeId<Cmplx>::Type cabs(const Cmplx & z)
 {
   typename RealTypeId<Cmplx>::Type max, ratio, square;
   if(fabs(z.x) > fabs(z.y)){ max = z.x; ratio = z.y/max; }else{ max=z.y; ratio = z.x/max; }
-  square = max*max*(1.0 + ratio*ratio);
+  square = (max > 0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
@@ -32,7 +32,7 @@ template<class T, class U>
 inline DEVICEHOST typename PromoteTypeId<T,U>::Type quadSum(const T & a, const U & b){
   typename PromoteTypeId<T,U>::Type ratio, square, max;
   if(fabs(a) > fabs(b)){ max = a; ratio = b/a; }else{ max=b; ratio = a/b; }
-  square = max*max*(1.0 + ratio*ratio);
+  square = (max > 0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
@@ -291,6 +291,9 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   typename RealTypeId<Cmplx>::Type beta;
   Cmplx w, tau, z;
 
+  u(0,0).x = -2.0;
+  v(0,0).x = -2.0;
+
   if(norm1 == 0 && mat(0,0).y == 0){
     p = mat;
   }else{
@@ -385,6 +388,13 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
     temp(2,2) = p(2,2)/beta;
     u = u*temp;
   }
+
+  // unit matrix
+  if (u(0,0).x = -2.0 && v(0,0).x == -2.0) {
+    u = mat;
+    v = mat;
+  }
+
   return;
 }
 
@@ -628,6 +638,7 @@ void computeSVD(const Matrix<Cmplx,3> & m,
 {
 
   getRealBidiagMatrix<Cmplx>(m, u, v);
+
   Matrix<typename RealTypeId<Cmplx>::Type,3> bd, u_real, v_real;
   // Make real
   for(int i=0; i<3; ++i){
