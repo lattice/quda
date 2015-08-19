@@ -86,6 +86,8 @@ namespace quda {
       return;
     }
     
+    // this is the limit of precision possible
+    const double prec_tol = pow(10.,(-2*(int)b.Precision()+1));
 
     double *zeta = new double[num_offset];
     double *zeta_old = new double[num_offset];
@@ -264,8 +266,8 @@ namespace quda {
 	// break-out check if we have reached the limit of the precision
 
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
-    resIncrease++;
-    resIncreaseTotal[reliable_shift]++;
+	  resIncrease++;
+	  resIncreaseTotal[reliable_shift]++;
 	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)", 
 		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
 
@@ -304,13 +306,12 @@ namespace quda {
           num_offset_now--;
           if (getVerbosity() >= QUDA_VERBOSE)
               printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
-        }
-        else {
-	r2[j] = zeta[j] * zeta[j] * r2[0];
-	if (r2[j] < stop[j]) {
+        } else {
+	  r2[j] = zeta[j] * zeta[j] * r2[0];
+	  if (r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) {
             num_offset_now--;
-	  if (getVerbosity() >= QUDA_VERBOSE)
-	    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
+	    if (getVerbosity() >= QUDA_VERBOSE)
+	      printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
           }
 	}
       }
