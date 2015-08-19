@@ -14,7 +14,7 @@ typename RealTypeId<Cmplx>::Type cabs(const Cmplx & z)
 {
   typename RealTypeId<Cmplx>::Type max, ratio, square;
   if(fabs(z.x) > fabs(z.y)){ max = z.x; ratio = z.y/max; }else{ max=z.y; ratio = z.x/max; }
-  square = (max > 0) ? max*max*(1.0 + ratio*ratio) : 0.0;
+  square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
@@ -32,7 +32,7 @@ template<class T, class U>
 inline DEVICEHOST typename PromoteTypeId<T,U>::Type quadSum(const T & a, const U & b){
   typename PromoteTypeId<T,U>::Type ratio, square, max;
   if(fabs(a) > fabs(b)){ max = a; ratio = b/a; }else{ max=b; ratio = a/b; }
-  square = (max > 0) ? max*max*(1.0 + ratio*ratio) : 0.0;
+  square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
@@ -381,7 +381,6 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
     v = v*temp;
   }
 
-
   // Step 5: build the third left reflector
   if( p(2,2).y != 0.0 ){
     beta = p(2,2).x > 0.0 ? -cabs(p(2,2)) : cabs(p(2,2));
@@ -615,7 +614,6 @@ void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
     it++;
   } while( (b(0,1) != 0.0 || b(1,2) != 0.0) && it < max_it);
 
-
   for(int i=0; i<3; ++i){
     if( b(i,i) < 0.0) {
       b(i,i) *= -1;
@@ -636,7 +634,6 @@ void computeSVD(const Matrix<Cmplx,3> & m,
     Matrix<Cmplx,3>&  v,
     typename RealTypeId<Cmplx>::Type singular_values[3])
 {
-
   getRealBidiagMatrix<Cmplx>(m, u, v);
 
   Matrix<typename RealTypeId<Cmplx>::Type,3> bd, u_real, v_real;
