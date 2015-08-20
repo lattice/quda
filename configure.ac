@@ -339,6 +339,18 @@ AC_ARG_ENABLE(numa-affinity,
  [ numa_affinity=${enableval}],
  [ numa_affinity="yes" ]
 )
+
+AC_ARG_ENABLE(nvidia-ml,
+ AC_HELP_STRING([--enable-nvidia-ml], [ Use the nvidia-ml library to set NUMA affinity (default: enabled)]),
+ [ nvml=${enableval} ],
+ [ nvml="yes" ]
+)
+
+AC_ARG_WITH(nvidia-ml-lib,
+ AC_HELP_STRING([--with-nvidia-ml-lib], [ Specify location of the nvidia-ml library if not in the default library locations (default: blank)]),
+ [ nvmllibdir=${withval} ],
+ [ nvmllibdir="" ]
+)
 dnl Input validation
 
 dnl CPU Arch
@@ -844,6 +856,12 @@ AC_SUBST( FERMI_DBLE_TEX, [${fermi_double_tex}])
 
 AC_MSG_NOTICE([Setting NUMA_AFFINITY= ${numa_affinity}])
 AC_SUBST( NUMA_AFFINITY, [${numa_affinity}])
+
+AC_MSG_NOTICE([Setting NVML = ${nvml}])
+AC_SUBST( NVML, [${nvml}])
+
+AC_MSG_NOTICE([Setting NVMLLIB_DIR = ${nvmllibdir}])
+AC_SUBST( NVMLLIB_DIR, [${nvmllibdir}])
 
 AC_MSG_NOTICE([Setting USE_QDPJIT = ${build_qdpjit} ])
 AC_SUBST( USE_QDPJIT, [${build_qdpjit}])
