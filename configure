@@ -1457,13 +1457,10 @@ Optional Packages:
   --with-qio=QIODIR       Specify QIO installation directory
   --with-qdp=QDPDIR       Specify QDP++ installation directory
   --with-magma=MAGMADIR   Specify MAGMA installation directory
-<<<<<<< HEAD
   --with-atlas=ATLASDIR   Specify ATLAS installation directory
   --with-lapack=LAPACKDIR Specify LAPACK installation directory
-=======
   --with-nvidia-ml-lib    Specify location of the nvidia-ml library if not in
                           the default library locations (default: blank)
->>>>>>> hotfix/nvml
 
 Some influential environment variables:
   CC          C compiler command
