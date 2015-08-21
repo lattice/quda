@@ -453,7 +453,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 
  template <typename VectorType>
    __device__ __host__ VectorType vector_load(void *ptr, int idx) {
-   //#define USE_LDG
+#define USE_LDG
 #if defined(__CUDA_ARCH__) && defined(USE_LDG)
    return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
 #else
