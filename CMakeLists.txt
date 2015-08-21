@@ -140,7 +140,6 @@ if(${BUILD_MPI})
   #  MPI_LIBS =
   #  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include
   #  LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
-  #  COMM_OBJS = comm_mpi.o
   # endif
   message(WARNING "MPI not yet fully implemented in CMakeLists")
 endif()
@@ -373,37 +372,37 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     FORCE )
 
 
-set(CMAKE_CXX_FLAGS_DEVEL  -O3 -Wall CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVEL  "-O3 -Wall" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_RELEASE -O3 -w CACHE STRING
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_HOSTDEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG -Wall CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+set(CMAKE_CXX_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
 set(CMAKE_F_FLAGS -std=c99)
 
-set(CMAKE_C_FLAGS_DEVEL -Wall -O3  CACHE STRING
+set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
-set(CMAKE_C_FLAGS_RELEASE -Wall -O3 -w CACHE STRING
+set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CMAKE_C_FLAGS_HOSTDEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+set(CMAKE_C_FLAGS_HOSTDEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CMAKE_C_FLAGS_DEVICEDEBUG -Wall CACHE STRING
+set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
-set(CMAKE_C_FLAGS_DEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
@@ -412,11 +411,11 @@ SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING  "Choose the type of bui
 set(DEFBUILD Release)
 
 IF(GIT_FOUND)
-  execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG)
-  STRING(STRIP ${GITTAG} GITTAG)
-  execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD --count  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITCOUNT)
-  STRING(STRIP ${GITCOUNT} GITCOUNT)
-  execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION)
+  execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
+  #STRING(STRIP ${GITTAG} GITTAG)
+  execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD --count  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
+  #STRING(STRIP ${GITCOUNT} GITCOUNT)
+  execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
   #message(${GITTAG})
   #message(${GITVERSION})
   IF(GITCOUNT EQUAL 0)
