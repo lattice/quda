@@ -67,13 +67,15 @@ struct DslashCommsPattern {
       }
 #endif
 
-
-
+#undef DSLASH_PROFILE
+#ifdef DSLASH_PROFILE
 #define PROFILE(f, profile, idx)		\
   profile.TPSTART(idx);				\
   f;						\
   profile.TPSTOP(idx); 
-
+#else
+#define PROFILE(f, profile, idx) f;
+#endif
 
 
 
