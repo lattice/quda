@@ -171,18 +171,10 @@ if (${BUILD_QIO})
   FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
 endif()
 
-if(${MPI_NVTX})
-  LIST(APPEND $(COMM_OBJS) nvtx_pmpi.c)
-  message(WARNING "NVTX library not yet added")
-endif()
 
-if(${MILC_NVTX})
-  add_definitions(-DMPI_NVTX)
-  message(WARNING "NVTX library not yet added")
-endif(${MILC_NVTX})
 
 if(BUILD_MAGMA)
-  message(WARNING "Magma might be a pain")
+  message(WARNING "Magma support not yet implemented in CMakeLists")
 else(BUILD_MAGMA)
   #do we need these
   # MAGMA_INCLUDE
@@ -262,7 +254,6 @@ endif(BUILD_GAUGE_ALG)
 if(BUILD_DYNAMIC_CLOVER)
   add_definitions(-DDYNAMIC_CLOVER)
 endif(BUILD_DYNAMIC_CLOVER)
-
 
 
 if(QUDA_MPI_NVTX)
@@ -366,7 +357,7 @@ endif(QUDA_VERBOSE_BUILD)
 
 
 set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -O3 -lineinfo CACHE STRING
-    "Flags used by the CUDA compiler during regular builds."
+    "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
     "Flags used by the C++ compiler during release builds."
@@ -374,16 +365,70 @@ set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
 set(CUDA_NVCC_FLAGS_HOSTDEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -g CACHE STRING
+set(CUDA_NVCC_FLAGS_DEVICEDEBUG ${QUDA_NVCC_FLAGS} -G CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
+
+set(CMAKE_CXX_FLAGS_DEVEL  -O3 -Wall CACHE STRING
+    "Flags used by the CUDA compiler during regular development builds."
+    FORCE )
+set(CMAKE_CXX_FLAGS_RELEASE -O3 -w CACHE STRING
+    "Flags used by the C++ compiler during release builds."
+    FORCE )
+set(CMAKE_CXX_FLAGS_HOSTDEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds."
+    FORCE )
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG -Wall CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds."
+    FORCE )
+set(CMAKE_CXX_FLAGS_DEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds."
+    FORCE )
+
+set(CMAKE_F_FLAGS -std=c99)
+
+set(CMAKE_C_FLAGS_DEVEL -Wall -O3  CACHE STRING
+    "Flags used by the CUDA compiler during regular development builds."
+    FORCE )
+set(CMAKE_C_FLAGS_RELEASE -Wall -O3 -w CACHE STRING
+    "Flags used by the C++ compiler during release builds."
+    FORCE )
+set(CMAKE_C_FLAGS_HOSTDEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+    "Flags used by the C++ compiler during host-debug builds."
+    FORCE )
+set(CMAKE_C_FLAGS_DEVICEDEBUG -Wall CACHE STRING
+    "Flags used by the C++ compiler during device-debug builds."
+    FORCE )
+set(CMAKE_C_FLAGS_DEBUG -Wall -g -fno-inline -DHOST_DEBUG CACHE STRING
+    "Flags used by the C++ compiler during full (host+device) debug builds."
+    FORCE )
+
 SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING  "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug" FORCE )
 
+set(DEFBUILD Release)
+
+IF(GIT_FOUND)
+  execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG)
+  STRING(STRIP ${GITTAG} GITTAG)
+  execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD --count  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITCOUNT)
+  STRING(STRIP ${GITCOUNT} GITCOUNT)
+  execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION)
+  #message(${GITTAG})
+  #message(${GITVERSION})
+  IF(GITCOUNT EQUAL 0)
+    SET(DEFBUILD Release)
+  ELSE()
+    SET(DEFBUILD Devel)
+  ENDIF()
+ENDIF(GIT_FOUND)
+
 IF(NOT CMAKE_BUILD_TYPE)
+  # add some git magic here to decide whether we want to do a release or devel build as default
+
   SET(CMAKE_BUILD_TYPE Devel CACHE STRING
       "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug"
         FORCE)
