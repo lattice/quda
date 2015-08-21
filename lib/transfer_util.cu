@@ -186,13 +186,21 @@ namespace quda {
 
   // Creates a block-ordered version of a ColorSpinorField, with parity blocking (for staggered fields)
   // N.B.: same as above but parity are separated.
+  // For staggered world we need to zero out components with mismatched fine-grid coarse-grid parities.
+  // This is straightforward becaurse V is a parity odered and geo_map contains coarse-grid index that is also parity ordered.
+
   template <bool toBlock, int nVec, class Complex, class FieldOrder>
   void blockCBOrderV(Complex *out, FieldOrder &in,
-		   const int *geo_map, const int *geo_bs, int spin_bs,
+		   const int *geo_map, const int *geo_bs, 
 		   const cpuColorSpinorField &V) {
     //Compute the size of each block
     int geoBlockSize = 1;
-    for (int d=0; d<in.Ndim(); d++) geoBlockSize *= geo_bs[d];
+    int coarseVolume = 1;
+    for (int d=0; d<in.Ndim(); d++) 
+    {
+      geoBlockSize *= geo_bs[d];
+      coarseVolume *=  (in.X(d) / geo_bs[d]);
+    }
     int blockSize = geoBlockSize * in.Ncolor(); // blockSize includes internal dof
 
     int x[QUDA_MAX_DIM]; // global coordinates
@@ -218,8 +226,15 @@ namespace quda {
       }
 
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      //A.S.: geo_map introduced for the full site ordering, so ok to use it for the offset
-      int offset = geo_map[i]*nVec*geoBlockSize*in.Ncolor();
+      //A.S.: geo_map introduced for the full field parity odering, so ok to use it for the offset
+
+      int k = geo_map[i];
+      int offset = k*nVec*geoBlockSize*in.Ncolor();
+
+      int fine_grid_parity   = (i < in.Volume() / 2)  ? 0 : 1;
+      int coarse_grid_parity = (k < coarseVolume / 2) ? 0 : 1;
+
+      int nop_flag = fine_grid_parity ^ coarse_grid_parity;
 
       for (int v=0; v<in.Nvec(); v++) {
         for (int c=0; c<in.Ncolor(); c++) {
@@ -232,8 +247,8 @@ namespace quda {
 	                          blockOffset * in.Ncolor() + // local geometry
                                                          c;   // color
 
-	  if (toBlock) out[index] = in(i, s, c, v); // going to block order
-	  else in(i, s, c, v) = out[index]; // coming from block order
+	  if (toBlock) out[index] = nop_flag ? Complex(0.0, 0.0) : in(i, s, c, v); // going to block order
+	  else in(i, s, c, v) = nop_flag ? Complex(0.0, 0.0) : out[index]; // coming from block order
 	    
 	  check[count++] = index;
         }
@@ -321,9 +336,9 @@ namespace quda {
 
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
-      blockCBOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
+      blockCBOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, V);
       blockGramSchmidt<double,Float,nVec>(Vblock, numblocks, blocksize);  
-      blockCBOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
+      blockCBOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, V);    
    
     }
     delete []Vblock;

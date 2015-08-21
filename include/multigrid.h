@@ -177,6 +177,14 @@ namespace quda {
     cpuGaugeField *Y; //Coarse gauge field
     cpuGaugeField *X; //Coarse clover term
 
+    //for improved staggered (FX and FY are alias pointers of X and Y):
+    //for staggered multigrid: X and LX,FX are trivial fields, but let keep them for a moment 
+    cpuGaugeField *LX;
+    cpuGaugeField *FX;
+
+    cpuGaugeField *LY;
+    cpuGaugeField *FY;
+
     void initializeCoarse();  //Initialize the coarse gauge field
 
   public:

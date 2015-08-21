@@ -4,12 +4,17 @@
 namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param) 
-    : Dirac(param), transfer(param.transfer), dirac(param.dirac), Y(0), X(0) 
+    : Dirac(param), transfer(param.transfer), dirac(param.dirac), Y(0), X(0), LY(0), FY(0), LX(0), FX(0) 
   { initializeCoarse(); }
       
   DiracCoarse::~DiracCoarse() {
     if (Y) delete Y;
     if (X) delete X;
+
+    if (FY) delete FY;
+    if (LY) delete LY;
+    if (FX) delete FX;
+    if (LX) delete LX;
   }	
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const 
@@ -18,6 +23,11 @@ namespace quda {
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
   void DiracCoarse::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
     CoarseCoarseOp(T, Y, X, *(this->Y), *(this->X), kappa);
+  }
+
+  //improved staggered
+  void DiracCoarse::createCoarseOp(const Transfer &T, GaugeField &FY, GaugeField &LY, GaugeField &FX, GaugeField &LX) const {
+    errorQuda("\nImproved staggered is not supported yet.\n");    
   }
 
   void DiracCoarse::initializeCoarse() {
@@ -51,8 +61,13 @@ namespace quda {
 
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X = new cpuGaugeField(gParam);
-    
-    dirac->createCoarseOp(*transfer,*Y,*X);
+
+    //if improved staggered:
+    //Initialize LX, LY and FX, FY    
+
+    dirac->createCoarseOp(*transfer,*Y,*X);//also for staggered links or improved staggered fat links
+
+    if(gParam.link_type == QUDA_COARSE_LONG_LINKS) dirac->createCoarseOp(*transfer,*LY,*LX);
   }
 
 }
