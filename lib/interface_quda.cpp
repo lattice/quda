@@ -136,6 +136,10 @@ cudaGaugeField *extendedGaugeResident = NULL;
 
 std::vector<cudaColorSpinorField*> solutionResident;
 
+// Mapped memory buffer used to hold unitarization failures
+static int *num_failures_h = NULL;
+static int *num_failures_d = NULL;
+
 cudaDeviceProp deviceProp;
 cudaStream_t *streams;
 #ifdef PTHREADS
@@ -431,6 +435,9 @@ void initQudaMemory()
   createStaggeredOprodEvents();  
 #endif
   initBlas();
+
+  num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
+  cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
   loadTuneCache(getVerbosity());
 }
@@ -1092,6 +1099,10 @@ void endQuda(void)
   if(momResident) delete momResident;
 
   endBlas();
+
+  host_free(num_failures_h);
+  num_failures_h = NULL;
+  num_failures_d = NULL;
 
   if (streams) {
     for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
@@ -3328,23 +3339,15 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 
   if(ulink){
     profileFatLink.TPSTART(QUDA_PROFILE_INIT);
-    int num_failures=0;
-    int* num_failures_dev = (int*)device_malloc(sizeof(int));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    *num_failures_h = 0;
     profileFatLink.TPSTOP(QUDA_PROFILE_INIT);
 
     profileFatLink.TPSTART(QUDA_PROFILE_COMPUTE);
-    //quda::unitarizeLinksCuda(*param, *cudaFatLink, cudaUnitarizedLink, num_failures_dev); // unitarize on the gpu
-    quda::unitarizeLinksQuda(*cudaUnitarizedLink, *cudaFatLink, num_failures_dev); // unitarize on the gpu
+    quda::unitarizeLinksQuda(*cudaUnitarizedLink, *cudaFatLink, num_failures_d); // unitarize on the gpu
     profileFatLink.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-
-    profileFatLink.TPSTART(QUDA_PROFILE_D2H); 
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-    profileFatLink.TPSTOP(QUDA_PROFILE_D2H); 
-    device_free(num_failures_dev); 
-    if(num_failures>0){
-      errorQuda("Error in the unitarization component of the hisq fattening: %d failures\n", num_failures);
+    if(*num_failures_h>0){
+      errorQuda("Error in the unitarization component of the hisq fattening: %d failures\n", *num_failures_h);
     }
     profileFatLink.TPSTART(QUDA_PROFILE_D2H);
     cudaUnitarizedLink->saveCPUField(cpuUnitarizedLink, QUDA_CPU_FIELD_LOCATION);
@@ -4396,26 +4399,17 @@ computeHISQForceQuda(void* const milc_momentum,
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMMS);
 #endif
   // Done with cudaInForce. It becomes the output force. Oops!
-  profileHISQForce.TPSTART(QUDA_PROFILE_INIT);
-  int numFailures = 0;
-  int* numFailuresDev = (int*)device_malloc(sizeof(int));
-  cudaMemset(numFailuresDev, 0, sizeof(int));
-  profileHISQForce.TPSTOP(QUDA_PROFILE_INIT);
-
 
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
-  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, numFailuresDev, &partialFlops);
+  *num_failures_h = 0;
+  unitarizeForceCuda(*outForcePtr, *gaugePtr, inForcePtr, num_failures_d, &partialFlops);
   *flops += partialFlops;
   profileHISQForce.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileHISQForce.TPSTART(QUDA_PROFILE_D2H);
-  cudaMemcpy(&numFailures, numFailuresDev, sizeof(int), cudaMemcpyDeviceToHost);
-  profileHISQForce.TPSTOP(QUDA_PROFILE_D2H);
-  device_free(numFailuresDev); 
 
-  if(numFailures>0){
-    errorQuda("Error in the unitarization component of the hisq fermion force\n"); 
-    exit(1);
-  } 
+  if(*num_failures_h>0){
+    errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
+  }
+
   cudaMemset((void**)(outForcePtr->Gauge_p()), 0, outForcePtr->Bytes());
   // read in u-link
   profileHISQForce.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -4995,7 +4989,6 @@ void updateGaugeFieldQuda(void* gauge,
   updateGaugeField(*cudaOutGauge, dt, *cudaInGauge, *cudaMom, 
       (bool)conj_mom, (bool)exact);
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_COMPUTE);
-
   // copy the gauge field back to the host
   profileGaugeUpdate.TPSTART(QUDA_PROFILE_D2H);
   cudaOutGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);

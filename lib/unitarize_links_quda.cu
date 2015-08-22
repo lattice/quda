@@ -487,6 +487,7 @@ namespace{
     UnitarizeLinksQudaArg<Out,In> arg(output, input, meta, fails);
     UnitarizeLinksQuda<Float, Out, In> unitlinks(arg) ;
     unitlinks.apply(0);
+    cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
   }
   
 template<typename Float>

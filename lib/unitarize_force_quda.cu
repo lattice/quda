@@ -656,6 +656,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 
       UnitarizeForceCuda unitarizeForce(cudaOldForce, cudaGauge, *cudaNewForce, unitarization_failed);
       unitarizeForce.apply(0);
+      cudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
       if(flops) *flops = unitarizeForce.flops(); 
       checkCudaError();
     }
