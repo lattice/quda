@@ -73,6 +73,8 @@ extern void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeF
 #include <gauge_tools.h>
 #include <contractQuda.h>
 
+#include <momentum.h>
+
 int numa_affinity_enabled = 1;
 
 using namespace quda;
@@ -214,6 +216,9 @@ static TimeProfile profileContract("contractQuda");
 
 //!< Profiler for contractions
 static TimeProfile profileCovDev("covDevQuda");
+
+//!< Profiler for contractions
+static TimeProfile profileMomAction("momActionQuda");
 
 //!< Profiler for endQuda
 static TimeProfile profileEnd("endQuda");
@@ -1152,6 +1157,7 @@ void endQuda(void)
     profileCovDev.Print();
     profilePlaq.Print();
     profileAPE.Print();
+    profileMomAction.Print();
     profileEnd.Print();
 
     profileInit2End.Print();
@@ -5018,12 +5024,72 @@ void updateGaugeFieldQuda(void* gauge,
   return;
 }
 
+// evaluate the momentum action
+double momActionQuda(void* momentum, QudaGaugeParam* param)
+{
+  profileMomAction.TPSTART(QUDA_PROFILE_TOTAL);
 
+  profileMomAction.TPSTART(QUDA_PROFILE_INIT);  
+  checkGaugeParam(param);
 
+  // create the momentum fields
+
+  GaugeFieldParam gParam(0, *param);
+  gParam.pad = 0;
+  gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+  gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.reconstruct = (gParam.order == QUDA_TIFR_GAUGE_ORDER) ?
+    QUDA_RECONSTRUCT_NO : QUDA_RECONSTRUCT_10;
+  gParam.link_type = QUDA_ASQTAD_MOM_LINKS;
+  gParam.gauge = momentum;
+
+  cpuGaugeField *cpuMom = !param->use_resident_mom ? new cpuGaugeField(gParam) : NULL;
+
+  // create the device fields 
+  gParam.create = QUDA_NULL_FIELD_CREATE;
+  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  gParam.reconstruct = QUDA_RECONSTRUCT_10;
+
+  cudaGaugeField *cudaMom = !param->use_resident_mom ? new cudaGaugeField(gParam) : NULL;
+
+  profileMomAction.TPSTOP(QUDA_PROFILE_INIT);  
+
+  profileMomAction.TPSTART(QUDA_PROFILE_H2D);
+
+  if (!param->use_resident_mom) {
+    cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
+  } else {
+    if (!momResident) errorQuda("No resident mom field allocated");
+    cudaMom = momResident;
+    momResident = NULL;
+  }
+
+  profileMomAction.TPSTOP(QUDA_PROFILE_H2D);
+  
+  // perform the update
+  profileMomAction.TPSTART(QUDA_PROFILE_COMPUTE);
+  double action = computeMomAction(*cudaMom);
+  profileMomAction.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileMomAction.TPSTART(QUDA_PROFILE_FREE);
+  if (param->make_resident_mom) {
+    if (momResident != NULL && momResident != cudaMom) delete momResident;
+    momResident = cudaMom;
+  } else {
+    delete cudaMom;
+  }
+  if (cpuMom) delete cpuMom;
+  profileMomAction.TPSTOP(QUDA_PROFILE_FREE);
+
+  checkCudaError();
+
+  profileMomAction.TPSTOP(QUDA_PROFILE_TOTAL);
+  return action;
+}
 
 /*
-   The following functions are for the Fortran interface.
-   */
+  The following functions are for the Fortran interface.
+*/
 
 void init_quda_(int *dev) { initQuda(*dev); }
 void init_quda_device_(int *dev) { initQudaDevice(*dev); }

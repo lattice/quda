@@ -49,7 +49,6 @@ static int clover_alloc = 0;
 static bool invalidate_quda_gauge = true;
 static bool create_quda_gauge = false;
 
-
 using namespace quda;
 using namespace quda::fermion_force;
 
@@ -342,6 +341,20 @@ void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
   return;
 }
 
+double qudaMomAction(int prec, void *momentum)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam momParam = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+      QUDA_GENERAL_LINKS);
+
+  double action = momActionQuda(momentum, &momParam);
+
+  qudamilc_called<false>(__func__);
+
+  return action;
+}
 
 // gauge force code
 static int getVolume(const int dim[4])

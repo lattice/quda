@@ -522,6 +522,19 @@ extern "C" {
 		   void* link);
 
   /**
+   * Evaluate the momentum contribution to the Hybrid Monte Carlo
+   * action.  The momentum field is assumed to be in MILC order.  MILC
+   * convention is applied, subtracting 4.0 from each momentum matrix
+   * to increased stability.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param momentum The momentum field
+   * @return momentum action
+   */
+  double qudaMomAction(int precision, 
+		       void *momentum);
+
+  /**
    * Compute the clover force contributions in each dimension mu given
    * the array solution fields, and compute the resulting momentum
    * field.

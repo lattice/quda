@@ -630,6 +630,15 @@ extern "C" {
   void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, 
       int conj_mom, int exact, QudaGaugeParam* param);
 
+  /**
+   * Evaluate the momentum contribution to the Hybrid Monte Carlo
+   * action.  The momentum field is assumed to be in MILC order.
+   *
+   * @param momentum The momentum field
+   * @param param The parameters of the external fields and the computation settings
+   * @return momentum action
+   */
+  double momActionQuda(void* momentum, QudaGaugeParam* param);
 
   /**
    * Take a gauge field on the host, load it onto the device and extend it.
