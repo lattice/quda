@@ -45,10 +45,8 @@ namespace quda {
 
   };
 
-  __device__ inline void zero(double2 &a) {
-    a.x = 0.0;
-    a.y = 0.0;
-  }
+  __device__ inline void zero(double &a) { a = 0.0; }
+  __device__ inline void zero(double2 &a) { a.x = 0.0; a.y = 0.0; }
 
   __device__ unsigned int count = 0;
   __shared__ bool isLastBlockDone;
