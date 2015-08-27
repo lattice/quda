@@ -10,6 +10,8 @@
 
 namespace quda {
 
+#ifdef GPU_GAUGE_FORCE
+
   namespace gaugeforce {
 #include <dslash_constants.h>
 #include <dslash_textures.h>
@@ -178,15 +180,15 @@ namespace quda {
 
     virtual ~GaugeForceCuda() {
       if(link.Precision() == QUDA_DOUBLE_PRECISION){
-	cudaBindTexture(0, siteLink0TexDouble, link.Even_p(), link.Bytes()/2);
-	cudaBindTexture(0, siteLink1TexDouble, link.Odd_p(), link.Bytes()/2);			      
+	cudaUnbindTexture(siteLink0TexDouble);
+	cudaUnbindTexture(siteLink1TexDouble);
       }else{ //QUDA_SINGLE_PRECISION
 	if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	  cudaBindTexture(0, siteLink0TexSingle, link.Even_p(), link.Bytes()/2);
-	  cudaBindTexture(0, siteLink1TexSingle, link.Odd_p(), link.Bytes()/2);		
+	  cudaUnbindTexture(siteLink0TexSingle);
+	  cudaUnbindTexture(siteLink1TexSingle);
 	}else{//QUDA_RECONSTRUCT_12
-	  cudaBindTexture(0, siteLink0TexSingle_recon, link.Even_p(), link.Bytes()/2);
-	  cudaBindTexture(0, siteLink1TexSingle_recon, link.Odd_p(), link.Bytes()/2);	
+	  cudaUnbindTexture(siteLink0TexSingle_recon);
+	  cudaUnbindTexture(siteLink1TexSingle_recon);
 	}
       }
     }
@@ -322,6 +324,7 @@ namespace quda {
     device_free(length_d);
     device_free(path_coeff_d);
   }
+#endif // GPU_GAUGE_FORCE
 
 
   void
@@ -329,10 +332,14 @@ namespace quda {
 		   QudaGaugeParam* param, int*** input_path, 
 		   int* length, double* path_coeff, int num_paths, int max_length)
   {  
+#ifdef GPU_GAUGE_FORCE
     for(int dir=0; dir < 4; dir++){
       gauge_force_cuda_dir(cudaMom, dir, eb3, cudaSiteLink, param, input_path[dir], 
 			   length, path_coeff, num_paths, max_length);
-    }  
+    }
+#else
+    errorQuda("Gauge force has not been built");
+#endif // GPU_GAUGE_FORCE
   }
 
 } // namespace quda
