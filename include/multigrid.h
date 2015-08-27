@@ -164,6 +164,8 @@ namespace quda {
 
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
 
+  void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField *fat_links, const cudaGaugeField *long_links);
+
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, 
 		   const GaugeField &X, double kappa);
   void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, const cpuGaugeField &clover, double kappa);
@@ -176,14 +178,6 @@ namespace quda {
     // restrictor / prolongator defined here
     cpuGaugeField *Y; //Coarse gauge field
     cpuGaugeField *X; //Coarse clover term
-
-    //for improved staggered (FX and FY are alias pointers of X and Y):
-    //for staggered multigrid: X and LX,FX are trivial fields, but let keep them for a moment 
-    cpuGaugeField *LX;
-    cpuGaugeField *FX;
-
-    cpuGaugeField *LY;
-    cpuGaugeField *FY;
 
     void initializeCoarse();  //Initialize the coarse gauge field
 

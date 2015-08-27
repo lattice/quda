@@ -495,6 +495,8 @@ namespace quda {
          const QudaSolutionType) const;
   };
 
+  void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField *fat_links, const cudaGaugeField *long_links, double k);
+
   // Full staggered
   class DiracStaggered : public Dirac {
 
@@ -574,7 +576,7 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    //virtual void createCoarseOp(const Transfer &T, GaugeField &LY, GaugeField &FY, GaugeField &LX, GaugeField &LX) const;//Improved staggered version.
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;//Improved staggered version.
   };
 
   // Even-odd preconditioned staggered

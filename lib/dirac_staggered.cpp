@@ -142,8 +142,7 @@ namespace quda {
   */
 
   void DiracStaggered::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
-    cudaCloverField *c = NULL;
-    CoarseOp(T, Y, X, *gauge, c,  mass);//
+    CoarseKSOp(T, Y, X, *gauge, NULL,  mass);//
   }
 
 

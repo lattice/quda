@@ -30,7 +30,12 @@ namespace quda {
   {
     int ndim = B[0]->Ndim();
     this->geo_bs = new int[ndim];
-    for (int d = 0; d < ndim; d++) this->geo_bs[d] = geo_bs[d];
+    for (int d = 0; d < ndim; d++)
+    {
+      this->geo_bs[d] = geo_bs[d];
+      if(B[0]->Nspin() == 1 && geo_bs[d] < 4)
+         errorQuda("Too small block size in %d direction for spin=1 field (must be >= 4) %d\n", d, geo_bs[d]);
+    }
 
     if (B[0]->X(0) == geo_bs[0]) 
       errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);

@@ -4,17 +4,12 @@
 namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param) 
-    : Dirac(param), transfer(param.transfer), dirac(param.dirac), Y(0), X(0), LY(0), FY(0), LX(0), FX(0) 
+    : Dirac(param), transfer(param.transfer), dirac(param.dirac), Y(0), X(0) 
   { initializeCoarse(); }
       
   DiracCoarse::~DiracCoarse() {
     if (Y) delete Y;
     if (X) delete X;
-
-    if (FY) delete FY;
-    if (LY) delete LY;
-    if (FX) delete FX;
-    if (LX) delete LX;
   }	
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const 
@@ -62,12 +57,7 @@ namespace quda {
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X = new cpuGaugeField(gParam);
 
-    //if improved staggered:
-    //Initialize LX, LY and FX, FY    
-
-    dirac->createCoarseOp(*transfer,*Y,*X);//also for staggered links or improved staggered fat links
-
-    if(gParam.link_type == QUDA_COARSE_LONG_LINKS) dirac->createCoarseOp(*transfer,*LY,*LX);
+    dirac->createCoarseOp(*transfer,*Y,*X);//also for staggered links or improved staggered coarse links
   }
 
 }
