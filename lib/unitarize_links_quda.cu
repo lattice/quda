@@ -610,6 +610,98 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
 #endif
     return;
   }
+
+
+  template <typename Float, typename G>
+  struct ProjectSU3Arg {
+    int threads; // number of active threads required
+    G u;
+    Float tol;
+    int *fails;
+    ProjectSU3Arg(G &u, const GaugeField &meta, Float tol, int *fails) 
+      : u(u), tol(tol), fails(fails) {
+      threads = meta.VolumeCB();
+    }
+  };
+
+  template<typename Float, typename G>
+  __global__ void ProjectSU3kernel(ProjectSU3Arg<Float,G> arg){
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int parity = blockIdx.y;
+    if(idx >= arg.threads) return;
+    
+    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    Matrix<Cmplx,3> u;
+
+    for (int mu = 0; mu < 4; mu++) { 
+      arg.input.load((Float*)(u.data),idx, mu, parity);
+      polarSu3(u, arg.tol);
+
+      if(isUnitary(u, arg.tol) == false) atomicAdd(arg.fails, 1);
+
+      arg.output.save((Float*)(u.data),idx, mu, parity); 
+    }
+  }
+
+  template<typename Float, typename G>
+  class ProjectSU3 : Tunable {    
+    ProjectSU3Arg<Float,G> arg;
+    
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+    
+    // don't tune the grid dimension
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.threads; }
+    
+  public:
+    ProjectSU3(ProjectSU3Arg<Float,G> &arg) : arg(arg) { }
+    
+    void apply(const cudaStream_t &stream){
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      ProjectSU3kernel<Float,G><<<tp.grid, tp.block, 0, stream>>>(arg);
+    }
+    void preTune() { arg.u.save(); }
+    void postTune() { arg.u.load(); }
   
+    long long flops() const { return 0; } // depends on number of iterations
+    long long bytes() const { return 4ll * arg.threads * arg.u.Bytes(); }
+    
+    TuneKey tuneKey() const {
+      std::stringstream vol, aux;
+      vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
+      aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
+      return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
+    }
+  };
+  
+
+  template <typename Float>
+  void projectSU3(cudaGaugeField &u, double tol, int *fails) {
+    if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+      ProjectSU3Arg<Float,G> arg(G(u), u, tol, fails);
+      ProjectSU3<Float,G> project(arg);
+      arg.apply(0);
+      cudaDeviceSynchronize();
+    } else {
+      errorQuda("Reconstruct %d not supported", u.Reconstruct());
+    }
+  }
+  
+  void projectSU3(cudaGaugeField &u, double tol, int *fails) {
+#ifdef GPU_UNITARIZE
+    if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+      projectSU3<double>(u, tol, fails);
+    } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+      projectSU3<float>(u, tol, fails);      
+    } else {
+      errorQuda("Precision %d not supported", u.Precision());
+    }
+#else
+    errorQuda("Unitarization has not been built");
+#endif
+  }
+
 } // namespace quda
 
