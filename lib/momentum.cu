@@ -149,4 +149,87 @@ namespace quda {
 #endif
     return action;
   }
-}
+
+
+#ifdef GPU_GAUGE_TOOLS
+  template<typename Float, typename Mom, typename Force>
+  struct UpdateMomArg {
+    int volumeCB;
+    Mom mom;
+    Float coeff;
+    Force force;
+    UpdateMomArg(Mom &mom, const Float &coeff, Force &force, GaugeField &meta)
+      : volumeCB(meta.VolumeCB()), mom(mom), coeff(coeff), force(force) {}
+  };
+
+  template<typename Float, typename Mom, typename Force>
+  __global__ void UpdateMom(UpdateMomArg<Float, Mom, Force> arg) {
+    typedef typename ComplexTypeId<Float>::Type Complex;
+    int x = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = blockIdx.y;
+    Matrix<Complex,3> m, f;
+    while(x<arg.volumeCB){
+      for (int d=0; d<4; d++) {
+	arg.mom.load(reinterpret_cast<Float*>(m.data), x, d, parity); 
+	arg.force.load(reinterpret_cast<Float*>(f.data), x, d, parity); 
+	
+	m = m + arg.coeff * f;
+	makeAntiHerm(m);
+	
+	arg.mom.save(reinterpret_cast<Float*>(m.data), x, d, parity); 
+      }
+      
+      x += gridDim.x*blockDim.x;
+    }
+    return;
+  } // UpdateMom
+  
+  template<typename Float, typename Mom, typename Force>
+  void updateMomentum(Mom mom, Float coeff, Force force, GaugeField &meta) {
+    UpdateMomArg<Float,Mom,Force> arg(mom, coeff, force, meta);
+    dim3 block(128, 1, 1);
+    dim3 grid((arg.volumeCB + block.x - 1)/ block.x, 2, 1); // y dimension is parity 
+    UpdateMom<Float,Mom,Force><<<grid,block>>>(arg);
+  }
+  
+  template <typename Float>
+  void updateMomentum(cudaGaugeField &mom, double coeff, cudaGaugeField &force) {
+    if (mom.Reconstruct() != QUDA_RECONSTRUCT_10)
+      errorQuda("Momentum field with reconstruct %d not supported", mom.Reconstruct());
+
+    if (force.Reconstruct() == QUDA_RECONSTRUCT_10) {
+      updateMomentum<Float>(FloatNOrder<Float, 18, 2, 11>(mom), static_cast<Float>(coeff),
+			      FloatNOrder<Float, 18, 2, 11>(force), force);
+    } else if (force.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+      updateMomentum<Float>(FloatNOrder<Float, 18, 2, 11>(mom), static_cast<Float>(coeff),
+			      FloatNOrder<Float, 18, 2, 18>(force), force);
+    } else {
+      errorQuda("Unsupported force reconstruction: %d", force.Reconstruct());
+    }
+    
+  }
+#endif // GPU_GAUGE_TOOLS
+
+  void updateMomentum(cudaGaugeField &mom, double coeff, cudaGaugeField &force) {
+#ifdef GPU_GAUGE_TOOLS
+    if(mom.Order() != QUDA_FLOAT2_GAUGE_ORDER)
+      errorQuda("Unsupported output ordering: %d\n", mom.Order());
+
+    if (mom.Precision() != force.Precision()) 
+      errorQuda("Mixed precision not supported: %d %d\n", mom.Precision(), force.Precision());
+
+    if (mom.Precision() == QUDA_DOUBLE_PRECISION) {
+      updateMomentum<double>(mom, coeff, force);
+    } else {
+      errorQuda("Unsupported precision: %d", mom.Precision());
+    }      
+
+    checkCudaError();
+#else 
+    errorQuda("%s not built", __func__);
+#endif // GPU_GAUGE_TOOLS
+
+    return;
+  }
+  
+} // namespace quda
