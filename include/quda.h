@@ -70,6 +70,8 @@ extern "C" {
     int use_resident_mom;    /**< Use the resident mom field */
     int make_resident_gauge; /**< Make the gauge field resident */
     int make_resident_mom;   /**< Make the mom field resident */
+    int return_gauge;        /**< Return the new gauge field */
+    int return_mom;          /**< Return the new mom field */
 
   } QudaGaugeParam;
 
@@ -610,11 +612,10 @@ extern "C" {
    * @param max_length The maximum number of non-zero of links in any path in the action
    * @param dt The integration step size (for MILC this is dt*beta/3)
    * @param param The parameters of the external fields and the computation settings
-   * @param timeinfo
    */
   int computeGaugeForceQuda(void* mom, void* sitelink,  int*** input_path_buf, int* path_length,
 			    double* loop_coeff, int num_paths, int max_length, double dt,
-			    QudaGaugeParam* qudaGaugeParam, double* timeinfo);
+			    QudaGaugeParam* qudaGaugeParam);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
