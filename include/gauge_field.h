@@ -333,6 +333,14 @@ namespace quda {
 
   /**
      This is a debugging function, where we cast a gauge field into a
+     spinor field so we can compute its L1 norm.
+     @param u The gauge field that we want the norm of
+     @return The L1 norm of the gauge field
+  */
+  double norm1(const cudaGaugeField &u);
+
+  /**
+     This is a debugging function, where we cast a gauge field into a
      spinor field so we can compute its L2 norm.
      @param u The gauge field that we want the norm of
      @return The L2 norm squared of the gauge field

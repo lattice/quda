@@ -128,6 +128,36 @@ namespace quda {
   };
 
   /**
+     Return the L1 norm of x
+  */
+  __device__ double norm1_(const double2 &a) { return fabs(a.x) + fabs(a.y); }
+  __device__ float norm1_(const float2 &a) { return (double)fabs(a.x) + (double)fabs(a.y); }
+  __device__ float norm1_(const float4 &a) { return (double)fabs(a.x) + (double)fabs(a.y) + (double)fabs(a.z) + (double)fabs(a.w); }
+
+  template <typename ReduceType, typename Float2, typename FloatN>
+#if (__COMPUTE_CAPABILITY__ >= 200)
+  struct Norm1 : public ReduceFunctor<ReduceType, Float2, FloatN> {
+#else
+  struct Norm1 {
+#endif
+    Norm1(const Float2 &a, const Float2 &b) { ; }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,FloatN  &w, FloatN &v) { sum += norm1_(x); }
+    static int streams() { return 1; } //! total number of input and output streams
+    static int flops() { return 2; } //! flops per element
+  };
+
+  double norm1Cuda(const cudaColorSpinorField &x) {
+    cudaColorSpinorField &y = (cudaColorSpinorField&)x; // FIXME
+#ifdef HOST_DEBUG
+    return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm1,0,0,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
+#else
+    errorQuda("L1 norm kernel only built when HOST_DEBUG is enabled");
+    return 0.0;
+#endif
+  }
+
+  /**
      Return the L2 norm of x
   */
   __device__ double norm2_(const double2 &a) { return a.x*a.x + a.y*a.y; }

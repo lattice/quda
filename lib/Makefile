@@ -50,7 +50,7 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	staggered_oprod.h lanczos_quda.h ritz_quda.h blas_magma.h	\
 	random_quda.h pgauge_monte.h unitarization_links.h			\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
-	numa_affinity.h misc_helpers.h texture.h
+	numa_affinity.h misc_helpers.h texture.h object.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
