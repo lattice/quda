@@ -9,7 +9,10 @@
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <unitarization_links.h>
+
+#include <su3_project.cuh>
 #include <index_helper.cuh>
+
 
 namespace quda{
 #ifdef GPU_UNITARIZE
@@ -618,8 +621,10 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
     G u;
     Float tol;
     int *fails;
-    ProjectSU3Arg(G &u, const GaugeField &meta, Float tol, int *fails) 
+    int X[4];
+    ProjectSU3Arg(G u, const GaugeField &meta, Float tol, int *fails) 
       : u(u), tol(tol), fails(fails) {
+      for(int dir=0; dir<4; ++dir) X[dir] = meta.X()[dir];
       threads = meta.VolumeCB();
     }
   };
@@ -634,12 +639,13 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
     Matrix<Cmplx,3> u;
 
     for (int mu = 0; mu < 4; mu++) { 
-      arg.input.load((Float*)(u.data),idx, mu, parity);
-      polarSu3(u, arg.tol);
+      arg.u.load((Float*)(u.data),idx, mu, parity);
+      polarSu3<Cmplx,Float>(u, arg.tol);
 
+      // count number of failures
       if(isUnitary(u, arg.tol) == false) atomicAdd(arg.fails, 1);
 
-      arg.output.save((Float*)(u.data),idx, mu, parity); 
+      arg.u.save((Float*)(u.data),idx, mu, parity); 
     }
   }
 
@@ -680,10 +686,11 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
   void projectSU3(cudaGaugeField &u, double tol, int *fails) {
     if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-      ProjectSU3Arg<Float,G> arg(G(u), u, tol, fails);
+      ProjectSU3Arg<Float,G> arg(G(u), u, static_cast<Float>(tol), fails);
       ProjectSU3<Float,G> project(arg);
-      arg.apply(0);
+      project.apply(0);
       cudaDeviceSynchronize();
+      checkCudaError();
     } else {
       errorQuda("Reconstruct %d not supported", u.Reconstruct());
     }
