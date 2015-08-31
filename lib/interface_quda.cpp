@@ -211,6 +211,12 @@ static TimeProfile profilePlaq("plaqQuda");
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
+//!< Profiler for projectSU3Quda
+static TimeProfile profileProject("projectSU3Quda");
+
+//!< Profiler for staggeredPhaseQuda
+static TimeProfile profilePhase("staggeredPhaseQuda");
+
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
@@ -1157,6 +1163,8 @@ void endQuda(void)
     profileCovDev.Print();
     profilePlaq.Print();
     profileAPE.Print();
+    profileProject.Print();
+    profilePhase.Print();
     profileMomAction.Print();
     profileEnd.Print();
 
@@ -5018,6 +5026,128 @@ void updateGaugeFieldQuda(void* gauge,
   return;
 }
 
+ void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param) {
+   profileProject.TPSTART(QUDA_PROFILE_TOTAL);
+   
+   profileProject.TPSTART(QUDA_PROFILE_INIT);
+   checkGaugeParam(param);
+
+   // create the gauge field
+   GaugeFieldParam gParam(0, *param);
+   gParam.pad = 0;
+   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+   gParam.link_type = QUDA_GENERAL_LINKS;
+   gParam.gauge = gauge_h;
+   bool need_cpu = !param->use_resident_gauge || param->return_gauge;
+   cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
+   
+   // create the device fields
+   gParam.create = QUDA_NULL_FIELD_CREATE;
+   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;  
+   gParam.reconstruct = param->reconstruct;
+   cudaGaugeField *cudaGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : NULL;
+   profileProject.TPSTOP(QUDA_PROFILE_INIT);
+
+   if (param->use_resident_gauge) {
+     if (!gaugePrecise) errorQuda("No resident gauge field to use");
+     cudaGauge = gaugePrecise;
+   } else {
+     profileProject.TPSTART(QUDA_PROFILE_H2D);
+     cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+     profileProject.TPSTOP(QUDA_PROFILE_H2D);
+   }
+   
+   profileProject.TPSTART(QUDA_PROFILE_COMPUTE);
+   *num_failures_h = 0;
+
+   // project onto SU(3)
+   projectSU3(*cudaGauge, tol, num_failures_d); 
+
+   profileProject.TPSTOP(QUDA_PROFILE_COMPUTE);
+   
+   if(*num_failures_h>0)
+     errorQuda("Error in the SU(3) unitarization: %d failures\n", *num_failures_h);
+   
+   profileProject.TPSTART(QUDA_PROFILE_D2H);
+   if (param->return_gauge) cudaGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+   profileProject.TPSTOP(QUDA_PROFILE_D2H);
+
+   if (param->make_resident_gauge) {
+     if (gaugePrecise != NULL && cudaGauge != gaugePrecise) delete gaugePrecise;
+     gaugePrecise = cudaGauge;
+   } else {
+     delete cudaGauge;
+   }
+   
+   profileProject.TPSTART(QUDA_PROFILE_FREE);
+   if (cpuGauge) delete cpuGauge;
+   profileProject.TPSTOP(QUDA_PROFILE_FREE);
+
+   profileProject.TPSTOP(QUDA_PROFILE_TOTAL);
+ }
+
+ void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param) {
+   profilePhase.TPSTART(QUDA_PROFILE_TOTAL);
+   
+   profilePhase.TPSTART(QUDA_PROFILE_INIT);
+   checkGaugeParam(param);
+
+   // create the gauge field
+   GaugeFieldParam gParam(0, *param);
+   gParam.pad = 0;
+   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
+   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+   gParam.link_type = QUDA_GENERAL_LINKS;
+   gParam.gauge = gauge_h;
+   bool need_cpu = !param->use_resident_gauge || param->return_gauge;
+   cpuGaugeField *cpuGauge = need_cpu ? new cpuGaugeField(gParam) : NULL;
+   
+   // create the device fields
+   gParam.create = QUDA_NULL_FIELD_CREATE;
+   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;  
+   gParam.reconstruct = param->reconstruct;
+   cudaGaugeField *cudaGauge = !param->use_resident_gauge ? new cudaGaugeField(gParam) : NULL;
+   profilePhase.TPSTOP(QUDA_PROFILE_INIT);
+
+   if (param->use_resident_gauge) {
+     if (!gaugePrecise) errorQuda("No resident gauge field to use");
+     cudaGauge = gaugePrecise;
+   } else {
+     profilePhase.TPSTART(QUDA_PROFILE_H2D);
+     cudaGauge->loadCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+     profilePhase.TPSTOP(QUDA_PROFILE_H2D);
+   }
+   
+   profilePhase.TPSTART(QUDA_PROFILE_COMPUTE);
+   *num_failures_h = 0;
+
+   // apply / remove phase as appropriate
+   if (!cudaGauge->StaggeredPhaseApplied()) cudaGauge->applyStaggeredPhase();
+   else cudaGauge->removeStaggeredPhase();
+
+   profilePhase.TPSTOP(QUDA_PROFILE_COMPUTE);
+   
+   profilePhase.TPSTART(QUDA_PROFILE_D2H);
+   if (param->return_gauge) cudaGauge->saveCPUField(*cpuGauge, QUDA_CPU_FIELD_LOCATION);
+   profilePhase.TPSTOP(QUDA_PROFILE_D2H);
+
+   if (param->make_resident_gauge) {
+     if (gaugePrecise != NULL && cudaGauge != gaugePrecise) delete gaugePrecise;
+     gaugePrecise = cudaGauge;
+   } else {
+     delete cudaGauge;
+   }
+   
+   profilePhase.TPSTART(QUDA_PROFILE_FREE);
+   if (cpuGauge) delete cpuGauge;
+   profilePhase.TPSTOP(QUDA_PROFILE_FREE);
+
+   profilePhase.TPSTOP(QUDA_PROFILE_TOTAL);
+ }
+
 // evaluate the momentum action
 double momActionQuda(void* momentum, QudaGaugeParam* param)
 {
@@ -5027,7 +5157,6 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
   checkGaugeParam(param);
 
   // create the momentum fields
-
   GaugeFieldParam gParam(0, *param);
   gParam.pad = 0;
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;

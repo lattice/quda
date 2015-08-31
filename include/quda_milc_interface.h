@@ -535,6 +535,29 @@ extern "C" {
 		       void *momentum);
 
   /**
+   * Apply the staggered phase factors to the gauge field.  If the
+   * imaginary chemical potential is non-zero then the phase factor
+   * exp(imu/T) will be applied to the links in the temporal
+   * direction.
+   *
+   * @param prec Precision of the gauge field
+   * @param gauge_h The gauge field
+   * @param flag Whether to apply to remove the staggered phase
+   * @param i_mu Imaginary chemical potential
+   */
+  void qudaRephase(int prec, void *gauge, int flag, double i_mu);
+  
+  /**
+   * Project the input field on the SU(3) group.  If the target
+   * tolerance is not met, this routine will give a runtime error.
+   *
+   * @param prec Precision of the gauge field
+   * @param gauge_h The gauge field to be updated
+   * @param tol The tolerance to which we iterate
+   */
+  void qudaUnitarizeSU3(int prec, void *gauge, double tol);
+  
+  /**
    * Compute the clover force contributions in each dimension mu given
    * the array solution fields, and compute the resulting momentum
    * field.

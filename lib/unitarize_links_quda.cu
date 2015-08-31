@@ -698,6 +698,10 @@ void unitarizeLinksQuda(cudaGaugeField& output, const cudaGaugeField &input, int
   
   void projectSU3(cudaGaugeField &u, double tol, int *fails) {
 #ifdef GPU_UNITARIZE
+    // check the the field doesn't have staggered phases applied
+    if (u.StaggeredPhaseApplied()) 
+      errorQuda("Cannot project gauge field with staggered phases applied");
+
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       projectSU3<double>(u, tol, fails);
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {

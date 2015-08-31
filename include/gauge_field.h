@@ -45,6 +45,9 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
+    /** Imaginary chemical potential */
+    double i_mu;
+
     // Default constructor
   GaugeFieldParam(void* const h_gauge=NULL) : LatticeFieldParam(),
       nColor(3),
@@ -65,7 +68,8 @@ namespace quda {
       ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
 
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
-      staggeredPhaseApplied(false)
+      staggeredPhaseApplied(false),
+      i_mu(0.0)
 	{
 	  // variables declared in LatticeFieldParam
 	  precision = QUDA_INVALID_PRECISION;
@@ -85,7 +89,7 @@ namespace quda {
       link_type(QUDA_WILSON_LINKS), t_boundary(QUDA_INVALID_T_BOUNDARY), anisotropy(1.0), 
       tadpole(1.0), scale(1.0), gauge(0), create(QUDA_NULL_FIELD_CREATE), geometry(geometry), 
       pinned(0), compute_fat_link_max(false), ghostExchange(ghostExchange), 
-      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false)
+      staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE), staggeredPhaseApplied(false), i_mu(0.0)
       {
 	// variables declared in LatticeFieldParam
 	this->precision = precision;
@@ -104,7 +108,7 @@ namespace quda {
       create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
       compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
       staggeredPhaseType(param.staggered_phase_type), 
-      staggeredPhaseApplied(param.staggered_phase_applied) 
+      staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu)
 	{
 	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
 	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
@@ -165,6 +169,9 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
+    /** Imaginary chemical potential */
+    double i_mu;
+
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
@@ -184,6 +191,8 @@ namespace quda {
     const int* R() const { return r; }
     QudaGhostExchange GhostExchange() const { return ghostExchange; }
     QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
+    bool StaggeredPhaseApplied() const { return staggeredPhaseApplied; }
+
     /**
        Apply the staggered phase factors to the gauge field.
     */
@@ -193,6 +202,11 @@ namespace quda {
        Remove the staggered phase factors from the gauge field.
     */
     void removeStaggeredPhase();
+
+    /**
+       Return the imaginary chemical potential applied to this field
+    */
+    double iMu() const { return i_mu; }
 
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }

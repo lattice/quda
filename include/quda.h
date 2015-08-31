@@ -64,6 +64,8 @@ extern "C" {
     QudaStaggeredPhase staggered_phase_type; /**< Set the staggered phase type of the links */
     int staggered_phase_applied; /**< Whether the staggered phase has already been applied to the links */
 
+    double i_mu; /**< Imaginary chemical potential */
+
     int overlap; /**< Width of overlapping domains */
 
     int use_resident_gauge;  /**< Use the resident gauge field */
@@ -630,6 +632,27 @@ extern "C" {
    */
   void updateGaugeFieldQuda(void* gauge, void* momentum, double dt, 
       int conj_mom, int exact, QudaGaugeParam* param);
+
+  /**
+   * Apply the staggered phase factors to the gauge field.  If the
+   * imaginary chemical potential is non-zero then the phase factor
+   * exp(imu/T) will be applied to the links in the temporal
+   * direction.
+   *
+   * @param gauge_h The gauge field
+   * @param param The parameters of the gauge field
+   */
+  void staggeredPhaseQuda(void *gauge_h, QudaGaugeParam *param);
+
+  /**
+   * Project the input field on the SU(3) group.  If the target
+   * tolerance is not met, this routine will give a runtime error.
+   *
+   * @param gauge_h The gauge field to be updated
+   * @param tol The tolerance to which we iterate
+   * @param param The parameters of the gauge field
+   */
+  void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param);
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo

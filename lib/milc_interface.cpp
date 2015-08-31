@@ -361,6 +361,35 @@ void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
   return;
 }
 
+void qudaRephase(int prec, void *gauge, int flag, double i_mu)
+{
+  qudamilc_called<true>(__func__);
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+						QUDA_GENERAL_LINKS);
+
+  gaugeParam.staggered_phase_applied = 1-flag;
+  gaugeParam.staggered_phase_type = QUDA_MILC_STAGGERED_PHASE;
+  gaugeParam.i_mu = i_mu;
+  gaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
+
+  staggeredPhaseQuda(gauge, &gaugeParam);
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaUnitarizeSU3(int prec, void *gauge, double tol)
+{
+  qudamilc_called<true>(__func__);
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+						QUDA_GENERAL_LINKS);
+
+  projectSU3Quda(gauge, tol, &gaugeParam);
+  qudamilc_called<false>(__func__);
+  return;
+}
+
 double qudaMomAction(int prec, void *momentum)
 {
   qudamilc_called<true>(__func__);

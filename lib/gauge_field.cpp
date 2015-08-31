@@ -9,7 +9,7 @@ namespace quda {
     fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
     create(param.create), ghostExchange(param.ghostExchange), 
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied)
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
   {
     if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
     if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d", nDim);
