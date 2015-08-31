@@ -17,7 +17,7 @@ namespace quda {
   namespace gauge {
     
 
-    template<typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order> struct Accessor { 
+    template<typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
       Accessor(const GaugeField &) { }
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
@@ -28,12 +28,12 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor, int nSpinCoarse> 
-      struct Accessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> { 
+    template<typename Float, int nColor, int nSpinCoarse>
+      struct Accessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> {
       complex <Float> *u[QUDA_MAX_DIM];
       const size_t cb_offset;
-     Accessor(const GaugeField &U) : cb_offset((U.Bytes()>>1) / (sizeof(complex<Float>)*U.Geometry())) {
-       for (int d=0; d<U.Geometry(); d++)
+    Accessor(const GaugeField &U) : cb_offset((U.Bytes()>>1) / (sizeof(complex<Float>)*U.Geometry())) {
+	for (int d=0; d<U.Geometry(); d++)
 	  u[d] = static_cast<complex<Float>**>(const_cast<void*>(U.Gauge_p()))[d]; 
       }
       __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const 
