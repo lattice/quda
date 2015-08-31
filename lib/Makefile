@@ -32,7 +32,7 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	fermion_force_quda.o unitarize_force_quda.o			\
 	unitarize_links_quda.o milc_interface.o				\
 	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
-	ritz_quda.o eig_solver.o blas_magma.o blas_magma_gpu.o misc_helpers.o		\
+	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
 	inv_mpcg_quda.o inv_mpbicgstab_quda.o
 
 
@@ -251,10 +251,7 @@ covDev.o: covDev.cu $(HDRS) $(DSLASH_INLN) $(CORE)
 milc_interface.o: milc_interface.cpp $(HDRS) $(CORE)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
-blas_magma.o: blas_magma.cpp $(HDRS)
-	$(CXX) $(MAGMA_INCLUDE) $(CXXFLAGS) $(MAGMA_FLAGS) $< -c -o $@
-
-blas_magma_gpu.o: blas_magma.cu $(HDRS)
+blas_magma.o: blas_magma.cu $(HDRS)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
 
 copy_gauge_double.o: copy_gauge_double.cu copy_gauge_inc.cu $(HDRS)

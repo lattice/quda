@@ -115,44 +115,5 @@
       void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv); 
    };
 
-//experimental functions for spinor matrix complex matrix multiplications:
-extern void sMM(void *outBuff, const int bldm,  void *sMat, const int srows, const int scols, const int sldm, void *cMat, const int crows, const int ccols, const int cldm);
-
-extern void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const int scols, const int sldm, void *cMat, const int crows, const int ccols, const int cldm);
-
-#define LAPACK(s) s ## _
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern void LAPACK(zlarft)(char* direct, char* storev, int *n, int *k, _Complex double V[], int *ldV, _Complex double TAU[], _Complex double T[], int *ldT);
-
-
-extern void LAPACK(zgesv)(int* n, int* nrhs, _Complex double a[], int* lda,
-		 int ipivot[], _Complex double b[], int* ldb, int *info);
-
-extern void LAPACK(zgeevx)(char* balanc, char* jobvl, char* jobvr, char* sense,	 int* N, _Complex double A[], int* lda, _Complex double W[], _Complex double vl[], 
-			 int* ldvl, _Complex double vr[], int* ldvr, int* ilo, int* ihi, double scale[], double* abnrm, double rcone[], double rconv[],
-                         _Complex double work[], int* lwork, double work2[], int* info);
-
-
-extern void LAPACK(zgeev)(char* jobvl, char* jobvr, int* N, _Complex double A[], int* lda, _Complex double W[], _Complex double vl[], 
-			 int* ldvl, _Complex double vr[], int* ldvr, _Complex double work[], int* lwork, double work2[], int* info);
-
-
-
-extern void LAPACK(zgeqrf)(int *M, int *N, _Complex double *A, int *LDA, _Complex double *TAU,
-                         _Complex double  *WORK, int *LWORK, int *INFO);
-
-
-extern void LAPACK(zunmqr)(char *SIDE, char *TRANS, int *M, int *N, int *K,
-                         _Complex double  *A, int *LDA, _Complex double  *TAU, _Complex double  *C,
-                         int *LDC, _Complex double  *WORK, int *LWORK, int *INFO);
-
-#ifdef __cplusplus
-}
-#endif
-
 
 #endif // _BLAS_MAGMA_H
