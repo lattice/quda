@@ -646,7 +646,7 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
       void preTune() { ; }
       void postTune() { cudaMemset(fails, 0, sizeof(int)); } // reset fails counter
       
-      long long flops() const { return 4*4528*gauge.Volume(); } // FIXME: add flops counter
+      long long flops() const { return 4ll*4528*gauge.Volume(); } // FIXME: add flops counter
       
       TuneKey tuneKey() const { return TuneKey(gauge.VolString(), typeid(*this).name(), aux); }
     }; // UnitarizeForceCuda

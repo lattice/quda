@@ -199,7 +199,6 @@ namespace quda {
 	}
       }else{ //QUDA_SINGLE_PRECISION
 	if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	
 	  parity_compute_gauge_force_kernel_sp18<float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
 									       (float2*)link.Even_p(), (float2*)link.Odd_p(), arg);
 	}else{ //QUDA_RECONSTRUCT_12
