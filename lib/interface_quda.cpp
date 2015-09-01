@@ -3400,14 +3400,6 @@ int getGaugePadding(GaugeFieldParam& param){
   return pad;
 }
 
-#ifdef GPU_GAUGE_FORCE
-namespace quda {
-  namespace gaugeforce {
-#include <dslash_init.cuh>
-  }
-}
-#endif
-
 int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int* path_length,
 			  double* loop_coeff, int num_paths, int max_length, double eb3,
 			  QudaGaugeParam* qudaGaugeParam)
@@ -3512,13 +3504,6 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
   }
-
-  gaugeforce::initLatticeConstants(*cudaMom, profileGaugeForce);
-
-  profileGaugeForce.TPSTART(QUDA_PROFILE_CONSTANT);
-  qudaGaugeParam->mom_ga_pad = gParamMom.pad; //need to set this (until we use order classes)
-  gauge_force_init_cuda(qudaGaugeParam, max_length); 
-  profileGaugeForce.TPSTOP(QUDA_PROFILE_CONSTANT);
 
   // actually do the computation
   profileGaugeForce.TPSTART(QUDA_PROFILE_COMPUTE);
