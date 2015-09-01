@@ -77,7 +77,7 @@ printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21
 // 	: 24 times with +ve sig and 24 times with -ve sig
 //	28944 Flops per site in total
 //
-template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change> 
+template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change> 
   __global__ void
                  HISQ_KERNEL_NAME(do_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
                      const RealA* const QprevEven, const RealA* const QprevOdd,  
@@ -92,7 +92,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 {
 
 
-  int oddBit = _oddBit;
+  int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
   int dx[4] = {0,0,0,0};
@@ -127,7 +127,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = _oddBit ^ oddness_change;
+  oddBit = oddBit ^ oddness_change;
 
 #else
   int E[4] = {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
@@ -246,7 +246,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBi
 //  else                  (2, 0)
 //  if(sig is positive) 810 flops per lattice site
 //  else 396 flops per lattice site
-template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change> 
+template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change> 
   __global__ void
 HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
     const RealA* const QprevEven, const RealA* const QprevOdd,  
@@ -260,7 +260,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
-  int oddBit = _oddBit;
+  int oddBit = threadIdx.y;
 
 
   Matrix<RealA,3> Uab, Ubc, Uad;
@@ -292,7 +292,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = _oddBit ^ oddness_change;
+  oddBit = oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -430,7 +430,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 // call 1: 103680
 // call 2: 864 
 
-template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
+template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change>
   __global__ void
 HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
     const RealA* const QprodEven, const RealA* const QprodOdd,
@@ -442,7 +442,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
-  int oddBit = _oddBit;
+  int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
@@ -462,7 +462,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = _oddBit ^ oddness_change;
+  oddBit = oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -520,7 +520,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
 
 
   addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit, kparam.color_matrix_stride);
-  mycoeff = CoeffSign<sig_positive,_oddBit ^ oddness_change>::result*coeff;
+  mycoeff = CoeffSign(sig_positive, oddBit)*coeff;
 
   loadMatrixFromField(QprodEven, QprodOdd, point_d, Ox.data, 1-oddBit, kparam.color_matrix_stride);
 
@@ -541,7 +541,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
 // 		(0,1)
 
 
-template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
+template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change>
   __global__ void
 HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
     const RealB* const linkEven,  const RealB* const linkOdd,
@@ -550,7 +550,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
-  int oddBit = _oddBit;
+  int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
@@ -566,7 +566,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = _oddBit ^ oddness_change;
+  oddBit = oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -595,7 +595,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
 
   updateCoords(y, mymu, (mu_positive ? -1 : 1), kparam.X, kparam.ghostDim[mymu]);
   point_d = linkIndexShift(y,dx,E);
-  mycoeff = CoeffSign<sig_positive,_oddBit ^ oddness_change>::result*coeff;
+  mycoeff = CoeffSign(sig_positive,oddBit)*coeff;
 
   if(mu_positive){
     if(!oddBit){ mycoeff = -mycoeff;} // need to change this to get away from oddBit
@@ -646,7 +646,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
 // 1242*192 + 828*192
 // = 397440 Flops per site
 
-template<class RealA, class RealB, int sig_positive, int mu_positive, int _oddBit, int oddness_change>
+template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change>
   __global__ void
 HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd, 
     const RealA* const QprevEven, const RealA* const QprevOdd,
@@ -658,7 +658,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     RealA* const newOprodEven, RealA* const newOprodOdd,
     hisq_kernel_param_t kparam)
 {
-  int oddBit = _oddBit;
+  int oddBit = threadIdx.y;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if(sid >= kparam.threads) return;
 
@@ -693,7 +693,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
   int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = _oddBit ^ oddness_change;
+  oddBit = oddBit ^ oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -709,7 +709,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
   for(int dir=0; dir<4; ++dir) y[dir] = x[dir];
 
 
-  const typename RealTypeId<RealA>::Type & mycoeff = CoeffSign<sig_positive,_oddBit ^ oddness_change>::result*coeff;
+  const typename RealTypeId<RealA>::Type & mycoeff = CoeffSign(sig_positive,oddBit)*coeff;
   if(mu_positive){ //positive mu
 
     updateCoords(y, mu, -1, kparam.X, kparam.ghostDim[mu]);
@@ -729,7 +729,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
     if (sig_positive)
     {
       Ow = Oz*Ox*Uad;
-      addMatrixToNewOprod(Ow.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
+      addMatrixToNewOprod(Ow.data, sig, new_sid, Sign(oddBit)*mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
     }
 
     
@@ -743,7 +743,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
 
     Ow = Oy*Ox;
-    addMatrixToNewOprod(Ow.data, mu, point_d, -Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, 1-oddBit, kparam.color_matrix_stride);
+    addMatrixToNewOprod(Ow.data, mu, point_d, -Sign(oddBit)*mycoeff, newOprodEven, newOprodOdd, 1-oddBit, kparam.color_matrix_stride);
     Ow = Uad*Oy;
     addMatrixToField(Ow.data, point_d, accumu_coeff, shortPEven, shortPOdd, 1-oddBit, kparam.color_matrix_stride);
 
@@ -770,7 +770,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
     if (sig_positive){	
       Oy = Oz*Ow;
-      addMatrixToNewOprod(Oy.data, sig, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
+      addMatrixToNewOprod(Oy.data, sig, new_sid, Sign(oddBit)*mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
     }
     loadLink<18>(linkEven, linkOdd, posDir(sig), ab_link_nbr_idx, Uab.data, sig_positive^(1-oddBit), kparam.thin_link_stride); 
 
@@ -783,7 +783,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
     Ow = conj(Ox)*conj(Oy);
 
-    addMatrixToNewOprod(Ow.data, mu, new_sid, Sign<_oddBit ^ oddness_change>::result*mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
+    addMatrixToNewOprod(Ow.data, mu, new_sid, Sign(oddBit)*mycoeff, newOprodEven, newOprodOdd, oddBit, kparam.color_matrix_stride);
 
     Ow = conj(Uad)*Oy;
 
@@ -798,7 +798,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 // Flops count, in two-number pair (matrix_mult, matrix_add)
 // 				   (24, 12)
 // 4968 Flops per site in total
-template<class RealA, class RealB,  int oddBit>
+template<class RealA, class RealB>
   __global__ void 
 HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* const linkOdd,
     const RealA* const naikOprodEven, const RealA* const naikOprodOdd,
@@ -808,7 +808,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
 {
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if (sid >= kparam.threads) return;
-
+  int oddBit = threadIdx.y;
 
   int x[4];
   int dx[4] = {0,0,0,0};
@@ -880,7 +880,7 @@ HISQ_KERNEL_NAME(do_longlink, EXT)(const RealB* const linkEven, const RealB* con
 
 
 // Flops count: 4 matrix multiplications per lattice site = 792 Flops per site
-template<class RealA, class RealB, int oddBit>
+template<class RealA, class RealB>
   __global__ void 
 HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const RealB* const linkOdd, 
     const RealA* const oprodEven, const RealA* const oprodOdd,
@@ -889,7 +889,7 @@ HISQ_KERNEL_NAME(do_complete_force, EXT)(const RealB* const linkEven, const Real
 {
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
   if (sid >= kparam.threads) return;
-
+  int oddBit = threadIdx.y;
 
   int x[4];
   int dx[4] = {0,0,0,0};
