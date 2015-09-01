@@ -74,6 +74,8 @@ namespace quda {
       int thin_link_stride;
       int momentum_stride;
 
+      mutable int oddness_change;
+
       void setStride(const QudaGaugeParam& param){
         int half_volume = param.X[0]*param.X[1]*param.X[2]*param.X[3]/2;
 #ifdef MULTI_GPU
@@ -675,47 +677,28 @@ namespace quda {
 
 
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
-      if(oddness_change ==0 ){						\
-	if(sizeof(RealA) == sizeof(float2)){				\
-	  if(recon  == QUDA_RECONSTRUCT_NO){				\
-	    do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-	  }else{							\
-	    do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-	  }								\
-	}else{								\
-	  if(recon  == QUDA_RECONSTRUCT_NO){				\
-	    do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-	  }else{							\
-	    do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-	  }								\
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
 	}								\
-      }else{								\
-	if(sizeof(RealA) == sizeof(float2)){				\
-	  if(recon  == QUDA_RECONSTRUCT_NO){				\
-	    do_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-	  }else{							\
-	    do_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-	  }								\
-	}else{								\
-	  if(recon  == QUDA_RECONSTRUCT_NO){				\
-	    do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-	  }else{							\
-	    do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-	  }								\
+      } else {								\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
 	}								\
       }
-      
-
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
-                + kparam.base_idx[2] + kparam.base_idx[3])&1;
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+				  + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             const void *Qprev_even = (&Qprev == &link) ? NULL : Qprev.Even_p();
             const void *Qprev_odd = (&Qprev == &link) ? NULL : Qprev.Odd_p();
-
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
               CALL_MIDDLE_LINK_KERNEL(1,1);
@@ -789,81 +772,65 @@ namespace quda {
           }  
 
 #define CALL_ARGUMENTS(typeA, typeB) <<<tp.grid, tp.block>>>		\
-          ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
-           (typeA*)Qprev.Even_p(), (typeA*)Qprev.Odd_p(),			\
-           (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
-           sig, mu, coeff,							\
-           (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
-           (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
-           kparam)
-
+      ((typeA*)oprod.Even_p(), (typeA*)oprod.Odd_p(),			\
+       (typeA*)Qprev.Even_p(), (typeA*)Qprev.Odd_p(),			\
+       (typeB*)link.Even_p(), (typeB*)link.Odd_p(),			\
+       sig, mu, coeff,							\
+       (typeA*)P3.Even_p(), (typeA*)P3.Odd_p(),				\
+       (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(),		\
+       kparam)
+      
 #define CALL_MIDDLE_LINK_KERNEL(sig_sign, mu_sign)			\
-  if(oddness_change == 0){						\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-      }else{								\
-	do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      } else {								\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	}								\
       }									\
-    }else{								\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-      }else{								\
-	do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-      }									\
-    }									\
-  }else{								\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_lepage_middle_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-      }else{								\
-	do_lepage_middle_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-      }									\
-    }else{								\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_lepage_middle_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }else{								\
-	do_lepage_middle_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }									\
-    }									\
-  }     
-
-void apply(const cudaStream_t &stream) {
-            TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-            QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
-                + kparam.base_idx[2] + kparam.base_idx[3])&1;
-
-            if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
-              CALL_MIDDLE_LINK_KERNEL(1,1);
-            }else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
-              CALL_MIDDLE_LINK_KERNEL(1,0);
-            }else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
-              CALL_MIDDLE_LINK_KERNEL(0,1);
-            }else{
-              CALL_MIDDLE_LINK_KERNEL(0,0);
-            }
-
-          }
-
+  
+      void apply(const cudaStream_t &stream) {
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	QudaReconstructType recon = link.Reconstruct();
+	kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+				 + kparam.base_idx[2] + kparam.base_idx[3])&1;
+	
+	if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){	
+	  CALL_MIDDLE_LINK_KERNEL(1,1);
+	}else if (GOES_FORWARDS(sig) && GOES_BACKWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(1,0);
+	}else if (GOES_BACKWARDS(sig) && GOES_FORWARDS(mu)){
+	  CALL_MIDDLE_LINK_KERNEL(0,1);
+	}else{
+	  CALL_MIDDLE_LINK_KERNEL(0,0);
+	}
+	
+      }
+      
 #undef CALL_ARGUMENTS	
 #undef CALL_MIDDLE_LINK_KERNEL
-
-          void preTune() {
-            P3.backup();
-            newOprod.backup();
-          }
-
-          void postTune() {
-            P3.restore();
-            newOprod.restore();
-          }
-
-          long long flops() const { 
-	    if(GOES_FORWARDS(sig)) return 810*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
-            return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*396; 
-	  }
-      };
+      
+      void preTune() {
+	P3.backup();
+	newOprod.backup();
+      }
+      
+      void postTune() {
+	P3.restore();
+	newOprod.restore();
+      }
+      
+      long long flops() const { 
+	if(GOES_FORWARDS(sig)) return 810*kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3];
+	return kparam.X[0]*kparam.X[1]*kparam.X[2]*kparam.X[3]*396; 
+      }
+    };
 
     template<class RealA, class RealB>
       class SideLink : public TunableLocalParity {
@@ -921,40 +888,24 @@ void apply(const cudaStream_t &stream) {
            kparam)
 
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
-  if(oddness_change == 0){						\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-      }else{								\
-	do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-      }									\
-    }else{								\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-      }else{								\
-	do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-      }									\
-    }									\
-  }else{								\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-      }else{								\
-	do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-      }									\
-    }else{								\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }else{								\
-	do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }									\
-    }									\
-  }
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_side_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_side_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      } else {								\
+	if(recon  == QUDA_RECONSTRUCT_NO){				\
+	  do_side_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_side_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -1027,40 +978,24 @@ void apply(const cudaStream_t &stream) {
 
 
 #define CALL_SIDE_LINK_KERNEL(sig_sign, mu_sign)			\
-  if(oddness_change == 0){						\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
+    if (sizeof(RealA) == sizeof(float2)) {				\
+      if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
       }else{								\
-	do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
+	do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
       }									\
-    }else{								\
+    } else {								\
       if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
       }else{								\
-	do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
+	do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
       }									\
-    }									\
-  }else{								\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_short_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-      }else{								\
-	do_side_link_short_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-      }									\
-    }else{								\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_side_link_short_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }else{								\
-	do_side_link_short_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }									\
-    }									\
-  }
+    }
 
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){
@@ -1143,39 +1078,24 @@ void apply(const cudaStream_t &stream) {
            (typeA*)newOprod.Even_p(), (typeA*)newOprod.Odd_p(), kparam)
 
 #define CALL_ALL_LINK_KERNEL(sig_sign, mu_sign)				\
-  if(oddness_change == 0){						\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float2); \
-      }else{								\
-	do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 0> CALL_ARGUMENTS(float2, float4); \
-      }									\
-    }else{								\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-      }else{								\
-	do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 0> CALL_ARGUMENTS(double2, double2); \
-      }									\
-    }									\
-  }else{								\
-    if(sizeof(RealA) == sizeof(float2)){				\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float2); \
-      }else{								\
-	do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign, 1> CALL_ARGUMENTS(float2, float4); \
-      }									\
-    }else{								\
-      if(recon  == QUDA_RECONSTRUCT_NO){				\
-	do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }else{								\
-	do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign, 1> CALL_ARGUMENTS(double2, double2); \
-      }									\
-    }									\
-  }     
+      if (sizeof(RealA) == sizeof(float2)) {				\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_all_link_sp_18_kernel<float2, float2, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float2); \
+	} else {							\
+	  do_all_link_sp_12_kernel<float2, float4, sig_sign, mu_sign> CALL_ARGUMENTS(float2, float4); \
+	}								\
+      } else {								\
+	if (recon  == QUDA_RECONSTRUCT_NO) {				\
+	  do_all_link_dp_18_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	} else {							\
+	  do_all_link_dp_12_kernel<double2, double2, sig_sign, mu_sign> CALL_ARGUMENTS(double2, double2); \
+	}								\
+      }
+
           void apply(const cudaStream_t &stream) {
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             QudaReconstructType recon = link.Reconstruct();
-            int oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
+            kparam.oddness_change = (kparam.base_idx[0] + kparam.base_idx[1]
                 + kparam.base_idx[2] + kparam.base_idx[3])&1;
 
             if (GOES_FORWARDS(sig) && GOES_FORWARDS(mu)){

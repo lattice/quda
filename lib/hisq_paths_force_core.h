@@ -77,7 +77,7 @@ printf(" (%f %f) (%f %f) (%f %f)\n", mul##20_re, mul##20_im, mul##21_re, mul##21
 // 	: 24 times with +ve sig and 24 times with -ve sig
 //	28944 Flops per site in total
 //
-template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change> 
+template<class RealA, class RealB, int sig_positive, int mu_positive> 
   __global__ void
                  HISQ_KERNEL_NAME(do_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
                      const RealA* const QprevEven, const RealA* const QprevOdd,  
@@ -127,7 +127,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddnes
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = oddBit ^ oddness_change;
+  oddBit = oddBit ^ kparam.oddness_change;
 
 #else
   int E[4] = {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
@@ -246,7 +246,7 @@ template<class RealA, class RealB, int sig_positive, int mu_positive, int oddnes
 //  else                  (2, 0)
 //  if(sig is positive) 810 flops per lattice site
 //  else 396 flops per lattice site
-template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change> 
+template<class RealA, class RealB, int sig_positive, int mu_positive> 
   __global__ void
 HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd,
     const RealA* const QprevEven, const RealA* const QprevOdd,  
@@ -292,7 +292,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = oddBit ^ oddness_change;
+  oddBit = oddBit ^ kparam.oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -430,7 +430,7 @@ HISQ_KERNEL_NAME(do_lepage_middle_link, EXT)(const RealA* const oprodEven, const
 // call 1: 103680
 // call 2: 864 
 
-template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change>
+template<class RealA, class RealB, int sig_positive, int mu_positive>
   __global__ void
 HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
     const RealA* const QprodEven, const RealA* const QprodOdd,
@@ -462,7 +462,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = oddBit ^ oddness_change;
+  oddBit = oddBit ^ kparam.oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -541,7 +541,7 @@ HISQ_KERNEL_NAME(do_side_link, EXT)(const RealA* const P3Even, const RealA* cons
 // 		(0,1)
 
 
-template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change>
+template<class RealA, class RealB, int sig_positive, int mu_positive>
   __global__ void
 HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA* const P3Odd,
     const RealB* const linkEven,  const RealB* const linkOdd,
@@ -566,7 +566,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
   x[2] = x[2] + kparam.base_idx[2];
   x[3] = x[3] + kparam.base_idx[3];
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = oddBit ^ oddness_change;
+  oddBit = oddBit ^ kparam.oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
@@ -646,7 +646,7 @@ HISQ_KERNEL_NAME(do_side_link_short, EXT)(const RealA* const P3Even, const RealA
 // 1242*192 + 828*192
 // = 397440 Flops per site
 
-template<class RealA, class RealB, int sig_positive, int mu_positive, int oddness_change>
+template<class RealA, class RealB, int sig_positive, int mu_positive>
   __global__ void
 HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* const oprodOdd, 
     const RealA* const QprevEven, const RealA* const QprevOdd,
@@ -693,7 +693,7 @@ HISQ_KERNEL_NAME(do_all_link, EXT)(const RealA* const oprodEven, const RealA* co
 
   int E[4]= {kparam.X[0]+4, kparam.X[1]+4, kparam.X[2]+4, kparam.X[3]+4};
   int new_sid = linkIndexShift(x,dx,E);
-  oddBit = oddBit ^ oddness_change;
+  oddBit = oddBit ^ kparam.oddness_change;
 #else
   int E[4]= {kparam.X[0], kparam.X[1], kparam.X[2], kparam.X[3]};
   int new_sid = sid;
