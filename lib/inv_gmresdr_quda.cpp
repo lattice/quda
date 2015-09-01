@@ -690,8 +690,9 @@ namespace quda {
     //Givens coefficients:
     Complex *Cn = new Complex[m];
     //
-    double *Sn = (double *) calloc(m, sizeof(double));//in fact, it's real
-
+    double *Sn = (double *) safe_malloc(m*sizeof(double));
+    memset(Sn, 0, m * sizeof(double));
+ 
     //Compute initial residual:
     const double normb = norm2(*in);  
     double stop = param.tol*param.tol* normb;	/* Relative to b tolerance */
@@ -1029,7 +1030,7 @@ namespace quda {
 
    delete [] Cn;
 
-   free(Sn);
+   host_free(Sn);
 
    printfQuda("\n..done.\n");
 
@@ -1136,7 +1137,8 @@ namespace quda {
      //Givens coefficients:
      Complex *Cn = new Complex[m];
      //
-     double *Sn = (double *) calloc(m, sizeof(double));//in fact, it's real
+     double *Sn = (double *) safe_malloc(m*sizeof(double));
+     memset(Sn, 0, m * sizeof(double));
 
      //Compute initial residual:
      const double normb = norm2(*in);  
@@ -1319,7 +1321,7 @@ namespace quda {
 
    delete [] Cn;
 
-   free(Sn);
+   host_free(Sn);
 
    printfQuda("\n..done.\n");
 

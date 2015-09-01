@@ -342,9 +342,9 @@ BlasMagmaArgs::~BlasMagmaArgs()
 
 void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, bool host)
 {
-     if(prob_size > m) printf("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m), exit(-1);
-   
 #ifdef MAGMA_LIB
+     if(prob_size > m) printf("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m), exit(-1);
+
      cudaPointerAttributes ptr_attr;
 
      if(!host)
@@ -585,14 +585,13 @@ void BlasMagmaArgs::SpinorMatVec
 
 void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn)
 {
-
+#ifdef MAGMA_LIB
      magma_int_t m = clen; 
      magma_int_t n = qrlen; 
      magma_int_t k = nrefls;
 
      magma_int_t lwork = -1;
 
-#ifdef MAGMA_LIB
      if(prec == 4)
      {
 
@@ -652,6 +651,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
 //computes pVm * pQR
 void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *pQR, const int ldqr, void *pTau, void *pVm, const int cldn)
 {
+#ifdef MAGMA_LIB
     #define  A(i_,j_) ( A + (i_) + (j_)*lda)
     #define dC(i_,j_) (dC + (i_) + (j_)*ldc)
 
@@ -744,14 +744,14 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
      magma_free_cpu( T );
 
      cudaHostUnregister(pQR);
-
+#endif
      return;   
 } 
 
 void BlasMagmaArgs::LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm)
 {
+#ifdef MAGMA_LIB
   if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
-
 
   magma_int_t _m   = ncolsMat;//matrix size
 
@@ -795,14 +795,14 @@ void BlasMagmaArgs::LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat,
   if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
   magma_free_cpu( work );
-
+#endif
   return; 
 }
 
 //pure Lapack-based methods
 void BlasMagmaArgs::LapackLeftConjUNMQR(const int dh /*# of rows*/,  const int n /*# of columns of H*/, const int k /*# of reflectors*/, void *H, const int ldh, void * QR,  const int ldqr, void *tau)//for vectors: n =1
 {
-
+#ifdef MAGMA_LIB
   if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
 
 //Note: # rows of QR = # rows of H.
@@ -844,12 +844,13 @@ void BlasMagmaArgs::LapackLeftConjUNMQR(const int dh /*# of rows*/,  const int n
   if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
   magma_free_cpu( work );
-
+#endif
   return;
 }
 
 void BlasMagmaArgs::LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldh)
 {
+#ifdef MAGMA_LIB
   if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
   //Lapack parameters:
   magma_int_t _n    = n;
@@ -871,12 +872,13 @@ void BlasMagmaArgs::LapackGESV(void* rhs, const int ldn, const int n, void* H, c
   if( (info != 0 ) ) printf( "Error: DGESV, info %d\n",info), exit(-1);
 
   magma_free_cpu(ipiv);
-
+#endif
   return;
 }
 
 void BlasMagmaArgs::LapackGEQR(const int n, void *Mat, const int m, const int ldm, void *tau)
 {
+#ifdef MAGMA_LIB
   if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
 
   magma_int_t _m   = m;
@@ -909,12 +911,13 @@ void BlasMagmaArgs::LapackGEQR(const int n, void *Mat, const int m, const int ld
   if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
 
   magma_free_cpu( work );
-
+#endif
   return;
 }
 
 void BlasMagmaArgs::LapackRightEV(const int m,  const int ldm, void *Mat, void *harVals, void *harVecs, const int ldv)
 {
+#ifdef MAGMA_LIB
   if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
 
   magma_int_t _m   = m;//matrix size
@@ -996,8 +999,7 @@ void BlasMagmaArgs::LapackRightEV(const int m,  const int ldm, void *Mat, void *
   if(rwork)  free(rwork);
   //
   magma_free_cpu( work );
-
-
+#endif
   return;
 }
 
@@ -1046,6 +1048,7 @@ void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev,
 
 void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const int ldm, Complex  *tau)
 {
+#ifdef MAGMA_LIB
   int _m   = m;//matrix size
 
   int _nev = nev;//matrix size
@@ -1123,7 +1126,7 @@ void restoreOrthVectors(Complex * vnev,  const int nev, Complex  *QR, const int 
   LAPACK(zunmqr)(&_s, &_t, &_n, &_n, &_k, (_Complex double *)QR, &_ldn, (_Complex double *)tau, (_Complex double *)vnev, &_ldn, work, &lwork, &info);
 
   if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
-
+#endif
   return;
 }
 
@@ -1131,6 +1134,7 @@ void restoreOrthVectors(Complex * vnev,  const int nev, Complex  *QR, const int 
 void BlasMagmaArgs::LeftConjZUNMQR(const int k /*number of reflectors*/, const int n /*number of columns of H*/, Complex *H, const int dh /*number of rows*/, 
 const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
 {
+#ifdef MAGMA_LIB
 //Note: # rows of QR = # rows of H.
   int _h   = dh;//matrix size
 
@@ -1174,13 +1178,14 @@ const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
   if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
   free(work);
-
+#endif
   return;
 }
 
 
 void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * const conjH, const double beta2, const int m, const int ldH)
 {
+#ifdef MAGMA_LIB
   //Lapack parameters:
   int _m    = m;
   //
@@ -1223,10 +1228,14 @@ void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * c
   free(ipiv);
   //
   delete [] em; 
+#endif
+
+  return;
 }
 
 void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv) 
 {
+#ifdef MAGMA_LIB
   int _m   = m;//matrix size
  
   int _ldH = ldH;
@@ -1312,6 +1321,7 @@ void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int
   //
   if(work)   free(work);
   //
+#endif
   return;
 }
 
@@ -1319,6 +1329,7 @@ void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int
 //in fact ldh = ldm, but let's keep it for a moment.
 void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh)
 {
+#ifdef MAGMA_LIB
     if(prec == 4)
     {
        printf("\nError: single precision is not currently supported\n");
@@ -1489,7 +1500,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     delete [] Qmat;
     delete [] tau ;
-
+#endif
     return; 
 }
 

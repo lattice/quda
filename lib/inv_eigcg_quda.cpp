@@ -58,7 +58,8 @@ namespace quda {
 
         //allocate deflation resources:
         proj_matrix  = new Complex[ld*tot_dim];
-        ritz_values  = (double*)calloc(tot_dim, sizeof(double));
+        ritz_values  = (double*)safe_malloc(tot_dim*sizeof(double));
+        memset(ritz_values, 0 , tot_dim*sizeof(double));
        
         ritz_prec = param.precision_ritz;
 
@@ -78,7 +79,7 @@ namespace quda {
 
         if(cuda_ritz_alloc)    delete cudaRitzVectors;
 
-        if(ritz_values)        free(ritz_values);
+        if(ritz_values)        host_free(ritz_values);
      }
 
      //reset current dimension:
