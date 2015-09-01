@@ -145,18 +145,13 @@ namespace quda {
 #undef GAUGE_FORCE_KERN_NAME
 
 
-  class GaugeForceCuda : public Tunable {
+  class GaugeForceCuda : public TunableLocalParity {
 
   private:
     cudaGaugeField &mom;
     const cudaGaugeField &link;
     const GaugeForceArg &arg;
 
-    unsigned int sharedBytesPerThread() const { return 0; }
-    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-  
-    // don't tune the grid dimension
-    bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
   public:
@@ -190,17 +185,6 @@ namespace quda {
 	  cudaUnbindTexture(siteLink1TexSingle_recon);
 	}
       }
-    }
-
-    bool advanceBlockDim(TuneParam &param) const {
-      bool rtn = Tunable::advanceBlockDim(param);
-      param.block.y = 2;
-      return rtn;
-    }
-    
-    void initTuneParam(TuneParam &param) const {
-      Tunable::initTuneParam(param);
-      param.block.y = 2;
     }
 
     void apply(const cudaStream_t &stream) {
