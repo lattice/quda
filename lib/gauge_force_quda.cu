@@ -40,8 +40,19 @@ namespace quda {
     const double *path_coeff;
 
     int count; // equal to sum of all path lengths.  Used a convenience for computing perf
+
   };
  
+  std::ostream& operator<<(std::ostream& output, const GaugeForceArg& arg) {
+    std::cout << "threads         = " << arg.threads << std::endl;
+    std::cout << "gauge_stride    = " << arg.gauge_stride << std::endl;
+    std::cout << "mom_stride      = " << arg.mom_stride << std::endl;
+    std::cout << "num_paths       = " << arg.num_paths << std::endl;
+    std::cout << "path_max_length = " << arg.path_max_length << std::endl;
+    std::cout << "coeff           = " << arg.coeff << std::endl;
+    std::cout << "dir             = " << arg.dir << std::endl;
+    std::cout << "count           = " << arg.count << std::endl;
+  }
 
 #define GF_SITE_MATRIX_LOAD_TEX 1
 
@@ -181,38 +192,35 @@ namespace quda {
       }
     }
 
+    bool advanceBlockDim(TuneParam &param) const {
+      bool rtn = Tunable::advanceBlockDim(param);
+      param.block.y = 2;
+      return rtn;
+    }
+    
+    void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      param.block.y = 2;
+    }
+
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());    
       if(link.Precision() == QUDA_DOUBLE_PRECISION){      
 	if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	  parity_compute_gauge_force_kernel_dp18<0,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
-										  (double2*)link.Even_p(), (double2*)link.Odd_p(), arg);
-	  parity_compute_gauge_force_kernel_dp18<1,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
-										  (double2*)link.Even_p(), (double2*)link.Odd_p(), arg);
-	
+	  parity_compute_gauge_force_kernel_dp18<double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+										(double2*)link.Even_p(), (double2*)link.Odd_p(), arg);
 	}else{ //QUDA_RECONSTRUCT_12
-	  parity_compute_gauge_force_kernel_dp12<0,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
-										  (double2*)link.Even_p(), (double2*)link.Odd_p(), arg);
-	  parity_compute_gauge_force_kernel_dp12<1,double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
-										  (double2*)link.Even_p(), (double2*)link.Odd_p(), arg);
+	  parity_compute_gauge_force_kernel_dp12<double><<<tp.grid, tp.block>>>((double2*)mom.Even_p(), (double2*)mom.Odd_p(),
+										(double2*)link.Even_p(), (double2*)link.Odd_p(), arg);
 	}
       }else{ //QUDA_SINGLE_PRECISION
 	if(link.Reconstruct() == QUDA_RECONSTRUCT_NO){
 	
-	  parity_compute_gauge_force_kernel_sp18<0,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
-										 (float2*)link.Even_p(), (float2*)link.Odd_p(), arg);
-	  parity_compute_gauge_force_kernel_sp18<1,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
-										 (float2*)link.Even_p(), (float2*)link.Odd_p(), arg);
-	
+	  parity_compute_gauge_force_kernel_sp18<float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+									       (float2*)link.Even_p(), (float2*)link.Odd_p(), arg);
 	}else{ //QUDA_RECONSTRUCT_12
-	  parity_compute_gauge_force_kernel_sp12<0,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
-										 (float4*)link.Even_p(), (float4*)link.Odd_p(), arg);
-	  //odd
-	  /* The reason we do not switch the even/odd function input paramemters and the texture binding
-	   * is that we use the oddbit to decided where to load, in the kernel function
-	   */
-	  parity_compute_gauge_force_kernel_sp12<1,float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
-										 (float4*)link.Even_p(), (float4*)link.Odd_p(), arg);
+	  parity_compute_gauge_force_kernel_sp12<float><<<tp.grid, tp.block>>>((float2*)mom.Even_p(), (float2*)mom.Odd_p(),
+									       (float4*)link.Even_p(), (float4*)link.Odd_p(), arg);
 	}
       }
     }
@@ -220,8 +228,8 @@ namespace quda {
     void preTune() { mom.backup(); }
     void postTune() { mom.restore(); } 
   
-    long long flops() const { return (arg.count - arg.num_paths + 1) * 198ll * mom.VolumeCB(); }
-    long long bytes() const { return ((arg.count + 1ll) * link.Reconstruct() + 2ll*mom.Reconstruct()) * mom.VolumeCB() * mom.Precision(); }
+    long long flops() const { return (arg.count - arg.num_paths + 1) * 198ll * mom.Volume(); }
+    long long bytes() const { return ((arg.count + 1ll) * link.Reconstruct() + 2ll*mom.Reconstruct()) * mom.Volume() * mom.Precision(); }
 
     TuneKey tuneKey() const {
       std::stringstream vol, aux;
@@ -285,7 +293,7 @@ namespace quda {
     arg.length = length_d;
     arg.input_path = input_path_d;
     arg.path_coeff = static_cast<double*>(path_coeff_d);
-    
+
     GaugeForceCuda gaugeForce(cudaMom, cudaSiteLink, arg);
     gaugeForce.apply(0);
     checkCudaError();

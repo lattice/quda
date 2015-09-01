@@ -520,8 +520,13 @@ gauge_force_test(void)
   if (tune) {
     printfQuda("Tuning...\n");
     setTuning(QUDA_TUNE_YES);
+    computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
+			  loop_coeff_d, num_paths, max_length, eb3,
+			  &qudaGaugeParam);
+    memcpy(mom, refmom, 4*V*momSiteSize*gSize); // restore initial momentum for correctness
+    printfQuda("...done\n");
   }
-  
+
   struct timeval t0, t1;
   /* Multiple execution to exclude warmup time in the first run*/
   for (int i =0;i < attempts; i++){

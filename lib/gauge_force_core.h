@@ -471,29 +471,27 @@
 
 //FloatN can be float2/float4/double2
 //Float2 can be float2/double2
-template<int oddBit, typename Float, typename Float2, typename FloatN>
+template<typename Float, typename Float2, typename FloatN>
   __global__ void
   GAUGE_FORCE_KERN_NAME(Float2* momEven, Float2* momOdd, const FloatN* linkEven, const FloatN* linkOdd, GaugeForceArg arg)
 {
   int i,j=0;
   int sid = blockIdx.x * blockDim.x + threadIdx.x;
+  int parity = threadIdx.y;
   if (sid >= arg.threads) return;
 
   int x[4];
-  getCoords(x, sid, arg.X, oddBit);
+  getCoords(x, sid, arg.X, parity);
 
 #ifdef MULTI_GPU
   x[3] += 2; x[2] += 2; x[1] += 2; x[0] += 2;
   int X = x[3]*arg.E[2]*arg.E[1]*arg.E[0] + x[2]*arg.E[1]*arg.E[0] + x[1]*arg.E[0] + x[0];
 #else
-  int x_odd = (x[1] + x[2] + x[3] + oddBit) & 1;
+  int x_odd = (x[1] + x[2] + x[3] + parity) & 1;
   int X = 2*sid + x_odd;
 #endif
     
-  Float2* mymom=momEven;
-  if (oddBit){
-    mymom = momOdd;
-  }
+  Float2* mymom =parity ? momOdd : momEven;
 
   DECLARE_LINK_VARS(LINKA);
   DECLARE_LINK_VARS(LINKB);
@@ -509,7 +507,7 @@ template<int oddBit, typename Float, typename Float2, typename FloatN>
     Float coeff = arg.path_coeff[i];
     if(coeff == 0) continue;
 
-    int nbr_oddbit = (oddBit^1 );
+    int nbr_oddbit = (parity^1 );
 	
     int new_x1 = x[0];
     int new_x2 = x[1];
@@ -586,7 +584,7 @@ template<int oddBit, typename Float, typename Float2, typename FloatN>
     
 
   //update mom 
-  if (oddBit){
+  if (parity){
     LOAD_ODD_MATRIX(arg.dir, (X>>1), LINKA);
   }else{
     LOAD_EVEN_MATRIX(arg.dir, (X>>1), LINKA);
