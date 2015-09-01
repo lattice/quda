@@ -241,6 +241,38 @@ namespace quda {
 
   };
 
+  
+  /**
+     This derived class is for algorithms that deploy parity across
+     the y dimension of the thread block.  The x threads will
+     typically correspond to the checkboarded volume, and there is no
+     explicit shared memory usage.
+   */
+  class TunableLocalParity : public Tunable {
+
+  private:
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
+  
+    // don't tune the grid dimension
+    bool tuneGridDim() const { return false; }
+
+  public:
+    bool advanceBlockDim(TuneParam &param) const {
+      bool rtn = Tunable::advanceBlockDim(param);
+      param.block.y = 2;
+      return rtn;
+    }
+    
+    void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      param.block.y = 2;
+    }
+
+
+  };
+  
+
   void loadTuneCache(QudaVerbosity verbosity);
   void saveTuneCache(QudaVerbosity verbosity);
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity);
