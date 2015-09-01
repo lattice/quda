@@ -186,6 +186,9 @@ namespace quda {
       return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
+    void preTune() { arg.order.save(); }
+    void postTune() { arg.order.load(); }
+
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;
       ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
