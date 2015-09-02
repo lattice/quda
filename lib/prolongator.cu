@@ -37,28 +37,52 @@ namespace quda {
   /**
      Applies the grid prolongation operator (coarse to fine)
   */
+
+  template <typename Float, int coarseColor, class Coarse>
+  __device__ __host__ inline void prolongateStaggered(complex<Float> out[2*coarseColor], const Coarse &in, 
+					     int parity, int x_cb, int parity_coarse, int x_cb_coarse) {
+    for (int s = 0; s < 2; s++) {
+      for (int c = 0; c < coarseColor; c++) {
+        out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, s, c); //spin_map[s] -> s, i.e. if spin_map is a fine grid spin map, then we need direct mapping
+      }
+    }
+    return;
+  }
+
+
   template <typename Float, int fineSpin, int coarseColor, class Coarse>
   __device__ __host__ inline void prolongate(complex<Float> out[fineSpin*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, const int *geo_map, const int *spin_map, int fineVolume) {
-    int x = parity*fineVolume/2 + x_cb;
-    int x_coarse = geo_map[x];
-    int parity_coarse = (x_coarse >= in.Volume()/2) ? 1 : 0;
-    int x_coarse_cb = x_coarse - parity_coarse*in.Volume()/2;
-
+					     int parity, int x_cb, int parity_coarse, int x_cb_coarse, const int *spin_map) {
     for (int s=0; s<fineSpin; s++) {
       for (int c=0; c<coarseColor; c++) {
 	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map[s], c);
       }
     }
+    return;
   }
 
   /**
      Rotates from the coarse-color basis into the fine-color basis.  This
      is the second step of applying the prolongator.
   */
+  template <typename Float, int fineColor, int coarseColor, class FineColor, class Rotator>
+  __device__ __host__ inline void rotateFineColorStaggered(FineColor &out, const complex<Float> in[2*coarseColor],
+						  const Rotator &V, int parity, int x_cb, int parity_coarse) {
+    for (int i=0; i<out.Ncolor(); i++) out(parity, x_cb, 0, i) = 0.0;
+
+    int coherent_block_parity = parity ^ parity_coarse;
+    
+    for (int i=0; i<fineColor; i++) {
+      for (int j=0; j<coarseColor; j++) { 
+	// V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
+ 	out(parity, x_cb, 0, i) += V(parity, x_cb, 0, i, j) * in[coherent_block_parity*coarseColor + j];
+      }
+    }
+  }
+
   template <typename Float, int fineSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
   __device__ __host__ inline void rotateFineColor(FineColor &out, const complex<Float> in[fineSpin*coarseColor],
-						  const Rotator &V, int parity, int x_cb) {
+						  const Rotator &V, int parity, int x_cb, int parity_coarse) {
     for (int s=0; s<out.Nspin(); s++) 
       for (int i=0; i<out.Ncolor(); i++) out(parity, x_cb, s, i) = 0.0;
     
@@ -70,29 +94,57 @@ namespace quda {
 	}
       }
     }
-
   }
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   void Prolongate(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
       for (int x_cb=0; x_cb<arg.out.Volume()/2; x_cb++) {
-	complex<Float> tmp[fineSpin*coarseColor];
-	prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.Volume());
-	rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
+
+        int x = parity*arg.out.Volume()/2 + x_cb;
+        int x_coarse = arg.geo_map[x];
+        int parity_coarse = (x_coarse >= arg.in.Volume()/2) ? 1 : 0;
+        int x_coarse_cb = x_coarse - parity_coarse*arg.in.Volume()/2;
+
+        if(fineSpin == 1)//staggered top level
+        {
+          complex<Float> tmp[2*coarseColor];
+	  prolongateStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse);
+	  rotateFineColorStaggered<Float,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+        }
+        else
+        {
+          complex<Float> tmp[fineSpin*coarseColor];
+	  prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse, arg.spin_map);
+	  rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+        }
       }
     }
   }
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   __global__ void ProlongateKernel(Arg arg) {
+
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity=threadIdx.y; //parity is within the block
     if (x_cb >= arg.out.Volume()/2) return;
 
-    complex<Float> tmp[fineSpin*coarseColor];
-    prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.Volume());
-    rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
+    int x = parity*arg.out.Volume()/2 + x_cb;
+    int x_coarse = arg.geo_map[x];
+    int parity_coarse = (x_coarse >= arg.in.Volume()/2) ? 1 : 0;
+    int x_coarse_cb = x_coarse - parity_coarse*arg.in.Volume()/2;
+    if(fineSpin == 1)
+    {
+      complex<Float> tmp[2*coarseColor];
+      prolongateStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse);
+      rotateFineColorStaggered<Float,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+    }
+    else
+    {
+      complex<Float> tmp[fineSpin*coarseColor];
+      prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse, arg.spin_map);
+      rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse, x_cb_coarse);
+    }
   }
   
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
@@ -120,8 +172,7 @@ namespace quda {
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	tp.block.y = 2; // need factor of two for parity with in the block
-	ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg> 
-	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }
 

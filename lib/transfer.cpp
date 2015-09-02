@@ -20,13 +20,14 @@ namespace quda {
   /*
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
+  * spin_bs = 2 for the top level and = 1 otherwise. For staggered it's always 1, however.
   */
 
   Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs = 1) 
     : B(B), Nvec(Nvec), V(0), V_h(0), V_d(0), tmp2(0), tmp3(0), geo_bs(0), 
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0)
+      spin_bs(spin_bs), spin_map(0), block_parity_h(0), block_parity_d(0), block_parity(0)
   {
     int ndim = B[0]->Ndim();
     this->geo_bs = new int[ndim];
@@ -110,21 +111,29 @@ namespace quda {
     // allocate and compute the fine-to-coarse and coarse-to-fine site maps
     fine_to_coarse_h = static_cast<int*>(safe_malloc(B[0]->Volume()*sizeof(int)));
     coarse_to_fine_h = static_cast<int*>(safe_malloc(B[0]->Volume()*sizeof(int)));
+    //
+    block_parity_h   = static_cast<int*>(safe_malloc(B[0]->Volume()*sizeof(int)));
 
     if (gpu_transfer) {
       fine_to_coarse_d = static_cast<int*>(device_malloc(B[0]->Volume()*sizeof(int)));
       coarse_to_fine_d = static_cast<int*>(device_malloc(B[0]->Volume()*sizeof(int)));
+      block_parity_d   = static_cast<int*>(device_malloc(B[0]->Volume()*sizeof(int)));
       fine_to_coarse = fine_to_coarse_d;
       coarse_to_fine = coarse_to_fine_d;
+      block_parity = block_parity_d;
     } else {
       fine_to_coarse = fine_to_coarse_h;
       coarse_to_fine = coarse_to_fine_h;
+      block_parity = block_parity_h;
     }
 
     createGeoMap(geo_bs);
 
-    // allocate the fine-to-coarse spin map (don't need it for staggered.)
-    if (param.nSpin != 1){
+    // allocate the fine-to-coarse spin map (don't need it for the top level staggered lattice.)
+    //if (param.nSpin == 1 && spin_bs != 1 ) { errorQuda("Error: wrong spin block size for the top level staggered lattice! (%d) ", spin_bs);}
+
+    if ( param.nSpin != 1 )
+    {
       spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
       createSpinMap(spin_bs);
     }
@@ -188,6 +197,8 @@ namespace quda {
       coarse.OffsetIndex(k, x); // this index is parity ordered
       fine_to_coarse_h[i] = k;
 
+      block_parity[i] = (k < coarse.Volume() / 2) ? 0 : 1;//too simple information, better to compute on the fly?
+
       //printfQuda("coarse after (%d,%d,%d,%d), coarse idx %d\n", x[0], x[1], x[2], x[3], k);
     }
 
@@ -210,7 +221,7 @@ namespace quda {
   void Transfer::createSpinMap(int spin_bs) {
 
     for (int s=0; s<B[0]->Nspin(); s++) {
-      spin_map[s] = s / spin_bs;
+      spin_map[s] = s / spin_bs;//Transfer from coarse to coarsecoarse grid : spin_bs = 1 => direct mapping
     }
 
   }

@@ -86,13 +86,21 @@ namespace quda {
     /** The length of the coarse lattice */
     int coarse_length;
 
+    /** Block parity of the fine lattice */
+    int *block_parity_h;
+
+    int *block_parity_d;
+
+    int *block_parity;
+
+
     /**
      * Copies the null-space vector components into the V-field
      */
     void fillV(ColorSpinorField &V);
 
     /** 
-     * Creates the map between fine and coarse grids 
+     * Creates the map between fine and coarse grids, identifies block parity 
      * @param geo_bs An array storing the block size in each geometric dimension
      */
     void createGeoMap(int *geo_bs);

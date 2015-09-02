@@ -558,7 +558,14 @@ namespace quda {
 						   QudaFieldLocation new_location) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin 
+    if(nColor == 3 && nSpin == 1 && spinBlockSize == 1) //create coarse staggered from fine staggered
+    {
+      coarseParam.nSpin = 2;//enforce nSpin = 2 for the coarse grid staggered field, spinBlockSize = 1 always for staggered.
+    }
+    else
+    {
+      coarseParam.nSpin = nSpin / spinBlockSize; //for coarse coarse staggered coarseParam.nSpin = nSpin , spinBlockSize = 1
+    }
     coarseParam.nColor = Nvec;
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -582,7 +589,14 @@ namespace quda {
 						 QudaFieldLocation new_location) {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
-    fineParam.nSpin = nSpin * spinBlockSize;
+    if(Nvec == 3 && nSpin == 2 && spinBlockSize == 1)
+    {
+      fineParam.nSpin = 1; //top-level fine grid staggered.
+    }
+    else
+    { 
+      fineParam.nSpin = nSpin * spinBlockSize;
+    }
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
     fineParam.create = QUDA_ZERO_FIELD_CREATE;
