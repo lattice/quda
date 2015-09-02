@@ -108,17 +108,35 @@ namespace quda {
     texture<float2, 1, cudaReadModeElementType>  newOprod0TexSingle;
     texture<float2, 1, cudaReadModeElementType> newOprod1TexSingle;
 
-
-    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned){
+    template <int dir>
+    inline __device__ __host__ void updateCoords(int x[], int shift, const int X[4], const int partitioned[]){
 #ifdef MULTI_GPU
-      if(shift == 1){
-        x[dir] = (partitioned || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
-      }else if(shift == -1){
-        x[dir] = (partitioned || (x[dir] != 2)) ? x[dir]-1 : X[dir]+1;
+      if (shift == 1) {
+        x[dir] = (partitioned[dir] || (x[dir] != X[dir]+1)) ? x[dir]+1 : 2;
+      } else if (shift == -1) {
+        x[dir] = (partitioned[dir] || (x[dir] != 2)) ? x[dir]-1 : X[dir]+1;
       }
 #else 
       x[dir] = (x[dir]+shift + X[dir])%X[dir];
 #endif
+    }
+
+    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const int X[4], const int partitioned[]) {
+      switch (dir) {
+        case 0:
+	  updateCoords<0>(x, shift, X, partitioned);
+	  break;
+        case 1:
+	  updateCoords<1>(x, shift, X, partitioned);
+	  break;
+        case 2:
+	  updateCoords<2>(x, shift, X, partitioned);
+	  break;
+        case 3:
+	  updateCoords<3>(x, shift, X, partitioned);
+	  break;
+      }
+
       return;
     }
 
@@ -948,7 +966,6 @@ namespace quda {
           cudaGaugeField &newOprod;
           const hisq_kernel_param_t &kparam;
 
-          bool tuneGridDim() const { return false; }
           unsigned int minThreads() const { return kparam.threads; }
 
         public:
