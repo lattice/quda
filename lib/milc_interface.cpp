@@ -431,69 +431,54 @@ static int getVolume(const int dim[4])
 }
 
 
-  template<class Real>
-static void setLoopCoeffs(const double milc_loop_coeff[3],
-    Real loop_coeff[48])
-{
-  // 6 plaquette terms
-  for(int i=0; i<6; ++i) loop_coeff[i] = milc_loop_coeff[0];      
-
-  // 18 rectangle terms
-  for(int i=0; i<18; ++i) loop_coeff[i+6] = milc_loop_coeff[1];
-
-  for(int i=0; i<24; ++i) loop_coeff[i+24] = milc_loop_coeff[2];
-
-  return;
-}
-
-
-
 static inline int opp(int dir){
   return 7-dir;
 }
 
 
-static void createGaugeForcePaths(int **paths, int dir){
+static void createGaugeForcePaths(int **paths, int dir, int num_loop_types){
 
   int index=0;
   // Plaquette paths
-  for(int i=0; i<4; ++i){
-    if(i==dir) continue;
-    paths[index][0] = i;        paths[index][1] = opp(dir);   paths[index++][2] = opp(i);
-    paths[index][0] = opp(i);   paths[index][1] = opp(dir);   paths[index++][2] = i;
-  }
+  if (num_loop_types >= 1) 
+    for(int i=0; i<4; ++i){
+      if(i==dir) continue;
+      paths[index][0] = i;        paths[index][1] = opp(dir);   paths[index++][2] = opp(i);
+      paths[index][0] = opp(i);   paths[index][1] = opp(dir);   paths[index++][2] = i;
+    }
 
   // Rectangle Paths
-  for(int i=0; i<4; ++i){
-    if(i==dir) continue;
-    paths[index][0] = paths[index][1] = i;       paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = opp(i);
-    index++;  
-    paths[index][0] = paths[index][1] = opp(i);  paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = i;
-    index++;
-    paths[index][0] = dir; paths[index][1] = i; paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = opp(i);
-    index++;
-    paths[index][0] = dir; paths[index][1] = opp(i); paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = i;
-    index++;
-    paths[index][0] = i;  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = opp(i); paths[index][4] = dir; 
-    index++;
-    paths[index][0] = opp(i);  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = i; paths[index][4] = dir; 
-    index++;
-  }
+  if (num_loop_types >= 2) 
+    for(int i=0; i<4; ++i){
+      if(i==dir) continue;
+      paths[index][0] = paths[index][1] = i;       paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = opp(i);
+      index++;  
+      paths[index][0] = paths[index][1] = opp(i);  paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = i;
+      index++;
+      paths[index][0] = dir; paths[index][1] = i; paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = opp(i);
+      index++;
+      paths[index][0] = dir; paths[index][1] = opp(i); paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = i;
+      index++;
+      paths[index][0] = i;  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = opp(i); paths[index][4] = dir; 
+      index++;
+      paths[index][0] = opp(i);  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = i; paths[index][4] = dir; 
+      index++;
+    }
 
-
-  // Staple paths
-  for(int i=0; i<4; ++i){
-    for(int j=0; j<4; ++j){
-      if(i==dir || j==dir || i==j) continue;
-
-      paths[index][0] = i; paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = opp(j);
-      index++;
-      paths[index][0] = i; paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = j;
-      index++;
-      paths[index][0] = opp(i); paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = opp(j);
-      index++;
-      paths[index][0] = opp(i); paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = j;
-      index++;
+  if (num_loop_types >= 3) {
+    // Staple paths
+    for(int i=0; i<4; ++i){
+      for(int j=0; j<4; ++j){
+	if(i==dir || j==dir || i==j) continue;	
+	paths[index][0] = i; paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = opp(j);
+	index++;
+	paths[index][0] = i; paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = j;
+	index++;
+	paths[index][0] = opp(i); paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = opp(j);
+	index++;
+	paths[index][0] = opp(i); paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = j;
+	index++;
+      }
     }
   }
 
@@ -502,44 +487,57 @@ static void createGaugeForcePaths(int **paths, int dir){
 
 
 void qudaGaugeForce( int precision,
-    int num_loop_types,
-    double milc_loop_coeff[3],
-    double eb3,
-    void* milc_sitelink,
-    void* milc_momentum
-    )
+		     int num_loop_types,
+		     double milc_loop_coeff[3],
+		     double eb3,
+		     void* milc_sitelink,
+		     void* milc_momentum )
 {
   qudamilc_called<true>(__func__);
-  const int numPaths = 48;
+
+  int numPaths = 0;
+  switch (num_loop_types) {
+  case 1:
+    numPaths = 6;
+    break;
+  case 2:
+    numPaths = 24;
+    break;
+  case 3:
+    numPaths = 48;
+    break;
+  default:
+    errorQuda("Invalid num_loop_types = %d\n", num_loop_types);
+  }
+
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
       QUDA_SU3_LINKS);
 
-  static double loop_coeff[numPaths];
-  static int length[numPaths];
+  double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
+  int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
 
-  if((milc_loop_coeff[0] != loop_coeff[0]) ||
-      (milc_loop_coeff[1] != loop_coeff[6]) ||
-      (milc_loop_coeff[2] != loop_coeff[24]) ){
-
-    setLoopCoeffs(milc_loop_coeff, loop_coeff);
-    for(int i=0; i<6; ++i)  length[i] = 3;
-    for(int i=6; i<48; ++i) length[i] = 5;
-  }
-
-
+  if (num_loop_types >= 1) for(int i= 0; i< 6; ++i) {
+      loop_coeff[i] = milc_loop_coeff[0];      
+      length[i] = 3;
+    }
+  if (num_loop_types >= 2) for(int i= 6; i<24; ++i) {
+      loop_coeff[i] = milc_loop_coeff[1];
+      length[i] = 5;
+    }
+  if (num_loop_types >= 3) for(int i=24; i<48; ++i) {
+      loop_coeff[i] = milc_loop_coeff[2];
+      length[i] = 5;
+    }
+    
   int** input_path_buf[4];
   for(int dir=0; dir<4; ++dir){
-    input_path_buf[dir] = new int*[numPaths];
+    input_path_buf[dir] = static_cast<int**>(safe_malloc(numPaths*sizeof(int*)));
     for(int i=0; i<numPaths; ++i){
-      input_path_buf[dir][i] = new int[length[i]];
+      input_path_buf[dir][i] = static_cast<int*>(safe_malloc(length[i]*sizeof(int)));
     }
-    createGaugeForcePaths(input_path_buf[dir], dir);
+    createGaugeForcePaths(input_path_buf[dir], dir, num_loop_types);
   }
-
-  int max_length = 6;
-
-  memset(milc_momentum, 0, 4*getVolume(localDim)*10*qudaGaugeParam.cpu_prec);
 
   if (!invalidate_quda_mom) {
     qudaGaugeParam.use_resident_mom = true;
@@ -551,16 +549,19 @@ void qudaGaugeForce( int precision,
     qudaGaugeParam.return_mom = true;
   }
 
+  int max_length = 6;
+
   computeGaugeForceQuda(milc_momentum, milc_sitelink,  input_path_buf, length,
-			loop_coeff, numPaths, max_length, eb3, 
-			&qudaGaugeParam);
+			loop_coeff, numPaths, max_length, eb3, &qudaGaugeParam);
 
   for(int dir=0; dir<4; ++dir){
-    for(int i=0; i<numPaths; ++i){
-      delete[] input_path_buf[dir][i];
-    }
-    delete[] input_path_buf[dir];
+    for(int i=0; i<numPaths; ++i) host_free(input_path_buf[dir][i]);
+    host_free(input_path_buf[dir]);
   }
+
+  host_free(length);
+  host_free(loop_coeff);
+
   qudamilc_called<false>(__func__);
   return;
 }
