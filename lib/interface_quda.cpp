@@ -514,10 +514,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   // if we are using half precision then we need to compute the fat
   // link maximum while still on the cpu
   // FIXME get a kernel for this
-  if ((param->cuda_prec == QUDA_HALF_PRECISION ||
-        param->cuda_prec_sloppy == QUDA_HALF_PRECISION ||
-        param->cuda_prec_precondition == QUDA_HALF_PRECISION) &&
-      param->type == QUDA_ASQTAD_FAT_LINKS)
+  if (param->type == QUDA_ASQTAD_FAT_LINKS)
     gauge_param.compute_fat_link_max = true;
 
   GaugeField *in = (param->location == QUDA_CPU_FIELD_LOCATION) ?
@@ -1061,6 +1058,109 @@ void freeSloppyGaugeQuda(void)
   gaugeFatSloppy = NULL;
 }
 
+
+void loadSloppyGaugeQuda(QudaPrecision prec_sloppy, QudaPrecision prec_precondition)
+{
+  // first do SU3 links (if they exist)
+  if (gaugePrecise) {
+    GaugeFieldParam gauge_param(*gaugePrecise);
+    gauge_param.setPrecision(prec_sloppy);
+    //gauge_param.reconstruct = param->reconstruct_sloppy; // FIXME 
+
+    if (gaugeSloppy) errorQuda("gaugeSloppy already exists");
+
+    if (gauge_param.precision != gaugePrecise->Precision() ||
+	gauge_param.reconstruct != gaugePrecise->Reconstruct()) {
+      gaugeSloppy = new cudaGaugeField(gauge_param);
+      gaugeSloppy->copy(*gaugePrecise);
+    } else {
+      gaugeSloppy = gaugePrecise;
+    }
+
+    // switch the parameters for creating the mirror preconditioner cuda gauge field
+    gauge_param.setPrecision(prec_precondition);
+    //gauge_param.reconstruct = param->reconstruct_precondition; // FIXME
+
+    if (gaugePrecondition) errorQuda("gaugePrecondition already exists");
+
+    if (gauge_param.precision != gaugeSloppy->Precision() ||
+	gauge_param.reconstruct != gaugeSloppy->Reconstruct()) {
+      gaugePrecondition = new cudaGaugeField(gauge_param);
+      gaugePrecondition->copy(*gaugeSloppy);
+    } else {
+      gaugePrecondition = gaugeSloppy;
+    }
+  }
+
+  // fat links (if they exist)
+  if (gaugeFatPrecise) {
+    GaugeFieldParam gauge_param(*gaugeFatPrecise);
+
+    if (gaugeFatSloppy != gaugeSloppy) {
+      gauge_param.setPrecision(prec_sloppy);
+      //gauge_param.reconstruct = param->reconstruct_sloppy; // FIXME 
+      
+      if (gaugeFatSloppy) errorQuda("gaugeFatSloppy already exists");
+      if (gaugeFatSloppy != gaugeFatPrecise) delete gaugeFatSloppy;
+      
+      if (gauge_param.precision != gaugeFatPrecise->Precision() ||
+	  gauge_param.reconstruct != gaugeFatPrecise->Reconstruct()) {
+	gaugeFatSloppy = new cudaGaugeField(gauge_param);
+	gaugeFatSloppy->copy(*gaugeFatPrecise);
+      } else {
+	gaugeFatSloppy = gaugeFatPrecise;
+      }
+    }
+
+    if (gaugeFatPrecondition != gaugePrecondition) {
+      // switch the parameters for creating the mirror preconditioner cuda gauge field
+      gauge_param.setPrecision(prec_precondition);
+      //gauge_param.reconstruct = param->reconstruct_precondition; // FIXME
+      
+      if (gaugeFatPrecondition) errorQuda("gaugeFatPrecondition already exists\n");
+      
+      if (gauge_param.precision != gaugeFatSloppy->Precision() ||
+	  gauge_param.reconstruct != gaugeFatSloppy->Reconstruct()) {
+	gaugeFatPrecondition = new cudaGaugeField(gauge_param);
+	gaugeFatPrecondition->copy(*gaugeFatSloppy);
+      } else {
+	gaugeFatPrecondition = gaugeFatSloppy;
+      }
+    }
+  }
+
+  // long links (if they exist)
+  if (gaugeLongPrecise) {
+    GaugeFieldParam gauge_param(*gaugeLongPrecise);
+    gauge_param.setPrecision(prec_sloppy);
+    //gauge_param.reconstruct = param->reconstruct_sloppy; // FIXME 
+
+    if (gaugeLongSloppy) errorQuda("gaugeLongSloppy already exists");
+    if (gaugeLongSloppy != gaugeLongPrecise) delete gaugeLongSloppy;
+
+    if (gauge_param.precision != gaugeLongPrecise->Precision() ||
+	gauge_param.reconstruct != gaugeLongPrecise->Reconstruct()) {
+      gaugeLongSloppy = new cudaGaugeField(gauge_param);
+      gaugeLongSloppy->copy(*gaugeLongPrecise);
+    } else {
+      gaugeLongSloppy = gaugeLongPrecise;
+    }
+
+    // switch the parameters for creating the mirror preconditioner cuda gauge field
+    gauge_param.setPrecision(prec_precondition);
+    //gauge_param.reconstruct = param->reconstruct_precondition; // FIXME
+
+    if (gaugeLongPrecondition) warningQuda("gaugeLongPrecondition already exists\n");
+
+    if (gauge_param.precision != gaugeLongSloppy->Precision() ||
+	gauge_param.reconstruct != gaugeLongSloppy->Reconstruct()) {
+      gaugeLongPrecondition = new cudaGaugeField(gauge_param);
+      gaugeLongPrecondition->copy(*gaugeLongSloppy);
+    } else {
+      gaugeLongPrecondition = gaugeLongSloppy;
+    }
+  }
+}
 
 void freeCloverQuda(void)
 {
@@ -1805,8 +1905,19 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 }
 
 quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
+
+  if (param->cuda_prec != gaugePrecise->Precision()) {
+    errorQuda("Solve precision %d doesn't match gauge precision %d", param->cuda_prec, gaugePrecise->Precision());
+  }
+
   quda::cudaGaugeField *cudaGauge = NULL;
   if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+    if (param->cuda_prec_sloppy != gaugeSloppy->Precision() ||
+	param->cuda_prec_precondition != gaugePrecondition->Precision()) {
+      freeSloppyGaugeQuda();
+      loadSloppyGaugeQuda(param->cuda_prec_sloppy, param->cuda_prec_precondition);
+    }
+
     if (gaugePrecise == NULL) errorQuda("Precise gauge field doesn't exist");
     if (gaugeSloppy == NULL) errorQuda("Sloppy gauge field doesn't exist");
     if (gaugePrecondition == NULL) errorQuda("Precondition gauge field doesn't exist");
@@ -1815,6 +1926,14 @@ quda::cudaGaugeField* checkGauge(QudaInvertParam *param) {
     }
     cudaGauge = gaugePrecise;
   } else {
+    if (param->cuda_prec_sloppy != gaugeFatSloppy->Precision() ||
+	param->cuda_prec_precondition != gaugeFatPrecondition->Precision() ||
+	param->cuda_prec_sloppy != gaugeLongSloppy->Precision() ||
+	param->cuda_prec_precondition != gaugeLongPrecondition->Precision()) {
+      freeSloppyGaugeQuda();
+      loadSloppyGaugeQuda(param->cuda_prec_sloppy, param->cuda_prec_precondition);
+    }
+
     if (gaugeFatPrecise == NULL) errorQuda("Precise gauge fat field doesn't exist");
     if (gaugeFatSloppy == NULL) errorQuda("Sloppy gauge fat field doesn't exist");
     if (gaugeFatPrecondition == NULL) errorQuda("Precondition gauge fat field doesn't exist");
