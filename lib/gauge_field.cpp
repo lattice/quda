@@ -3,6 +3,39 @@
 
 namespace quda {
 
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(),
+    nColor(3),
+    nFace(u.Nface()),
+    reconstruct(u.Reconstruct()),
+    order(u.Order()),
+    fixed(u.GaugeFixed()),
+    link_type(u.LinkType()),
+    t_boundary(u.TBoundary()),
+    anisotropy(u.Anisotropy()),
+    tadpole(u.Tadpole()),
+    scale(u.Scale()),
+    gauge(NULL),
+    create(QUDA_NULL_FIELD_CREATE),
+    geometry(u.Geometry()),
+    pinned(0),
+    compute_fat_link_max(false),
+    ghostExchange(u.GhostExchange()),
+    staggeredPhaseType(u.StaggeredPhase()),
+    staggeredPhaseApplied(u.StaggeredPhaseApplied()),
+    i_mu(u.iMu())
+      {
+	precision = u.Precision();
+	nDim = u.Ndim();
+	pad = u.Pad();
+	siteSubset = QUDA_FULL_SITE_SUBSET;
+
+	for(int dir=0; dir<nDim; ++dir) {
+	  x[dir] = u.X()[dir];
+	  r[dir] = u.X()[dir];
+	}
+      }
+
+
   GaugeField::GaugeField(const GaugeFieldParam &param) :
     LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
     geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 

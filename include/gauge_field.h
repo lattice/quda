@@ -81,6 +81,8 @@ namespace quda {
 	  }
 	}
 
+    GaugeFieldParam(const GaugeField &u);
+
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry, 
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
