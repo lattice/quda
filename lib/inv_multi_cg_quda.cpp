@@ -22,6 +22,49 @@
 
 namespace quda {
 
+  class Worker {
+
+  public:
+    Worker() { }
+    virtual ~Worker() { }
+    virtual void apply(const cudaStream_t &stream);
+    
+  };
+  
+  class ShiftUpdate : public Worker {
+
+    cudaColorSpinorField *r;
+    cudaColorSpinorField **p;
+    cudaColorSpinorField **x;
+
+    double **alpha;
+    double **beta;
+    double **zeta;
+    double **zeta_old;
+
+    int j_low;
+    int n_shift;
+
+  public:
+    ShiftUpdate(cudaColorSpinorField *r, cudaColorSpinorField **p, cudaColorSpinorField **x,
+		double **alpha, double **beta, double **zeta, double **zeta_old, int j_low, int n_shift) :
+      r(r), p(p), x(x), alpha(alpha), beta(beta), zeta(zeta), zeta_old(zeta_old), j_low(j_low), n_shift(n_shift) {
+      
+    }
+    virtual ~ShiftUpdate() { }
+    
+    void updateNshift(int new_n_shift) { n_shift = new_n_shift; }
+    
+    void apply(const cudaStream_t &stream) {      
+      for (int j=0; j<n_shift; j++) {
+	*beta[j] = *beta[j_low] * *zeta[j] * *alpha[j] / (*zeta_old[j] * *alpha[j_low]);
+	// update p[i] and x[i]
+	axpyBzpcxCuda(*alpha[j], *p[j], *x[j], *zeta[j], *r, *beta[j]);
+      }
+    }
+    
+  };
+  
   MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param,
 			     TimeProfile &profile) 
     : MultiShiftSolver(param, profile), mat(mat), matSloppy(matSloppy) {
@@ -199,6 +242,9 @@ namespace quda {
     int rUpdate = 0;
     quda::blas_flops = 0;
 
+    // now create the worker class for updating the shifted solutions and gradient vectors
+    ShiftUpdate shift_update(r_sloppy, p, x, &alpha, &beta, &zeta, &zeta_old, j_low, num_offset_now);
+    
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -242,11 +288,12 @@ namespace quda {
 	// update p[0] and x[0]
 	axpyZpbxCuda(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
 
-	for (int j=1; j<num_offset_now; j++) {
+	shift_update.apply(0);
+	/*for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
 	  // update p[i] and x[i]
 	  axpyBzpcxCuda(alpha[j], *p[j], *x_sloppy[j], zeta[j], *r_sloppy, beta[j]);
-	}
+	  }*/
       } else {
 	for (int j=0; j<num_offset_now; j++) {
 	  axpyCuda(alpha[j], *p[j], *x_sloppy[j]);
@@ -304,6 +351,7 @@ namespace quda {
       for (int j=1; j<num_offset_now; j++) {
         if (zeta[j] == 0.0) {
           num_offset_now--;
+	  shift_update.updateNshift(num_offset_now);
           if (getVerbosity() >= QUDA_VERBOSE)
               printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
         } else {
