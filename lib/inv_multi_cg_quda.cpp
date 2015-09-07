@@ -27,7 +27,7 @@ namespace quda {
   public:
     Worker() { }
     virtual ~Worker() { }
-    virtual void apply(const cudaStream_t &stream);
+    virtual void apply(const cudaStream_t &stream) = 0;
     
   };
   
@@ -37,17 +37,17 @@ namespace quda {
     cudaColorSpinorField **p;
     cudaColorSpinorField **x;
 
-    double **alpha;
-    double **beta;
-    double **zeta;
-    double **zeta_old;
+    double *alpha;
+    double *beta;
+    double *zeta;
+    double *zeta_old;
 
     int j_low;
     int n_shift;
 
   public:
     ShiftUpdate(cudaColorSpinorField *r, cudaColorSpinorField **p, cudaColorSpinorField **x,
-		double **alpha, double **beta, double **zeta, double **zeta_old, int j_low, int n_shift) :
+		double *alpha, double *beta, double *zeta, double *zeta_old, int j_low, int n_shift) :
       r(r), p(p), x(x), alpha(alpha), beta(beta), zeta(zeta), zeta_old(zeta_old), j_low(j_low), n_shift(n_shift) {
       
     }
@@ -56,10 +56,10 @@ namespace quda {
     void updateNshift(int new_n_shift) { n_shift = new_n_shift; }
     
     void apply(const cudaStream_t &stream) {      
-      for (int j=0; j<n_shift; j++) {
-	*beta[j] = *beta[j_low] * *zeta[j] * *alpha[j] / (*zeta_old[j] * *alpha[j_low]);
+      for (int j=1; j<n_shift; j++) {
+	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
 	// update p[i] and x[i]
-	axpyBzpcxCuda(*alpha[j], *p[j], *x[j], *zeta[j], *r, *beta[j]);
+	axpyBzpcxCuda(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
       }
     }
     
@@ -243,7 +243,7 @@ namespace quda {
     quda::blas_flops = 0;
 
     // now create the worker class for updating the shifted solutions and gradient vectors
-    ShiftUpdate shift_update(r_sloppy, p, x, &alpha, &beta, &zeta, &zeta_old, j_low, num_offset_now);
+    ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
     
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -358,6 +358,7 @@ namespace quda {
 	  r2[j] = zeta[j] * zeta[j] * r2[0];
 	  if (r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) {
             num_offset_now--;
+	    shift_update.updateNshift(num_offset_now);
 	    if (getVerbosity() >= QUDA_VERBOSE)
 	      printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
           }
