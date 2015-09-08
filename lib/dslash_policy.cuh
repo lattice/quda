@@ -1012,6 +1012,7 @@ struct DslashFusedExterior : DslashPolicyImp {
 #endif // MULTI_GPU
 
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
 #ifdef MULTI_GPU 
 
