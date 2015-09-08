@@ -20,17 +20,10 @@
  *
  */
 
+#include <worker.h>
+
 namespace quda {
 
-  class Worker {
-
-  public:
-    Worker() { }
-    virtual ~Worker() { }
-    virtual void apply(const cudaStream_t &stream) = 0;
-    
-  };
-  
   class ShiftUpdate : public Worker {
 
     cudaColorSpinorField *r;
@@ -56,15 +49,35 @@ namespace quda {
     void updateNshift(int new_n_shift) { n_shift = new_n_shift; }
     
     void apply(const cudaStream_t &stream) {      
-      for (int j=1; j<n_shift; j++) {
-	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
-	// update p[i] and x[i]
-	axpyBzpcxCuda(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
+      static int count = 0;
+
+      if (count == 0) {
+	// on the first call do the first half of the update
+	//printfQuda("Updating shifts %d..%d\n", 1, n_shift/2);
+	for (int j=1; j<=n_shift/2; j++) {
+	  beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
+	  // update p[i] and x[i]
+	  axpyBzpcxCuda(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
+	}
+	count = 1;
+      } else {
+	// on the second call do the second half of the update
+	//printfQuda("Updating shifts %d..%d\n", n_shift/2+1, n_shift);
+	for (int j=n_shift/2+1; j<n_shift; j++) {
+	  beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
+	  // update p[i] and x[i]
+	  axpyBzpcxCuda(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
+	}
+	count = 0;
       }
     }
     
   };
-  
+
+  namespace dslash {
+    extern Worker* aux_worker;
+  }  
+
   MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param,
 			     TimeProfile &profile) 
     : MultiShiftSolver(param, profile), mat(mat), matSloppy(matSloppy) {
@@ -242,6 +255,8 @@ namespace quda {
     int rUpdate = 0;
     quda::blas_flops = 0;
 
+    bool aux_update = false;
+
     // now create the worker class for updating the shifted solutions and gradient vectors
     ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
     
@@ -252,7 +267,12 @@ namespace quda {
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
     while (r2[0] > stop[0] &&  k < param.maxiter) {
+
+      if (aux_update) dslash::aux_worker = &shift_update;
       matSloppy(*Ap, *p[0], tmp1, tmp2);
+      dslash::aux_worker = NULL;
+      aux_update = false;
+
       // FIXME - this should be curried into the Dirac operator
       if (r->Nspin()==4) axpyCuda(offset[0], *p[0], *Ap); 
 
@@ -288,6 +308,9 @@ namespace quda {
 	// update p[0] and x[0]
 	axpyZpbxCuda(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
 
+	// this should trigger the shift update in the subsequent sloppy dslash
+	//aux_update = true;
+	shift_update.apply(0);
 	shift_update.apply(0);
 	/*for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
@@ -348,25 +371,43 @@ namespace quda {
       }    
 
       // now we can check if any of the shifts have converged and remove them
+      bool shift_converge = false;
       for (int j=1; j<num_offset_now; j++) {
         if (zeta[j] == 0.0) {
           num_offset_now--;
-	  shift_update.updateNshift(num_offset_now);
+	  shift_converge = true;
           if (getVerbosity() >= QUDA_VERBOSE)
               printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
         } else {
 	  r2[j] = zeta[j] * zeta[j] * r2[0];
 	  if (r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) {
+	    shift_converge = true;
             num_offset_now--;
-	    shift_update.updateNshift(num_offset_now);
 	    if (getVerbosity() >= QUDA_VERBOSE)
 	      printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
           }
 	}
       }
 
-      k++;
+      // this ensure we do the update on any of the systems in case
+      // one has converged also need to check for convergence of
+      // unshifted system in case all converge at same time
+      if ( (r2[0] <= stop[0] ||  k == param.maxiter || shift_converge) && aux_update == true) {
+	if (getVerbosity() >= QUDA_VERBOSE) 
+	  printfQuda("Convergence of at least one system so trigger shiftUpdate\n");
+	
+	shift_update.apply(0);
+	shift_update.apply(0);
+
+	// if we update here, then forgo next iteration
+	aux_update = false;
+      }
       
+      shift_update.updateNshift(num_offset_now);
+
+
+      k++;
+
       if (getVerbosity() >= QUDA_VERBOSE) 
 	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }

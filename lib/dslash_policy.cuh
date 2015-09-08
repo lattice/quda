@@ -252,6 +252,7 @@ namespace {
 } // anonymous namespace
 #endif
 
+
 namespace{
 
 struct DslashPolicyImp {
@@ -333,7 +334,7 @@ struct DslashCuda2 : DslashPolicyImp {
 #endif // MULTI_GPU
 
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
-    dslash.launch_auxiliary(streams[Nstream-1]);
+    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
 #ifdef MULTI_GPU 
 

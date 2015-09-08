@@ -403,9 +403,9 @@ public:
     }
   }
 
-  void launch_auxiliary(cudaStream_t &stream) {
+  /*void launch_auxiliary(cudaStream_t &stream) {
     auxiliary.apply(stream);
-  }
+    }*/
   
   /*
     per direction / dimension flops
