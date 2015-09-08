@@ -273,6 +273,10 @@ namespace quda {
       dslash::aux_worker = NULL;
       aux_update = false;
 
+      // update number of shifts now instead of end of previous
+      // iteration so that all shifts are updated during the dslash
+      shift_update.updateNshift(num_offset_now);
+
       // FIXME - this should be curried into the Dirac operator
       if (r->Nspin()==4) axpyCuda(offset[0], *p[0], *Ap); 
 
@@ -309,9 +313,10 @@ namespace quda {
 	axpyZpbxCuda(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
 
 	// this should trigger the shift update in the subsequent sloppy dslash
-	//aux_update = true;
-	shift_update.apply(0);
-	shift_update.apply(0);
+	// note this is presently broken for Wilson type operators
+	aux_update = true;
+	//shift_update.apply(0);
+	//shift_update.apply(0);
 	/*for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
 	  // update p[i] and x[i]
@@ -371,17 +376,14 @@ namespace quda {
       }    
 
       // now we can check if any of the shifts have converged and remove them
-      bool shift_converge = false;
       for (int j=1; j<num_offset_now; j++) {
         if (zeta[j] == 0.0) {
           num_offset_now--;
-	  shift_converge = true;
           if (getVerbosity() >= QUDA_VERBOSE)
               printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
         } else {
 	  r2[j] = zeta[j] * zeta[j] * r2[0];
 	  if (r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) {
-	    shift_converge = true;
             num_offset_now--;
 	    if (getVerbosity() >= QUDA_VERBOSE)
 	      printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
@@ -389,23 +391,19 @@ namespace quda {
 	}
       }
 
-      // this ensure we do the update on any of the systems in case
-      // one has converged also need to check for convergence of
-      // unshifted system in case all converge at same time
-      if ( (r2[0] <= stop[0] ||  k == param.maxiter || shift_converge) && aux_update == true) {
+      // this ensure we do the update on any shifted systems that
+      // happen to converge when the un-shifted system converges
+      if ( (r2[0] <= stop[0] ||  k == param.maxiter) && aux_update == true) {
 	if (getVerbosity() >= QUDA_VERBOSE) 
 	  printfQuda("Convergence of at least one system so trigger shiftUpdate\n");
 	
 	shift_update.apply(0);
 	shift_update.apply(0);
 
-	// if we update here, then forgo next iteration
+	// if we update here, then forgo next iteration (not actually needed)
 	aux_update = false;
       }
       
-      shift_update.updateNshift(num_offset_now);
-
-
       k++;
 
       if (getVerbosity() >= QUDA_VERBOSE) 
