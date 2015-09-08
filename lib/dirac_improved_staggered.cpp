@@ -66,7 +66,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, profile);
+    improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, 0, 0, commDim, profile, QUDA_FUSED_DSLASH);
   
     flops += 1146ll*in.Volume();
   }
@@ -78,7 +78,7 @@ namespace quda {
     checkParitySpinor(in, out);
 
     improvedstaggered::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-    improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, profile);
+    improvedStaggeredDslashCuda(&out, fatGauge, longGauge, &in, parity, dagger, &x, k, commDim, profile, QUDA_FUSED_DSLASH);
   
     flops += 1158ll*in.Volume();
   }
