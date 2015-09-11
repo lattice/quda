@@ -134,13 +134,7 @@ endif()
 if(${BUILD_MPI})
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
-  #ifeq ($(strip $(BUILD_MPI)), yes)
-  #  MPI_CFLAGS =
-  #  MPI_LDFLAGS =
-  #  MPI_LIBS =
-  #  INC += -DMPI_COMMS $(MPI_CFLAGS) -I$(MPI_HOME)/include
-  #  LIB += $(MPI_LDFLAGS) $(MPI_LIBS)
-  # endif
+  include_directories(${MPI_CXX_INCLUDE_PATH})
   message(WARNING "MPI not yet fully implemented in CMakeLists")
 endif()
 
@@ -156,6 +150,8 @@ if (${BUILD_QMP})
   #QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
   #INC += $(QMP_CFLAGS)
   #LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
+
+  FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   FIND_LIBRARY(QMP_LIB ${QUDA_QMPHOME}/lib)
   include_directories(${QUDA_QMPHOME}/include)
   set(COMM_OBJS comm_qmp.cpp)
@@ -168,6 +164,7 @@ if (${BUILD_QIO})
   message("BUILD with QIO")
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
   FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
+  include_directories(${QUDA_QIOHOME}/include)
 endif()
 
 
