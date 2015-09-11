@@ -117,6 +117,7 @@ namespace {
     InteriorParam* param = static_cast<InteriorParam*>(interiorParam);
     cudaSetDevice(param->current_device); // set device in the new thread
     PROFILE(param->dslash->apply(streams[Nstream-1]), (*(param->profile)), QUDA_PROFILE_DSLASH_KERNEL);
+    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
     return NULL;
   }
 
@@ -359,6 +360,7 @@ struct DslashPthreads : DslashPolicyImp {
 
 #if (!defined MULTI_GPU)
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 #endif
 
 #ifdef MULTI_GPU 
@@ -487,6 +489,7 @@ struct DslashGPUComms : DslashPolicyImp {
 #endif // MULTI_GPU
 
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
 #ifdef MULTI_GPU 
 
@@ -604,6 +607,7 @@ struct DslashFusedGPUComms : DslashPolicyImp {
 #endif // MULTI_GPU
 
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
 #ifdef MULTI_GPU 
 
@@ -735,6 +739,7 @@ struct DslashFaceBuffer : DslashPolicyImp {
 #endif
 
     PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+    if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
 #ifdef MULTI_GPU
 
@@ -1055,6 +1060,7 @@ void dslashZeroCopyCuda(DslashCuda &dslash, const size_t regSize, const int pari
 #endif
 
   PROFILE(dslash.apply(streams[Nstream-1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+  if (aux_worker) aux_worker->apply(streams[Nstream-1]);
 
 #ifdef MULTI_GPU
 
