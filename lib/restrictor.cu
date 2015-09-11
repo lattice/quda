@@ -76,8 +76,9 @@ namespace quda {
         //spin map is undefined for Spin 1 fine level field, treat at separately	
         if(fineSpin == 1)
         {
-           int coherent_block_parity = parity_coarse ^ parity; //0 if block parity and fine parity coincides, 1 otherwise
-           for (int c=0; c<coarseColor; c++) arg.out(parity_coarse,x_coarse_cb, coherent_block_parity,c) += tmp[c];//what about sign (v{\dagger} \eta_5 * in)?
+           int staggered_coarse_spin = parity; //0 if fine parity even, 1 otherwise
+           Float sign = parity == 0 ? +1.0 : -1.0; // sign due to (v{\dagger} \eta_5 * in)
+           for (int c=0; c<coarseColor; c++) arg.out(parity_coarse,x_coarse_cb, staggered_coarse_spin,c) += (sign*tmp[c]);
         }
         else
         {

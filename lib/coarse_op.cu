@@ -666,16 +666,67 @@ namespace quda {
     }
   }
 
+  //Adds the reverse links to the coarse local term, which is just
+  //the conjugate of the existing coarse local term but with
+  //plus/minus signs for off-diagonal spin components
+  //Also multiply by the appropriate factor of -2*kappa
+  template<typename Float, typename Gauge>
+  void createKSCoarseLocal(Gauge &X, int ndim, const int *xc_size, double k) {
+    const int nColor = X.NcolorCoarse();
+    const int nSpin = X.NspinCoarse();
+    if (nSpin != 2) errorQuda("\nWrong coarse spin degrees.\n");
+
+    Float kap = (Float) k;//mass term
+    complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
+	
+    for (int parity=0; parity<2; parity++) {
+      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++) {
+
+	for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+	  for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+	    
+	    //Copy the Hermitian conjugate term to temp location 
+	    for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+	      for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
+		//Flip s_col, s_row on the rhs because of Hermitian conjugation.  Color part left untransposed.
+		Xlocal[((nSpin*s_col+s_row)*nColor+ic_c)*nColor+jc_c] = X(0,parity,x_cb,s_row, s_col, ic_c, jc_c);
+	      }	
+	    }
+	  }
+	}
+	      
+	for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+	  for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+            for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+//!
+	      if(s_row == s_col){
+                X(0,parity,x_cb, parity, parity, ic_c,ic_c) += (parity == 0) ? +1.0 : -1.0;
+                continue;
+              }
+//!
+	      for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
+		//Transpose color part
+		X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) = 2*kap*(+X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)-conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));//always minus sign?
+	      } //Color column
+	    } //Color row
+	  } //Spin column
+	} //Spin row
+
+      } // x_cb
+    } //parity
+
+    delete[] Xlocal;
+
+    return;
+  }
+
   //added HISQ links
   template<typename Float, int dir, typename F, typename fineGauge>
   void computeKSUV(F &UV, const F &V, const fineGauge *FL, const fineGauge *LL int ndim, 
-                   const int *x_size, const int *xc_size, const int *geo_bs) {
+                   const int *x_size) {
 	
     int coord[QUDA_MAX_DIM];
-    int coord_coarse[QUDA_MAX_DIM];
-    int coarse_size = 1;
-    for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
-    
+     
     for (int parity=0; parity<2; parity++) {
       int x_cb = 0;
       for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
@@ -689,18 +740,6 @@ namespace quda {
 	      int oddBit = (parity + coord[1] + coord[2] + coord[3]) & 1;
 	      if (dir==0) coord[0] = 2*coord[0] + oddBit;
               //!
-	      for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
-	      int coarse_parity = 0;
-	      for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
-	      coarse_parity &= 1;
-              const bool isAdj1NBLink = ((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir] ? false : true;
-              bool isAdj3NBLink = false;
-
-              if(LL != NULL) isAdj3NBLink = ((coord[dir]+3)%x_size[dir])/geo_bs[dir] == coord_coarse[dir] ? false : true;
-//if coarse_parity == parity : contribution to coarse_spin_row = 0, coarse_spin_col = 0 
-//if coarse_parity != parity : contribution to coarse_spin_row = 1, coarse_spin_col = 1 
-              if(isAdj1NBLink || (!isAdj1NBLink && isAdj3NBLink)) { x_cb++; continue;}
-              //!
  	      coord[dir]   = (coord[dir]+1)%x_size[dir];
               if(LL != NULL) coord_3[dir] = (coord_3[dir]+3)%x_size[dir];
 
@@ -712,7 +751,7 @@ namespace quda {
 	      for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
                 for(int ic = 0; ic < FL.Ncolor(); ic++) { //Fine Color rows of gauge field
 		   for(int jc = 0; jc < FL.Ncolor(); jc++) {  //Fine Color columns of gauge field
-		      UV(parity, x_cb, 0, ic, ic_c) += *FL(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y_cb, 0, jc, ic_c);
+		      UV(parity, x_cb, 0, ic, ic_c) += *FL(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y_cb, 0, jc, ic_c);//mind transformation to the opposite parity field: in UVU operation.
                       if(LL != NULL) UV(parity, x_cb, 0, ic, ic_c) += *LL(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y3_cb, 0, jc, ic_c);
 		   }  //Fine color columns
 		}  //Fine color rows
@@ -728,24 +767,9 @@ namespace quda {
 
   }  //UV
 
-
-  //Trivial diagonal term for KS operator is trivial due to even-odd aggregation:
-  template<typename Float, typename Gauge>
-  void createKSCoarseDiagonal(Gauge &X, int ndim, const int *xc_size) {
-    for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++) {
-        for(int ic_c = 0; ic_c < X.NcolorCoarse(); ic_c++) { //Color
-            X(0,parity,x_cb,0,0,ic_c,ic_c) += 1.0;
-        } //Color
-      } // x_cb
-    } //parity
-    return;
-  }
-
-//No off-diagonal terms for KS operator:
-
+//KS (also HISQ) operator:
   template<typename Float, int dir, typename F, typename coarseGauge, typename fineGauge>
-  void computeKSVUV(coarseGauge &Y, const F &UV, const F &V, const int ncolors,
+  void computeKSVUV(coarseGauge &Y, coarseGauge &X, const F &UV, const F &V, const int ncolors,
 		  const int *x_size, const int *xc_size, const int *geo_bs) {
 
     const int nDim = 4;
@@ -757,13 +781,17 @@ namespace quda {
 
     // paralleling this requires care with respect to race conditions
     // on CPU, parallelize over dimension not parity
+    Float eta = 1.0;
 
     //#pragma omp parallel for 
     for (int parity=0; parity<2; parity++) {
       int x_cb = 0;
       for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
+        if(dir == 3) eta *= -1.0;
 	for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
+          if(dir >= 2) eta *= -1.0;
 	  for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
+            if(dir >= 1) eta *= -1.0;
 	    for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
 
 	      int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
@@ -775,11 +803,8 @@ namespace quda {
 	      //adjacent site is in same block, M = X, else M = Y
 	      bool isDiagonal = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) || (((coord[dir]+3)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? true : false;
 
-              if(isDiagonal) continue; //nop for the block interior
-	                    
-	      //printf("dir = %d (%d,%d,%d,%d)=(%d,%d) (%d,%d,%d,%d)=", dir, 
-	      //   coord[0], coord[1], coord[2], coord[3], x_cb, parity,
-	      //   coord_coarse[0], coord_coarse[1], coord_coarse[2], coord_coarse[3]);
+	      coarseGauge &M =  isDiagonal ? X : Y;
+	      const int dim_index = isDiagonal ? 0 : dir;
 
 	      int coarse_parity = 0;
 	      for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
@@ -791,28 +816,18 @@ namespace quda {
 
 	      coord[0] /= 2;
 
-              if(coarse_parity == parity)
-              {
-	        for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
-		  for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
-		    for(int ic = 0; ic < ncolors; ic++) { //Sum over fine color
-		      Y(dir,coarse_parity,coarse_x_cb,0, 0,ic_c,jc_c) += 
-			  half * conj(V(parity, x_cb, 0, ic, ic_c)) * UV(parity, x_cb, 0, ic, jc_c);
-		    } //Fine color
-		  } //Coarse Color column
-	        } //Coarse Color row
-              }
-              else //opposite parity
-              {
-	        for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
-		  for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
-		    for(int ic = 0; ic < ncolors; ic++) { //Sum over fine color
-		      Y(dir,coarse_parity,coarse_x_cb,1, 1,ic_c,jc_c) += 
-			  half * conj(V(parity, x_cb, 0, ic, ic_c)) * UV(parity, x_cb, 0, ic, jc_c);
-		    } //Fine color
-		  } //Coarse Color column
-	        } //Coarse Color row
-              } 
+              int coarse_spin_row = parity == 0 ? 0 : 1  ;
+              int coarse_spin_col = (1 - coarse_spin_row); 
+
+              half *= eta; //multiply by sing factor 
+
+              for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
+		for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
+		  for(int ic = 0; ic < ncolors; ic++) { //Sum over fine color
+		      M(dir,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += half*conj(V(parity, x_cb, 0, ic, ic_c)) * UV(parity, x_cb, 0, ic, jc_c);
+		  } //Fine color
+		} //Coarse Color column
+	      } //Coarse Color row
 	      x_cb++;
 	    } // coord[0]
 	  } // coord[1]
@@ -834,29 +849,31 @@ namespace quda {
     int geo_bs[QUDA_MAX_DIM]; 
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
 
-    for(int d = 0; d < nDim; d++) {
+    for(int d = 0; d < nDim; d++) 
+    {
       //First calculate UV
       setZero<Float,F>(UV);
 
       printfQuda("Computing %d UV and VUV\n", d);
       //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y
       if (d==0) {
-        computeKSUV<Float,0>(UV, V, FL, LL, nDim, x_size, xc_size, geo_bs);
-        computeKSVUV<Float,0>(Y, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
+        computeKSUV<Float,0>(UV, V, FL, LL, nDim, x_size);
+        computeKSVUV<Float,0>(Y, X, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
       } else if (d==1) {
-        computeKSUV<Float,1>(UV, V, FL, LL, nDim, x_size, xc_size, geo_bs);
-        computeKSVUV<Float,1>(Y, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
+        computeKSUV<Float,1>(UV, V, FL, LL, nDim, x_size);
+        computeKSVUV<Float,1>(Y, X, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
       } else if (d==2) {
-        computeKSUV<Float,2>(UV, V, FL, LL, nDim, x_size, xc_size, geo_bs);
-        computeKSVUV<Float,2>(Y, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
+        computeKSUV<Float,2>(UV, V, FL, LL, nDim, x_size);
+        computeKSVUV<Float,2>(Y, X, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
       } else {
-        computeKSUV<Float,3>(UV, V, FL, LL, nDim, x_size, xc_size, geo_bs);
-        computeKSVUV<Float,3>(Y, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
+        computeKSUV<Float,3>(UV, V, FL, LL, nDim, x_size);
+        computeKSVUV<Float,3>(Y, X, UV, V, FL->Ncolor(), x_size, xc_size, geo_bs);
       }
 
       printf("UV2[%d] = %e\n", d, UV.norm2());
       printf("Y2[%d] = %e\n", d, Y.norm2(d));
     }
+
     printf("X2 = %e\n", X.norm2(0));
     printfQuda("Computing coarse diagonal\n");
     createKSCoarseDiagonal<Float>(X, nDim, xc_size, k);
@@ -1018,7 +1035,7 @@ namespace quda {
   //Apply the coarse KS Dslash to a vector:
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
   template<typename Float, int nDim, typename F, typename Gauge>
-  void coarseKSDslash(F &out, F &in, Gauge &Y, Gauge &X, Float kappa) {
+  void coarseKSDslash(F &out, F &in, Gauge &Y, Gauge &X, Float k) {
     const int Nc = in.Ncolor();
     int x_size[QUDA_MAX_DIM];
     for(int d = 0; d < nDim; d++) x_size[d] = in.X(d);
@@ -1041,8 +1058,8 @@ namespace quda {
 
           for(int c_row = 0; c_row < Nc; c_row++) { //Color row
   	    for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-	        out(parity, x_cb, 0, c_row) += Y(d, parity, x_cb, 0, 0, c_row, c_col) * in((parity+1)&1, fwd_idx/2, 0, c_col);
-	        out(parity, x_cb, 1, c_row) += Y(d, parity, x_cb, 1, 1, c_row, c_col) * in((parity+1)&1, fwd_idx/2, 1, c_col);
+	        out(parity, x_cb, 0, c_row) += Y(d, parity, x_cb, 0, 1, c_row, c_col) * in((parity+1)&1, fwd_idx/2, 1, c_col);
+	        out(parity, x_cb, 1, c_row) += Y(d, parity, x_cb, 1, 0, c_row, c_col) * in((parity+1)&1, fwd_idx/2, 0, c_col);
 	    } //Color column
 	  } //Color row
 
@@ -1054,19 +1071,21 @@ namespace quda {
 
           for(int c_row = 0; c_row < Nc; c_row++) { //Color row
 	     for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-		  out(parity, x_cb, 0, c_row) += - conj(Y(d,(parity+1)&1, back_idx/2, 0, 0, c_col, c_row))
-		    * in((parity+1)&1, back_idx/2, 0, c_col);//(Remark: note the minus sign.)
+		  out(parity, x_cb, 0, c_row) += - conj(Y(d,(parity+1)&1, back_idx/2, 0, 1, c_col, c_row))* in((parity+1)&1, back_idx/2, 1, c_col);//(Remark: note the minus sign.)
+		  out(parity, x_cb, 1, c_row) += - conj(Y(d,(parity+1)&1, back_idx/2, 1, 0, c_col, c_row))* in((parity+1)&1, back_idx/2, 0, c_col);//(Remark: note the minus sign.)
 	     } //Color column
 	  } //Color row
 	} //nDim
 
-	// apply kappa
-	for (int c=0; c<Nc; c++) out(parity, x_cb, 0, c) *= -(Float)2.0*kappa;
+	// apply mass term
+	for (int c=0; c<Nc; c++) out(parity, x_cb, 0, c) *= -(Float)2.0*k;
 
 	// apply clover term
         for(int c = 0; c < Nc; c++) { //Color out
            for(int c_col = 0; c_col < Nc; c_col++) { //Color in
                 out(parity,x_cb,0,c) += X(0, parity, x_cb, 0, 0, c, c_col)*in(parity,x_cb,0,c_col);
+                out(parity,x_cb,1,c) += X(0, parity, x_cb, 1, 0, c, c_col)*in(parity,x_cb,0,c_col);
+                out(parity,x_cb,0,c) += X(0, parity, x_cb, 0, 1, c, c_col)*in(parity,x_cb,1,c_col);
                 out(parity,x_cb,1,c) += X(0, parity, x_cb, 1, 1, c, c_col)*in(parity,x_cb,1,c_col);
 	   } //Color in
         } //Color out

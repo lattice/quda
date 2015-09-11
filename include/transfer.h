@@ -86,14 +86,6 @@ namespace quda {
     /** The length of the coarse lattice */
     int coarse_length;
 
-    /** Block parity of the fine lattice */
-    int *block_parity_h;
-
-    int *block_parity_d;
-
-    int *block_parity;
-
-
     /**
      * Copies the null-space vector components into the V-field
      */
