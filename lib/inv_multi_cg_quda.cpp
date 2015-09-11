@@ -69,6 +69,8 @@ namespace quda {
     void updateNshift(int new_n_shift) { n_shift = new_n_shift; }
     void updateNupdate(int new_n_update) { n_update = 1; }
     
+    // note that we can't set the stream parameter here so it is
+    // ignored.  This is more of a future design direction to consider
     void apply(const cudaStream_t &stream) {      
       static int count = 0;
 
