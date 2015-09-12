@@ -124,15 +124,22 @@ namespace quda {
 	param.gflops += gflops;
 	param.iter += k;
 	
-	// Calculate the true residual
+	// this is the relative residual since it has been scaled by b2
 	r2 = norm2(r);
-	mat(r, x);
-	double true_res = xmyNormCuda(b, r);
-	param.true_res = sqrt(true_res / b2);
 
-	if (getVerbosity() >= QUDA_SUMMARIZE) {
-	  printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-		     k, sqrt(r2/b2), param.true_res);    
+	if (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
+	  // Calculate the true residual
+	  mat(r, x);
+	  double true_res = xmyNormCuda(b, r);
+	  param.true_res = sqrt(true_res / b2);
+	  if (getVerbosity() >= QUDA_SUMMARIZE) {
+	    printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n",
+		       k, sqrt(r2), param.true_res);
+	  }
+	} else {
+	  if (getVerbosity() >= QUDA_SUMMARIZE) {
+	    printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e\n", k, sqrt(r2));
+	  }
 	}
 
 	// reset the flops counters
