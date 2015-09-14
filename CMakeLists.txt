@@ -142,8 +142,6 @@ if (${BUILD_QMP})
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags OUTPUT_VARIABLE QMP_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
-  message ("QMP related info " ${QMP_CFLAGS} ${QMP_LDFLAGS} ${QMP_LIBS})
-
   FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
   include_directories(${QUDA_QMPHOME}/include)
   set(COMM_OBJS comm_qmp.cpp)
@@ -152,7 +150,6 @@ endif()
 if (${BUILD_QIO})
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_util.cpp layout_hyper.c gauge_qio.cpp)
-  message("BUILD with QIO")
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
   FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
   include_directories(${QUDA_QIOHOME}/include)
@@ -387,7 +384,7 @@ set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
-SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING  "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug" FORCE )
+#SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING  "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug" FORCE )
 
 set(DEFBUILD Release)
 
@@ -406,7 +403,7 @@ ENDIF(GIT_FOUND)
 IF(NOT CMAKE_BUILD_TYPE)
   # add some git magic here to decide whether we want to do a release or devel build as default
 
-  SET(CMAKE_BUILD_TYPE Devel CACHE STRING
+  SET(CMAKE_BUILD_TYPE ${DEFBUILD} CACHE STRING
       "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug"
         FORCE)
 ENDIF(NOT CMAKE_BUILD_TYPE)
