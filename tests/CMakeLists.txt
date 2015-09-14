@@ -9,12 +9,11 @@ cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 set(TEST_LIBS quda quda_test ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(BUILD_QIO)
-  message(need to append QIO_LIB)
   LIST(APPEND TEST_LIBS ${QIO_LIB} ${LIME_LIB})
 endif()
 
 if(BUILD_QMP)
-  LIST(APPEND TEST_LIBS ${QMP_LIB})
+  LIST(APPEND TEST_LIBS ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(BUILD_MPI)
@@ -71,7 +70,7 @@ if(${BUILD_FERMION_FORCE})
   target_link_libraries(fermion_force_test ${TEST_LIBS})
 endif()
 
-if(BUILD_GAUGE_ALG)
+if(${BUILD_GAUGE_ALG})
   cuda_add_executable(gauge_alg_test gauge_alg_test.cpp)
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
 endif()

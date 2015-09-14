@@ -36,9 +36,7 @@ find_package(PythonInterp)
 find_package(Git)
 find_package(CUDA REQUIRED)
 find_package(Threads REQUIRED)
-if(BUILD_MPI)
-  find_package(MPI)
-endif(BUILD_MPI)
+
 
 
 
@@ -127,6 +125,7 @@ if(${BUILD_MULTI_GPU})
   if(NOT (${BUILD_MPI} OR ${BUILD_QMP}) )
     message(FATAL_ERROR "Multi GPU build requires either MPI or QMP")
   endif()
+  find_package(MPI)
 else(${BUILD_MULTI_GPU})
   set(COMM_OBJS comm_single.cpp)
 endif()
@@ -144,18 +143,10 @@ if (${BUILD_QMP})
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags OUTPUT_VARIABLE QMP_LDFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs OUTPUT_VARIABLE QMP_LIBS OUTPUT_STRIP_TRAILING_WHITESPACE)
   message ("QMP related info " ${QMP_CFLAGS} ${QMP_LDFLAGS} ${QMP_LIBS})
-  ## we might need to get rid of the
-  #QMP_CFLAGS = $(shell $(QUDA_QMPHOME)/bin/qmp-config --cflags )
-  #QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
-  #QMP_LIBS = $(shell $(QMP_HOME)/bin/qmp-config --libs )
-  #INC += $(QMP_CFLAGS)
-  #LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
 
   FIND_LIBRARY(QMP_LIB qmp ${QUDA_QMPHOME}/lib)
-  FIND_LIBRARY(QMP_LIB ${QUDA_QMPHOME}/lib)
   include_directories(${QUDA_QMPHOME}/include)
   set(COMM_OBJS comm_qmp.cpp)
-  message(WARNING "QMP not yet fully tested in CMakeLists")
 endif()
 
 if (${BUILD_QIO})
@@ -166,8 +157,6 @@ if (${BUILD_QIO})
   FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
   include_directories(${QUDA_QIOHOME}/include)
 endif()
-
-
 
 if(BUILD_MAGMA)
   message(WARNING "Magma support not yet implemented in CMakeLists")
@@ -184,7 +173,6 @@ endif()
 if(POSIX_THREADS)
   add_definitions(-DPTHREADS)
 endif()
-
 
 if(BUILD_WILSON_DIRAC)
   add_definitions(-DGPU_WILSON_DIRAC)
@@ -205,7 +193,6 @@ endif(BUILD_CLOVER_DIRAC)
 if(BUILD_TWISTED_MASS_DIRAC)
   add_definitions(-DGPU_TWISTED_MASS_DIRAC)
 endif(BUILD_TWISTED_MASS_DIRAC)
-
 
 if(BUILD_TWISTED_CLOVER_DIRAC)
   add_definitions(-DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
@@ -244,13 +231,11 @@ if(BUILD_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_TOOLS)
   add_definitions(-DGPU_UNITARIZE)
   LIST(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
-#TODO: CUDARAND, CUFFT
 endif(BUILD_GAUGE_ALG)
 
 if(BUILD_DYNAMIC_CLOVER)
   add_definitions(-DDYNAMIC_CLOVER)
 endif(BUILD_DYNAMIC_CLOVER)
-
 
 if(QUDA_MPI_NVTX)
   LIST(APPEND COMM_OBJS nvtx_pmpi.c)
@@ -267,7 +252,6 @@ if(QUDA_NVTX)
   FIND_LIBRARY(CUDA_NVTX_LIB nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
   LIST(APPEND QUDA_LIBS ${CUDA_NVTX_LIB})
 endif(QUDA_NVTX)
-
 
 if(NOT QUDA_BLAS_TEX)
   add_definitions(-DDIRECT_ACCESS_BLAS)
