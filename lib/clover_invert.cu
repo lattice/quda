@@ -1,9 +1,10 @@
 #include <tune_quda.h>
 #include <clover_field_order.h>
 #include <complex_quda.h>
-#include <cub/cub.cuh> 
 #include <launch_kernel.cuh>
 #include <face_quda.h>
+#include <atomic.cuh>
+#include <cub/cub.cuh> 
 
 namespace quda {
 
@@ -24,20 +25,6 @@ namespace quda {
       cudaHostGetDevicePointer(&trlogA_d, trlogA_h, 0); // set the matching device pointer
     }
   };
-
-  static __inline__ __device__ double atomicAdd(double *addr, double val)
-  {
-    double old=*addr, assumed;
-    
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-					    __double_as_longlong(assumed),
-					    __double_as_longlong(val+assumed)));
-    } while( __double_as_longlong(assumed)!=__double_as_longlong(old) );
-    
-    return old;
-  }
 
   /**
      Use a Cholesky decomposition to invert the clover matrix
@@ -278,14 +265,11 @@ namespace quda {
 
   template <typename Float>
   void cloverInvert(const CloverField &clover, bool computeTraceLog, QudaFieldLocation location) {
-    if (clover.Order() == QUDA_FLOAT2_CLOVER_ORDER) {
-      cloverInvert<Float>(FloatNOrder<Float,72,2>(clover, 1), 
-			  FloatNOrder<Float,72,2>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), clover, location);
-    } else if (clover.Order() == QUDA_FLOAT4_CLOVER_ORDER) {
-      cloverInvert<Float>(FloatNOrder<Float,72,4>(clover, 1), 
-			  FloatNOrder<Float,72,4>(clover, 0), 
-			  computeTraceLog, clover.TrLog(), clover, location);
+
+    if (clover.isNative()) {
+      typedef typename clover_mapper<Float>::type C;
+      cloverInvert<Float>(C(clover, 1), C(clover, 0), computeTraceLog,
+			  clover.TrLog(), clover, location);
     } else {
       errorQuda("Clover field %d order not supported", clover.Order());
     }

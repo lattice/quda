@@ -49,6 +49,10 @@ namespace quda {
 
   cudaStream_t* getBlasStream();
     
+  void* getDeviceReduceBuffer() { return d_reduce; }
+  void* getMappedHostReduceBuffer() { return hd_reduce; }
+  void* getHostReduceBuffer() { return h_reduce; }
+
   void initReduce()
   { 
 
@@ -241,22 +245,6 @@ namespace quda {
         break;
       case 16:
         reduce::multiReduceCuda<16,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 17:
-        reduce::multiReduceCuda<17,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 18:
-        reduce::multiReduceCuda<18,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 19:
-        reduce::multiReduceCuda<19,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 20:
-        reduce::multiReduceCuda<20,double,QudaSumFloat,QudaSumFloat,Dot,0,0,0,0,0,false>
         (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       default:
@@ -498,14 +486,6 @@ namespace quda {
         break;
       case 14:
         reduce::multiReduceCuda<14,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
-        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 18:
-        reduce::multiReduceCuda<18,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
-        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
-        break;
-      case 22:
-        reduce::multiReduceCuda<22,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
         (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
       default:

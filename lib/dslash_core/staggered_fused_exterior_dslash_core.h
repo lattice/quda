@@ -25,6 +25,8 @@
 #define t02_re T2.x
 #define t02_im T2.y
 
+#define time_boundary t_boundary
+
 #else
 
 #define spinorFloat float
@@ -46,6 +48,8 @@
 #define t01_im T1.y
 #define t02_re T2.x
 #define t02_im T2.y
+
+#define time_boundary t_boundary_f
 
 #endif
 
@@ -92,6 +96,7 @@
 
 #else
 
+#if (DD_FAT_RECON == 18) //18 (no) reconstruct
 #define fat00_re FAT0.x
 #define fat00_im FAT0.y
 #define fat01_re FAT1.x
@@ -110,8 +115,28 @@
 #define fat21_im FAT7.y
 #define fat22_re FAT8.x
 #define fat22_im FAT8.y
+#else
+#define fat00_re FAT0.x
+#define fat00_im FAT0.y
+#define fat01_re FAT0.z
+#define fat01_im FAT0.w
+#define fat02_re FAT1.x
+#define fat02_im FAT1.y
+#define fat10_re FAT1.z
+#define fat10_im FAT1.w
+#define fat11_re FAT2.x
+#define fat11_im FAT2.y
+#define fat12_re FAT2.z
+#define fat12_im FAT2.w
+#define fat20_re FAT3.x
+#define fat20_im FAT3.y
+#define fat21_re FAT3.z
+#define fat21_im FAT3.w
+#define fat22_re FAT4.x
+#define fat22_im FAT4.y
+#endif // DD_FAT_RECON
 
-#if (DD_RECON == 18) //18 (no) reconstruct
+#if (DD_LONG_RECON == 18) //18 (no) reconstruct
 #define long00_re LONG0.x
 #define long00_im LONG0.y
 #define long01_re LONG1.x
@@ -331,7 +356,7 @@ spinorFloat o02_im;
   const float& fat_link_max = param.fat_link_max;
 #endif
 
-#if ((DD_RECON==9 || DD_RECON==13) && DD_IMPROVED==1)
+#if ((DD_LONG_RECON==9 || DD_LONG_RECON==13) && DD_IMPROVED==1)
 #if (DD_PREC==0) // double precision
   double PHASE = 0.;
 #else
@@ -387,15 +412,21 @@ int full_idx=0;
   o01_re = o01_im = 0.f;
   o02_re = o02_im = 0.f;
 #endif
-#if((DD_RECON == 13 || DD_RECON == 9) && DD_IMPROVED==1)
-int sign = 1;
+#if(DD_FAT_RECON == 13 || DD_FAT_RECON == 9)
+int fat_sign = 1;
+#endif
+#if((DD_LONG_RECON == 13 || DD_LONG_RECON == 9) && DD_IMPROVED==1)
+int long_sign = 1;
 #endif
 
 {
   //direction: +X
 
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = (y[3]%2 == 1) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = (y[3]%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = (y[3]%2 == 1) ? -1 : 1;
 #endif
 
   int ga_idx = half_idx;
@@ -423,6 +454,7 @@ int sign = 1;
     }
 #endif
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(0, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);    
     o00_re += A0_re;
     o00_im += A0_im;
@@ -459,7 +491,7 @@ int sign = 1;
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
-    RECONSTRUCT_GAUGE_MATRIX(0, long, ga_idx, sign);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(0, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);        
     o00_re += B0_re;
     o00_im += B0_im;
@@ -476,8 +508,11 @@ int sign = 1;
 
 {
   // direction: -X
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = (y[3]%2 == 1) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = (y[3]%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = (y[3]%2 == 1) ? -1 : 1;
 #endif
   int dir =1;
 
@@ -510,6 +545,7 @@ int sign = 1;
     }        
 #endif
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(1, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);       
     o00_re -= A0_re;
     o00_im -= A0_im;
@@ -552,7 +588,7 @@ int sign = 1;
 
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);  
-    RECONSTRUCT_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, sign);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(1, long, sp_idx_3rd_nbr, long_sign);
     ADJ_MAT_MUL_V(B, long, t);    
     o00_re -= B0_re;
     o00_im -= B0_im;
@@ -569,8 +605,11 @@ int sign = 1;
 
 {
   //direction: +Y
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
 #endif
 
   int ga_idx = half_idx;
@@ -598,6 +637,7 @@ int sign = 1;
     }      
 #endif 
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(2, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);
     o00_re += A0_re;
     o00_im += A0_im;
@@ -634,7 +674,7 @@ int sign = 1;
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
-    RECONSTRUCT_GAUGE_MATRIX(2, long, ga_idx, sign);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(2, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);            
     o00_re += B0_re;
     o00_im += B0_im;
@@ -649,8 +689,11 @@ int sign = 1;
 {
   //direction: -Y
 
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0])%2 == 1) ? -1 : 1;
 #endif
 
   int dir=3;
@@ -683,6 +726,7 @@ int sign = 1;
     }              
 #endif
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(3, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);
     o00_re -= A0_re;
     o00_im -= A0_im;
@@ -725,7 +769,7 @@ int sign = 1;
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
-    RECONSTRUCT_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,sign);	    
+    RECONSTRUCT_LONG_GAUGE_MATRIX(3, long, sp_idx_3rd_nbr,long_sign);
     ADJ_MAT_MUL_V(B, long, t);    
     o00_re -= B0_re;
     o00_im -= B0_im;
@@ -741,8 +785,11 @@ int sign = 1;
 {
   //direction: +Z
 
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
 #endif
 
   int ga_idx = half_idx;
@@ -770,6 +817,7 @@ int sign = 1;
     }
 #endif
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(4, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);	 
     o00_re += A0_re;
     o00_im += A0_im;
@@ -806,7 +854,7 @@ int sign = 1;
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
-    RECONSTRUCT_GAUGE_MATRIX(4, long, ga_idx, sign);    
+    RECONSTRUCT_LONG_GAUGE_MATRIX(4, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);        
     o00_re += B0_re;
     o00_im += B0_im;
@@ -822,8 +870,11 @@ int sign = 1;
 {
   //direction: -Z
 
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ((y[3]+y[0]+y[1])%2 == 1) ? -1 : 1;
 #endif
 
   int dir = 5;
@@ -857,6 +908,7 @@ int sign = 1;
     }
 #endif
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(5, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);
     o00_re -= A0_re;
     o00_im -= A0_im;
@@ -899,7 +951,7 @@ int sign = 1;
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);
 
-    RECONSTRUCT_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,sign);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(5, long, sp_idx_3rd_nbr,long_sign);
     ADJ_MAT_MUL_V(B, long, t);    	    
     o00_re -= B0_re;
     o00_im -= B0_im;
@@ -914,8 +966,11 @@ int sign = 1;
 
 {
   //direction: +T
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = (y[3] >= (X4-3)) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = (y[3] >= (X4-1)) ? time_boundary : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = (y[3] >= (X4-3)) ? time_boundary : 1;
 #endif
 
   int ga_idx = half_idx;
@@ -943,6 +998,7 @@ int sign = 1;
     }
 #endif
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);    
+    RECONSTRUCT_FAT_GAUGE_MATRIX(6, fat, ga_idx, fat_sign);
     MAT_MUL_V(A, fat, i);
     o00_re += A0_re;
     o00_im += A0_im;
@@ -981,7 +1037,7 @@ int sign = 1;
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3); 
 
-    RECONSTRUCT_GAUGE_MATRIX(6, long, ga_idx, sign);
+    RECONSTRUCT_LONG_GAUGE_MATRIX(6, long, ga_idx, long_sign);
     MAT_MUL_V(B, long, t);    
     o00_re += B0_re;
     o00_im += B0_im;
@@ -995,8 +1051,11 @@ int sign = 1;
 
 {
   //direction: -T
-#if ((DD_RECON == 12 || DD_RECON == 8) && DD_IMPROVED==1)
-  int sign = ( ((y[3]+(X[3]-3))%X[3])>= (X[3]-3) ) ? -1 : 1;
+#if (DD_FAT_RECON == 12 || DD_FAT_RECON == 8)
+  int fat_sign = ( ((y[3]+(X[3]-1))%X[3])>= (X[3]-1) ) ? -1 : 1;
+#endif
+#if ((DD_LONG_RECON == 12 || DD_LONG_RECON == 8) && DD_IMPROVED==1)
+  int long_sign = ( ((y[3]+(X[3]-3))%X[3])>= (X[3]-3) ) ? -1 : 1;
 #endif
 
   int dir = 7;
@@ -1029,6 +1088,7 @@ int sign = 1;
 #endif
     READ_FAT_MATRIX(FATLINK1TEX, dir, fat_idx, fat_stride);
     READ_1ST_NBR_SPINOR( SPINORTEX, nbr_idx1, stride1);
+    RECONSTRUCT_FAT_GAUGE_MATRIX(7, fat, ga_idx, fat_sign);
     ADJ_MAT_MUL_V(A, fat, i);
     o00_re -= A0_re;
     o00_im -= A0_im;
@@ -1068,7 +1128,7 @@ int sign = 1;
     spinorFloat2 T0, T1, T2;
     READ_3RD_NBR_SPINOR(T, SPINORTEX, nbr_idx3, stride3);       
 
-    RECONSTRUCT_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, sign);    
+    RECONSTRUCT_LONG_GAUGE_MATRIX(7, long, sp_idx_3rd_nbr, long_sign);
     ADJ_MAT_MUL_V(B, long, t);    
     o00_re -= B0_re;
     o00_im -= B0_im;

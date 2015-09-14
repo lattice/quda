@@ -6,13 +6,41 @@
 #include <quda_internal.h>
 #include <color_spinor_field.h>
 #include <string.h>
-#include <hisq_links_quda.h>
+#include <unitarization_links.h>
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 #ifdef BUILD_MILC_INTERFACE
+
+// code for NVTX taken from Jiri Kraus' blog post:
+// http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-generate-custom-application-profile-timelines-nvtx/
+
+#ifdef INTERFACE_NVTX
+#include "nvToolsExt.h"
+
+static const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+static const int num_colors = sizeof(colors)/sizeof(uint32_t);
+
+#define PUSH_RANGE(name,cid) { \
+  int color_id = cid; \
+  color_id = color_id%num_colors;\
+  nvtxEventAttributes_t eventAttrib = {0}; \
+  eventAttrib.version = NVTX_VERSION; \
+  eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE; \
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = colors[color_id]; \
+  eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
+  eventAttrib.message.ascii = name; \
+  nvtxRangePushEx(&eventAttrib); \
+}
+#define POP_RANGE nvtxRangePop();
+#else
+#define PUSH_RANGE(name,cid)
+#define POP_RANGE
+#endif
+
 
 static bool initialized = false;
 static int gridDim[4];
@@ -32,12 +60,17 @@ template <bool start>
 void  inline qudamilc_called(const char* func, QudaVerbosity verb){
 #ifdef QUDAMILC_VERBOSE
 if (verb >= QUDA_VERBOSE) {
-     if(start)
+     if(start){
        printf("QUDA_MILC_INTERFACE: %s (called) \n",func);
-     else
+       PUSH_RANGE(func,1)
+     }
+     else {
       printf("QUDA_MILC_INTERFACE: %s (return) \n",func);
+      POP_RANGE
+     }
    }
 #endif
+
 }
 
 template <bool start>
@@ -834,6 +867,9 @@ void qudaInvert(int external_precision,
   setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
       mass, target_res, target_res_hq, inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
   invertParam.use_sloppy_partial_accumulator = 0;
+  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
+
+
 
   ColorSpinorParam csParam;
   setColorSpinorParams(localDim, host_precision, &csParam);
@@ -1005,7 +1041,6 @@ void qudaEigCGInvert(int external_precision,
   return;
 } // qudaEigCGInvert
 
-
 #endif
 
 #ifdef GPU_CLOVER_DIRAC
@@ -1017,7 +1052,7 @@ static inline void* createExtendedGaugeField(void* gauge, int geometry, int prec
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
       (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
   gaugeParam.use_resident_gauge = resident ? 1 : 0;
-
+  qudamilc_called<false>(__func__);
   return createExtendedGaugeFieldQuda(gauge, geometry, &gaugeParam);
 }
 
@@ -1038,7 +1073,7 @@ void* qudaCreateGaugeField(void* gauge, int geometry, int precision)
   QudaPrecision qudaPrecision = (precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, qudaPrecision,
       (geometry==1) ? QUDA_GENERAL_LINKS : QUDA_SU3_LINKS);
-
+  qudamilc_called<false>(__func__);
   return createGaugeFieldQuda(gauge, geometry, &gaugeParam);
 }
 
@@ -1058,14 +1093,51 @@ void qudaDestroyGaugeField(void* gauge)
 {
   qudamilc_called<true>(__func__);
   destroyGaugeFieldQuda(gauge);
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+
+void setInvertParam(QudaInvertParam &invertParam, QudaInvertArgs_t &inv_args, 
+		    int external_precision, int quda_precision, double kappa, double reliable_delta);
+
+void qudaCloverForce(void *mom, double dt, void **x, void **p, double *coeff, double kappa, double ck,
+		     int nvec, double multiplicity, void *gauge, int precision, QudaInvertArgs_t inv_args)
+{
+  qudamilc_called<true>(__func__);
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
+						(precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+						QUDA_GENERAL_LINKS);
+  gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER; // refers to momentume gauge order
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+  setInvertParam(invertParam, inv_args, precision, precision, kappa, 0);
+  invertParam.num_offset = nvec;
+  for (int i=0; i<nvec; ++i) invertParam.offset[i] = 0.0; // not needed
+  invertParam.clover_coeff = 0.0; // not needed
+
+  // solution types
+  invertParam.solution_type      = QUDA_MATPCDAG_MATPC_SOLUTION;
+  invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
+  invertParam.inv_type           = QUDA_CG_INVERTER;
+  invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+
+  invertParam.verbosity = getVerbosity();
+  invertParam.verbosity_precondition = QUDA_SILENT;
+  invertParam.use_resident_solution = inv_args.use_resident_solution;
+
+  computeCloverForceQuda(mom, dt, x, p, coeff, -kappa*kappa, ck, nvec, multiplicity, 
+			 gauge, &gaugeParam, &invertParam);
+  qudamilc_called<false>(__func__);
   return;
 }
 
 
 void qudaCloverTrace(void* out, void* clover, int mu, int nu)
 {
+  qudamilc_called<true>(__func__);
   computeCloverTraceQuda(out, clover, mu, nu, const_cast<int*>(localDim));
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -1073,14 +1145,14 @@ void qudaCloverTrace(void* out, void* clover, int mu, int nu)
 
 void qudaCloverDerivative(void* out, void* gauge, void* oprod, int mu, int nu, double coeff, int precision, int parity, int conjugate)
 {
-
+  qudamilc_called<true>(__func__);
   QudaParity qudaParity = (parity==2) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
   QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim, 
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
   computeCloverDerivativeQuda(out, gauge, oprod, mu, nu, coeff, qudaParity, &gaugeParam, conjugate);
-
+  qudamilc_called<false>(__func__);
   return;
 }
 
@@ -1210,7 +1282,7 @@ void qudaLoadCloverField(int external_precision,
     double clover_coeff,
     int compute_trlog,
     double *trlog) {
-
+  qudamilc_called<true>(__func__);
   QudaInvertParam invertParam = newQudaInvertParam();
   setInvertParam(invertParam, inv_args, external_precision, quda_precision, 0.0, 0.0);
   invertParam.solution_type = solution_type;
@@ -1232,19 +1304,21 @@ void qudaLoadCloverField(int external_precision,
     trlog[0] = invertParam.trlogA[0];
     trlog[1] = invertParam.trlogA[1];
   }
+  qudamilc_called<false>(__func__);
 } // qudaLoadCoverField
 
 
 
 void qudaFreeCloverField() {
+  qudamilc_called<true>(__func__);
   if (clover_alloc==1) {
     freeCloverQuda();
     clover_alloc = 0;
   } else {
     errorQuda("Trying to free non-allocated clover term");
   }
+  qudamilc_called<false>(__func__);
 } // qudaFreeCloverField
-
 
 
 void qudaCloverInvert(int external_precision, 
@@ -1263,7 +1337,7 @@ void qudaCloverInvert(int external_precision,
     double* const final_fermilab_residual,
     int* num_iters)
 {
-
+  qudamilc_called<true>(__func__);
   if(target_fermilab_residual == 0 && target_residual == 0){
     errorQuda("qudaCloverInvert: requesting zero residual\n");
     exit(1);
@@ -1285,6 +1359,7 @@ void qudaCloverInvert(int external_precision,
 
   invertParam.tol =  target_residual;
   invertParam.tol_hq = target_fermilab_residual;
+  if (invertParam.residual_type == QUDA_HEAVY_QUARK_RESIDUAL) invertParam.heavy_quark_check = 1;
 
   // solution types
   invertParam.solution_type      = QUDA_MAT_SOLUTION;
@@ -1299,10 +1374,9 @@ void qudaCloverInvert(int external_precision,
 
   qudaFreeGaugeField();
   qudaFreeCloverField();
-
+  qudamilc_called<false>(__func__);
   return;
 } // qudaCloverInvert
-
 
 
 void qudaEigCGCloverInvert(int external_precision, 
@@ -1424,6 +1498,7 @@ void qudaEigCGCloverInvert(int external_precision,
   return;
 } // qudaEigCGCloverInvert
 
+
 void qudaCloverMultishiftInvert(int external_precision, 
     int quda_precision,
     int num_offsets,
@@ -1463,7 +1538,7 @@ void qudaCloverMultishiftInvert(int external_precision,
   }
   invertParam.tol = target_residual_offset[0];
   invertParam.clover_coeff = clover_coeff;
-
+  
   // solution types
   invertParam.solution_type      = QUDA_MATPCDAG_MATPC_SOLUTION;
   invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
@@ -1472,82 +1547,88 @@ void qudaCloverMultishiftInvert(int external_precision,
 
   invertParam.verbosity = verbosity;
   invertParam.verbosity_precondition = QUDA_SILENT;
+
+  invertParam.make_resident_solution = inv_args.make_resident_solution;
 
   invertMultiShiftQuda(solutionArray, source, &invertParam); 
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
   for(int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];
-
+  qudamilc_called<false>(__func__, verbosity);
   return;
 } // qudaCloverMultishiftInvert
 
+#endif // GPU_CLOVER_DIRAC
 
 
 
+#ifdef GPU_GAUGE_ALG
 
-void qudaCloverMultishiftMDInvert(int external_precision, 
-    int quda_precision,
-    int num_offsets,
-    double* const offset,
-    double kappa,
-    double clover_coeff,
-    QudaInvertArgs_t inv_args,
-    const double* target_residual_offset,
-    const void* milc_link,
-    void* milc_clover, 
-    void* milc_clover_inv,
-    void* source,
-    void** psiEven,
-    void** psiOdd,
-    void** pEven,
-    void** pOdd,
-    double* const final_residual, 
-    int* num_iters)
+void qudaGaugeFixingOVR( int precision,
+    unsigned int gauge_dir, 
+    int Nsteps,
+    int verbose_interval,
+    double relax_boost,
+    double tolerance,
+    unsigned int reunit_interval,
+    unsigned int stopWtheta,
+    void* milc_sitelink
+    )
 {
-  static const QudaVerbosity verbosity = getVerbosity();
-  qudamilc_called<true>(__func__, verbosity);
 
-  for(int i=0; i<num_offsets; ++i){
-    if(target_residual_offset[i] == 0){
-      errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
-      exit(1);
-    }
-  }
 
-  // if doing a pure double-precision multi-shift solve don't use reliable updates
-  double reliable_delta = (inv_args.mixed_precision == 1 || quda_precision == 1) ? 1e-1 : 0.0;
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
+      QUDA_SU3_LINKS);
+  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
 
-  QudaInvertParam invertParam = newQudaInvertParam();
-  setInvertParam(invertParam, inv_args, external_precision, quda_precision, kappa, reliable_delta);
-  invertParam.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-  invertParam.num_offset = num_offsets;
-  for(int i=0; i<num_offsets; ++i){
-    invertParam.offset[i] = offset[i];
-    invertParam.tol_offset[i] = target_residual_offset[i];
-  }
-  invertParam.tol = target_residual_offset[0];
-  invertParam.clover_coeff = clover_coeff;
 
-  // solution types
-  invertParam.solution_type      = QUDA_MATPCDAG_MATPC_SOLUTION;
-  invertParam.solve_type         = QUDA_NORMOP_PC_SOLVE;
-  invertParam.inv_type           = QUDA_CG_INVERTER;
-  invertParam.matpc_type         = QUDA_MATPC_EVEN_EVEN_ASYMMETRIC;
+  double timeinfo[3];
+  computeGaugeFixingOVRQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, \
+    &qudaGaugeParam, timeinfo);
 
-  invertParam.verbosity = verbosity;
-  invertParam.verbosity_precondition = QUDA_SILENT;
-
-  invertMultiShiftMDQuda(psiEven, psiOdd, pEven, pOdd, source, &invertParam); 
-
-  // return the number of iterations taken by the inverter
-  *num_iters = invertParam.iter;
-  for(int i=0; i<num_offsets; ++i) final_residual[i] = invertParam.true_res_offset[i];
+  printfQuda("Time H2D: %lf\n", timeinfo[0]);
+  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
+  printfQuda("Time D2H: %lf\n", timeinfo[2]);
+  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
 
   return;
-} // qudaCloverMultishiftMDInvert
+}
 
-#endif // GPU_CLOVER_DIRAC
+void qudaGaugeFixingFFT( int precision,
+    unsigned int gauge_dir, 
+    int Nsteps,
+    int verbose_interval,
+    double alpha,
+    unsigned int autotune,
+    double tolerance,
+    unsigned int stopWtheta,
+    void* milc_sitelink
+    )
+{
+
+
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
+      QUDA_GENERAL_LINKS);
+  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+
+
+  double timeinfo[3];
+  computeGaugeFixingFFTQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta, \
+    &qudaGaugeParam, timeinfo);
+
+  printfQuda("Time H2D: %lf\n", timeinfo[0]);
+  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
+  printfQuda("Time D2H: %lf\n", timeinfo[2]);
+  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+
+  return;
+}
+#endif // BUILD_GAUGE_ALG
 
 
 #endif // BUILD_MILC_INTERFACE

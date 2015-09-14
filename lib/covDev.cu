@@ -121,9 +121,9 @@ namespace quda
     }
 
   #define PROFILE(f, profile, idx)		\
-    profile.Start(idx);				\
+    profile.TPSTART(idx);			\
     f;						\
-    profile.Stop(idx); 
+    profile.TPSTOP(idx); 
 
   /**
      This is a simpler version of the dslashCuda function to call the right kernels
@@ -154,6 +154,7 @@ namespace quda
         dslashParam.commDim[dir] = 0; 
       }
     #endif // MULTI_GPU
+    cudaStreamSynchronize(streams[Nstream-1]);
   }
 
   /**
@@ -234,13 +235,9 @@ namespace quda
         /**
            Allocates ghosts for multi-GPU
         */
-
         void allocateGhosts()
         {
-          if(cudaMalloc(&ghostBuffer, ghostBytes) != cudaSuccess) {
-            printf("Error in rank %d: Unable to allocate %d bytes for GPU ghosts\n", comm_rank(), ghostBytes);
-            exit(-1);
-          }
+          ghostBuffer = (Float*)device_malloc(ghostBytes);
         }
 
         /**
@@ -253,20 +250,11 @@ namespace quda
         {
           const int rel = (mu < 4) ? 1 : -1;
 
-          void *send = 0;
-          void *recv = 0;
-
           // Send buffers:
-          if(cudaHostAlloc(&send, ghostBytes, 0) != cudaSuccess) {
-            printf("Error in rank %d: Unable to allocate %d bytes for MPI requests (send)\n", comm_rank(), ghostBytes);
-            exit(-1);
-          }
+          void *send = pinned_malloc(ghostBytes);
 
           // Receive buffers:
-          if(cudaHostAlloc(&recv, ghostBytes, 0) != cudaSuccess) {
-            printf("Error in rank %d: Unable to allocate %d bytes for MPI requests (recv)\n", comm_rank(), ghostBytes);
-            exit(-1);
-          }
+          void *recv = pinned_malloc(ghostBytes);
 
           switch(mu) {
             default:
@@ -389,8 +377,8 @@ namespace quda
           MsgHandle *mh_send;
           MsgHandle *mh_from;
 
-          mh_send = comm_declare_send_relative	(send, dir, rel,      ghostBytes);
-          mh_from = comm_declare_receive_relative	(recv, dir, rel*(-1), ghostBytes);
+          mh_send = comm_declare_send_relative(send, dir, rel*(-1), ghostBytes);
+          mh_from = comm_declare_receive_relative(recv, dir, rel, ghostBytes);
           comm_start (mh_send);
           comm_start (mh_from);
           comm_wait (mh_send);
@@ -402,12 +390,12 @@ namespace quda
           cudaMemcpy(ghostBuffer, recv, ghostBytes, cudaMemcpyHostToDevice);
           cudaDeviceSynchronize();
 
-          cudaFreeHost(send);
-          cudaFreeHost(recv);
+          host_free(send);
+          host_free(recv);
         }
 
 
-        void freeGhosts() { cudaFree(ghostBuffer); }
+        void freeGhosts() { device_free(ghostBuffer); }
 
         void bindGhosts()
         {
@@ -590,8 +578,8 @@ namespace quda
         if(in->Precision() != gauge.Precision())
           errorQuda("Mixing gauge %d and spinor %d precision not supported", gauge.Precision(), in->Precision());
 
-        profile.Start(QUDA_PROFILE_TOTAL);
-        profile.Start(QUDA_PROFILE_INIT);
+        profile.TPSTART(QUDA_PROFILE_TOTAL);
+        profile.TPSTART(QUDA_PROFILE_INIT);
 
         if(in->Precision() == QUDA_SINGLE_PRECISION)
           covdev = new CovDevCuda<float, float4>(out, &gauge, in, parity, mu);
@@ -603,15 +591,15 @@ namespace quda
             errorQuda("Error: Double precision not supported by hardware");
           #endif
         }
-        profile.Stop(QUDA_PROFILE_INIT);
+        profile.TPSTOP(QUDA_PROFILE_INIT);
 
         covDevCuda(*covdev, regSize, mu, profile);
 
-        profile.Start(QUDA_PROFILE_EPILOGUE);
+        profile.TPSTART(QUDA_PROFILE_EPILOGUE);
         delete covdev;
         checkCudaError();
-        profile.Stop(QUDA_PROFILE_EPILOGUE);
-        profile.Stop(QUDA_PROFILE_TOTAL);
+        profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+        profile.TPSTOP(QUDA_PROFILE_TOTAL);
       #else
         errorQuda("Contraction kernels have not been built");
       #endif

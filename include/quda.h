@@ -139,6 +139,9 @@ extern "C" {
     /** Actual L2 residual norm achieved in solver for each offset */
     double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
 
+    /** Iterated L2 residual norm achieved in multi shift solver for each offset */
+    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
+
     /** Actual heavy quark residual norm achieved in solver for each offset */
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
@@ -247,6 +250,12 @@ extern "C" {
     int rhs_idx;
 
     int deflation_grid;//total deflation space is nev*deflation_grid
+
+    /** Whether to make the solution vector(s) after the solve */
+    int make_resident_solution;
+
+    /** Whether to use the resident solution vector(s) */
+    int use_resident_solution;
 
   } QudaInvertParam;
 
@@ -489,21 +498,6 @@ extern "C" {
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
 
   /**
-   * Solve for multiple shifts (e.g., masses).  This is a special
-   * variant of the multi-shift solver where the additional vectors
-   * required for force computation are also returned.
-   * @param _hp_xe   Array of solution spinor fields
-   * @param _hp_xo   Array of fields with A_oo^{-1} D_oe * x 
-   * @param _hp_ye   Array of fields with M_ee * x
-   * @param _hp_yo   Array of fields with A_oo^{-1} D_oe * M_ee * x
-   * @param _hp_b    Array of source spinor fields
-   * @param param  Contains all metadata regarding host and device
-   *               storage and solver parameters
-   */
-  void invertMultiShiftMDQuda(void **_hp_xe, void **_hp_xo, void **_hp_ye, 
-      void **_hp_yo, void *_hp_b, QudaInvertParam *param);
-
-  /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
    * @param _hp_b    Array of source spinor fields
@@ -723,6 +717,27 @@ extern "C" {
   void computeCloverDerivativeQuda(void* out, void* gauge, void* oprod, int mu, int nu,
 				   double coeff,
 				   QudaParity parity, QudaGaugeParam* param, int conjugate);
+  /**
+   * Compute the clover force contributions in each dimension mu given
+   * the array of solution fields, and compute the resulting momentum
+   * field.
+   *
+   * @param mom Force matrix
+   * @param dt Integrating step size
+   * @param x Array of solution vectors
+   * @param p Array of intermediate vectors
+   * @param coeff Array of residues for each contribution (multiplied by stepsize)
+   * @param kappa2 -kappa*kappa parameter
+   * @param ck -clover_coefficient * kappa / 8
+   * @param nvec Number of vectors
+   * @param multiplicity Number fermions this bilinear reresents
+   * @param gauge Gauge Field
+   * @param gauge_param Gauge field meta data
+   * @param inv_param Dirac and solver meta data
+   */
+  void computeCloverForceQuda(void *mom, double dt, void **x, void **p, double *coeff, double kappa2, double ck,
+			      int nvector, double multiplicity, void *gauge, 
+			      QudaGaugeParam *gauge_param, QudaInvertParam *inv_param);
 
   /**
    * Compute the quark-field outer product needed for gauge generation
@@ -803,9 +818,10 @@ extern "C" {
                       const QudaGaugeParam* param);
 
   /**
-   * Computes the plaquette of the loaded gauge configuration.
+   * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
+   * @param Array for storing the averages (total, spatial, temporal)
    */
-  double plaqCuda();
+  void plaqQuda(double plaq[3]);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
@@ -813,6 +829,53 @@ extern "C" {
    * @param alpha  Alpha coefficient for APE smearing.
    */
   void performAPEnStep(unsigned int nSteps, double alpha);
+
+  /**
+   * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
+   * @param[in,out] gauge, gauge field to be fixed
+   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
+   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
+   * @param[in] relax_boost, gauge fixing parameter of the overrelaxation method, most common value is 1.5 or 1.7.
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] reunit_interval, reunitarize gauge field when iteration count is a multiple of this
+   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] param The parameters of the external fields and the computation settings
+   * @param[out] timeinfo
+   */
+  int computeGaugeFixingOVRQuda(void* gauge,
+                      const unsigned int gauge_dir,  
+                      const unsigned int Nsteps, 
+                      const unsigned int verbose_interval, 
+                      const double relax_boost, 
+                      const double tolerance, 
+                      const unsigned int reunit_interval, 
+                      const unsigned int stopWtheta, 
+                      QudaGaugeParam* param, 
+                      double* timeinfo);
+  /**
+   * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
+   * @param[in,out] gauge, gauge field to be fixed
+   * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
+   * @param[in] Nsteps, maximum number of steps to perform gauge fixing
+   * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
+   * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
+   * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value 
+   * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
+   * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
+   * @param[in] param The parameters of the external fields and the computation settings
+   * @param[out] timeinfo
+   */
+  int computeGaugeFixingFFTQuda(void* gauge,
+                      const unsigned int gauge_dir,  
+                      const unsigned int Nsteps, 
+                      const unsigned int verbose_interval, 
+                      const double alpha,
+                      const unsigned int autotune, 
+                      const double tolerance,  
+                      const unsigned int stopWtheta, 
+                      QudaGaugeParam* param, 
+                      double* timeinfo);
 
   /**
   * Open/Close MAGMA library

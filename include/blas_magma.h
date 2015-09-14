@@ -11,9 +11,10 @@
 //MAGMA library interface 
 //required for (incremental) EigCG solver
 
-   typedef std::complex<double> Complex; //same notations
-
    class BlasMagmaArgs{
+
+      typedef std::complex<double> Complex; 
+
     private:
 
       //problem sizes:

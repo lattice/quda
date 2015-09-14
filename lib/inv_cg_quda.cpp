@@ -28,12 +28,12 @@ namespace quda {
 
   void CG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
   {
-    profile.Start(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
     if(b2 == 0){
-      profile.Stop(QUDA_PROFILE_INIT);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
       param.true_res = 0.0;
@@ -100,8 +100,8 @@ namespace quda {
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     bool heavy_quark_restart = false;
     
-    profile.Stop(QUDA_PROFILE_INIT);
-    profile.Start(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double r2_old;
 
@@ -143,8 +143,8 @@ namespace quda {
     // only used if we use the heavy_quark_res
     bool L2breakdown =false;
 
-    profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
 
     int k=0;
@@ -307,8 +307,8 @@ namespace quda {
     copyCuda(x, xSloppy); // nop when these pointers alias
     xpyCuda(y, x);
 
-    profile.Stop(QUDA_PROFILE_COMPUTE);
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops())*1e-9;
@@ -338,8 +338,8 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
     if (&tmp3 != &tmp) delete tmp3_p;
     if (&tmp2 != &tmp) delete tmp2_p;
@@ -347,7 +347,7 @@ namespace quda {
     if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
     if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }

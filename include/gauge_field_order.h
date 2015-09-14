@@ -1,6 +1,7 @@
 #include <tune_quda.h>
 #include <assert.h>
 #include <register_traits.h>
+#include <generics/ldg.h>
 
 namespace quda {
 
@@ -243,7 +244,7 @@ namespace quda {
 
       // Multiply the third row by exp(I*3*phase)
       RegType cos_sin[2];
-      Trig<isHalf<RegType>::value>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);     
+      Trig<isHalf<RegType>::value,RegType>::SinCos(static_cast<RegType>(3.*phase), &cos_sin[1], &cos_sin[0]);
       RegType tmp[2];
       complexProduct(tmp, cos_sin, &out[12]); out[12] = tmp[0]; out[13] = tmp[1];
       complexProduct(tmp, cos_sin, &out[14]); out[14] = tmp[0]; out[15] = tmp[1];
@@ -263,7 +264,7 @@ namespace quda {
       // numerator = U[2][2]
       complexQuotient(expI3Phase, in+16, denom);
 
-      *phase = Trig<isHalf<RegType>::value>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
+      *phase = Trig<isHalf<RegType>::value,RegType>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
       return;
     }
 
@@ -292,8 +293,8 @@ namespace quda {
     }
 
     __device__ __host__ inline void Pack(RegType out[8], const RegType in[18], int idx) const {
-      out[0] = Trig<isHalf<Float>::value>::Atan2(in[1], in[0]);
-      out[1] = Trig<isHalf<Float>::value>::Atan2(in[13], in[12]);
+      out[0] = Trig<isHalf<Float>::value,RegType>::Atan2(in[1], in[0]);
+      out[1] = Trig<isHalf<Float>::value,RegType>::Atan2(in[13], in[12]);
       for (int i=2; i<8; i++) out[i] = in[i];
     }
 
@@ -309,11 +310,11 @@ namespace quda {
       RegType u0 = dir < 3 ? anisotropy : 
 	timeBoundary<RegType>(idx, X, R, tBoundary,isFirstTimeSlice, isLastTimeSlice, ghostExchange);
 
-      RegType diff = 1.0/(u0*u0) - row_sum;
-      RegType U00_mag = sqrt(diff >= 0 ? diff : 0.0);
+      RegType diff = static_cast<RegType>(1.0)/(u0*u0) - row_sum;
+      RegType U00_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      out[0] = U00_mag * Trig<isHalf<Float>::value>::Cos(in[0]);
-      out[1] = U00_mag * Trig<isHalf<Float>::value>::Sin(in[0]);
+      out[0] = U00_mag * Trig<isHalf<Float>::value,RegType>::Cos(in[0]);
+      out[1] = U00_mag * Trig<isHalf<Float>::value,RegType>::Sin(in[0]);
 
       // Now reconstruct first column
       RegType column_sum = 0.0;
@@ -323,14 +324,14 @@ namespace quda {
 	column_sum += in[i]*in[i];
       }
       diff = 1.f/(u0*u0) - column_sum;
-      RegType U20_mag = sqrt(diff >= 0 ? diff : 0.0);
+      RegType U20_mag = sqrt(diff >= static_cast<RegType>(0.0) ? diff : static_cast<RegType>(0.0));
 
-      out[12] = U20_mag * Trig<isHalf<Float>::value>::Cos(in[1]);
-      out[13] = U20_mag * Trig<isHalf<Float>::value>::Sin(in[1]);
+      out[12] = U20_mag * Trig<isHalf<Float>::value,RegType>::Cos(in[1]);
+      out[13] = U20_mag * Trig<isHalf<Float>::value,RegType>::Sin(in[1]);
       // First column now restored
 
       // finally reconstruct last elements from SU(2) rotation
-      RegType r_inv2 = 1.0/(u0*row_sum);
+      RegType r_inv2 = static_cast<RegType>(1.0)/(u0*row_sum);
 
       // U11
       RegType A[2];
@@ -386,7 +387,7 @@ namespace quda {
       // numerator = U[2][2]
       complexQuotient(expI3Phase, in+16, denom);
 
-      *phase = Trig<isHalf<RegType>::value>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
+      *phase = Trig<isHalf<RegType>::value,RegType>::Atan2(expI3Phase[1], expI3Phase[0])/3.;
     }
 
 
@@ -411,7 +412,7 @@ namespace quda {
     __device__ __host__ inline void Unpack(RegType out[18], const RegType in[8], int idx, int dir, const RegType phase) const {
       reconstruct_8.Unpack(out, in, idx, dir, phase);
       RegType cos_sin[2];
-      Trig<isHalf<RegType>::value>::SinCos(phase, &cos_sin[1], &cos_sin[0]);     
+      Trig<isHalf<RegType>::value,RegType>::SinCos(phase, &cos_sin[1], &cos_sin[0]);
       RegType tmp[2];
       cos_sin[0] *= scale;
       cos_sin[1] *= scale;
@@ -431,14 +432,44 @@ namespace quda {
   };
 
 
+
+
+template <typename Float, int number> struct VectorType;
+
+// double precision
+template <> struct VectorType<double, 1>{typedef double type; };
+template <> struct VectorType<double, 2>{typedef double2 type; };
+template <> struct VectorType<double, 4>{typedef double4 type; };
+
+// single precision
+template <> struct VectorType<float, 1>{typedef float type; };
+template <> struct VectorType<float, 2>{typedef float2 type; };
+template <> struct VectorType<float, 4>{typedef float4 type; };
+
+// half precision
+template <> struct VectorType<short, 1>{typedef short type; };
+template <> struct VectorType<short, 2>{typedef short2 type; };
+template <> struct VectorType<short, 4>{typedef short4 type; };
+
+ template <typename VectorType>
+   __device__ __host__ VectorType vector_load(void *ptr, int idx) {
+   //#define USE_LDG
+#if defined(__CUDA_ARCH__) && defined(USE_LDG)
+   return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
+#else
+   return reinterpret_cast< VectorType* >(ptr)[idx];
+#endif
+ }
+
   template <typename Float, int length, int N, int reconLen>
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;
       Reconstruct<reconLen,Float> reconstruct;
-      Float *gauge[2];
+      Float *gauge;
+      size_t offset;
       Float *ghost[4];
-      int faceVolumeCB[4];
       const int volumeCB;
+      int faceVolumeCB[4];
       const int stride;
       const int geometry;
 #if __COMPUTE_CAPABILITY__ >= 200
@@ -455,15 +486,14 @@ namespace quda {
 	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
 #endif
       {
-	if (gauge_) { gauge[0] = gauge_; gauge[1] = (Float*)((char*)gauge_ + u.Bytes()/2);
-	} else { gauge[0] = (Float*)u.Gauge_p(); gauge[1] = (Float*)((char*)u.Gauge_p() + u.Bytes()/2);	}
+	if (gauge_) { gauge = gauge_; offset = u.Bytes()/(2*sizeof(Float));
+	} else { gauge = (Float*)u.Gauge_p(); offset = u.Bytes()/(2*sizeof(Float)); }
 
 	for (int i=0; i<4; i++) {
 	  ghost[i] = ghost_ ? ghost_[i] : 0; 
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth	  
 	}
       }
-
 
     FloatNOrder(const FloatNOrder &order) 
     : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), 
@@ -472,8 +502,8 @@ namespace quda {
 	, hasPhase(order.hasPhase), phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
 #endif
       {
-	gauge[0] = order.gauge[0];
-	gauge[1] = order.gauge[1];
+	gauge = order.gauge;
+	offset = order.offset;
 	for (int i=0; i<4; i++) {
 	  ghost[i] = order.ghost[i];
 	  faceVolumeCB[i] = order.faceVolumeCB[i];
@@ -484,16 +514,20 @@ namespace quda {
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity) const {
         const int M = reconLen / N;
         RegType tmp[reconLen];
-        for (int i=0; i<M; i++) {
-          for (int j=0; j<N; j++) {
-            int intIdx = i*N + j; // internal dof index
-            int padIdx = intIdx / N;
-            copy(tmp[i*N+j], gauge[parity][dir*stride*M*N + (padIdx*stride + x)*N + intIdx%N]);
-          }
+	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
+#pragma unroll
+        for (int i=0; i<M; i++){
+	  // first do vectorized copy from memory
+	  Vector vecTmp = vector_load<Vector>(gauge + parity*offset, x + dir*stride*M + stride*i);
+	  // second do vectorized copy converting into register type
+          copy(reinterpret_cast<RegVector*>(tmp)[i], vecTmp);
         }
+	
         RegType phase = 0.;
 #if __COMPUTE_CAPABILITY__ >= 200
-        if(hasPhase) copy(phase, gauge[parity][phaseOffset/sizeof(Float) + stride*dir + x]);
+        if(hasPhase) copy(phase, (gauge+parity*offset)[phaseOffset/sizeof(Float) + stride*dir + x]);
         // The phases come after the ghost matrices
 #endif
         reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);
@@ -503,18 +537,22 @@ namespace quda {
         const int M = reconLen / N;
         RegType tmp[reconLen];
         reconstruct.Pack(tmp, v, x);
-        for (int i=0; i<M; i++) {
-          for (int j=0; j<N; j++) {
-            int intIdx = i*N + j;
-            int padIdx = intIdx / N;
-            copy(gauge[parity][dir*stride*M*N + (padIdx*stride + x)*N + intIdx%N], tmp[i*N+j]);
-          }
+	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
+#pragma unroll
+        for (int i=0; i<M; i++){
+	  Vector vecTmp;
+	  // first do vectorized copy converting into storage type
+	  copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
+	  // second do vectorized copy into memory
+	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
         }
 #if __COMPUTE_CAPABILITY__ >= 200
         if(hasPhase){
           RegType phase;
           reconstruct.getPhase(&phase,v);
-          copy(gauge[parity][phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI))); 
+          copy((gauge+parity*offset)[phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI))); 
         }        
 #endif
       }
@@ -526,15 +564,19 @@ namespace quda {
         } else {
           const int M = reconLen / N;
           RegType tmp[reconLen];
+	  typedef typename VectorType<Float,N>::type Vector;
+	  typedef typename VectorType<RegType,N>::type RegVector;
+
+#pragma unroll
           for (int i=0; i<M; i++) {
-            for (int j=0; j<N; j++) {
-              int intIdx = i*N + j; // internal dof index
-              int padIdx = intIdx / N;
 #if __COMPUTE_CAPABILITY__ < 200
-	      const int hasPhase = 0;
+	    const int hasPhase = 0;
 #endif
-              copy(tmp[i*N+j], ghost[dir][parity*faceVolumeCB[dir]*(M*N + hasPhase) + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N]);
-            }
+	    // first do vectorized copy from memory into registers
+	    Vector vecTmp = vector_load<Vector>(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), 
+						i*faceVolumeCB[dir]+x);
+	    // second do vectorized copy converting into register type
+	    copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
           }
           RegType phase=0.; 
 #if __COMPUTE_CAPABILITY__ >= 200
@@ -551,15 +593,20 @@ namespace quda {
           const int M = reconLen / N;
           RegType tmp[reconLen];
           reconstruct.Pack(tmp, v, x);
+	  typedef typename VectorType<Float,N>::type Vector;
+	  typedef typename VectorType<RegType,N>::type RegVector;
+
+#pragma unroll
           for (int i=0; i<M; i++) {
-            for (int j=0; j<N; j++) {
-              int intIdx = i*N + j;
-              int padIdx = intIdx / N;
 #if __COMPUTE_CAPABILITY__ < 200
-	      const int hasPhase = 0;
+	    const int hasPhase = 0;
 #endif
-              copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + hasPhase) + (padIdx*faceVolumeCB[dir]+x)*N + intIdx%N], tmp[i*N+j]);
-            }
+	    Vector vecTmp;
+	    // first do vectorized copy converting into storage type
+	    copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+	    // second do vectorized copy into memory
+	    reinterpret_cast< Vector*>
+	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
           }
 
 #if __COMPUTE_CAPABILITY__ >= 200
@@ -579,16 +626,19 @@ namespace quda {
 #endif
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
+	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
+#pragma unroll
 	for (int i=0; i<M; i++) {
-	  for (int j=0; j<N; j++) {
-	    int intIdx = i*N + j; // internal dof index
-	    int padIdx = intIdx / N;
-	    copy(tmp[i*N+j], ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase) 
-					+ (padIdx*R[dim]*faceVolumeCB[dim]+buff_idx)*N + intIdx%N]);
-	  }
+	  // first do vectorized copy from memory
+	  Vector vecTmp = vector_load<Vector>(ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase),
+					      +i*R[dim]*faceVolumeCB[dim]+buff_idx);
+	  // second do vectorized copy converting into register type
+	  copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
 	}
 	RegType phase=0.; 
-	if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1) 
+	if(hasPhase) copy(phase, ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + 1)
 					    + R[dim]*faceVolumeCB[dim]*M*N + buff_idx]); 
 
 	// use the extended_idx to determine the boundary condition
@@ -604,13 +654,18 @@ namespace quda {
 	RegType tmp[reconLen];
 	// use the extended_idx to determine the boundary condition
 	reconstruct.Pack(tmp, v, extended_idx);
+	typedef typename VectorType<Float,N>::type Vector;
+	typedef typename VectorType<RegType,N>::type RegVector;
+
+#pragma unroll
 	for (int i=0; i<M; i++) {
-	  for (int j=0; j<N; j++) {
-	    int intIdx = i*N + j;
-	    int padIdx = intIdx / N;
-	    copy(ghost[dim][((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase) 
-			    + (padIdx*R[dim]*faceVolumeCB[dim]+buff_idx)*N + intIdx%N], tmp[i*N+j]);
-	  }
+	  Vector vecTmp;
+	  // first do vectorized copy converting into storage type
+	  copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
+	  // second do vectorized copy to memory
+	  reinterpret_cast< Vector* >
+	    (ghost[dim] + ((dir*2+parity)*geometry+g)*R[dim]*faceVolumeCB[dim]*(M*N + hasPhase))
+	    [i*R[dim]*faceVolumeCB[dim]+buff_idx] = vecTmp;
 	}
 	if(hasPhase){
 	  RegType phase=0.;
@@ -627,7 +682,7 @@ namespace quda {
 #if __COMPUTE_CAPABILITY__ >= 200
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-	cudaMemcpy(backup_h, gauge[0], bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
 	checkCudaError();
 #endif
       }
@@ -637,7 +692,7 @@ namespace quda {
       */
       void load() {
 #if __COMPUTE_CAPABILITY__ >= 200
-	cudaMemcpy(gauge[0], backup_h, bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = 0;
 	checkCudaError();
@@ -646,6 +701,7 @@ namespace quda {
 
       size_t Bytes() const { return reconLen * sizeof(Float); }
     };
+
 
   /** 
       The LegacyOrder defines the ghost zone storage and ordering for
@@ -945,4 +1001,29 @@ namespace quda {
   };
 
 
-}
+  
+  // Use traits to reduce the template explosion
+  template<typename ,QudaReconstructType,int N=18> struct gauge_mapper { };
+
+  // double precision
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_NO,N> { typedef FloatNOrder<double, N, 2, N> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_13,N> { typedef FloatNOrder<double, N, 2, 13> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_12,N> { typedef FloatNOrder<double, N, 2, 12> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_9,N> { typedef FloatNOrder<double, N, 2, 9> type; };
+  template<int N> struct gauge_mapper<double,QUDA_RECONSTRUCT_8,N> { typedef FloatNOrder<double, N, 2, 8> type; };
+
+  // single precision
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_NO,N> { typedef FloatNOrder<float, N, 2, N> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_13,N> { typedef FloatNOrder<float, N, 4, 13> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_12,N> { typedef FloatNOrder<float, N, 4, 12> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_9,N> { typedef FloatNOrder<float, N, 4, 9> type; };
+  template<int N> struct gauge_mapper<float,QUDA_RECONSTRUCT_8,N> { typedef FloatNOrder<float, N, 4, 8> type; };
+
+  // half precision
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_NO,N> { typedef FloatNOrder<short, N, 2, N> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_13,N> { typedef FloatNOrder<short, N, 4, 13> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N> { typedef FloatNOrder<short, N, 4, 12> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N> { typedef FloatNOrder<short, N, 4, 9> type; };
+  template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N> { typedef FloatNOrder<short, N, 4, 8> type; };
+
+} // namespace quda

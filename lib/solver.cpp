@@ -156,7 +156,7 @@ namespace quda {
       solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
     }else if (param.inv_type == QUDA_GMRESDR_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ){
       report("GMRESDR");
-      solver = new GmresDR(mat, matSloppy, matDeflate, param, profile);
+      solver = new GMResDR(mat, matSloppy, matDeflate, param, profile);
     }else{
       errorQuda("Invalid solver type");
     }

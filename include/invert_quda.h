@@ -112,6 +112,9 @@ namespace quda {
     /** Actual L2 residual norm achieved in solver for each offset */
     double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
 
+    /** Iterated L2 residual norm achieved in multi shift solver for each offset */
+    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
+
     /** Actual heavy quark residual norm achieved in solver for each offset */
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
@@ -204,10 +207,12 @@ namespace quda {
       param.secs += secs;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];
+        param.iter_res_offset[offset] = iter_res_offset[offset];
 	param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
       } else {
 	for (int i=0; i<num_offset; i++) {
 	  param.true_res_offset[i] = true_res_offset[i];
+          param.iter_res_offset[i] = iter_res_offset[i];
 	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
 	}
       }
@@ -642,10 +647,10 @@ namespace quda {
   };
 
 //forward declaration
- struct GmresdrDeflationParam;
- class GmresDRArgs; 
+ struct GMResDRDeflationParam;
+ class GMResDRArgs; 
 
- class GmresDR : public DeflatedSolver {
+ class GMResDR : public DeflatedSolver {
 
   private:
 
@@ -667,13 +672,13 @@ namespace quda {
 
   public:
 
-    GmresDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
+    GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
 
-    virtual ~GmresDR();
+    virtual ~GMResDR();
 
     //GMRES-DR solver
     //void   GmresDRCycle(cudaColorSpinorField &out, cudaColorSpinorField &in, Complex *u);
-    double GmresDRCycle(cudaColorSpinorField &x, double r2, Complex *u, const double stop);
+    double GMResDRCycle(cudaColorSpinorField &x, double r2, Complex *u, const double stop);
     //GMRES-DR solver 
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
     //

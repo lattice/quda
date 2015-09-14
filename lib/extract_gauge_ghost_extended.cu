@@ -3,10 +3,9 @@
 
 namespace quda {
 
-  template <typename Order, int nDim>
+  template <typename Order, int nDim, int dim>
   struct ExtractGhostExArg {
     Order order;
-    int dim;
     int X[nDim];
     int R[nDim];
     int surfaceCB[nDim];
@@ -19,12 +18,12 @@ namespace quda {
     int fBody[nDim][nDim];
     int fBuf[nDim][nDim];
     int localParity[nDim];
-    ExtractGhostExArg(const Order &order, int dim, const int *X_, const int *R_, 
+    ExtractGhostExArg(const Order &order, const int *X_, const int *R_, 
 		      const int *surfaceCB_, 
 		      const int *A0_, const int *A1_, const int *B0_, const int *B1_, 
 		      const int *C0_, const int *C1_, const int fBody_[nDim][nDim], 
 		      const int fBuf_[nDim][nDim], const int *localParity_) 
-  : order(order), dim(dim) { 
+  : order(order) { 
       for (int d=0; d<nDim; d++) {
 	X[d] = X_[d];
 	R[d] = R_[d];
@@ -45,11 +44,10 @@ namespace quda {
 
   };
 
-  template <typename Float, int length, typename Arg>
+  template <typename Float, int length, int dim, typename Arg>
   __device__ __host__ void extractor(Arg &arg, int dir, int a, int b, 
 				     int c, int d, int g, int parity) {
     typename mapper<Float>::type u[length];
-    int &dim = arg.dim;
     int srcIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
 		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
     
@@ -66,11 +64,10 @@ namespace quda {
   }
 
 
-  template <typename Float, int length, typename Arg>
+  template <typename Float, int length, int dim, typename Arg>
   __device__ __host__ void injector(Arg &arg, int dir, int a, int b, 
 				    int c, int d, int g, int parity) {
     typename mapper<Float>::type u[length];
-    int &dim = arg.dim;
     int srcIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
 		  c*arg.fBuf[dim][2] + (d-dir*(arg.X[dim]+arg.R[dim]))*arg.fBuf[dim][3]) >> 1;
     
@@ -89,11 +86,9 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, typename Order, bool extract>
-  void extractGhostEx(ExtractGhostExArg<Order,nDim> arg) {  
+  template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
+  void extractGhostEx(ExtractGhostExArg<Order,nDim,dim> arg) {  
     typedef typename mapper<Float>::type RegType;
-
-    int dim = arg.dim;
 
     for (int parity=0; parity<2; parity++) {
 
@@ -112,8 +107,8 @@ namespace quda {
 		  // we only do the extraction for parity we are currently working on
 		  int oddness = (a+b+c+d) & 1;
 		  if (oddness == parity) {
-		    if (extract) extractor<Float,length>(arg, dir, a, b, c, d, g, parity);
-		    else injector<Float,length>(arg, dir, a, b, c, d, g, parity);
+		    if (extract) extractor<Float,length,dim>(arg, dir, a, b, c, d, g, parity);
+		    else injector<Float,length,dim>(arg, dir, a, b, c, d, g, parity);
 		  } // oddness == parity
 		} // g
 	      } // c
@@ -136,11 +131,9 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <typename Float, int length, int nDim, typename Order, bool extract>
-  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim> arg) {  
+  template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
+  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim,dim> arg) {  
     typedef typename mapper<Float>::type RegType;
-
-    int dim = arg.dim;
 
     // parallelize over parity and dir using block or grid 
     /*for (int parity=0; parity<2; parity++) {*/
@@ -179,8 +172,8 @@ namespace quda {
 	// we only do the extraction for parity we are currently working on
 	int oddness = (a+b+c+d) & 1;
 	if (oddness == parity) {
-	  if (extract) extractor<Float,length>(arg, dir, a, b, c, d, g, parity);
-	  else injector<Float,length>(arg, dir, a, b, c, d, g, parity);
+	  if (extract) extractor<Float,length,dim>(arg, dir, a, b, c, d, g, parity);
+	  else injector<Float,length,dim>(arg, dir, a, b, c, d, g, parity);
 	} // oddness == parity
       } // dir
       
@@ -188,9 +181,9 @@ namespace quda {
 
   }
 
-  template <typename Float, int length, int nDim, typename Order>
+  template <typename Float, int length, int nDim, int dim, typename Order>
   class ExtractGhostEx : Tunable {
-    ExtractGhostExArg<Order,nDim> arg;
+    ExtractGhostExArg<Order,nDim,dim> arg;
     int size;
     bool extract;
     const GaugeField &meta;
@@ -204,28 +197,28 @@ namespace quda {
     unsigned int minThreads() const { return size; }
 
   public:
-    ExtractGhostEx(ExtractGhostExArg<Order,nDim> &arg, bool extract, 
+    ExtractGhostEx(ExtractGhostExArg<Order,nDim,dim> &arg, bool extract, 
 		   const GaugeField &meta, QudaFieldLocation location)
       : arg(arg), extract(extract), meta(meta), location(location) {
-      int dA = arg.A1[arg.dim]-arg.A0[arg.dim];
-      int dB = arg.B1[arg.dim]-arg.B0[arg.dim];
-      int dC = arg.C1[arg.dim]-arg.C0[arg.dim];
-      size = arg.R[arg.dim]*dA*dB*dC*arg.order.geometry;
+      int dA = arg.A1[dim]-arg.A0[dim];
+      int dB = arg.B1[dim]-arg.B0[dim];
+      int dC = arg.C1[dim]-arg.C0[dim];
+      size = arg.R[dim]*dA*dB*dC*arg.order.geometry;
       writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d",
-		     sizeof(Float),arg.order.stride, extract, arg.dim);
+		     sizeof(Float),arg.order.stride, extract, dim);
     }
     virtual ~ExtractGhostEx() { ; }
   
     void apply(const cudaStream_t &stream) {
       if (extract) {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  extractGhostEx<Float,length,nDim,Order,true>(arg);
+	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);
 	} else {
 #if (__COMPUTE_CAPABILITY__ >= 200)
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,Order,true> 
+	  extractGhostExKernel<Float,length,nDim,dim,Order,true> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #else
       errorQuda("extractGhostEx not supported on pre-Fermi architecture");
@@ -234,13 +227,13 @@ namespace quda {
 	}
       } else { // we are injecting
 	if (location==QUDA_CPU_FIELD_LOCATION) {
-	  extractGhostEx<Float,length,nDim,Order,false>(arg);
+	  extractGhostEx<Float,length,nDim,dim,Order,false>(arg);
 	} else {
 #if (__COMPUTE_CAPABILITY__ >= 200)
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
-	  extractGhostExKernel<Float,length,nDim,Order,false> 
+	  extractGhostExKernel<Float,length,nDim,dim,Order,false> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #else
       errorQuda("extractGhostEx not supported on pre-Fermi architecture");
@@ -314,10 +307,30 @@ namespace quda {
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
     //      localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
 
-    ExtractGhostExArg<Order, nDim> arg(order, dim, X, R, surfaceCB, A0, A1, B0, B1, 
-				       C0, C1, fSrc, fBuf, localParity);
-    ExtractGhostEx<Float,length,nDim,Order> extractor(arg, extract, u, location);
-    extractor.apply(0);
+    if (dim==0) {
+      ExtractGhostExArg<Order,nDim,0> arg(order, X, R, surfaceCB, A0, A1, B0, B1, 
+					  C0, C1, fSrc, fBuf, localParity);
+      ExtractGhostEx<Float,length,nDim,0,Order> extractor(arg, extract, u, location);
+      extractor.apply(0);
+    } else if (dim==1) {
+      ExtractGhostExArg<Order,nDim,1> arg(order, X, R, surfaceCB, A0, A1, B0, B1, 
+					  C0, C1, fSrc, fBuf, localParity);
+      ExtractGhostEx<Float,length,nDim,1,Order> extractor(arg, extract, u, location);
+      extractor.apply(0);
+    } else if (dim==2) {
+      ExtractGhostExArg<Order,nDim,2> arg(order, X, R, surfaceCB, A0, A1, B0, B1, 
+					  C0, C1, fSrc, fBuf, localParity);
+      ExtractGhostEx<Float,length,nDim,2,Order> extractor(arg, extract, u, location);
+      extractor.apply(0);
+    } else if (dim==3) {
+      ExtractGhostExArg<Order,nDim,3> arg(order, X, R, surfaceCB, A0, A1, B0, B1, 
+					  C0, C1, fSrc, fBuf, localParity);
+      ExtractGhostEx<Float,length,nDim,3,Order> extractor(arg, extract, u, location);
+      extractor.apply(0);
+    } else {
+      errorQuda("Invalid dim=%d", dim);
+    }
+
     if (location == QUDA_CUDA_FIELD_LOCATION) {
       cudaDeviceSynchronize(); // need to sync before we commence any communication
       checkCudaError();
@@ -333,48 +346,31 @@ namespace quda {
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
-    if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,19>(u, 0, Ghost), 
+	  extractGhostEx<short,length>(FloatNOrder<short,length,2,19>(u, 0, (short**)Ghost), 
 				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	} else {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,2,18>(u, 0, Ghost),
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	  extractGhostEx<Float,length>(G(u, 0, Ghost),
 				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,12>(u, 0, Ghost),
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,8>(u, 0, Ghost), 
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost), 
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,13>(u, 0, Ghost),
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,2,9>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      }
-    } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,19>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-	} else {
-	  extractGhostEx<Float,length>(FloatNOrder<Float,length,1,18>(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-	}
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,12>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) { 
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,8>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_13){
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,13>(u, 0, Ghost),
-				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-      } else if(u.Reconstruct() == QUDA_RECONSTRUCT_9){
-	extractGhostEx<Float,length>(FloatNOrder<Float,length,4,9>(u, 0, Ghost),
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {

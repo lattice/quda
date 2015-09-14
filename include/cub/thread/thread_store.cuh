@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2014, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -104,14 +104,14 @@ enum CacheStoreModifier
  * \endcode
  *
  * \tparam MODIFIER             <b>[inferred]</b> CacheStoreModifier enumeration
- * \tparam InputIterator        <b>[inferred]</b> Output iterator type \iterator
+ * \tparam InputIteratorT       <b>[inferred]</b> Output iterator type \iterator
  * \tparam T                    <b>[inferred]</b> Data type of output value
  */
 template <
     CacheStoreModifier  MODIFIER,
-    typename            OutputIterator,
+    typename            OutputIteratorT,
     typename            T>
-__device__ __forceinline__ void ThreadStore(OutputIterator itr, T val);
+__device__ __forceinline__ void ThreadStore(OutputIteratorT itr, T val);
 
 
 //@}  end member group
@@ -131,8 +131,8 @@ struct IterateThreadStore
         IterateThreadStore<COUNT + 1, MAX>::template Store<MODIFIER>(ptr, vals);
     }
 
-    template <typename OutputIterator, typename T>
-    static __device__ __forceinline__ void Dereference(OutputIterator ptr, T *vals)
+    template <typename OutputIteratorT, typename T>
+    static __device__ __forceinline__ void Dereference(OutputIteratorT ptr, T *vals)
     {
         ptr[COUNT] = vals[COUNT];
         IterateThreadStore<COUNT + 1, MAX>::Dereference(ptr, vals);
@@ -147,8 +147,8 @@ struct IterateThreadStore<MAX, MAX>
     template <CacheStoreModifier MODIFIER, typename T>
     static __device__ __forceinline__ void Store(T *ptr, T *vals) {}
 
-    template <typename OutputIterator, typename T>
-    static __device__ __forceinline__ void Dereference(OutputIterator ptr, T *vals) {}
+    template <typename OutputIteratorT, typename T>
+    static __device__ __forceinline__ void Dereference(OutputIteratorT ptr, T *vals) {}
 };
 
 
@@ -263,7 +263,7 @@ struct IterateThreadStore<MAX, MAX>
 /**
  * Define ThreadStore specializations for the various Cache load modifiers
  */
-#if CUB_PTX_VERSION >= 200
+#if CUB_PTX_ARCH >= 200
     CUB_STORE_ALL(STORE_WB, ca)
     CUB_STORE_ALL(STORE_CG, cg)
     CUB_STORE_ALL(STORE_CS, cs)
@@ -276,12 +276,21 @@ struct IterateThreadStore<MAX, MAX>
 #endif
 
 
+// Macro cleanup
+#undef CUB_STORE_ALL
+#undef CUB_STORE_1
+#undef CUB_STORE_2
+#undef CUB_STORE_4
+#undef CUB_STORE_8
+#undef CUB_STORE_16
+
+
 /**
  * ThreadStore definition for STORE_DEFAULT modifier on iterator types
  */
-template <typename OutputIterator, typename T>
+template <typename OutputIteratorT, typename T>
 __device__ __forceinline__ void ThreadStore(
-    OutputIterator              itr,
+    OutputIteratorT             itr,
     T                           val,
     Int2Type<STORE_DEFAULT>     modifier,
     Int2Type<false>             is_pointer)
@@ -326,7 +335,7 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     T                           val,
     Int2Type<false>             is_primitive)
 {
-#if CUB_PTX_VERSION <= 130
+#if CUB_PTX_ARCH <= 130
 
     *ptr = val;
     __threadfence_block();
@@ -340,11 +349,13 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     VolatileWord words[VOLATILE_MULTIPLE];
     *reinterpret_cast<T*>(words) = val;
 
+//    VolatileWord *words = reinterpret_cast<VolatileWord*>(&val);
+
     IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
         reinterpret_cast<volatile VolatileWord*>(ptr),
         words);
 
-#endif  // CUB_PTX_VERSION <= 130
+#endif  // CUB_PTX_ARCH <= 130
 
 }
 
@@ -390,14 +401,14 @@ __device__ __forceinline__ void ThreadStore(
 /**
  * ThreadStore definition for generic modifiers
  */
-template <CacheStoreModifier MODIFIER, typename OutputIterator, typename T>
-__device__ __forceinline__ void ThreadStore(OutputIterator itr, T val)
+template <CacheStoreModifier MODIFIER, typename OutputIteratorT, typename T>
+__device__ __forceinline__ void ThreadStore(OutputIteratorT itr, T val)
 {
     ThreadStore(
         itr,
         val,
         Int2Type<MODIFIER>(),
-        Int2Type<IsPointer<OutputIterator>::VALUE>());
+        Int2Type<IsPointer<OutputIteratorT>::VALUE>());
 }
 
 
