@@ -27,7 +27,7 @@ namespace quda {
     : B(B), Nvec(Nvec), V(0), V_h(0), V_d(0), tmp2(0), tmp3(0), geo_bs(0), 
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0), block_parity_h(0), block_parity_d(0), block_parity(0)
+      spin_bs(spin_bs), spin_map(0)
   {
     int ndim = B[0]->Ndim();
     this->geo_bs = new int[ndim];
@@ -265,7 +265,7 @@ namespace quda {
 
     *input = in; // copy result to input field (aliasing handled automatically)  
     
-    if ((V->Nspin() != 1) && (output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis())))
+    if (((V->Nspin() != 1) && (output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis())))
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 

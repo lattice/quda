@@ -41,7 +41,6 @@ namespace quda {
       FillV<Float,nSpin,nColor,24,order>(V,B);
     } else if (Nvec == 48) {
       FillV<Float,nSpin,nColor,48,order>(V,B);
-    }
     } else {
       errorQuda("Unsupported Nvec %d", Nvec);
     }

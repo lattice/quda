@@ -40,7 +40,7 @@ namespace quda {
 
   template <typename Float, int coarseColor, class Coarse>
   __device__ __host__ inline void prolongate2TopLevelStaggered(complex<Float> out[2*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, int parity_coarse, int x_cb_coarse) {
+					     int parity, int x_cb, int parity_coarse, int x_coarse_cb) {
     for (int s = 0; s < 2; s++) {
       for (int c = 0; c < coarseColor; c++) {
         out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, s, c); //spin_map[s] -> s, i.e. if spin_map is a fine grid spin map, then we need direct mapping
@@ -55,7 +55,7 @@ namespace quda {
 
   template <typename Float, int fineSpin, int coarseColor, class Coarse>
   __device__ __host__ inline void prolongate(complex<Float> out[fineSpin*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, int parity_coarse, int x_cb_coarse, const int *spin_map) {
+					     int parity, int x_cb, int parity_coarse, int x_coarse_cb, const int *spin_map) {
     for (int s=0; s<fineSpin; s++) {
       for (int c=0; c<coarseColor; c++) {
 	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map[s], c);
@@ -112,13 +112,13 @@ namespace quda {
         if(fineSpin == 1)//staggered top level
         {
           complex<Float> tmp[2*coarseColor];
-	  prolongate2TopLevelStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse);
+	  prolongate2TopLevelStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb);
 	  rotateFineColorTopLevelStaggered<Float,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
         }
         else//also for staggered if the fine grid is NOT a top level grid.
         {
           complex<Float> tmp[fineSpin*coarseColor];
-	  prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse, arg.spin_map);
+	  prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb, arg.spin_map);
 	  rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
         }
       }
@@ -139,14 +139,14 @@ namespace quda {
     if(fineSpin == 1)
     {
       complex<Float> tmp[2*coarseColor];
-      prolongateStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse);
-      rotateFineColorStaggered<Float,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+      prolongate2TopLevelStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb);
+      rotateFineColorTopLevelStaggered<Float,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
     }
     else
     {
       complex<Float> tmp[fineSpin*coarseColor];
-      prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_cb_coarse, arg.spin_map);
-      rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse, x_cb_coarse);
+      prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb, arg.spin_map);
+      rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
     }
   }
   

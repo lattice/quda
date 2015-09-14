@@ -88,6 +88,7 @@ namespace quda {
       }
     }
 
+    return;
   }
 
   /**
@@ -126,11 +127,11 @@ namespace quda {
 
     if(fineSpin == 1)
     { 
-      int coherent_block_parity = parity_coarse ^ parity; //0 if block parity and fine parity coincides, 1 otherwise
+      int staggered_coarse_spin = parity; //0 if block parity and fine parity coincides, 1 otherwise
       for (int v=0; v<coarseColor; v++) { 
         __shared__ typename BlockReduce::TempStorage temp_storage;
-	reduced[coherent_block_parity*coarseColor+v] += 
-	BlockReduce(temp_storage).Sum( tmp[s*coarseColor+v] );
+	reduced[staggered_coarse_spin*coarseColor+v] += 
+	BlockReduce(temp_storage).Sum( tmp[coarseColor+v] );
       }
     }
     else
@@ -144,10 +145,12 @@ namespace quda {
       }
     }
 
+    Float sign = (fineSpin != 1) ? + 1.0 : (( parity == 0) ?  +1.0 : -1.0);
+
     if (threadIdx.x==0 && threadIdx.y == 0) {
       for (int s=0; s<coarseSpin; s++) { // hard code coarse spin to 2 for now
 	for (int v=0; v<coarseColor; v++) {
-	  arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarseColor+v];
+	  arg.out(parity_coarse, x_coarse_cb, s, v) = sign*reduced[s*coarseColor+v];
 	}
       }
     }
