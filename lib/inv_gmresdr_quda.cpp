@@ -1355,7 +1355,7 @@ namespace quda {
    const double tol_threshold = 6.0;//for mixed precision version only.
    const bool   use_gmresproj_mixed_precision = true;
 
-   if(param.inv_type == QUDA_GMResDR_INVERTER || (param.inv_type == QUDA_GMResDR_PROJ_INVERTER && param.rhs_idx == 0))
+   if(param.inv_type == QUDA_GMRESDR_INVERTER || (param.inv_type == QUDA_GMRESDR_PROJ_INVERTER && param.rhs_idx == 0))
    {
      //run GMResDR cycles:
      args->InitGMResDRArgs();
@@ -1368,7 +1368,7 @@ namespace quda {
      RunProjectedCycles(out, in, defl_param, use_gmresproj_mixed_precision); //last argument enforces mixed precision for this stage
    }
 
-   if(param.inv_type == QUDA_GMResDR_PROJ_INVERTER && defl_param->init_flag == false) 
+   if(param.inv_type == QUDA_GMRESDR_PROJ_INVERTER && defl_param->init_flag == false) 
    {
      printfQuda("\nLoad eigenvectors for the projection stage.\n");
      defl_param->projType = QUDA_MINRES_PROJECTION;  

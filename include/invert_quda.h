@@ -665,7 +665,7 @@ namespace quda {
 
     TimeProfile &profile;    //time profile for initCG solver
 
-    GmresDRArgs *args;
+    GMResDRArgs *args;
 
     bool gmres_alloc;
 
@@ -685,11 +685,11 @@ namespace quda {
     // 
     void CleanResources(); 
     //
-    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GmresdrDeflationParam *dpar);
+    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method
-    void RunDeflatedCycles (cudaColorSpinorField *out, cudaColorSpinorField *in, GmresdrDeflationParam *dpar, const double tol_threshold);
+    void RunDeflatedCycles (cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
     //
-    void RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GmresdrDeflationParam *dpar, const bool enforce_mixed_precision);
+    void RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
 
     void AllocateKrylovSubspace(ColorSpinorParam &csParam);
 
