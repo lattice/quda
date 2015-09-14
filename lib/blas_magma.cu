@@ -4,11 +4,6 @@
 #include <vector>
 #include <algorithm>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-
-#include <cuComplex.h>
-
 #ifndef MAX
 #define MAX(a, b) (a > b) ? a : b;
 #endif
@@ -42,6 +37,41 @@
 
 #endif
 
+#endif
+
+
+#define LAPACK(s) s ## _
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern void LAPACK(zlarft)(char* direct, char* storev, int *n, int *k, _Complex double V[], int *ldV, _Complex double TAU[], _Complex double T[], int *ldT);
+
+
+extern void LAPACK(zgesv)(int* n, int* nrhs, _Complex double a[], int* lda,
+		 int ipivot[], _Complex double b[], int* ldb, int *info);
+
+extern void LAPACK(zgeevx)(char* balanc, char* jobvl, char* jobvr, char* sense,	 int* N, _Complex double A[], int* lda, _Complex double W[], _Complex double vl[], 
+			 int* ldvl, _Complex double vr[], int* ldvr, int* ilo, int* ihi, double scale[], double* abnrm, double rcone[], double rconv[],
+                         _Complex double work[], int* lwork, double work2[], int* info);
+
+
+extern void LAPACK(zgeev)(char* jobvl, char* jobvr, int* N, _Complex double A[], int* lda, _Complex double W[], _Complex double vl[], 
+			 int* ldvl, _Complex double vr[], int* ldvr, _Complex double work[], int* lwork, double work2[], int* info);
+
+
+
+extern void LAPACK(zgeqrf)(int *M, int *N, _Complex double *A, int *LDA, _Complex double *TAU,
+                         _Complex double  *WORK, int *LWORK, int *INFO);
+
+
+extern void LAPACK(zunmqr)(char *SIDE, char *TRANS, int *M, int *N, int *K,
+                         _Complex double  *A, int *LDA, _Complex double  *TAU, _Complex double  *C,
+                         int *LDC, _Complex double  *WORK, int *LWORK, int *INFO);
+
+#ifdef __cplusplus
+}
 #endif
 
 
@@ -142,6 +172,7 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
 }
 
 #undef BLOCK_SIZE
+
 
 void BlasMagmaArgs::OpenMagma(){ 
 
@@ -311,9 +342,9 @@ BlasMagmaArgs::~BlasMagmaArgs()
 
 void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, bool host)
 {
-     if(prob_size > m) printf("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m), exit(-1);
-   
 #ifdef MAGMA_LIB
+     if(prob_size > m) printf("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m), exit(-1);
+
      cudaPointerAttributes ptr_attr;
 
      if(!host)
@@ -551,6 +582,928 @@ void BlasMagmaArgs::SpinorMatVec
 #endif
        return;
 }
+
+void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn)
+{
+#ifdef MAGMA_LIB
+     magma_int_t m = clen; 
+     magma_int_t n = qrlen; 
+     magma_int_t k = nrefls;
+
+     magma_int_t lwork = -1;
+
+     if(prec == 4)
+     {
+
+     }
+     else
+     {
+        magmaDoubleComplex *dQR  = NULL;
+
+        magmaDoubleComplex *dtau = NULL;
+
+        magmaDoubleComplex *htau = NULL;
+
+        magmaDoubleComplex *hW   = NULL;
+
+        magmaDoubleComplex qW;
+
+        magma_malloc_pinned((void**)&dQR, ldqr*k*sizeof(magmaDoubleComplex));
+
+        magma_malloc_pinned((void**)&htau, k*sizeof(magmaDoubleComplex));
+        //
+        magma_malloc((void**)&dTau,  k*sizeof(magmaDoubleComplex));
+
+        cudaMemcpy(dQR, QR, ldqr*k*sizeof(magmaDoubleComplex), cudaMemcpyDefault);
+
+        magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
+        //
+        magma_zgeqrf_gpu(n, k, (magmaDoubleComplex *)dQR, ldqr, (magmaDoubleComplex *)htau, (magmaDoubleComplex *)dtau, &info);//identical to zgeqrf?
+
+        magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, &qW, lwork, dtau, nb, &info); 
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
+
+        lwork = (magma_int_t) MAGMA_Z_REAL(qW);
+
+        magma_malloc_cpu((void**)&hW, lwork*sizeof(magmaDoubleComplex));
+
+        //get TQ product:
+        magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, hW, lwork, dtau, nb, &info); 
+        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
+
+        magma_free_cpu(hW);
+
+        magma_free(dtau);
+
+        magma_free_pinned(htau);
+
+        magma_free_pinned(dQR);
+
+     }
+#endif
+
+  return;
+}
+
+//WARNING: experimental stuff -> modification of magma_zunmqr library routines (see zunmqr.cpp file)
+//pQR, pTau : host arrays
+//pVm : device (cuda) arrays
+//computes pVm * pQR
+void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *pQR, const int ldqr, void *pTau, void *pVm, const int cldn)
+{
+#ifdef MAGMA_LIB
+    #define  A(i_,j_) ( A + (i_) + (j_)*lda)
+    #define dC(i_,j_) (dC + (i_) + (j_)*ldc)
+
+    cudaHostRegister(pQR, ldqr*nrefls*sizeof(magmaDoubleComplex), cudaHostRegisterMapped);
+
+    magmaDoubleComplex *A   = (magmaDoubleComplex *)pQR;
+    magmaDoubleComplex *dC  = (magmaDoubleComplex *)pVm;
+    magmaDoubleComplex *tau = (magmaDoubleComplex *)pTau;
+
+    magma_int_t m = clen;//The number of rows of the matrix dC
+    magma_int_t n = qrlen;//The number of columns of the matrix C
+    magma_int_t k = nrefls;//The number of elementary reflectors whose product defines the matrix A, as returned by ZGEQRF.
+
+    magma_int_t lda = ldqr;//leading dimension of A
+    magma_int_t ldc = cldn;//WARNING: must be ((m+31)/32)*32;
+
+    
+    magmaDoubleComplex *T, *T2;
+    magma_int_t i, i1, i2, ib, ic, jc, nb, mi, ni, nq_i;
+
+    magma_int_t nq = n;
+    magma_int_t nw = m;
+
+    magma_int_t ldwork = nw;
+
+    nb = magma_get_zgelqf_nb( ( m < n ? m : n) ); //=64 for m < 1024, and 128 otherwise
+
+    if (nb >= nrefls) printf("\nError: number of reflectors must be bigger then 64. (%d : %d)\n", nb, nrefls), exit(-1);
+
+    /* Use hybrid CPU-GPU code */
+    /* Allocate work space on the GPU.
+     * nw*nb  for dwork (m or n) by nb
+     * nq*nb  for dV    (n or m) by nb
+     * nb*nb  for dT
+     */
+     magmaDoubleComplex *dwork, *dV, *dT;
+     magma_zmalloc( &dwork, (nw + nq + nb)*nb+nb);//the last nb just padding
+
+     if ( dwork == NULL ) printf("\nError: cannot allocate device memory!\n"), exit(-1);
+
+     dV = dwork + nw*nb;
+     dT = dV    + nq*nb;
+        
+     /* work space on CPU.
+      * nb*nb for T
+      * nb*nb for T2, used to save and restore diagonal block of panel */
+     magma_zmalloc_cpu( &T, 2*nb*nb );
+     if ( T == NULL ) printf("\nError: cannot allocate host memory!\n"), exit(-1);
+
+     T2 = T + nb*nb;
+        
+     i1 = 0;
+     i2 = k;
+
+     // silence "uninitialized" warnings
+     ni = 0;
+     mi = m;
+     ic = 0;
+
+     for (i = i1; i < i2; i += nb) {
+         ib = (nb < (k - i)) ? nb : (k - i);
+         /* Form the triangular factor of the block reflector
+            H = H(i) H(i+1) . . . H(i+ib-1) */
+         nq_i = nq - i;
+         //zlarft("Forward", "Columnwise", &nq_i, &ib, A(i,i), &lda, &tau[i], T, &ib);
+         LAPACK(zlarft)("Forward", "Columnwise", &nq_i, &ib, (_Complex double*)(A(i,i)), &lda, (_Complex double*)&tau[i], (_Complex double*)T, &ib);
+            /* 1) set upper triangle of panel in A to identity,
+               2) copy the panel from A to the GPU, and
+               3) restore A                                      */
+         zpanel_to_q( MagmaUpper, ib, A(i,i), lda, T2 );
+         magma_zsetmatrix( nq_i,  ib, A(i,i), lda, dV, nq_i );
+         zq_to_panel( MagmaUpper, ib, A(i,i), lda, T2 );
+
+         /* H or H**H is applied to C(1:m,i:n) */
+         ni = n - i;
+         jc = i;
+
+         /* Apply H or H**H; First copy T to the GPU */
+         magma_zsetmatrix( ib, ib, T, ib, dT, ib );
+
+         magma_zlarfb_gpu( MagmaRight, MagmaNoTrans, MagmaForward, MagmaColumnwise,
+                              mi, ni, ib,
+                              dV, nq_i,
+                              dT, ib,
+                              dC(ic,jc), ldc,
+                              dwork, ldwork );
+     }
+
+     magma_free( dwork );
+     magma_free_cpu( T );
+
+     cudaHostUnregister(pQR);
+#endif
+     return;   
+} 
+
+void BlasMagmaArgs::LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm)
+{
+#ifdef MAGMA_LIB
+  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+
+  magma_int_t _m   = ncolsMat;//matrix size
+
+  magma_int_t _k   = nref;
+
+  magma_int_t _mp1 = nrowsMat;
+ 
+  magma_int_t _ldm = ldm;
+
+  magma_int_t _ldp = ldqr;
+
+  //Lapack parameters:   
+  char _r = 'R';//apply P-matrix from the right
+
+  char _n = 'N';//no left eigenvectors 
+
+  magma_int_t info  = 0;
+
+  magma_int_t lwork = -1; 
+
+  magmaDoubleComplex *work = NULL;
+
+  magmaDoubleComplex qwork; //parameter to extract optimal size of work
+
+  //bar{H}_{m} P_{k}
+
+  lwork = -1;
+
+  LAPACK(zunmqr)(&_r, &_n, &_mp1, &_m, &_k, (_Complex double *)QRM, &_ldp, (_Complex double *)tau, (_Complex double *)Mat, &_ldm, (_Complex double *)&qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
+
+  magma_zmalloc_cpu( &work, lwork );
+#ifdef VERBOSE
+  printf("\nAdjusted lwork  ( ZUNMQR ## 2): %d\n", lwork);
+#endif
+  LAPACK(zunmqr)(&_r, &_n, &_mp1, &_m, &_k, (_Complex double *)QRM, &_ldp, (_Complex double *)tau, (_Complex double *)Mat, &_ldm, (_Complex double *)work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  magma_free_cpu( work );
+#endif
+  return; 
+}
+
+//pure Lapack-based methods
+void BlasMagmaArgs::LapackLeftConjUNMQR(const int dh /*# of rows*/,  const int n /*# of columns of H*/, const int k /*# of reflectors*/, void *H, const int ldh, void * QR,  const int ldqr, void *tau)//for vectors: n =1
+{
+#ifdef MAGMA_LIB
+  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+
+//Note: # rows of QR = # rows of H.
+  magma_int_t _h   = dh;//matrix size
+
+  magma_int_t _n   = n;//vector size
+
+  magma_int_t _k   = k;
+ 
+  magma_int_t _ldh = ldh;
+
+  magma_int_t _ldqr = ldqr;
+
+  //Lapack parameters:   
+  char _s = 'L';//apply QR-matrix from the left
+
+  char _t = 'C';//conjugate 
+
+  magma_int_t info  = 0;
+
+  magma_int_t lwork = -1; 
+
+  magmaDoubleComplex *work = NULL;
+
+  magmaDoubleComplex qwork; //parameter to extract optimal size of work
+
+  //Pdagger_{k+1} PrevRes
+
+  LAPACK(zunmqr)(&_s, &_t, &_h, &_n, &_k, (_Complex double*)QR, &_ldqr, (_Complex double*)tau, (_Complex double*)H, &_ldh, (_Complex double*)&qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
+  //
+  magma_zmalloc_cpu( &work, lwork );
+
+  LAPACK(zunmqr)(&_s, &_t, &_h, &_n, &_k, (_Complex double*)QR, &_ldqr, (_Complex double*)tau, (_Complex double*)H, &_ldh, (_Complex double*)work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  magma_free_cpu( work );
+#endif
+  return;
+}
+
+void BlasMagmaArgs::LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldh)
+{
+#ifdef MAGMA_LIB
+  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+  //Lapack parameters:
+  magma_int_t _n    = n;
+  //
+  magma_int_t _ldh  = ldh;
+  //
+  magma_int_t _ldn  = ldn; 
+  //
+  magma_int_t info  = 0;
+  //
+  magma_int_t LAPACK_ONE = 1;//just for one rhs
+  //
+  magma_int_t *ipiv = NULL;
+
+  magma_malloc_cpu((void**)&ipiv, ldh*sizeof(magma_int_t));
+  //
+  LAPACK(zgesv)(&_n, &LAPACK_ONE, (_Complex double*)H, &_ldh, ipiv, (_Complex double*)rhs, &_ldn, &info);
+
+  if( (info != 0 ) ) printf( "Error: DGESV, info %d\n",info), exit(-1);
+
+  magma_free_cpu(ipiv);
+#endif
+  return;
+}
+
+void BlasMagmaArgs::LapackGEQR(const int n, void *Mat, const int m, const int ldm, void *tau)
+{
+#ifdef MAGMA_LIB
+  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+
+  magma_int_t _m   = m;
+
+  magma_int_t _n   = n;
+ 
+  magma_int_t _ldm = ldm;
+
+  //Lapack parameters:   
+  magma_int_t info  = 0;
+
+  magma_int_t lwork = -1; 
+
+  magmaDoubleComplex *work = NULL;
+
+  magmaDoubleComplex qwork; //parameter to extract optimal size of work
+
+  LAPACK(zgeqrf)(&_m, &_n, (_Complex double*)Mat, &_ldm, (_Complex double*)tau, (_Complex double*)&qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
+
+  lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
+  //
+  magma_zmalloc_cpu( &work, lwork );
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  LAPACK(zgeqrf)(&_m, &_n, (_Complex double*)Mat, &_ldm, (_Complex double*)tau, (_Complex double*)work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
+
+  magma_free_cpu( work );
+#endif
+  return;
+}
+
+void BlasMagmaArgs::LapackRightEV(const int m,  const int ldm, void *Mat, void *harVals, void *harVecs, const int ldv)
+{
+#ifdef MAGMA_LIB
+  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+
+  magma_int_t _m   = m;//matrix size
+ 
+  magma_int_t _ldm = ldm;
+
+  magma_int_t _ldv = ldv;
+
+  //Lapack parameters:   
+  magma_int_t info = 0;
+  //
+  char _r = 'V';
+
+  char _l = 'N';//no left eigenvectors
+
+  magma_int_t lwork = -1;
+ 
+  magmaDoubleComplex *work = NULL;
+
+  magmaDoubleComplex qwork; //parameter to extract optimal size of work
+  
+  double *rwork       = (double*)calloc(2*_m, sizeof(double));
+
+  //_Complex double *vr = (_Complex double*) calloc(ldv*m, sizeof(_Complex double));
+#ifdef USE_ZGEEVX
+
+  char _b = 'N';//balance
+
+  char _s = 'N';//sense
+
+  magma_int_t ilo, ihi;
+
+  double abnrm = 0.0;
+
+  double *scale  = calloc(_m, sizeof(double));
+
+  double *rconde = calloc(_m, sizeof(double));
+
+  double *rcondv = calloc(_m, sizeof(double));
+
+  //Get optimal work:
+  LAPACK(zgeevx)(&_b, &_l, &_r, &_s, &_m, (_Complex double*)Mat, &_ldm, (_Complex double*)harVals, NULL, &_ldv, (_Complex double*)harVecs, &_ldv, &ilo, &ihi, scale, &abnrm, rconde, rcondv, (_Complex double*)&qwork, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
+  //
+  magma_zmalloc_cpu( &work, lwork );
+  //now get eigenpairs:
+  LAPACK(zgeevx)(&_b, &_l, &_r, &_s, &_m, (_Complex double*)Mat, &_ldm, (_Complex double*)harVals, NULL, &_ldv, (_Complex double*)harVecs, &_ldv, &ilo, &ihi, scale, &abnrm, rconde, rcondv, (_Complex double*)work, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  if(scale)  free(scale);
+  //
+  if(rcondv) free(rcondv);
+  //
+  if(rconde) free(rconde);
+
+#else
+
+  //Get optimal work:
+  LAPACK(zgeev)(&_l, &_r, &_m, (_Complex double*)Mat, &_ldm, (_Complex double*)harVals, NULL, &_ldv, (_Complex double*)harVecs, &_ldv, (_Complex double*)&qwork, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
+  //
+  magma_zmalloc_cpu( &work, lwork );
+
+  //now get eigenpairs:
+  LAPACK(zgeev)(&_l, &_r, &_m, (_Complex double*)Mat, &_ldm, (_Complex double*)harVals, NULL, &_ldv, (_Complex double*)harVecs, &_ldv, (_Complex double*)work, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+
+#endif
+
+  if(rwork)  free(rwork);
+  //
+  magma_free_cpu( work );
+#endif
+  return;
+}
+
+//STL based version:
+//
+
+struct SortedEval{
+
+   double eval_nrm;
+   int    eval_idx;
+
+   SortedEval(double val, int idx) : eval_nrm(val), eval_idx(idx) {}; 
+};
+
+bool cmp_eigen_nrms (SortedEval v1, SortedEval v2)
+{
+  return (v1.eval_nrm < v2.eval_nrm);
+}
+
+void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals)
+{
+  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+
+  std::vector<SortedEval> sorted_evals_cntr;
+
+  for(int e = 0; e < m; e++) sorted_evals_cntr.push_back( SortedEval( abs(((std::complex<double>*)eVals)[e]), e ));
+
+  std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), cmp_eigen_nrms);
+  
+
+  for(int e = 0; e < nev; e++)
+  {  
+    memcpy(&(((std::complex<double>*)eVecs)[ldm*e]), &(((std::complex<double>*)unsorted_eVecs)[ldm*( sorted_evals_cntr[e].eval_idx)]), (ldm)*sizeof(std::complex<double>));
+    //set zero in m+1 element:
+    ((std::complex<double>*)eVecs)[ldm*e+m] = std::complex<double>(0.0, 0.0);
+  }
+
+  return;
+}
+
+
+///NEW STUFF:
+
+#include <complex.h>
+
+
+void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const int ldm, Complex  *tau)
+{
+#ifdef MAGMA_LIB
+  int _m   = m;//matrix size
+
+  int _nev = nev;//matrix size
+ 
+  int _ldm = ldm;
+
+  //Lapack parameters:   
+  int info  = 0;
+
+  int lwork = -1; 
+
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+
+  LAPACK(zgeqrf)(&_m, &_nev, (_Complex double *)evmat, &_ldm, (_Complex double *)tau, &qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  LAPACK(zgeqrf)(&_m, &_nev, (_Complex double *)evmat, &_ldm, (_Complex double *)tau, work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
+
+  if(work) free(work);
+
+  return;
+}
+
+//temporary hack: need to extract Q-matrix.
+
+void restoreOrthVectors(Complex * vnev,  const int nev, Complex  *QR, const int n, const int ldn, Complex *tau)
+{
+  int _n   = n;//vector size
+
+  int _k   = nev;
+
+  int _ldn = ldn;
+
+  //Lapack parameters:   
+  char _s = 'R';//apply P-matrix from the right
+
+  char _t = 'N';//no left eigenvectors 
+
+  int info  = 0;
+
+  int lwork = -1; 
+
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+
+  //Construct unit matrix to populate this later by the basis vectors (nxn matrix):
+  memset(vnev, 0, n*ldn*sizeof(Complex));
+
+  for(int d = 0; d < n; d++) vnev[ldn*d+d] = Complex(1.0, 0.0);
+
+  //First compute V_{nev} = V_{nev}*QR
+
+  LAPACK(zunmqr)(&_s, &_t, &_n, &_n, &_k, (_Complex double *)QR, &_ldn, (_Complex double *)tau, (_Complex double *)vnev, &_ldn, &qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork ( ZUNMQR ) : %d\n", lwork);
+#endif
+  LAPACK(zunmqr)(&_s, &_t, &_n, &_n, &_k, (_Complex double *)QR, &_ldn, (_Complex double *)tau, (_Complex double *)vnev, &_ldn, work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+#endif
+  return;
+}
+
+
+void BlasMagmaArgs::LeftConjZUNMQR(const int k /*number of reflectors*/, const int n /*number of columns of H*/, Complex *H, const int dh /*number of rows*/, 
+const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
+{
+#ifdef MAGMA_LIB
+//Note: # rows of QR = # rows of H.
+  int _h   = dh;//matrix size
+
+  int _n   = n;//vector size
+
+  int _k   = k;
+ 
+  int _ldh = ldh;
+
+  int _ldqr = ldqr;
+
+  //Lapack parameters:   
+  char _s = 'L';//apply QR-matrix from the left
+
+  char _t = 'C';//conjugate 
+
+  int info  = 0;
+
+  int lwork = -1; 
+
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+
+  //Pdagger_{k+1} PrevRes
+
+  LAPACK(zunmqr)(&_s, &_t, &_h, &_n, &_k, (_Complex double *)QR, &_ldqr, (_Complex double *)tau, (_Complex double *)H, &_ldh, &qwork, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  free(work);
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  LAPACK(zunmqr)(&_s, &_t, &_h, &_n, &_k, (_Complex double *)QR, &_ldqr, (_Complex double *)tau, (_Complex double *)H, &_ldh, work, &lwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+  free(work);
+#endif
+  return;
+}
+
+
+void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * const conjH, const double beta2, const int m, const int ldH)
+{
+#ifdef MAGMA_LIB
+  //Lapack parameters:
+  int _m    = m;
+  //
+  int _ldH  = ldH;
+  //
+  int info  = 0;
+  //
+  int I_ONE = 1;
+  //
+  int *ipiv = (int* )calloc(ldH, sizeof(int));
+  //
+  //Construct H + beta*H^{-H} e_m*e_m^{T}
+  // 1. need to solve H^{H}y = e_m;
+  Complex *em = new Complex[m];
+  
+  em[m-1] = beta2;//in fact, we construct beta*em,
+
+  LAPACK(zgesv)(&_m, &I_ONE, (_Complex double *)conjH, &_ldH, ipiv, (_Complex double *)em, &_ldH, &info);
+
+  if( (info != 0 ) ) printf( "Error: DGESV, info %d\n",info), exit(-1);
+
+//make this cleaner!
+  //check solution:
+  for (int j = 0; j < m; j++)
+  {
+    Complex accum = 0.0;
+
+    for (int i = 0; i < m; i++) accum = (accum + harmH[ldH*j+i]*em[(ipiv[i])-1]);
+  } 
+
+  printf("\nDone for: stage 1\n"); 
+
+  // 2. Construct matrix for harmonic Ritz vectors:
+  //    Adjust last column with KroneckerProd((H^{-H}*beta*em)=em, em^{T}=[0,....,1]):
+
+  for(int i = 0; i < m; i++) harmH[ldH*(m-1)+i] += em[i]; 
+
+  printf("\nDone for: stage 2\n");
+
+  free(ipiv);
+  //
+  delete [] em; 
+#endif
+
+  return;
+}
+
+void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv) 
+{
+#ifdef MAGMA_LIB
+  int _m   = m;//matrix size
+ 
+  int _ldH = ldH;
+
+  int _ldv = ldv;
+
+  //Lapack parameters:   
+  int info = 0;
+  //
+  char _r = 'V';
+
+  char _l = 'N';//no left eigenvectors
+
+  int lwork = -1;
+ 
+  _Complex double *work = NULL;
+
+  _Complex double qwork; //parameter to extract optimal size of work
+  
+  double *rwork       = (double*)calloc(2*_m, sizeof(double));
+
+  //_Complex double *vr = (_Complex double*) calloc(ldv*m, sizeof(_Complex double));
+#ifdef USE_ZGEEVX
+
+  char _b = 'N';//balance
+
+  char _s = 'N';//sense
+
+  int ilo, ihi;
+
+  double abnrm = 0.0;
+
+  double *scale  = calloc(_m, sizeof(double));
+
+  double *rconde = calloc(_m, sizeof(double));
+
+  double *rcondv = calloc(_m, sizeof(double));
+
+  //Get optimal work:
+  LAPACK(zgeevx)(&_b, &_l, &_r, &_s, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, &ilo, &ihi, scale, &abnrm, rconde, rcondv, &qwork, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  //now get eigenpairs:
+  LAPACK(zgeevx)(&_b, &_l, &_r, &_s, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, &ilo, &ihi, scale, &abnrm, rconde, rcondv, work, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  if(scale)  free(scale);
+  //
+  if(rcondv) free(rcondv);
+  //
+  if(rconde) free(rconde);
+
+#else
+
+  //Get optimal work:
+  LAPACK(zgeev)(&_l, &_r, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, &qwork, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+  lwork = (int)(creal(qwork));
+  //
+  work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+#ifdef VERBOSE
+  printf("\nAdjusted lwork : %d\n", lwork);
+#endif
+  //now get eigenpairs:
+  LAPACK(zgeev)(&_l, &_r, &_m, (_Complex double *)harmH, &_ldH, (_Complex double *)evalues, NULL, &_ldv, (_Complex double *)vr, &_ldv, work, &lwork, rwork, &info);
+
+  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+
+
+#endif
+
+  if(rwork)  free(rwork);
+  //
+  if(work)   free(work);
+  //
+#endif
+  return;
+}
+
+
+//in fact ldh = ldm, but let's keep it for a moment.
+void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh)
+{
+#ifdef MAGMA_LIB
+    if(prec == 4)
+    {
+       printf("\nError: single precision is not currently supported\n");
+       exit(-1);
+    }
+
+    if( (vld % 32) != 0) printf("\nError: leading dimension must be multiple of the warp size\n"), exit(-1);
+
+    int nev  = (max_nev - 1); //(nev+1) - 1 for GMRESDR
+
+    int _m   = m;//matrix size
+
+    int _k   = nev;
+
+    int _kp1 = max_nev;
+
+    int _mp1 = (m+1);
+ 
+    int _ldm = ldh;
+
+  //Lapack parameters:   
+    char _s = 'R';//apply P-matrix from the right
+
+    char _t = 'N';//no left eigenvectors 
+
+    int info  = 0;
+
+    int lwork = -1; 
+
+    _Complex double *work = NULL;
+
+    _Complex double qwork; //parameter to extract optimal size of work
+
+    const int cprec  = 2*prec; //currently: sizeof(Complex)
+    const int cvprec = 2*vprec;
+
+    const int l = max_nev;
+
+    int lbsize           = 2*((nev / 16)*16);
+
+    //const int bufferSize = 2*vld+lbsize*lbsize;
+    //int bufferBlock = bufferSize / lbsize;//or: lbsize = (nev+1)
+
+    int bufferBlock = (2*vld) / lbsize;
+    bufferBlock     = (bufferBlock / 32) * 32;//corrected bufferBlock to be multiple of the warp size
+    int bufferSize  = (bufferBlock * lbsize);
+
+    void  *buffer = NULL;
+    void  *dQmat  = NULL;
+
+    magma_malloc(&buffer, bufferSize*cvprec);
+    cudaMemset(buffer, 0, bufferSize*cvprec);
+
+    magma_malloc(&dQmat, l*ldh*cprec);
+
+    //GPU code:
+    Complex *tau  = new Complex[l];//nev+1 =>max_nev
+
+    Complex *Qmat = new Complex[ldh*_mp1];//need (m+1)x(m+1) matrix on input...
+
+    ComputeQR(l, (Complex*)sortedHarVecs, _mp1, ldh, tau);//lapack version 
+   
+    //max_nev vectors are stored in Qmat (output):
+    //restoreOrthVectors(Qmat, max_nev, (Complex*)sortedHarVecs, (m+1), ldh, tau);
+    //Load diagonal units
+    for(int d = 0; d < (m+1); d++) Qmat[ldh*d+d] = Complex(1.0, 0.0);
+   
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)Qmat, &_ldm, &qwork, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    lwork = (int)(creal(qwork));
+  
+    work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_mp1, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)Qmat, &_ldm, work, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    free(work);
+
+    //Copy (nev+1) vectors on the device:
+    cudaMemcpy(dQmat, Qmat, (max_nev)*ldh*cprec, cudaMemcpyDefault);
+
+    if(cvprec == sizeof(magmaDoubleComplex))
+    {
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+      {
+        if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+//printf("\nBuffer block : %d\n", bufferBlock);
+
+        magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
+
+        magmablas_zgemm(_cN, _cN, bufferBlock, l, _mp1, MAGMA_Z_ONE, ptrV, vld, (magmaDoubleComplex*)dQmat, ldh, MAGMA_Z_ZERO, (magmaDoubleComplex*)buffer, bufferBlock);
+
+        cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);//make this async!
+      }
+
+      cudaMemset(&(((magmaDoubleComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaDoubleComplex));//= m - nev
+    }
+    else // low precision field
+    {
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+      {
+        if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
+
+        magmaFloatComplex *ptrV = &(((magmaFloatComplex*)dV)[blockOffset]);
+
+        sMM_v2(buffer, bufferBlock, ptrV, bufferBlock, _mp1, vld, dQmat, _mp1, l, ldh);
+
+        cudaMemcpy2D(ptrV, vld*cvprec, buffer, bufferBlock*cvprec,  bufferBlock*cvprec, l, cudaMemcpyDefault);
+      }
+
+      cudaMemset(&(((magmaFloatComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaFloatComplex));//= m - nev
+    }
+
+    //Construct H_new = Pdagger_{k+1} \bar{H}_{m} P_{k}  
+
+    //bar{H}_{m} P_{k}
+
+    lwork = -1;
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_m, &_k, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, &qwork, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    lwork = (int)(creal(qwork));
+    //
+    work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_m, &_k, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, work, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    //Pdagger_{k+1} PrevRes
+
+    lwork = -1;
+
+    _s = 'L';
+
+    _t = 'C';
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_k, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, &qwork, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    lwork = (int)(creal(qwork));
+    //
+    free(work);
+    //
+    work = (_Complex double*)calloc(lwork, sizeof(_Complex double));
+
+    LAPACK(zunmqr)(&_s, &_t, &_mp1, &_k, &_kp1, (_Complex double *)sortedHarVecs, &_ldm, (_Complex double *)tau, (_Complex double *)H, &_ldm, work, &lwork, &info);
+
+    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+
+    const int len = ldh - nev-1;
+    for(int i = 0; i < nev; i++) memset(&(((Complex*)H)[ldh*i+nev+1]), 0, len*sizeof(Complex) );
+
+    //
+    memset(&(((Complex*)H)[ldh*(nev)]), 0, (m-nev)*ldh*sizeof(Complex));
+
+    free(work);
+
+    magma_free(buffer);
+    magma_free(dQmat);
+
+    delete [] Qmat;
+    delete [] tau ;
+#endif
+    return; 
+}
+
 
 #ifdef MAGMA_LIB
 
