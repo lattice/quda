@@ -291,7 +291,6 @@ extern "C" {
       double* const final_fermilab_residual,
       int* num_iters);
 
-
  /**
    * Solve for a system with many RHS using an improved
    * staggered operator.  
@@ -354,8 +353,6 @@ extern "C" {
       int *num_iters);
 
 
-
-
   /**
    * Solve Ax=b using a Wilson-Clover operator.  All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
@@ -393,7 +390,6 @@ extern "C" {
 			double* const final_residual, 
 			double* const final_fermilab_residual,
 			int* num_iters);
-
 
   /**
    * Solve for a system with many RHS using using a Wilson-Clover operator.  
@@ -456,8 +452,6 @@ extern "C" {
       double* const final_residual,
       double* const final_fermilab_residual,
       int *num_iters);
-
-
 
   /**
    * Load the gauge field from the host.

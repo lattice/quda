@@ -102,9 +102,14 @@ void init()
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
 
+    // ensure that the default is improved staggered
+  if (dslash_type != QUDA_STAGGERED_DSLASH &&
+      dslash_type != QUDA_ASQTAD_DSLASH)
+    dslash_type = QUDA_ASQTAD_DSLASH;
+
   gaugeParam.anisotropy = 1.0;
   gaugeParam.tadpole_coeff = 0.8;
-  gaugeParam.scale = -1.0/(24.0*gaugeParam.tadpole_coeff*gaugeParam.tadpole_coeff);
+  gaugeParam.scale = (dslash_type == QUDA_ASQTAD_DSLASH) ? -1.0/(24.0*gaugeParam.tadpole_coeff*gaugeParam.tadpole_coeff) : 1.0;
   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
@@ -173,35 +178,13 @@ void init()
   for (int dir = 0; dir < 4; dir++) {
     fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
     longlink[dir] = malloc(V*gaugeSiteSize*gSize);
+
+    if (fatlink[dir] == NULL || longlink[dir] == NULL){
+      errorQuda("ERROR: malloc failed for fatlink/longlink");
+    }  
   }
-  if (fatlink == NULL || longlink == NULL){
-    errorQuda("ERROR: malloc failed for fatlink/longlink");
-  }
+
   construct_fat_long_gauge_field(fatlink, longlink, 1, gaugeParam.cpu_prec, &gaugeParam, dslash_type);
-
-  if(link_recon == QUDA_RECONSTRUCT_9 || link_recon == QUDA_RECONSTRUCT_13){ // incorporate non-trivial phase into long links
-    const double cos_pi_3 = 0.5; // Cos(pi/3)
-    const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j+=2){
-          if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-            const double real = ((double*)longlink[dir])[i*gaugeSiteSize + j];
-            const double imag = ((double*)longlink[dir])[i*gaugeSiteSize + j + 1];
-            ((double*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
-            ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
-          }else{
-            const float real = ((float*)longlink[dir])[i*gaugeSiteSize + j];
-            const float imag = ((float*)longlink[dir])[i*gaugeSiteSize + j + 1];
-            ((float*)longlink[dir])[i*gaugeSiteSize + j] = real*cos_pi_3 - imag*sin_pi_3;
-            ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
-          }
-        } 
-      }
-    }
-  }
-
-
 
 #ifdef MULTI_GPU
   gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
@@ -219,15 +202,19 @@ void init()
   int y_face_size = X[0]*X[2]*X[3]/2;
   int z_face_size = X[0]*X[1]*X[3]/2;
   int t_face_size = X[0]*X[1]*X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
+  int pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
   gaugeParam.ga_pad = pad_size;    
 #endif
 
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-
+  gaugeParam.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
+  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+  } else {
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  }
+  
   printfQuda("Fat links sending..."); 
   loadGaugeQuda(fatlink, &gaugeParam);
   printfQuda("Fat links sent\n"); 
@@ -238,10 +225,12 @@ void init()
   gaugeParam.ga_pad = 3*pad_size;
 #endif
 
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
-  printfQuda("Long links sending..."); 
-  loadGaugeQuda(longlink, &gaugeParam);
-  printfQuda("Long links sent...\n"); 
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
+    printfQuda("Long links sending..."); 
+    loadGaugeQuda(longlink, &gaugeParam);
+    printfQuda("Long links sent...\n");
+  }
 
   printfQuda("Sending fields to GPU..."); 
 
@@ -507,8 +496,7 @@ int main(int argc, char **argv)
 {
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  int i;
-  for (i =1;i < argc; i++){
+  for (int i=1 ;i < argc; i++){
 
     if(process_command_line_option(argc, argv, &i) == 0){
       continue;

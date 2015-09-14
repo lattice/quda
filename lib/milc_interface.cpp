@@ -1417,6 +1417,8 @@ void qudaEigCGCloverInvert(int external_precision,
     errorQuda("Sloppy half is not supported for eigCG solver\n");
   }
 
+  // if doing a pure double-precision multi-shift solve don't use reliable updates
+  double reliable_delta = (inv_args.mixed_precision == 1 || quda_precision == 1) ? 1e-1 : 0.0;
   QudaInvertParam invertParam = newQudaInvertParam();
 
   invertParam.inv_type           = QUDA_INC_EIGCG_INVERTER;//set it first.
@@ -1559,7 +1561,72 @@ void qudaCloverMultishiftInvert(int external_precision,
   return;
 } // qudaCloverMultishiftInvert
 
-#endif // GPU_CLOVER_DIRAC
+#ifdef GPU_GAUGE_ALG
+
+void qudaGaugeFixingOVR( int precision,
+    unsigned int gauge_dir, 
+    int Nsteps,
+    int verbose_interval,
+    double relax_boost,
+    double tolerance,
+    unsigned int reunit_interval,
+    unsigned int stopWtheta,
+    void* milc_sitelink
+    )
+{
+
+
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
+      QUDA_SU3_LINKS);
+  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+
+
+  double timeinfo[3];
+  computeGaugeFixingOVRQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, relax_boost, tolerance, reunit_interval, stopWtheta, \
+    &qudaGaugeParam, timeinfo);
+
+  printfQuda("Time H2D: %lf\n", timeinfo[0]);
+  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
+  printfQuda("Time D2H: %lf\n", timeinfo[2]);
+  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+
+  return;
+}
+
+void qudaGaugeFixingFFT( int precision,
+    unsigned int gauge_dir, 
+    int Nsteps,
+    int verbose_interval,
+    double alpha,
+    unsigned int autotune,
+    double tolerance,
+    unsigned int stopWtheta,
+    void* milc_sitelink
+    )
+{
+
+
+  QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
+      (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
+      QUDA_GENERAL_LINKS);
+  qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  //qudaGaugeParam.reconstruct = QUDA_RECONSTRUCT_12;
+
+
+  double timeinfo[3];
+  computeGaugeFixingFFTQuda(milc_sitelink, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta, \
+    &qudaGaugeParam, timeinfo);
+
+  printfQuda("Time H2D: %lf\n", timeinfo[0]);
+  printfQuda("Time to Compute: %lf\n", timeinfo[1]);
+  printfQuda("Time D2H: %lf\n", timeinfo[2]);
+  printfQuda("Time all: %lf\n", timeinfo[0]+timeinfo[1]+timeinfo[2]);
+
+  return;
+}
+#endif // BUILD_GAUGE_ALG
 
 
 

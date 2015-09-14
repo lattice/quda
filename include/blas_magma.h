@@ -11,6 +11,8 @@
 //MAGMA library interface 
 //required for (incremental) EigCG solver
 
+
+
    class BlasMagmaArgs{
 
       typedef std::complex<double> Complex; 
@@ -115,6 +117,5 @@
 
       void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv); 
    };
-
 
 #endif // _BLAS_MAGMA_H
