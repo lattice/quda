@@ -45,3 +45,5 @@ set (QUDA_OBJS
 include_directories(dslash_core)
 include_directories(.)
 cuda_add_library(quda STATIC ${QUDA_OBJS})
+
+add_library(quda_fortran OBJECT EXCLUDE_FROM_ALL quda_fortran.F90 )

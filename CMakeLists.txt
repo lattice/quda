@@ -14,7 +14,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 #
 # PROJECT is QUDA
 #
-project("QUDA")
+project("QUDA" CXX C Fortran)
 
 ###### Local configuration:
 
