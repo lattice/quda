@@ -628,48 +628,11 @@ def gen(dir, pack_only=False):
 
     load_spinor = "// read spinor from device memory\n"
     if row_cnt[0] == 0:
-	if not dagger:
-#	    if not pack_only:
-#		load_spinor += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
-		load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#		load_spinor += "#else\n"
-#	    load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
- #           load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-	else:
-#	    if not pack_only:
-		load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#	    else:
-#		load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, i);\n"
-#        if not pack_only and not dagger:
-#            load_spinor += "#endif\n"
+	load_spinor += "READ_SPINOR_DOWN(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     elif row_cnt[2] == 0:
-	if not dagger:
-#	    if not pack_only:
-#		load_spinor += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
-		load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#		load_spinor += "#else\n"
-#	    load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#	    load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-        else:
-#	    if not pack_only:
-		load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#	    else:
-#		load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, i);\n"
-#        if not pack_only and not dagger:
-#            load_spinor += "#endif\n"
+	load_spinor += "READ_SPINOR_UP(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
     else:
         load_spinor += "READ_SPINOR(SPINORTEX, param.sp_stride, sp_idx, sp_idx);\n"
-#        if not dagger and not pack_only:
-#           load_spinor += "#ifdef CLOVER_TWIST_INV_DSLASH\n"
-#           load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-#           load_spinor += "#endif\n"
-#	if pack_only:
-#	    if not dagger:	# Was behind
-#   		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, a, i);\n"
-#	    else:
-#   		load_spinor += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, i);\n"
     load_spinor += "\n"
 
     load_half = ""
@@ -774,23 +737,10 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
 		copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
 		copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
     else:
-#	if dagger:
-	    for h in range(0, 2):
-		for c in range(0, 3):
-		    copy_half += h1_re(h,c)+" = t_proj_scale*"+in_re(h,c)+";  "
-		    copy_half += h1_im(h,c)+" = t_proj_scale*"+in_im(h,c)+";\n"
-#	else:
-#	    copy_half += "#ifdef CLOVER_TWIST_INV_DSLASH\n"
-#	    for h in range(0, 2):
-#		for c in range(0, 3):
-#		    copy_half += h1_re(h,c)+" = "+in_re(h,c)+";  "
-#		    copy_half += h1_im(h,c)+" = "+in_im(h,c)+";\n"
-#	    copy_half += "#else  \n"
-#	    for h in range(0, 2):
-#		for c in range(0, 3):
-#		    copy_half += h1_re(h,c)+" = "+"2*"+in_re(h,c)+";  "
-#		    copy_half += h1_im(h,c)+" = "+"2*"+in_im(h,c)+";\n"
-#	    copy_half += "#endif \n"
+        for h in range(0, 2):
+	    for c in range(0, 3):
+		copy_half += h1_re(h,c)+" = t_proj_scale*"+in_re(h,c)+";  "
+		copy_half += h1_im(h,c)+" = t_proj_scale*"+in_im(h,c)+";\n"
     copy_half += "\n"
 
     prep_half = ""
@@ -910,12 +860,6 @@ READ_SPINOR_SHARED(tx, threadIdx.y, tz);\n
     else:
         str += decl_half + prep_half + load_gauge + reconstruct_gauge + mult + reconstruct
     
-#    if pack_only:
-#        out = load_spinor + decl_half + project
-#        out = out.replace("sp_idx", "idx")
-#        return out
-#    else:
-#        return cond + block(str)+"\n\n"
     return cond + block(str)+"\n\n"
 # end def gen
 
@@ -936,7 +880,11 @@ def clover_twisted_xpay():
     if not dagger:
 	str += "#ifndef CLOVER_TWIST_XPAY\n"
 	str += "//perform invert twist first:\n"
-        str += "APPLY_CLOVER_TWIST_INV(c, cinv, a, o);\n"
+	str += "#ifndef DYNAMIC_CLOVER\n"
+	str += "APPLY_CLOVER_TWIST_INV(c, cinv, a, o);\n"
+	str += "#else\n"
+	str += "APPLY_CLOVER_TWIST_DYN_INV(c, a, o);\n"
+	str += "#endif\n"
 	for s in range(0,4):
 	    for c in range(0,3):
 		i = 3*s+c
@@ -951,13 +899,21 @@ def clover_twisted_xpay():
 		str += out_im(s,c) +" = b*"+out_im(s,c)+" + "+acc_im(s,c)+";\n"
 	str += "#endif//CLOVER_TWIST_XPAY\n"
 	str += "#else //no XPAY\n"
+	str += "#ifndef DYNAMIC_CLOVER\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, a, o);\n"
+	str += "#else\n"
+	str += "APPLY_CLOVER_TWIST_DYN_INV(c, a, o);\n"
+	str += "#endif\n"
 	str += "#endif\n"
     else:
 	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
 	str += "#ifndef CLOVER_TWIST_XPAY\n"
 	str += "//perform invert twist first:\n"
+	str += "#ifndef DYNAMIC_CLOVER\n"
         str += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);\n"
+	str += "#else\n"
+        str += "APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);\n"
+	str += "#endif\n"
 	str += "#else\n"
         str += "APPLY_CLOVER_TWIST(c, -a, acc);\n"
 	str += "#endif\n"
@@ -969,7 +925,11 @@ def clover_twisted_xpay():
 		str += out_im(s,c) +" = b*"+out_im(s,c)+" + "+acc_im(s,c)+";\n"
 	str += "#else //no XPAY\n"
 	str += "#ifndef CLOVER_TWIST_INV_DSLASH\n"
+	str += "#ifndef DYNAMIC_CLOVER\n"
 	str += "APPLY_CLOVER_TWIST_INV(c, cinv, -a, o);\n"
+	str += "#else\n"
+	str += "APPLY_CLOVER_TWIST_DYN_INV(c, -a, o);\n"
+	str += "#endif\n"
 	str += "#endif\n"
 	str += "#endif\n"
     return str
@@ -1085,78 +1045,6 @@ case EXTERIOR_KERNEL_Y:
 # end def epilog
 
 
-#def pack_face(facenum):
-#    str = "\n"
-#    str += "switch(dim) {\n"
-#    for dim in range(0,4):
-#        str += "case "+`dim`+":\n"
-#        proj = gen(2*dim+facenum, pack_only=True)
-#        proj += "\n"
-#        proj += "// write half spinor back to device memory\n"
-#        proj += "WRITE_HALF_SPINOR(face_volume, face_idx);\n"
-#        str += indent(block(proj)+"\n"+"break;\n")
-#    str += "}\n\n"
-#    return str
-## end def pack_face
-
-#def generate_pack():
-#    assert (sharedFloats == 0)
-#    str = ""
-#    str += def_input_spinor()
-#    str += def_clover(True)
-#    str += "#include \"io_spinor.h\"\n\n"
-#    str += "#include \"read_clover.h\"\n\n"
-#    str += "#include \"tmc_core.h\"\n\n"
-#
-#    str += "if (face_num) "
-#    str += block(pack_face(1))
-#    str += " else "
-#    str += block(pack_face(0))
-#
-#    str += "\n\n"
-#    str += "// undefine to prevent warning when precision is changed\n"
-#    str += "#undef spinorFloat\n"
-#    str += "#undef SHARED_STRIDE\n\n"
-#
-#    for s in range(0,4):
-#        for c in range(0,3):
-#            i = 3*s+c
-#            str += "#undef "+in_re(s,c)+"\n"
-#            str += "#undef "+in_im(s,c)+"\n"
-#    str += "\n"
-#
-#    for m in range(0,6):
-#        s = m/3
-#        c = m%3
-#        str += "#undef "+c_re(0,s,c,s,c)+"\n"
-#    for n in range(0,6):
-#        sn = n/3
-#        cn = n%3
-#        for m in range(n+1,6):
-#            sm = m/3
-#            cm = m%3
-#            str += "#undef "+c_re(0,sm,cm,sn,cn)+"\n"
-#            str += "#undef "+c_im(0,sm,cm,sn,cn)+"\n"
-#    str += "\n"
-#
-#    for m in range(0,6):
-#        s = m/3
-#        c = m%3
-#        str += "#undef "+cinv_re(0,s,c,s,c)+"\n"
-#    for n in range(0,6):
-#        sn = n/3
-#        cn = n%3
-#        for m in range(n+1,6):
-#            sm = m/3
-#            cm = m%3
-#            str += "#undef "+cinv_re(0,sm,cm,sn,cn)+"\n"
-#            str += "#undef "+cinv_im(0,sm,cm,sn,cn)+"\n"
-#    str += "\n"
-#
-#    return str
-## end def generate_pack
-
-
 def generate_dslash():
     return prolog() + gen(0) + gen(1) + gen(2) + gen(3) + gen(4) + gen(5) + gen(6) + gen(7) + epilog()
 
@@ -1224,24 +1112,4 @@ generate_dslash_kernels(arch)
 
 arch = 100
 generate_dslash_kernels(arch)
-
-# generate packing kernels
-#dslash = True
-#sharedFloats = 0
-#twist = False
-#dagger = False
-#pack = True
-#print sys.argv[0] + ": generating wilson_pack_clover_twisted_clover_face_core.h";
-#f = open('dslash_core/wilson_pack_clover_twisted_face_core.h', 'w')
-#f.write(generate_pack())
-#f.close()
-
-#dagger = True
-#print sys.argv[0] + ": generating wilson_pack_clover_twisted_face_dagger_core.h";
-#f = open('dslash_core/wilson_pack_clover_twisted_face_dagger_core.h', 'w')
-#f.write(generate_pack())
-#f.close()
-#dslash = False
-#pack = False
-
 

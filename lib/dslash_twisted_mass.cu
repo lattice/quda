@@ -142,7 +142,23 @@ namespace quda {
       }
     }
 
-    long long flops() const { return (x ? 1416ll : 1392ll) * in->VolumeCB(); } // FIXME for multi-GPU
+    long long flops() const {
+      int twisted_flops = 48;
+      long long flops = DslashCuda::flops();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+      case EXTERIOR_KERNEL_ALL:
+	break;
+      case INTERIOR_KERNEL:
+	// twisted mass flops are done in the interior kernel
+	flops += twisted_flops * in->VolumeCB();	  
+	break;
+      }
+      return flops;
+    }
   };
 #endif // GPU_TWISTED_MASS_DIRAC
 

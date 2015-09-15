@@ -55,7 +55,13 @@ void initComms(int argc, char **argv, const int *commDims)
   QMP_declare_logical_topology(commDims, 4);
 
 #elif defined(MPI_COMMS)
+#ifdef PTHREADS
+  int provided;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+#else
   MPI_Init(&argc, &argv);
+#endif
+
 #endif
   initCommsGridQuda(4, commDims, NULL, NULL);
   initRand();
@@ -720,7 +726,7 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 }
 
 template <typename Float>
-void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
+void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
 
   int X1h=param->X[0]/2;
@@ -730,9 +736,11 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
   int X4 =param->X[3];
 
   // rescale long links by the appropriate coefficient
-  for(int d=0; d<4; d++){
-    for(int i=0; i < V*gaugeSiteSize; i++){
-      gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    for(int d=0; d<4; d++){
+      for(int i=0; i < V*gaugeSiteSize; i++){
+	gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
+      }
     }
   }
 
@@ -747,7 +755,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
       int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
       int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
       int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
-      int sign=1;
+      int sign = 1;
 
       if (d == 0) {
 	if (i4 % 2 == 1){
@@ -777,17 +785,17 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
       int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
       int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
       int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
-      int sign=1;
+      int sign = 1;
 
       if (d == 0) {
 	if (i4 % 2 == 1){
-	  sign= -1;
+	  sign = -1;
 	}
       }
 
       if (d == 1){
 	if ((i4+i1) % 2 == 1){
-	  sign= -1;
+	  sign = -1;
 	}
       }
       if (d == 2){
@@ -807,8 +815,14 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
   if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
     for (int j = 0; j < Vh; j++) {
       int sign =1;
-      if (j >= (X4-3)*X1h*X2*X3 ){
-	sign= -1;
+      if (dslash_type == QUDA_ASQTAD_DSLASH) {
+	if (j >= (X4-3)*X1h*X2*X3 ){
+	  sign = -1;
+	}
+      } else {
+	if (j >= (X4-1)*X1h*X2*X3 ){
+	  sign = -1;
+	}
       }
 
       for (int i = 0; i < 6; i++) {
@@ -817,6 +831,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param)
       }
     }
   }
+
 }
 
 
@@ -862,7 +877,7 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
 }
 
 template <typename Float> 
-static void constructGaugeField(Float **res, QudaGaugeParam *param) {
+static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {  
     resEven[dir] = res[dir];
@@ -921,7 +936,7 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param) {
   if (param->type == QUDA_WILSON_LINKS){  
     applyGaugeFieldScaling(res, Vh, param);
   } else if (param->type == QUDA_ASQTAD_LONG_LINKS){
-    applyGaugeFieldScaling_long(res, Vh, param);      
+    applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
   } else if (param->type == QUDA_ASQTAD_FAT_LINKS){
     for (int dir = 0; dir < 4; dir++){ 
       for (int i = 0; i < Vh; i++) {
@@ -1029,15 +1044,16 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     }
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) {
-      param->type = QUDA_ASQTAD_FAT_LINKS;
-      constructGaugeField((double**)fatlink, param);
+      // if doing naive staggered then set to long links so that the staggered phase is applied
+      param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+      constructGaugeField((double**)fatlink, param, dslash_type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((double**)longlink, param);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((double**)longlink, param, dslash_type);
     }else {
-      param->type = QUDA_ASQTAD_FAT_LINKS;
-      constructGaugeField((float**)fatlink, param);
+      param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
+      constructGaugeField((float**)fatlink, param, dslash_type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((float**)longlink, param);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((float**)longlink, param, dslash_type);
     }
   }
 
@@ -1064,7 +1080,8 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     }
   }
 
-  if (dslash_type == QUDA_STAGGERED_DSLASH) { // set all links to zero to emulate the 1-link operator
+  // set all links to zero to emulate the 1-link operator (needed for host comparison)
+  if (dslash_type == QUDA_STAGGERED_DSLASH) { 
     for(int dir=0; dir<4; ++dir){
       for(int i=0; i<V; ++i){
 	for(int j=0; j<gaugeSiteSize; j+=2){
@@ -1079,7 +1096,6 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       }
     }
   }
-
 
 }
 
@@ -1569,6 +1585,8 @@ QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
 double mass = 0.1;
+double tol = 1e-7;
+double tol_hq = 0.;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_MINUS;
 bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
@@ -1622,6 +1640,8 @@ void usage(char** argv )
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd_odd, even_even_asym, odd_odd_asym) \n");
+  printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
+  printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
@@ -2005,6 +2025,26 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--tol") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    tol= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--tolhq") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    tol_hq= atof(argv[i+1]);
     i++;
     ret = 0;
     goto out;

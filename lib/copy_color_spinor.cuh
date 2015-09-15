@@ -444,11 +444,23 @@ namespace quda {
       errorQuda("source and destination spins must match");
 
     if (dst.Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       copyGenericColorSpinor<4>(dst, src, location, Dst, Src, dstNorm, srcNorm);
+#else
+      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
+#endif
     } else if (dst.Nspin() == 2) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
       copyGenericColorSpinor<2>(dst, src, location, Dst, Src, dstNorm, srcNorm);
+#else
+      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
+#endif
     } else if (dst.Nspin() == 1) {
+#ifdef GPU_STAGGERED_DIRAC
       copyGenericColorSpinor<1>(dst, src, location, Dst, Src, dstNorm, srcNorm);    
+#else
+      errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
+#endif
     } else {
       errorQuda("Nspin=%d unsupported", dst.Nspin());
     }

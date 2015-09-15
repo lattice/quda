@@ -9,7 +9,7 @@
 //namespace quda{
 
 template<class Cmplx> 
-  inline DEVICEHOST
+inline DEVICEHOST
 typename RealTypeId<Cmplx>::Type cabs(const Cmplx & z)
 {
   typename RealTypeId<Cmplx>::Type max, ratio, square;
@@ -49,7 +49,7 @@ inline DEVICEHOST typename PromoteTypeId<T,U>::Type quadSum(const T & a, const U
 
 // In future iterations of the code, I would like to use templates to compute the norm
 DEVICEHOST
-float getNorm(const Array<float2,3>& a){
+inline float getNorm(const Array<float2,3>& a){
   float temp1, temp2, temp3;
   temp1 = cabs(a[0]);
   temp2 = cabs(a[1]);
@@ -60,7 +60,7 @@ float getNorm(const Array<float2,3>& a){
 
 
 DEVICEHOST
-double getNorm(const Array<double2,3>& a){
+inline double getNorm(const Array<double2,3>& a){
   double temp1, temp2, temp3;
   temp1 = cabs(a[0]);
   temp2 = cabs(a[1]);
@@ -71,7 +71,7 @@ double getNorm(const Array<double2,3>& a){
 
 
 template<class T>
-  DEVICEHOST 
+inline DEVICEHOST 
 void constructHHMat(const T & tau, const Array<T,3> & v, Matrix<T,3> & hh)
 {
   Matrix<T,3> temp1, temp2;
@@ -87,13 +87,13 @@ void constructHHMat(const T & tau, const Array<T,3> & v, Matrix<T,3> & hh)
 
 
 template<class Real>
-DEVICEHOST
+inline DEVICEHOST
 void getLambdaMax(const Matrix<Real,3> & b, Real & lambda_max){
 
   Real m11 = b(1,1)*b(1,1) + b(0,1)*b(0,1);
   Real m22 = b(2,2)*b(2,2) + b(1,2)*b(1,2);
   Real m12 = b(1,1)*b(1,2);
-  Real dm  = (m11 - m22)/2.0;
+  Real dm  = (m11 - m22) * 0.5;
 
   Real norm1 = quadSum(dm, m12);
   if( dm >= 0.0 ){ 
@@ -106,7 +106,7 @@ void getLambdaMax(const Matrix<Real,3> & b, Real & lambda_max){
 
 
 template<class Real>
-  DEVICEHOST
+inline DEVICEHOST
 void getGivensRotation(const Real & alpha, const Real & beta, Real & c, Real & s)
 {
   Real ratio;
@@ -225,13 +225,8 @@ void smallSVD(Matrix<Real,2> & u, Matrix<Real,2> & v, Matrix<Real,2> & m){
     if( m(0,0) < 0.0 ){ temp *= -1.0; }
     if( m(0,1) < 0.0 ){ temp *= -1.0; }
 
-    beta = quadSum(1.0, temp);
-
-    if( temp >= 0.0 ){
-      temp = 1.0/(temp + beta);
-    }else{
-      temp = 1.0/(temp - beta);
-    }
+    beta = (temp >= 0.0) ? quadSum(1.0, temp) : -quadSum(1.0, temp);
+    temp = 1.0/(temp + beta);
 
     // Calculate beta = sqrt(1 + temp**2)
     beta = quadSum(1.0, temp);
@@ -302,19 +297,17 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
     Array<Cmplx,3> temp_vec;
     copyColumn(mat, 0, &temp_vec);
 
-    beta = getNorm(temp_vec); 
-
-    if(mat(0,0).x > 0.0){ beta = -beta; }
+    beta = (mat(0,0).x > 0.0) ? -getNorm(temp_vec) : getNorm(temp_vec);
 
     w.x = mat(0,0).x - beta; // work around for LLVM
     w.y = mat(0,0).y;
-    norm1 = cabs(w);
-    w = Conj(w)/norm1; 
+    typename RealTypeId<Cmplx>::Type norm1_inv = 1.0/cabs(w);
+    w = Conj(w)*norm1_inv; 
 
     // Assign the vector elements
     vec[0] = COMPLEX_UNITY; 
-    vec[1] = mat(1,0)*w/norm1;
-    vec[2] = mat(2,0)*w/norm1;
+    vec[1] = mat(1,0)*w*norm1_inv;
+    vec[2] = mat(2,0)*w*norm1_inv;
 
     // Now compute tau
     tau.x =  (beta - mat(0,0).x)/beta;
@@ -329,16 +322,15 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   typename RealTypeId<Cmplx>::Type norm2 = cabs(p(0,2));
   if(norm2 != 0.0 || p(0,1).y != 0.0){
     norm1 = cabs(p(0,1));
-    beta  = quadSum(norm1,norm2);
+    beta  = (p(0,1).x > 0.0) ? -quadSum(norm1,norm2) : quadSum(norm1,norm2);
     vec[0] = COMPLEX_ZERO;
     vec[1] = COMPLEX_UNITY;  
 
-    if( p(0,1).x > 0.0 ){ beta = -beta; }
     w.x = p(0,1).x-beta; // work around for LLVM
     w.y = p(0,1).y;
-    norm1 = cabs(w);
-    w = Conj(w)/norm1; 
-    z = Conj(p(0,2))/norm1;
+    typename RealTypeId<Cmplx>::Type norm1_inv = 1.0/cabs(w);
+    w = Conj(w)*norm1_inv; 
+    z = Conj(p(0,2))*norm1_inv;
     vec[2] = z*Conj(w);
 
     tau.x = (beta - p(0,1).x)/beta; // work around for LLVM
@@ -353,18 +345,17 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   norm2 = cabs(p(2,1));
   if(norm2 != 0.0 || p(1,1).y != 0.0){
     norm1 = cabs(p(1,1));
-    beta  = quadSum(norm1,norm2);
+    beta  = (p(1,1).x > 0) ? -quadSum(norm1,norm2) : quadSum(norm1,norm2);
 
     // Set the first two elements of the vector
     vec[0] = COMPLEX_ZERO;
     vec[1] = COMPLEX_UNITY;
 
-    if( p(1,1).x > 0 ){ beta = -beta; }
     w.x = p(1,1).x - beta; // work around for LLVM
     w.y = p(1,1).y;
-    norm1 = cabs(w);
-    w = Conj(w)/norm1;
-    z = p(2,1)/norm1;
+    typename RealTypeId<Cmplx>::Type norm1_inv = 1.0/cabs(w);
+    w = Conj(w)*norm1_inv;
+    z = p(2,1)*norm1_inv;
     vec[2] = z*w;
 
     tau.x  = (beta - p(1,1).x)/beta;
@@ -381,8 +372,7 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   // Step 4: build the second right reflector
   setIdentity(&temp);
   if( p(1,2).y != 0.0 ){
-    beta = cabs(p(1,2));
-    if( p(1,2).x > 0.0 ){ beta = -beta; }
+    beta = p(1,2).x > 0.0 ? -cabs(p(1,2)) : cabs(p(1,2));
     temp(2,2) = Conj(p(1,2))/beta;
     p(2,2) = p(2,2)*temp(2,2); // This is the only element of p needed below
     v = v*temp;
@@ -391,8 +381,7 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
 
   // Step 5: build the third left reflector
   if( p(2,2).y != 0.0 ){
-    beta = cabs(p(2,2));
-    if( p(2,2).x > 0.0 ){ beta = -beta; }
+    beta = p(2,2).x > 0.0 ? -cabs(p(2,2)) : cabs(p(2,2));
     temp(2,2) = p(2,2)/beta;
     u = u*temp;
   }

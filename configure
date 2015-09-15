@@ -586,6 +586,8 @@ PACKAGE_URL=''
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+LAPACK_HOME
+ATLAS_HOME
 MAGMA_HOME
 BUILD_MAGMA
 QDP_INSTALL_PATH
@@ -607,14 +609,18 @@ BUILD_QDPJIT_INTERFACE
 BUILD_CPS_INTERFACE
 BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
+INTERFACE_NVTX
+MPI_NVTX
 GPU_COMMS
 GPU_DIRECT
 POSIX_THREADS
 BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
+DYNAMIC_CLOVER
 BUILD_CONTRACT
 BUILD_SSTEP
+BUILD_GAUGE_ALG
 BUILD_GAUGE_TOOLS
 BUILD_HISQ_FORCE
 BUILD_FERMION_FORCE
@@ -651,6 +657,7 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
+GIT
 target_alias
 host_alias
 build_alias
@@ -719,11 +726,15 @@ enable_gauge_force
 enable_staggered_force
 enable_hisq_force
 enable_gauge_tools
+enable_gauge_alg
 enable_sstep
 enable_contract
+enable_dynamic_clover
 enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
+enable_mpi_nvtx
+enable_interface_nvtx
 enable_device_pack
 with_mpi
 enable_pthreads
@@ -732,6 +743,8 @@ with_qio
 enable_qdp_jit
 with_qdp
 with_magma
+with_atlas
+with_lapack
 enable_blas_tex
 enable_fermi_double_tex
 enable_numa_affinity
@@ -1358,8 +1371,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-cpu-arch=arch  Set CPU arch: x86 or x86_64 (default: x86_64)
-  --enable-gpu-arch=arch  Set GPU arch: sm_11, sm_12, sm_13, sm_20, sm_21,
-                          sm_30, sm_35 (default: sm_35)
+  --enable-gpu-arch=arch  Set GPU arch: sm_13, sm_20, sm_21, sm_30, sm_35,
+                          sm_50, sm_52 (default: sm_35)
   --enable-os=os          Set operating system: linux, osx (default: linux)
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
@@ -1399,13 +1412,21 @@ Optional Features:
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
                           evolver, APE, extended gauge routines (default:
                           disabled)
+  --enable-gauge-alg      Build gauge fixing and pure gauge algorithms
+                          (default: disabled)
   --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
+  --enable-dynamic-clover Invert dynamically the clover term for
+                          twisted-clover fermions (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
   --enable-gpu-comms      Enable direct CUDA-NIC communication (experimental,
                           default: disabled)
+  --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
+                          the visual profiler (default: disabled)
+  --enable-interface-nvtx Enable NVTX markup for profiling interface calls in
+                          the visual profiler (default: disabled)
   --enable-device-pack    Enable the packing / unpacking of fields on the
                           device (default: disabled)
   --enable-pthreads       Enable pthreads in the multi-GPU dslash build
@@ -1430,6 +1451,8 @@ Optional Packages:
   --with-qio=QIODIR       Specify QIO installation directory
   --with-qdp=QDPDIR       Specify QDP++ installation directory
   --with-magma=MAGMADIR   Specify MAGMA installation directory
+  --with-atlas=ATLASDIR   Specify ATLAS installation directory
+  --with-lapack=LAPACKDIR Specify LAPACK installation directory
 
 Some influential environment variables:
   CC          C compiler command
@@ -1951,6 +1974,43 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+# Extract the first word of "git", so it can be a program name with args.
+set dummy git; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_GIT+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$GIT"; then
+  ac_cv_prog_GIT="$GIT" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_GIT="git"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+GIT=$ac_cv_prog_GIT
+if test -n "$GIT"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GIT" >&5
+$as_echo "$GIT" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
 
 
 # Check whether --with-cuda was given.
@@ -2197,6 +2257,15 @@ else
 fi
 
 
+# Check whether --enable-gauge-alg was given.
+if test "${enable_gauge_alg+set}" = set; then :
+  enableval=$enable_gauge_alg;  build_gauge_alg=${enableval}
+else
+   build_gauge_alg="no"
+
+fi
+
+
 # Check whether --enable-sstep was given.
 if test "${enable_sstep+set}" = set; then :
   enableval=$enable_sstep;  build_sstep=${enableval}
@@ -2211,6 +2280,15 @@ if test "${enable_contract+set}" = set; then :
   enableval=$enable_contract;  build_contract=${enableval}
 else
    build_contract="no"
+
+fi
+
+
+# Check whether --enable-dynamic-clover was given.
+if test "${enable_dynamic_clover+set}" = set; then :
+  enableval=$enable_dynamic_clover;  dynamic_clover=${enableval}
+else
+   dynamic_clover="no"
 
 fi
 
@@ -2239,6 +2317,24 @@ if test "${enable_gpu_comms+set}" = set; then :
   enableval=$enable_gpu_comms;  gpu_comms=${enableval}
 else
    gpu_comms="no"
+
+fi
+
+
+# Check whether --enable-mpi-nvtx was given.
+if test "${enable_mpi_nvtx+set}" = set; then :
+  enableval=$enable_mpi_nvtx;  mpi_nvtx=${enableval}
+else
+   mpi_nvtx="no"
+
+fi
+
+
+# Check whether --enable-interface-nvtx was given.
+if test "${enable_interface_nvtx+set}" = set; then :
+  enableval=$enable_interface_nvtx;  interface_nvtx=${enableval}
+else
+   interface_nvtx="no"
 
 fi
 
@@ -3787,6 +3883,25 @@ fi
 
 
 
+# Check whether --with-atlas was given.
+if test "${with_atlas+set}" = set; then :
+  withval=$with_atlas;  atlas_home=${withval}
+else
+   atlas_home=""
+
+fi
+
+
+
+# Check whether --with-lapack was given.
+if test "${with_lapack+set}" = set; then :
+  withval=$with_lapack;  lapack_home=${withval}
+else
+   lapack_home=""
+
+fi
+
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: User supplied NVCCFLAGS: ${NVCCFLAGS} " >&5
 $as_echo "$as_me: User supplied NVCCFLAGS: ${NVCCFLAGS} " >&6;}
@@ -3930,9 +4045,9 @@ x86 | x86_64 ) ;;
 esac
 
 case ${gpu_arch} in
-sm_11 | sm_12 | sm_13 | sm_20 | sm_21 | sm_30 | sm_35) ;;
+sm_13 | sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
 *)
-  as_fn_error $? " GPU arch must be one of: sm_11, sm_12, sm_13, sm_20, sm_21, sm_30, or sm_35 " "$LINENO" 5
+  as_fn_error $? " GPU arch must be one of: sm_13, sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
   ;;
 esac
 
@@ -4097,6 +4212,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_gauge_alg} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-gauge-alg " "$LINENO" 5
+  ;;
+esac
+
 case ${build_sstep} in
 yes|no);;
 *)
@@ -4108,6 +4230,13 @@ case ${build_contract} in
 yes|no);;
 *)
   as_fn_error $? " invalid value for --enable-contract " "$LINENO" 5
+  ;;
+esac
+
+case ${dynamic_clover} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-dynamic-clover " "$LINENO" 5
   ;;
 esac
 
@@ -4132,6 +4261,21 @@ yes|no);;
   ;;
 esac
 
+case ${mpi_nvtx} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-mpi-nvtx " "$LINENO" 5
+  ;;
+esac
+
+case ${interface_nvtx} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-interface-nvtx " "$LINENO" 5
+  ;;
+esac
+
+
 case ${build_qdpjit} in
 yes|no);;
 *)
@@ -4155,6 +4299,11 @@ $as_echo "$as_me: Enabling Multi-GPU" >&6;}
   { $as_echo "$as_me:${as_lineno-$LINENO}: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&5
 $as_echo "$as_me: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&6;}
   build_staggered_force="no";
+
+  if test "X${build_gauge_alg}X" = "XyesX"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&5
+$as_echo "$as_me: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&2;}
+  fi
 
 
   if test "X${qmp_home}X" = "XX"; then
@@ -4305,6 +4454,11 @@ $as_echo "$as_me: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&6;}
 BUILD_GAUGE_TOOLS=${build_gauge_tools}
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&5
+$as_echo "$as_me: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&6;}
+BUILD_GAUGE_ALG=${build_gauge_alg}
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_SSTEP = ${build_sstep}  " >&5
 $as_echo "$as_me: Setting BUILD_SSTEP = ${build_sstep}  " >&6;}
 BUILD_SSTEP=${build_sstep}
@@ -4313,6 +4467,11 @@ BUILD_SSTEP=${build_sstep}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CONTRACT = ${build_contract}  " >&5
 $as_echo "$as_me: Setting BUILD_CONTRACT = ${build_contract}  " >&6;}
 BUILD_CONTRACT=${build_contract}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&5
+$as_echo "$as_me: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&6;}
+DYNAMIC_CLOVER=${dynamic_clover}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MULTI_GPU = ${multi_gpu}  " >&5
@@ -4343,6 +4502,16 @@ GPU_DIRECT=${gpu_direct}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting GPU_COMMS= ${gpu_comms}" >&5
 $as_echo "$as_me: Setting GPU_COMMS= ${gpu_comms}" >&6;}
 GPU_COMMS=${gpu_comms}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_NVTXS= ${mpi_nvtx}" >&5
+$as_echo "$as_me: Setting MPI_NVTXS= ${mpi_nvtx}" >&6;}
+MPI_NVTX=${mpi_nvtx}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting INTERFACE_NVTXS= ${interface_nvtx}" >&5
+$as_echo "$as_me: Setting INTERFACE_NVTXS= ${interface_nvtx}" >&6;}
+INTERFACE_NVTX=${interface_nvtx}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}" >&5
@@ -4448,6 +4617,16 @@ BUILD_MAGMA=${build_magma}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting MAGMA_HOME = ${magma_home}" >&5
 $as_echo "$as_me: Setting MAGMA_HOME = ${magma_home}" >&6;}
 MAGMA_HOME=${magma_home}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting ATLAS_HOME = ${atlas_home}" >&5
+$as_echo "$as_me: Setting ATLAS_HOME = ${atlas_home}" >&6;}
+ATLAS_HOME=${atlas_home}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting LAPACK_HOME = ${lapack_home}" >&5
+$as_echo "$as_me: Setting LAPACK_HOME = ${lapack_home}" >&6;}
+LAPACK_HOME=${lapack_home}
 
 
 ac_config_files="$ac_config_files make.inc"

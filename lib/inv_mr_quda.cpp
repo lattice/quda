@@ -23,7 +23,7 @@ namespace quda {
   }
 
   MR::~MR() {
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Start(QUDA_PROFILE_FREE);
+    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTART(QUDA_PROFILE_FREE);
     if (init) {
       if (allocate_r) delete rp;
       delete Arp;
@@ -31,7 +31,7 @@ namespace quda {
       if (allocate_y) delete yp;
 
     }
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.Stop(QUDA_PROFILE_FREE);
+    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
@@ -89,7 +89,7 @@ namespace quda {
 
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
       blas::flops = 0;
-      profile.Start(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
     double omega = 1.2;
@@ -142,8 +142,8 @@ namespace quda {
     
 
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
-        profile.Stop(QUDA_PROFILE_COMPUTE);
-        profile.Start(QUDA_PROFILE_EPILOGUE);
+        profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+        profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 	param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
 	double gflops = (blas::flops + mat.flops())*1e-9;
@@ -169,7 +169,7 @@ namespace quda {
 	// reset the flops counters
 	blas::flops = 0;
 	mat.flops();
-        profile.Stop(QUDA_PROFILE_EPILOGUE);
+        profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
     globalReduce = true; // renable global reductions for outer solver

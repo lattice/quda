@@ -49,12 +49,16 @@ extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern double tol; // tolerance for inverter
+extern double tol_hq; // heavy-quark tolerance for inverter
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaMatPCType matpc_type; // preconditioning type
 
 extern char latfile[];
 
 extern void usage(char** );
+
+
 
 void
 display_test_info()
@@ -99,16 +103,8 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
-  // initialize QMP or MPI
-#if defined(QMP_COMMS)
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-#elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
-#endif
-
-  // call srand() with a rank-dependent seed
-  initRand();
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
 
@@ -157,6 +153,7 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
+  inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -166,12 +163,10 @@ int main(int argc, char **argv)
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-    inv_param.mass = 0.02;
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;
   } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    inv_param.mass = 0.02;
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;
@@ -216,13 +211,24 @@ int main(int argc, char **argv)
 
   inv_param.Nsteps = 2;
   inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-7;
+  inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
 #if __COMPUTE_CAPABILITY__ >= 200
+  if(tol_hq == 0 && tol == 0){
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
   // require both L2 relative and heavy quark residual to determine convergence
-  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
-  inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
+  inv_param.residual_type = static_cast<QudaResidualType_s>(0);
+  inv_param.residual_type = (tol != 0) ? static_cast<QudaResidualType_s> ( inv_param.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : inv_param.residual_type;
+  inv_param.residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param.residual_type;
+
+  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 #else
+  if(tol == 0){
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
   // Pre Fermi architecture only supports L2 relative residual norm
   inv_param.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 #endif
@@ -232,7 +238,7 @@ int main(int argc, char **argv)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = 10000;
-  inv_param.reliable_delta = 1e-2;
+  inv_param.reliable_delta = 1e-1;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.max_res_increase = 1;
 
@@ -285,10 +291,6 @@ int main(int argc, char **argv)
   }
 
   inv_param.verbosity = QUDA_VERBOSE;
-
-  // declare the dimensions of the communication grid
-  initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
-
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -583,12 +585,7 @@ int main(int argc, char **argv)
   // finalize the QUDA library
   endQuda();
 
-  // finalize the communications layer
-#if defined(QMP_COMMS)
-  QMP_finalize_msg_passing();
-#elif defined(MPI_COMMS)
-  MPI_Finalize();
-#endif
+  finalizeComms();
 
   return 0;
 }

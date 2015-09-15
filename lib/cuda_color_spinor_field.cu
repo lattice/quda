@@ -217,10 +217,20 @@ namespace quda {
       even = new cudaColorSpinorField(*this, param);
       odd = new cudaColorSpinorField(*this, param);
 
-      // need this hackery for the moment (need to locate the odd pointer half way into the full field)
+      // need this hackery for the moment (need to locate the odd pointers half way into the full field)
       (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
       if (precision == QUDA_HALF_PRECISION) 
 	(dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+
+      for(int i=0; i<nDim; ++i){
+        if(commDimPartitioned(i)){
+          (dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i] =
+	    static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i]) + bytes/2;
+          if(precision == QUDA_HALF_PRECISION)
+	    (dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i] =
+	      static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i]) + norm_bytes/2;
+        }
+      }
 
 #ifdef USE_TEXTURE_OBJECTS
       dynamic_cast<cudaColorSpinorField*>(even)->destroyTexObject();
@@ -560,7 +570,6 @@ namespace quda {
     // only allocate if not already allocated or buffer required is bigger than previously
     if(initGhostFaceBuffer == 0 || faceBytes > ghostFaceBytes){    
 
-
       if (initGhostFaceBuffer){
         for(int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]); 
       }
@@ -645,6 +654,7 @@ namespace quda {
 	(dir == QUDA_BACKWARDS) ? this->backGhostFaceBuffer[bufferIndex][dim] : this->fwdGhostFaceBuffer[bufferIndex][dim];
 
       cudaMemcpyAsync(ghost_spinor, gpu_buf, bytes, cudaMemcpyDeviceToHost, *stream); 
+
     } else if(this->TwistFlavor() != QUDA_TWIST_NONDEG_DOUBLET){ // do multiple cudaMemcpys
 
       int Npad = Nint / Nvec; // number Nvec buffers we have
@@ -953,13 +963,14 @@ namespace quda {
 	  if (!commDimPartitioned(i)) continue;
 #ifdef GPU_COMMS
 	  size_t nbytes_Nface = surfaceCB[i]*Ndof*precision*(j+1);
+	  size_t nbytes_Nface_norm = surfaceCB[i]*(j+1)*sizeof(float);
 	  if (i != 3 || getKernelPackT() || getTwistPack()) {
 #else 
 	    size_t nbytes_Nface = (nbytes[i] / maxNface) * (j+1);
 #endif
 	    for(int b=0; b<2; ++b){
-	      mh_send_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_face[b][i], i, +1, nbytes_Nface);
-	      mh_send_back[b][j][2*i+0] = comm_declare_send_relative(my_back_face[b][i], i, -1, nbytes_Nface);
+	      mh_send_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_fwd_face[b][i], i, +1, nbytes_Nface) : NULL;
+	      mh_send_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_back_face[b][i], i, -1, nbytes_Nface) : NULL;
 	      mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i]; // alias pointers
 	      mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i]; // alias pointers
 	    }
@@ -967,8 +978,8 @@ namespace quda {
 
 	    if(precision == QUDA_HALF_PRECISION){
 	      for(int b=0; b<2; ++b){
-		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
-		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(my_back_norm_face[b][i], i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+		mh_send_norm_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm) : NULL;
+		mh_send_norm_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(my_back_norm_face[b][i], i, -1, nbytes_Nface_norm) : NULL;
 		mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
 		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i]; 	
 	      }
@@ -1020,11 +1031,12 @@ namespace quda {
 	    //printf("%d strided sends with Nface=%d Nblocks=%d blksize=%d Stride=%d\n", i, j+1, Nblocks, blksize, Stride);
 
             for(int b=0; b<2; ++b){
-	      mh_send_fwd[b][j][2*i+0] = comm_declare_strided_send_relative(base[2], i, +1, blksize, Nblocks, Stride);
-	      mh_send_back[b][j][2*i+0] = comm_declare_strided_send_relative(base[0], i, -1, blksize, Nblocks, Stride);
+	      // only allocate a communicator for the present face (this needs cleaned up)
+	      mh_send_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[2], i, +1, blksize, Nblocks, Stride) : NULL;
+	      mh_send_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[0], i, -1, blksize, Nblocks, Stride) : NULL;
 	      if (nSpin ==4) { // dagger communicators
-	        mh_send_fwd[b][j][2*i+1] = comm_declare_strided_send_relative(base[3], i, +1, blksize, Nblocks, Stride);
-	        mh_send_back[b][j][2*i+1] = comm_declare_strided_send_relative(base[1], i, -1, blksize, Nblocks, Stride);
+	        mh_send_fwd[b][j][2*i+1] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[3], i, +1, blksize, Nblocks, Stride) : NULL;
+	        mh_send_back[b][j][2*i+1] = (j+1 == nFace) ? comm_declare_strided_send_relative(base[1], i, -1, blksize, Nblocks, Stride) : NULL;
 	      } else {
 	        mh_send_fwd[b][j][2*i+1] = mh_send_fwd[b][j][2*i+0];
 	        mh_send_back[b][j][2*i+1] = mh_send_back[b][j][2*i+0];
@@ -1038,8 +1050,8 @@ namespace quda {
 	      void *norm_fwd = static_cast<float*>(norm) + Nt_minus1_offset;
 	      void *norm_back = norm; // the first time slice has zero offset
 	      for(int b=0; b<2; ++b){
-		mh_send_norm_fwd[b][j][2*i+0] = comm_declare_send_relative(norm_fwd, i, +1, surfaceCB[i]*(j+1)*sizeof(float)); 
-		mh_send_norm_back[b][j][2*i+0] = comm_declare_send_relative(norm_back, i, -1, surfaceCB[i]*(j+1)*sizeof(float));
+		mh_send_norm_fwd[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(norm_fwd, i, +1, surfaceCB[i]*(j+1)*sizeof(float)) : NULL;
+		mh_send_norm_back[b][j][2*i+0] = (j+1 == nFace) ? comm_declare_send_relative(norm_back, i, -1, surfaceCB[i]*(j+1)*sizeof(float)) : NULL;
 		mh_send_norm_fwd[b][j][2*i+1] = mh_send_norm_fwd[b][j][2*i];
 		mh_send_norm_back[b][j][2*i+1] = mh_send_norm_back[b][j][2*i];  
 	      }
@@ -1049,15 +1061,15 @@ namespace quda {
 
 	  if(precision == QUDA_HALF_PRECISION){
             for(int b=0; b<2; ++b){
-	      mh_recv_norm_fwd[b][j][i] = comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, surfaceCB[i]*sizeof(float)*(j+1));
-	      mh_recv_norm_back[b][j][i] = comm_declare_receive_relative(from_back_norm_face[b][i], i, -1, surfaceCB[i]*sizeof(float)*(j+1));
+	      mh_recv_norm_fwd[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_fwd_norm_face[b][i], i, +1, nbytes_Nface_norm) : NULL;
+	      mh_recv_norm_back[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_back_norm_face[b][i], i, -1, nbytes_Nface_norm) : NULL;
             }
 	  }
 #endif // GPU_COMMS
 
 	  for(int b=0; b<2; ++b){
-	    mh_recv_fwd[b][j][i] = comm_declare_receive_relative(from_fwd_face[b][i], i, +1, nbytes_Nface);
-	    mh_recv_back[b][j][i] = comm_declare_receive_relative(from_back_face[b][i], i, -1, nbytes_Nface);
+	    mh_recv_fwd[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_fwd_face[b][i], i, +1, nbytes_Nface) : NULL;
+	    mh_recv_back[b][j][i] = (j+1 == nFace) ? comm_declare_receive_relative(from_back_face[b][i], i, -1, nbytes_Nface) : NULL;
 	  }
 	 
 
@@ -1078,22 +1090,22 @@ namespace quda {
       for (int j=0; j<maxNface; j++) {
 	for (int i=0; i<nDimComms; i++) {
 	  if (commDimPartitioned(i)) {
-	    comm_free(mh_recv_fwd[b][j][i]);
-	    comm_free(mh_recv_back[b][j][i]);
-	    comm_free(mh_send_fwd[b][j][2*i]);
-	    comm_free(mh_send_back[b][j][2*i]);
+	    if (mh_recv_fwd[b][j][i]) comm_free(mh_recv_fwd[b][j][i]);
+	    if (mh_recv_fwd[b][j][i]) comm_free(mh_recv_back[b][j][i]);
+	    if (mh_send_fwd[b][j][2*i]) comm_free(mh_send_fwd[b][j][2*i]);
+	    if (mh_send_back[b][j][2*i]) comm_free(mh_send_back[b][j][2*i]);
 	    // only in a special case are these not aliasing pointers
 #ifdef GPU_COMMS
 	    if(precision == QUDA_HALF_PRECISION){
-	      comm_free(mh_recv_norm_fwd[b][j][i]);
-	      comm_free(mh_recv_norm_back[b][j][i]);
-	      comm_free(mh_send_norm_fwd[b][j][2*i]);
-	      comm_free(mh_send_norm_back[b][j][2*i]);
+	      if (mh_recv_norm_fwd[b][j][i]) comm_free(mh_recv_norm_fwd[b][j][i]);
+	      if (mh_recv_norm_back[b][j][i]) comm_free(mh_recv_norm_back[b][j][i]);
+	      if (mh_send_norm_fwd[b][j][2*i]) comm_free(mh_send_norm_fwd[b][j][2*i]);
+	      if (mh_send_norm_back[b][j][2*i]) comm_free(mh_send_norm_back[b][j][2*i]);
 	    }
 
 	    if (i == 3 && !getKernelPackT() && nSpin == 4) {
-	      comm_free(mh_send_fwd[b][j][2*i+1]);
-	      comm_free(mh_send_back[b][j][2*i+1]);
+	      if (mh_send_fwd[b][j][2*i+1]) comm_free(mh_send_fwd[b][j][2*i+1]);
+	      if (mh_send_back[b][j][2*i+1]) comm_free(mh_send_back[b][j][2*i+1]);
 	    }
 #endif // GPU_COMMS
 	  }
@@ -1279,7 +1291,6 @@ namespace quda {
       comm_start(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
     }
 #ifdef GPU_COMMS
-
     if(precision != QUDA_HALF_PRECISION) return;		
 
     if (dir%2 == 0) { // sending backwards
@@ -1328,6 +1339,38 @@ namespace quda {
     return 0;
   }
 
+  void cudaColorSpinorField::commsWait(int nFace, int dir, int dagger) {
+    int dim = dir / 2;
+    if(!commDimPartitioned(dim)) return;
+
+#ifdef GPU_COMMS
+    if(precision != QUDA_HALF_PRECISION){
+#endif
+    if (dir%2==0) {
+      comm_wait(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+      comm_wait(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+    } else {
+      comm_wait(mh_recv_back[bufferIndex][nFace-1][dim]);
+      comm_wait(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+    }
+#ifdef GPU_COMMS
+   } else { // half precision
+      if (dir%2==0) {
+	comm_wait(mh_recv_fwd[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_back[bufferIndex][nFace-1][2*dim+dagger]);
+	comm_wait(mh_recv_norm_fwd[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_norm_back[bufferIndex][nFace-1][2*dim+dagger]);
+      } else {
+	comm_wait(mh_recv_back[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+	comm_wait(mh_recv_norm_back[bufferIndex][nFace-1][dim]);
+	comm_wait(mh_send_norm_fwd[bufferIndex][nFace-1][2*dim+dagger]);
+      }
+    } // half precision
+#endif
+
+    return;
+  }
 
   void cudaColorSpinorField::scatter(int nFace, int dagger, int dir, cudaStream_t* stream_p)
   {

@@ -31,12 +31,12 @@ namespace quda {
     if (Location(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
 
-    profile.Start(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = blas::norm2(b);
     if(b2 == 0){
-      profile.Stop(QUDA_PROFILE_INIT);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
       param.true_res = 0.0;
@@ -51,19 +51,15 @@ namespace quda {
     cudaColorSpinorField y(b, csParam); 
   
     mat(r, x, y);
-
     double r2 = blas::xmyNorm(b, r);
-  
+
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField Ap(x, csParam);
     cudaColorSpinorField tmp(x, csParam);
 
-    cudaColorSpinorField *tmp2_p = &tmp;
-    // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
-	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(x, csParam);
-    }
+    // tmp2 only needed for multi-gpu Wilson-like kernels
+    cudaColorSpinorField *tmp2_p = !mat.isStaggered() ?
+      new cudaColorSpinorField(x, csParam) : &tmp;
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
     cudaColorSpinorField *r_sloppy;
@@ -83,9 +79,16 @@ namespace quda {
       x_sloppy = new cudaColorSpinorField(x, csParam);
     }
 
+    // additional high-precision temporary if Wilson and mixed-precision
+    csParam.setPrecision(param.precision);
+    cudaColorSpinorField *tmp3_p =
+      (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
+      new cudaColorSpinorField(x, csParam) : &tmp;
+    cudaColorSpinorField &tmp3 = *tmp3_p;
 
     ColorSpinorField &xSloppy = *x_sloppy;
     ColorSpinorField &rSloppy = *r_sloppy;
+
     cudaColorSpinorField p(rSloppy);
 
     if(&x != &xSloppy){
@@ -99,8 +102,8 @@ namespace quda {
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     bool heavy_quark_restart = false;
     
-    profile.Stop(QUDA_PROFILE_INIT);
-    profile.Start(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double r2_old;
 
@@ -113,7 +116,7 @@ namespace quda {
       heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
       heavy_quark_res_old = heavy_quark_res; // heavy quark residual
     }
-    const int heavy_quark_check = 1; // how often to check the heavy quark residual
+    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double alpha=0.0, beta=0.0;
     double pAp;
@@ -142,8 +145,8 @@ namespace quda {
     // only used if we use the heavy_quark_res
     bool L2breakdown =false;
 
-    profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     blas::flops = 0;
 
     int k=0;
@@ -223,7 +226,7 @@ namespace quda {
 	blas::copy(x, xSloppy); // nop when these pointers alias
       
 	blas::xpy(x, y); // swap these around?
-	mat(r, y, x); // here we can use x as tmp
+	mat(r, y, x, tmp3); // here we can use x as tmp
 	r2 = blas::xmyNorm(b, r);
 
 	blas::copy(rSloppy, r); //nop when these pointers alias
@@ -303,8 +306,8 @@ namespace quda {
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.Stop(QUDA_PROFILE_COMPUTE);
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
@@ -334,15 +337,16 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
+    if (&tmp3 != &tmp) delete tmp3_p;
     if (&tmp2 != &tmp) delete tmp2_p;
 
     if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
     if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }

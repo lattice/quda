@@ -59,8 +59,13 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS)
       {
+
 	FullClover *cs = new FullClover(clover);
+#ifndef DYNAMIC_CLOVER
 	FullClover *cI = new FullClover(cloverInv, false);
+#else
+	FullClover *cI = NULL;
+#endif
 	double flavor_mu = in.TwistFlavor() * mu;
 	twistCloverGamma5Cuda(&static_cast<cudaColorSpinorField&>(out),
 			      &static_cast<const cudaColorSpinorField&>(in),
@@ -72,7 +77,9 @@ namespace quda {
 	  flops += 552ll*in.Volume();
 
 	delete cs;
+#ifndef DYNAMIC_CLOVER
 	delete cI;
+#endif
       }
     else
       errorQuda("DiracTwistedClover::twistedCloverApply method for flavor doublet is not implemented..\n");
@@ -106,7 +113,11 @@ namespace quda {
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda      
 
     FullClover *cs = new FullClover(clover);
+#ifndef DYNAMIC_CLOVER
     FullClover *cI = new FullClover(cloverInv, false);
+#else
+    FullClover *cI = NULL;
+#endif
 
     if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
       double a = 2.0 * kappa * in.TwistFlavor() * mu;//for direct twist (must be daggered separately)  
@@ -124,7 +135,9 @@ namespace quda {
     }
     deleteTmp(&tmp, reset);
     delete cs;
+#ifndef DYNAMIC_CLOVER
     delete cI;
+#endif
   }
 
   void DiracTwistedClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -196,7 +209,11 @@ namespace quda {
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
   
     FullClover *cs = new FullClover(clover);
+#ifndef DYNAMIC_CLOVER
     FullClover *cI = new FullClover(cloverInv, false);
+#else
+    FullClover *cI = NULL;
+#endif
 
     if (in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
       double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist (not daggered)
@@ -211,14 +228,15 @@ namespace quda {
 	twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
 				&static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0,
 				QUDA_DEG_CLOVER_TWIST_INV_DSLASH, a, b, 0.0, 0.0, commDim, profile);
-
         flops += 1320ll*in.Volume();
       }
     } else {//TWIST doublet :
       errorQuda("Non-degenerate DiracTwistedCloverPC is not implemented \n");
     }
     delete cs;
+#ifndef DYNAMIC_CLOVER
     delete cI;
+#endif
   }
 
   // xpay version of the above
@@ -235,7 +253,11 @@ namespace quda {
     twistedclover::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
   
     FullClover *cs = new FullClover(clover);
+#ifndef DYNAMIC_CLOVER
     FullClover *cI = new FullClover(cloverInv, false);
+#else
+    FullClover *cI = NULL;
+#endif
 
     if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
       double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist
@@ -260,7 +282,9 @@ namespace quda {
       errorQuda("Non-degenerate DiracTwistedCloverPC is not implemented \n");
     }
     delete cs;
+#ifndef DYNAMIC_CLOVER
     delete cI;
+#endif
   }
 
   void DiracTwistedCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -270,7 +294,11 @@ namespace quda {
     bool reset = newTmp(&tmp1, in);
 
     FullClover *cs = new FullClover(clover);
+#ifndef DYNAMIC_CLOVER
     FullClover *cI = new FullClover(cloverInv, false);
+#else
+    FullClover *cI = NULL;
+#endif
 
     if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
@@ -319,7 +347,9 @@ namespace quda {
     }
 
     delete cs;
+#ifndef DYNAMIC_CLOVER
     delete cI;
+#endif
 
     deleteTmp(&tmp1, reset);
   }

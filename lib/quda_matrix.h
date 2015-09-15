@@ -674,6 +674,20 @@ namespace quda{
     }
 
 
+  template<typename Complex,int N>
+    __device__ __host__ inline void makeAntiHerm(Matrix<Complex,N> &m) {
+    typedef typename RealTypeId<Complex>::Type real;
+    // first make the matrix anti-hermitian
+    Matrix<Complex,N> am = m - conj(m);
+
+    // second make it traceless
+    real imag_trace = 0.0;
+    for (int i=0; i<N; i++) imag_trace += am(i,i).y;
+    for (int i=0; i<N; i++) {
+      am(i,i).y -= imag_trace/N;
+    }
+    m = 0.5*am;
+  }
 
 
 
@@ -1003,6 +1017,36 @@ namespace quda{
       }
       return;
     }
+
+  template<class T>
+  __device__ __host__ inline Matrix<T,3> getSubTraceUnit(const Matrix<T,3>& a){
+    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
+    Matrix<T,3> res;
+    res(0,0) = a(0,0) - tr; res(0,1) = a(0,1); res(0,2) = a(0,2);
+    res(1,0) = a(1,0); res(1,1) = a(1,1) - tr; res(1,2) = a(1,2);
+    res(2,0) = a(2,0); res(2,1) = a(2,1); res(2,2) = a(2,2) - tr;
+    return res;
+  }
+
+  template<class T>
+  __device__ __host__ inline void SubTraceUnit(Matrix<T,3>& a){
+    T tr = (a(0,0) + a(1,1) + a(2,2)) / 3.0;
+    a(0,0) -= tr; a(1,1) -= tr; a(2,2) -= tr;
+  }
+
+  template<class T>
+  __device__ __host__ inline double getRealTraceUVdagger(const Matrix<T,3>& a, const Matrix<T,3>& b){
+    double sum = (double)(a(0,0).x * b(0,0).x  + a(0,0).y * b(0,0).y);
+    sum += (double)(a(0,1).x * b(0,1).x  + a(0,1).y * b(0,1).y);
+    sum += (double)(a(0,2).x * b(0,2).x  + a(0,2).y * b(0,2).y);
+    sum += (double)(a(1,0).x * b(1,0).x  + a(1,0).y * b(1,0).y);
+    sum += (double)(a(1,1).x * b(1,1).x  + a(1,1).y * b(1,1).y);
+    sum += (double)(a(1,2).x * b(1,2).x  + a(1,2).y * b(1,2).y);
+    sum += (double)(a(2,0).x * b(2,0).x  + a(2,0).y * b(2,0).y);
+    sum += (double)(a(2,1).x * b(2,1).x  + a(2,1).y * b(2,1).y);
+    sum += (double)(a(2,2).x * b(2,2).x  + a(2,2).y * b(2,2).y);
+    return sum;
+  }
 
 
 

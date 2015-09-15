@@ -257,7 +257,7 @@ namespace quda {
 
     *input = in; // copy result to input field (aliasing handled automatically)  
     
-    if ((V->Nspin() != 1) && (output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis())))
+    if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 

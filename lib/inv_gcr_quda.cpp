@@ -159,14 +159,14 @@ namespace quda {
   }
 
   GCR::~GCR() {
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
     if (K) delete K;
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-    profile.Start(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     int Nkrylov = param.Nkrylov; // size of Krylov space
 
@@ -253,7 +253,7 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      profile.Stop(QUDA_PROFILE_INIT);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       warningQuda("inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -278,8 +278,8 @@ namespace quda {
     int resIncrease = 0;
     int resIncreaseTotal = 0;
 
-    profile.Stop(QUDA_PROFILE_INIT);
-    profile.Start(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     blas::flops = 0;
 
@@ -290,8 +290,8 @@ namespace quda {
     double r2_old = r2;
     bool l2_converge = false;
 
-    profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     int k = 0;
     PrintStats("GCR", total_iter+k, r2, b2, heavy_quark_res);
@@ -401,8 +401,8 @@ namespace quda {
 
     if (total_iter > 0) blas::copy(x, y);
 
-    profile.Stop(QUDA_PROFILE_COMPUTE);
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
@@ -433,8 +433,8 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
     PrintSummary("GCR", total_iter, r2, b2);
 
@@ -464,7 +464,7 @@ namespace quda {
     delete []beta;
     delete []gamma;
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }

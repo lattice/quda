@@ -214,10 +214,12 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(use_sloppy_partial_accumulator, 0); /**< Default is to use a high-precision accumulator (not yet supported in all solvers) */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
-#else
+  P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
+ #else
   P(use_sloppy_partial_accumulator, INVALID_INT);
   P(max_res_increase, INVALID_INT);
   P(max_res_increase_total, INVALID_INT);
+  P(heavy_quark_check, INVALID_INT);
 #endif
 
 #ifndef CHECK_PARAM
@@ -234,6 +236,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 	P(tol_hq_offset[i], INVALID_DOUBLE);
 #ifndef CHECK_PARAM
       P(true_res_offset[i], INVALID_DOUBLE); 
+      P(iter_res_offset[i], INVALID_DOUBLE);
 #endif
     }
   }
@@ -385,6 +388,13 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(deflation_grid, INVALID_INT);
 #endif
 
+#if defined INIT_PARAM
+  P(use_resident_solution, 0);
+  P(make_resident_solution, 0);
+#else
+  P(use_resident_solution, INVALID_INT);
+  P(make_resident_solution, INVALID_INT);
+#endif
 
 
 #ifdef INIT_PARAM

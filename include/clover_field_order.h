@@ -452,7 +452,21 @@ namespace quda {
       };
 
   } // namespace clover
+
+  // Use traits to reduce the template explosion
+  template<typename Float,int N=72> struct clover_mapper { };
+
+  // double precision uses Float2
+  template<int N> struct clover_mapper<double,N> { typedef clover::FloatNOrder<double, N, 2> type; };
+
+  // single precision uses Float4
+  template<int N> struct clover_mapper<float,N> { typedef clover::FloatNOrder<float, N, 4> type; };
+
+  // half precision uses Float4
+  template<int N> struct clover_mapper<short,N> { typedef clover::FloatNOrder<short, N, 4> type; };
+
 } // namespace quda
 
 #endif //_CLOVER_ORDER_H
+
 

@@ -1,3 +1,173 @@
+Version 0.7.1 - 11th June 2015
+
+- Added Maxwell-generation GPU support.
+
+- Added automatic support for NVTX markup of MPI calls for visualizing
+  MPI calls in the visual profiler.  Enabled by using
+  "--enable-mpi-nvtx" when configuring QUDA.
+
+- Modified clover derivative code to use gauge::FloatNorder structs,
+  which in the process adds support for different reconstruct types.
+
+- Added autotuning support to clover derivative and sigma trace
+  computations.
+
+- Multiple fixes and improvements to GPU_COMMS feature of QUDA: fixed
+  a bug when using full-field fermions, improved support on Cray
+  systems, and added much more robust memory checking of message memory when
+  host debugging is enabled.
+
+- Multi-GPU dslash now correctly report flops and bandwidth when
+  autotuning.
+
+- Fixed a bug where by the 5-d domain wall dslash was called twice
+  every time it was called.
+
+- Fixed a bug when using both improved staggered fermions and naive
+  staggered fermions with auto-tuning enabled.
+
+- Fixed a bug with using fused exterior kernels with auto tuning that
+  could result in incorrect results.
+
+- To aid debugging, QUDA now prints its version, including a git id
+  tag, when initialized.
+
+- Drastically improved Doxygen markup of the MILC interface.
+
+- Multiple bug fixes that affects stability and correctness throughout
+  the library.  Many of these fixes are listed here:
+  https://github.com/lattice/quda/issues?q=milestone%3A%22QUDA+0.7.1%22+is%3Aclosed
+
+Version 0.7.0 - 4th February 2015
+
+- Added support for twisted-clover, 4-d preconditioned domain wall and
+  4-d preconditioned Mobius fermions.
+
+- Reworked auto-tuning framework to drastically reduce the lookup
+  overhead of querying the tune cache.  This has the effect of
+  improving the strong scaling (greater than 10% improvement in solver
+  performance seen at scale).
+
+- Support for GPU-aware MPI and GPUDirect RDMA for faster multi-GPU
+  communication.  This option is enabled using the --enable-gpu-comms
+  option (GPU_COMMS in make.in), and requires a GPU-aware MPI stack
+  (MVAPICH or OpenMPI).
+
+- Reduction in communication latency for half-precision dslash through
+  merging the main quark and norm fields into a contiguous buffer for
+  host to device transfers.  This reduces API overhead and increases
+  sustained PCIe bandwidth.
+
+- Added support for double buffering of the MPI receive buffers in the
+  multi-GPU dslash to allow for early preposting of MPI_Recv.
+
+- Implemented an initial multi-threaded dslash (parallelizing between
+  MPI and CUDA API calls) to reduce overall CPU frequency sensitivity.
+  This implementation is embryonic: it simply provides for early
+  preposting of MPI_Recv and will be extended to parallelize between
+  MPI_Test and CUDA event querying.
+
+- Added an alternative multi-GPU dslash where the update of the
+  boundary regions is deployed in a single kernel after all
+  communication is complete.  This reduces kernel launch overhead and
+  ensures communication is done with maximum priority.
+
+- Reworked multi-GPU dslash interface: there are now different
+  policies supported for a variety of execution flows.  Supported
+  policies at the moment are QUDA_DSLASH (legacy multi-gpu that
+  utilizes face buffers for communication buffers), QUDA_DSLASH2 (the
+  default - regular multi-GPU dslash with CPU-routed communication),
+  QUDA_FUSED_DSLASH (use a single kernel to update all boundaries
+  after all communication has finished), QUDA_GPU_COMMS_DSLASH (all
+  communication emanates directly from GPU memory locations),
+  QUDA_PTHREADS_DSLASH (multi-threaded dslash).  This can be described
+  as experimental, and changing the policy type has yet to be exposed
+  to the interface.
+
+- New routines for construction of the clover matrix field and
+  inversion of the clover matrices (with optional computation of the
+  trace log of the clover field).  Presently exposed by using
+  loadCloverQuda with NULL pointers to host fields to force
+  construction instead of download of the clover field.
+
+- Implemented support for exact momentum exponentiation to
+  complement the pre-existing Taylor expanded variant
+  (updateGaugeFieldQuda).
+
+- Partial implementation of the clover-field force terms
+  (clover_deriv_quda.cu and clover_trace_quda.cu).
+
+- All extended gauge field creation routines have been offloaded to
+  QUDA, minimizing PCIe traffic and minimizing CPU time.  This has
+  lead to a significant speedup in routines that need this, e.g., the
+  gauge force.
+
+- Initial support for extended fermion-field creation routines (only
+  supports staggered fields).
+
+- Fermion field outer product implemented in QUDA.  Only exposed for
+  staggered fermions at present (computeStaggeredOprodQuda).
+
+- EigCG eigenvector deflation algorithm and subsequent initCG
+  implemented for the preconditioned normal operator.  Added a
+  deflation_test to demonstrate the use of this algorithm.
+
+- Implemented Lanczos eigenvector solver (no unit test yet for
+  demonstrating this - presently only hooked into the CPS).
+
+- Implemented initial support for communication-avoiding s-step
+  solvers: CG - QUDA_MPCG_INVERTER and BiCGstab -
+  QUDA_MPBICGSTAB_INVERTER.  Only proof of concept at the moment and
+  need to be optimized.
+
+- Implemented initial support for overlapping domain-decomposition
+  preconditioners.  Presently only proof of concept and needs further
+  development.
+
+- Implemented initial support for applying different phases to a gauge
+  field.  Presently only proof of concept and needs further
+  development.  Will be useful for minimizing memory and PCIe traffic
+  in staggered HMC.
+
+- Implemented support for computation of the gauge field plaquette.
+
+- Implemented initial support for fermion-field contractions.
+
+- Added support for the CGNE solver, to complement the already
+  existing CGNR.
+
+- Improvements to stability and robustness of the solvers in mixed
+  precision.  QUDA will default to always using a high precision
+  solution accumulator since this drastically improves convergence,
+  especially using half precision.
+
+- Improved the stability and robustness of CG when used in combination
+  with the Fermilab heavy-quark residual stopping criterion.  This has
+  been validated against the MILC implementation.
+
+- Separated dslash_quda.cu into multiple files to allow for parallel
+  building to increase compilation speed.
+
+- Added interface support for Luescher's chiral basis for fermion
+  fields: page 11 of doc/dirac.ps in the DD-HMC code package
+  http://luscher.web.cern.ch/luscher/DD-HMC.  This is selected through
+  setting QudaInvertParam::gamma_basis = QUDA_CHIRAL_GAMMA_BASIS.
+
+- QUDA will now complain and exit if it detects that a stale tunecache
+  is being used.
+
+- Removed official support for obsolete compute capabilities 1.1 and
+  1.2.  This makes the minimum supported device compute capability 1.3
+  (GT200).
+
+- Multiple bug fixes that affects stability and correctness throughout
+  the library.  Many of these fixes are listed here:
+  https://github.com/lattice/quda/issues?q=milestone%3A%22QUDA+0.7.0+%22+is%3Aclosed.
+
+- Although not strictly related to this release, we have started to
+  collect common running settings and hints in the QUDA wiki:
+  https://github.com/lattice/quda/wiki.
+
 
 Version 0.6.1 - 10th March 2014
 
@@ -17,7 +187,7 @@ Version 0.6.0 - 23rd January 2014
 - Support for reconstruct 9/13 for the long link in HISQ fermions.
   This provides up to a 25% speedup over using no reconstruction.
   Owing to architecture constraints, reconstruct 9/13 is not supported
-  on "Tesla" architectures, and is only supported on superceding
+  on "Tesla" architectures, and is only supported on superseding
   architectures (Fermi, Kepler, etc.).
 
 - Implemented the long link calculation for HISQ and asqtad fermions.
@@ -28,7 +198,7 @@ Version 0.6.0 - 23rd January 2014
   field by a given step size using a momentum field.  This is exposed
   as the function updateGaugeFieldQuda(...).
 
-- Added support for qdpjit field ordering.  When used in conjuction
+- Added support for qdpjit field ordering.  When used in conjunction
   with the device interface, this allows Chroma (when compiled using
   qdpjit) to avoid all CPU <-> GPU transfers.
 
@@ -61,13 +231,13 @@ Version 0.6.0 - 23rd January 2014
   memory footprint.
 
 - The source vector is now scaled such that it is equal to unity.
-  This prevents underflow from occuring when the source vector is too
+  This prevents underflow from occurring when the source vector is too
   small.
 
 - Fixed double precision definition of *= vector operator, which caused a
   truncation to single precision for certain solver types.
 
-- Fixed memory overalloction when doing clover fermions in half precision.
+- Fixed memory overallocation when doing clover fermions in half precision.
 
 - Memory leak fix to clover fermions.
 
@@ -181,7 +351,7 @@ Version 0.5.0 - 20 March 2013
     MATDAG_MAT       NORMOP        Solve (A^dag A) x = b
 
     An even/odd preconditioned (PC) solution_type generally requires a PC
-    solve_type and vice versa.  As an exception, the unpreconditioned
+    solve_type and vice versa.  As an exception, the un-preconditioned
     MAT solution_type may be used with any solve_type, including
     DIRECT_PC and NORMOP_PC.
 
@@ -409,7 +579,7 @@ Version 0.2.4 - 22 June 2010
 
 
 Version 0.2.3 - 2 June 2010
- 
+
 - Further improved performance of the blas routines.
 
 - Added 3D Wilson Dslash in anticipation of temporal preconditioning.
@@ -453,4 +623,3 @@ Version 0.2 - 16 December 2009
 Version 0.1 - 17 November 2009
 
 - Initial public release.
-

@@ -41,7 +41,6 @@ namespace quda {
       FillV<Float,nSpin,nColor,24,order>(V,B);
     } else if (Nvec == 48) {
       FillV<Float,nSpin,nColor,48,order>(V,B);
-    }
     } else {
       errorQuda("Unsupported Nvec %d", Nvec);
     }
@@ -220,6 +219,8 @@ namespace quda {
       //Take the block-ordered offset from the coarse grid offset (geo_map) 
       //A.S.: geo_map introduced for the full site ordering, so ok to use it for the offset
       int offset = geo_map[i]*nVec*geoBlockSize*in.Ncolor();
+
+      const int s = 0;
 
       for (int v=0; v<in.Nvec(); v++) {
         for (int c=0; c<in.Ncolor(); c++) {

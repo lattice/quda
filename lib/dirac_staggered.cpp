@@ -63,7 +63,7 @@ namespace quda {
       errorQuda("Not supported");
     }  
 
-    flops += 654ll*in.Volume();
+    flops += 570ll*in.Volume();
   }
 
   void DiracStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -81,7 +81,7 @@ namespace quda {
       errorQuda("Not supported");
     }  
 
-    flops += 666ll*in.Volume();
+    flops += 582ll*in.Volume();
   }
 
   // Full staggered operator
