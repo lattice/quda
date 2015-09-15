@@ -409,13 +409,8 @@ int main(int argc, char **argv)
 
       double time1 = -((double)clock());
 
-<<<<<<< HEAD
       inv_param.cuda_prec_sloppy = cuda_prec; //QUDA_DOUBLE_PRECISION;
       incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, NULL, 0);
-=======
-    inv_param.cuda_prec_sloppy = cuda_prec_sloppy; 
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, 0);
->>>>>>> develop
 
       time1 += clock();
       time1 /= CLOCKS_PER_SEC;
@@ -455,13 +450,8 @@ int main(int argc, char **argv)
 
       double time1 = -((double)clock());
 
-<<<<<<< HEAD
       inv_param.cuda_prec_sloppy = cuda_prec_sloppy;//QUDA_SINGLE_PRECISION;
       incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, NULL, last_rhs);
-=======
-    inv_param.cuda_prec_sloppy = cuda_prec_precondition;//QUDA_HALF_PRECISION
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, inverse_ritzVals, last_rhs);
->>>>>>> develop
   
       time1 += clock();
       time1 /= CLOCKS_PER_SEC;
@@ -570,14 +560,6 @@ int main(int argc, char **argv)
   endQuda();
 
   // finalize the communications layer
-<<<<<<< HEAD
-//#if defined(QMP_COMMS)
-//  QMP_finalize_msg_passing();
-//#elif defined(MPI_COMMS)
-//  MPI_Finalize();
-//#endif
-=======
->>>>>>> develop
   finalizeComms();
 
   return 0;

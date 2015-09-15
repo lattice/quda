@@ -703,7 +703,7 @@ namespace quda {
 
     const double b2 = r2;
 
-    printfQuda("\nInitial residual squred: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
+    printfQuda("\nInitial residual squared: %1.16e, source %1.16e, tolerance %1.16e\n", sqrt(r2), sqrt(normb), param.tol);
 
     //copy the first vector:
     double beta = sqrt(r2);

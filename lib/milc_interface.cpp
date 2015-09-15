@@ -1561,6 +1561,8 @@ void qudaCloverMultishiftInvert(int external_precision,
   return;
 } // qudaCloverMultishiftInvert
 
+#endif
+
 #ifdef GPU_GAUGE_ALG
 
 void qudaGaugeFixingOVR( int precision,

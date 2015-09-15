@@ -1217,14 +1217,10 @@ void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * c
     for (int i = 0; i < m; i++) accum = (accum + harmH[ldH*j+i]*em[(ipiv[i])-1]);
   } 
 
-  printf("\nDone for: stage 1\n"); 
-
   // 2. Construct matrix for harmonic Ritz vectors:
   //    Adjust last column with KroneckerProd((H^{-H}*beta*em)=em, em^{T}=[0,....,1]):
 
   for(int i = 0; i < m; i++) harmH[ldH*(m-1)+i] += em[i]; 
-
-  printf("\nDone for: stage 2\n");
 
   free(ipiv);
   //
