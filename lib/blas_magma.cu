@@ -1079,14 +1079,15 @@ void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const
   if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
 
   if(work) free(work);
-
+#endif
   return;
 }
 
 //temporary hack: need to extract Q-matrix.
-
+#if 0
 void restoreOrthVectors(Complex * vnev,  const int nev, Complex  *QR, const int n, const int ldn, Complex *tau)
 {
+#ifdef MAGMA_LIB
   int _n   = n;//vector size
 
   int _k   = nev;
@@ -1129,7 +1130,7 @@ void restoreOrthVectors(Complex * vnev,  const int nev, Complex  *QR, const int 
 #endif
   return;
 }
-
+#endif
 
 void BlasMagmaArgs::LeftConjZUNMQR(const int k /*number of reflectors*/, const int n /*number of columns of H*/, Complex *H, const int dh /*number of rows*/, 
 const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
