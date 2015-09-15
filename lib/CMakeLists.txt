@@ -38,7 +38,7 @@ set (QUDA_OBJS
 	pgauge_init.cu pgauge_heatbath.cu random.cu
 	gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
 	pgauge_det_trace.cu clover_outer_product.cu
-	clover_sigma_outer_product.cu
+	clover_sigma_outer_product.cu version.cpp
 
 )
 
@@ -46,4 +46,14 @@ include_directories(dslash_core)
 include_directories(.)
 cuda_add_library(quda STATIC ${QUDA_OBJS})
 
-add_library(quda_fortran OBJECT EXCLUDE_FROM_ALL quda_fortran.F90 )
+# this is not working as intended
+add_library(quda_fortran STATIC EXCLUDE_FROM_ALL quda_fortran.F90 )
+
+
+add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Generating dslash_core files" )
+
+add_custom_target(mpi_nvtx ${PYTHON_EXECUTABLE} generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Generating mpi_nvtx wrapper" )

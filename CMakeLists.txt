@@ -393,6 +393,7 @@ IF(GIT_FOUND)
 # we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but that might not always be available
   execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND wc -l OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+  add_definitions(-DGITVERSION="${GITVERSION}")
   IF(GITCOUNT EQUAL 0)
     SET(DEFBUILD Release)
   ELSE()
