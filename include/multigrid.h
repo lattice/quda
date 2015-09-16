@@ -99,6 +99,9 @@ namespace quda {
     /** TimeProfile for the smoother */
     TimeProfile profile_smoother;
 
+    /** Prefix label used for printf at this level */
+    char prefix[128];
+
     /** This is the next lower level */
     MG *coarse;
 

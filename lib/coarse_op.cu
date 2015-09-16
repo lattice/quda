@@ -478,10 +478,10 @@ namespace quda {
         computeVUV<Float,3>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       }
 
-      printf("UV2[%d] = %e\n", d, UV.norm2());
-      printf("Y2[%d] = %e\n", d, Y.norm2(d));
+      printfQuda("UV2[%d] = %e\n", d, UV.norm2());
+      printfQuda("Y2[%d] = %e\n", d, Y.norm2(d));
     }
-    printf("X2 = %e\n", X.norm2(0));
+    printfQuda("X2 = %e\n", X.norm2(0));
     printfQuda("Computing coarse diagonal\n");
     createCoarseLocal<Float>(X, nDim, xc_size, kappa);
 
@@ -489,14 +489,14 @@ namespace quda {
     if (C != NULL) {
       printfQuda("Computing fine->coarse clover term\n");
       createCoarseClover<Float>(X, V, *C, nDim, x_size, xc_size, geo_bs, spin_bs);
-      printf("X2 = %e\n", X.norm2(0));
+      printfQuda("X2 = %e\n", X.norm2(0));
     }
     //Otherwise, we have a fine Wilson operator.  The "clover" term for the Wilson operator
     //is just the identity matrix.
     else {
       addCoarseDiagonal<Float>(X, nDim, xc_size);
     }
-    printf("X2 = %e\n", X.norm2(0));
+    printfQuda("X2 = %e\n", X.norm2(0));
 
 }
 
