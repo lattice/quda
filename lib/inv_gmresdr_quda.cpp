@@ -18,14 +18,11 @@
 #include <blas_magma.h>
 #include <algorithm>
 
-#define DEBUG_MODE
-
-#define MAX_EIGENVEC_WINDOW 64
 
 /*
 GMRES-DR algorithm:
 R. B. Morgan, "GMRES with deflated restarting", SIAM J. Sci. Comput. 24 (2002) p. 20-37
-Code design based on: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES in Lattice QCD simulations" ArXiv hep-lat/1204.5463
+See also: A.Frommer et al, "Deflation and Flexible SAP-Preconditioning of GMRES in Lattice QCD simulations" ArXiv hep-lat/1204.5463
 */
 
 namespace quda {
@@ -501,12 +498,6 @@ namespace quda {
     DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), gmres_space_prec(QUDA_INVALID_PRECISION), 
     Vm(0), profile(profile), args(0), gmres_alloc(false)
  {
-     if(param.nev > MAX_EIGENVEC_WINDOW )
-     { 
-          warningQuda("\nWarning: the eigenvector window is too big, using default value %d.\n", MAX_EIGENVEC_WINDOW);
-          param.nev = MAX_EIGENVEC_WINDOW;
-     }
-
      //if(param.precision != param.precision_sloppy) errorQuda("\nMixed precision GMResDR is not currently supported.\n");
      //
      gmres_space_prec = param.precision_sloppy;//We don't allow half precision, do we?
