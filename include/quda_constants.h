@@ -28,3 +28,10 @@
  * @brief Maximum length of the Ls dimension for domain-wall fermions
  */
 #define QUDA_MAX_DWF_LS 128
+
+/**
+ * @def QUDA_MAX_MG_LEVEL
+ * @brief Maximum number of multi-grid levels.  This number may be
+ * changed if need be.
+ */
+#define QUDA_MAX_MG_LEVEL 3

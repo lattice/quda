@@ -138,8 +138,8 @@ namespace quda {
       printfQuda("Creating next multigrid level\n");
       param_coarse = new MGParam(param, *B_coarse, *matCoarse, *matCoarse);
       for (int i=0; i<4; i++) param_coarse->geoBlockSize[i] = 2;
-      param_coarse->nu_pre = 8; // set the number of pre-smoothing applications 
-      param_coarse->nu_post = 8; // set the number of pre-smoothing applications 
+      param_coarse->nu_pre = param.nu_pre; // set the number of pre-smoothing applications 
+      param_coarse->nu_post = param.nu_post; // set the number of pre-smoothing applications 
       param_coarse->spinBlockSize = 1;
       param_coarse->level++;
       param_coarse->fine = this;
@@ -326,11 +326,9 @@ namespace quda {
 
   //supports seperate reading or single file read
   void loadVectors(std::vector<ColorSpinorField*> &B) {
-    printfQuda("Start loading %d vectors from %s\n", nvec, vecfile);
+    const int Nvec = B.size();
+    printfQuda("Start loading %d vectors from %s\n", Nvec, vecfile);
 
-    if (nvec < 1 || nvec > 50) errorQuda("nvec not set");
-
-    const int Nvec = nvec;
 
     void **V = new void*[Nvec];
     for (int i=0; i<Nvec; i++) { 
@@ -357,7 +355,7 @@ namespace quda {
       printfQuda("Using %d constant nullvectors\n", Nvec);
       //errorQuda("No nullspace file defined");
 
-      for (int i = 0; i < (nvec < 2 ? nvec : 2); i++) {
+      for (int i = 0; i < (Nvec < 2 ? Nvec : 2); i++) {
 	blas::zero(*B[i]);
 #if 1
 	ColorSpinorParam csParam(*B[i]);
@@ -379,7 +377,7 @@ namespace quda {
 	//for (int x=0; x<B[i]->Volume(); x++) static_cast<cpuColorSpinorField*>(B[i])->PrintVector(x);
       }
 
-      for (int i=2; i<nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
+      for (int i=2; i<Nvec; i++) B[i] -> Source(QUDA_RANDOM_SOURCE);
     }
 
     printfQuda("Done loading vectors\n");

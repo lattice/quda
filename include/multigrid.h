@@ -6,10 +6,7 @@
 #include <vector>
 #include <complex_quda.h>
 
-#define QUDA_MAX_MG_LEVEL 3
-
 extern char vecfile[];
-extern int nvec; 
   
 namespace quda {
 

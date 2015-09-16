@@ -2450,8 +2450,9 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 
 #define LOAD_NVECS
 
-void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
+void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
 {
+  QudaInvertParam *param = mg_param->invert_param;
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
@@ -2608,12 +2609,12 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
   
   profileInvert.TPSTART(QUDA_PROFILE_INIT);
-  printfQuda("Creating vector of null space fields of length %d\n", nvec);
+  printfQuda("Creating vector of null space fields of length %d\n", mg_param->n_vec[0]);
   cpuParam.create = QUDA_ZERO_FIELD_CREATE;
   cpuParam.precision = param->cuda_prec_sloppy;
   std::vector<ColorSpinorField*>B;
-  B.resize(nvec);
-  for (int i=0; i<nvec; i++) {
+  B.resize(mg_param->n_vec[0]);
+  for (int i=0; i<mg_param->n_vec[0]; i++) {
     B[i] = new cpuColorSpinorField(cpuParam);
   }
 
@@ -2631,14 +2632,14 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // fill out the MG parameters for the fine level
   MGParam mgParam(*param, B, mSloppy, mSloppy);  
   mgParam.level = 1;         // set this level
-  mgParam.Nlevel = 3;        // total number of levels
+  mgParam.Nlevel = mg_param->n_level;        // total number of levels
   // set the block size
-  for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = 4;
+  for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = mg_param->geo_block_size[0][i];
   mgParam.spinBlockSize = 2;
-  mgParam.Nvec = nvec;       // set number of null space components
-  mgParam.nu_pre = 8; // set the number of pre-smoothing applications
-  mgParam.nu_post = 8; // set the number of pre-smoothing applications  
-  mgParam.smoother = QUDA_MR_INVERTER;  // set the smoother type
+  mgParam.Nvec = mg_param->n_vec[0];       // set number of null space components
+  mgParam.nu_pre = mg_param->nu_pre[0]; // set the number of pre-smoothing applications
+  mgParam.nu_post = mg_param->nu_post[0]; // set the number of pre-smoothing applications  
+  mgParam.smoother = mg_param->smoother[0];  // set the smoother type
 
   // create the MG preconditioner
   Solver *K = new MG(mgParam, profileInvert);
@@ -2655,7 +2656,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   // delete K; // GCR presently deletes the preconditioner
   solverParam.updateInvertParam(*param);
 
-  for (int i=0; i<nvec; i++) delete B[i];
+  for (int i=0; i<mg_param->n_vec[0]; i++) delete B[i];
 
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = blas::norm2(*x);

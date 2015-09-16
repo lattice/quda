@@ -287,6 +287,31 @@ extern "C" {
   } QudaEigParam;
 
     
+  typedef struct QudaMultigridParam_s {
+
+    QudaInvertParam *invert_param;
+
+    /** Number of multigrid levels */
+    int n_level;
+
+    /** Geometric block sizes to use on each level */
+    int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
+
+    /** Number of null-space vectors to use on each level */
+    int n_vec[QUDA_MAX_MG_LEVEL];
+
+    /** Number of pre-smoother applications on each level */
+    int nu_pre[QUDA_MAX_MG_LEVEL];
+
+    /** Number of post-smoother applicaitons on each level */
+    int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Smoother / solver to use on each level */
+    QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+  } QudaMultigridParam;
+
+
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -517,7 +542,7 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void multigridQuda(void *h_x, void *h_b, QudaInvertParam *param);
+  void multigridQuda(void *h_x, void *h_b, QudaMultigridParam *param);
 
   /**
    * Deflated solvers interface (e.g., based on invremental deflation space constructors, like incremental eigCG).

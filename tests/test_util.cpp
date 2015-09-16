@@ -1595,6 +1595,11 @@ QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 int gpu_prolongate = 0;
 int mg_levels = 2;
 
+int nu_pre = 2;
+int nu_post = 2;
+
+int geo_block_size[] = {4, 4, 4, 4, 4};
+
 static int dim_partitioned[4] = {0,0,0,0};
 
 int dimPartitioned(int dim)
@@ -1616,12 +1621,14 @@ void usage(char** argv )
   printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n"); 
   printf("    --recon_sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n"); 
   printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
-  printf("    --sdim <n>                                # Set space dimention(X/Y/Z) size\n"); 
+  printf("    --dim <n>                                 # Set space-time dimension (X Y Z T)\n"); 
+  printf("    --sdim <n>                                # Set space dimension(X/Y/Z) size\n"); 
   printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
   printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
   printf("    --Lsdim <n>                               # Set Ls dimension size(default 16)\n");  
+  printf("    --gridsize <x y z t>                      # Set the grid size in all four dimension (default 1 1 1 1)\n");
   printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
   printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
   printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
@@ -1635,7 +1642,8 @@ void usage(char** argv )
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --inv_type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
-  printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified))\n");
+  printf("    --precon_type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
+	 "                                                  For multigrid this sets the smoother type.\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass)\n");
@@ -1645,11 +1653,15 @@ void usage(char** argv )
   printf("    --tune <true/false>                       # Whether to autotune or not (default true)\n");     
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
-  printf("    --nvec                                    # Number of vectors to load\n");
-  printf("    --gpu-prolongate <true/false>             # Whether to do the transfer operators on the GPU (default false)\n");
+  printf("    --mg-nvec                                 # Number of null-space vectors to define the multigrid transfer operator at each level\n");
+  printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
-  printf("    --load-vec file                           # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
+  printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
+  printf("    --mg-block-size <x y z t>                 # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
+  printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --help                                    # Print out this message\n"); 
+
   usage_extra(argv); 
 #ifdef MULTI_GPU
   char msg[]="multi";
@@ -1750,6 +1762,51 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
   
+  if( strcmp(argv[i], "--dim") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    xdim= atoi(argv[i+1]);
+    if (xdim < 0 || xdim > 512){
+      printf("ERROR: invalid X dimension (%d)\n", xdim);
+      usage(argv);
+    }
+    i++;
+
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    ydim= atoi(argv[i+1]);
+    if (ydim < 0 || ydim > 512){
+      printf("ERROR: invalid Y dimension (%d)\n", ydim);
+      usage(argv);
+    }
+    i++;
+
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    zdim= atoi(argv[i+1]);
+    if (zdim < 0 || zdim > 512){
+      printf("ERROR: invalid Z dimension (%d)\n", zdim);
+      usage(argv);
+    }
+    i++;
+
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    tdim= atoi(argv[i+1]);
+    if (tdim < 0 || tdim > 512){
+      printf("ERROR: invalid T dimension (%d)\n", tdim);
+      usage(argv);
+    }
+    i++;
+
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--xdim") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -1799,7 +1856,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }	    
     tdim =  atoi(argv[i+1]);
     if (tdim < 0 || tdim > 512){
-      errorQuda("Error: invalid t dimension");
+      printf("Error: invalid t dimension");
+      usage(argv);
     }
     i++;
     ret = 0;
@@ -1812,7 +1870,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }	    
     int sdim =  atoi(argv[i+1]);
     if (sdim < 0 || sdim > 512){
-      printfQuda("ERROR: invalid S dimension\n");
+      printf("ERROR: invalid S dimension\n");
+      usage(argv);
     }
     xdim=ydim=zdim=sdim;
     i++;
@@ -1826,7 +1885,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }	    
     int Ls =  atoi(argv[i+1]);
     if (Ls < 0 || Ls > 128){
-      printfQuda("ERROR: invalid Ls dimension\n");
+      printf("ERROR: invalid Ls dimension\n");
+      usage(argv);
     }
     Lsdim=Ls;
     i++;
@@ -1905,7 +1965,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--gpu-prolongate") == 0){
+  if( strcmp(argv[i], "--mg-gpu-prolongate") == 0){
     if (i+1 >= argc){
       usage(argv);
     }	    
@@ -1915,11 +1975,51 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }else if (strcmp(argv[i+1], "false") == 0){
       gpu_prolongate = false;
     }else{
-      fprintf(stderr, "ERROR: invalid gpu-prolongate boolean\n");	
+      fprintf(stderr, "ERROR: invalid mg-gpu-prolongate boolean\n");	
       exit(1);
     }
 
     i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--gridsize") == 0){
+    if (i+1 >= argc){ 
+      usage(argv);
+    }     
+    int xsize =  atoi(argv[i+1]);
+    if (xsize <= 0 ){
+      printf("ERROR: invalid X grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[0] = xsize;
+    i++;
+
+    int ysize =  atoi(argv[i+1]);
+    if (ysize <= 0 ){
+      printf("ERROR: invalid Y grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[1] = ysize;
+    i++;
+
+    int zsize =  atoi(argv[i+1]);
+    if (zsize <= 0 ){
+      printf("ERROR: invalid Z grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[2] = zsize;
+    i++;
+
+    int tsize =  atoi(argv[i+1]);
+    if (tsize <= 0 ){
+      printf("ERROR: invalid T grid size");
+      usage(argv);
+    }
+    gridsize_from_cmdline[3] = tsize;
+    i++;
+
     ret = 0;
     goto out;
   }
@@ -1930,7 +2030,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }     
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
-      errorQuda("ERROR: invalid X grid size");
+      printf("ERROR: invalid X grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[0] = xsize;
     i++;
@@ -1944,7 +2045,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }     
     int ysize =  atoi(argv[i+1]);
     if (ysize <= 0 ){
-      errorQuda("ERROR: invalid Y grid size");
+      printf("ERROR: invalid Y grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[1] = ysize;
     i++;
@@ -1958,7 +2060,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }     
     int zsize =  atoi(argv[i+1]);
     if (zsize <= 0 ){
-      errorQuda("ERROR: invalid Z grid size");
+      printf("ERROR: invalid Z grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[2] = zsize;
     i++;
@@ -1972,7 +2075,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }     
     int tsize =  atoi(argv[i+1]);
     if (tsize <= 0 ){
-      errorQuda("ERROR: invalid T grid size");
+      printf("ERROR: invalid T grid size");
+      usage(argv);
     }
     gridsize_from_cmdline[3] = tsize;
     i++;
@@ -2090,7 +2194,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;	    
   }
     
-  if( strcmp(argv[i], "--nvec") == 0){
+  if( strcmp(argv[i], "--mg-nvec") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
@@ -2108,12 +2212,80 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    nvec= atoi(argv[i+1]);
-    if (mg_levels < 2 || mg_levels > 4){
+    mg_levels= atoi(argv[i+1]);
+    if (mg_levels < 2 || mg_levels > QUDA_MAX_MG_LEVEL){
       printf("ERROR: invalid number of multigrid levels (%d)\n", mg_levels);
       usage(argv);
     }
     i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-nu-pre") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    nu_pre= atoi(argv[i+1]);
+    if (nu_pre < 0 || nu_pre > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_pre=%d)\n", nu_pre);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-nu-post") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    nu_post= atoi(argv[i+1]);
+    if (nu_post < 0 || nu_post > 20){
+      printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-block-size") == 0){
+    if (i+1 >= argc){ 
+      usage(argv);
+    }     
+    int xsize =  atoi(argv[i+1]);
+    if (xsize <= 0 ){
+      printf("ERROR: invalid X block size");
+      usage(argv);
+    }
+    geo_block_size[0] = xsize;
+    i++;
+
+    int ysize =  atoi(argv[i+1]);
+    if (ysize <= 0 ){
+      printf("ERROR: invalid Y block size");
+      usage(argv);
+    }
+    geo_block_size[1] = ysize;
+    i++;
+
+    int zsize =  atoi(argv[i+1]);
+    if (zsize <= 0 ){
+      printf("ERROR: invalid Z block size");
+      usage(argv);
+    }
+    geo_block_size[2] = zsize;
+    i++;
+
+    int tsize =  atoi(argv[i+1]);
+    if (tsize <= 0 ){
+      printf("ERROR: invalid T block size");
+      usage(argv);
+    }
+    geo_block_size[3] = tsize;
+    i++;
+
     ret = 0;
     goto out;
   }
