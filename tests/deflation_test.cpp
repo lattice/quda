@@ -424,7 +424,7 @@ int main(int argc, char **argv)
 
   if(inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER) inv_param.max_search_dim = 96;//resize Krylov subspace dimension, not strictly necessary
 
-  for(int is = inv_param.deflation_grid; is < (inv_param.deflation_grid+initCGruns); is++)
+  for(int is = inv_param.deflation_grid; is < (inv_param.deflation_grid+projection_runs); is++)
   {
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
     {
@@ -438,7 +438,7 @@ int main(int argc, char **argv)
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
-    if(is == (inv_param.deflation_grid+initCGruns-1)) last_rhs = 1;
+    if(is == (inv_param.deflation_grid+projection_runs-1)) last_rhs = 1;
 
     double time1 = -((double)clock());
 
