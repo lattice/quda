@@ -175,6 +175,8 @@ namespace quda {
     if (param_coarse) delete param_coarse;
     if (param_presmooth) delete param_presmooth;
     if (param_postsmooth) delete param_postsmooth;
+
+    if (getVerbosity() >= QUDA_VERBOSE) profile_smoother.Print();
   }
 
   /**

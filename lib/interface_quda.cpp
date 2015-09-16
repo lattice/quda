@@ -2315,8 +2315,6 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.sp_pad = 0; // 24*24*24/2;
    inv_param.cl_pad = 0; // 24*24*24/2;
 
-   double anisotropy = 1.0;
-   double mass       = -0.4125; //?
    inv_param.kappa   = mg_inv_param->kappa;//1.0 / (2.0 * (1 + 3/anisotropy + mass));
 ///////////////////////////////////////////////////
    pushVerbosity(inv_param.verbosity);
@@ -2655,6 +2653,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
   (*solve)(*out, *in);
   delete solve;
   // delete K; // GCR presently deletes the preconditioner
+  solverParam.updateInvertParam(*param);
 
   for (int i=0; i<nvec; i++) delete B[i];
 

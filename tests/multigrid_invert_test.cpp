@@ -154,6 +154,7 @@ int main(int argc, char **argv)
   inv_param.dslash_type = dslash_type;
 
   //Free field!
+  inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
