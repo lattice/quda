@@ -424,6 +424,22 @@ namespace quda {
     param.create = QUDA_INVALID_FIELD_CREATE;
   }
 
+  bool ColorSpinorField::isNative() const {
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
+    } else if (precision == QUDA_SINGLE_PRECISION || 
+	       precision == QUDA_HALF_PRECISION) {
+      if (nSpin == 4) {
+	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
+      } else if (nSpin == 2) {
+	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
+      } else if (nSpin == 1) {
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+      }
+    }
+    return false;
+  }
+
   // For kernels with precision conversion built in
   void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b) {
     if (a.Length() != b.Length()) {
@@ -554,6 +570,11 @@ namespace quda {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
     coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin 
+    if (isNative()) {
+      coarseParam.fieldOrder = (coarseParam.nSpin==1 || coarseParam.precision==QUDA_DOUBLE_PRECISION) ?
+	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    }
+
     coarseParam.nColor = Nvec;
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -578,6 +599,10 @@ namespace quda {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
     fineParam.nSpin = nSpin * spinBlockSize;
+    if (isNative()) {
+      fineParam.fieldOrder = (fineParam.nSpin==1 || fineParam.precision==QUDA_DOUBLE_PRECISION) ?
+	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    }
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
     fineParam.create = QUDA_ZERO_FIELD_CREATE;

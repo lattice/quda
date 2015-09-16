@@ -270,14 +270,11 @@ namespace quda {
     void genericCopyColorSpinor(InOrder &inOrder, ColorSpinorField &out, 
 				QudaGammaBasis inBasis, QudaFieldLocation location, 
 				FloatOut *Out, float *outNorm) {
-    if (out.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-      FloatNOrder<FloatOut, Ns, Nc, 4> outOrder(out, Out, outNorm);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
-    } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      FloatNOrder<FloatOut, Ns, Nc, 2> outOrder(out, Out, outNorm);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
+
+    if (out.isNative()) {
+      typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
+      ColorSpinor outOrder(out, Out, outNorm);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
@@ -307,11 +304,10 @@ namespace quda {
     void genericCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, 
 				QudaFieldLocation location, FloatOut *Out, FloatIn *In, 
 				float *outNorm, float *inNorm) {
-    if (in.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-      FloatNOrder<FloatIn, Ns, Nc, 4> inOrder(in, In, inNorm);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-    } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      FloatNOrder<FloatIn, Ns, Nc, 2> inOrder(in, In, inNorm);
+
+    if (in.isNative()) {
+      typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
+      ColorSpinor inOrder(in, In, inNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
@@ -450,7 +446,7 @@ namespace quda {
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());
 #endif
     } else if (dst.Nspin() == 2) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
       copyGenericColorSpinor<2>(dst, src, location, Dst, Src, dstNorm, srcNorm);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());

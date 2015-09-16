@@ -123,10 +123,10 @@ namespace quda {
     void setPrecision(QudaPrecision precision) {
       // is the current status in native field order?
       bool native = false;
-      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin ==1) && 
+      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1) && 
 	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
 	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION) && 
-	    nSpin ==4 && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
+	    (nSpin==4 || nSpin==2) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 	   
       this->precision = precision;
 
@@ -287,6 +287,12 @@ namespace quda {
     const void* V() const {return v;}
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
+
+    /**
+       This function returns true if the field is stored in an
+       internal field order for the given precision.
+    */ 
+    bool isNative() const;
 
     //! for eigcg only:
     int EigvDim() const { return eigv_dim; }
