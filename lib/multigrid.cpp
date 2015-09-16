@@ -5,8 +5,8 @@
 namespace quda {  
 
   MG::MG(MGParam &param, TimeProfile &profile) 
-    : Solver(param, profile), param(param), presmoother(0), postsmoother(0), coarse(0), fine(param.fine), 
-      param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), 
+    : Solver(param, profile), param(param), presmoother(0), postsmoother(0), profile_smoother("Smoother"), 
+      coarse(0), fine(param.fine), param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), 
       diracCoarse(0), matCoarse(0) {
 
     printfQuda("MG: Creating level %d of %d levels\n", param.level, param.Nlevel);
@@ -34,7 +34,7 @@ namespace quda {
       param_presmooth->delta = 1e-7;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
-				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
+				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile_smoother);
 
     if (param.level < param.Nlevel) {
 
@@ -49,7 +49,7 @@ namespace quda {
       param_postsmooth->Nkrylov = 4;
       param_postsmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
       postsmoother = Solver::create(*param_postsmooth, param_postsmooth->matResidual, 
-				    param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile);
+				    param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile_smoother);
     }
 
     // create residual vectors
@@ -261,7 +261,7 @@ namespace quda {
     if (param.level < param.Nlevel) {
       
       // do the pre smoothing
-      printfQuda("MG: level %d, pre smoothing b2=%e\n", param.level, blas::norm2(b));
+      printfQuda("MG: level %d, pre-smoothing b2=%e\n", param.level, blas::norm2(b));
       (*presmoother)(x, b);
 
       // FIXME - residual computation should be in the previous smoother

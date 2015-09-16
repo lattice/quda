@@ -96,6 +96,9 @@ namespace quda {
     /** This is the smoother used */
     Solver *presmoother, *postsmoother;
 
+    /** TimeProfile for the smoother */
+    TimeProfile profile_smoother;
+
     /** This is the next lower level */
     MG *coarse;
 
