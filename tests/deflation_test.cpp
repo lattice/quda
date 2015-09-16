@@ -191,14 +191,14 @@ int main(int argc, char **argv)
     inv_param.nev = 8; 
     inv_param.max_search_dim = 128;
     inv_param.deflation_grid = 24;//to test the stuff
-    inv_param.cuda_prec_ritz = cuda_prec;
+    inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
   }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     inv_param.nev = 31;
     inv_param.max_search_dim = 95;
     inv_param.deflation_grid = 320;//to test the stuff
-    inv_param.cuda_prec_ritz = cuda_prec;
+    inv_param.cuda_prec_ritz = cuda_prec_sloppy;
 //    inv_param.cuda_prec_ritz = cuda_prec_sloppy;//for the mixed precision uncomment this line, be sure that ((inv_param.nev + 1) % 16) = 0 is satisfied
     inv_param.tol_restart = 0.0;//restart is not requested...
   }  
@@ -382,92 +382,75 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
   // perform the inversions
-  printfQuda("\nStart the incremental stage.\n");
+  if( inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) printfQuda("\nStart the incremental stage.\n");
+  //!
 
-<<<<<<< HEAD
- //!
-  if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER)
-=======
   for(int is = 0; is < inv_param.deflation_grid; is++)
->>>>>>> develop
   {
-    //for(int is = 0; (is < inv_param.deflation_grid || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER); is++)
-    for(int is = 0; is < inv_param.deflation_grid; is++)
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
     {
-      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
-      {
-        for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-      }
-      else
-      {
-        memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-        memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+    }
+    else
+    {
+      memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+      memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
 
-        for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-        //for (int i=0; i<inv_param.Ls*24*24*24*spinorSiteSize; i++) ((double*)spinorIn)[i] = comm_rank() == 0 ? rand() / (double)RAND_MAX: 0.0;
-      }
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+      //for (int i=0; i<inv_param.Ls*24*24*24*spinorSiteSize; i++) ((double*)spinorIn)[i] = comm_rank() == 0 ? rand() / (double)RAND_MAX: 0.0;
+    }
 
-      double time1 = -((double)clock());
+    double time1 = -((double)clock());
 
-      inv_param.cuda_prec_sloppy = cuda_prec; //QUDA_DOUBLE_PRECISION;
-      incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, NULL, 0);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, 0);
 
-      time1 += clock();
-      time1 /= CLOCKS_PER_SEC;
+    time1 += clock();
+    time1 /= CLOCKS_PER_SEC;
 
-      printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
+    printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
          inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time1);
      
-      printfQuda("\n Current RHS : %d\n", inv_param.rhs_idx);
+    printfQuda("\n Current RHS : %d\n", inv_param.rhs_idx);
 
-      if(inv_param.inv_type == QUDA_GMRESDR_INVERTER || inv_param.inv_type == QUDA_EIGCG_INVERTER) break;
-    }
+    if(inv_param.inv_type == QUDA_GMRESDR_INVERTER || inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ||  inv_param.inv_type == QUDA_EIGCG_INVERTER) break;
+  }
 
-    printfQuda("\n Total eigCG RHS : %d\n", inv_param.rhs_idx);
+
+  if( inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) printfQuda("\n Total number of RHS in the incremental stage: %d\n", inv_param.rhs_idx);
 //***
-  printfQuda("\nStart the initCG stage.\n");
+  const int projection_runs = (inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) ? 4 : 0; 
 
-    const int initCGruns = 1; 
+  int last_rhs  = 0;
 
-    int last_rhs  = 0;
+  if(inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER) inv_param.max_search_dim = 96;//resize Krylov subspace dimension, not strictly necessary
 
-    for(int is = inv_param.deflation_grid; is < (inv_param.deflation_grid+initCGruns); is++)
+  for(int is = inv_param.deflation_grid; is < (inv_param.deflation_grid+initCGruns); is++)
+  {
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
     {
-      if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
-      {
-        for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-      }
-      else
-      {
-        memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-        memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+    }
+    else
+    {
+      memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+      memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
 
-        for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-        //for (int i=0; i<inv_param.Ls*24*24*24*spinorSiteSize; i++) ((double*)spinorIn)[i] = comm_rank() == 0 ? rand() / (double)RAND_MAX: 0.0;
-      }
-
-      if(is == (inv_param.deflation_grid+initCGruns-1)) last_rhs = 1;
-
-      double time1 = -((double)clock());
-
-      inv_param.cuda_prec_sloppy = cuda_prec_sloppy;//QUDA_SINGLE_PRECISION;
-      incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, NULL, last_rhs);
-  
-      time1 += clock();
-      time1 /= CLOCKS_PER_SEC;
-
-      printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time1);
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
-    printfQuda("\nTotal  InitCG RHS : %d\n", inv_param.rhs_idx);
-  }
-  else //run GMRESDR test
-  {
-    //inv_param.cuda_prec_sloppy = cuda_prec; //QUDA_DOUBLE_PRECISION;
-    inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, NULL, 0);
+    if(is == (inv_param.deflation_grid+initCGruns-1)) last_rhs = 1;
+
+    double time1 = -((double)clock());
+
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, last_rhs);
+  
+    time1 += clock();
+    time1 /= CLOCKS_PER_SEC;
+
+    printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time1);
   }
 
+  if(projection_runs != 0) printfQuda("\nTotal number of RHS after the projection stage: %d\n", inv_param.rhs_idx);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
