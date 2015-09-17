@@ -405,9 +405,17 @@ IF(NOT CMAKE_BUILD_TYPE)
   # add some git magic here to decide whether we want to do a release or devel build as default
 
   SET(CMAKE_BUILD_TYPE ${DEFBUILD} CACHE STRING
-      "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug"
+      "Choose the type of build, options are: Devel Release Debug HostDebug DeviceDebug"
         FORCE)
 ENDIF(NOT CMAKE_BUILD_TYPE)
+
+set(VALID_BUILD_TYPES DEVEL RELEASE DEBUG HOSTDEBUG DEVICEDEBUG )
+string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
+LIST(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
+
+if(BUILD_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid build type! Valid build types are:" "${VALID_BUILD_TYPES}")
+endif()
 
 ### add tests and quda library
 add_subdirectory(lib)
