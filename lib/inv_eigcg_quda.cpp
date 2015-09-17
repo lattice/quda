@@ -359,11 +359,11 @@ namespace quda {
     {
       for(int j = 0; j < nev; j++) caxpyCuda(hproj[i*nev+j], Vm->Eigenvec(j), *W);
 
-      double  norm2W = normCuda(*W);            
-
       matDefl(*W2, *W, tmp, tmp2);
  
-      Complex dotWW2 = cDotProductCuda(*W, *W2);
+      double3 dotnorm = cDotProductNormACuda(*W, *W2);
+      double norm2W = dotnorm.z;
+      Complex dotWW2 = Complex(dotnorm.x, dotnorm.y);
 
       evals[i] = dotWW2.real() / norm2W;
 
@@ -859,11 +859,11 @@ namespace quda {
      {
          for(int j = 0; j < curr_evals; j++) caxpyCuda(projm[i*dpar->ld+j], dpar->cudaRitzVectors->Eigenvec(j), *W);
 
-         double  norm2W = normCuda(*W);            
-
          matDefl(*W2, *W, tmp, tmp2);
 
-         Complex dotWW2 = cDotProductCuda(*W, *W2);
+	 double3 dotnorm = cDotProductNormACuda(*W, *W2);
+	 double norm2W = dotnorm.z;
+	 Complex dotWW2 = Complex(dotnorm.x, dotnorm.y);
 
          evals[i] = dotWW2.real() / norm2W;
 
@@ -968,12 +968,12 @@ namespace quda {
        
          if(getVerbosity() >= QUDA_VERBOSE)
          {
-             double  norm2W = normCuda(*W);            
-
              matDefl(*W2, *W, tmp, tmp2);
- 
-	     Complex dotWW2 = cDotProductCuda(*W, *W2);
 
+	     double3 dotnorm = cDotProductNormACuda(*W, *W2);
+	     double norm2W = dotnorm.z;
+	     Complex dotWW2 = Complex(dotnorm.x, dotnorm.y);
+	     
              evals[idx] = dotWW2.real() / norm2W;
 
              axCuda(evals[idx], *W);
@@ -1117,13 +1117,18 @@ namespace quda {
        out = &x;
     }
 
-    for(int i = 0; i < dpar->rtz_dim; i++)
+    for(int i = 0; i < dpar->rtz_dim; i+=2)
     {
       Complex tmp = cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(i), *in);//<i, b>
-
       tmp = tmp * dpar->ritz_values[i];
 
-      caxpyCuda(tmp, dpar->cudaRitzVectors->Eigenvec(i), *out); //a*i+x
+      if (i+1 < dpar->rtz_dim) {
+	Complex tmp2 = cDotProductCuda(dpar->cudaRitzVectors->Eigenvec(i+1), *in);//<i, b>
+	tmp2 = tmp2 * dpar->ritz_values[i+1];
+	caxpbypzCuda(tmp, dpar->cudaRitzVectors->Eigenvec(i), tmp2,  dpar->cudaRitzVectors->Eigenvec(i+1), *out);
+      } else {
+	caxpyCuda(tmp, dpar->cudaRitzVectors->Eigenvec(i), *out); //a*i+x
+      }
     } 
 
     if(dpar->cudaRitzVectors->Precision() != x.Precision())
