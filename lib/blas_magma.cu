@@ -8,12 +8,12 @@
 #define MAX(a, b) (a > b) ? a : b;
 #endif
 
-#define MAGMA_15 //version of the MAGMA library
+#define MAGMA_17 //default version version of the MAGMA library
 
 #ifdef MAGMA_LIB
 #include <magma.h>
 
-#if (defined MAGMA_14)
+#ifdef MAGMA_14
 
 #define _cV 'V' 
 #define _cU 'U'
@@ -24,7 +24,7 @@
 #define _cC 'C'
 #define _cN 'N'
 
-#elif (defined MAGMA_15)
+#else
 
 #define _cV MagmaVec 
 #define _cU MagmaUpper
@@ -721,9 +721,17 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
             /* 1) set upper triangle of panel in A to identity,
                2) copy the panel from A to the GPU, and
                3) restore A                                      */
+#ifdef MAGMA_17
+         magma_zpanel_to_q( MagmaUpper, ib, A(i,i), lda, T2 );
+#else
          zpanel_to_q( MagmaUpper, ib, A(i,i), lda, T2 );
+#endif
          magma_zsetmatrix( nq_i,  ib, A(i,i), lda, dV, nq_i );
+#ifdef MAGMA_17
+         magma_zq_to_panel( MagmaUpper, ib, A(i,i), lda, T2 );
+#else
          zq_to_panel( MagmaUpper, ib, A(i,i), lda, T2 );
+#endif
 
          /* H or H**H is applied to C(1:m,i:n) */
          ni = n - i;

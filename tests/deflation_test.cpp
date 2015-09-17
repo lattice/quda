@@ -336,9 +336,11 @@ int main(int argc, char **argv)
 
   const int defl_dim  = inv_param.deflation_grid*inv_param.nev;
 
-  ritzVects = malloc(defl_dim*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
+  size_t bytes = defl_dim*((long long)Vh)*spinorSiteSize*sSize*inv_param.Ls;
 
-  memset(ritzVects, 0, defl_dim*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+  ritzVects = malloc(bytes);
+
+  memset(ritzVects, 0, bytes);
 
   inverse_ritzVals = (double*)malloc(defl_dim*sizeof(double));
 
