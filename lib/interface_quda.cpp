@@ -3035,7 +3035,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
 
     solverParam.updateInvertParam(*param);//will update rhs_idx as well...
     
-    if(last_rhs)
+    if(last_rhs || param->inv_type == QUDA_EIGCG_INVERTER)
     {
       if(_h_u) solve->StoreRitzVecs(_h_u, inv_eigenvals, X, param, param->nev); 
       printfQuda("\nDelete incremental EigCG solver resources...\n");
