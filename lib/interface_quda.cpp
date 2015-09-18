@@ -2275,7 +2275,8 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.tol      = 1e-3;
 
    inv_param.use_init_guess      = QUDA_USE_INIT_GUESS_YES;
-   inv_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+   // removed this from QudaInvertParam so set this by hand below for now
+   //inv_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
 
    inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
    inv_param.reliable_delta    = 1e-7;
@@ -2394,6 +2395,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 
      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
      SolverParam solverParam(inv_param);
+     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
      (*solve)(*out, *in);
      solverParam.updateInvertParam(inv_param);
@@ -2618,7 +2620,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
     B[i] = new cpuColorSpinorField(cpuParam);
   }
 
-  if(param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
+  if(mg_param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES)
   {
      generateNullVectors(B, param);
   }
@@ -2627,19 +2629,8 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
      loadVectors(B);
   }
 
-  param->compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;//just to be safe here
-
   // fill out the MG parameters for the fine level
-  MGParam mgParam(*param, B, mSloppy, mSloppy);  
-  mgParam.level = 1;         // set this level
-  mgParam.Nlevel = mg_param->n_level;        // total number of levels
-  // set the block size
-  for (int i=0; i<4; i++) mgParam.geoBlockSize[i] = mg_param->geo_block_size[0][i];
-  mgParam.spinBlockSize = 2;
-  mgParam.Nvec = mg_param->n_vec[0];       // set number of null space components
-  mgParam.nu_pre = mg_param->nu_pre[0]; // set the number of pre-smoothing applications
-  mgParam.nu_post = mg_param->nu_post[0]; // set the number of pre-smoothing applications  
-  mgParam.smoother = mg_param->smoother[0];  // set the smoother type
+  MGParam mgParam(*mg_param, B, mSloppy, mSloppy);
 
   // create the MG preconditioner
   Solver *K = new MG(mgParam, profileInvert);

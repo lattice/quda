@@ -19,21 +19,66 @@ namespace quda {
 
   /**
      This struct contains all the metadata required to define the
-     multigrid solver
+     multigrid solver.  For each level of multigrid we will have an
+     instance of MGParam describing all the meta data appropriate for
+     given level.
    */
   struct MGParam : SolverParam {
 
-    MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> &B, 
-	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
-    SolverParam(invParam), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
+    /**
+       This is top level instantiation done when we start creating the multigrid operator.
+     */
+    MGParam(const QudaMultigridParam &param, 
+	    std::vector<ColorSpinorField*> &B, 
+	    DiracMatrix &matResidual, 
+	    DiracMatrix &matSmooth,
+	    int level=0) :
+      SolverParam(*(param.invert_param)), 
+      mg_global(param), 
+      level(level),
+      Nlevel(param.n_level),
+      spinBlockSize(param.spin_block_size[level]),
+      Nvec(param.n_vec[level]),
+      B(B), 
+      nu_pre(param.nu_pre[level]),
+      nu_post(param.nu_post[level]),
+      matResidual(matResidual),
+      matSmooth(matSmooth),
+      smoother(param.smoother[level]),
+      location(param.location[level])
+      { 
+	// set the block size
+	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
+      }
 
-    MGParam(const MGParam &param, const std::vector<ColorSpinorField*> &B, 
-	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
-    SolverParam(param), level(param.level), Nlevel(param.Nlevel), spinBlockSize(param.spinBlockSize),
-      Nvec(param.Nvec), coarse(param.coarse), fine(param.fine),  B(B), nu_pre(param.nu_pre), 
-    nu_post(param.nu_post),  matResidual(matResidual), matSmooth(matSmooth), smoother(param.smoother) { 
-      for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geoBlockSize[i];
-    }
+    MGParam(const MGParam &param, 
+	    const std::vector<ColorSpinorField*> &B, 
+	    DiracMatrix &matResidual, 
+	    DiracMatrix &matSmooth,
+	    int level=0) :
+      SolverParam(param),
+      mg_global(param.mg_global),
+      level(level),
+      Nlevel(param.Nlevel),
+      spinBlockSize(param.mg_global.spin_block_size[level]),
+      Nvec(param.mg_global.n_vec[level]),
+      coarse(param.coarse),
+      fine(param.fine),
+      B(B),
+      nu_pre(param.mg_global.nu_pre[level]),
+      nu_post(param.mg_global.nu_post[level]),
+      matResidual(matResidual),
+      matSmooth(matSmooth),
+      smoother(param.mg_global.smoother[level]),
+      location(param.mg_global.location[level])
+      {
+	// set the block size
+	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
+      }
+
+    /** This points to the parameter struct that is passed into QUDA.
+	We use this to set per-level parameters */
+    const QudaMultigridParam  &mg_global;
 
     /** What is the level of this instance */
     int level; 
@@ -71,11 +116,14 @@ namespace quda {
     /** The Dirac operator to use for smoothing */
     DiracMatrix &matSmooth;
 
-    /** Filename for where to load/store the null space */
-    char filename[100];
-
     /** What type of smoother to use */
     QudaInverterType smoother;
+
+    /** Where to compute this level of multigrid */
+    QudaFieldLocation location;
+
+    /** Filename for where to load/store the null space */
+    char filename[100];
   };
 
   /**

@@ -9,13 +9,14 @@ namespace quda {
       coarse(0), fine(param.fine), param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), 
       diracCoarse(0), matCoarse(0) {
 
-    sprintf(prefix,"MG level %d: ", param.level);
+    // for reporting level 1 is the fine level but internally use level 0 for indexing
+    sprintf(prefix,"MG level %d: ", param.level+1);
     setOutputPrefix(prefix);
 
-    printfQuda("Creating level %d of %d levels\n", param.level, param.Nlevel);
+    printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
 
-    if (param.level > QUDA_MAX_MG_LEVEL)
-      errorQuda("Level=%d is greater than limit of multigrid recursion depth", param.level);
+    if (param.level >= QUDA_MAX_MG_LEVEL)
+      errorQuda("Level=%d is greater than limit of multigrid recursion depth", param.level+1);
 
     // create the smoother for this level
     printfQuda("smoother has operator %s\n", typeid(param.matSmooth).name());
@@ -29,17 +30,17 @@ namespace quda {
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
-    if (param.level==param.Nlevel) {
+    if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
       param_presmooth->tol = 1e-3;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-7;
+      param_presmooth->delta = 1e-3;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
 				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile_smoother);
 
-    if (param.level < param.Nlevel) {
+    if (param.level < param.Nlevel-1) {
 
       //Create the post smoother
       param_postsmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
@@ -59,18 +60,17 @@ namespace quda {
     {
       ColorSpinorParam csParam(*(param.B[0]));
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      if (param.level==1) {
+      csParam.location = param.location;
+      if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
 	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
 	csParam.setPrecision(csParam.precision);
 	csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-	r = new cudaColorSpinorField(csParam);
-      } else {
-	r = new cpuColorSpinorField(csParam);	
       }
+      r = ColorSpinorField::Create(csParam);
     }
 
     // if not on the coarsest level, construct it
-    if (param.level < param.Nlevel) {
+    if (param.level < param.Nlevel-1) {
       // create transfer operator
       printfQuda("start creating transfer operator\n");
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize);
@@ -136,33 +136,22 @@ namespace quda {
 
       // create the next multigrid level
       printfQuda("Creating next multigrid level\n");
-      param_coarse = new MGParam(param, *B_coarse, *matCoarse, *matCoarse);
-      for (int i=0; i<4; i++) param_coarse->geoBlockSize[i] = 2;
-      param_coarse->nu_pre = param.nu_pre; // set the number of pre-smoothing applications 
-      param_coarse->nu_post = param.nu_post; // set the number of pre-smoothing applications 
-      param_coarse->spinBlockSize = 1;
-      param_coarse->level++;
+      param_coarse = new MGParam(param, *B_coarse, *matCoarse, *matCoarse, param.level+1);
       param_coarse->fine = this;
-      if (param.level == param.Nlevel-1) param_coarse->smoother = QUDA_GCR_INVERTER;
-      param_coarse->delta = 1e-1;
-      //This is already set in MGParam constructor, but put it here explicitly so it can be changed.
-      param_coarse->Nvec = param.Nvec;
+      param_coarse->delta = 1e-20;
 
       coarse = new MG(*param_coarse, profile);
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
     }
 
-    printfQuda("Setup of level %d completed\n", param.level);
+    printfQuda("setup completed\n");
 
     // now we can run through the verificaion
-    if (param.level < param.Nlevel) {
-      verify();  
-    }
-
+    if (param.level < param.Nlevel-1) verify();  
   }
 
   MG::~MG() {
-    if (param.level < param.Nlevel) {
+    if (param.level < param.Nlevel-1) {
       if (B_coarse) for (int i=0; i<param.Nvec; i++) delete (*B_coarse)[i];
       if (coarse) delete coarse;
       if (transfer) delete transfer;
@@ -218,7 +207,7 @@ namespace quda {
 #endif
 
     printfQuda("\n");
-    printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c (level %d)\n", param.level);
+    printfQuda("Checking 0 = (1 - P^\\dagger P) eta_c\n");
     x_coarse->Source(QUDA_RANDOM_SOURCE);
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
@@ -226,7 +215,7 @@ namespace quda {
     printfQuda("deviation = %e\n", blas::xmyNorm(*x_coarse, *r_coarse));
 
     printfQuda("\n");
-    printfQuda("Comparing native coarse operator to emulated operator (level %d)\n", param.level);
+    printfQuda("Comparing native coarse operator to emulated operator\n");
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
     blas::zero(*tmp_coarse);
     blas::zero(*r_coarse);
@@ -242,7 +231,7 @@ namespace quda {
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
     #if 0
-    if(param.level == 1) {
+    if(param.level == 0) {
       printfQuda("x_coarse\n");
       //static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(0);
       for (int x=0; x<x_coarse->Volume(); x++) if(x<2) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
@@ -267,11 +256,13 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("entering V-cycle with x2=%e, r2=%e\n", blas::norm2(x), blas::norm2(b));
 
-    if (param.level < param.Nlevel) {
+    if (param.level < param.Nlevel-1) {
       
       // do the pre smoothing
       printfQuda("pre-smoothing b2=%e\n", blas::norm2(b));
       (*presmoother)(x, b);
+
+      printfQuda("done smoother %d %d %d\n", r->Location(), x.Location(), b.Location());
 
       // FIXME - residual computation should be in the previous smoother
       param.matResidual(*r, x);

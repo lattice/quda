@@ -71,7 +71,7 @@ display_test_info()
 	     get_recon_str(link_recon), 
 	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
-  printfQuda("MG paramters\n");
+  printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
   printfQuda(" - number of null-space vectors %d\n", nvec);
   printfQuda(" - number of pre-smoother applications %d\n", nu_pre);
@@ -279,12 +279,24 @@ int main(int argc, char **argv)
     for (int j=0; j<QUDA_MAX_DIM; j++) {
       mg_param.geo_block_size[i][j] = geo_block_size[j];
     }
+    mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec;
     mg_param.nu_pre[i] = nu_pre;
     mg_param.nu_post[i] = nu_post;
 
     mg_param.smoother[i] = precon_type;
+
+    mg_param.location[i] = QUDA_CPU_FIELD_LOCATION;
   }
+  // only the fine level is on the GPU (for now)
+  mg_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
+
+  // only coarsen the spin on the first restriction
+  mg_param.spin_block_size[0] = 2;
+
+  // coarse grid solver is GCR
+  mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
+  
 
   // declare the dimensions of the communication grid
   initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);

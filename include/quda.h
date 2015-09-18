@@ -171,7 +171,6 @@ extern "C" {
 
     QudaCloverFieldOrder clover_order;     /**< The order of the input clover field */
     QudaUseInitGuess use_init_guess;       /**< Whether to use an initial guess in the solver or not */
-    QudaComputeNullVector compute_null_vector;       /**< Whether to solve linear system with zero RHS (use_init_guess must be 'yes'!) */
 
     double clover_coeff;                   /**< Coefficient of the clover term */
 
@@ -297,6 +296,9 @@ extern "C" {
     /** Geometric block sizes to use on each level */
     int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 
+    /** Spin block sizes to use on each level */
+    int spin_block_size[QUDA_MAX_MG_LEVEL];
+
     /** Number of null-space vectors to use on each level */
     int n_vec[QUDA_MAX_MG_LEVEL];
 
@@ -308,6 +310,12 @@ extern "C" {
 
     /** Smoother / solver to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
+
+    /** Location where each level should be done */
+    QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
+
+    /** Whether to compute the null vectors or reload them */
+    QudaComputeNullVector compute_null_vector;
 
   } QudaMultigridParam;
 
