@@ -446,7 +446,7 @@ namespace quda {
     /**
        double caxpyXmaz(c a, V x, V y, V z){}
    
-       First performs the operation y[i] = a*x[i] + y[i]
+       First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
     */
     template <typename Float2, typename FloatN>
@@ -454,7 +454,7 @@ namespace quda {
       Float2 a;
       caxpyxmaz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
       __device__ __host__ void operator()(FloatN &x, FloatN &y, const FloatN &z, const FloatN &w) 
-      { _caxpy(a, x, y); x-= a.x*z; }
+      { _caxpy(a, x, y); _caxpy(-a, z, x); }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 8; } //! flops per element
     };
@@ -468,10 +468,10 @@ namespace quda {
     /**
        double tripleCGUpdate(d a, d b, V x, V y, V z, V w){}
    
-       First performs the operatio y[i] = y[i] + a*w[i]
+       First performs the operation y[i] = y[i] + a*w[i]
        Second performs the operation z[i] = z[i] - a*x[i] 
        Third performs the operation w[i] = z[i] + b*w[i]
-  */
+    */
     template <typename Float2, typename FloatN>
     struct tripleCGUpdate_ {
       Float2 a, b;

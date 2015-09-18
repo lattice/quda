@@ -100,6 +100,8 @@ namespace quda {
       double3 Ar3 = blas::cDotProductNormB(Ar, r);
       printfQuda("MR: %d iterations, r2 = %e, <r|A|r> = (%e, %e), x2 = %e\n", 
 		 k, Ar3.z, Ar3.x, Ar3.y, x2);
+    } else if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("MR: %d iterations, r2 = %e\n", k, r2);
     }
 
     while (k < param.maxiter && r2 > 0.0) {
@@ -113,6 +115,8 @@ namespace quda {
       //r2 = blas::caxpyXmazNormX(omega*alpha, r, x, Ar);
       blas::caxpyXmaz(omega*alpha, r, x, Ar);
 
+      k++;
+
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
 	double x2 = blas::norm2(x);
 	double r2 = blas::norm2(r);
@@ -121,25 +125,15 @@ namespace quda {
       } else if (getVerbosity() >= QUDA_VERBOSE) {
 	printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, Ar3.x, Ar3.y);
       }
-
-      k++;
     }
   
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      mat(Ar, r, tmp);    
-      Complex Ar2 = blas::cDotProduct(Ar, r);
-      printfQuda("MR: %d iterations, <r|A|r> = (%e, %e)\n", k, real(Ar2), imag(Ar2));
-    }
-
-
-    // Obtain global solution by rescaling
-    if (c2 > 0.0) blas::ax(sqrt(c2), x);
-
-    //Add back initial guess (if appropriate)
+    //Add back initial guess (if appropriate) and scale if necessary
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      blas::xpy(y,x);
+      double scale = c2 > 0.0 ? sqrt(c2) : 1.0;
+      blas::xpay(y,scale,x);
+    } else {
+      if (c2 > 0.0) blas::ax(sqrt(c2), x);
     }
-    
 
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
         profile.TPSTOP(QUDA_PROFILE_COMPUTE);
@@ -152,18 +146,24 @@ namespace quda {
 	param.gflops += gflops;
 	param.iter += k;
 	
-	// Calculate the true residual
+	// compute the iterated relative residual
+	r2 = blas::norm2(r) * c2 / b2;
 
-	//FIXME: Does not work if QUDA_PRESERVE_SOURCE_NO
-	r2 = blas::norm2(r);
-	mat(r, x);
-	double true_res = blas::xmyNorm(b, r);
-	param.true_res = sqrt(true_res / b2);
-	printfQuda("test norm(r2/c2)=%10e norm(x)=%10e norm((b-Ax)/b2)=%10e\n", sqrt(r2/c2), sqrt(blas::norm2(x)), sqrt(true_res));
+	// calculate the true residual
+	if (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
 
-	if (getVerbosity() >= QUDA_SUMMARIZE) {
-	  printfQuda("MR: Converged after %d iterations, relative residua: iterated = %e, true = %e\n", 
-	  k, sqrt(r2/c2), param.true_res);    
+	  mat(r, x, tmp);
+	  double true_res = blas::xmyNorm(b, r);
+	  param.true_res = sqrt(true_res / b2);
+
+	  if (getVerbosity() >= QUDA_SUMMARIZE) {
+	    printfQuda("MR: Converged after %d iterations, relative residual: iterated = %e, true = %e\n",
+		       k, sqrt(r2), param.true_res);
+	  }
+	} else {
+	  if (getVerbosity() >= QUDA_SUMMARIZE) {
+	    printfQuda("MR: Converged after %d iterations, relative residual: iterated = %e\n", k, sqrt(r2));
+	  }
 	}
 
 	// reset the flops counters
