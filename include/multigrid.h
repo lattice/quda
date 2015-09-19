@@ -141,8 +141,11 @@ namespace quda {
     /** This is the smoother used */
     Solver *presmoother, *postsmoother;
 
-    /** TimeProfile for the smoother */
-    TimeProfile profile_smoother;
+    /** TimeProfile for all levels (refers to profile from parent solver) */
+    TimeProfile &profile_global;
+
+    /** TimeProfile for this level */
+    TimeProfile profile;
 
     /** Prefix label used for printf at this level */
     char prefix[128];

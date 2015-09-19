@@ -3,9 +3,11 @@
 #include <string.h>
 
 namespace quda {  
-
-  MG::MG(MGParam &param, TimeProfile &profile) 
-    : Solver(param, profile), param(param), presmoother(0), postsmoother(0), profile_smoother("Smoother"), 
+  //(param.level+1 + '0')
+  MG::MG(MGParam &param, TimeProfile &profile_global) 
+    : Solver(param, profile), param(param), presmoother(0), postsmoother(0), 
+      profile_global(profile_global),
+      profile( "MG level " + std::to_string(param.level+1), false ),
       coarse(0), fine(param.fine), param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), 
       diracCoarse(0), matCoarse(0) {
 
@@ -38,7 +40,7 @@ namespace quda {
       param_presmooth->delta = 1e-3;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
-				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile_smoother);
+				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
 
     if (param.level < param.Nlevel-1) {
 
@@ -53,7 +55,7 @@ namespace quda {
       param_postsmooth->Nkrylov = 4;
       param_postsmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
       postsmoother = Solver::create(*param_postsmooth, param_postsmooth->matResidual, 
-				    param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile_smoother);
+				    param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile);
     }
 
     // create residual vectors
@@ -140,7 +142,7 @@ namespace quda {
       param_coarse->fine = this;
       param_coarse->delta = 1e-20;
 
-      coarse = new MG(*param_coarse, profile);
+      coarse = new MG(*param_coarse, profile_global);
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
     }
 
@@ -169,7 +171,7 @@ namespace quda {
     if (param_presmooth) delete param_presmooth;
     if (param_postsmooth) delete param_postsmooth;
 
-    if (getVerbosity() >= QUDA_VERBOSE) profile_smoother.Print();
+    if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
   }
 
   /**
@@ -273,16 +275,13 @@ namespace quda {
 
       transfer->R(*r_coarse, *r);
 
-      /*printf("now doing CPU\n");
-      setTransferGPU(false);
-      transfer->R(*x_coarse, *r);*/
-
       if (getVerbosity() >= QUDA_VERBOSE) 
 	printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", 
 		   blas::norm2(x), r2, blas::norm2(*r_coarse));
 
       // recurse to the next lower level
       (*coarse)(*x_coarse, *r_coarse);
+
       setOutputPrefix(prefix); // restore prefix after return from coarse grid
 
       if (getVerbosity() >= QUDA_VERBOSE) 
