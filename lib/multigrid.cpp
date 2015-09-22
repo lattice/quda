@@ -185,16 +185,23 @@ namespace quda {
     csParam.create = QUDA_NULL_FIELD_CREATE;
     cpuColorSpinorField *tmp1 = new cpuColorSpinorField(csParam);
     cpuColorSpinorField *tmp2 = new cpuColorSpinorField(csParam);
+    double deviation;
+    QudaPrecision prec = csParam.precision;
 
     printfQuda("\n");
-    printfQuda("Checking 0 = (1 - P^\\dagger P) v_k for %d vectors\n", param.Nvec);
+    printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *param.B[i]);
 
       transfer->P(*tmp2, *r_coarse);
-      printfQuda("Vector %d: norms %e %e (coarse tmp %e) ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp2), blas::norm2(*r_coarse));
-      printfQuda("deviation = %e\n", blas::xmyNorm(*(param.B[i]), *tmp2));
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P^\\dagger P v_k = %e\n", 
+		 i, blas::norm2(*param.B[i]), blas::norm2(*r_coarse), blas::norm2(*tmp2));
+
+      deviation = blas::xmyNorm(*(param.B[i]), *tmp2);
+      printfQuda("deviation = %e\n", deviation);
+
+      if (deviation > pow(1.0,-2*prec)) errorQuda("failed");
     }
 #if 0
     printfQuda("Checking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", 
@@ -216,7 +223,10 @@ namespace quda {
     transfer->P(*tmp2, *x_coarse);
     transfer->R(*r_coarse, *tmp2);
     printfQuda("Vector norms %e %e (fine tmp %e) ", blas::norm2(*x_coarse), blas::norm2(*r_coarse), blas::norm2(*tmp2));
-    printfQuda("deviation = %e\n", blas::xmyNorm(*x_coarse, *r_coarse));
+
+    deviation = blas::xmyNorm(*x_coarse, *r_coarse);
+    printfQuda("deviation = %e\n", deviation);
+    if (deviation > pow(1.0,-2*prec) ) errorQuda("failed");
 
     printfQuda("\n");
     printfQuda("Comparing native coarse operator to emulated operator\n");
@@ -244,9 +254,12 @@ namespace quda {
       //static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(0);
     }
     #endif
-    printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
-    printfQuda("deviation = %e\n\n", blas::xmyNorm(*x_coarse, *r_coarse));
 
+    printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
+    deviation = blas::xmyNorm(*x_coarse, *r_coarse);
+    printfQuda("deviation = %e\n\n", deviation);
+    if (deviation > pow(1.0, -2*prec)) errorQuda("failed");
+    
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
