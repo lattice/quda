@@ -295,7 +295,9 @@ int main(int argc, char **argv)
 
   // coarse grid solver is GCR
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
-  
+
+  mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;
+
   // declare the dimensions of the communication grid
   initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
 
