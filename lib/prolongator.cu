@@ -101,6 +101,7 @@ namespace quda {
   protected:
     Arg &arg;
     QudaFieldLocation location;
+    char vol[TuneKey::volume_n];
 
     long long flops() const { return 0; }
     long long bytes() const { return 0; }
@@ -110,8 +111,18 @@ namespace quda {
     unsigned int minThreads() const { return arg.out.Volume()/2; } // fine parity is the block y dimension
 
   public:
-    ProlongateLaunch(Arg &arg, const QudaFieldLocation location) 
-      : arg(arg), location(location) { }
+    ProlongateLaunch(Arg &arg, const ColorSpinorField &fine, const ColorSpinorField &coarse, 
+		     const QudaFieldLocation location) : arg(arg), location(location) { 
+
+      strcpy(vol, fine.VolString());
+      strcat(vol, ",");
+      strcat(vol, coarse.VolString());
+
+      strcpy(aux, fine.AuxString());
+      strcat(aux, ",");
+      strcat(aux, coarse.AuxString());
+    }
+
     virtual ~ProlongateLaunch() { }
 
     void apply(const cudaStream_t &stream) {
@@ -126,12 +137,7 @@ namespace quda {
     }
 
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.out.Volume(); 
-      // FIXME should use stride here
-      aux << "out_stride=" << arg.out.Volume() << ",in_stride=" << arg.in.Volume();
-      //return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      return TuneKey("fixme", typeid(*this).name(), "fixme");
+      return TuneKey(vol, typeid(*this).name(), aux);
     }
 
     void initTuneParam(TuneParam &param) const {
@@ -161,7 +167,7 @@ namespace quda {
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
     Arg arg(Out, In, V, fine_to_coarse,spin_map);
-    ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> prolongator(arg, Location(out, in, v));
+    ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> prolongator(arg, out, in, Location(out, in, v));
     prolongator.apply(0);
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
