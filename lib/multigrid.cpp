@@ -3,7 +3,7 @@
 #include <string.h>
 
 namespace quda {  
-  //(param.level+1 + '0')
+
   MG::MG(MGParam &param, TimeProfile &profile_global) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), 
       profile_global(profile_global),
@@ -75,7 +75,9 @@ namespace quda {
     if (param.level < param.Nlevel-1) {
       // create transfer operator
       printfQuda("start creating transfer operator\n");
-      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize);
+      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
+			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+      //transfer->setTransferGPU(false); // use this to force location of transfer
       printfQuda("end creating transfer operator\n");
 
       // create coarse residual vector
@@ -250,50 +252,51 @@ namespace quda {
     delete tmp_coarse;
   }
 
-  void setTransferGPU(bool use_gpu);
+  bool debug = false;
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     setOutputPrefix(prefix);
 
-    if (getVerbosity() >= QUDA_VERBOSE)
+    if ( debug ) {
       printfQuda("entering V-cycle with x2=%e, r2=%e\n", blas::norm2(x), blas::norm2(b));
+    }
 
     if (param.level < param.Nlevel-1) {
+      //transfer->setTransferGPU(false); // use this to force location of transfer
       
       // do the pre smoothing
-      printfQuda("pre-smoothing b2=%e\n", blas::norm2(b));
-      (*presmoother)(x, b);
+      if ( debug ) printfQuda("pre-smoothing b2=%e\n", blas::norm2(b));
 
-      printfQuda("done smoother %d %d %d\n", r->Location(), x.Location(), b.Location());
+      (*presmoother)(x, b);
 
       // FIXME - residual computation should be in the previous smoother
       param.matResidual(*r, x);
       double r2 = blas::xmyNorm(b, *r);
 
       // restrict to the coarse grid
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("restriction\n");
-
       transfer->R(*r_coarse, *r);
 
-      if (getVerbosity() >= QUDA_VERBOSE) 
+      if ( debug ) {
 	printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", 
 		   blas::norm2(x), r2, blas::norm2(*r_coarse));
+      }
 
       // recurse to the next lower level
       (*coarse)(*x_coarse, *r_coarse);
 
       setOutputPrefix(prefix); // restore prefix after return from coarse grid
 
-      if (getVerbosity() >= QUDA_VERBOSE) 
+      if ( debug ) {
 	printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", 
 		   blas::norm2(*x_coarse), blas::norm2(*r_coarse)); 
+      }
 
       // prolongate back to this grid
       transfer->P(*r, *x_coarse); // repurpose residual storage
       // FIXME - sum should be done inside the transfer operator
       blas::xpy(*r, x); // sum to solution
 
-      if (getVerbosity() >= QUDA_VERBOSE) {
+      if ( debug ) {
 	printfQuda("Prolongated coarse solution y2 = %e\n", blas::norm2(*r)); 
 	printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
 		   blas::norm2(x), blas::norm2(*r));
@@ -305,7 +308,7 @@ namespace quda {
       (*presmoother)(x, b);
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) {
+    if ( debug ) {
       param.matResidual(*r, x);
       double r2 = blas::xmyNorm(b, *r);
       printfQuda("leaving V-cycle with x2=%e, r2=%e\n", blas::norm2(x), r2);

@@ -46,7 +46,6 @@ extern char latfile[];
 extern int niter;
 extern int nvec;
 extern int mg_levels;
-extern int gpu_prolongate;
 
 extern int nu_pre;
 extern int nu_post;
@@ -205,7 +204,7 @@ int main(int argc, char **argv)
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  inv_param.gcrNkrylov = 50;
+  inv_param.gcrNkrylov = 10;
   inv_param.tol = 1e-7;
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -297,7 +296,6 @@ int main(int argc, char **argv)
   // coarse grid solver is GCR
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
   
-
   // declare the dimensions of the communication grid
   initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
 
@@ -311,8 +309,6 @@ int main(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
-
-  quda::setTransferGPU(gpu_prolongate);
 
   setSpinorSiteSize(24);
 

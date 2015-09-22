@@ -1592,7 +1592,6 @@ bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 
-int gpu_prolongate = 0;
 int mg_levels = 2;
 
 int nu_pre = 2;
@@ -1957,25 +1956,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
       multishift = false;
     }else{
       fprintf(stderr, "ERROR: invalid multishift boolean\n");	
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-gpu-prolongate") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-
-    if (strcmp(argv[i+1], "true") == 0){
-      gpu_prolongate = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      gpu_prolongate = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid mg-gpu-prolongate boolean\n");	
       exit(1);
     }
 
