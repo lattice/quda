@@ -330,8 +330,7 @@ namespace quda {
     virtual ColorSpinorField& Even() { errorQuda("Not implemented"); return *this; }
     virtual ColorSpinorField& Odd() { errorQuda("Not implemented"); return *this; }
 
-    virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0)
-    { errorQuda("Not implemented"); }
+    virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
     /** 
      * Compute the n-dimensional site index given the 1-d offset index
@@ -568,6 +567,8 @@ namespace quda {
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
 
     void getTexObjectInfo() const;
+
+    void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
   };
 
   // CPU implementation

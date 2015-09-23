@@ -1516,4 +1516,16 @@ namespace quda {
 #endif
   }
 
+  void cudaColorSpinorField::Source(const QudaSourceType sourceType, const int st, const int s, const int c) {
+    ColorSpinorParam param(*this);
+    param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+    param.location = QUDA_CPU_FIELD_LOCATION;
+    param.create = QUDA_NULL_FIELD_CREATE;
+
+    cpuColorSpinorField tmp(param);
+    tmp.Source(sourceType, st, s, c);
+    *this = tmp;
+  }
+
+
 } // namespace quda
