@@ -3,6 +3,8 @@
 #include <tune_quda.h>
 #include <typeinfo>
 
+#include <multigrid_helper.cuh>
+
 namespace quda {
 
   using namespace quda::colorspinor;
@@ -10,36 +12,29 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Out, typename In, typename Rotator, int fineSpin>
+  template <typename Out, typename In, typename Rotator, int fineSpin, int coarseSpin>
   struct ProlongateArg {
     Out out;
     const In in;
     const Rotator V;
     const int *geo_map;  // need to make a device copy of this
-    int spin_map[fineSpin];
+    const spin_mapper<fineSpin,coarseSpin> spin_map;
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
-		  const int *geo_map, const int *spin_map) : 
-      out(out), in(in), V(V), geo_map(geo_map)  {
-      if(spin_map)
-      {
-        for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s];
-      }
-      else
-      { this->spin_map[0] = 0;}//fineSpin=1
-    }
+		  const int *geo_map) : 
+      out(out), in(in), V(V), geo_map(geo_map), spin_map()
+    { }
 
-    ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin> &arg) :
-      out(arg.out), in(arg.in), V(arg.V), geo_map(arg.geo_map) {
-      for (int s=0; s<fineSpin; s++) this->spin_map[s] = arg.spin_map[s];
+    ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin,coarseSpin> &arg) :
+      out(arg.out), in(arg.in), V(arg.V), geo_map(arg.geo_map), spin_map() {
     }
   };
 
   /**
      Applies the grid prolongation operator (coarse to fine)
   */
-  template <typename Float, int fineSpin, int coarseColor, class Coarse>
+  template <typename Float, int fineSpin, int coarseColor, class Coarse, typename S>
   __device__ __host__ inline void prolongate(complex<Float> out[fineSpin*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, const int *geo_map, const int *spin_map, int fineVolume) {
+					     int parity, int x_cb, const int *geo_map, const S& spin_map, int fineVolume) {
     int x = parity*fineVolume/2 + x_cb;
     int x_coarse = geo_map[x];
     int parity_coarse = (x_coarse >= in.Volume()/2) ? 1 : 0;
@@ -47,7 +42,7 @@ namespace quda {
 
     for (int s=0; s<fineSpin; s++) {
       for (int c=0; c<coarseColor; c++) {
-	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map[s], c);
+	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map(s), c);
       }
     }
   }
@@ -155,18 +150,18 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  const int *fine_to_coarse, const int *spin_map) {
+		  const int *fine_to_coarse) {
 
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
     typedef FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order> packedSpinor;
-    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,fineSpin> Arg;
+    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,fineSpin,coarseSpin> Arg;
 
     fineSpinor   Out(const_cast<ColorSpinorField&>(out));
     coarseSpinor In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
-    Arg arg(Out, In, V, fine_to_coarse,spin_map);
+    Arg arg(Out, In, V, fine_to_coarse);
     ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> prolongator(arg, out, in, Location(out, in, v));
     prolongator.apply(0);
 
@@ -178,12 +173,17 @@ namespace quda {
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int nVec, const int *fine_to_coarse, const int *spin_map) {
 
+    // first check that the spin_map matches the spin_mapper
+    spin_mapper<fineSpin,coarseSpin> mapper;
+    for (int s=0; s<fineSpin; s++) 
+      if (mapper(s) != spin_map[s]) errorQuda("Spin map does not match spin_mapper");
+
     if (nVec == 2) {
-      Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse);
     } else if (nVec == 24) {
-      Prolongate<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse);
     } else if (nVec == 48) {
-      Prolongate<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse);
     } else {
       errorQuda("Unsupported nVec %d", nVec);
     }
