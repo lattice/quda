@@ -570,10 +570,6 @@ namespace quda {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
     coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin 
-    if (isNative()) {
-      coarseParam.fieldOrder = (coarseParam.nSpin==1 || coarseParam.precision==QUDA_DOUBLE_PRECISION) ?
-	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-    }
 
     coarseParam.nColor = Nvec;
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
@@ -581,6 +577,9 @@ namespace quda {
     
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
+    // for GPU fields, always use native ordering to ensure coalescing
+    if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 
     ColorSpinorField *coarse = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {
@@ -599,16 +598,18 @@ namespace quda {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
     fineParam.nSpin = nSpin * spinBlockSize;
-    if (isNative()) {
-      fineParam.fieldOrder = (fineParam.nSpin==1 || fineParam.precision==QUDA_DOUBLE_PRECISION) ?
-	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-    }
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
     fineParam.create = QUDA_ZERO_FIELD_CREATE;
     
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
+    // for GPU fields, always use native ordering to ensure coalescing
+    if (new_location == QUDA_CUDA_FIELD_LOCATION) {
+      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.precision!= QUDA_DOUBLE_PRECISION) ?
+	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+    }
 
     ColorSpinorField *fine = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {

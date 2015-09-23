@@ -12,7 +12,7 @@ namespace quda {
       diracCoarse(0), matCoarse(0) {
 
     // for reporting level 1 is the fine level but internally use level 0 for indexing
-    sprintf(prefix,"MG level %d: ", param.level+1);
+    sprintf(prefix,"MG level %d (%s): ", param.level+1, param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
     setOutputPrefix(prefix);
 
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
@@ -81,19 +81,12 @@ namespace quda {
       printfQuda("end creating transfer operator\n");
 
       // create coarse residual vector
-      r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
+      r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
       // create coarse solution vector
-      x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
+      x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
       // create coarse grid operator
-
-      // these need to be gpu fields with native ordering basis
-      ColorSpinorParam csParam(*(param.B[0]));
-      csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-      csParam.setPrecision(csParam.precision);
-      csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
       printfQuda("creating coarse operator of type %s\n", typeid(matCoarse).name());
 
@@ -104,7 +97,6 @@ namespace quda {
       printfQuda("Kappa = %e\n", diracParam.kappa);
       diracCoarse = new DiracCoarse(diracParam);
       matCoarse = new DiracM(*diracCoarse);
-
 
       printfQuda("coarse operator of type %s created\n", typeid(matCoarse).name());
 
@@ -152,6 +144,7 @@ namespace quda {
 
     // now we can run through the verificaion
     if (param.level < param.Nlevel-1) verify();  
+
   }
 
   MG::~MG() {
@@ -230,7 +223,7 @@ namespace quda {
 
     printfQuda("\n");
     printfQuda("Comparing native coarse operator to emulated operator\n");
-    ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
+    ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     blas::zero(*tmp_coarse);
     blas::zero(*r_coarse);
     #if 1
@@ -288,7 +281,6 @@ namespace quda {
 
       // restrict to the coarse grid
       transfer->R(*r_coarse, *r);
-
       if ( debug ) {
 	printfQuda("after pre-smoothing x2 = %e, r2 = %e, r_coarse2 = %e\n", 
 		   blas::norm2(x), r2, blas::norm2(*r_coarse));
