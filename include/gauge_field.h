@@ -175,6 +175,8 @@ namespace quda {
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
 
+    virtual void exchangeGhost() = 0;
+
     int Length() const { return length; }
     int Ncolor() const { return nColor; }
     QudaReconstructType Reconstruct() const { return reconstruct; }

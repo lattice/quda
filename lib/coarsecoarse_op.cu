@@ -477,6 +477,9 @@ namespace quda {
     cpuColorSpinorField uv(UVparam);
 
     calculateYcoarse(Y, X, uv, T, gauge, clover, kappa);
+
+    // now exchange Y halos for multi-process dslash
+    Y.exchangeGhost();
   }
   
 } //namespace quda

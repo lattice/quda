@@ -517,7 +517,6 @@ namespace quda {
 
     if(c != NULL) {
       cFine cAccessor(const_cast<CloverField&>(*c));
-
       calculateY<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, &cAccessor, g.X(), kappa);
     }
     else {
@@ -664,6 +663,10 @@ namespace quda {
     else {
       calculateY(Y, X, uv, T, g, NULL, kappa);
     }
+
+    // now exchange Y halos for multi-process dslash
+    Y.exchangeGhost();
+
   }
 
 } //namespace quda
