@@ -224,7 +224,7 @@ namespace quda {
 	}
 
 
-	__device__ __host__ inline void getPhase(RegType *phase, const RegType in[18]) const {
+	__device__ __host__ inline void getPhase(RegType *phase, const RegType in[N]) const {
 	  *phase = 0;
 	}
 
