@@ -142,6 +142,24 @@ namespace quda {
       init = true;
     }
  
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      ColorSpinorParam param(*this);
+      param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+      param.nDim = nDim;
+      memcpy(param.x, x, nDim*sizeof(int));
+      param.x[0] /= 2;
+      param.create = QUDA_REFERENCE_FIELD_CREATE;
+      param.v = v;
+      param.norm = norm;
+      even = new cpuColorSpinorField(param);
+      odd = new cpuColorSpinorField(param);
+
+      // need this hackery for the moment (need to locate the odd pointers half way into the full field)
+      (dynamic_cast<cpuColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
+      if (precision == QUDA_HALF_PRECISION)
+	(dynamic_cast<cpuColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+    }
+
   }
 
   void cpuColorSpinorField::destroy() {
@@ -153,8 +171,12 @@ namespace quda {
       init = false;
     }
 
-  }
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      if (even) delete even;
+      if (odd) delete odd;
+    }
 
+  }
 
   void cpuColorSpinorField::copy(const cpuColorSpinorField &src) {
     checkField(*this, src);

@@ -401,30 +401,6 @@ namespace quda {
 
   }
 
-  const ColorSpinorField& cudaColorSpinorField::Even() const { 
-    if (siteSubset != QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot return even subset of %d subset", siteSubset);
-    return *even;
-  }
-
-  const ColorSpinorField& cudaColorSpinorField::Odd() const {
-    if (siteSubset != QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot return odd subset of %d subset", siteSubset);
-    return *odd;
-  }
-
-  ColorSpinorField& cudaColorSpinorField::Even() { 
-    if (siteSubset != QUDA_FULL_SITE_SUBSET)
-      errorQuda("Cannot return even subset of %d subset", siteSubset);
-    return *even;
-  }
-
-  ColorSpinorField& cudaColorSpinorField::Odd() {
-    if (siteSubset != QUDA_FULL_SITE_SUBSET) 
-      errorQuda("Cannot return odd subset of %d subset", siteSubset);
-    return *odd;
-  }
-
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {

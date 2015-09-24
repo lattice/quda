@@ -459,6 +459,30 @@ namespace quda {
     }
   }
 
+  const ColorSpinorField& ColorSpinorField::Even() const {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    return *even;
+  }
+
+  const ColorSpinorField& ColorSpinorField::Odd() const {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    return *odd;
+  }
+
+  ColorSpinorField& ColorSpinorField::Even() {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    return *even;
+  }
+
+  ColorSpinorField& ColorSpinorField::Odd() {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    return *odd;
+  }
+
   // Set the ghost pointers to NULL.
   // This is a private initialisation routine. 
   void ColorSpinorField::clearGhostPointers() 

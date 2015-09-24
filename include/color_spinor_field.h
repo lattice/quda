@@ -324,11 +324,11 @@ namespace quda {
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
     
-    virtual const ColorSpinorField& Even() const { errorQuda("Not implemented"); return *this;}
-    virtual const ColorSpinorField& Odd() const { errorQuda("Not implemented"); return *this; }
+    const ColorSpinorField& Even() const;
+    const ColorSpinorField& Odd() const;
 
-    virtual ColorSpinorField& Even() { errorQuda("Not implemented"); return *this; }
-    virtual ColorSpinorField& Odd() { errorQuda("Not implemented"); return *this; }
+    ColorSpinorField& Even();
+    ColorSpinorField& Odd();
 
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
@@ -544,12 +544,6 @@ namespace quda {
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
 #endif
 
-    const ColorSpinorField& Even() const;
-    const ColorSpinorField& Odd() const;
-
-    ColorSpinorField& Even();
-    ColorSpinorField& Odd();
-
     cudaColorSpinorField& Eigenvec(const int idx) const;
     void CopyEigenvecSubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
 
@@ -602,9 +596,6 @@ namespace quda {
     ColorSpinorField& operator=(const ColorSpinorField &);
     cpuColorSpinorField& operator=(const cpuColorSpinorField&);
     cpuColorSpinorField& operator=(const cudaColorSpinorField&);
-
-    //cpuColorSpinorField& Even() const;
-    //cpuColorSpinorField& Odd() const;
 
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
