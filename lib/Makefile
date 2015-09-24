@@ -2,17 +2,18 @@ include ../make.inc
 
 QUDA = libquda.a
 
-QUDA_OBJS = dirac_coarse.o coarse_op.o coarsecoarse_op.o multigrid.o	\
-	transfer.o transfer_util.o prolongator.o restrictor.o		\
-	gauge_phase.o timer.o malloc.o solver.o inv_bicgstab_quda.o	\
-	inv_cg_quda.o inv_multi_cg_quda.o inv_eigcg_quda.o gauge_ape.o	\
-	gauge_plaq.o inv_gcr_quda.o inv_mr_quda.o inv_sd_quda.o		\
-	inv_xsd_quda.o inv_pcg_quda.o inv_mre.o interface_quda.o	\
-	util_quda.o color_spinor_field.o color_spinor_util.o		\
+QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
+	coarsecoarse_op.o multigrid.o transfer.o transfer_util.o	\
+	prolongator.o restrictor.o gauge_phase.o timer.o malloc.o	\
+	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
+	inv_multi_cg_quda.o inv_eigcg_quda.o gauge_ape.o gauge_plaq.o	\
+	inv_gcr_quda.o inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o	\
+	inv_pcg_quda.o inv_mre.o interface_quda.o util_quda.o		\
+	color_spinor_field.o color_spinor_util.o			\
 	cpu_color_spinor_field.o cuda_color_spinor_field.o dirac.o	\
-	clover_field.o lattice_field.o gauge_field.o cpu_gauge_field.o	\
-	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
-	gauge_update_quda.o dirac_clover.o dirac_wilson.o		\
+	clover_field.o lattice_field.o gauge_field.o			\
+	cpu_gauge_field.o cuda_gauge_field.o extract_gauge_ghost.o	\
+	max_gauge.o gauge_update_quda.o dirac_clover.o dirac_wilson.o	\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
 	dirac_domain_wall.o dirac_domain_wall_4d.o dirac_mobius.o	\
 	dirac_twisted_clover.o dirac_twisted_mass.o tune.o		\
@@ -35,13 +36,14 @@ QUDA_OBJS = dirac_coarse.o coarse_op.o coarsecoarse_op.o multigrid.o	\
 	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
 	copy_clover.o staggered_oprod.o clover_trace_quda.o		\
 	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
-	unitarize_force_quda.o unitarize_links_quda.o milc_interface.o	\
-	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
-	ritz_quda.o eig_solver.o blas_magma.o misc_helpers.o		\
-	inv_mpcg_quda.o inv_mpbicgstab_quda.o pgauge_exchange.o		\
-	pgauge_init.o pgauge_heatbath.o random.o gauge_fix_ovr_extra.o	\
-	gauge_fix_fft.o gauge_fix_ovr.o pgauge_det_trace.o		\
-	clover_outer_product.o clover_sigma_outer_product.o
+	unitarize_force_quda.o unitarize_links_quda.o			\
+	milc_interface.o extended_color_spinor_utilities.o		\
+	eig_lanczos_quda.o ritz_quda.o eig_solver.o blas_magma.o	\
+	misc_helpers.o inv_mpcg_quda.o inv_mpbicgstab_quda.o		\
+	pgauge_exchange.o pgauge_init.o pgauge_heatbath.o random.o	\
+	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
+	pgauge_det_trace.o clover_outer_product.o			\
+	clover_sigma_outer_product.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
