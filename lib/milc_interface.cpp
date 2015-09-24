@@ -50,7 +50,9 @@ static bool invalidate_quda_gauge = true;
 static bool create_quda_gauge = false;
 
 static bool invalidate_quda_mom = true;
-#define MOM_PIPE 1
+
+// set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
+#define MOM_PIPE 0
 
 using namespace quda;
 using namespace quda::fermion_force;
