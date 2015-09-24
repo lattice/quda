@@ -64,7 +64,9 @@ namespace quda {
       csParam.create = QUDA_NULL_FIELD_CREATE;
       csParam.location = param.location;
       if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
-	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+	// all coarse GPU vectors use FLOAT2 ordering
+	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION || param.level > 0) ? 
+	  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
 	csParam.setPrecision(csParam.precision);
 	csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
       }
@@ -145,6 +147,7 @@ namespace quda {
     // now we can run through the verificaion
     if (param.level < param.Nlevel-1) verify();  
 
+    setOutputPrefix("");
   }
 
   MG::~MG() {

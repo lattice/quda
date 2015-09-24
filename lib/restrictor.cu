@@ -169,8 +169,6 @@ namespace quda {
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
 	tp.block.y = 2; // need factor of two for fine parity with in the block
 
-	printfQuda("threads = %d block = %d grid = %d out = %d in = %d\n", tp.grid.x*tp.block.x, tp.block.x, tp.grid.x, arg.out.Volume(), arg.in.Volume());
-
 	if (block_size == 8) {
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,8>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);

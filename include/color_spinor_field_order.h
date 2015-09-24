@@ -792,12 +792,12 @@ namespace quda {
   
   // single precision
   template<int Nc> struct colorspinor_mapper<float,4,Nc> { typedef colorspinor::FloatNOrder<float, 4, Nc, 4> type; };
-  template<int Nc> struct colorspinor_mapper<float,2,Nc> { typedef colorspinor::FloatNOrder<float, 2, Nc, 4> type; };
+  template<int Nc> struct colorspinor_mapper<float,2,Nc> { typedef colorspinor::FloatNOrder<float, 2, Nc, 2> type; };
   template<int Nc> struct colorspinor_mapper<float,1,Nc> { typedef colorspinor::FloatNOrder<float, 1, Nc, 2> type; };
   
   // half precision
   template<int Nc> struct colorspinor_mapper<short,4,Nc> { typedef colorspinor::FloatNOrder<short, 4, Nc, 4> type; };
-  template<int Nc> struct colorspinor_mapper<short,2,Nc> { typedef colorspinor::FloatNOrder<short, 2, Nc, 4> type; };
+  template<int Nc> struct colorspinor_mapper<short,2,Nc> { typedef colorspinor::FloatNOrder<short, 2, Nc, 2> type; };
   template<int Nc> struct colorspinor_mapper<short,1,Nc> { typedef colorspinor::FloatNOrder<short, 1, Nc, 2> type; };
     
 } // namespace quda

@@ -432,7 +432,7 @@ namespace quda {
       if (nSpin == 4) {
 	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
       } else if (nSpin == 2) {
-	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
       } else if (nSpin == 1) {
 	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
       }

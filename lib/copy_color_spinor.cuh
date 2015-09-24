@@ -274,7 +274,13 @@ namespace quda {
     if (out.isNative()) {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
       ColorSpinor outOrder(out, Out, outNorm);
-      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
+    } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) { // hack for single-precision null-space matrix field
+      typedef typename colorspinor::FloatNOrder<float, 4, Nc, 2> ColorSpinor;
+      ColorSpinor outOrder(out, (float*)Out, outNorm);
+      genericCopyColorSpinor<float,FloatIn,4,Nc>
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
@@ -294,7 +300,7 @@ namespace quda {
 #endif
 
     } else {
-      errorQuda("Order not defined");
+      errorQuda("Order %d not defined (Ns=%d, Nc=%d)", out.FieldOrder(), Ns, Nc);
     }
 
   }
@@ -309,6 +315,10 @@ namespace quda {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
       ColorSpinor inOrder(in, In, inNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
+    } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) { // hack for single-precision null-space matrix field
+      typedef typename colorspinor::FloatNOrder<float, 4, Nc, 2> ColorSpinor;
+      ColorSpinor inOrder(in, (float*)In, inNorm);
+      genericCopyColorSpinor<FloatOut,float,4,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
@@ -325,7 +335,7 @@ namespace quda {
 #endif
 
     } else {
-      errorQuda("Order not defined");
+      errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
     }
 
   }
