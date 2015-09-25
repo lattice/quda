@@ -3,21 +3,34 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const DiracParam &param) 
-    : Dirac(param), transfer(param.transfer), dirac(param.dirac), Y(0), X(0) 
+  DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
+    : Dirac(param), transfer(param.transfer), dirac(param.dirac),
+      Y_h(0), X_h(0), Y_d(0), X_d(0), enable_gpu(enable_gpu)
   { initializeCoarse(); }
       
   DiracCoarse::~DiracCoarse() {
-    if (Y) delete Y;
-    if (X) delete X;
+    if (Y_h) delete Y_h;
+    if (X_h) delete X_h;
+    if (Y_d) delete Y_d;
+    if (X_d) delete X_d;
   }	
 
-  void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const 
-  { ApplyCoarse(out,in,*Y,*X,kappa); }
+  void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
+      if (!enable_gpu)
+	errorQuda("Cannot apply coarse grid operator in GPU since enable_gpu has not been set");
+      ApplyCoarse(out, in, *Y_d, *X_d, kappa, QUDA_EVEN_PARITY);
+      ApplyCoarse(out, in, *Y_d, *X_d, kappa, QUDA_ODD_PARITY);
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, *Y_h, *X_h, kappa, QUDA_EVEN_PARITY);
+      ApplyCoarse(out, in, *Y_h, *X_h, kappa, QUDA_ODD_PARITY);
+    }
+  }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
   void DiracCoarse::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
-    CoarseCoarseOp(T, Y, X, *(this->Y), *(this->X), kappa);
+    CoarseCoarseOp(T, Y, X, *(this->Y_h), *(this->X_h), kappa);
   }
 
   void DiracCoarse::initializeCoarse() {
@@ -45,14 +58,26 @@ namespace quda {
     gParam.precision = prec;
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
 
     gParam.geometry = QUDA_VECTOR_GEOMETRY;
-    Y = new cpuGaugeField(gParam);
+    Y_h = new cpuGaugeField(gParam);
 
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
-    X = new cpuGaugeField(gParam);
+    X_h = new cpuGaugeField(gParam);
     
-    dirac->createCoarseOp(*transfer,*Y,*X);
+    dirac->createCoarseOp(*transfer,*Y_h,*X_h);
+
+    if (enable_gpu) {
+      gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+      gParam.geometry = QUDA_VECTOR_GEOMETRY;
+      Y_d = new cudaGaugeField(gParam);
+      Y_d->copy(*Y_h);
+
+      gParam.geometry = QUDA_SCALAR_GEOMETRY;
+      X_d = new cudaGaugeField(gParam);
+      X_d->copy(*X_h);
+    }
   }
 
 }

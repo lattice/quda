@@ -219,22 +219,32 @@ namespace quda {
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, 
-		   const GaugeField &X, double kappa);
-  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, const cpuGaugeField &clover, double kappa);
+		   const GaugeField &X, double kappa, int parity);
+
+  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, 
+		      const cpuGaugeField &clover, double kappa);
 
   class DiracCoarse : public Dirac {
 
-    const Transfer *transfer;
-    const Dirac *dirac;
+    const Transfer *transfer; /** restrictor / prolongator defined here */
+    const Dirac *dirac; /** Parent Dirac operator */
 
-    // restrictor / prolongator defined here
-    cpuGaugeField *Y; //Coarse gauge field
-    cpuGaugeField *X; //Coarse clover term
+    cpuGaugeField *Y_h; /** CPU copy of coarse gauge field */
+    cpuGaugeField *X_h; /** CPU copy of coarse clover term */
 
-    void initializeCoarse();  //Initialize the coarse gauge field
+    cudaGaugeField *Y_d; /** GPU copy of coarse gauge field */
+    cudaGaugeField *X_d; /** GPU copy of coarse clover term */
+
+    void initializeCoarse();  /** Initialize the coarse gauge field */
+
+    bool enable_gpu; /** Whether to enable this operator for the GPU */
 
   public:
-    DiracCoarse(const DiracParam &param);
+    /**
+       @param param Parameters defining this operator
+       @param enable_gpu Whether to enable this operator for the GPU
+     */
+    DiracCoarse(const DiracParam &param, bool enable_gpu=true);
     virtual ~DiracCoarse();
 
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
