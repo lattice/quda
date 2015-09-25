@@ -263,14 +263,14 @@ namespace quda {
   }
 
   template<typename Float, typename F, typename coarseGauge, typename fineGauge>
-  void calculateYcoarse(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineGauge &C, const int *x_size, double kappa) {
+  void calculateYcoarse(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineGauge &C,
+			const int *x_size, const int *xc_size, double kappa) {
     if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
     const QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
 
-    const int *xc_size = Y.Field().X();
     int geo_bs[QUDA_MAX_DIM]; 
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = V.Nspin()/Y.NspinCoarse();
@@ -351,7 +351,6 @@ namespace quda {
   }
 #endif
 
-
   }
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, 
@@ -368,7 +367,7 @@ namespace quda {
     gCoarse yAccessor(const_cast<GaugeField&>(Y));
     gCoarse xAccessor(const_cast<GaugeField&>(X)); 
 
-    calculateYcoarse<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cloverAccessor, g.X(), kappa);
+    calculateYcoarse<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cloverAccessor, g.X(), Y.X(), kappa);
   }
 
 

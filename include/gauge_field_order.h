@@ -52,7 +52,6 @@ namespace quda {
 
       protected:
 	/** An internal reference to the actual field we are accessing */
-	GaugeField &U;
 	const int volumeCB;
 	const int nDim;
 	const int geometry;
@@ -67,15 +66,13 @@ namespace quda {
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-      FieldOrder(GaugeField &U) : U(U), volumeCB(U.VolumeCB()), 
+      FieldOrder(GaugeField &U) : volumeCB(U.VolumeCB()),
 	  nDim(U.Ndim()), geometry(U.Geometry()), nColorCoarse(nColor/nSpinCoarse),
 	  u(static_cast<complex<Float>**>(U.Gauge_p())), accessor(U)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	    errorQuda("GaugeField ordering not supported with reconstruction");
 	}
-	
-	GaugeField& Field() { return U; }
 	
 	virtual ~FieldOrder() { ; } 
     
@@ -185,7 +182,6 @@ namespace quda {
       a[0] = b[0]*c[0] + b[1]*c[1];
       a[1] = b[0]*c[1] - b[1]*c[0];
     }
-
 
     // a = b/c
     template <typename Float> 
