@@ -309,7 +309,6 @@ namespace quda {
 
     QudaDWFPCType DWFPCtype() const { return PCtype; }
 
-    virtual QudaFieldLocation Location() const = 0;
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
@@ -549,8 +548,6 @@ namespace quda {
 
     void zero();
 
-    QudaFieldLocation Location() const;
-
     /**
       This function returns true if the field is stored in an internal
       field order, given the precision and the length of the spin
@@ -612,10 +609,6 @@ namespace quda {
     void copy(const cpuColorSpinorField&);
     void zero();
 
-    /**
-     * @return The location of the field (CUDA or CPU)
-     */
-    QudaFieldLocation Location() const;
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
@@ -629,29 +622,6 @@ namespace quda {
   
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b) {
-    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-    if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations do not match");
-    return location;
-  }
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b, 
-				    const ColorSpinorField &c) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(b,c));
-  }
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b,
-				    const ColorSpinorField &c, const ColorSpinorField &d) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d));
-  }
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b, 
-				    const ColorSpinorField &c, const ColorSpinorField &d, 
-				    const ColorSpinorField &e) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d) & Location(a,e));
-  }
 
 } // namespace quda
 

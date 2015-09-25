@@ -384,9 +384,4 @@ namespace quda {
     }
   }
 
-  // Return the location of the field
-  QudaFieldLocation cpuColorSpinorField::Location() const { 
-    return QUDA_CPU_FIELD_LOCATION;
-  }
-
 } // namespace quda

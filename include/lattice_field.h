@@ -286,6 +286,60 @@ namespace quda {
     const char *VolString() const { return vol_string; }
   };
   
+  /**
+     Helper function for determining if the location of the fields is the same.
+     @param a Input field
+     @param b Input field
+     @return If location is unique return the location
+   */
+  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b) {
+    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
+    if (a.Location() == b.Location()) location = a.Location();
+    else errorQuda("Locations do not match");
+    return location;
+  }
+
+  /**
+     Helper function for determining if the location of the fields is the same.
+     @param a Input field
+     @param b Input field
+     @param c Input field
+     @return If location is unique return the location
+   */
+  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b, 
+				    const LatticeField &c) {
+    return static_cast<QudaFieldLocation>(Location(a,b) & Location(b,c));
+  }
+
+  /**
+     Helper function for determining if the location of the fields is the same.
+     @param a Input field
+     @param b Input field
+     @param c Input field
+     @param d Input field
+     @return If location is unique return the location
+   */
+  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b,
+				    const LatticeField &c, const LatticeField &d) {
+    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d));
+  }
+
+  /**
+     Helper function for determining if the location of the fields is the same.
+     @param a Input field
+     @param b Input field
+     @param c Input field
+     @param d Input field
+     @param e Input field
+     @return If location is unique return the location
+   */
+  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b, 
+				    const LatticeField &c, const LatticeField &d, 
+				    const LatticeField &e) {
+    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d) & Location(a,e));
+  }
+
+
 } // namespace quda
 
 #endif // _LATTICE_FIELD_H
