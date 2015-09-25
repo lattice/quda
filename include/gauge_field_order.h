@@ -41,6 +41,29 @@ namespace quda {
       { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
     };
 
+    template<int nColor, int N>
+      __device__ __host__ inline int indexFloatN(int dir, int parity, int x_cb, int row, int col, int stride, int offset_cb) {
+      const int M = (2*nColor*nColor) / N;
+      int j = ((row*nColor+col)*2) / N; // factor of two for complexity
+      int i = ((row*nColor+col)*2) % N;
+      int index = ((x_cb + dir*stride*M + j*stride)*2+i) / 2; // back to a complex offset
+      index += parity*offset_cb;
+      return index;
+    };
+
+    template<typename Float, int nColor, int nSpinCoarse>
+      struct Accessor<Float,nColor,nSpinCoarse,QUDA_FLOAT2_GAUGE_ORDER> {
+      complex <Float> *u;
+      const size_t cb_offset;
+      const int stride;
+    Accessor(const GaugeField &U)
+      : u(static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
+	cb_offset( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride())
+	{  }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      { return u[indexFloatN<nColor,QUDA_FLOAT2_GAUGE_ORDER>(d, parity, x, row, col, stride, cb_offset)]; }
+    };
+
 
     /**
        This is a template driven generic gauge field accessor.  To
