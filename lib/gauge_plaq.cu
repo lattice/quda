@@ -108,10 +108,6 @@ namespace quda {
       const QudaFieldLocation location;
 
       private:
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-      bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
       unsigned int minThreads() const { return arg.threads; }
 
       public:
