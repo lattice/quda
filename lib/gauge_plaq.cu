@@ -103,7 +103,7 @@ namespace quda {
   }
 
   template<typename Float, typename Gauge>
-    class GaugePlaq : Tunable {
+    class GaugePlaq : TunableLocalParity {
       GaugePlaqArg<Gauge> arg;
       const QudaFieldLocation location;
 
@@ -119,23 +119,12 @@ namespace quda {
         : arg(arg), location(location) {}
       ~GaugePlaq () { }
 
-      bool advanceBlockDim(TuneParam &param) const {
-      	bool rtn = Tunable::advanceBlockDim(param);
-	param.block.y = 2;
-	return rtn;
-      }
-
-      void initTuneParam(TuneParam &param) const {
-	Tunable::initTuneParam(param);
-	param.block.y = 2;
-      }
-
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
           arg.result_h[0] = make_double2(0.,0.);
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-	  LAUNCH_KERNEL(computePlaq, tp, stream, arg, Float, Gauge);
+	  LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, tp, stream, arg, Float, Gauge);
 	  cudaDeviceSynchronize();
         } else {
           errorQuda("CPU not supported yet\n");
@@ -144,10 +133,7 @@ namespace quda {
 
       TuneKey tuneKey() const {
         std::stringstream vol, aux;
-        vol << arg.X[0] << "x";
-        vol << arg.X[1] << "x";
-        vol << arg.X[2] << "x";
-	vol << arg.X[3];
+        vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
 	aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
         return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
       }

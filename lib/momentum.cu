@@ -47,7 +47,7 @@ namespace quda {
   }
 
   template<typename Float, typename Mom>
-    class MomAction : Tunable {
+    class MomAction : TunableLocalParity {
       MomActionArg<Mom> arg;
       const QudaFieldLocation location;
 
@@ -63,22 +63,11 @@ namespace quda {
         : arg(arg), location(QUDA_CUDA_FIELD_LOCATION) {}
       ~MomAction () { }
 
-      bool advanceBlockDim(TuneParam &param) const {
-      	bool rtn = Tunable::advanceBlockDim(param);
-	param.block.y = 2;
-	return rtn;
-      }
-
-      void initTuneParam(TuneParam &param) const {
-	Tunable::initTuneParam(param);
-	param.block.y = 2;
-      }
-
       void apply(const cudaStream_t &stream){
         if(location == QUDA_CUDA_FIELD_LOCATION){
           arg.result_h[0] = 0.0;
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	  LAUNCH_KERNEL(computeMomAction, tp, stream, arg, Float, Mom);
+	  LAUNCH_KERNEL_LOCAL_PARITY(computeMomAction, tp, stream, arg, Float, Mom);
         } else {
           errorQuda("CPU not supported yet\n");
         }
