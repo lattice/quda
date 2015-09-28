@@ -25,7 +25,7 @@ namespace quda {
    */
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 4> {
-    const int Ns = 4;
+    static const int Ns = 4;
     complex<Float> data[Nc*4];
     
     __device__ __host__ ColorSpinor<Float, Nc, 4>() {
@@ -319,7 +319,7 @@ namespace quda {
    */
   template <typename Float, int Nc>
     struct ColorSpinor<Float, Nc, 2> {
-    const int Ns = 2;
+    static const int Ns = 2;
     complex<Float> data[Nc*2];
     
     __device__ __host__ ColorSpinor<Float, Nc, 2>() {
