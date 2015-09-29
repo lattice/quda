@@ -1,9 +1,12 @@
+#include <float.h>
+
 #ifndef _SVD_QUDA_H_
 #define _SVD_QUDA_H_
 
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11
 #define LOG2 0.69314718055994530942
+#define INVALID_DOUBLE (-DBL_MAX)
 
 
 //namespace quda{
@@ -291,8 +294,11 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   typename RealTypeId<Cmplx>::Type beta;
   Cmplx w, tau, z;
 
-  u(0,0).x = -2.0;
-  v(0,0).x = -2.0;
+  // Set them to values that would never be set.  If at the end of the
+  // below algorithmic flow, these values have been preserved then we
+  // know that the input matrix was the unit matrix
+  u(0,0).x = INVALID_DOUBLE;
+  v(0,0).x = INVALID_DOUBLE;
 
   if(norm1 == 0 && mat(0,0).y == 0){
     p = mat;
@@ -389,14 +395,13 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   }
 
   // unit matrix
-  if (u(0,0).x == -2.0 && v(0,0).x == -2.0) {
+  if (u(0,0).x == INVALID_DOUBLE && v(0,0).x == INVALID_DOUBLE) {
     u = mat;
     v = mat;
   }
 
   return;
 }
-
 
 
 template<class Real>
@@ -658,5 +663,6 @@ void computeSVD(const Matrix<Cmplx,3> & m,
 
 //} // end namespace quda
 
+#undef INVALID_DOUBLE
 
 #endif // _SVD_QUDA_H

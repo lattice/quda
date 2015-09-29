@@ -1015,7 +1015,8 @@ struct DslashFactory {
 
 #if 0
 
-// FIXME there is no policy version of this variant
+// FIXME there is no policy version of this variant.  For now just
+// leave this here as this experiment may be useful in the future.
 
 /**
    Variation of multi-gpu dslash where the packing kernel writes
