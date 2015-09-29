@@ -38,8 +38,7 @@ set (QUDA_OBJS
 	pgauge_init.cu pgauge_heatbath.cu random.cu
 	gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
 	pgauge_det_trace.cu clover_outer_product.cu
-	clover_sigma_outer_product.cu version.cpp
-
+	clover_sigma_outer_product.cu version.cpp quda_fortran.F90
 )
 
 include_directories(dslash_core)
@@ -47,7 +46,7 @@ include_directories(.)
 cuda_add_library(quda STATIC ${QUDA_OBJS})
 
 # this is not working as intended
-add_library(quda_fortran STATIC EXCLUDE_FROM_ALL quda_fortran.F90 )
+#add_library(quda_fortran STATIC EXCLUDE_FROM_ALL  )
 
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py

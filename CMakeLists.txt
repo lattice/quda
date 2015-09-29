@@ -134,7 +134,7 @@ if(${BUILD_MPI})
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(${MPI_CXX_INCLUDE_PATH})
-  message(WARNING "MPI not yet fully implemented in CMakeLists")
+  #message(WARNING "MPI not yet fully implemented in CMakeLists")
 endif()
 
 if (${BUILD_QMP})
