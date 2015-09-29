@@ -593,16 +593,11 @@ namespace quda {
 
   template <typename Float, typename Gauge>
   __global__ void kernel_gauge_fix_U_EO_NEW( GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha){
-    int idd = threadIdx.x + blockIdx.x * blockDim.x;
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y;
 
-    if ( idd >= arg.threads ) return;
+    if ( id >= arg.threads/2 ) return;
 
-    int parity = 0;
-    int id = idd;
-    if ( idd >= arg.threads / 2 ) {
-      parity = 1;
-      id -= arg.threads / 2;
-    }
     typedef typename ComplexTypeId<Float>::Type Cmplx;
 
     int x[4];
@@ -610,21 +605,21 @@ namespace quda {
     int idx = ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
     Matrix<Cmplx,3> de;
     //Read Delta
-        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-    de(0,0) = TEXTURE_DELTA<Cmplx>(idx);
-    de(0,1) = TEXTURE_DELTA<Cmplx>(idx + arg.threads);
+#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+    de(0,0) = TEXTURE_DELTA<Cmplx>(idx + 0 * arg.threads);
+    de(0,1) = TEXTURE_DELTA<Cmplx>(idx + 1 * arg.threads);
     de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
     de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
     de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
     de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
-        #else
-    de(0,0) = arg.delta[idx];
-    de(0,1) = arg.delta[idx + arg.threads];
+#else
+    de(0,0) = arg.delta[idx + 0 * arg.threads];
+    de(0,1) = arg.delta[idx + 1 * arg.threads];
     de(0,2) = arg.delta[idx + 2 * arg.threads];
     de(1,1) = arg.delta[idx + 3 * arg.threads];
     de(1,2) = arg.delta[idx + 4 * arg.threads];
     de(2,2) = arg.delta[idx + 5 * arg.threads];
-        #endif
+#endif
     de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
     de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
     de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
@@ -645,15 +640,15 @@ namespace quda {
       idx = linkNormalIndexP1(x,arg.X,mu);
       //Read Delta
 #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-      de(0,0) = TEXTURE_DELTA<Cmplx>(idx);
-      de(0,1) = TEXTURE_DELTA<Cmplx>(idx + arg.threads);
+      de(0,0) = TEXTURE_DELTA<Cmplx>(idx + 0 * arg.threads);
+      de(0,1) = TEXTURE_DELTA<Cmplx>(idx + 1 * arg.threads);
       de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
       de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
       de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
       de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
 #else
-      de(0,0) = arg.delta[idx];
-      de(0,1) = arg.delta[idx + arg.threads];
+      de(0,0) = arg.delta[idx + 0 * arg.threads];
+      de(0,1) = arg.delta[idx + 1 * arg.threads];
       de(0,2) = arg.delta[idx + 2 * arg.threads];
       de(1,1) = arg.delta[idx + 3 * arg.threads];
       de(1,2) = arg.delta[idx + 4 * arg.threads];
@@ -677,25 +672,17 @@ namespace quda {
 
 
   template<typename Float, typename Gauge>
-  class GaugeFixNEW : Tunable {
+  class GaugeFixNEW : TunableLocalParity {
     GaugeFixArg<Float> arg;
     Float half_alpha;
     Gauge dataOr;
     mutable char aux_string[128];     // used as a label in the autotuner
     private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+
+    // since GaugeFixArg is used by other kernels that don't use
+    // tunableLocalParity, arg.threads stores Volume and not VolumeCB
+    // so we need to divide by two
+    unsigned int minThreads() const { return arg.threads/2; }
 
     public:
     GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha)
@@ -703,13 +690,9 @@ namespace quda {
       half_alpha = alpha * 0.5;
       cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   cudaFuncCachePreferL1);
     }
-    ~GaugeFixNEW () {
-    }
+    ~GaugeFixNEW () { }
 
-    void setAlpha(Float alpha){
-      half_alpha = alpha * 0.5;
-    }
-
+    void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -718,10 +701,7 @@ namespace quda {
 
     TuneKey tuneKey() const {
       std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
+      vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
       sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
