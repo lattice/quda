@@ -68,7 +68,7 @@ namespace quda {
 	csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION || param.level > 0) ? 
 	  QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
 	csParam.setPrecision(csParam.precision);
-	csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+	csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
       }
       r = ColorSpinorField::Create(csParam);
     }
