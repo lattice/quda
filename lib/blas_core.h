@@ -180,8 +180,10 @@ template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int write
 
 template <typename Float, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
-  if (x.Nspin() == 2) {
-    genericBlas<Float,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);    
+  if (x.Nspin() == 1) {
+    genericBlas<Float,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Nspin() == 2) {
+    genericBlas<Float,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Nspin() == 4) {
     genericBlas<Float,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
@@ -222,7 +224,7 @@ template <template <typename Float, typename FloatN> class Functor,
       return;
     }
 
-    if (!static_cast<cudaColorSpinorField&>(x).isNative()) {
+    if (!x.isNative()) {
       warningQuda("Device blas on non-native fields is not supported\n");
       return;
     }
@@ -269,8 +271,8 @@ template <template <typename Float, typename FloatN> class Functor,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else if (x.Nspin()==1) {
-#ifdef GPU_STAGGERED_DIRAC
+      } else if (x.Nspin()==2 || x.Nspin()==1) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
 	Spinor<float2,float2,float2,M,writeX,0> X(x);
 	Spinor<float2,float2,float2,M,writeY,1> Y(y);
 	Spinor<float2,float2,float2,M,writeZ,2> Z(z);
@@ -284,10 +286,10 @@ template <template <typename Float, typename FloatN> class Functor,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    } else {
-      if (x.Ncolor() != 3) { errorQuda("Not supported"); }
-      if (x.Nspin() == 4){ //wilson
+      } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+  } else {
+    if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
+    if (x.Nspin() == 4){ //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	Spinor<float4,float4,short4,6,writeX,0> X(x);
 	Spinor<float4,float4,short4,6,writeY,1> Y(y);
@@ -318,7 +320,7 @@ template <template <typename Float, typename FloatN> class Functor,
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else {
-	errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+	errorQuda("nSpin=%d is not supported\n", x.Nspin());
       }
       blas::bytes += Functor<double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
     }

@@ -289,9 +289,10 @@ namespace quda {
     const void* Norm() const {return norm;}
 
     /**
-       This function returns true if the field is stored in an
-       internal field order for the given precision.
-    */ 
+      This function returns true if the field is stored in an internal
+      field order, given the precision and the length of the spin
+      dimension.
+      */ 
     bool isNative() const;
 
     //! for eigcg only:
@@ -547,13 +548,6 @@ namespace quda {
     void CopyEigenvecSubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
 
     void zero();
-
-    /**
-      This function returns true if the field is stored in an internal
-      field order, given the precision and the length of the spin
-      dimension.
-      */ 
-    bool isNative() const;
 
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
 

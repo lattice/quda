@@ -90,7 +90,6 @@ namespace quda {
 
       void copy(cudaColorSpinorField &dst, const cudaColorSpinorField &src) {
 	if (&src == &dst) return; // aliasing fields
-	if (src.Nspin() != 1 && src.Nspin() != 4) errorQuda("nSpin(%d) not supported\n", src.Nspin());
 	
 	if (dst.SiteSubset() == QUDA_FULL_SITE_SUBSET || src.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
 	  if (src.SiteSubset() != dst.SiteSubset()) 
@@ -112,6 +111,9 @@ namespace quda {
 	strcat(tmp, src.AuxString());
 	blasStrings.aux_str = tmp;
 	
+	if (dst.Nspin() != src.Nspin())
+	  errorQuda("Spins (%d,%d) do not match", dst.Nspin(), src.Nspin());
+
 	// For a given dst precision, there are two non-trivial possibilities for the
 	// src precision.
 
@@ -135,14 +137,25 @@ namespace quda {
 		     Spinor<float4, float4, float4, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
-	  } else { //src.Nspin() == 1
+	  } else if (src.Nspin() == 2) {
+	    if (src.Length() != src.RealLength() || dst.Length() != dst.RealLength())
+	      errorQuda("Non-zero stride not supported"); // we need to know how many colors to set "M" (requires JIT)
+	    Spinor<float2, float2, float2, 1, 0, 0> src_tex(src);
+	    Spinor<float2, float2, double2, 1, 1> dst_spinor(dst);
+	    CopyCuda<float2, 1, Spinor<float2, float2, double2, 1, 1>,
+		     Spinor<float2, float2, float2, 1, 0, 0> >
+	      copy(dst_spinor, src_tex, src.Length()/2);
+	    copy.apply(*blas::getStream());
+	  } else if (src.Nspin() == 1) {
 	    Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
 	    Spinor<float2, float2, double2, 3, 1> dst_spinor(dst);
 	    CopyCuda<float2, 3, Spinor<float2, float2, double2, 3, 1>,
 		     Spinor<float2, float2, float2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
-	  } 
+	  } else {
+	    errorQuda("Nspin(%d) is not supported", src.Nspin());
+	  }
 	} else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 	  if (src.Nspin() == 4){
 	    Spinor<float4, float2, double2, 6, 0, 0> src_tex(src);
@@ -151,13 +164,24 @@ namespace quda {
 		     Spinor<float4, float2, double2, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
-	  } else { //src.Nspin() ==1
+	  } else if (src.Nspin() == 2) {
+	    if (src.Length() != src.RealLength() || dst.Length() != dst.RealLength())
+	      errorQuda("Non-zero stride not supported"); // we need to know how many colors to set "M" (requires JIT)
+	    Spinor<float2, float2, double2, 1, 0, 0> src_tex(src);
+	    Spinor<float2, float2, float2, 1, 1> dst_spinor(dst);
+	    CopyCuda<float2, 1, Spinor<float2, float2, float2, 1, 1>,
+		     Spinor<float2, float2, double2, 1, 0, 0> >
+	      copy(dst_spinor, src_tex, src.Length()/2);
+	    copy.apply(*blas::getStream());
+	  } else if (src.Nspin() == 1) {
 	    Spinor<float2, float2, double2, 3, 0, 0> src_tex(src);
 	    Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
 	    CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
 		     Spinor<float2, float2, double2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
+	  } else {
+	    errorQuda("Nspin(%d) is not supported", src.Nspin());
 	  }
 	} else if (dst.Precision() == QUDA_SINGLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	  blas::bytes += (unsigned long long)src.Volume()*sizeof(float);
@@ -168,13 +192,15 @@ namespace quda {
 		     Spinor<float4, float4, short4, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
-	  } else { //nSpin== 1;
+	  } else if (src.Nspin() == 1) {
 	    Spinor<float2, float2, short2, 3, 0, 0> src_tex(src);
 	    Spinor<float2, float2, float2, 3, 1> dst_spinor(dst);
 	    CopyCuda<float2, 3, Spinor<float2, float2, float2, 3, 1>,
 		     Spinor<float2, float2, short2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
+	  } else {
+	    errorQuda("Nspin(%d) is not supported", src.Nspin());
 	  }
 	} else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	  blas::bytes += (unsigned long long)dst.Volume()*sizeof(float);
@@ -185,23 +211,15 @@ namespace quda {
 		     Spinor<float4, float4, float4, 6, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
-	  }
-	} else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
-	  blas::bytes += (unsigned long long)dst.Volume()*sizeof(float);
-	  if (src.Nspin() == 4){
-	    Spinor<float4, float4, float4, 6, 0, 0> src_tex(src);
-	    Spinor<float4, float4, short4, 6, 1> dst_spinor(dst);
-	    CopyCuda<float4, 6, Spinor<float4, float4, short4, 6, 1>,
-		     Spinor<float4, float4, float4, 6, 0, 0> >
-	      copy(dst_spinor, src_tex, src.Volume());
-	    copy.apply(*blas::getStream());	
-	  } else { //nSpin == 1
+	  } else if (src.Nspin() == 1) {
 	    Spinor<float2, float2, float2, 3, 0, 0> src_tex(src);
 	    Spinor<float2, float2, short2, 3, 1> dst_spinor(dst);
 	    CopyCuda<float2, 3, Spinor<float2, float2, short2, 3, 1>,
 		     Spinor<float2, float2, float2, 3, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
+	  } else {
+	    errorQuda("Nspin(%d) is not supported", src.Nspin());
 	  }
 	} else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_HALF_PRECISION) {
 	  blas::bytes += (unsigned long long)src.Volume()*sizeof(float);
@@ -212,13 +230,15 @@ namespace quda {
 		     Spinor<double2, float4, short4, 12, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
-	  } else { //nSpin == 1
+	  } else if (src.Nspin() == 1) {
 	    Spinor<double2, float2, short2, 3, 0, 0> src_tex(src);
 	    Spinor<double2, double2, double2, 3, 1> dst_spinor(dst);
 	    CopyCuda<double2, 3, Spinor<double2, double2, double2, 3, 1>,
 		     Spinor<double2, float2, short2, 3, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
+	  } else {
+	    errorQuda("Nspin(%d) is not supported", src.Nspin());
 	  }
 	} else if (dst.Precision() == QUDA_HALF_PRECISION && src.Precision() == QUDA_DOUBLE_PRECISION) {
 	  blas::bytes += (unsigned long long)dst.Volume()*sizeof(float);
@@ -229,13 +249,15 @@ namespace quda {
 		     Spinor<double2, double2, double2, 12, 0, 0> >
 	      copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
-	  } else { //nSpin == 1
+	  } else if (src.Nspin() == 1) {
 	    Spinor<double2, double2, double2, 3, 0, 0> src_tex(src);
 	    Spinor<double2, double2, short2, 3, 1> dst_spinor(dst);
 	    CopyCuda<double2, 3, Spinor<double2, double2, short2, 3, 1>,
 		     Spinor<double2, double2, double2, 3, 0, 0> >
 	    copy(dst_spinor, src_tex, src.Volume());
 	    copy.apply(*blas::getStream());	
+	  } else {
+	    errorQuda("Nspin(%d) is not supported", src.Nspin());
 	  }
 	} else {
 	  errorQuda("Invalid precision combination dst=%d and src=%d", dst.Precision(), src.Precision());

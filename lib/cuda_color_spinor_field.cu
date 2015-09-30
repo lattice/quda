@@ -168,27 +168,6 @@ namespace quda {
     destroy();
   }
 
-  bool cudaColorSpinorField::isNative() const {
-
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION) {
-      if (nSpin == 4) {
-	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
-      } else if (nSpin == 1) {
-	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-      }
-    } else if (precision == QUDA_HALF_PRECISION) {
-      if (nSpin == 4) {
-	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
-      } else if (nSpin == 1) {
-	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
-      }
-    }
-
-    return false;
-  }
-
   void cudaColorSpinorField::create(const QudaFieldCreate create) {
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET && siteOrder != QUDA_EVEN_ODD_SITE_ORDER) {
@@ -311,13 +290,13 @@ namespace quda {
       if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
       else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
       
-      // staggered fields in half and single are always two component
-      if (nSpin == 1 && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
+      // staggered and coarse fields in half and single are always two component
+      if ( (nSpin == 1 || nSpin == 2) && (precision == QUDA_HALF_PRECISION || precision == QUDA_SINGLE_PRECISION)) {
 	desc.x = 8*precision;
 	desc.y = 8*precision;
 	desc.z = 0;
 	desc.w = 0;
-      } else { // all others are four component
+      } else { // all others are four component (double2 is spread across int4)
 	desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
 	desc.y = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
 	desc.z = (precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*precision;
