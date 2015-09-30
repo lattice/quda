@@ -177,10 +177,10 @@ namespace quda {
    */
   void MG::verify() {
     // temporary fields used for verification
-    ColorSpinorParam csParam(*(param.B[0]));
+    ColorSpinorParam csParam(*r);
     csParam.create = QUDA_NULL_FIELD_CREATE;
-    cpuColorSpinorField *tmp1 = new cpuColorSpinorField(csParam);
-    cpuColorSpinorField *tmp2 = new cpuColorSpinorField(csParam);
+    ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
+    ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
     QudaPrecision prec = csParam.precision;
 
@@ -188,13 +188,16 @@ namespace quda {
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
-      transfer->R(*r_coarse, *param.B[i]);
+      // as well as copying to the correct location this also changes basis if necessary
+      *tmp1 = *param.B[i]; 
 
+      transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
-      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P^\\dagger P v_k = %e\n", 
-		 i, blas::norm2(*param.B[i]), blas::norm2(*r_coarse), blas::norm2(*tmp2));
 
-      deviation = blas::xmyNorm(*(param.B[i]), *tmp2);
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P^\\dagger P v_k = %e\n", 
+		 i, blas::norm2(*tmp1), blas::norm2(*r_coarse), blas::norm2(*tmp2));
+
+      deviation = blas::xmyNorm(*tmp1, *tmp2);
       printfQuda("deviation = %e\n", deviation);
 
       if (deviation > pow(1.0,-2*prec)) errorQuda("failed");
@@ -205,11 +208,13 @@ namespace quda {
 
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *(param.B[i]));
-      (*coarse)(*x_coarse, *r_coarse);
+      (*coarse)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
+      setOutputPrefix(prefix); // restore output prefix
       transfer->P(*tmp2, *x_coarse);
       param.matResidual(*tmp1,*tmp2);
+      *tmp2 = *(param.B[i]);
       printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp1));
-      printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*(param.B[i]), *tmp1) / blas::norm2(*param.B[i])) );
+      printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*tmp2, *tmp1) / blas::norm2(*param.B[i])) );
     }
 #endif
 
@@ -335,7 +340,7 @@ namespace quda {
     for (int i=0; i<Nvec; i++) { 
       V[i] = B[i]->V();
       if (V[i] == NULL) {
-	printf("Could not allocate V[%d]\n", i);      
+	printfQuda("Could not allocate V[%d]\n", i);
       }
     }
     
