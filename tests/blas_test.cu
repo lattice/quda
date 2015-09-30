@@ -14,8 +14,9 @@
 // google test
 #include <gtest.h>
 
-// Wilson, clover-improved Wilson, and twisted mass are supported.
 extern QudaDslashType dslash_type;
+extern QudaInverterType inv_type;
+extern int nvec;
 extern bool tune;
 extern int device;
 extern int xdim;
@@ -41,11 +42,12 @@ using namespace quda;
 ColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
 ColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
 int Nspin;
+int Ncolor;
 
 void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
 {
   param.precision = precision;
-  if (Nspin == 1 || precision == QUDA_DOUBLE_PRECISION) {
+  if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else {
     param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
@@ -56,18 +58,41 @@ void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
-  printfQuda("S_dimension T_dimension Nspin\n");
-  printfQuda("%d/%d/%d        %d      %d\n", xdim, ydim, zdim, tdim, Nspin);     
-
+  printfQuda("S_dimension T_dimension Nspin Ncolor\n");
+  printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
-  
   return;  
+}
+
+// Only benchmark double precision if supported
+#if (__COMPUTE_CAPABILITY__ >= 130)
+int Nprec = 3;
+#else
+int Nprec = 2;
+#endif
+
+
+bool skip_kernel(int precision, int kernel) {
+  if ( Nspin == 2 && precision == 0) {
+    // avoid half precision tests if doing coarse fields
+    return true;
+  } else if (Nspin == 2 && kernel == 1) {
+    // avoid low-precision copy if doing coarse fields
+    return true;
+  } else if (Ncolor != 3 && kernel == 31) {
+    // only benchmark heavy-quark norm if doing 3 colors
+    return true;
+  } else if ((Nprec < 3) && (kernel == 0)) {
+    // only benchmark high-precision copy() if double is supported
+    return true;
+  }
+
+  return false;
 }
 
 void initFields(int prec)
@@ -77,10 +102,7 @@ void initFields(int prec)
   QudaPrecision low_aux_prec;
 
   ColorSpinorParam param;
-  param.nColor = 3;
-  // set spin according to the type of dslash
-  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || 
-	   dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
+  param.nColor = Ncolor;
   param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
 
@@ -394,6 +416,8 @@ double test(int kernel) {
     *yD = *yH;
     blas::axpy(a, *xD, *yD);
     blas::axpy(a, *xH, *yH);
+    *zH = *yD;
+    printfQuda("axpy check %e %e\n", blas::norm2(*yH), blas::norm2(*zH));
     error = ERROR(y);
     break;
 
@@ -512,6 +536,7 @@ double test(int kernel) {
     // double
   case 18:
     *xD = *xH;
+    *yH = *xD;
     error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
     break;
     
@@ -633,13 +658,6 @@ double test(int kernel) {
   return error;
 }
 
-// Only benchmark double precision if supported
-#if (__COMPUTE_CAPABILITY__ >= 130)
-int Nprec = 3;
-#else
-int Nprec = 2;
-#endif
-
 const char *prec_str[] = {"half", "single", "double"};
 
 const char *names[] = {
@@ -687,6 +705,17 @@ int main(int argc, char** argv)
     usage(argv);
   }
 
+  // override spin setting if mg solver is set to test coarse grids
+  if (inv_type == QUDA_MG_INVERTER) {
+    Nspin = 2;
+    Ncolor = nvec;
+  } else {
+    // set spin according to the type of dslash
+    Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || 
+	     dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
+    Ncolor = 3;
+  }
+
   setSpinorSiteSize(24);
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
@@ -697,13 +726,13 @@ int main(int argc, char** argv)
   setVerbosity(QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
+    if (Nspin == 2 && prec == 0) continue;
 
     printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
     initFields(prec);
 
     for (int kernel = 0; kernel < Nkernels; kernel++) {
-      // only benchmark "high precision" blas::copy() if double is supported
-      if ((Nprec < 3) && (kernel == 0)) continue;
+      if (skip_kernel(prec, kernel)) continue;
 
       // do the initial tune
       benchmark(kernel, 1);
@@ -757,7 +786,10 @@ public:
 TEST_P(BlasTest, verify) {
   int prec = param.x;
   int kernel = param.y;
-  double deviation = test(kernel);
+
+  // certain tests will fail to run for coarse grids so mark these as
+  // failed without running
+  double deviation =  skip_kernel(prec,kernel) ? 1.0 : test(kernel);
   printfQuda("%-35s error = %e\n", names[kernel], deviation);
   double tol = (prec == 2 ? 1e-12 : (prec == 1 ? 1e-5 : 1e-3));
   tol = (kernel < 2) ? 1e-4 : tol; // use different tolerance for copy
