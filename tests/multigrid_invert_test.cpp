@@ -206,7 +206,7 @@ int main(int argc, char **argv)
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  inv_param.gcrNkrylov = 10;
+  inv_param.gcrNkrylov = 20;
   inv_param.tol = tol;
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -291,6 +291,7 @@ int main(int argc, char **argv)
   }
   // only the fine level is on the GPU (for now)
   mg_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
+  mg_param.location[1] = QUDA_CUDA_FIELD_LOCATION;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
