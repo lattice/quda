@@ -79,4 +79,5 @@ namespace quda {
 		    const GaugeField& gauge, 
 		    QudaFieldLocation location);
 
+  double computeQCharge(GaugeField& Fmunu, QudaFieldLocation location);
 }

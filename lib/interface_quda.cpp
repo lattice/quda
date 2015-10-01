@@ -5261,7 +5261,6 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   gParam.tadpole = gaugePrecise->Tadpole();
 
   if (gaugeSmeared == NULL) {
-//    gaugeSmeared = new cudaGaugeField(gParamEx);
     gaugeSmeared = new cudaGaugeField(gParam);
   }
 
@@ -5531,6 +5530,63 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
   } else {
     errorQuda("Precision not supported for contractions\n");
   }
+}
+
+double qChargeCuda ()
+{
+  cudaGaugeField *data = NULL;
+  cudaGaugeField *temp = NULL;
+
+  #ifndef MULTI_GPU
+    if (!gaugeSmeared) 
+      data = gaugePrecise;
+    else
+      data = gaugeSmeared;
+  #else
+    if ((!gaugeSmeared) && (extendedGaugeResident)) {
+      data = extendedGaugeResident;
+      temp = gaugePrecise;
+    } else {
+      if (!gaugeSmeared) {
+        temp = gaugePrecise;
+      } else {
+        temp = gaugeSmeared;
+        if (extendedGaugeResident)
+          delete extendedGaugeResident; // This is not necessary and depends on the policy:
+      }                                 // Do we keep the smeared extended field on memory, or the unsmeared one?
+                                        // Or both of them?
+      int y[4];
+      for(int dir=0; dir<4; ++dir) y[dir] = temp->X()[dir] + 4;
+      int pad = 0;
+      GaugeFieldParam gParamEx(y, temp->Precision(), temp->Reconstruct(),
+          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+      gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+      gParamEx.order = temp->Order();
+      gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+      gParamEx.t_boundary = temp->TBoundary();
+      gParamEx.nFace = 1;
+
+      data = new cudaGaugeField(gParamEx);
+
+      copyExtendedGauge(*data, *temp, QUDA_CUDA_FIELD_LOCATION);
+      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+      data->exchangeExtendedGhost(R,true);
+      extendedGaugeResident = data;
+      cudaDeviceSynchronize();
+    }
+  #endif
+
+  GaugeField *gauge = data;
+
+  // create the Fmunu field
+  GaugeFieldParam tensorParam(temp->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+  tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaGaugeField Fmunu(tensorParam);
+
+  computeFmunu(Fmunu, *data, QUDA_CUDA_FIELD_LOCATION);
+  return quda::computeQCharge(Fmunu, QUDA_CUDA_FIELD_LOCATION);
 }
 
 
