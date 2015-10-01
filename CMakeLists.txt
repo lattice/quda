@@ -14,7 +14,7 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 #
 # PROJECT is QUDA
 #
-project("QUDA" CXX C Fortran)
+project("QUDA")
 
 ###### Local configuration:
 
@@ -289,6 +289,12 @@ endif(BUILD_BQCD_INTERFACE)
 if(BUILD_TIFR_INTERFACE)
   add_definitions(-DBUILD_TIFR_INTERFACE)
 endif(BUILD_TIFR_INTERFACE)
+
+# derive whether we need to build the fortran interface
+if(BUILD_TIFR_INTERFACE OR BUILD_BQCD_INTERFACE)
+  SET(BUILD_FORTRAN_INTERFACE ON)
+  enable_language(Fortran)
+endif()
 
 if(DEVICE_PACK)
   add_definitions(-DDEVICE_PACK)
