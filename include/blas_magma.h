@@ -93,21 +93,8 @@
       void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn);
 
       void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *pQR, const int ldqr, void *pTau, void *pVm, const int cldn);
-
-      //Pure LAPACK routines (when problem size is very small, no need for MAGMA routines):
-
-      void LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldh);
-      //Compute right eigenvectors and eigenvalues of a complex non-symm. matrix
-      void LapackRightEV(const int m,  const int ldm, void *Mat, void *harVals, void *harVecs, const int ldv);
-      //
-      void LapackGEQR(const int n, void *Mat, const int m, const int ldm, void *tau);//QR decomposion of a (m by n) matrix, ldm is the leading dimension
-      //
-      void LapackLeftConjUNMQR(const int dh /*number of rows*/, const int n /*number of columns of H*/, const int k /*number of reflectors*/,  void *H, const int ldh, void * QR,  const int ldqr, void *tau) ;//for vectors: n =1
-
-      void LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
       //
       void Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals);//Sort nev smallest eigenvectors
-
 //new:
       void ComputeQR(const int nev, Complex * evmat, const int m, const int ldm, Complex  *tau);
 
