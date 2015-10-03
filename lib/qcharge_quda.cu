@@ -6,6 +6,9 @@
 
 #include <cub/cub.cuh> 
 #include <launch_kernel.cuh>
+#include <atomic.cuh>
+#include <cub_helper.cuh>
+#include <index_helper.cuh>
 
 #ifndef Pi2
 #define Pi2   6.2831853071795864769252867665590
@@ -13,45 +16,23 @@
 
 namespace quda {
 
-  template<typename Float>
-    struct QChargeArg {
-      int threads; // number of active threads required
+#ifdef GPU_GAUGE_TOOLS
+  template<typename Float, typename Gauge>
+  struct QChargeArg : public ReduceArg<double> {
+    int threads; // number of active threads required
 
-      int FmunuStride; // stride used on Fmunu field
-      int FmunuOffset; // parity offset 
+    typename ComplexTypeId<Float>::Type* Fmunu;
 
-      typename ComplexTypeId<Float>::Type* Fmunu;
-
-      double *Qch;
-      double *Q_h;
-
-      QChargeArg(GaugeField& Fmunu) : threads(Fmunu.Volume()), 
-        FmunuStride(Fmunu.Stride()), FmunuOffset(Fmunu.Bytes()/(4*sizeof(Float))),
-        Fmunu(reinterpret_cast<typename ComplexTypeId<Float>::Type*>(Fmunu.Gauge_p())),
-        Q_h(static_cast<double*>(pinned_malloc(sizeof(double)))) {
-	  if (cudaHostGetDevicePointer(&Qch, Q_h, 0) != cudaSuccess)
-	    errorQuda("ERROR: Failed to allocate pinned memory.\n");
-        }
+    Gauge data;
+    
+      QChargeArg(const Gauge &data, GaugeField& Fmunu) : ReduceArg<double>(), data(data), 
+        threads(Fmunu.Volume()) {}
     };
 
-  static __inline__ __device__ double atomicAdd(double *addr, double val)
-  {
-    double old=*addr, assumed;
-    
-    do {
-      assumed = old;
-      old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-					    __double_as_longlong(assumed),
-					    __double_as_longlong(val+assumed)));
-    } while( __double_as_longlong(assumed)!=__double_as_longlong(old) );
-    
-    return old;
-  }
-
   // Core routine for computing the topological charge from the field strength
-  template<int blockSize, typename Float>
+  template<int blockSize, typename Float, typename Gauge>
     __global__
-    void qChargeComputeKernel(QChargeArg<Float> arg) {
+    void qChargeComputeKernel(QChargeArg<Float,Gauge> arg) {
       int idx = threadIdx.x + blockIdx.x*blockDim.x;
 
       double tmpQ1 = 0.;
@@ -68,7 +49,7 @@ namespace quda {
         Matrix<Cmplx,3> F[6], temp1, temp2, temp3;
         double tmpQ2, tmpQ3;
         for(int i=0; i<6; ++i){
-          loadLinkVariableFromArray(arg.Fmunu + parity*arg.FmunuOffset, i, idx, arg.FmunuStride, &F[i]); 
+          arg.data.load((Float*)(F[i].data), idx, i, parity);
         }
 
         temp1 = F[0]*F[5];
@@ -82,29 +63,18 @@ namespace quda {
         tmpQ1 /= (Pi2*Pi2);
       }
 
-      typedef cub::BlockReduce<double, blockSize> BlockReduce;
-      __shared__ typename BlockReduce::TempStorage temp_storage;
-      double aggregate = BlockReduce(temp_storage).Sum(tmpQ1);
-
-      if (threadIdx.x == 0) atomicAdd((double *) arg.Qch, aggregate);
+      double Q = tmpQ1;
+      reduce<blockSize>(arg, Q);
     }
-/*
-  template<typename Float, typename Gauge>
-    void qChargeComputeCPU(QChargeArg<Float,Gauge> arg){
-*/  /*    for(int idx=0; idx<arg.threads; ++idx){
-        qChargeComputeCore(arg, idx);
-      }*/
-/*    }
-*/
 
-  template<typename Float>
+  template<typename Float, typename Gauge>
     class QChargeCompute : Tunable {
-      QChargeArg<Float> arg;
+      QChargeArg<Float,Gauge> arg;
       const QudaFieldLocation location;
       GaugeField *vol;
 
       private: 
-      unsigned int sharedBytesPerThread() const { return 0; };//sizeof(double); };//Float); }
+      unsigned int sharedBytesPerThread() const { return 0; };
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
 //      bool tuneSharedBytes() const { return false; } // Don't tune the shared memory.
@@ -112,25 +82,19 @@ namespace quda {
       unsigned int minThreads() const { return arg.threads; }
 
       public:
-      QChargeCompute(QChargeArg<Float> &arg, GaugeField *vol, QudaFieldLocation location) 
+      QChargeCompute(QChargeArg<Float,Gauge> &arg, GaugeField *vol, QudaFieldLocation location) 
         : arg(arg), vol(vol), location(location) {
 	writeAuxString("threads=%d,prec=%lu",arg.threads,sizeof(Float));
-	*(arg.Q_h) = 0.;
       }
 
-      virtual ~QChargeCompute() { host_free(arg.Q_h); }
+      virtual ~QChargeCompute() { }
 
       void apply(const cudaStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
-#if (__COMPUTE_CAPABILITY__ >= 200)
+          arg.result_h[0] = 0.;
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
-	  #ifdef MULTI_GPU
-	    comm_allreduce((double*) arg.Q_h);
-	  #endif
-#else
-	  errorQuda("qChargeComputeKernel not supported on pre-Fermi architecture");
-#endif
+          cudaDeviceSynchronize();
         }else{ // run the CPU code
 	  errorQuda("qChargeComputeKernel not supported on CPU");
 //          qChargeComputeCPU(arg);
@@ -150,31 +114,45 @@ namespace quda {
 
       void preTune(){}
       void postTune(){}
-      long long flops() const { return 480*arg.threads; } // Cambiar
-      long long bytes() const { return arg.threads*(6*18 + 72)*sizeof(Float); } // Cambiar
+      long long flops() const { return arg.threads*(3*198+9); }
+      long long bytes() const { return arg.threads*(6*18)*sizeof(Float); }
     };
 
 
 
-  template<typename Float>
-    void computeQCharge(GaugeField& Fmunu, QudaFieldLocation location, Float &qChg){
-      QChargeArg<Float> arg(Fmunu);
-      QChargeCompute<Float> qChargeCompute(arg, &Fmunu, location);
+  template<typename Float, typename Gauge>
+    void computeQCharge(const Gauge data, GaugeField& Fmunu, QudaFieldLocation location, Float &qChg){
+      QChargeArg<Float,Gauge> arg(data,Fmunu);
+      QChargeCompute<Float,Gauge> qChargeCompute(arg, &Fmunu, location);
       qChargeCompute.apply(0);
-      cudaDeviceSynchronize();
       checkCudaError();
-      qChg = ((double *) arg.Q_h)[0];
+      comm_allreduce((double*) arg.result_h);
+      qChg = arg.result_h[0];
     }
 
   template<typename Float>
     Float computeQCharge(GaugeField &Fmunu, QudaFieldLocation location){
-      int pad = 0;
       Float res = 0.;
 
-      computeQCharge(Fmunu, location, res);
+      if (!Fmunu.isNative()) errorQuda("Topological charge computation only supported on native ordered fields");
+
+      if (Fmunu.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+        typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
+        computeQCharge<Float>(Gauge(Fmunu), Fmunu, location, res);
+      } else if(Fmunu.Reconstruct() == QUDA_RECONSTRUCT_12){
+        typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
+        computeQCharge<Float>(Gauge(Fmunu), Fmunu, location, res);
+      } else if(Fmunu.Reconstruct() == QUDA_RECONSTRUCT_8){
+        typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
+        computeQCharge<Float>(Gauge(Fmunu), Fmunu, location, res);
+      } else {
+        errorQuda("Reconstruction type %d of gauge field not supported", Fmunu.Reconstruct());
+      }
+//      computeQCharge(Fmunu, location, res);
 
       return res;
     }
+#endif
 
   double computeQCharge(GaugeField& Fmunu, QudaFieldLocation location){
 
@@ -192,7 +170,7 @@ namespace quda {
     }
     return;
 #else
-    errorQuda("QCharge has not been built");
+    errorQuda("Gauge tools are not build");
 #endif
 
   }
