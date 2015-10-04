@@ -122,11 +122,96 @@ namespace quda {
 
     int Nface() { return 6; } 
 
-    long long flops() const { 
+    /*
+      per direction / dimension flops
+      SU(3) matrix-vector flops = (8 Nc - 2) * Nc
+      xpay = 2 * 2 * Nc * Ns
+      
+      So for the full dslash we have      
+      flops = (2 * 2 * Nd * (8*Nc-2) * Nc)  +  ((2 * 2 * Nd - 1) * 2 * Nc * Ns)
+      flops_xpay = flops + 2 * 2 * Nc * Ns
+      
+      For Asqtad this should give 1146 for Nc=3,Ns=2 and 1158 for the axpy equivalent
+    */
+    virtual long long flops() const {
+      int mv_flops = (8 * in->Ncolor() - 2) * in->Ncolor(); // SU(3) matrix-vector flops
+      int ghost_flops = (3 + 1) * (mv_flops + 2*in->Ncolor()*in->Nspin());
+      int xpay_flops = 2 * 2 * in->Ncolor() * in->Nspin(); // multiply and add per real component
+      int num_dir = 2 * 4; // dir * dim
+
       long long flops;
-      flops = (x ? 1158ll : 1146ll) * in->VolumeCB();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	flops = ghost_flops * 2 * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	{
+	  long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	  flops = ghost_flops * ghost_sites;
+	  break;
+	}
+      case INTERIOR_KERNEL:
+	{
+	  long long sites = in->VolumeCB();
+	  flops = (2*num_dir*mv_flops +                   // SU(3) matrix-vector multiplies
+		   (2*num_dir-1)*2*in->Ncolor()*in->Nspin()) * sites;   // accumulation
+	  if (x) flops += xpay_flops * sites; // axpy is always on interior
+
+	  // now correct for flops done by exterior kernel
+	  long long ghost_sites = 0;
+	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
+	  flops -= ghost_flops * ghost_sites;
+	  
+	  break;
+	}
+      }
       return flops;
-    } 
+    }
+
+    virtual long long bytes() const {
+      int gauge_bytes_fat = QUDA_RECONSTRUCT_NO * in->Precision();
+      int gauge_bytes_long = reconstruct * in->Precision();
+      bool isHalf = in->Precision() == sizeof(short) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat) + spinor_bytes;
+      int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
+
+      long long bytes;
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+	bytes = ghost_bytes * 2 * in->GhostFace()[dslashParam.kernel_type];
+	break;
+      case EXTERIOR_KERNEL_ALL:
+	{
+	  long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
+	  bytes = ghost_bytes * ghost_sites;
+	  break;
+	}
+      case INTERIOR_KERNEL:
+	{
+	  long long sites = in->VolumeCB();
+	  bytes = (num_dir*(gauge_bytes_fat + gauge_bytes_long) + // gauge reads
+		   num_dir*2*spinor_bytes +                       // spinor reads
+		   spinor_bytes)*sites;                           // spinor write
+	  if (x) bytes += spinor_bytes;
+
+	  // now correct for bytes done by exterior kernel
+	  long long ghost_sites = 0;
+	  for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
+	  bytes -= ghost_bytes * ghost_sites;
+	  
+	  break;
+	}
+      }
+      return bytes;
+    }
+
   };
 #endif // GPU_STAGGERED_DIRAC
 

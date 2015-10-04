@@ -263,14 +263,14 @@ namespace quda {
   }
 
   template<typename Float, typename F, typename coarseGauge, typename fineGauge>
-  void calculateYcoarse(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineGauge &C, const int *x_size, double kappa) {
+  void calculateYcoarse(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineGauge &C,
+			const int *x_size, const int *xc_size, double kappa) {
     if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
     const QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
 
-    const int *xc_size = Y.Field().X();
     int geo_bs[QUDA_MAX_DIM]; 
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = V.Nspin()/Y.NspinCoarse();
@@ -296,8 +296,8 @@ namespace quda {
           computeVUVcoarse<Float,3>(Y, X, UV, V, G, x_size, xc_size, geo_bs, spin_bs, s);
         }
       }
-      printf("UV2[%d] = %e\n", d, UV.norm2());
-      printf("Y2[%d] = %e\n", d, Y.norm2(d));
+      printfQuda("UV2[%d] = %e\n", d, UV.norm2());
+      printfQuda("Y2[%d] = %e\n", d, Y.norm2(d));
     }
 
     printfQuda("Computing coarse diagonal\n");
@@ -309,9 +309,9 @@ namespace quda {
         for(int s_col = 0; s_col < X.NspinCoarse(); s_col++) {
           for(int c = 0; c < X.NcolorCoarse(); c++) {
             for(int c_col = 0; c_col < X.NcolorCoarse(); c_col++) {
-              printf("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
-                     X(0,parity,i,s,s_col,c,c_col).real(),
-                     X(0,parity,i,s,s_col,c,c_col).imag());
+              printfQuda("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
+			 X(0,parity,i,s,s_col,c,c_col).real(),
+			 X(0,parity,i,s,s_col,c,c_col).imag());
             }
           }
         }
@@ -320,7 +320,7 @@ namespace quda {
   }
 #endif
     createCoarseClover<Float>(X, V, C, nDim, x_size, xc_size, geo_bs, spin_bs);
-    printf("X2 = %e\n", X.norm2(0));
+    printfQuda("X2 = %e\n", X.norm2(0));
 
     #if 0
      for(int d = 0; d < 4; d++) {
@@ -330,7 +330,7 @@ namespace quda {
           for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
             for(int c = 0; c < Y.NcolorCoarse(); c++) {
               for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
-                printf("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(d) = %e %e\n",d,parity,i,s,s_col,c,c_col,Y(d,parity,i,s,s_col,c,c_col).real(),Y(d,parity,i,s,s_col,c,c_col).imag());
+                printfQuda("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(d) = %e %e\n",d,parity,i,s,s_col,c,c_col,Y(d,parity,i,s,s_col,c,c_col).real(),Y(d,parity,i,s,s_col,c,c_col).imag());
               }}}}}}}
     #endif
     #if 0
@@ -340,9 +340,9 @@ namespace quda {
         for(int s_col = 0; s_col < X.NspinCoarse(); s_col++) {
           for(int c = 0; c < X.NcolorCoarse(); c++) {
             for(int c_col = 0; c_col < X.NcolorCoarse(); c_col++) {
-              printf("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
-                     X(0,parity,i,s,s_col,c,c_col).real(),
-                     X(0,parity,i,s,s_col,c,c_col).imag());
+              printfQuda("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
+			 X(0,parity,i,s,s_col,c,c_col).real(),
+			 X(0,parity,i,s,s_col,c,c_col).imag());
             }
           }
         }
@@ -350,7 +350,6 @@ namespace quda {
     }
   }
 #endif
-
 
   }
 
@@ -368,7 +367,7 @@ namespace quda {
     gCoarse yAccessor(const_cast<GaugeField&>(Y));
     gCoarse xAccessor(const_cast<GaugeField&>(X)); 
 
-    calculateYcoarse<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cloverAccessor, g.X(), kappa);
+    calculateYcoarse<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cloverAccessor, g.X(), Y.X(), kappa);
   }
 
 
@@ -477,6 +476,9 @@ namespace quda {
     cpuColorSpinorField uv(UVparam);
 
     calculateYcoarse(Y, X, uv, T, gauge, clover, kappa);
+
+    // now exchange Y halos for multi-process dslash
+    Y.exchangeGhost();
   }
   
 } //namespace quda

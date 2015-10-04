@@ -109,7 +109,9 @@ namespace quda {
 
   template <typename Float, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
-    if (a.Nspin() == 2) {
+    if (a.Nspin() == 1) {
+      genericSource<Float,1,order>(a,sourceType, x, s, c);
+    } else if (a.Nspin() == 2) {
       genericSource<Float,2,order>(a,sourceType, x, s, c);
     } else if (a.Nspin() == 4) {
       genericSource<Float,4,order>(a,sourceType, x, s, c);
@@ -217,7 +219,7 @@ namespace quda {
     int ret = 0;
     if (a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER &&
 	a.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      genericCompare<oFloat,iFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, b, tol);
+      ret = genericCompare<oFloat,iFloat,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(a, b, tol);
     } else {
       errorQuda("Unsupported field order %d\n", a.FieldOrder());
     }

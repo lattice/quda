@@ -13,7 +13,11 @@ namespace quda {
     // creates and destroys reduction buffers  
     void init(); 
     void end(void);
-
+    
+    void* getDeviceReduceBuffer();
+    void* getMappedHostReduceBuffer();
+    void* getHostReduceBuffer();
+    
     void setParam(int kernel, int prec, int threads, int blocks);
 
     extern unsigned long long flops;

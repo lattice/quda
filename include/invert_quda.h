@@ -57,6 +57,9 @@ namespace quda {
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
 
+    /**< After how many iterations shall the heavy quark residual be updated */
+    int heavy_quark_check;
+
     /**< Enable pipeline solver */
     int pipeline;
 
@@ -113,6 +116,9 @@ namespace quda {
     /** Actual L2 residual norm achieved in solver for each offset */
     double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
 
+    /** Iterated L2 residual norm achieved in multi shift solver for each offset */
+    double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
+
     /** Actual heavy quark residual norm achieved in solver for each offset */
     double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
 
@@ -168,9 +174,10 @@ namespace quda {
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type), 
       inv_type_precondition(param.inv_type_precondition), 
-      residual_type(param.residual_type), use_init_guess(param.use_init_guess), compute_null_vector(param.compute_null_vector),
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
-      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), pipeline(param.pipeline), tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq), 
+      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
+      tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
       true_res(param.true_res), true_res_hq(param.true_res_hq),
       maxiter(param.maxiter), iter(param.iter), 
       precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
@@ -191,7 +198,7 @@ namespace quda {
         m = (m / 16) * 16 + 16;
         warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
       }
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_EIGCG_INVERTER)){
+      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
     }
@@ -209,10 +216,12 @@ namespace quda {
       param.secs += secs;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];
+	param.iter_res_offset[offset] = iter_res_offset[offset];
 	param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
       } else {
 	for (int i=0; i<num_offset; i++) {
 	  param.true_res_offset[i] = true_res_offset[i];
+	  param.iter_res_offset[i] = iter_res_offset[i];
 	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
 	}
       }
@@ -546,126 +555,6 @@ namespace quda {
 		    std::vector<ColorSpinorField*> q, int N);
   };
 
-  struct DeflationParam {
-    //host   projection matrix:
-    Complex *proj_matrix; //VH A V
-
-    QudaPrecision           ritz_prec;             //keep it right now.    
-    cudaColorSpinorField    *cudaRitzVectors;      //device buffer for Ritz vectors
-    double *ritz_values;
-
-    int ld;                 //projection matrix leading dimension
-    int tot_dim;            //projection matrix full (maximum) dimension (nev*deflation_grid)
-    int cur_dim;            //current dimension (must match rhs_idx: if(rhs_idx < deflation_grid) curr_nevs <= nev * rhs_idx) 
-    int rtz_dim;            //number of ritz values contained in ritz_values array
-    int added_nevs;
-
-    bool cuda_ritz_alloc;
-    bool in_incremental_stage;
-
-    DeflationParam(ColorSpinorParam &eigv_param, SolverParam &param) : cur_dim(0), rtz_dim(0), added_nevs(0), cuda_ritz_alloc(true), in_incremental_stage(true){
-
-       if(param.nev == 0 || param.deflation_grid == 0) errorQuda("\nIncorrect deflation space parameters...\n");
-       
-       tot_dim      = param.deflation_grid*param.nev;
-
-       ld           = ((tot_dim+15) / 16) * tot_dim;
-
-       //allocate deflation resources:
-       proj_matrix  = new Complex[ld*tot_dim];
-       ritz_values  = (double*)calloc(tot_dim, sizeof(double));
-       
-       ritz_prec = param.precision_ritz;
-
-       eigv_param.setPrecision(ritz_prec);//the same as for full precision iterations (see diracDeflateParam)
-       eigv_param.create   = QUDA_ZERO_FIELD_CREATE;
-       eigv_param.eigv_dim = tot_dim;
-       eigv_param.eigv_id  = -1;
-  
-       //if(eigv_param.siteSubset == QUDA_FULL_SITE_SUBSET) eigv_param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-       cudaRitzVectors = new cudaColorSpinorField(eigv_param);
-
-       return;
-    }
-
-    ~DeflationParam(){
-       if(proj_matrix)        delete[] proj_matrix;
-
-       if(cuda_ritz_alloc)    delete cudaRitzVectors;
-
-       if(ritz_values)        free(ritz_values);
-    }
-
-    //reset current dimension:
-    void ResetDeflationCurrentDim(const int addedvecs){
-
-      if(addedvecs == 0) return; //nothing to do
-
-      if((cur_dim+addedvecs) > tot_dim) errorQuda("\nCannot reset projection matrix dimension.\n");
-
-      added_nevs = addedvecs;
-      cur_dim   += added_nevs;
-
-      return;
-    }   
-
-    //print information about the deflation space:
-    void PrintInfo(){
-
-       printfQuda("\nProjection matrix information:\n");
-       printfQuda("Leading dimension %d\n", ld);
-       printfQuda("Total dimension %d\n", tot_dim);
-       printfQuda("Current dimension %d\n", cur_dim);
-       printfQuda("Host pointer: %p\n", proj_matrix);
-
-       return;
-
-    }
-
-    void CleanDeviceRitzVectors()
-    {
-       if( cuda_ritz_alloc ){
-
-         delete cudaRitzVectors;
-
-         cuda_ritz_alloc = false;
-       }
-
-       return;
-    }
-
-    void ReshapeDeviceRitzVectorsSet(const int nev, QudaPrecision new_ritz_prec = QUDA_INVALID_PRECISION)//reset param.ritz_prec?
-    {
-       if(nev > tot_dim || (nev == tot_dim && new_ritz_prec == QUDA_INVALID_PRECISION)) return;//nothing to do
-
-       if(!cuda_ritz_alloc) errorQuda("\nCannot reshape Ritz vectors set.\n");
-       //
-       ColorSpinorParam cudaEigvParam(cudaRitzVectors->Eigenvec(0));
-
-       cudaEigvParam.create   = QUDA_ZERO_FIELD_CREATE;
-       cudaEigvParam.eigv_dim = nev;
-       cudaEigvParam.eigv_id  = -1;
-
-       if(new_ritz_prec != QUDA_INVALID_PRECISION)
-       {
-	  ritz_prec = new_ritz_prec;
-
-          cudaEigvParam.setPrecision(ritz_prec);
-       }
-
-       CleanDeviceRitzVectors();
-
-       cudaRitzVectors = new cudaColorSpinorField(cudaEigvParam);
-
-       cur_dim = nev;
-
-       cuda_ritz_alloc = true;
-
-       return;
-    }
-
-  };
-
   class DeflatedSolver {
 
   protected:
@@ -687,7 +576,7 @@ namespace quda {
     virtual void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) = 0;
 
 //    virtual void Deflate(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;//extrenal method (not implemented yet)
-    virtual void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) = 0;//extrenal method
+    virtual void StoreRitzVecs(void *host_buffer, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) = 0;//extrenal method
 
     virtual void CleanResources() = 0;
 
@@ -711,6 +600,8 @@ namespace quda {
     void PrintSummary(const char *name, int k, const double &r2, const double &b2);
 
   };
+
+  struct DeflationParam;//Forward declaration
 
   class IncEigCG : public DeflatedSolver {
 
@@ -763,7 +654,7 @@ namespace quda {
     //
     void SaveEigCGRitzVecs(DeflationParam *param, bool cleanResources = false);
     //
-    void StoreRitzVecs(void *host_buffer, const cudaColorSpinorField *ritzvects, bool cleanResources = false) {};//extrenal method
+    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
     //
     void CleanResources(); 
 

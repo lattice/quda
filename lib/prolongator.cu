@@ -3,6 +3,8 @@
 #include <tune_quda.h>
 #include <typeinfo>
 
+#include <multigrid_helper.cuh>
+
 namespace quda {
 
   using namespace quda::colorspinor;
@@ -10,27 +12,20 @@ namespace quda {
   /** 
       Kernel argument struct
   */
-  template <typename Out, typename In, typename Rotator, int fineSpin>
+  template <typename Out, typename In, typename Rotator, int fineSpin, int coarseSpin>
   struct ProlongateArg {
     Out out;
     const In in;
     const Rotator V;
     const int *geo_map;  // need to make a device copy of this
-    int spin_map[fineSpin];
+    const spin_mapper<fineSpin,coarseSpin> spin_map;
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
-		  const int *geo_map, const int *spin_map) : 
-      out(out), in(in), V(V), geo_map(geo_map)  {
-      if(spin_map)
-      {
-        for (int s=0; s<fineSpin; s++) this->spin_map[s] = spin_map[s];
-      }
-      else
-      { this->spin_map[0] = 0;}//fineSpin=1
-    }
+		  const int *geo_map) : 
+      out(out), in(in), V(V), geo_map(geo_map), spin_map()  
+    { }
 
-    ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin> &arg) :
-      out(arg.out), in(arg.in), V(arg.V), geo_map(arg.geo_map) {
-      for (int s=0; s<fineSpin; s++) this->spin_map[s] = arg.spin_map[s];
+    ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin, coarseSpin> &arg) :
+      out(arg.out), in(arg.in), V(arg.V), geo_map(arg.geo_map), spin_map() {
     }
   };
 
@@ -53,16 +48,17 @@ namespace quda {
      Applies the grid prolongation operator (coarse to fine)
   */
 
-  template <typename Float, int fineSpin, int coarseColor, class Coarse>
+  template <typename Float, int fineSpin, int coarseColor, class Coarse, typename S>
   __device__ __host__ inline void prolongate(complex<Float> out[fineSpin*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, int parity_coarse, int x_coarse_cb, const int *spin_map) {
+					     int parity, int x_cb, int parity_coarse, int x_coarse_cb, const S& spin_map) {
     for (int s=0; s<fineSpin; s++) {
       for (int c=0; c<coarseColor; c++) {
-	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map[s], c);
+	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map(s), c);
       }
     }
     return;
   }
+
 
   /**
      Rotates from the coarse-color basis into the fine-color basis.  This
@@ -156,6 +152,7 @@ namespace quda {
   protected:
     Arg &arg;
     QudaFieldLocation location;
+    char vol[TuneKey::volume_n];
 
     long long flops() const { return 0; }
     long long bytes() const { return 0; }
@@ -165,8 +162,18 @@ namespace quda {
     unsigned int minThreads() const { return arg.out.Volume()/2; } // fine parity is the block y dimension
 
   public:
-    ProlongateLaunch(Arg &arg, const QudaFieldLocation location) 
-      : arg(arg), location(location) { }
+    ProlongateLaunch(Arg &arg, const ColorSpinorField &fine, const ColorSpinorField &coarse, 
+		     const QudaFieldLocation location) : arg(arg), location(location) { 
+
+      strcpy(vol, fine.VolString());
+      strcat(vol, ",");
+      strcat(vol, coarse.VolString());
+
+      strcpy(aux, fine.AuxString());
+      strcat(aux, ",");
+      strcat(aux, coarse.AuxString());
+    }
+
     virtual ~ProlongateLaunch() { }
 
     void apply(const cudaStream_t &stream) {
@@ -175,17 +182,13 @@ namespace quda {
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	tp.block.y = 2; // need factor of two for parity with in the block
-	ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg> 
+	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }
 
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.out.Volume(); 
-      // FIXME should use stride here
-      aux << "out_stride=" << arg.out.Volume() << ",in_stride=" << arg.in.Volume();
-      //return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      return TuneKey("fixme", typeid(*this).name(), "fixme");
+      return TuneKey(vol, typeid(*this).name(), aux);
     }
 
     void initTuneParam(TuneParam &param) const {
@@ -203,18 +206,18 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		  const int *fine_to_coarse, const int *spin_map) {
+		  const int *fine_to_coarse) {
 
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
     typedef FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order> packedSpinor;
-    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,fineSpin> Arg;
+    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,fineSpin, coarseSpin> Arg;
 
     fineSpinor   Out(const_cast<ColorSpinorField&>(out));
     coarseSpinor In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
-    Arg arg(Out, In, V, fine_to_coarse,spin_map);
+    Arg arg(Out, In, V, fine_to_coarse);
     ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> prolongator(arg, Location(out, in, v));
     prolongator.apply(0);
 
@@ -225,6 +228,13 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int nVec, const int *fine_to_coarse, const int *spin_map) {
+    // first check that the spin_map matches the spin_mapper  
+    if(spin_map != NULL)
+    {
+      spin_mapper<fineSpin,coarseSpin> mapper;
+      for (int s=0; s<fineSpin; s++) 
+        if (mapper(s) != spin_map[s]) errorQuda("Spin map does not match spin_mapper");
+    }
 
     if (nVec == 2) {
       Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, spin_map);

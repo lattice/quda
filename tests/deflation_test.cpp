@@ -20,8 +20,6 @@
 #include <mpi.h>
 #endif
 
-#include <omp.h>
-
 #include <gauge_qio.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -43,6 +41,8 @@ extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
+extern double tol; // tolerance for inverter
+
 
 extern char latfile[];
 
@@ -88,16 +88,8 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
-  // initialize QMP or MPI
-#if defined(QMP_COMMS)
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-#elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
-#endif
-
-  // call srand() with a rank-dependent seed
-  initRand();
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
 
@@ -182,7 +174,7 @@ int main(int argc, char **argv)
   inv_param.pipeline = 0;
 
   inv_param.gcrNkrylov = 10;
-  inv_param.tol = 1e-10;
+  inv_param.tol = tol;
 
 //! For deflated solvers only:
   //inv_param.inv_type = QUDA_EIGCG_INVERTER;
@@ -270,10 +262,6 @@ int main(int argc, char **argv)
 
   inv_param.verbosity = QUDA_VERBOSE;
 
-  // declare the dimensions of the communication grid
-  initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
-
-
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 
@@ -336,11 +324,15 @@ int main(int argc, char **argv)
 
   void *ritzVects = 0;
 
+  double *inverse_ritzVals = 0;
+
   const int defl_dim  = inv_param.deflation_grid*inv_param.nev;
 
-  ritzVects = malloc((defl_dim+1)*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
+  ritzVects = malloc(defl_dim*(Vh)*spinorSiteSize*sSize*inv_param.Ls);
 
-  memset(ritzVects, 0, (defl_dim+1)*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+  memset(ritzVects, 0, defl_dim*inv_param.Ls*(Vh)*spinorSiteSize*sSize);
+
+  inverse_ritzVals = (double*)malloc(defl_dim*sizeof(double));
 
   //printf("\nDeflation: %p :: %u\n", ritzVects, defl_size);
 
@@ -381,9 +373,9 @@ int main(int argc, char **argv)
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-  // perform the inversion
+  // perform the inversions
+  printfQuda("\nStart the incremental stage.\n");
 
- //!
   for(int is = 0; is < inv_param.deflation_grid; is++)
   {
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
@@ -401,8 +393,8 @@ int main(int argc, char **argv)
 
     double time1 = -((double)clock());
 
-    inv_param.cuda_prec_sloppy = cuda_prec; //QUDA_DOUBLE_PRECISION;
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, 0);
+    inv_param.cuda_prec_sloppy = cuda_prec_sloppy; 
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, 0);
 
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -415,6 +407,7 @@ int main(int argc, char **argv)
 
   printfQuda("\n Total eigCG RHS : %d\n", inv_param.rhs_idx);
 //***
+  printfQuda("\nStart the initCG stage.\n");
 
   const int initCGruns = 16; 
 
@@ -439,8 +432,8 @@ int main(int argc, char **argv)
 
     double time1 = -((double)clock());
 
-    inv_param.cuda_prec_sloppy = cuda_prec_sloppy;//QUDA_SINGLE_PRECISION;
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, last_rhs);
+    inv_param.cuda_prec_sloppy = cuda_prec_precondition;//QUDA_HALF_PRECISION
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, ritzVects, inverse_ritzVals, last_rhs);
   
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -533,6 +526,8 @@ int main(int argc, char **argv)
 
   free(ritzVects);
 
+  free(inverse_ritzVals);
+
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) freeCloverQuda();
 
@@ -540,11 +535,7 @@ int main(int argc, char **argv)
   endQuda();
 
   // finalize the communications layer
-#if defined(QMP_COMMS)
-  QMP_finalize_msg_passing();
-#elif defined(MPI_COMMS)
-  MPI_Finalize();
-#endif
+  finalizeComms();
 
   return 0;
 }

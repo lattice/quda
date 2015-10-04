@@ -123,10 +123,10 @@ namespace quda {
     void setPrecision(QudaPrecision precision) {
       // is the current status in native field order?
       bool native = false;
-      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin ==1) && 
+      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1) && 
 	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
 	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION) && 
-	    nSpin ==4 && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
+	    (nSpin==4 || nSpin==2) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 	   
       this->precision = precision;
 
@@ -288,6 +288,13 @@ namespace quda {
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
 
+    /**
+      This function returns true if the field is stored in an internal
+      field order, given the precision and the length of the spin
+      dimension.
+      */ 
+    bool isNative() const;
+
     //! for eigcg only:
     int EigvDim() const { return eigv_dim; }
     int EigvId() const { return eigv_id; }
@@ -303,7 +310,6 @@ namespace quda {
 
     QudaDWFPCType DWFPCtype() const { return PCtype; }
 
-    virtual QudaFieldLocation Location() const = 0;
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
@@ -318,14 +324,13 @@ namespace quda {
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
     
-    virtual const ColorSpinorField& Even() const { errorQuda("Not implemented"); return *this;}
-    virtual const ColorSpinorField& Odd() const { errorQuda("Not implemented"); return *this; }
+    const ColorSpinorField& Even() const;
+    const ColorSpinorField& Odd() const;
 
-    virtual ColorSpinorField& Even() { errorQuda("Not implemented"); return *this; }
-    virtual ColorSpinorField& Odd() { errorQuda("Not implemented"); return *this; }
+    ColorSpinorField& Even();
+    ColorSpinorField& Odd();
 
-    virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0)
-    { errorQuda("Not implemented"); }
+    virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
     /** 
      * Compute the n-dimensional site index given the 1-d offset index
@@ -526,6 +531,7 @@ namespace quda {
     void sendStart(int nFace, int dir, int dagger=0);
     void commsStart(int nFace, int dir, int dagger=0);
     int commsQuery(int nFace, int dir, int dagger=0); 
+    void commsWait(int nFace, int dir, int dagger=0); 
     void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
 
@@ -538,29 +544,16 @@ namespace quda {
     const cudaTextureObject_t& TexNorm() const { return texNorm; }
 #endif
 
-    const ColorSpinorField& Even() const;
-    const ColorSpinorField& Odd() const;
-
-    ColorSpinorField& Even();
-    ColorSpinorField& Odd();
-
     cudaColorSpinorField& Eigenvec(const int idx) const;
     void CopyEigenvecSubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
 
     void zero();
 
-    QudaFieldLocation Location() const;
-
-    /**
-      This function returns true if the field is stored in an internal
-      field order, given the precision and the length of the spin
-      dimension.
-      */ 
-    bool isNative() const;
-
     friend std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &);
 
     void getTexObjectInfo() const;
+
+    void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
   };
 
   // CPU implementation
@@ -595,9 +588,6 @@ namespace quda {
     cpuColorSpinorField& operator=(const cpuColorSpinorField&);
     cpuColorSpinorField& operator=(const cudaColorSpinorField&);
 
-    //cpuColorSpinorField& Even() const;
-    //cpuColorSpinorField& Odd() const;
-
     void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0);
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
     void PrintVector(unsigned int x);
@@ -613,10 +603,6 @@ namespace quda {
     void copy(const cpuColorSpinorField&);
     void zero();
 
-    /**
-     * @return The location of the field (CUDA or CPU)
-     */
-    QudaFieldLocation Location() const;
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 
@@ -630,29 +616,6 @@ namespace quda {
   
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b) {
-    QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-    if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations do not match");
-    return location;
-  }
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b, 
-				    const ColorSpinorField &c) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(b,c));
-  }
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b,
-				    const ColorSpinorField &c, const ColorSpinorField &d) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d));
-  }
-
-  inline QudaFieldLocation Location(const ColorSpinorField &a, const ColorSpinorField &b, 
-				    const ColorSpinorField &c, const ColorSpinorField &d, 
-				    const ColorSpinorField &e) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,c) & Location(a,d) & Location(a,e));
-  }
 
 } // namespace quda
 

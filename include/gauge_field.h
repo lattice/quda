@@ -68,7 +68,7 @@ namespace quda {
       staggeredPhaseType(QUDA_INVALID_STAGGERED_PHASE),
       staggeredPhaseApplied(false),
       siteDim(4)
-        {
+	{
 	  // variables declared in LatticeFieldParam
 	  precision = QUDA_INVALID_PRECISION;
 	  nDim = 4;
@@ -78,7 +78,7 @@ namespace quda {
 	    r[dir] = 0;
 	  }
 	}
-	
+
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry, 
 		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
@@ -98,25 +98,38 @@ namespace quda {
 	  this->r[dir] = 0;
 	}
       }
-      
+
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param) : LatticeFieldParam(param),
       nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO), order(param.gauge_order), 
-	fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
-	anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
-	create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
-	compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
-	staggeredPhaseType(param.staggered_phase_type), 
-	staggeredPhaseApplied(param.staggered_phase_applied) 
-	  {
-	    //Following is irrelevant for non-coarse gauge fields.
-	    this->siteDim = this->nDim;
-	    if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
-	    else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
-	    else errorQuda("Error: invalid link type(%d)\n", link_type);
-	    for (int d=0; d<nDim; d++) r[d] = 0;
-	  }
+      fixed(param.gauge_fix), link_type(param.type), t_boundary(param.t_boundary), 
+      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), scale(param.scale), gauge(h_gauge), 
+      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY), pinned(0), 
+      compute_fat_link_max(false), ghostExchange(QUDA_GHOST_EXCHANGE_PAD),
+      staggeredPhaseType(param.staggered_phase_type), 
+      staggeredPhaseApplied(param.staggered_phase_applied) 
+	{
+	  //Following is irrelevant for non-coarse gauge fields.
+	  this->siteDim = this->nDim;
+
+	  if (link_type == QUDA_WILSON_LINKS || link_type == QUDA_ASQTAD_FAT_LINKS) nFace = 1;
+	  else if (link_type == QUDA_ASQTAD_LONG_LINKS) nFace = 3;
+	  else errorQuda("Error: invalid link type(%d)\n", link_type);
+	  for (int d=0; d<nDim; d++) r[d] = 0;
+	}
+    
+    /**
+       Helper function for setting the precision and corresponding
+       field order for QUDA internal fields.
+       @param precision The precision to use 
+     */
+    void setPrecision(QudaPrecision precision) {
+      this->precision = precision;
+      order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO) ? 
+	QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER; 
+    }
+
   };
-  
+
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
 
   class GaugeField : public LatticeField {
@@ -142,8 +155,8 @@ namespace quda {
     double tadpole;
     double fat_link_max;
     double scale;
-  
-    
+
+
     QudaFieldCreate create; // used to determine the type of field created
 
     /** Array storing the length of dimension */
@@ -158,15 +171,11 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
-    /**
-       This function returns true if the field is stored in an
-       internal field order for the given precision.
-    */ 
-    bool isNative() const;
-
   public:
     GaugeField(const GaugeFieldParam &param);
     virtual ~GaugeField();
+
+    virtual void exchangeGhost() = 0;
 
     int Length() const { return length; }
     int Ncolor() const { return nColor; }
@@ -183,21 +192,26 @@ namespace quda {
     const int* R() const { return r; }
     QudaGhostExchange GhostExchange() const { return ghostExchange; }
     QudaStaggeredPhase StaggeredPhase() const { return staggeredPhaseType; }
-
     /**
        Apply the staggered phase factors to the gauge field.
-     */
+    */
     void applyStaggeredPhase();
 
     /**
        Remove the staggered phase factors from the gauge field.
-     */
+    */
     void removeStaggeredPhase();
 
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
-  
+
     void checkField(const GaugeField &);
+
+    /**
+       This function returns true if the field is stored in an
+       internal field order for the given precision.
+    */ 
+    bool isNative() const;
 
     size_t Bytes() const { return bytes; }
     size_t PhaseBytes() const { return phase_bytes; }
@@ -215,7 +229,11 @@ namespace quda {
       if ( isNative() ) errorQuda("No ghost zone pointer for quda-native gauge fields");
       return (const void**)ghost; 
     }
-    
+
+    /**
+       Set all field elements to zero (virtual)
+    */
+    virtual void zero() = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -247,7 +265,7 @@ namespace quda {
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
-     */
+    */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     void copy(const GaugeField &);     // generic gauge field copy
@@ -278,6 +296,11 @@ namespace quda {
     void restore();
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
+
+    /**
+       Set all field elements to zero
+    */
+    void zero();
   };
 
   class cpuGaugeField : public GaugeField {
@@ -289,7 +312,7 @@ namespace quda {
   private:
     void **gauge; // the actual gauge field
     int pinned;
-  
+
   public:
     cpuGaugeField(const GaugeFieldParam &);
     virtual ~cpuGaugeField();
@@ -303,12 +326,17 @@ namespace quda {
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimenions
-     */
+    */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
     void setGauge(void** _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE
+
+    /**
+       Set all field elements to zero
+    */
+    void zero();
   };
 
   /**

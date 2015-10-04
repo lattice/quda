@@ -55,8 +55,8 @@ cpuColorSpinorField* tmp;
 cpuGaugeField *cpuFat = NULL;
 cpuGaugeField *cpuLong = NULL;
 
-static double tol = 1e-7;
-
+extern double tol; // tolerance for inverter
+extern double tol_hq; // heavy-quark tolerance for inverter
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -109,7 +109,11 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   gaugeParam->gauge_fix = QUDA_GAUGE_FIXED_NO;
   gaugeParam->anisotropy = 1.0;
   gaugeParam->tadpole_coeff = tadpole_coeff;
-  gaugeParam->scale = -1.0/(24.0*tadpole_coeff*tadpole_coeff);
+
+  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
+    dslash_type = QUDA_ASQTAD_DSLASH;
+
+  gaugeParam->scale = dslash_type == QUDA_STAGGERED_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
   gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
@@ -130,14 +134,24 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
   
 #if __COMPUTE_CAPABILITY__ >= 200
+  if(tol_hq == 0 && tol == 0){
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
   // require both L2 relative and heavy quark residual to determine convergence
-  inv_param->residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
-  inv_param->tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
+  inv_param->residual_type = static_cast<QudaResidualType_s>(0);
+  inv_param->residual_type = (tol != 0) ? static_cast<QudaResidualType_s> ( inv_param->residual_type | QUDA_L2_RELATIVE_RESIDUAL) : inv_param->residual_type;
+  inv_param->residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param->residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param->residual_type;
+
+  inv_param->tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 #else
+  if(tol == 0){
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
   // Pre Fermi architecture only supports L2 relative residual norm
   inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 #endif
-  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
 
 
  
@@ -167,8 +181,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH)
-    dslash_type = QUDA_STAGGERED_DSLASH;
   inv_param->dslash_type = dslash_type;
 
   inv_param->tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
@@ -192,9 +204,6 @@ invert_test(void)
       link_recon, link_recon_sloppy, mass, tol, 500, 1e-3,
       0.8);
 
-  // declare the dimensions of the communication grid
-  initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
-
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
@@ -212,35 +221,13 @@ invert_test(void)
   construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, 
 				 &gaugeParam, dslash_type);
 
-  const double cos_pi_3 = 0.5; // Cos(pi/3)
-  const double sin_pi_3 = sqrt(0.75); // Sin(pi/3)
-
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
       for(int j=0; j<gaugeSiteSize; ++j){
         if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-          ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j] = 0.5*rand()/RAND_MAX;
-          if(link_recon != QUDA_RECONSTRUCT_8 && link_recon != QUDA_RECONSTRUCT_12){ // incorporate non-trivial phase into long links
-            if(j%2 == 0){
-              const double real = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
-              const double imag = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1];
-              ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j]     = real*cos_pi_3 - imag*sin_pi_3;
-              ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
-            }
-          }
           ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
           ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
         }else{
-          ((float*)qdp_fatlink[dir])[i] = 0.5*rand()/RAND_MAX;
-          if(link_recon != QUDA_RECONSTRUCT_8 && link_recon != QUDA_RECONSTRUCT_12){ // incorporate non-trivial phase into long links
-            if(j%2 == 0){
-              const float real = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
-              const float imag = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1];
-              ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j]     = real*cos_pi_3 - imag*sin_pi_3;
-              ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j + 1] = real*sin_pi_3 + imag*cos_pi_3;
-            }
-          }
-          ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
           ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
           ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
         }
@@ -297,10 +284,21 @@ invert_test(void)
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
+
+#else
+  int fat_pad = 0;
+  int link_pad = 0;
+#endif
+  
   gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.ga_pad = fat_pad;
-  gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  if (dslash_type == QUDA_STAGGERED_DSLASH) {
+    gaugeParam.reconstruct = link_recon;
+    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+  } else {
+    gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+  }
   gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
   loadGaugeQuda(fatlink, &gaugeParam);
 
@@ -311,19 +309,6 @@ invert_test(void)
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
     loadGaugeQuda(longlink, &gaugeParam);
   }
-#else
-  gaugeParam.type = QUDA_ASQTAD_FAT_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-  gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
-  loadGaugeQuda(fatlink, &gaugeParam);
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
-    gaugeParam.reconstruct = link_recon;
-    gaugeParam.reconstruct_sloppy = link_recon_sloppy;
-    loadGaugeQuda(longlink, &gaugeParam);
-  }
-#endif
 
   double time0 = -((double)clock()); // Start the timer
 
@@ -555,7 +540,6 @@ display_test_info()
 usage_extra(char** argv )
 {
   printfQuda("Extra options:\n");
-  printfQuda("    --tol  <resid_tol>                       # Set residual tolerance\n");
   printfQuda("    --test <0/1>                             # Test method\n");
   printfQuda("                                                0: Even even spinor CG inverter\n");
   printfQuda("                                                1: Odd odd spinor CG inverter\n");
@@ -573,20 +557,7 @@ int main(int argc, char** argv)
       continue;
     }   
 
-    if( strcmp(argv[i], "--tol") == 0){
-      float tmpf;
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      sscanf(argv[i+1], "%f", &tmpf);
-      if (tmpf <= 0){
-        printf("ERROR: invalid tol(%f)\n", tmpf);
-        usage(argv);
-      }
-      tol = tmpf;
-      i++;
-      continue;
-    }
+
 
     if( strcmp(argv[i], "--cpu_prec") == 0){
       if (i+1 >= argc){
@@ -613,30 +584,17 @@ int main(int argc, char** argv)
   }
 
 
-  // initialize QMP or MPI
-#if defined(QMP_COMMS)
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-#elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
-#endif
-
-  // call srand() with a rank-dependent seed
-  initRand();
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
-
   
   printfQuda("dslash_type = %d\n", dslash_type);
 
   int ret = invert_test();
 
   // finalize the communications layer
-#if defined(QMP_COMMS)
-  QMP_finalize_msg_passing();
-#elif defined(MPI_COMMS)
-  MPI_Finalize();
-#endif
+  finalizeComms();
 
   return ret;
 }

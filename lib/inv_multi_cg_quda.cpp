@@ -69,7 +69,7 @@ namespace quda {
     if (Location(*(x[0]), b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
 
-    profile.Start(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     int num_offset = param.num_offset;
     double *offset = param.offset;
@@ -79,7 +79,7 @@ namespace quda {
     const double b2 = blas::norm2(b);
     // Check to see that we're not trying to invert on a zero-field source
     if(b2 == 0){
-      profile.Stop(QUDA_PROFILE_INIT);
+      profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       for(int i=0; i<num_offset; ++i){
         *(x[i]) = b;
@@ -151,16 +151,21 @@ namespace quda {
     cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
   
     cudaColorSpinorField tmp1(*Ap, csParam);
-    cudaColorSpinorField *tmp2_p = &tmp1;
-    // tmp only needed for multi-gpu Wilson-like kernels
-    if (mat.Type() != typeid(DiracStaggeredPC).name() && 
-	mat.Type() != typeid(DiracStaggered).name()) {
-      tmp2_p = new cudaColorSpinorField(*Ap, csParam);
-    }
+
+    // tmp2 only needed for multi-gpu Wilson-like kernels
+    cudaColorSpinorField *tmp2_p = !mat.isStaggered() ?
+      new cudaColorSpinorField(*Ap, csParam) : &tmp1;
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
-    profile.Stop(QUDA_PROFILE_INIT);
-    profile.Start(QUDA_PROFILE_PREAMBLE);
+    // additional high-precision temporary if Wilson and mixed-precision
+    csParam.setPrecision(param.precision);
+    cudaColorSpinorField *tmp3_p =
+      (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
+      new cudaColorSpinorField(*r, csParam) : &tmp1;
+    cudaColorSpinorField &tmp3 = *tmp3_p;
+
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     // stopping condition of each shift
     double stop[QUDA_MAX_MULTI_SHIFT];
@@ -201,8 +206,8 @@ namespace quda {
     int rUpdate = 0;
     blas::flops = 0;
 
-    profile.Stop(QUDA_PROFILE_PREAMBLE);
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() >= QUDA_VERBOSE) 
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
@@ -227,13 +232,15 @@ namespace quda {
       for (int j=1; j<num_offset_now; j++) rNorm[j] = rNorm[0] * zeta[j];
 
       int updateX=0, updateR=0;
+      //fixme: with the current implementation of the reliable update it is sufficient to trigger it only for shift 0
+      //fixme: The loop below is unnecessary but I don't want to delete it as we still might find a better reliable update
       int reliable_shift = -1; // this is the shift that sets the reliable_shift
-      for (int j=num_offset_now-1; j>=0; j--) {
-	if (rNorm[j] > maxrx[j]) maxrx[j] = rNorm[j];
-	if (rNorm[j] > maxrr[j]) maxrr[j] = rNorm[j];
-	updateX = (rNorm[j] < delta*r0Norm[j] && r0Norm[j] <= maxrx[j]) ? 1 : updateX;
-	updateR = ((rNorm[j] < delta*maxrr[j] && r0Norm[j] <= maxrr[j]) || updateX) ? 1 : updateR;
-	if ((updateX || updateR) && reliable_shift == -1) reliable_shift = j;
+      for (int j=0; j>=0; j--) {
+        if (rNorm[j] > maxrx[j]) maxrx[j] = rNorm[j];
+        if (rNorm[j] > maxrr[j]) maxrr[j] = rNorm[j];
+        updateX = (rNorm[j] < delta*r0Norm[j] && r0Norm[j] <= maxrx[j]) ? 1 : updateX;
+        updateR = ((rNorm[j] < delta*maxrr[j] && r0Norm[j] <= maxrr[j]) || updateX) ? 1 : updateR;
+        if ((updateX || updateR) && reliable_shift == -1) reliable_shift = j;
       }
 
       if ( !(updateR || updateX) || !reliable) {
@@ -254,7 +261,7 @@ namespace quda {
 	  blas::xpy(*x[j], *y[j]);
 	}
 
-	mat(*r, *y[0], *x[0]); // here we can use x as tmp
+	mat(*r, *y[0], *x[0], tmp3); // here we can use x as tmp
 	if (r->Nspin()==4) blas::axpy(offset[0], *y[0], *r);
 
 	r2[0] = blas::xmyNorm(b, *r);
@@ -266,8 +273,8 @@ namespace quda {
 	// break-out check if we have reached the limit of the precision
 
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
-    resIncrease++;
-    resIncreaseTotal[reliable_shift]++;
+	  resIncrease++;
+	  resIncreaseTotal[reliable_shift]++;
 	  warningQuda("MultiShiftCG: Shift %d, updated residual %e is greater than previous residual %e (total #inc %i)", 
 		      reliable_shift, sqrt(r2[reliable_shift]), r0Norm[reliable_shift], resIncreaseTotal[reliable_shift]);
 
@@ -329,8 +336,11 @@ namespace quda {
       if (reliable) blas::xpy(*y[i], *x[i]);
     }
 
-    profile.Stop(QUDA_PROFILE_COMPUTE);
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("MultiShift CG: Reliable updates = %d\n", rUpdate);
 
     if (k==param.maxiter) warningQuda("Exceeded maximum iterations %d\n", param.maxiter);
     
@@ -349,6 +359,7 @@ namespace quda {
       }
       double true_res = blas::xmyNorm(b, *r);
       param.true_res_offset[i] = sqrt(true_res/b2);
+      param.iter_res_offset[i] = sqrt(r2[i]/b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
       param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
 #else
@@ -359,19 +370,21 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE){
       printfQuda("MultiShift CG: Converged after %d iterations\n", k);
       for(int i=0; i < num_offset; i++) { 
-	printfQuda(" shift=%d, relative residua: iterated = %e, true = %e\n", 
-		   i, sqrt(r2[i]/b2), param.true_res_offset[i]);
+	printfQuda(" shift=%d, relative residual: iterated = %e, true = %e\n", 
+		   i, param.iter_res_offset[i], param.true_res_offset[i]);
       }
-    }      
+    }
+
   
     // reset the flops counters
     blas::flops = 0;
     mat.flops();
     matSloppy.flops();
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
+    if (&tmp3 != &tmp1) delete tmp3_p;
     if (&tmp2 != &tmp1) delete tmp2_p;
 
     if (r_sloppy->Precision() != r->Precision()) delete r_sloppy;
@@ -391,7 +404,7 @@ namespace quda {
     delete []alpha;
     delete []beta;
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }

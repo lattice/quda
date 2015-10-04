@@ -180,8 +180,10 @@ template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int write
 
 template <typename Float, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
-  if (x.Nspin() == 2) {
-    genericBlas<Float,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);    
+  if (x.Nspin() == 1) {
+    genericBlas<Float,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Nspin() == 2) {
+    genericBlas<Float,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Nspin() == 4) {
     genericBlas<Float,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
@@ -222,7 +224,7 @@ template <template <typename Float, typename FloatN> class Functor,
       return;
     }
 
-    if (!static_cast<cudaColorSpinorField&>(x).isNative()) {
+    if (!x.isNative()) {
       warningQuda("Device blas on non-native fields is not supported\n");
       return;
     }
@@ -230,25 +232,29 @@ template <template <typename Float, typename FloatN> class Functor,
     blasStrings.vol_str = x.VolString();
     blasStrings.aux_str = x.AuxString();
 
-    // FIXME: use traits to encapsulate register type for shorts -
-    // will reduce template type parameters from 3 to 2
+  // FIXME: use traits to encapsulate register type for shorts -
+  // will reduce template type parameters from 3 to 2
 
-    size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
-    size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
+  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
+  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
 
-    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      const int M = 1;
-      Spinor<double2,double2,double2,M,writeX,0> X(x);
-      Spinor<double2,double2,double2,M,writeY,1> Y(y);
-      Spinor<double2,double2,double2,M,writeZ,2> Z(z);
-      Spinor<double2,double2,double2,M,writeW,3> W(w);
-      Functor<double2, double2> f(a,b,c);
-      BlasCuda<double2,M,
-	Spinor<double2,double2,double2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
-	Spinor<double2,double2,double2,M,writeZ,2>, Spinor<double2,double2,double2,M,writeW,3>,
-	Functor<double2, double2> > blas(X, Y, Z, W, f, x.Length()/(2*M), bytes, norm_bytes);
-      blas.apply(*blasStream);
-    } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
+  if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+    const int M = 1;
+    Spinor<double2,double2,double2,M,writeX,0> X(x);
+    Spinor<double2,double2,double2,M,writeY,1> Y(y);
+    Spinor<double2,double2,double2,M,writeZ,2> Z(z);
+    Spinor<double2,double2,double2,M,writeW,3> W(w);
+    Functor<double2, double2> f(a,b,c);
+    BlasCuda<double2,M,
+      Spinor<double2,double2,double2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
+      Spinor<double2,double2,double2,M,writeZ,2>, Spinor<double2,double2,double2,M,writeW,3>,
+      Functor<double2, double2> > blas(X, Y, Z, W, f, x.Length()/(2*M), bytes, norm_bytes);
+    blas.apply(*blasStream);
+#else
+    errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+  } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       const int M = 1;
       if (x.Nspin() == 4) {
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
@@ -265,8 +271,8 @@ template <template <typename Float, typename FloatN> class Functor,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else if (x.Nspin()==1) {
-#ifdef GPU_STAGGERED_DIRAC
+      } else if (x.Nspin()==2 || x.Nspin()==1) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
 	Spinor<float2,float2,float2,M,writeX,0> X(x);
 	Spinor<float2,float2,float2,M,writeY,1> Y(y);
 	Spinor<float2,float2,float2,M,writeZ,2> Z(z);
@@ -280,10 +286,10 @@ template <template <typename Float, typename FloatN> class Functor,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
-    } else {
-      if (x.Ncolor() != 3) { errorQuda("Not supported"); }
-      if (x.Nspin() == 4){ //wilson
+      } else { errorQuda("nSpin=%d is not supported\n", x.Nspin()); }
+  } else {
+    if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
+    if (x.Nspin() == 4){ //wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	Spinor<float4,float4,short4,6,writeX,0> X(x);
 	Spinor<float4,float4,short4,6,writeY,1> Y(y);
@@ -314,7 +320,7 @@ template <template <typename Float, typename FloatN> class Functor,
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
       } else {
-	errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin());
+	errorQuda("nSpin=%d is not supported\n", x.Nspin());
       }
       blas::bytes += Functor<double2,double2>::streams()*(unsigned long long)x.Volume()*sizeof(float);
     }

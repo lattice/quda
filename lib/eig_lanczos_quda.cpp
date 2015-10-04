@@ -32,12 +32,12 @@ namespace quda {
   {
     using namespace blas;
 
-    profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Check to see that we'reV not trying to invert on a zero-field source    
     const double b2 = norm2(r);
     if(b2 == 0){
-      profile.Stop(QUDA_PROFILE_COMPUTE);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       printfQuda("Warning: initial residual is already zero\n");
       return;
     }
@@ -89,7 +89,7 @@ namespace quda {
         }
       }
     }
-    profile.Stop(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     return;
   }
   

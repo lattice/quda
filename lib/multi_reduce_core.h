@@ -379,7 +379,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
           Spinor<double2, double2, double2, M, writeZ>, Spinor<double2, double2, double2, M, writeW>,
           Spinor<double2, double2, double2, M, writeV>, Reducer<ReduceType, double2, double2> >
             reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
-        reduce.apply(*getBlasStream());
+        reduce.apply(*blas::getStream());
 
         
 
@@ -409,7 +409,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
             reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
 
         
-        reduce.apply(*getBlasStream());
+        reduce.apply(*blas::getStream());
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
 
     }else if (x[0]->Precision() == QUDA_SINGLE_PRECISION) {
@@ -437,7 +437,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float4,float4,float4,M,writeZ>, Spinor<float4,float4,float4,M,writeW>,
 	  Spinor<float4,float4,float4,M,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(4*M));
-	reduce.apply(*getBlasStream());
+	reduce.apply(*blas::getStream());
       }else if(x[0]->Nspin() == 1){ // staggered
 
 	const int M = siteUnroll ? 3 : 1; 
@@ -462,7 +462,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float2,float2,float2,M,writeZ>, Spinor<float2,float2,float2,M,writeW>,
 	  Spinor<float2,float2,float2,M,writeV>, Reducer<ReduceType, float2, float2> >
 	reduce(result, X, Y, Z, W, V, r, reduce_length/(2*M));
-	reduce.apply(*getBlasStream());
+	reduce.apply(*blas::getStream());
       }
     }else{ // half precision
       if(x[0]->Nspin() == 4){ // wilson
@@ -486,7 +486,7 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float4,float4,short4,6,writeZ>, Spinor<float4,float4,short4,6,writeW>,
 	  Spinor<float4,float4,short4,6,writeV>, Reducer<ReduceType, float2, float4> >
 	reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
-	reduce.apply(*getBlasStream());	  
+	reduce.apply(*blas::getStream());	  
       }else if(x[0]->Nspin() == 1){ // staggered
         Spinor<float2,float2,short2,3,writeX> X[N];
 	Spinor<float2,float2,short2,3,writeY> Y[N];
@@ -508,14 +508,14 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
 	  Spinor<float2,float2,short2,3,writeZ>, Spinor<float2,float2,short2,3,writeW>,
 	  Spinor<float2,float2,short2,3,writeV>, Reducer<ReduceType, float2, float2> >
 	  reduce(result, X, Y, Z, W, V, r, y[0]->Volume());
-	reduce.apply(*getBlasStream());
+	reduce.apply(*blas::getStream());
 
       }else{ errorQuda("ERROR: nSpin=%d is not supported\n", x[0]->Nspin()); }
     }
 
     for(int i=0; i<N; ++i){
-      blas_bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x[i]->RealLength()*x[i]->Precision();
-      blas_flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x[i]->RealLength();
+      blas::bytes += Reducer<ReduceType,double2,double2>::streams()*(unsigned long long)x[i]->RealLength()*x[i]->Precision();
+      blas::flops += Reducer<ReduceType,double2,double2>::flops()*(unsigned long long)x[i]->RealLength();
     }
     checkCudaError();
     return;

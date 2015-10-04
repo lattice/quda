@@ -23,7 +23,7 @@ namespace quda {
   }
 
   BiCGstab::~BiCGstab() {
-    //profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
     if(init) {
       delete yp;
@@ -34,7 +34,7 @@ namespace quda {
       delete tp;
     }
 
-    //profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta) {
@@ -53,7 +53,7 @@ namespace quda {
 
   void BiCGstab::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
-    profile.Start(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     if (!init) {
       ColorSpinorParam csParam(x);
@@ -95,7 +95,8 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      profile.Stop(QUDA_PROFILE_PREAMBLE);
+      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+
       warningQuda("inverting on zero-field source\n");
       if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
       {
@@ -169,8 +170,7 @@ namespace quda {
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     double heavy_quark_res = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
-    int heavy_quark_check = 10; // how often to check the heavy quark residual
-
+    const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double delta = param.delta;
 
@@ -197,9 +197,8 @@ namespace quda {
       blas::flops = 0;    
     }
 
-    profile.Stop(QUDA_PROFILE_PREAMBLE);
-    //FIXME: MC - Hack to fix nested profilers in MG V-cycle
-    //profile.Start(QUDA_PROFILE_COMPUTE);
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
     
     rho = r2; // cDotProductCuda(r0, r_sloppy); // BiCRstab
     blas::copy(p, rSloppy);
@@ -312,9 +311,8 @@ namespace quda {
     if (x.Precision() != xSloppy.Precision()) blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    //FIXME: Temporary hack to fix nested profilers in MG - MC
-    //profile.Stop(QUDA_PROFILE_COMPUTE);
-    profile.Start(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     //param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
@@ -346,11 +344,12 @@ namespace quda {
     matSloppy.flops();
     matPrecon.flops();
 
+    // copy the residual to b so we can use it outside of the solver
     if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) blas::copy(b,r);
 
-    profile.Stop(QUDA_PROFILE_EPILOGUE);
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
-    profile.Start(QUDA_PROFILE_FREE);
+    profile.TPSTART(QUDA_PROFILE_FREE);
     if (param.precision_sloppy != x.Precision()) {
       delete r_0;
       delete r_sloppy;
@@ -362,7 +361,7 @@ namespace quda {
 
     if (&x != &xSloppy) delete x_sloppy;
 
-    profile.Stop(QUDA_PROFILE_FREE);
+    profile.TPSTOP(QUDA_PROFILE_FREE);
     
     return;
   }

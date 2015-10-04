@@ -26,20 +26,23 @@ namespace quda {
     /** The number of null space components */
     const int Nvec;
 
-    /** The block-normalized null-space components that define the prolongator */
-    ColorSpinorField *V;
-
-    /** CPU copy of the null-space components */
+    /** CPU copy of the block-normalized null-space components that define the prolongator */
     ColorSpinorField *V_h;
 
-    /** CPU copy of the null-space components */
+    /** GPU copy of the block-normalized null-space components that define the prolongator */
     ColorSpinorField *V_d;
 
-    /** A temporary field with fine geometry and fine color we use for changing gamma basis */
-    ColorSpinorField *tmp2; // FIXME - this should be in the transfer kernels
+    /** A CPU temporary field with fine geometry and fine color we use for changing gamma basis */
+    ColorSpinorField *fine_tmp_h;
 
-    /** A temporary field with coarse geometry and coarse color we use for CPU input / output */
-    ColorSpinorField *tmp3; 
+    /** A GPU temporary field with fine geometry and fine color we use for changing gamma basis */
+    ColorSpinorField *fine_tmp_d;
+
+    /** A CPU temporary field with coarse geometry and coarse color */
+    ColorSpinorField *coarse_tmp_h; 
+
+    /** A GPU temporary field with coarse geometry and coarse color we use for CPU input / output */
+    ColorSpinorField *coarse_tmp_d; 
 
     /** The geometrical coase grid blocking */
     int *geo_bs;
@@ -66,14 +69,6 @@ namespace quda {
 	block order, with each value corresponding to a fine-grid offset. (GPU) */
     int *coarse_to_fine_d;
 
-    /** Points to fine_to_coarse_d or fine_to_coarse_h according to
-	default transfer type */
-    int *fine_to_coarse; 
-
-    /** Points to coarse_to_fine_d or coarse_to_fine_h according to
-	default transfer type */
-    int *coarse_to_fine; 
-
     /** The spin blocking */
     int spin_bs;
 
@@ -86,13 +81,20 @@ namespace quda {
     /** The length of the coarse lattice */
     int coarse_length;
 
+    /** Whether to enable transfer operator on the GPU */
+    bool enable_gpu;
+
+    /** Whether to apply the transfer operaton the GPU (requires
+	enable_gpu=true in the constructor) */
+    mutable bool use_gpu;
+
     /**
      * Copies the null-space vector components into the V-field
      */
     void fillV(ColorSpinorField &V);
 
     /** 
-     * Creates the map between fine and coarse grids, identifies block parity 
+     * Creates the map between fine and coarse grids 
      * @param geo_bs An array storing the block size in each geometric dimension
      */
     void createGeoMap(int *geo_bs);
@@ -140,8 +142,9 @@ namespace quda {
      * @param d The Dirac operator to which these null-space vectors correspond
      * @param geo_bs The geometric block sizes to use
      * @param spin_bs The spin block sizes to use
+     * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs);
+    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs=1, bool enable_gpu=true);
 
     /** The destructor for Transfer */
     virtual ~Transfer();
@@ -183,6 +186,12 @@ namespace quda {
      * @returns geo_bs
      */
     const int *Geo_bs() const {return geo_bs;}
+    
+    /**
+     * Sets where the prolongator / restrictor should take place
+     * @param location Location where the transfer operator should be computed
+     */
+    void setTransferGPU(bool use_gpu) const { this->use_gpu = use_gpu; }
 
   };
 

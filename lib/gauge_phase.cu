@@ -218,29 +218,17 @@ namespace quda {
     QudaFieldLocation location = 
       (typeid(u)==typeid(cudaGaugeField)) ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION;
 
-    using namespace gauge;
-    
-    if (u.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,19>(u), u, location);
+	  gaugePhase<short,length>(gauge::FloatNOrder<short,length,2,19>(u), u, location);
 	} else {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,2,18>(u), u, location);
+	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	  gaugePhase<Float,length>(G(u), u, location);
 	}
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	gaugePhase<Float,length>(FloatNOrder<Float,length,2,12>(u), u, location);
-      } else {
-	errorQuda("Unsupported recsontruction type");
-      }
-    } else if (u.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,19>(u), u, location);
-	} else {
-	  gaugePhase<Float,length>(FloatNOrder<Float,length,1,18>(u),u, location);
-	}
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	gaugePhase<Float,length>(FloatNOrder<Float,length,4,12>(u), u, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+	gaugePhase<Float,length>(G(u), u, location);
       } else {
 	errorQuda("Unsupported recsontruction type");
       }

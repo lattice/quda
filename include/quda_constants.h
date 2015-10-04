@@ -1,6 +1,6 @@
 #define QUDA_VERSION_MAJOR     0
 #define QUDA_VERSION_MINOR     7
-#define QUDA_VERSION_SUBMINOR  0
+#define QUDA_VERSION_SUBMINOR  1
 
 /**
  * @def   QUDA_VERSION
@@ -29,3 +29,9 @@
  */
 #define QUDA_MAX_DWF_LS 128
 
+/**
+ * @def QUDA_MAX_MG_LEVEL
+ * @brief Maximum number of multi-grid levels.  This number may be
+ * changed if need be.
+ */
+#define QUDA_MAX_MG_LEVEL 3

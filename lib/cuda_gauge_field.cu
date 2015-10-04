@@ -488,6 +488,10 @@ namespace quda {
     backed_up = false;
   }
 
+  void cudaGaugeField::zero() {
+    cudaMemset(gauge, 0, bytes);
+  }
+
   void setGhostSpinor(bool value);
 
   // Return the L2 norm squared of the gauge field
@@ -508,9 +512,6 @@ namespace quda {
       case QUDA_VECTOR_GEOMETRY:
         spin = a.Ndim();
         break;
-      case QUDA_TENSOR_GEOMETRY:
-        spin = a.Ndim() * (a.Ndim()-1) / 2;
-        break;
       default:
         errorQuda("Unsupported field geometry %d", a.Geometry());
     }
@@ -523,8 +524,8 @@ namespace quda {
 
     ColorSpinorParam spinor_param;
     spinor_param.nColor = a.Reconstruct()/2;
-    spinor_param.nSpin = a.Ndim();
-    spinor_param.nDim = spin;
+    spinor_param.nSpin = spin;
+    spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
     spinor_param.precision = a.Precision();
     spinor_param.pad = a.Pad();

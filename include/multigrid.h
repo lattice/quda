@@ -6,10 +6,7 @@
 #include <vector>
 #include <complex_quda.h>
 
-#define QUDA_MAX_MG_LEVEL 3
-
 extern char vecfile[];
-extern int nvec; 
   
 namespace quda {
 
@@ -22,21 +19,66 @@ namespace quda {
 
   /**
      This struct contains all the metadata required to define the
-     multigrid solver
+     multigrid solver.  For each level of multigrid we will have an
+     instance of MGParam describing all the meta data appropriate for
+     given level.
    */
   struct MGParam : SolverParam {
 
-    MGParam(const QudaInvertParam &invParam, std::vector<ColorSpinorField*> &B, 
-	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
-    SolverParam(invParam), B(B), matResidual(matResidual), matSmooth(matSmooth) { ; }
+    /**
+       This is top level instantiation done when we start creating the multigrid operator.
+     */
+    MGParam(const QudaMultigridParam &param, 
+	    std::vector<ColorSpinorField*> &B, 
+	    DiracMatrix &matResidual, 
+	    DiracMatrix &matSmooth,
+	    int level=0) :
+      SolverParam(*(param.invert_param)), 
+      mg_global(param), 
+      level(level),
+      Nlevel(param.n_level),
+      spinBlockSize(param.spin_block_size[level]),
+      Nvec(param.n_vec[level]),
+      B(B), 
+      nu_pre(param.nu_pre[level]),
+      nu_post(param.nu_post[level]),
+      matResidual(matResidual),
+      matSmooth(matSmooth),
+      smoother(param.smoother[level]),
+      location(param.location[level])
+      { 
+	// set the block size
+	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
+      }
 
-    MGParam(const MGParam &param, const std::vector<ColorSpinorField*> &B, 
-	    DiracMatrix &matResidual, DiracMatrix &matSmooth) :
-    SolverParam(param), level(param.level), Nlevel(param.Nlevel), spinBlockSize(param.spinBlockSize),
-      Nvec(param.Nvec), coarse(param.coarse), fine(param.fine),  B(B), nu_pre(param.nu_pre), 
-    nu_post(param.nu_post),  matResidual(matResidual), matSmooth(matSmooth), smoother(param.smoother) { 
-      for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geoBlockSize[i];
-    }
+    MGParam(const MGParam &param, 
+	    const std::vector<ColorSpinorField*> &B, 
+	    DiracMatrix &matResidual, 
+	    DiracMatrix &matSmooth,
+	    int level=0) :
+      SolverParam(param),
+      mg_global(param.mg_global),
+      level(level),
+      Nlevel(param.Nlevel),
+      spinBlockSize(param.mg_global.spin_block_size[level]),
+      Nvec(param.mg_global.n_vec[level]),
+      coarse(param.coarse),
+      fine(param.fine),
+      B(B),
+      nu_pre(param.mg_global.nu_pre[level]),
+      nu_post(param.mg_global.nu_post[level]),
+      matResidual(matResidual),
+      matSmooth(matSmooth),
+      smoother(param.mg_global.smoother[level]),
+      location(param.mg_global.location[level])
+      {
+	// set the block size
+	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
+      }
+
+    /** This points to the parameter struct that is passed into QUDA.
+	We use this to set per-level parameters */
+    const QudaMultigridParam  &mg_global;
 
     /** What is the level of this instance */
     int level; 
@@ -74,11 +116,14 @@ namespace quda {
     /** The Dirac operator to use for smoothing */
     DiracMatrix &matSmooth;
 
-    /** Filename for where to load/store the null space */
-    char filename[100];
-
     /** What type of smoother to use */
     QudaInverterType smoother;
+
+    /** Where to compute this level of multigrid */
+    QudaFieldLocation location;
+
+    /** Filename for where to load/store the null space */
+    char filename[100];
   };
 
   /**
@@ -95,6 +140,15 @@ namespace quda {
 
     /** This is the smoother used */
     Solver *presmoother, *postsmoother;
+
+    /** TimeProfile for all levels (refers to profile from parent solver) */
+    TimeProfile &profile_global;
+
+    /** TimeProfile for this level */
+    TimeProfile profile;
+
+    /** Prefix label used for printf at this level */
+    char prefix[128];
 
     /** This is the next lower level */
     MG *coarse;
@@ -167,22 +221,32 @@ namespace quda {
   void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField *fat_links, const cudaGaugeField *long_links);
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, 
-		   const GaugeField &X, double kappa);
-  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, const cpuGaugeField &clover, double kappa);
+		   const GaugeField &X, double kappa, int parity);
+
+  void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, 
+		      const cpuGaugeField &clover, double kappa);
 
   class DiracCoarse : public Dirac {
 
-    const Transfer *transfer;
-    const Dirac *dirac;
+    const Transfer *transfer; /** restrictor / prolongator defined here */
+    const Dirac *dirac; /** Parent Dirac operator */
 
-    // restrictor / prolongator defined here
-    cpuGaugeField *Y; //Coarse gauge field
-    cpuGaugeField *X; //Coarse clover term
+    cpuGaugeField *Y_h; /** CPU copy of coarse gauge field */
+    cpuGaugeField *X_h; /** CPU copy of coarse clover term */
 
-    void initializeCoarse();  //Initialize the coarse gauge field
+    cudaGaugeField *Y_d; /** GPU copy of coarse gauge field */
+    cudaGaugeField *X_d; /** GPU copy of coarse clover term */
+
+    void initializeCoarse();  /** Initialize the coarse gauge field */
+
+    bool enable_gpu; /** Whether to enable this operator for the GPU */
 
   public:
-    DiracCoarse(const DiracParam &param);
+    /**
+       @param param Parameters defining this operator
+       @param enable_gpu Whether to enable this operator for the GPU
+     */
+    DiracCoarse(const DiracParam &param, bool enable_gpu=true);
     virtual ~DiracCoarse();
 
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 

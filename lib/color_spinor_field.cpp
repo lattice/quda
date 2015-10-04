@@ -48,32 +48,27 @@ namespace quda {
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) 
       printfQuda("Precision = %d, Subset = %d\n", precision, siteSubset);
 
-    int num_faces = 1;
-    int num_norm_faces=2;
+    // FIXME - The ghost zone is allocated before we know which
+    // operator (and hence number of faces are needed), thus we
+    // allocate a ghost zone large enough to cope with the maximum
+    // number of faces.  All Wilson-like operators support only
+    // involve the excahnge of one face so this is no problem.
+    // However, for staggered fermions, we have either nFace=1 or 3,
+    // thus we allocated using the latter.  This will artificially
+    // raise the GPU memory requirements for naive staggered fermions.
+    // One potential future solution may be to separate the ghost zone
+    // memory allocation from the field itself, which has other
+    // benefits (1. on multi-gpu machines with UVA, we can read the
+    // ghost zone directly from the neighbouring field and 2.) we can
+    // use a single contiguous buffer for the ghost zone and its norm
+    // which will reduce latency for half precision and allow us to
+    // enable GPU_COMMS support for half precision).
+    int nFaceGhost = (nSpin == 1) ? 3 : 1;
 
-    // FIXME - this is a hack from hell that needs to be fixed.  When
-    // the TIFR interface is enabled we are forcing naive staggered
-    // support which breaks asqtad/hisq fermions.  The problem occurs
-    // because the ghost zone is allocated before we know which
-    // operator (and hence number of faces are needed).  One solution
-    // may be to separate the ghost zone memory allocation from the
-    // field itself, which has other benefits (1. on multi-gpu
-    // machines with UVA, we can read the ghost zone directly from the
-    // neighbouring field and 2.) we can use a single contiguous
-    // buffer for the ghost zone and its norm which will reduce
-    // latency for half precision and allow us to enable GPU_COMMS
-    // support for half precision).
-#ifdef BUILD_TIFR_INTERFACE
-    if (nSpin == 1) { //staggered
-      num_faces=2;
-      num_norm_faces=2;
-    }
-#else
-    if (nSpin == 1) { // improved staggered
-      num_faces=6;
-      num_norm_faces=6;
-    }
-#endif
+    // For Wilson we have the number of effective faces since the
+    // fields are spin projected.
+    int num_faces = ((nSpin == 1) ? 2 : 1) * nFaceGhost;
+    int num_norm_faces = 2*nFaceGhost;
 
     // calculate size of ghost zone required
     int ghostVolume = 0;
@@ -429,6 +424,22 @@ namespace quda {
     param.create = QUDA_INVALID_FIELD_CREATE;
   }
 
+  bool ColorSpinorField::isNative() const {
+    if (precision == QUDA_DOUBLE_PRECISION) {
+      if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;
+    } else if (precision == QUDA_SINGLE_PRECISION || 
+	       precision == QUDA_HALF_PRECISION) {
+      if (nSpin == 4) {
+	if (fieldOrder == QUDA_FLOAT4_FIELD_ORDER) return true;
+      } else if (nSpin == 2) {
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+      } else if (nSpin == 1) {
+	if (fieldOrder == QUDA_FLOAT2_FIELD_ORDER) return true;
+      }
+    }
+    return false;
+  }
+
   // For kernels with precision conversion built in
   void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b) {
     if (a.Length() != b.Length()) {
@@ -446,6 +457,30 @@ namespace quda {
     if (a.TwistFlavor() != b.TwistFlavor()) {
       errorQuda("checkSpinor: twist flavors do not match: %d %d", a.TwistFlavor(), b.TwistFlavor());
     }
+  }
+
+  const ColorSpinorField& ColorSpinorField::Even() const {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    return *even;
+  }
+
+  const ColorSpinorField& ColorSpinorField::Odd() const {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    return *odd;
+  }
+
+  ColorSpinorField& ColorSpinorField::Even() {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return even subset of %d subset", siteSubset);
+    return *even;
+  }
+
+  ColorSpinorField& ColorSpinorField::Odd() {
+    if (siteSubset != QUDA_FULL_SITE_SUBSET)
+      errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    return *odd;
   }
 
   // Set the ghost pointers to NULL.
@@ -558,20 +593,17 @@ namespace quda {
 						   QudaFieldLocation new_location) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    if(nColor == 3 && nSpin == 1 && spinBlockSize == 1) //create coarse staggered from fine staggered
-    {
-      coarseParam.nSpin = 2;//enforce nSpin = 2 for the coarse grid staggered field, spinBlockSize = 1 always for staggered.
-    }
-    else
-    {
-      coarseParam.nSpin = nSpin / spinBlockSize; //for coarse coarse staggered coarseParam.nSpin = nSpin , spinBlockSize = 1
-    }
+    coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin 
+
     coarseParam.nColor = Nvec;
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full
     coarseParam.create = QUDA_ZERO_FIELD_CREATE;
     
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
+    // for GPU fields, always use native ordering to ensure coalescing
+    if (new_location == QUDA_CUDA_FIELD_LOCATION) coarseParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 
     ColorSpinorField *coarse = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {
@@ -589,20 +621,19 @@ namespace quda {
 						 QudaFieldLocation new_location) {
     ColorSpinorParam fineParam(*this);
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
-    if(Nvec == 3 && nSpin == 2 && spinBlockSize == 1)
-    {
-      fineParam.nSpin = 1; //top-level fine grid staggered.
-    }
-    else
-    { 
-      fineParam.nSpin = nSpin * spinBlockSize;
-    }
+    fineParam.nSpin = nSpin * spinBlockSize;
     fineParam.nColor = Nvec;
     fineParam.siteSubset = QUDA_FULL_SITE_SUBSET; // FIXME fine grid is always full
     fineParam.create = QUDA_ZERO_FIELD_CREATE;
     
     // if new location is not set, use this->location
     new_location = (new_location == QUDA_INVALID_FIELD_LOCATION) ? Location(): new_location;
+
+    // for GPU fields, always use native ordering to ensure coalescing
+    if (new_location == QUDA_CUDA_FIELD_LOCATION) {
+      fineParam.fieldOrder = (fineParam.nSpin==4 && fineParam.precision!= QUDA_DOUBLE_PRECISION) ?
+	QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER;
+    }
 
     ColorSpinorField *fine = NULL;
     if (new_location == QUDA_CPU_FIELD_LOCATION) {

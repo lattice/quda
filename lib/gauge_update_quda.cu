@@ -314,25 +314,15 @@ namespace quda {
       errorQuda("Input and output gauge field ordering and reconstruction must match");
     }
 
-    if (out.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
+    if (out.isNative()) {
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	updateGaugeField<Float>(gauge::FloatNOrder<Float, Nc*Nc*2, 2, 18>(out),
-				gauge::FloatNOrder<Float, Nc*Nc*2, 2, 18>(in), 
-				mom, dt, conj_mom, exact, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	updateGaugeField<Float>(G(out),G(in), mom, dt, conj_mom, exact, location);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	updateGaugeField<Float>(gauge::FloatNOrder<Float, Nc*Nc*2, 2, 12>(out),
-				gauge::FloatNOrder<Float, Nc*Nc*2, 2, 12>(in), 
-				mom, dt, conj_mom, exact, location);
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
+	updateGaugeField<Float>(G(out), G(in), mom, dt, conj_mom, exact, location);
       } else {
 	errorQuda("Reconstruction type not supported");
-      }
-    } else if (out.Order() == QUDA_FLOAT4_GAUGE_ORDER) {
-      if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	updateGaugeField<Float>(gauge::FloatNOrder<Float, Nc*Nc*2, 4, 12>(out),
-				gauge::FloatNOrder<Float, Nc*Nc*2, 4, 12>(in), 
-				mom, dt, conj_mom, exact,  location);
-      } else {
-	errorQuda("Reconstruction type %d not supported", out.Order());
       }
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
       updateGaugeField<Float>(gauge::MILCOrder<Float, Nc*Nc*2>(out),

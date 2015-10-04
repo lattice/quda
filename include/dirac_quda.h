@@ -84,7 +84,7 @@ namespace quda {
   class Transfer;
 
   // Abstract base class
-  class Dirac {
+  class Dirac : public Object {
 
     friend class DiracMatrix;
     friend class DiracM;
@@ -524,7 +524,7 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;//Staggered version
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
   // Even-odd preconditioned staggered
@@ -576,7 +576,8 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;//Improved staggered version.
+
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
   // Even-odd preconditioned staggered
@@ -623,7 +624,14 @@ namespace quda {
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 
     std::string Type() const { return typeid(*dirac).name(); }
-
+    
+    bool isStaggered() const {
+      return (Type() == typeid(DiracStaggeredPC).name() ||
+	      Type() == typeid(DiracStaggered).name()   ||
+	      Type() == typeid(DiracImprovedStaggeredPC).name() ||
+	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
+    }
+    
     const Dirac* Expose() { return dirac; }
   };
 

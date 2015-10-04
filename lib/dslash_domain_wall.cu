@@ -157,12 +157,41 @@ namespace quda {
 	     (sFloat*)in->V(), (float*)in->Norm(), mferm, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
     }
 
-    long long flops() const { // FIXME for multi-GPU
-      long long Ls = in->X(4);
-      long long vol4d = in->VolumeCB()/Ls;
-      long long bulk = (Ls-2)*vol4d;
-      long long wall = 2*vol4d;
-      return (x ? 1368ll : 1320ll)*in->VolumeCB() + 96ll*bulk + 120ll*wall;
+    long long flops() const {
+      long long flops = DslashCuda::flops();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+      case EXTERIOR_KERNEL_ALL:
+	break;
+      case INTERIOR_KERNEL:
+	int Ls = in->X(4);
+	long long bulk = (Ls-2)*(in->VolumeCB()/Ls);
+	long long wall = 2*(in->VolumeCB()/Ls);
+	flops += 96ll*bulk + 120ll*wall;
+	break;
+      }
+      return flops;
+    }
+
+    virtual long long bytes() const {
+      bool isHalf = in->Precision() == sizeof(short) ? true : false;
+      int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+      long long bytes = DslashCuda::bytes();
+      switch(dslashParam.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+      case EXTERIOR_KERNEL_ALL:
+	break;
+      case INTERIOR_KERNEL:
+	bytes += 2 * spinor_bytes * in->VolumeCB();
+	break;
+      }
+      return bytes;
     }
   };
 #endif // GPU_DOMAIN_WALL_DIRAC
@@ -218,7 +247,6 @@ namespace quda {
     // faces because Ls is added as the y-dimension in thread space
     int ghostFace[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) ghostFace[i] = in->GhostFace()[i] / in->X(4);
-    dslashCuda(*dslash, regSize, parity, dagger, in->Volume() / in->X(4), ghostFace, profile);
 
 #ifndef GPU_COMMS
     DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);

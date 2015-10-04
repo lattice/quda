@@ -102,8 +102,6 @@ namespace quda {
 	     dslashParam, (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
 	     (sFloat*)in->V(), (float*)in->Norm(), (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a);
     }
-
-    long long flops() const { return (x ? 1368ll : 1320ll) * in->VolumeCB(); } // FIXME for multi-GPU
   };
 #endif // GPU_WILSON_DIRAC
 

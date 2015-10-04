@@ -20,7 +20,7 @@ namespace quda {
        slowest running dimension, with the internal 36 degrees of
        freedom stored as follows (s=spin, c = color)
 
-       i |  col  |  row  |
+       i |  row  |  col  |
            s   c   s   c   z
        0   0   0   0   0   0
        1   0   1   0   1   0
@@ -85,14 +85,13 @@ namespace quda {
 	 int col' = N - col;
 
 	 // The linear offset (in bottom-right coordinates) to the
-	 // required element is simply 1/2*row'*(row'-1)+col'.
+	 // required element is simply 1/2*col'*(col'-1) + col - row.
 	 // Subtract this offset from the number of elements: N=6,
 	 // means 15 elements (14 with C-style indexing)), multiply by
 	 // two to account for complexity and then add on number of
 	 // real diagonals at the end
 
-	 //int k = 2 * ( (1/2 N*(N-1) -1) - 1/2 * row' * (row'-1) + col') + N;
-         int k = 2 * ( (1/2 N*(N-1) -1) - (1/2 * col' * (col'-1) + col - row) + N;
+	 int k = 2 * ( (1/2 N*(N-1) -1) - (1/2 * col' * (col'-1) + col - row) + N;
          return complex(a[2*k], a[2*k+1]);
        } else {
          conj(swap(col,row));
@@ -140,20 +139,10 @@ namespace quda {
 	  return tmp;
 	} else if (col < row) {
 	  // switch coordinates to count from bottom right instead of top left of matrix
-	  /*
-	  int row2 = (N-1) - row;
-	  int col2 = (N-1) - col;
-	  int k = (N*(N-1)/2 - 1) - (row2*(row2-1)/2 + col2);
-	  int idx = (x*2 + chirality)*N*N + 2*k + N;
-	  complex<Float> *tmp = static_cast<complex<Float>*>((void *)(a[parity]+idx));
-
-          return *tmp;
-          */
 	  int k = N*(N-1)/2 - (N-col)*(N-col-1)/2 + row - col - 1;
           int idx = (x*2 + chirality)*N*N + N + 2*k;
           complex<Float> tmp(a[parity][idx], a[parity][idx+1]);
-
-	  return tmp;
+          return tmp;
 	} else {
 	  // requesting upper triangular so return conjuate transpose
 	  return conj(operator()(parity,x,s_col,s_row,c_col,c_row) );
@@ -463,7 +452,21 @@ namespace quda {
       };
 
   } // namespace clover
+
+  // Use traits to reduce the template explosion
+  template<typename Float,int N=72> struct clover_mapper { };
+
+  // double precision uses Float2
+  template<int N> struct clover_mapper<double,N> { typedef clover::FloatNOrder<double, N, 2> type; };
+
+  // single precision uses Float4
+  template<int N> struct clover_mapper<float,N> { typedef clover::FloatNOrder<float, N, 4> type; };
+
+  // half precision uses Float4
+  template<int N> struct clover_mapper<short,N> { typedef clover::FloatNOrder<short, N, 4> type; };
+
 } // namespace quda
 
 #endif //_CLOVER_ORDER_H
+
 

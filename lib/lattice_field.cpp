@@ -75,10 +75,13 @@ namespace quda {
   QudaFieldLocation LatticeField::Location() const { 
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (typeid(*this)==typeid(cudaCloverField) || 
+	typeid(*this)==typeid(cudaColorSpinorField) ||
 	typeid(*this)==typeid(cudaGaugeField)) {
       location = QUDA_CUDA_FIELD_LOCATION; 
     } else if (typeid(*this)==typeid(cpuCloverField) || 
+	       typeid(*this)==typeid(cpuColorSpinorField) ||
 	       typeid(*this)==typeid(cpuGaugeField)) {
+      location = QUDA_CPU_FIELD_LOCATION;
       location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
