@@ -5535,51 +5535,48 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
 double qChargeCuda ()
 {
   cudaGaugeField *data = NULL;
-  cudaGaugeField *temp = NULL;
 
-  #ifndef MULTI_GPU
-    if (!gaugeSmeared) 
-      data = gaugePrecise;
-    else
-      data = gaugeSmeared;
-  #else
-    if ((!gaugeSmeared) && (extendedGaugeResident)) {
-      data = extendedGaugeResident;
+#ifndef MULTI_GPU
+  if (!gaugeSmeared) 
+    data = gaugePrecise;
+  else
+    data = gaugeSmeared;
+#else
+  if ((!gaugeSmeared) && (extendedGaugeResident)) {
+    data = extendedGaugeResident;
+  } else {
+    if (!gaugeSmeared) {
       temp = gaugePrecise;
-    } else {
-      if (!gaugeSmeared) {
-        temp = gaugePrecise;
-      } else {
-        temp = gaugeSmeared;
-        if (extendedGaugeResident)
-          delete extendedGaugeResident; // This is not necessary and depends on the policy:
-      }                                 // Do we keep the smeared extended field on memory, or the unsmeared one?
-                                        // Or both of them?
+
       int y[4];
       for(int dir=0; dir<4; ++dir) y[dir] = temp->X()[dir] + 4;
       int pad = 0;
-      GaugeFieldParam gParamEx(y, temp->Precision(), temp->Reconstruct(),
-          pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
       gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-      gParamEx.order = temp->Order();
+      gParamEx.order = gaugePrecise->Order();
       gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-      gParamEx.t_boundary = temp->TBoundary();
+      gParamEx.t_boundary = gaugePrecise->TBoundary();
       gParamEx.nFace = 1;
 
       data = new cudaGaugeField(gParamEx);
 
-      copyExtendedGauge(*data, *temp, QUDA_CUDA_FIELD_LOCATION);
+      copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
       int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
       data->exchangeExtendedGhost(R,true);
       extendedGaugeResident = data;
       cudaDeviceSynchronize();
+    } else {
+      data = gaugeSmeared;
     }
-  #endif
+  }
+                                 // Do we keep the smeared extended field on memory, or the unsmeared one?
+#endif
 
   GaugeField *gauge = data;
-
   // create the Fmunu field
-  GaugeFieldParam tensorParam(temp->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+
+  GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
   tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
@@ -5588,5 +5585,4 @@ double qChargeCuda ()
   computeFmunu(Fmunu, *data, QUDA_CUDA_FIELD_LOCATION);
   return quda::computeQCharge(Fmunu, QUDA_CUDA_FIELD_LOCATION);
 }
-
 
