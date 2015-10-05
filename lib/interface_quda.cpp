@@ -5546,10 +5546,8 @@ double qChargeCuda ()
     data = extendedGaugeResident;
   } else {
     if (!gaugeSmeared) {
-      temp = gaugePrecise;
-
       int y[4];
-      for(int dir=0; dir<4; ++dir) y[dir] = temp->X()[dir] + 4;
+      for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
       int pad = 0;
       GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
