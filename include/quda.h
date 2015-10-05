@@ -831,6 +831,11 @@ extern "C" {
   void performAPEnStep(unsigned int nSteps, double alpha);
 
   /**
+   * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
+   */
+  double qChargeCuda();
+
+  /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] gauge, gauge field to be fixed
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing

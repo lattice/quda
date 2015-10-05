@@ -79,4 +79,11 @@ namespace quda {
 		    const GaugeField& gauge, 
 		    QudaFieldLocation location);
 
+  /**
+     Compute the topological charge
+     @param Fmunu The Fmunu tensor, usually calculated from a smeared configuration
+     @param location The location of where to do the computation, currently supports only the GPU
+   */
+
+  double computeQCharge(GaugeField& Fmunu, QudaFieldLocation location);
 }
