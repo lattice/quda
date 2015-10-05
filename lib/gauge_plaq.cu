@@ -149,7 +149,7 @@ namespace quda {
     }; 
 
   template<typename Float, typename Gauge>
-    void plaquette(const Gauge dataOr, const GaugeField& data, QudaFieldLocation location, double2 &plq) {
+  void plaquette(const Gauge dataOr, const GaugeField& data, double2 &plq, QudaFieldLocation location) {
       GaugePlaqArg<Gauge> arg(dataOr, data);
       GaugePlaq<Float,Gauge> gaugePlaq(arg, location);
       gaugePlaq.apply(0);
@@ -163,41 +163,16 @@ namespace quda {
     }
 
   template<typename Float>
-    double2 plaquette(const GaugeField& data, QudaFieldLocation location) {
-      double2 res;
-      if (!data.isNative()) errorQuda("Plaquette computation only supported on native ordered fields");
-
-      if(data.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge;
-	plaquette<Float>(Gauge(data), data, location, res);
-      } else if(data.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge;
-	plaquette<Float>(Gauge(data), data, location, res);
-      } else if(data.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
-	plaquette<Float>(Gauge(data), data, location, res);
-      } else {
-	errorQuda("Reconstruction type %d of gauge field not supported", data.Reconstruct());
-      }
-
-      return res;
-    }
+  double2 plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
+    INSTANTIATE_RECONSTRUCT(plaquette<Float>, data, plq, location);
+  }
 #endif
 
   double3 plaquette(const GaugeField& data, QudaFieldLocation location) {
 
 #ifdef GPU_GAUGE_TOOLS
     double2 plq;
-    if(data.Precision() == QUDA_HALF_PRECISION) {
-      errorQuda("Half precision not supported\n");
-    }
-    if (data.Precision() == QUDA_SINGLE_PRECISION) {
-      plq = plaquette<float> (data, location);
-    } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
-      plq = plaquette<double>(data, location);
-    } else {
-      errorQuda("Precision %d not supported", data.Precision());
-    }
+    INSTANTIATE_PRECISION(plaquette, data, plq, location);
     double3 plaq = make_double3(0.5*(plq.x + plq.y), plq.x, plq.y);
 #else
     errorQuda("Gauge tools are not build");
@@ -205,4 +180,5 @@ namespace quda {
 #endif
     return plaq;
   }
-}
+
+} // namespace quda
