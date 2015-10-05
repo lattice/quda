@@ -163,7 +163,7 @@ else
   MAXREG = --maxrregcount=80
 endif
 
-all: $(QUDA)
+all: clean_git $(QUDA)
 
 
 $(QUDA): $(QUDA_OBJS) version.o ../make.inc
@@ -181,6 +181,9 @@ mpi_nvtx:
 
 clean:
 	-rm -f *.o $(QUDA)
+
+clean_git:
+	-rm -f interface_quda.o version.o tune.o
 
 version.o: version.cpp $(HDRS) $(QUDA_OBJS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
