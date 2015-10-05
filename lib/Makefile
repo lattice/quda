@@ -59,7 +59,7 @@ BLAS_INLN = blas_core.h blas_mixed_core.h
 REDUCE_INLN = reduce_core.h reduce_mixed_core.h multi_reduce_core.h
 
 # These are only inlined into cuda_color_spinor_field.cu
-CSF_INLN = 
+CSF_INLN =
 
 # These are only inlined into dslash_quda.cu
 DSLASH_INLN = dslash_constants.h dslash_textures.h io_spinor.h	\
@@ -169,19 +169,12 @@ all: $(QUDA)
 $(QUDA): $(QUDA_OBJS) version.o ../make.inc
 	ar cru $@  version.o $(QUDA_OBJS)
 
+
+# The file generate/gen.py imports all the code generators
+# if you create a new code generator please register it there
 gen:
-	$(PYTHON) generate/dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_dslash_gen.py
-	$(PYTHON) generate/dw_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_dw_dslash_cuda_gen.py
-	$(PYTHON) generate/ndeg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_ndeg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_deg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/deg_tmc_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_deg_tmc_dslash_cuda_gen.py
-	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_dw_dslash_4D_cuda_gen.py
+	$(PYTHON) generate/gen.py
+
 
 mpi_nvtx:
 	$(PYTHON) generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
