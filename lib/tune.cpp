@@ -36,6 +36,8 @@ namespace quda {
 #undef STR
 #undef STR_
 
+  static const std::string git_version = GITVERSION;
+
   /**
    * Deserialize tunecache from an istream, useful for reading a file or receiving from other nodes.
    */
@@ -167,6 +169,8 @@ namespace quda {
 	ls >> token;
 	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 	ls >> token;
+	if (token.compare(git_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+	ls >> token;
 	if (token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 
       
@@ -244,7 +248,7 @@ namespace quda {
       }
     
       time(&now);
-      cache_file << "tunecache\t" << quda_version << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
+      cache_file << "tunecache\t" << quda_version << "\t" << git_version << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << "volume\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tcomment" << std::endl;
       serializeTuneCache(cache_file);
       cache_file.close();

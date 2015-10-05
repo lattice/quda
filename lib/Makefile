@@ -189,7 +189,7 @@ interface_quda.o: interface_quda.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
 
 tune.o: tune.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
+	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $(DGITVERSION) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
