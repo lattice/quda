@@ -11,6 +11,32 @@ set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
 
+find_package(Git)
+SET(DEFBUILD "RELEASE")
+IF(GIT_FOUND)
+  execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
+# we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but that might not always be available
+  execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND wc -l OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+  add_definitions(-DGITVERSION="${GITVERSION}")
+  IF(GITCOUNT EQUAL 0)
+    SET(DEFBUILD "RELEASE")
+  ELSE()
+    SET(DEFBUILD "DEVEL")
+  ENDIF()
+ENDIF(GIT_FOUND)
+
+SET(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING  "Choose the type of build, options are: Devel Release Debug Release HostDebug DeviceDebug")
+
+set(VALID_BUILD_TYPES DEVEL RELEASE DEBUG HOSTDEBUG DEVICEDEBUG )
+string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
+LIST(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
+
+if(BUILD_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
+endif()
+
+
 #
 # PROJECT is QUDA
 #
@@ -18,38 +44,15 @@ project("QUDA")
 
 ###### Local configuration:
 
-#CUDA_INSTALL_PATH = /usr/local/cuda-7.0/
-#QDP_INSTALL_PATH =
-#QDPXX_CXXFLAGS =
-#QDPXX_LDFLAGS =
-#QDPXX_LIBS =
-
-##CMAKE no longer needed
-#CPU_ARCH = x86_64  	  # x86 or x86_64
-
 ##CMAKE we need to support this
 set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
 set(CPU_ARCH x86_64 CACHE STRING "set the CPU architecture (currently only x86_64 supported)")
 
 # we need to check for some packages
 find_package(PythonInterp)
-find_package(Git)
+
 find_package(CUDA REQUIRED)
 find_package(Threads REQUIRED)
-
-
-
-
-
-# compilation options
-# HOST_DEBUG = no			# compile host debug code
-# DEVICE_DEBUG = no		# compile device debug code for cuda-gdb
-# CMAKE build types: DEBUG, RELEASE, '', MINSIZEREL, RELWITHDEBINFO
-# we need HOST_DEBUG, DEVICE_DEBUG, RELEASE, '',
-# DEVICE_DEBUG adds -G to NVCC
-# VERBOSE adds --ptxas-options-v
-# HOST_DEBUG adds -g -fno_inline -DHOST_DEBUG
-
 
 
 set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
@@ -372,7 +375,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
-set(CMAKE_F_FLAGS -std=c99)
+set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags" FORCE)
 
 set(CMAKE_C_FLAGS_DEVEL "-Wall -O3"  CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
@@ -389,39 +392,6 @@ set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
 set(CMAKE_C_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
-
-#SET(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING  "Choose the type of build, options are: Devel Relaese Debug Release HostDebug DeviceDebug" FORCE )
-
-set(DEFBUILD Release)
-
-IF(GIT_FOUND)
-  execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
-# we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but that might not always be available
-  execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND wc -l OUTPUT_VARIABLE GITCOUNT OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${GIT_EXECUTABLE}  describe --long --dirty WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-  add_definitions(-DGITVERSION="${GITVERSION}")
-  IF(GITCOUNT EQUAL 0)
-    SET(DEFBUILD Release)
-  ELSE()
-    SET(DEFBUILD Devel)
-  ENDIF()
-ENDIF(GIT_FOUND)
-
-IF(NOT CMAKE_BUILD_TYPE)
-  # add some git magic here to decide whether we want to do a release or devel build as default
-
-  SET(CMAKE_BUILD_TYPE ${DEFBUILD} CACHE STRING
-      "Choose the type of build, options are: Devel Release Debug HostDebug DeviceDebug"
-        FORCE)
-ENDIF(NOT CMAKE_BUILD_TYPE)
-
-set(VALID_BUILD_TYPES DEVEL RELEASE DEBUG HOSTDEBUG DEVICEDEBUG )
-string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
-LIST(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
-
-if(BUILD_TYPE_VALID LESS 0)
-  message(SEND_ERROR "Please specify a valid build type! Valid build types are:" "${VALID_BUILD_TYPES}")
-endif()
 
 ### add tests and quda library
 add_subdirectory(lib)
