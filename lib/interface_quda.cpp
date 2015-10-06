@@ -5553,7 +5553,6 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   gParam.tadpole = gaugePrecise->Tadpole();
 
   if (gaugeSmeared == NULL) {
-//    gaugeSmeared = new cudaGaugeField(gParamEx);
     gaugeSmeared = new cudaGaugeField(gParam);
   }
 
@@ -5825,4 +5824,55 @@ void contract(const cudaColorSpinorField x, const cudaColorSpinorField y, void *
   }
 }
 
+double qChargeCuda ()
+{
+  cudaGaugeField *data = NULL;
+
+#ifndef MULTI_GPU
+  if (!gaugeSmeared) 
+    data = gaugePrecise;
+  else
+    data = gaugeSmeared;
+#else
+  if ((!gaugeSmeared) && (extendedGaugeResident)) {
+    data = extendedGaugeResident;
+  } else {
+    if (!gaugeSmeared) {
+      int y[4];
+      for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
+      int pad = 0;
+      GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+      gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+      gParamEx.order = gaugePrecise->Order();
+      gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+      gParamEx.t_boundary = gaugePrecise->TBoundary();
+      gParamEx.nFace = 1;
+
+      data = new cudaGaugeField(gParamEx);
+
+      copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+      data->exchangeExtendedGhost(R,true);
+      extendedGaugeResident = data;
+      cudaDeviceSynchronize();
+    } else {
+      data = gaugeSmeared;
+    }
+  }
+                                 // Do we keep the smeared extended field on memory, or the unsmeared one?
+#endif
+
+  GaugeField *gauge = data;
+  // create the Fmunu field
+
+  GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+  tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaGaugeField Fmunu(tensorParam);
+
+  computeFmunu(Fmunu, *data, QUDA_CUDA_FIELD_LOCATION);
+  return quda::computeQCharge(Fmunu, QUDA_CUDA_FIELD_LOCATION);
+}
 
