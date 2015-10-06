@@ -16,6 +16,15 @@ struct MsgHandle_s {
 
 static int gpuid = -1;
 
+// this is a work around (in the absence of C++11) to do a compile
+// time check that the size of float and int are the same.  Since we
+// are reinterpretting a float as an int, this property is required.
+template <typename A, typename B>
+inline void static_assert_equal_size()
+{
+  typedef char sizeof_float_must_equal_sizeof_int[sizeof(A) == sizeof(B) ? 1 : -1];
+  (void) sizeof(sizeof_float_must_equal_sizeof_int);
+}
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -47,7 +56,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
       data[j] = (i == comm_rank()) ? hostname[j] : 0;
     }
     // check nasty int to float hack is valid
-    if (sizeof(float) != sizeof(int)) errorQuda("Broken");
+    static_assert_equal_size<float,int>();
     QMP_sum_float_array(reinterpret_cast<float*>(&data), 128);
 
     for (int j=0; j<128; j++) {
