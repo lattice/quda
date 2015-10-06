@@ -182,8 +182,10 @@ mpi_nvtx:
 clean:
 	-rm -f *.o $(QUDA)
 
+.PHONY: version.o
 version.o: version.cpp $(HDRS) $(QUDA_OBJS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
+
 
 interface_quda.o: interface_quda.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
