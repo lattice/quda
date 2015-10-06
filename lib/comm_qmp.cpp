@@ -37,7 +37,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
 
   // determine which GPU this rank will use
   char *hostname = comm_hostname();
-  char *hostname_recv_buf = (char *)safe_malloc(128*size);
+  char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
 
   // Abuse reductions to emulate all-gather.  We need to copy the
   // local hostname to all other nodes
@@ -56,7 +56,7 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   }
 
   gpuid = 0;
-  for (int i = 0; i < rank; i++) {
+  for (int i = 0; i < comm_rank(); i++) {
     if (!strncmp(hostname, &hostname_recv_buf[128*i], 128)) {
       gpuid++;
     }
