@@ -171,7 +171,7 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
-    void exchangeLink(void **ghost_link, void **link_sendbuf) const;
+    void exchange(void **ghost_link, void **link_sendbuf) const;
 
   public:
     GaugeField(const GaugeFieldParam &param);

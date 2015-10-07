@@ -113,7 +113,7 @@ namespace quda {
     return false;
   }
 
-  void GaugeField::exchangeLink(void **ghost_link, void **link_sendbuf) const {
+  void GaugeField::exchange(void **ghost_link, void **link_sendbuf) const {
     MsgHandle *mh_from_back[4];
     MsgHandle *mh_send_fwd[4];
     size_t bytes[4];

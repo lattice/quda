@@ -176,7 +176,7 @@ namespace quda {
     extractGaugeGhost(*this, send);
 
     // communicate between nodes
-    exchangeLink(ghost_, send);
+    exchange(ghost_, send);
 
     for (int d=0; d<nDim; d++) device_free(send[d]);
 
