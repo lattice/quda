@@ -289,6 +289,17 @@ namespace quda {
     const void* Norm() const {return norm;}
 
     /**
+       This is a unified exchange function for doing a complete halo
+       exchange regardless of the type of field.  All dimensions are
+       exchanged and no spin projection is done in the case of Wilson
+       fermions.
+       @param ghost Packed buffer where we store the result
+       @param sendbuf Packed buffer from which we're sending
+       @param nFace Number of layers we are exchanging
+     */
+    void exchange(void **ghost, void **sendbuf, int nFace=1) const;
+
+    /**
       This function returns true if the field is stored in an internal
       field order, given the precision and the length of the spin
       dimension.

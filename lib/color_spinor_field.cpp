@@ -424,6 +424,97 @@ namespace quda {
     param.create = QUDA_INVALID_FIELD_CREATE;
   }
 
+  void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const {
+
+    // FIXME: use LatticeField MsgHandles
+    MsgHandle *mh_send_fwd[4];
+    MsgHandle *mh_from_back[4];
+    MsgHandle *mh_from_fwd[4];
+    MsgHandle *mh_send_back[4];
+    size_t bytes[4];
+
+    const int Ninternal = 2*nColor*nSpin;
+    for (int i=0; i<nDimComms; i++) bytes[i] = nFace*surfaceCB[i]*Ninternal*precision;
+
+    void *send_fwd[4];
+    void *send_back[4];
+    void *recv_fwd[4];
+    void *recv_back[4];
+
+    for (int i=0; i<nDimComms; i++) {
+      if (Location() == QUDA_CPU_FIELD_LOCATION) {
+	if (comm_dim_partitioned(i)) {
+	  send_back[i] = sendbuf[2*i + 0];
+	  send_fwd[i]  = sendbuf[2*i + 1];
+	  recv_fwd[i]  =   ghost[2*i + 1];
+	  recv_back[i] =   ghost[2*i + 0];
+	} else {
+	  memcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i]);
+	  memcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i]);
+	}
+
+      } else { // FIXME add GPU_COMMS support
+	if (comm_dim_partitioned(i)) {
+	  send_back[i] = allocatePinned(bytes[i]);
+	  send_fwd[i] = allocatePinned(bytes[i]);
+	  recv_fwd[i] = allocatePinned(bytes[i]);
+	  recv_back[i] = allocatePinned(bytes[i]);
+	  cudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
+	  cudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
+	} else {
+	  cudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
+	  cudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
+	}
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      mh_send_fwd[i] = comm_declare_send_relative(send_fwd[i], i, +1, bytes[i]);
+      mh_send_back[i] = comm_declare_send_relative(send_back[i], i, -1, bytes[i]);
+      mh_from_fwd[i] = comm_declare_receive_relative(recv_fwd[i], i, +1, bytes[i]);
+      mh_from_back[i] = comm_declare_receive_relative(recv_back[i], i, -1, bytes[i]);
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (comm_dim_partitioned(i)) {
+	comm_start(mh_from_back[i]);
+	comm_start(mh_from_fwd[i]);
+	comm_start(mh_send_fwd[i]);
+	comm_start(mh_send_back[i]);
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_wait(mh_send_fwd[i]);
+      comm_wait(mh_send_back[i]);
+      comm_wait(mh_from_back[i]);
+      comm_wait(mh_from_fwd[i]);
+    }
+
+    if (Location() == QUDA_CUDA_FIELD_LOCATION) {
+      for (int i=0; i<nDimComms; i++) {
+	if (!comm_dim_partitioned(i)) continue;
+	cudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], cudaMemcpyHostToDevice);
+	cudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], cudaMemcpyHostToDevice);
+	freePinned(send_back[i]);
+	freePinned(send_fwd[i]);
+	freePinned(recv_fwd[i]);
+	freePinned(recv_back[i]);
+      }
+    }
+
+    for (int i=0; i<nDimComms; i++) {
+      if (!comm_dim_partitioned(i)) continue;
+      comm_free(mh_send_fwd[i]);
+      comm_free(mh_send_back[i]);
+      comm_free(mh_from_back[i]);
+      comm_free(mh_from_fwd[i]);
+    }
+
+  }
+
   bool ColorSpinorField::isNative() const {
     if (precision == QUDA_DOUBLE_PRECISION) {
       if (fieldOrder  == QUDA_FLOAT2_FIELD_ORDER) return true;

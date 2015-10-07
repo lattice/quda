@@ -416,46 +416,17 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
 		     QUDA_FORWARDS, (QudaParity)oddBit, dagger);
   }
 
-  MsgHandle *mh_send_fwd[4];
-  MsgHandle *mh_from_back[4];
-  MsgHandle *mh_from_fwd[4];
-  MsgHandle *mh_send_back[4];
+  void *sendbuf[8];
+  void *ghost[8];
 
-  for (int i=0; i<nDimComms; i++) {
-    if (!commDimPartitioned(i)) continue;
-    mh_send_fwd[i] = comm_declare_send_relative(spinor.fwdGhostFaceSendBuffer[i], i, +1, nbytes[i]);
-    mh_send_back[i] = comm_declare_send_relative(spinor.backGhostFaceSendBuffer[i], i, -1, nbytes[i]);
-    mh_from_fwd[i] = comm_declare_receive_relative(spinor.fwdGhostFaceBuffer[i], i, +1, nbytes[i]);
-    mh_from_back[i] = comm_declare_receive_relative(spinor.backGhostFaceBuffer[i], i, -1, nbytes[i]);
+  for (int i=0; i<4; i++) {
+    sendbuf[2*i + 0] = spinor.backGhostFaceSendBuffer[i];
+    sendbuf[2*i + 1] = spinor.fwdGhostFaceSendBuffer[i];
+    ghost[2*i + 0] = spinor.backGhostFaceBuffer[i];
+    ghost[2*i + 1] = spinor.fwdGhostFaceBuffer[i];
   }
 
-  for (int i=0; i<nDimComms; i++) {
-    if (commDimPartitioned(i)) {
-      comm_start(mh_from_back[i]);
-      comm_start(mh_from_fwd[i]);
-      comm_start(mh_send_fwd[i]);
-      comm_start(mh_send_back[i]);
-    } else {
-      memcpy(spinor.backGhostFaceBuffer[i], spinor.fwdGhostFaceSendBuffer[i], nbytes[i]);
-      memcpy(spinor.fwdGhostFaceBuffer[i], spinor.backGhostFaceSendBuffer[i], nbytes[i]);
-    }
-  }
-
-  for (int i=0; i<nDimComms; i++) {
-    if (!commDimPartitioned(i)) continue;
-    comm_wait(mh_send_fwd[i]);
-    comm_wait(mh_send_back[i]);
-    comm_wait(mh_from_back[i]);
-    comm_wait(mh_from_fwd[i]);
-  }
-
-  for (int i=0; i<nDimComms; i++) {
-    if (!commDimPartitioned(i)) continue;
-    comm_free(mh_send_fwd[i]);
-    comm_free(mh_send_back[i]);
-    comm_free(mh_from_back[i]);
-    comm_free(mh_from_fwd[i]);
-  }
+  spinor.exchange(ghost, sendbuf);
 }
 
 
