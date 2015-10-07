@@ -289,15 +289,22 @@ namespace quda {
     const void* Norm() const {return norm;}
 
     /**
-       This is a unified exchange function for doing a complete halo
-       exchange regardless of the type of field.  All dimensions are
-       exchanged and no spin projection is done in the case of Wilson
-       fermions.
-       @param ghost Packed buffer where we store the result
+       Do the exchange between neighbouring nodes of the data in
+       sendbuf storing the result in recvbuf.  The arrays are ordered
+       (2*dim + dir).
+       @param recvbuf Packed buffer where we store the result
        @param sendbuf Packed buffer from which we're sending
        @param nFace Number of layers we are exchanging
      */
     void exchange(void **ghost, void **sendbuf, int nFace=1) const;
+
+    /**
+       This is a unified ghost exchange function for doing a complete
+       halo exchange regardless of the type of field.  All dimensions
+       are exchanged and no spin projection is done in the case of
+       Wilson fermions.
+     */
+    virtual void exchangeGhost(QudaParity parity) const = 0; 
 
     /**
       This function returns true if the field is stored in an internal
@@ -432,7 +439,6 @@ namespace quda {
     /** How many faces we are communicating in this communicator */
     int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
-
     public:
 
     static int bufferIndex;
@@ -549,6 +555,13 @@ namespace quda {
     void scatterExtended(int nFace, int parity, int dagger, int dir);
 
 
+    /**
+       Do a ghost exchange between neighbouring nodes.  All dimensions
+       are exchanged and no spin projection is done in the case of
+       Wilson fermions.
+     */
+    void exchangeGhost(QudaParity parity) const;
+
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
@@ -603,16 +616,23 @@ namespace quda {
     static int Compare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, const int resolution=1);
     void PrintVector(unsigned int x);
 
-    void allocateGhostBuffer(void);
+    void allocateGhostBuffer(void) const;
     static void freeGhostBuffer(void);
 
-    void packGhost(void* ghost_spinor, const int dim, 
-        const QudaDirection dir, const QudaParity parity, const int dagger);
+    void packGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
+		   const QudaParity parity, const int dagger) const;
     void unpackGhost(void* ghost_spinor, const int dim, 
-        const QudaDirection dir, const int dagger);
+		     const QudaDirection dir, const int dagger);
 
     void copy(const cpuColorSpinorField&);
     void zero();
+
+    /**
+       Do a ghost exchange between neighbouring nodes.  All dimensions
+       are exchanged and no spin projection is done in the case of
+       Wilson fermions.
+     */
+    void exchangeGhost(QudaParity parity) const;
 
   };
 

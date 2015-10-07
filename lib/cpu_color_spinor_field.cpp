@@ -209,7 +209,7 @@ namespace quda {
   // print out the vector at volume point x
   void cpuColorSpinorField::PrintVector(unsigned int x) { genericPrintVector(*this, x); }
 
-  void cpuColorSpinorField::allocateGhostBuffer(void)
+  void cpuColorSpinorField::allocateGhostBuffer(void) const
   {
     if (initGhostFaceBuffer) return;
 
@@ -241,6 +241,7 @@ namespace quda {
       backGhostFaceSendBuffer[i] = safe_malloc(nbytes);
     }
     initGhostFaceBuffer = 1;
+
   }
 
 
@@ -258,8 +259,8 @@ namespace quda {
   }
 
 
-  void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim, 
-				      const QudaDirection dir, const QudaParity oddBit, const int dagger)
+  void cpuColorSpinorField::packGhost(void* ghost_spinor, const int dim, const QudaDirection dir,
+				      const QudaParity oddBit, const int dagger) const
   {
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in packGhost for cpu");
@@ -383,5 +384,37 @@ namespace quda {
       errorQuda("Full spinor is not supported in unpackGhost for cpu");
     }
   }
+
+  void cpuColorSpinorField::exchangeGhost(QudaParity parity) const
+  {
+
+    // allocate ghost buffer if not yet allocated
+    allocateGhostBuffer();
+
+    int dummy = 0; // dagger parameter is presently ignore in packGhost
+
+    for(int i=0; i < nDimComms; i++){
+      packGhost(backGhostFaceSendBuffer[i], i, QUDA_BACKWARDS, parity, dummy);
+      packGhost(fwdGhostFaceSendBuffer[i], i, QUDA_FORWARDS, parity, dummy);
+    }
+
+    void **sendbuf = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
+    void **ghost  = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
+
+    // FIXME this is crashing
+    for (int i=0; i<nDimComms; i++) {
+      sendbuf[2*i + 0] = backGhostFaceSendBuffer[i];
+      sendbuf[2*i + 1] = fwdGhostFaceSendBuffer[i];
+      ghost[2*i + 0] = backGhostFaceBuffer[i];
+      ghost[2*i + 1] = fwdGhostFaceBuffer[i];
+    }
+
+    int nFace = (nSpin == 1) ? 3 : 1;
+    exchange(ghost, sendbuf, nFace);
+
+    host_free(sendbuf);
+    host_free(ghost);
+  }
+
 
 } // namespace quda

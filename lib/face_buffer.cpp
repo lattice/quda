@@ -406,6 +406,9 @@ void FaceBuffer::scatter(cudaColorSpinorField &out, int dagger, int dir){
 // This is just an initial hack for CPU comms - should be creating the message handlers at instantiation
 void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int dagger)
 {
+#if 1
+  spinor.exchangeGhost((QudaParity)oddBit);
+#else
   // allocate the ghost buffer if not yet allocated
   spinor.allocateGhostBuffer();
 
@@ -427,6 +430,7 @@ void FaceBuffer::exchangeCpuSpinor(cpuColorSpinorField &spinor, int oddBit, int 
   }
 
   spinor.exchange(ghost, sendbuf);
+#endif
 }
 
 
