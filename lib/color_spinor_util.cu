@@ -206,10 +206,22 @@ namespace quda {
   template <typename oFloat, typename iFloat, QudaFieldOrder order>
   int genericCompare(const cpuColorSpinorField &a, const cpuColorSpinorField &b, int tol) {
     int ret = 0;
-    if (a.Ncolor() != 3 || a.Nspin() != 4) errorQuda("Not supported");
-    FieldOrder<oFloat,4,3,1,order> A(a);
-    FieldOrder<iFloat,4,3,1,order> B(b);
-    ret = compareSpinor(A, B, tol);
+    if (a.Ncolor() == 3) {
+      const int Nc = 3;
+      if (a.Nspin() == 4) {
+	const int Ns = 4;
+	FieldOrder<oFloat,Ns,Nc,1,order> A(a);
+	FieldOrder<iFloat,Ns,Nc,1,order> B(b);
+	ret = compareSpinor(A, B, tol);
+      } else if (a.Nspin() == 1) {
+	const int Ns = 1;
+	FieldOrder<oFloat,Ns,Nc,1,order> A(a);
+	FieldOrder<iFloat,Ns,Nc,1,order> B(b);
+	ret = compareSpinor(A, B, tol);
+      }
+    } else {
+      errorQuda("Number of colors %d not supported", a.Ncolor());
+    }
     return ret;
   }
 
