@@ -11,11 +11,13 @@ namespace quda {
   */
   template <class T>
   void random(T &t) {
-    for (int x=0; x<t.Volume(); x++) {
-      for (int s=0; s<t.Nspin(); s++) {
-	for (int c=0; c<t.Ncolor(); c++) {
-	  t(x,s,c).real(comm_drand());
-	  t(x,s,c).imag(comm_drand());
+    for (int parity=0; parity<t.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
+	for (int s=0; s<t.Nspin(); s++) {
+	  for (int c=0; c<t.Ncolor(); c++) {
+	    t(parity,x_cb,s,c).real(comm_drand());
+	    t(parity,x_cb,s,c).imag(comm_drand());
+	  }
 	}
       }
     }
@@ -25,7 +27,7 @@ namespace quda {
      Create a point source at spacetime point x, spin s and colour c
   */
   template <class T>
-  void point(T &t, int x, int s, int c) { t(x, s, c) = 1.0; }
+  void point(T &t, int x, int s, int c) { t(x%2, x/2, s, c) = 1.0; }
 
   /**
      Set all space-time real elements at spin s and color c of the
@@ -33,14 +35,16 @@ namespace quda {
   */
   template <class T>
   void constant(T &t, int k, int s, int c) {
-    for (int x=0; x<t.Volume(); x++) {
-      // set all color-spin components to zero
-      for (int s2=0; s2<t.Nspin(); s2++) {
-	for (int c2=0; c2<t.Ncolor(); c2++) {
-	  t(x,s2,c2) = 0.0;
+    for (int parity; parity<t.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
+	// set all color-spin components to zero
+	for (int s2=0; s2<t.Nspin(); s2++) {
+	  for (int c2=0; c2<t.Ncolor(); c2++) {
+	    t(parity,x_cb,s2,c2) = 0.0;
+	  }
 	}
+	t(parity,x_cb,s,c) = k; // now set the one we want
       }
-      t(x,s,c) = k; // now set the one we want
     }
   }
 
@@ -71,13 +75,13 @@ namespace quda {
 	    double k = sin (M_PI * mode);
 
 	    int offset = ((t*p.X(2)+z)*p.X(1) + y)*p.X(0) + x;
-	    int offset_h = offset / 2;
-	    int parity = offset % 2;
-	    int linear_index = parity * p.Volume()/2 + offset_h;
+	    int offset_h = offset / p.Nparity();
+	    int parity = offset % p.Nparity();
+	    int linear_index = parity * p.VolumeCB() + offset_h;
 
 	    for (int s=0; s<p.Nspin(); s++) 
 	      for (int c=0; c<p.Ncolor(); c++) 
-		p(linear_index, s, c) = k;
+		p(parity, linear_index, s, c) = k;
 	  }
 	}
       }
@@ -87,7 +91,7 @@ namespace quda {
   // print out the vector at volume point x
   template <typename Float, int nSpin, int nColor, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
-    FieldOrder<Float,nSpin,nColor,1,order> A(a);
+    FieldOrderCB<Float,nSpin,nColor,1,order> A(a);
     if (sourceType == QUDA_RANDOM_SOURCE) random(A);
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
@@ -154,40 +158,32 @@ namespace quda {
     int *iter = new int[N];
     for (int i=0; i<N; i++) iter[i] = 0;
 
-    for (int x=0; x<u.Volume(); x++) {
-      //int test[u.Nspin()*u.Ncolor()*2];
-      
-      //printf("x = %d (", x);
-      for (int s=0; s<u.Nspin(); s++) {
-	for (int c=0; c<u.Ncolor(); c++) {
-	  for (int z=0; z<2; z++) {
-	    int j = (s*u.Ncolor() + c)*2+z;
-	    //test[j] = 0;
+    for (int parity=0; parity<v.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<u.VolumeCB(); x_cb++) {
 
-	    double diff = z==0 ? fabs(u(x,s,c,z).real() - v(x,s,c,z).real()) :
-	      fabs(u(x,s,c).imag() - v(x,s,c).imag());
+	for (int s=0; s<u.Nspin(); s++) {
+	  for (int c=0; c<u.Ncolor(); c++) {
+	    for (int z=0; z<2; z++) {
+	      int j = (s*u.Ncolor() + c)*2+z;
 
-	    for (int f=0; f<fail_check; f++) {
-	      if (diff > pow(10.0,-(f+1)/(double)tol)) {
-		fail[f]++;
+	      double diff = z==0 ? fabs(u(parity,x_cb,s,c,z).real() - v(parity,x_cb,s,c,z).real()) :
+		fabs(u(parity,x_cb,s,c).imag() - v(parity,x_cb,s,c).imag());
+
+	      for (int f=0; f<fail_check; f++) {
+		if (diff > pow(10.0,-(f+1)/(double)tol)) {
+		  fail[f]++;
+		}
 	      }
-	    }
 
-	    if (diff > 1e-3) {
-	      iter[j]++;
-	      //printf("%d %d %e %e\n", x, j, u(x,s,c,z), v(x,s,c,z));
-	      //test[j] = 1;
+	      if (diff > 1e-3) iter[j]++;
 	    }
-	    //printf("%d ", test[j]);
-
 	  }
 	}
       }
-      //      printf(")\n");
     }
 
     for (int i=0; i<N; i++) printfQuda("%d fails = %d\n", i, iter[i]);
-    
+
     int accuracy_level =0;
     for (int f=0; f<fail_check; f++) {
       if (fail[f] == 0) accuracy_level = f+1;
@@ -197,10 +193,10 @@ namespace quda {
       printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)/(double)tol), 
 		 fail[f], u.Volume()*N, fail[f] / (double)(u.Volume()*N));
     }
-  
+
     delete []iter;
     delete []fail;
-  
+
     return accuracy_level;
   }
 
@@ -211,13 +207,13 @@ namespace quda {
       const int Nc = 3;
       if (a.Nspin() == 4) {
 	const int Ns = 4;
-	FieldOrder<oFloat,Ns,Nc,1,order> A(a);
-	FieldOrder<iFloat,Ns,Nc,1,order> B(b);
+	FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
+	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 	ret = compareSpinor(A, B, tol);
       } else if (a.Nspin() == 1) {
 	const int Ns = 1;
-	FieldOrder<oFloat,Ns,Nc,1,order> A(a);
-	FieldOrder<iFloat,Ns,Nc,1,order> B(b);
+	FieldOrderCB<oFloat,Ns,Nc,1,order> A(a);
+	FieldOrderCB<iFloat,Ns,Nc,1,order> B(b);
 	ret = compareSpinor(A, B, tol);
       }
     } else {
@@ -270,10 +266,13 @@ namespace quda {
   template <class Order>
   void print_vector(const Order &o, unsigned int x) {
 
+    int x_cb = x / o.Nparity();
+    int parity = x%o.Nparity();
+
     for (int s=0; s<o.Nspin(); s++) {
       std::cout << "x = " << x << ", s = " << s << ", { ";
       for (int c=0; c<o.Ncolor(); c++) {
-	std::cout << o(x, s, c) ;
+	std::cout << o(parity, x_cb, s, c) ;
 	std::cout << ((c<o.Ncolor()-1) ? " , "  : " " ) ;
       }
       std::cout << "}" << std::endl;
@@ -285,23 +284,23 @@ namespace quda {
   template <typename Float, QudaFieldOrder order>
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
     if (a.Ncolor() == 3 && a.Nspin() == 4)  {
-      FieldOrder<Float,4,3,1,order> A(a);
+      FieldOrderCB<Float,4,3,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 2 && a.Nspin() == 2) {
-      FieldOrder<Float,2,2,1,order> A(a);
+      FieldOrderCB<Float,2,2,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 24 && a.Nspin() == 2) {
-      FieldOrder<Float,2,24,1,order> A(a);
+      FieldOrderCB<Float,2,24,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 72 && a.Nspin() == 4) {
-      FieldOrder<Float,2,24,1,order> A(a);
+      FieldOrderCB<Float,2,24,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 576 && a.Nspin() == 2) {
-      FieldOrder<Float,2,576,1,order> A(a);
+      FieldOrderCB<Float,2,576,1,order> A(a);
       print_vector(A, x);
     }    
     else {
@@ -335,15 +334,21 @@ namespace quda {
 
   struct PackGhostArg {
 
+    void **ghost;
+    const void *v;
     int X[QUDA_MAX_DIM];
+    const int volumeCB;
     const int nDim;
     const int nFace;
     const int parity;
     const int dagger;
     const QudaDWFPCType pc_type;
 
-    PackGhostArg(const ColorSpinorField &a, int parity, int dagger)
-      : nDim(a.Ndim()),
+    PackGhostArg(void **ghost, const ColorSpinorField &a, int parity, int dagger)
+      : ghost(ghost),
+	v(a.V()),
+	volumeCB(a.VolumeCB()),
+	nDim(a.Ndim()),
 	nFace(a.Nspin() == 1 ? 3 : 1),
 	parity(parity), dagger(dagger),
 	pc_type(a.DWFPCtype())
@@ -356,7 +361,7 @@ namespace quda {
   };
 
   template <typename Float, int Ns, int Nc>
-  __host__ void packGhost(void **ghost, const ColorSpinorField &a, PackGhostArg &arg, int cb_idx) {
+  __host__ void packGhost(PackGhostArg &arg, int cb_idx) {
     int spinor_size = 2*Ns*Nc*sizeof(Float);
 
     const int *X = arg.X;
@@ -364,11 +369,12 @@ namespace quda {
     if (arg.nDim == 5)  getCoords5(x, cb_idx, X, arg.parity, arg.pc_type);
     else getCoords(x, cb_idx, X, arg.parity);
 
-    const void *v = a.V();
+    const void *v = arg.v;
+    void **ghost = arg.ghost;
 
     if (x[0] < arg.nFace){
       int ghost_face_idx = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-      memcpy( ((char*)ghost[0]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
+      memcpy( (char*)(ghost[0]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
     }
 
     if (x[0] >= X[0] - arg.nFace){
@@ -409,18 +415,18 @@ namespace quda {
   }
 
   template <typename Float, int Ns, int Nc>
-  void GenericPackGhost(void **ghost, const ColorSpinorField &a, PackGhostArg &arg) {
-    for (int i=0; i<a.VolumeCB(); i++) packGhost<Float,Ns,Nc>(ghost, a, arg, i);
+  void GenericPackGhost(PackGhostArg &arg) {
+    for (int i=0; i<arg.volumeCB; i++) packGhost<Float,Ns,Nc>(arg, i);
   }
 
 
   template <typename Float, int Ns>
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
-    PackGhostArg arg(a, parity, dagger);
+    PackGhostArg arg(ghost, a, parity, dagger);
 
     if (a.Ncolor() == 3) {
-      GenericPackGhost<Float,Ns,3>(ghost, a, arg);
+      GenericPackGhost<Float,Ns,3>(arg);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
     }
@@ -447,7 +453,6 @@ namespace quda {
     if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in packGhost for cpu");
     }
-
     if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
       errorQuda("Field order %d not supported", a.FieldOrder());
     }

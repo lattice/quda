@@ -13,10 +13,12 @@ namespace quda {
   // copy the null-space vectors into the V-field
   template <int nSpin, int nColor, int nVec, class V, class B>
   void fill(V &out, const B &in, int v) {
-    for (int x=0; x<out.Volume(); x++) {
-      for (int s=0; s<nSpin; s++) {
-	for (int c=0; c<nColor; c++) {
-	  out(x, s, c, v) = in(x, s, c);
+    for (int parity=0; parity<out.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<out.VolumeCB(); x_cb++) {
+	for (int s=0; s<nSpin; s++) {
+	  for (int c=0; c<nColor; c++) {
+	    out(parity, x_cb, s, c, v) = in(parity, x_cb, s, c);
+	  }
 	}
       }
     }
@@ -24,9 +26,9 @@ namespace quda {
 
   template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B) {
-    FieldOrder<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
+    FieldOrderCB<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
     for (int v=0; v<nVec; v++) {
-      FieldOrder<Float,nSpin,nColor,1,order> bOrder(const_cast<ColorSpinorField&>(*B[v]));
+      FieldOrderCB<Float,nSpin,nColor,1,order> bOrder(const_cast<ColorSpinorField&>(*B[v]));
       fill<nSpin,nColor,nVec>(vOrder, bOrder, v);
     }
   }
@@ -123,41 +125,44 @@ namespace quda {
     int count = 0;
 
     // Run through the fine grid and do the block ordering
-    for (int i=0; i<in.Volume(); i++) {
+    for (int parity = 0; parity<in.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<in.VolumeCB(); x_cb++) {
+	int i = in.Nparity()*x_cb + parity;
       
-      // Get fine grid coordinates
-      V.LatticeIndex(x, i);
+	// Get fine grid coordinates
+	V.LatticeIndex(x, i);
+	
+	//Compute the geometric offset within a block 
+	// (x fastest direction, t is slowest direction, non-parity ordered)
+	int blockOffset = 0;
+	for (int d=in.Ndim()-1; d>=0; d--) {
+	  y[d] = x[d]%geo_bs[d];
+	  blockOffset *= geo_bs[d];
+	  blockOffset += y[d];
+	}
+	
+	//Take the block-ordered offset from the coarse grid offset (geo_map) 
+	int offset = geo_map[i]*nSpin_coarse*nVec*geoBlockSize*in.Ncolor()*spin_bs;
+	
+	for (int v=0; v<in.Nvec(); v++) {
+	  for (int s=0; s<in.Nspin(); s++) {
+	    for (int c=0; c<in.Ncolor(); c++) {
+	      
+	      int chirality = s / spin_bs; // chirality is the coarse spin
+	      int blockSpin = s % spin_bs; // the remaining spin dof left in each block
+	      
+	      int index = offset +                                              // geo block
+		chirality * nVec * geoBlockSize * spin_bs * in.Ncolor() + // chiral block
+	                       v * geoBlockSize * spin_bs * in.Ncolor() + // vector
+	                            blockOffset * spin_bs * in.Ncolor() + // local geometry
+	                                          blockSpin*in.Ncolor() + // block spin
+	                                                                   c;   // color
 
-      //Compute the geometric offset within a block 
-      // (x fastest direction, t is slowest direction, non-parity ordered)
-      int blockOffset = 0;
-      for (int d=in.Ndim()-1; d>=0; d--) {
-	y[d] = x[d]%geo_bs[d];
-	blockOffset *= geo_bs[d];
-	blockOffset += y[d];
-      }
-
-      //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      int offset = geo_map[i]*nSpin_coarse*nVec*geoBlockSize*in.Ncolor()*spin_bs;
-
-      for (int v=0; v<in.Nvec(); v++) {
-	for (int s=0; s<in.Nspin(); s++) {
-	  for (int c=0; c<in.Ncolor(); c++) {
-
-	    int chirality = s / spin_bs; // chirality is the coarse spin
-	    int blockSpin = s % spin_bs; // the remaining spin dof left in each block
-
-	    int index = offset +                                              // geo block
-	      chirality * nVec * geoBlockSize * spin_bs * in.Ncolor() + // chiral block
-	                     v * geoBlockSize * spin_bs * in.Ncolor() + // vector
-	                          blockOffset * spin_bs * in.Ncolor() + // local geometry
-	                                        blockSpin*in.Ncolor() + // block spin
-	                                                                 c;   // color
-
-	    if (toBlock) out[index] = in(i, s, c, v); // going to block order
-	    else in(i, s, c, v) = out[index]; // coming from block order
+	      if (toBlock) out[index] = in(parity, x_cb, s, c, v); // going to block order
+	      else in(parity, x_cb, s, c, v) = out[index]; // coming from block order
 	    
-	    check[count++] = index;
+	      check[count++] = index;
+	    }
 	  }
 	}
       }
@@ -187,8 +192,8 @@ namespace quda {
   // N.B.: same as above but parity are separated.
   template <bool toBlock, int nVec, class Complex, class FieldOrder>
   void blockCBOrderV(Complex *out, FieldOrder &in,
-		   const int *geo_map, const int *geo_bs, int spin_bs,
-		   const cpuColorSpinorField &V) {
+		     const int *geo_map, const int *geo_bs, int spin_bs,
+		     const cpuColorSpinorField &V) {
     //Compute the size of each block
     int geoBlockSize = 1;
     for (int d=0; d<in.Ndim(); d++) geoBlockSize *= geo_bs[d];
@@ -202,52 +207,54 @@ namespace quda {
     int count = 0;
 
     // Run through the fine grid and do the block ordering
-    for (int i=0; i<in.Volume(); i++) {
-      
-      // Get fine grid coordinates
-      V.LatticeIndex(x, i);
+    for (int parity = 0; parity<in.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<in.VolumeCB(); x_cb++) {
+	int i = in.Nparity()*x_cb + parity;
 
-      //Compute the geometric offset within a block 
-      // (x fastest direction, t is slowest direction, non-parity ordered)
-      int blockOffset = 0;
-      for (int d=in.Ndim()-1; d>=0; d--) {
-	y[d] = x[d]%geo_bs[d];
-	blockOffset *= geo_bs[d];
-	blockOffset += y[d];
-      }
+	// Get fine grid coordinates
+	V.LatticeIndex(x, i);
 
-      //Take the block-ordered offset from the coarse grid offset (geo_map) 
-      //A.S.: geo_map introduced for the full site ordering, so ok to use it for the offset
-      int offset = geo_map[i]*nVec*geoBlockSize*in.Ncolor();
+	//Compute the geometric offset within a block 
+	// (x fastest direction, t is slowest direction, non-parity ordered)
+	int blockOffset = 0;
+	for (int d=in.Ndim()-1; d>=0; d--) {
+	  y[d] = x[d]%geo_bs[d];
+	  blockOffset *= geo_bs[d];
+	  blockOffset += y[d];
+	}
 
-      const int s = 0;
+	//Take the block-ordered offset from the coarse grid offset (geo_map) 
+	//A.S.: geo_map introduced for the full site ordering, so ok to use it for the offset
+	int offset = geo_map[i]*nVec*geoBlockSize*in.Ncolor();
 
-      for (int v=0; v<in.Nvec(); v++) {
-        for (int c=0; c<in.Ncolor(); c++) {
+	const int s = 0;
 
-	  int chirality = (x[0]+x[1]+x[2]+x[3])%2; // chirality is the fine-grid parity flag
+	for (int v=0; v<in.Nvec(); v++) {
+	  for (int c=0; c<in.Ncolor(); c++) {
 
-          int index = offset +                                // geo block
+	    int chirality = (x[0]+x[1]+x[2]+x[3])%2; // chirality is the fine-grid parity flag
+
+	    int index = offset +                                // geo block
 	      chirality * nVec * geoBlockSize * in.Ncolor() + // chiral block
 	                     v * geoBlockSize * in.Ncolor() + // vector
 	                          blockOffset * in.Ncolor() + // local geometry
-                                                         c;   // color
+	                                                       c;   // color
 
-	  if (toBlock) out[index] = in(i, s, c, v); // going to block order
-	  else in(i, s, c, v) = out[index]; // coming from block order
-	    
-	  check[count++] = index;
-        }
-      }
+	    if (toBlock) out[index] = in(parity, x_cb, s, c, v); // going to block order
+	    else in(parity, x_cb, s, c, v) = out[index]; // coming from block order
 
-      //printf("blockOrderV done %d / %d\n", i, in.Volume());
-    }
-    
+	    check[count++] = index;
+	  }
+	}
+
+	//printf("blockOrderV done %d / %d\n", i, in.Volume());
+      } // x_cb
+    } // parity
+
     if (count != checkLength) {
       errorQuda("Number of elements packed %d does not match expected value %d nvec=%d ncolor=%d", 
 		count, checkLength, in.Nvec(), in.Ncolor());
     }
-
 
     delete []check;
   }
@@ -301,7 +308,7 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, const int *geo_bs, const int *geo_map, int spin_bs) {
     complex<Float> *Vblock = new complex<Float>[V.Volume()*V.Nspin()*V.Ncolor()];
 
-    FieldOrder<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
+    FieldOrderCB<Float,nSpin,nColor,nVec,order> vOrder(const_cast<ColorSpinorField&>(V));
 
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
