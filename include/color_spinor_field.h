@@ -591,6 +591,7 @@ namespace quda {
     static void* fwdGhostFaceSendBuffer[QUDA_MAX_DIM]; //cpu memory
     static void* backGhostFaceSendBuffer[QUDA_MAX_DIM]; //cpu memory
     static int initGhostFaceBuffer;
+    static size_t ghostFaceBytes[QUDA_MAX_DIM];
 
     private:
     //void *v; // the field elements

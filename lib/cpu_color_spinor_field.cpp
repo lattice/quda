@@ -25,17 +25,13 @@
 
 namespace quda {
 
-  /*cpuColorSpinorField::cpuColorSpinorField() : 
-    ColorSpinorField(), init(false) {
-
-    }*/
-
-
   int cpuColorSpinorField::initGhostFaceBuffer =0;
   void* cpuColorSpinorField::fwdGhostFaceBuffer[QUDA_MAX_DIM]; 
   void* cpuColorSpinorField::backGhostFaceBuffer[QUDA_MAX_DIM];
   void* cpuColorSpinorField::fwdGhostFaceSendBuffer[QUDA_MAX_DIM]; 
   void* cpuColorSpinorField::backGhostFaceSendBuffer[QUDA_MAX_DIM];
+
+  size_t cpuColorSpinorField::ghostFaceBytes[QUDA_MAX_DIM] = { };
 
   cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorParam &param) :
     ColorSpinorField(param), init(false), reference(false) {
@@ -211,36 +207,33 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(void) const
   {
-    if (initGhostFaceBuffer) return;
-
     if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
       errorQuda("Full spinor is not supported in alllocateGhostBuffer\n");
     }
-  
-    int X1 = this->x[0]*2;
-    int X2 = this->x[1];
-    int X3 = this->x[2];
-    int X4 = this->x[3];
-    int X5 = this->nDim == 5 ? this->x[4] : 1;
-  
-    int Vsh[4]={ X2*X3*X4*X5/2,
-		 X1*X3*X4*X5/2,
-		 X1*X2*X4*X5/2,
-		 X1*X2*X3*X5/2};
-  
+
     int num_faces = 1;
-    if(this->nSpin == 1) num_faces = 3; // staggered
+    if(nSpin == 1) num_faces = 3; // staggered
 
-    int spinor_size = 2*this->nSpin*this->nColor*this->precision;
-    for (int i=0; i<4; i++) {
-      size_t nbytes = num_faces*Vsh[i]*spinor_size;
+    int spinor_size = 2*nSpin*nColor*precision;
+    bool resize = false;
 
-      fwdGhostFaceBuffer[i] = safe_malloc(nbytes);
-      backGhostFaceBuffer[i] = safe_malloc(nbytes);
-      fwdGhostFaceSendBuffer[i] = safe_malloc(nbytes);
-      backGhostFaceSendBuffer[i] = safe_malloc(nbytes);
+    // resize face only if requested size is larger than previously allocated one
+    for (int i=0; i<nDimComms; i++) {
+      size_t nbytes = num_faces*surfaceCB[i]*spinor_size;
+      resize = (nbytes > ghostFaceBytes[i]) ? true : resize;
+      ghostFaceBytes[i] = (nbytes > ghostFaceBytes[i]) ? nbytes : ghostFaceBytes[i];
     }
-    initGhostFaceBuffer = 1;
+
+    if (!initGhostFaceBuffer || resize) {
+      freeGhostBuffer();
+      for (int i=0; i<nDimComms; i++) {
+	fwdGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+	backGhostFaceBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+	fwdGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+	backGhostFaceSendBuffer[i] = safe_malloc(ghostFaceBytes[i]);
+      }
+      initGhostFaceBuffer = 1;
+    }
 
   }
 
@@ -249,7 +242,7 @@ namespace quda {
   {
     if(!initGhostFaceBuffer) return;
 
-    for(int i=0;i < 4; i++){
+    for(int i=0; i < 4; i++){  // make nDimComms static
       host_free(fwdGhostFaceBuffer[i]); fwdGhostFaceBuffer[i] = NULL;
       host_free(backGhostFaceBuffer[i]); backGhostFaceBuffer[i] = NULL;
       host_free(fwdGhostFaceSendBuffer[i]); fwdGhostFaceSendBuffer[i] = NULL;
