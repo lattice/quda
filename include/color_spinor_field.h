@@ -304,7 +304,7 @@ namespace quda {
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
      */
-    virtual void exchangeGhost(QudaParity parity) const = 0; 
+    virtual void exchangeGhost(QudaParity parity, int dagger) const = 0; 
 
     /**
       This function returns true if the field is stored in an internal
@@ -560,7 +560,7 @@ namespace quda {
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
      */
-    void exchangeGhost(QudaParity parity) const;
+    void exchangeGhost(QudaParity parity, int dagger) const;
 
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -620,8 +620,7 @@ namespace quda {
     void allocateGhostBuffer(void) const;
     static void freeGhostBuffer(void);
 
-    void packGhost(void* ghost_spinor, const int dim, const QudaDirection dir, 
-		   const QudaParity parity, const int dagger) const;
+    void packGhost(void **ghost, QudaParity parity, int dagger) const;
     void unpackGhost(void* ghost_spinor, const int dim, 
 		     const QudaDirection dir, const int dagger);
 
@@ -633,7 +632,7 @@ namespace quda {
        are exchanged and no spin projection is done in the case of
        Wilson fermions.
      */
-    void exchangeGhost(QudaParity parity) const;
+    void exchangeGhost(QudaParity parity, int dagger) const;
 
   };
 
@@ -648,6 +647,8 @@ namespace quda {
   
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);
+
+  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger);
 
 } // namespace quda
 

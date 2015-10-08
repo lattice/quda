@@ -83,7 +83,7 @@ namespace quda {
      @param X Full lattice dimensions
      @param parity Site parity
    */
-  static __device__ __host__ inline void getCoords(int x[4], int cb_index, const int X[4], int parity) {
+  static __device__ __host__ inline void getCoords(int x[], int cb_index, const int X[], int parity) {
     //x[3] = cb_index/(X[2]*X[1]*X[0]/2);
     //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
     //x[1] = (cb_index/(X[0]/2)) % X[1];
@@ -95,6 +95,34 @@ namespace quda {
     x[3] = (zb / X[2]);
     x[2] = zb - x[3] * X[2];
     int x1odd = (x[1] + x[2] + x[3] + parity) & 1;
+    x[0] = (2 * cb_index + x1odd)  - za * X[0];
+    return;
+  }
+  
+  /**
+     Compute the 4-d spatial index from the checkerboarded 1-d index at parity parity
+
+     @param x Computed spatial index
+     @param cb_index 1-d checkerboarded index
+     @param X Full lattice dimensions
+     @param parity Site parity
+   */
+  static __device__ __host__ inline void getCoords5(int x[5], int cb_index, const int X[5], 
+						    int parity, QudaDWFPCType pc_type) {
+    //x[4] = cb_index/(X[3]*X[2]*X[1]*X[0]/2);
+    //x[3] = (cb_index/(X[2]*X[1]*X[0]/2) % X[3];
+    //x[2] = (cb_index/(X[1]*X[0]/2)) % X[2];
+    //x[1] = (cb_index/(X[0]/2)) % X[1];
+    //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
+
+    int za = (cb_index / (X[0] / 2));
+    int zb =  (za / X[1]);
+    x[1] = za - zb * X[1];
+    int zc = zb / X[2];
+    x[2] = zb - zc*X[2];
+    x[4] = (zc / X[3]);
+    x[3] = zc - x[4] * X[3];
+    int x1odd = (x[1] + x[2] + x[3] + (pc_type==QUDA_5D_PC ? x[4] : 0) + parity) & 1;
     x[0] = (2 * cb_index + x1odd)  - za * X[0];
     return;
   }
