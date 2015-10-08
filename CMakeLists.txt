@@ -15,7 +15,6 @@ find_package(Git)
 SET(DEFBUILD "RELEASE")
 IF(GIT_FOUND)
 execute_process(COMMAND ${GIT_EXECUTABLE} show WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} RESULT_VARIABLE IS_GIT_REPOSIITORY OUTPUT_QUIET ERROR_QUIET)
-message(${IS_GIT_REPOSIITORY})
   IF(${IS_GIT_REPOSIITORY} EQUAL 0)
     execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE GITTAG OUTPUT_STRIP_TRAILING_WHITESPACE)
 # we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but that might not always be available
@@ -331,9 +330,22 @@ STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
 set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
 add_definitions(-DQUDA_HASH=${HASH})
 
+string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
+
+
+# add -debug to GITVERSION if we build with debug options enabled
+if(DEBUG_BUILD)
+  if(GITVERSION)
+    set(GITVERSION ${GITVERSION}-debug)
+  else()
+    set(GITVERSION debug)
+  endif()
+endif()
+
 IF(GITVERSION)
   add_definitions(-DGITVERSION="${GITVERSION}")
 ENDIF()
+
 # GPU ARCH
 STRING(REGEX REPLACE sm_ "" COMP_CAP ${GPU_ARCH})
 SET(COMP_CAP "${COMP_CAP}0")
