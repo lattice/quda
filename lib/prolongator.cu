@@ -7,6 +7,7 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
   using namespace quda::colorspinor;
   
   /** 
@@ -252,9 +253,11 @@ namespace quda {
       errorQuda("Unsupported field type %d", out.FieldOrder());
     }
   }
+#endif // GPU_MULTIGRID
 
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int Nvec, const int *fine_to_coarse, const int *spin_map) {
+#ifdef GPU_MULTIGRID
     if (out.Precision() != in.Precision() || v.Precision() != in.Precision()) 
       errorQuda("Precision mismatch out=%d in=%d v=%d", out.Precision(), in.Precision(), v.Precision());
 
@@ -267,6 +270,9 @@ namespace quda {
     }
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+#else
+    errorQuda("Multigrid has not been built");
+#endif
   }
 
 } // end namespace quda

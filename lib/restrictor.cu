@@ -7,6 +7,8 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   using namespace quda::colorspinor;
 
   /** 
@@ -310,8 +312,12 @@ namespace quda {
     }
   }
 
+#endif // GPU_MULTIGRID
+
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
+
+#ifdef GPU_MULTIGRID
     if (out.Precision() != in.Precision() || v.Precision() != in.Precision())
       errorQuda("Precision mismatch out=%d in=%d v=%d", out.Precision(), in.Precision(), v.Precision());
 
@@ -322,7 +328,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d", out.Precision());
     }
-
+#else
+    errorQuda("Multigrid has not been built");
+#endif
   }
 
 } // namespace quda

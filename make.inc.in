@@ -35,6 +35,7 @@ BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
 BUILD_GAUGE_ALG = @BUILD_GAUGE_ALG@				# build gauge-fixing and pure-gauge algorithms?
 BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
+BUILD_MULTIGRID = @BUILD_MULTIGRID@                                 # build multigrid linear solvers?
 
 #Dynamically invert the clover term for twisted-clover?
 DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases the flops
@@ -197,6 +198,11 @@ endif
 ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
   NVCCOPT += -DDYNAMIC_CLOVER
   COPT += -DDYNAMIC_CLOVER
+endif
+
+ifeq ($(strip $(BUILD_MULTIGRID)), yes)
+  NVCCOPT += -DGPU_MULTIGRID
+  COPT += -DGPU_MULTIGRID
 endif
 
 ifeq ($(strip $(BUILD_SSTEP)), yes)
