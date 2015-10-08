@@ -1108,7 +1108,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
       else if (oddBit == QUDA_ODD_PARITY) otherParity = QUDA_EVEN_PARITY;
       else errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
 
-      inField.exchangeGhost(otherParity);
+      inField.exchangeGhost(otherParity, daggerBit);
     }
     void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
     void** back_nbr_spinor = inField.backGhostFaceBuffer;
@@ -1169,7 +1169,7 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
       else if (oddBit == QUDA_ODD_PARITY) otherParity = QUDA_EVEN_PARITY;
       else errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
 
-      inField.exchangeGhost(otherParity);
+      inField.exchangeGhost(otherParity, daggerBit);
     }
     void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
     void** back_nbr_spinor = inField.backGhostFaceBuffer;

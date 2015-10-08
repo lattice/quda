@@ -1367,7 +1367,7 @@ namespace quda {
     }
   }
  
-  void cudaColorSpinorField::exchangeGhost(QudaParity parity) const {
+  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger) const {
     errorQuda("Not implemented");
   }
 

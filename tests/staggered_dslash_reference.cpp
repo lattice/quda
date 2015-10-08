@@ -345,7 +345,7 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
     errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
   }
 
-  in->exchangeGhost(otherparity);
+  in->exchangeGhost(otherparity, daggerBit);
 
   void** fwd_nbr_spinor = in->fwdGhostFaceBuffer;
   void** back_nbr_spinor = in->backGhostFaceBuffer;
