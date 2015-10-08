@@ -1,3 +1,22 @@
+Version 0.7.2 - 07th October 2015
+
+- Add support for separate temporal-spatial plaquette
+
+- Fixed memory leak in MPI communications
+
+- Fixed issues with assignment of GPUs to processes when using the QMP
+  backend with multiple nodes with multiple GPUs
+
+- Fixed bug in MR solver which led to incorrect convergence
+
+- Similar to the NVTX markup support for MPI added in 0.7.1 we now
+  support NVTX markup for calls to the MILC interface. Enabled by using
+  "--enable-milc-nvtx" when configuring QUDA.
+
+- Multiple bug fixes to the library. Many of the fixes are listed here:
+  https://github.com/lattice/quda/issues?q=milestone%3A%22QUDA+0.7.2%22+is%3Aclosed
+
+
 Version 0.7.1 - 11th June 2015
 
 - Added Maxwell-generation GPU support.
@@ -37,6 +56,7 @@ Version 0.7.1 - 11th June 2015
 - Multiple bug fixes that affects stability and correctness throughout
   the library.  Many of these fixes are listed here:
   https://github.com/lattice/quda/issues?q=milestone%3A%22QUDA+0.7.1%22+is%3Aclosed
+
 
 Version 0.7.0 - 4th February 2015
 
