@@ -144,7 +144,7 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
 // Ninternal is the size of the "inner struct" (24 for Wilson spinor)
 int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], QudaPrecision cpu_prec, char *myname)
 {
-  int status;
+  int status = 0;
   switch (Ninternal) {
   case 24:
     status = read_field<24>(infile, count, field_in, cpu_prec, myname);
