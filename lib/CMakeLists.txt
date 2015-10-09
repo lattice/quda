@@ -42,6 +42,15 @@ set (QUDA_OBJS
   version.cpp
 )
 
+#set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS dummy)
+add_custom_target( git_version
+COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy
+)
+
+
+
+set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/gitversion.dummy)
+
 if(BUILD_FORTRAN_INTERFACE)
   LIST(APPEND QUDA_OBJS quda_fortran.F90)
 endif()
@@ -49,6 +58,9 @@ endif()
 include_directories(dslash_core)
 include_directories(.)
 cuda_add_library(quda STATIC ${QUDA_OBJS})
+if(GITVERSION)
+  ADD_DEPENDENCIES(quda git_version)
+endif()
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
