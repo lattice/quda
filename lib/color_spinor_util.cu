@@ -316,156 +316,17 @@ namespace quda {
     } else {
       errorQuda("Unsupported field order %d\n", a.FieldOrder());
     }
-
   }
 
   // print out the vector at volume point x
   void genericPrintVector(cpuColorSpinorField &a, unsigned int x) {
-  
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       genericPrintVector<double>(a,x);
     } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
       genericPrintVector<float>(a,x);
     } else {
       errorQuda("Precision %d not implemented", a.Precision()); 
-    }
-    
+    }    
   }
-
-  struct PackGhostArg {
-
-    void **ghost;
-    const void *v;
-    int X[QUDA_MAX_DIM];
-    const int volumeCB;
-    const int nDim;
-    const int nFace;
-    const int parity;
-    const int dagger;
-    const QudaDWFPCType pc_type;
-
-    PackGhostArg(void **ghost, const ColorSpinorField &a, int parity, int dagger)
-      : ghost(ghost),
-	v(a.V()),
-	volumeCB(a.VolumeCB()),
-	nDim(a.Ndim()),
-	nFace(a.Nspin() == 1 ? 3 : 1),
-	parity(parity), dagger(dagger),
-	pc_type(a.DWFPCtype())
-    {
-      for (int d=0; d<nDim; d++) X[d] = a.X(d);
-      X[0] *= 2; // set to full lattice size
-      X[4] = (nDim == 5) ? a.X(4) : 1; // set fifth dimension correctly
-    }
-
-  };
-
-  template <typename Float, int Ns, int Nc>
-  __host__ void packGhost(PackGhostArg &arg, int cb_idx) {
-    int spinor_size = 2*Ns*Nc*sizeof(Float);
-
-    const int *X = arg.X;
-    int x[5] = { };
-    if (arg.nDim == 5)  getCoords5(x, cb_idx, X, arg.parity, arg.pc_type);
-    else getCoords(x, cb_idx, X, arg.parity);
-
-    const void *v = arg.v;
-    void **ghost = arg.ghost;
-
-    if (x[0] < arg.nFace){
-      int ghost_face_idx = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-      memcpy( (char*)(ghost[0]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-    if (x[0] >= X[0] - arg.nFace){
-      int ghost_face_idx = ((x[0]-X[0]+arg.nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
-      memcpy( ((char*)ghost[1]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-    if (x[1] < arg.nFace){
-      int ghost_face_idx = (x[1]*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
-      memcpy( ((char*)ghost[2]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-    if (x[1] >= X[1] - arg.nFace){
-      int ghost_face_idx = ((x[1]-X[1]+arg.nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
-      memcpy( ((char*)ghost[3]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-    if (x[2] < arg.nFace){
-      int ghost_face_idx = (x[2]*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-      memcpy( ((char*)ghost[4]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-    if (x[2] >= X[2] - arg.nFace){
-      int ghost_face_idx = ((x[2]-X[2]+arg.nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
-      memcpy( ((char*)ghost[5]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-    if (x[3] < arg.nFace){
-      int ghost_face_idx = (x[3]*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-      memcpy( ((char*)ghost[6]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-    if (x[3] >= X[3] - arg.nFace){
-      int ghost_face_idx = ((x[3]-X[3]+arg.nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
-      memcpy( ((char*)ghost[7]) + ghost_face_idx*spinor_size, ((char*)v)+cb_idx*spinor_size, spinor_size);
-    }
-
-  }
-
-  template <typename Float, int Ns, int Nc>
-  void GenericPackGhost(PackGhostArg &arg) {
-    for (int i=0; i<arg.volumeCB; i++) packGhost<Float,Ns,Nc>(arg, i);
-  }
-
-
-  template <typename Float, int Ns>
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
-
-    PackGhostArg arg(ghost, a, parity, dagger);
-
-    if (a.Ncolor() == 3) {
-      GenericPackGhost<Float,Ns,3>(arg);
-    } else {
-      errorQuda("Unsupported nColor = %d", a.Ncolor());
-    }
-
-  }
-
-  template <typename Float>
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
-
-    if (a.Nspin() == 4) {
-      genericPackGhost<Float,4>(ghost, a, parity, dagger);
-    } else if (a.Nspin() == 2) {
-      genericPackGhost<Float,2>(ghost, a, parity, dagger);
-    } else if (a.Nspin() == 1) {
-      genericPackGhost<Float,1>(ghost, a, parity, dagger);
-    } else {
-      errorQuda("Unsupported nSpin = %d", a.Nspin());
-    }
-
-  }
-
-  void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
-
-    if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET){
-      errorQuda("Full spinor is not supported in packGhost for cpu");
-    }
-    if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
-      errorQuda("Field order %d not supported", a.FieldOrder());
-    }
-
-    if (a.Precision() == QUDA_DOUBLE_PRECISION) {
-      genericPackGhost<double>(ghost, a, parity, dagger);
-    } else if (a.Precision() == QUDA_SINGLE_PRECISION) {
-      genericPackGhost<float>(ghost, a, parity, dagger);
-    } else {
-      errorQuda("Unsupported precision %d", a.Precision());
-    }
-
-  }
-
 
 } // namespace quda
