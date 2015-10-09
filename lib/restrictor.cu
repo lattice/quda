@@ -146,18 +146,25 @@ namespace quda {
     Arg &arg;
     QudaFieldLocation location;
     const int block_size;
+    char vol[TuneKey::volume_n];
 
     long long flops() const { return 0; }
-    long long bytes() const { return 0; }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.in.Volume()/2; } // fine parity is the block y dimension
+    unsigned int minThreads() const { return arg.in.VolumeCB(); } // fine parity is the block y dimension
 
   public:
-    RestrictLaunch(Arg &arg, const QudaFieldLocation location) 
-      : arg(arg), location(location), 
+    RestrictLaunch(Arg &arg, const ColorSpinorField &coarse, const ColorSpinorField &fine, 
+		   const QudaFieldLocation location) : arg(arg), location(location), 
 	block_size((arg.in.Volume()/2)/arg.out.Volume()) { 
+      strcpy(vol, coarse.VolString());
+      strcat(vol, ",");
+      strcat(vol, fine.VolString());
+
+      strcpy(aux, coarse.AuxString());
+      strcat(aux, ",");
+      strcat(aux, fine.AuxString());
     } // block size is checkerboard fine length / full coarse length
     virtual ~RestrictLaunch() { }
 
@@ -165,10 +172,7 @@ namespace quda {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
       } else {
-	// no tuning here currently as we're assuming CTA size = geo
-	// block size later can think about multiple points per thread
-	// (after we have fully templated the parameters).
-	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	tp.block.y = 2; // need factor of two for fine parity with in the block
 
 	if (block_size == 8) {
@@ -187,13 +191,11 @@ namespace quda {
       }
     }
 
+    // only tune shared memory per thread since grid and block sizes are fixed
+    bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param); }
+
     TuneKey tuneKey() const {
-      std::stringstream vol, aux;
-      vol << arg.out.Volume(); 
-      // FIXME should use stride here
-      aux << "out_stride=" << arg.out.Volume() << ",in_stride=" << arg.in.Volume();
-      //return TuneKey(vol.str(), typeid(*this).name(), aux.str());
-      return TuneKey("fixme", typeid(*this).name(), "fixme");
+      return TuneKey(vol, typeid(*this).name(), aux);
     }
 
     void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }
@@ -203,6 +205,10 @@ namespace quda {
       param.block = dim3(block_size, 1, 1);
       param.grid = dim3( (minThreads()+param.block.x-1) / param.block.x, 1, 1);
       param.shared_bytes = 0;
+    }
+
+    long long bytes() const {
+      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes();
     }
 
   };
@@ -221,7 +227,7 @@ namespace quda {
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
     Arg arg(Out, In, V, fine_to_coarse,coarse_to_fine);
-    RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor> restrictor(arg, Location(out, in, v));
+    RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor> restrictor(arg, out, in, Location(out, in, v));
     restrictor.apply(0);
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();

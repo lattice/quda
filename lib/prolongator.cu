@@ -100,7 +100,6 @@ namespace quda {
     char vol[TuneKey::volume_n];
 
     long long flops() const { return 0; }
-    long long bytes() const { return 0; }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -109,7 +108,6 @@ namespace quda {
   public:
     ProlongateLaunch(Arg &arg, const ColorSpinorField &fine, const ColorSpinorField &coarse, 
 		     const QudaFieldLocation location) : arg(arg), location(location) { 
-
       strcpy(vol, fine.VolString());
       strcat(vol, ",");
       strcat(vol, coarse.VolString());
@@ -145,6 +143,10 @@ namespace quda {
     void defaultTuneParam(TuneParam &param) const {
       Tunable::defaultTuneParam(param);
       param.grid = dim3( ((arg.out.Volume()/2)+param.block.x-1) / param.block.x, 1, 1);
+    }
+
+    long long bytes() const {
+      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes();
     }
 
   };
