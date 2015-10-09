@@ -149,10 +149,19 @@ HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH)),cuda_versio
 
 
 DGITVERSION =
+GITVERSION =
 ifeq ($(strip $(GIT)), git)
 	GITVERSION = $(shell git describe --long --dirty 2> /dev/null)
 ifneq ($(GITVERSION),)
 	  DGITVERSION = -DGITVERSION=\"$(GITVERSION)\"
+endif
+endif
+
+ifeq ($(QUDA_DEBUG),true)
+ifeq ($(GITVERSION),)
+	DGITVERSION = -DGITVERSION=\"debug\"
+else
+	DGITVERSION= -DGITVERSION=\"$(GITVERSION)-debug\"
 endif
 endif
 
