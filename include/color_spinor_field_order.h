@@ -90,6 +90,7 @@ namespace quda {
       const QudaGammaBasis gammaBasis;
       const QudaSiteSubset siteSubset;
       const AccessorCB<Float,nSpin,nColor,nVec,order> accessor;
+      const int nParity;
 
     public:
       /** 
@@ -100,7 +101,9 @@ namespace quda {
       : v(static_cast<complex<Float>*>(const_cast<void*>(field.V()))), 
 	volume(field.Volume()), volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
-	siteSubset(field.SiteSubset()), accessor(field)
+	siteSubset(field.SiteSubset()),
+	nParity(siteSubset == QUDA_FULL_SITE_SUBSET ? 2 : 1),
+	accessor(field)
       { for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
 
       /**
@@ -114,7 +117,8 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      __device__ __host__ const complex<Float>& operator()(int parity, int x_cb, int s, int c) const {	return v[accessor.index(parity,x_cb,s,c,0)]; }
+      __device__ __host__ const complex<Float>& operator()(int parity, int x_cb, int s, int c) const 
+      {	return v[accessor.index(parity,x_cb,s,c,0)]; }
 
       /**
        * Writable complex-member accessor function
@@ -122,7 +126,8 @@ namespace quda {
        * @param s spin index
        * @param c color index
        */
-      __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c) { return v[accessor.index(parity,x_cb,s,c,0)]; }
+      __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c) 
+      { return v[accessor.index(parity,x_cb,s,c,0)]; }
 
 
       /**
@@ -207,7 +212,7 @@ namespace quda {
       __device__ __host__ inline int Nspin() const { return nSpin; }
 
       /** Returns the number of field parities (1 or 2) */
-      __device__ __host__ inline int Nparity() const { return (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2 : 1; }
+      __device__ __host__ inline int Nparity() const { return nParity; }
 
       /** Returns the field volume */
       __device__ __host__ inline int Volume() const { return volume; }
@@ -227,16 +232,10 @@ namespace quda {
       /** Returns the number of packed vectors (for mg prolongator) */
       __device__ __host__ inline int Nvec() const { return nVec; }
 
-      /** Returns the number of packed colors (for mg prolongator) */
-      //__device__ __host__ inline int NcolorPacked() const { return nColor / nVec; }
-
-      /** Returns the number of packed spins (for mg prolongator) */
-      //__device__ __host__ inline int NspinPacked() const { return nSpin; }    
-
       __host__ double norm2() const {
 	double nrm2 = 0.0;
-	for (int parity=0; parity<2; parity++)
-	  for (int x_cb=0; x_cb<volume/2; x_cb++)
+	for (int parity=0; parity<nParity; parity++)
+	  for (int x_cb=0; x_cb<volumeCB; x_cb++)
 	    for (int s=0; s<nSpin; s++)
 	      for (int c=0; c<nColor; c++)
 		for (int v=0; v<nVec; v++)
@@ -244,6 +243,7 @@ namespace quda {
 	return nrm2;
       }
 
+      size_t Bytes() const { return nParity * volumeCB * nColor * nSpin * 2 * sizeof(Float); }
     };
 
     template <typename Float, int Ns, int Nc, int N>
