@@ -288,6 +288,8 @@ namespace quda {
     void* Norm(){return norm;}
     const void* Norm() const {return norm;}
 
+    int Nface() const { return (nSpin == 1) ? 3 : 1; } // FIXME for naive staggered or other operators
+
     /**
        Do the exchange between neighbouring nodes of the data in
        sendbuf storing the result in recvbuf.  The arrays are ordered
