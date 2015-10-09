@@ -61,11 +61,14 @@ namespace quda {
   void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, 
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
 
+#ifdef GPU_MULTIGRID
     if (in.Ncolor() == 4) {
       // we are doing gauge field packing
       const int Nc = 4;
       copyGauge<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else {
+    } else 
+#endif // GPU_MULTIGRID
+    {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
   }
