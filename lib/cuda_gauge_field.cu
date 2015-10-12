@@ -176,8 +176,7 @@ namespace quda {
     extractGaugeGhost(*this, send);
 
     // communicate between nodes
-    FaceBuffer faceBuf(x, nDim, nInternal, nFace, precision);
-    faceBuf.exchangeLink(ghost_, send, QUDA_CUDA_FIELD_LOCATION);
+    exchange(ghost_, send);
 
     for (int d=0; d<nDim; d++) device_free(send[d]);
 

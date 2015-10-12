@@ -5,6 +5,8 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
+
   template <typename Float, typename F, typename G>
   struct CoarseDslashArg {
     F out;
@@ -231,6 +233,7 @@ namespace quda {
     }
   }
 
+#endif // GPU_MULTIGRID
 
   //Apply the coarse Dirac matrix to a coarse grid vector
   //out(x) = M*in = X*in - 2*kappa*\sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
@@ -239,6 +242,7 @@ namespace quda {
   //absorbed into the Y matrices.
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &Y, const GaugeField &X,
 		   double kappa, int parity) {
+#ifdef GPU_MULTIGRID
     if (Y.Precision() != in.Precision() || X.Precision() != Y.Precision() || Y.Precision() != out.Precision())
       errorQuda("Unsupported precision mix");
 
@@ -259,7 +263,9 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
-
+#else
+    errorQuda("Multigrid has not been built");
+#endif
   }//ApplyCoarse
 
-}
+} // namespace quda

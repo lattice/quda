@@ -609,33 +609,6 @@ namespace quda {
     };
 
 
-template <typename Float, int number> struct VectorType;
-
-// double precision
-template <> struct VectorType<double, 1>{typedef double type; };
-template <> struct VectorType<double, 2>{typedef double2 type; };
-template <> struct VectorType<double, 4>{typedef double4 type; };
-
-// single precision
-template <> struct VectorType<float, 1>{typedef float type; };
-template <> struct VectorType<float, 2>{typedef float2 type; };
-template <> struct VectorType<float, 4>{typedef float4 type; };
-
-// half precision
-template <> struct VectorType<short, 1>{typedef short type; };
-template <> struct VectorType<short, 2>{typedef short2 type; };
-template <> struct VectorType<short, 4>{typedef short4 type; };
-
- template <typename VectorType>
-   __device__ __host__ VectorType vector_load(void *ptr, int idx) {
-   //#define USE_LDG
-#if defined(__CUDA_ARCH__) && defined(USE_LDG)
-   return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
-#else
-   return reinterpret_cast< VectorType* >(ptr)[idx];
-#endif
- }
-
   template <typename Float, int length, int N, int reconLen>
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;

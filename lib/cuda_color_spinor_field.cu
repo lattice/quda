@@ -1367,6 +1367,9 @@ namespace quda {
     }
   }
  
+  void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger) const {
+    errorQuda("Not implemented");
+  }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
     out << (const ColorSpinorField&)a;

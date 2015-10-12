@@ -4,6 +4,7 @@
 #include <quda.h>
 #include <iostream>
 #include <comm_quda.h>
+#include <map>
 
 /**
  * @file lattice_field.h
@@ -165,9 +166,33 @@ namespace quda {
     char vol_string[TuneKey::volume_n];
     
     /** Sets the vol_string for use in tuning */
-    virtual void setTuningString(); 
+    virtual void setTuningString();
 
- public:
+    /** Cache of inactive pinned-memory allocations.  We cache pinned
+    memory allocations so that fields can reuse these with minimal
+    overhead.*/
+    static std::multimap<size_t, void *> pinnedCache;
+
+    /** Sizes of active pinned-memory allocations.  For convenience,
+     we keep track of the sizes of active allocations (i.e., those not
+     in the cache). */
+    static std::map<void *, size_t> pinnedSize;
+
+    /**
+       Allocate pinned-memory.  If free pre-existing allocation exists
+       reuse this.
+       @param bytes Size of allocation
+       @return Pointer to allocated memory
+     */
+    void *allocatePinned(size_t nbytes) const;
+
+    /**
+       Virtual free of pinned-memory allocation.
+       @param ptr Pointer to be (virtually) freed
+     */
+    void freePinned(void *ptr) const;
+
+  public:
 
     /**
        Constructor for creating a LatticeField from a LatticeFieldParam
@@ -184,6 +209,11 @@ namespace quda {
 	Free the pinned-memory buffer 
     */
     static void freeBuffer(int index=0);
+
+    /**
+       Free all outstanding pinned-memory allocations.
+     */
+    static void flushPinnedCache();
 
     /**
        @return The dimension of the lattice 

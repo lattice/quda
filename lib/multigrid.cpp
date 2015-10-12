@@ -207,11 +207,13 @@ namespace quda {
 
     for (int i=0; i<param.Nvec; i++) {
       transfer->R(*r_coarse, *(param.B[i]));
-      (*coarse)(*x_coarse, *r_coarse);
+      (*coarse)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
+      setOutputPrefix(prefix); // restore output prefix
       transfer->P(*tmp2, *x_coarse);
       param.matResidual(*tmp1,*tmp2);
+      *tmp2 = *(param.B[i]);
       printfQuda("Vector %d: norms %e %e ", i, blas::norm2(*param.B[i]), blas::norm2(*tmp1));
-      printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*(param.B[i]), *tmp1) / blas::norm2(*param.B[i])) );
+      printfQuda("relative residual = %e\n", sqrt(blas::xmyNorm(*tmp2, *tmp1) / blas::norm2(*param.B[i])) );
     }
 #endif
 
@@ -337,7 +339,7 @@ namespace quda {
     for (int i=0; i<Nvec; i++) { 
       V[i] = B[i]->V();
       if (V[i] == NULL) {
-	printfQuda("Could not allocate V[%d]\n", i);      
+	printfQuda("Could not allocate V[%d]\n", i);
       }
     }
     

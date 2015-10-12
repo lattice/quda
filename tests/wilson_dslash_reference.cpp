@@ -211,9 +211,7 @@ void wil_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit,
     else if (oddBit == QUDA_ODD_PARITY) otherParity = QUDA_EVEN_PARITY;
     else errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
 
-    int nFace = 1;
-    FaceBuffer faceBuf(Z, 4, mySpinorSiteSize, nFace, precision);
-    faceBuf.exchangeCpuSpinor(inField, otherParity, daggerBit); 
+    inField.exchangeGhost(otherParity, daggerBit);
   }
   void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
   void** back_nbr_spinor = inField.backGhostFaceBuffer;

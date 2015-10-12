@@ -135,18 +135,20 @@ template <typename Float2, int writeX, int writeY, int writeZ, int writeW,
   typename Functor>
 void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, Functor f) {
 
-  for (int x=0; x<X.Volume(); x++) {
-    for (int s=0; s<X.Nspin(); s++) {
-      for (int c=0; c<X.Ncolor(); c++) {
-	Float2 X2 = make_Float2( X(x, s, c) );
-	Float2 Y2 = make_Float2( Y(x, s, c) );
-	Float2 Z2 = make_Float2( Z(x, s, c) );
-	Float2 W2 = make_Float2( W(x, s, c) );
-	f(X2, Y2, Z2, W2);
-	if (writeX) X(x, s, c) = make_Complex(X2);
-	if (writeY) Y(x, s, c) = make_Complex(Y2);
-	if (writeZ) Z(x, s, c) = make_Complex(Z2);
-	if (writeW) W(x, s, c) = make_Complex(W2);
+  for (int parity=0; parity<X.Nparity(); parity++) {
+    for (int x=0; x<X.VolumeCB(); x++) {
+      for (int s=0; s<X.Nspin(); s++) {
+	for (int c=0; c<X.Ncolor(); c++) {
+	  Float2 X2 = make_Float2( X(parity, x, s, c) );
+	  Float2 Y2 = make_Float2( Y(parity, x, s, c) );
+	  Float2 Z2 = make_Float2( Z(parity, x, s, c) );
+	  Float2 W2 = make_Float2( W(parity, x, s, c) );
+	  f(X2, Y2, Z2, W2);
+	  if (writeX) X(parity, x, s, c) = make_Complex(X2);
+	  if (writeY) Y(parity, x, s, c) = make_Complex(Y2);
+	  if (writeZ) Z(parity, x, s, c) = make_Complex(Z2);
+	  if (writeW) W(parity, x, s, c) = make_Complex(W2);
+	}
       }
     }
   }
@@ -160,7 +162,7 @@ template <typename Float, int nSpin, int nColor, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
 		   ColorSpinorField &w, Functor f) {
-  colorspinor::FieldOrder<Float,nSpin,nColor,1,order> X(x), Y(y), Z(z), W(w);
+  colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Y(y), Z(z), W(w);
   typedef typename vector<Float,2>::type Float2;
   genericBlas<Float2,writeX,writeY,writeZ,writeW>(X, Y, Z, W, f);
 }

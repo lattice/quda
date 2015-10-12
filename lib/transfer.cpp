@@ -214,7 +214,6 @@ namespace quda {
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
 
-
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
     const ColorSpinorField *V = use_gpu ? V_d : V_h;

@@ -383,24 +383,26 @@ ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV
   ReduceType sum;
   zero(sum); 
 
-  for (int x=0; x<X.Volume(); x++) {
-    r.pre();
-    for (int s=0; s<X.Nspin(); s++) {
-      for (int c=0; c<X.Ncolor(); c++) {
-	Float2 X2 = make_Float2( X(x, s, c) );
-	Float2 Y2 = make_Float2( Y(x, s, c) );
-	Float2 Z2 = make_Float2( Z(x, s, c) );
-	Float2 W2 = make_Float2( W(x, s, c) );
-	Float2 V2 = make_Float2( V(x, s, c) );
-	r(sum, X2, Y2, Z2, W2, V2);
-	if (writeX) X(x, s, c) = make_Complex(X2);
-	if (writeY) Y(x, s, c) = make_Complex(Y2);
-	if (writeZ) Z(x, s, c) = make_Complex(Z2);
-	if (writeW) W(x, s, c) = make_Complex(W2);
-	if (writeV) V(x, s, c) = make_Complex(V2);
+  for (int parity=0; parity<X.Nparity(); parity++) {
+    for (int x=0; x<X.VolumeCB(); x++) {
+      r.pre();
+      for (int s=0; s<X.Nspin(); s++) {
+	for (int c=0; c<X.Ncolor(); c++) {
+	  Float2 X2 = make_Float2( X(parity, x, s, c) );
+	  Float2 Y2 = make_Float2( Y(parity, x, s, c) );
+	  Float2 Z2 = make_Float2( Z(parity, x, s, c) );
+	  Float2 W2 = make_Float2( W(parity, x, s, c) );
+	  Float2 V2 = make_Float2( V(parity, x, s, c) );
+	  r(sum, X2, Y2, Z2, W2, V2);
+	  if (writeX) X(parity, x, s, c) = make_Complex(X2);
+	  if (writeY) Y(parity, x, s, c) = make_Complex(Y2);
+	  if (writeZ) Z(parity, x, s, c) = make_Complex(Z2);
+	  if (writeW) W(parity, x, s, c) = make_Complex(W2);
+	  if (writeV) V(parity, x, s, c) = make_Complex(V2);
+	}
       }
+      r.post(sum);
     }
-    r.post(sum);
   }
 
   return sum;
@@ -414,7 +416,7 @@ template <typename ReduceType, typename Float, int nSpin, int nColor, QudaFieldO
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
 			   ColorSpinorField &w, ColorSpinorField &v, R r) {
-  colorspinor::FieldOrder<Float,nSpin,nColor,1,order> X(x), Y(y), Z(z), W(w), V(v);
+  colorspinor::FieldOrderCB<Float,nSpin,nColor,1,order> X(x), Y(y), Z(z), W(w), V(v);
   typedef typename vector<Float,2>::type Float2;
   return genericReduce<ReduceType,Float2,writeX,writeY,writeZ,writeW,writeV>(X, Y, Z, W, V, r);
 }

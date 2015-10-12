@@ -345,11 +345,8 @@ void staggered_dslash_mg4dir(cpuColorSpinorField* out, void **fatlink, void** lo
     errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
   }
 
-  int Nc = 3;
-  int nFace = 3;
-  FaceBuffer faceBuf(Z, 4, 2*Nc, nFace, sPrecision);
-  faceBuf.exchangeCpuSpinor(*in, otherparity, daggerBit); 
-  
+  in->exchangeGhost(otherparity, daggerBit);
+
   void** fwd_nbr_spinor = in->fwdGhostFaceBuffer;
   void** back_nbr_spinor = in->backGhostFaceBuffer;
 

@@ -1081,6 +1081,7 @@ void endQuda(void)
   cudaColorSpinorField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
   FaceBuffer::flushPinnedCache();
+  LatticeField::flushPinnedCache();
   freeGaugeQuda();
   freeCloverQuda();
 

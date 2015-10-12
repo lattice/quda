@@ -7,6 +7,7 @@
 
 namespace quda {
 
+#ifdef GPU_MULTIGRID
   using namespace quda::colorspinor;
   
   /** 
@@ -21,10 +22,10 @@ namespace quda {
     const spin_mapper<fineSpin,coarseSpin> spin_map;
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
 		  const int *geo_map) : 
-      out(out), in(in), V(V), geo_map(geo_map), spin_map()  
+      out(out), in(in), V(V), geo_map(geo_map), spin_map()
     { }
 
-    ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin, coarseSpin> &arg) :
+    ProlongateArg(const ProlongateArg<Out,In,Rotator,fineSpin,coarseSpin> &arg) :
       out(arg.out), in(arg.in), V(arg.V), geo_map(arg.geo_map), spin_map() {
     }
   };
@@ -155,7 +156,6 @@ namespace quda {
     char vol[TuneKey::volume_n];
 
     long long flops() const { return 0; }
-    long long bytes() const { return 0; }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -164,7 +164,6 @@ namespace quda {
   public:
     ProlongateLaunch(Arg &arg, const ColorSpinorField &fine, const ColorSpinorField &coarse, 
 		     const QudaFieldLocation location) : arg(arg), location(location) { 
-
       strcpy(vol, fine.VolString());
       strcat(vol, ",");
       strcat(vol, coarse.VolString());
@@ -202,6 +201,10 @@ namespace quda {
       param.grid = dim3( ((arg.out.Volume()/2)+param.block.x-1) / param.block.x, 1, 1);
     }
 
+    long long bytes() const {
+      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes();
+    }
+
   };
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order>
@@ -211,14 +214,14 @@ namespace quda {
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
     typedef FieldOrderCB<Float,fineSpin,fineColor,coarseColor,order> packedSpinor;
-    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,fineSpin, coarseSpin> Arg;
+    typedef ProlongateArg<fineSpinor,coarseSpinor,packedSpinor,fineSpin,coarseSpin> Arg;
 
     fineSpinor   Out(const_cast<ColorSpinorField&>(out));
     coarseSpinor In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
     Arg arg(Out, In, V, fine_to_coarse);
-    ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> prolongator(arg, Location(out, in, v));
+    ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> prolongator(arg, out, in, Location(out, in, v));
     prolongator.apply(0);
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
@@ -236,12 +239,17 @@ namespace quda {
         if (mapper(s) != spin_map[s]) errorQuda("Spin map does not match spin_mapper");
     }
 
+    // first check that the spin_map matches the spin_mapper
+    spin_mapper<fineSpin,coarseSpin> mapper;
+    for (int s=0; s<fineSpin; s++) 
+      if (mapper(s) != spin_map[s]) errorQuda("Spin map does not match spin_mapper");
+
     if (nVec == 2) {
-      Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse);
     } else if (nVec == 24) {
-      Prolongate<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse);
     } else if (nVec == 48) {
-      Prolongate<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse);
     } else {
       errorQuda("Unsupported nVec %d", nVec);
     }
@@ -308,9 +316,11 @@ namespace quda {
       errorQuda("Unsupported field type %d", out.FieldOrder());
     }
   }
+#endif // GPU_MULTIGRID
 
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int Nvec, const int *fine_to_coarse, const int *spin_map) {
+#ifdef GPU_MULTIGRID
     if (out.Precision() != in.Precision() || v.Precision() != in.Precision()) 
       errorQuda("Precision mismatch out=%d in=%d v=%d", out.Precision(), in.Precision(), v.Precision());
 
@@ -323,6 +333,9 @@ namespace quda {
     }
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+#else
+    errorQuda("Multigrid has not been built");
+#endif
   }
 
 } // end namespace quda
