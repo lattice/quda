@@ -832,7 +832,6 @@ void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int
 }
 
 
-//in fact ldh = ldm, but let's keep it for a moment.
 void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int vprec, void *sortedHarVecs, void *H, const int ldh)
 {
 #ifdef MAGMA_LIB
@@ -844,30 +843,28 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     if( (vld % 32) != 0) printf("\nError: leading dimension must be multiple of the warp size\n"), exit(-1);
 
-    magma_int_t nev  = (max_nev - 1); //(nev+1) - 1 for GMRESDR
+    int nev  = (max_nev - 1); //(nev+1) - 1 for GMRESDR
 
-    magma_int_t _m   = m;//matrix size
+    int _m   = m;//matrix size
 
-    magma_int_t _k   = nev;
+    int _k   = nev;
 
-    magma_int_t _kp1 = max_nev;
+    int _kp1 = max_nev;
 
-    magma_int_t _mp1 = (m+1);
+    int _mp1 = (m+1);
  
-    magma_int_t _ldm = ldh;
+    int _ldm = ldh;
 
-  //Lapack parameters:   
     magma_side_t  _s = _cR;//apply P-matrix from the right
 
-    magma_trans_t _t = _cN;//no left eigenvectors 
+    magma_trans_t _t = _cN;//no left eigenvectors
 
-    magma_int_t info  = 0;
+    int info  = 0;
 
-    magma_int_t lwork = -1; 
+    int lwork = -1; 
 
-    magmaDoubleComplex *work = NULL;
-
-    magmaDoubleComplex qwork; //parameter to extract optimal size of work
+    Complex  *work = NULL;
+    Complex qwork; //parameter to extract optimal size of work
 
     const int cprec  = 2*prec; //currently: sizeof(Complex)
     const int cvprec = 2*vprec;
@@ -903,19 +900,16 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
     //Load diagonal units
     for(int d = 0; d < (m+1); d++) Qmat[ldh*d+d] = Complex(1.0, 0.0);
    
-    magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, &qwork, lwork, &info);
+    magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
 
     if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
-    lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
+    lwork = (int) qwork.real();
+    work = new Complex[lwork];
 
-    magma_malloc_cpu((void**)&work, lwork*sizeof(magmaDoubleComplex));
-
-    magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, work, lwork, &info);
+    magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, (magmaDoubleComplex *)work, lwork, &info);
 
     if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
-
-    magma_free_cpu(work);
 
     //Copy (nev+1) vectors on the device:
     cudaMemcpy(dQmat, Qmat, (max_nev)*ldh*cprec, cudaMemcpyDefault);
@@ -959,39 +953,33 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     lwork = -1;
 
-    magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, &qwork, lwork, &info);
+    magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
 
     if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
-    if(work)   magma_free_cpu(work);
+    delete[] work;
+    lwork = (int) qwork.real();
+    work = new Complex[lwork];
 
-    lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
-
-    magma_malloc_cpu((void**)&work, lwork*sizeof(magmaDoubleComplex));
-
-    magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, work, lwork, &info);
+    magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)work, lwork, &info);
 
     if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
     //Pdagger_{k+1} PrevRes
-
     lwork = -1;
 
     _s = _cL;
-
     _t = _cC;
 
-    magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, &qwork, lwork, &info);
+    magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
 
     if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
-    if(work)   magma_free_cpu(work);
+    delete [] work;
+    lwork = (int) qwork.real();
+    work = new Complex[lwork];
 
-    lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
-
-    magma_malloc_cpu((void**)&work, lwork*sizeof(magmaDoubleComplex));
-
-    magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, work, lwork, &info);
+    magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)work, lwork, &info);
 
     if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
 
@@ -1000,16 +988,14 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     //
     memset(&(((Complex*)H)[ldh*(nev)]), 0, (m-nev)*ldh*sizeof(Complex));
-    //
-    magma_free_cpu(work);
+
+    delete [] work;
 
     magma_free(buffer);
-
     magma_free(dQmat);
 
     delete [] Qmat;
     delete [] tau ;
-
 #endif
     return; 
 }
