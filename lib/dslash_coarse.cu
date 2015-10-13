@@ -16,8 +16,10 @@ namespace quda {
     Float kappa;
     int parity;
 
+    int nFace; // hard code to 1 for now
+
     CoarseDslashArg(F &out, const F &in, const G &Y, const G &X, Float kappa, int parity)
-      : out(out), in(in), Y(Y), X(X), kappa(kappa), parity(parity) { }
+      : out(out), in(in), Y(Y), X(X), kappa(kappa), parity(parity), nFace(1) { }
   };
 
   /**
@@ -37,7 +39,7 @@ namespace quda {
     const int parity = arg.parity;
 
     int coord[nDim];
-    arg.in.LatticeIndex(coord,parity*arg.in.Volume()/2+x_cb);
+    arg.in.LatticeIndex(coord,parity*arg.in.VolumeCB()+x_cb);
 
     for(int s = 0; s < Ns; s++) for(int c = 0; c < Nc; c++) arg.out(parity, x_cb, s, c) = (Float)0.0;
 
@@ -121,7 +123,7 @@ namespace quda {
   void coarseDslash(CoarseDslashArg<Float,F,G> arg) {
 
     //#pragma omp parallel for 
-    for(int x_cb = 0; x_cb < arg.in.Volume()/2; x_cb++) { //Volume
+    for(int x_cb = 0; x_cb < arg.in.VolumeCB(); x_cb++) { //Volume
       dslash<Float,F,G,nDim>(arg, x_cb);
       clover<Float,F,G>(arg, x_cb);
     }//VolumeCB
@@ -134,7 +136,7 @@ namespace quda {
   __global__ void coarseDslashKernel(CoarseDslashArg<Float,F,G> arg) {
 
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
-    if (x_cb >= arg.in.Volume()/2) return;
+    if (x_cb >= arg.in.VolumeCB()) return;
 
     dslash<Float,F,G,nDim>(arg, x_cb);
     clover<Float,F,G>(arg, x_cb);
@@ -148,7 +150,7 @@ namespace quda {
     const ColorSpinorField &meta;
 
     long long flops() const { return 0; }
-    long long bytes() const { return 0; }
+    long long bytes() const { return arg.out.Bytes() + 8*arg.in.Bytes() + 8*arg.Y.Bytes() + arg.X.Bytes(); }
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.

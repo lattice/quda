@@ -162,7 +162,7 @@ namespace quda {
     const ColorSpinorField &meta; // this reference is for meta data only
 
   private:
-    unsigned int sharedBytesPerThread() const { 0; }
+    unsigned int sharedBytesPerThread() const { return 0; }
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem

@@ -77,7 +77,7 @@ namespace quda {
 	const int volumeCB;
 	const int nDim;
 	const int geometry;
-	const int nColorCoarse;
+	static const int nColorCoarse = nColor / nSpinCoarse;
 
 	complex<Float> **u;
 	
@@ -89,7 +89,7 @@ namespace quda {
 	 * @param field The field that we are accessing
 	 */
       FieldOrder(GaugeField &U) : volumeCB(U.VolumeCB()),
-	  nDim(U.Ndim()), geometry(U.Geometry()), nColorCoarse(nColor/nSpinCoarse),
+	  nDim(U.Ndim()), geometry(U.Geometry()),
 	  u(static_cast<complex<Float>**>(U.Gauge_p())), accessor(U)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
@@ -181,6 +181,8 @@ namespace quda {
 		  nrm2 += norm((*this)(dim,parity,x_cb,row,col));
 	  return nrm2;
 	}
+
+	size_t Bytes() const { return 2 * volumeCB * nColor * nColor * 2 * sizeof(Float); }
       };
 
 
