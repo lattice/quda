@@ -182,7 +182,8 @@ namespace quda {
 	  return nrm2;
 	}
 
-	size_t Bytes() const { return 2 * volumeCB * nColor * nColor * 2 * sizeof(Float); }
+	// geometry and parity left out and added as needed in Tunable::bytes
+	size_t Bytes() const { return volumeCB * nColor * nColor * 2 * sizeof(Float); } 
       };
 
 
