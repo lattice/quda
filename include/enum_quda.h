@@ -276,8 +276,8 @@ extern "C" {
   
   // Which sites are included
   typedef enum QudaSiteSubset_s {
-    QUDA_FULL_SITE_SUBSET,
-    QUDA_PARITY_SITE_SUBSET,
+    QUDA_PARITY_SITE_SUBSET = 1,
+    QUDA_FULL_SITE_SUBSET = 2,
     QUDA_INVALID_SITE_SUBSET = QUDA_INVALID_ENUM
   } QudaSiteSubset;
   

@@ -183,7 +183,8 @@ namespace quda {
 	  return nrm2;
 	}
 
-	size_t Bytes() const { return 2 * volumeCB * nColor * nColor * 2 * sizeof(Float); }
+	// geometry and parity left out and added as needed in Tunable::bytes
+	size_t Bytes() const { return volumeCB * nColor * nColor * 2 * sizeof(Float); } 
       };
 
 
@@ -629,16 +630,15 @@ namespace quda {
       size_t bytes;
 #endif
 
-      FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
-	reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry())
+      FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0)
+      : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
+	offset(u.Bytes()/(2*sizeof(Float))),
+	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry())
 #if __COMPUTE_CAPABILITY__ >= 200
-	, hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), 
+	, hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0),
 	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
 #endif
       {
-	if (gauge_) { gauge = gauge_; offset = u.Bytes()/(2*sizeof(Float));
-	} else { gauge = (Float*)u.Gauge_p(); offset = u.Bytes()/(2*sizeof(Float)); }
-	
 	for (int i=0; i<4; i++) {
 	  ghost[i] = ghost_ ? ghost_[i] : 0; 
 	  faceVolumeCB[i] = u.SurfaceCB(i)*u.Nface(); // face volume equals surface * depth	  
@@ -646,14 +646,12 @@ namespace quda {
       }
 
     FloatNOrder(const FloatNOrder &order) 
-    : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), 
-	geometry(order.geometry) 
+      : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
+        volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry)
 #if __COMPUTE_CAPABILITY__ >= 200
 	, hasPhase(order.hasPhase), phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
 #endif
       {
-	gauge = order.gauge;
-	offset = order.offset;
 	for (int i=0; i<4; i++) {
 	  ghost[i] = order.ghost[i];
 	  faceVolumeCB[i] = order.faceVolumeCB[i];
