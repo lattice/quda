@@ -67,7 +67,8 @@ namespace quda {
      @param x 4-d lattice index
      @param X Full lattice dimensions
      @param mu direction in which to add 1
-   */  static __device__ __host__ inline int linkIndexP1(int x[], const int X[4], const int mu) {
+   */  
+  static __device__ __host__ inline int linkIndexP1(int x[], const int X[4], const int mu) {
     int y[4];
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] + 1 + X[mu]) % X[mu];

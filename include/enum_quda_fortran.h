@@ -249,8 +249,8 @@
   
 ! Which sites are included
 #define QudaSiteSubset integer(4)
-#define QUDA_FULL_SITE_SUBSET 0
 #define QUDA_PARITY_SITE_SUBSET 1
+#define QUDA_FULL_SITE_SUBSET 2
 #define QUDA_INVALID_SITE_SUBSET QUDA_INVALID_ENUM
   
 ! Site ordering (always t-z-y-x with rightmost varying fastest)

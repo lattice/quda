@@ -101,8 +101,7 @@ namespace quda {
       : v(static_cast<complex<Float>*>(const_cast<void*>(field.V()))), 
 	volume(field.Volume()), volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
-	siteSubset(field.SiteSubset()),
-	nParity(siteSubset == QUDA_FULL_SITE_SUBSET ? 2 : 1),
+	siteSubset(field.SiteSubset()),	nParity(field.SiteSubset()),
 	accessor(field)
       { for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
 
@@ -205,6 +204,9 @@ namespace quda {
       /** Return the length of dimension d */
       __device__ __host__ inline int X(int d) const { return x[d]; }
 
+      /** Return the length of dimension d */
+      __device__ __host__ inline const int* X() const { return x; }
+
       /** Returns the number of field colors */
        __device__ __host__ inline int Ncolor() const { return nColor; }
 
@@ -253,47 +255,50 @@ namespace quda {
 	typedef typename VectorType<RegType,N>::type RegVector;
 	static const int length = 2 * Ns * Nc;
 	static const int M = length / N;
-
 	Float *field;
+	size_t offset;
 	float *norm;
+	size_t norm_offset;
 	int volumeCB;
 	int faceVolumeCB[4];
 	int stride;
 	Float *ghost[8];
-
+	int nParity;
       FloatNOrder(const ColorSpinorField &a, Float *field_=0, float *norm_=0, Float **ghost_=0)
-      : field(field_ ? field_ : (Float*)a.V()), norm(norm_ ? norm_ : (float*)a.Norm()), 
-	  volumeCB(a.VolumeCB()), stride(a.Stride()) { 
-	for (int i=0; i<4; i++) {
-	  ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
-	  ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
-	  faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
+      : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
+	norm(norm_ ? norm_ : (float*)a.Norm()), norm_offset(a.NormBytes()/(2*sizeof(float))),
+	volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
+	{
+	  for (int i=0; i<4; i++) {
+	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
+	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
+	    faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
+	  }
 	}
-      }
 	virtual ~FloatNOrder() { ; }
 
-	__device__ __host__ inline void load(RegType v[length], int x) const {
+	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
 #pragma unroll
 	  for (int i=0; i<M; i++) {
 	    // first do vectorized copy from memory
-	    Vector vecTmp = vector_load<Vector>(field, x + stride*i);
+	    Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
 	    // second do vectorized copy converting into register type
 	    copy(reinterpret_cast<RegVector*>(v)[i], vecTmp);
 	  }
 
 	  if (sizeof(Float)==sizeof(short))
 #pragma unroll
-	    for (int i=0; i<length; i++) v[i] *= norm[x];
+	    for (int i=0; i<length; i++) v[i] *= norm[x+parity*norm_offset];
 	}
 
-	__device__ __host__ inline void save(const RegType v[length], int x) {
+	__device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
 	  RegType scale = 0.0;
 	  RegType tmp[length];
 
 	  if (sizeof(Float)==sizeof(short)) {
 #pragma unroll
 	    for (int i=0; i<length; i++) scale = fabs(v[i]) > scale ? fabs(v[i]) : scale;
-	    norm[x] = scale;
+	    norm[x+parity*norm_offset] = scale;
 	  }
 
 	  if (sizeof(Float)==sizeof(short))
@@ -309,10 +314,12 @@ namespace quda {
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector* >(field)[x + stride*i] = vecTmp;
+	    reinterpret_cast< Vector* >(field)[x + parity*offset + stride*i] = vecTmp;
 	  }
 	}
 
+	// no parity argument since we only presently exchange single parity field
+	// add support for half-precision ghosts
 	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir) const {
 #pragma unroll
           for (int i=0; i<M; i++) {
@@ -323,6 +330,8 @@ namespace quda {
           }
 	}
 
+	// no parity argument since we only presently exchange single parity field
+	// add support for half-precision ghosts
 	__device__ __host__ inline void saveGhost(RegType v[length], int x, int dim, int dir) const {
 #pragma unroll
           for (int i=0; i<M; i++) {
@@ -334,7 +343,7 @@ namespace quda {
           }
 	}
 
-	size_t Bytes() const { return volumeCB * Nc * Ns * 2 * sizeof(Float); }
+	size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
       };
 
     template <typename Float, int Ns, int Nc>
@@ -342,13 +351,16 @@ namespace quda {
 	typedef typename mapper<Float>::type RegType;
 	static const int length = 2 * Ns * Nc;
 	Float *field;
+	size_t offset;
 	Float *ghost[8];
 	int volumeCB;
 	int faceVolumeCB[4];
 	int stride;
+	int nParity;
       SpaceColorSpinorOrder(const ColorSpinorField &a, Float *field_=0, float *dummy=0, Float **ghost_=0)
-      : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()) 
-	{ 
+      : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
+	  volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
+	{
 	  if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
 	  for (int i=0; i<4; i++) {
 	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
@@ -358,21 +370,21 @@ namespace quda {
 	}
 	virtual ~SpaceColorSpinorOrder() { ; }
 
-	__device__ __host__ inline void load(RegType v[length], int x) const {
+	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		v[(s*Nc+c)*2+z] = field[((x*Nc + c)*Ns + s)*2 + z]; 
+		v[(s*Nc+c)*2+z] = field[parity*offset + ((x*Nc + c)*Ns + s)*2 + z];
 	      }
 	    }
 	  }
 	}
 
-	__device__ __host__ inline void save(const RegType v[length], int x) {
+	__device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		field[((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
+		field[parity*offset + ((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
 	      }
 	    }
 	  }
@@ -398,7 +410,7 @@ namespace quda {
 	  }
 	}
 
-	size_t Bytes() const { return volumeCB * Nc * Ns * 2 * sizeof(Float); }
+	size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
       };
 
     template <typename Float, int Ns, int Nc>
@@ -406,14 +418,17 @@ namespace quda {
 	typedef typename mapper<Float>::type RegType;
 	static const int length = 2 * Ns * Nc;
 	Float *field;
+	size_t offset;
 	Float *ghost[8];
 	int volumeCB;
 	int faceVolumeCB[4];
 	int stride;
+	int nParity;
       SpaceSpinorColorOrder(const ColorSpinorField &a, Float *field_=0, float *dummy=0, Float **ghost_=0)
-      : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride())
-	{ 
-	  if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); 
+      : field(field_ ? field_ : (Float*)a.V()), offset(a.Bytes()/(2*sizeof(Float))),
+	  volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
+	{
+	  if (volumeCB != stride) errorQuda("Stride must equal volume for this field order");
 	  for (int i=0; i<4; i++) {
 	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
 	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
@@ -422,21 +437,21 @@ namespace quda {
 	}
 	virtual ~SpaceSpinorColorOrder() { ; }
 
-	__device__ __host__ inline void load(RegType v[length], int x) const {
+	__device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		v[(s*Nc+c)*2+z] = field[((x*Ns + s)*Nc + c)*2 + z];
+		v[(s*Nc+c)*2+z] = field[parity*offset + ((x*Ns + s)*Nc + c)*2 + z];
 	      }
 	    }
 	  }
 	}
 
-	__device__ __host__ inline void save(const RegType v[length], int x) {
+	__device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		field[((x*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+		field[parity*offset + ((x*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
 	      }
 	    }
 	  }
@@ -462,7 +477,7 @@ namespace quda {
 	  }
 	}
 
-	size_t Bytes() const { return volumeCB * Nc * Ns * 2 * sizeof(Float); }
+	size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
       };
 
 
@@ -471,15 +486,14 @@ namespace quda {
 	typedef typename mapper<Float>::type RegType;
 	Float *field;
 	int volumeCB;
-	int parity;
 	int stride;
-      QDPJITDiracOrder(const ColorSpinorField &a, Float *field_=0, int parity_=1) 
-      : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), parity(parity_)
+	int nParity;
+      QDPJITDiracOrder(const ColorSpinorField &a, Float *field_=0)
+      : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
 	{ if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
 	virtual ~QDPJITDiracOrder() { ; }
 
-	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x) const {
-	  if (x >= volumeCB) return;
+	__device__ __host__ inline void load(RegType v[Ns*Nc*2], int x, int parity=1) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -489,8 +503,7 @@ namespace quda {
 	  }
 	}
 
-	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x) {
-	  if (x >= volumeCB) return;
+	__device__ __host__ inline void save(const RegType v[Ns*Nc*2], int x, int parity=0) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
@@ -500,7 +513,7 @@ namespace quda {
 	  }
 	}
 
-	size_t Bytes() const { return volumeCB * Nc * Ns * 2 * sizeof(Float); }
+	size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }
       };
 
   } // namespace colorspinor
