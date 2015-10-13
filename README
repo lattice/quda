@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.7.1                          11th June 2015
+Release Notes for QUDA v0.7.2                         07th October 2015
 -----------------------------
 
 Overview:
@@ -29,7 +29,7 @@ supported throughout, with communication handled by QMP or MPI.
 Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.8 and Ubuntu 14.04)
-using releases 5.5, 6.0, 6.5 and 7.0 of the CUDA toolkit and Cray
+using releases 5.5, 6.0, 6.5, 7.0 and 7.5 of the CUDA toolkit and Cray
 XK7/XC30 machines using CUDA 5.5 and 6.5.  CUDA 4.x and earlier are not
 supported.  The library also works on recent 64-bit Intel-based Macs.
 Due to issues with compilation using LLVM, under Mac OS X 10.9.x it is
@@ -209,7 +209,7 @@ Claudio Rebbi (Boston University)
 Guochun Shi (NCSA)
 Alexei Strelchenko (Fermi National Accelerator Laboratory)
 Alejandro Vaquero (INFN Sezione Milano Bicocca)
-Mathias Wagner (Indiana University)
+Mathias Wagner (NVIDIA)
 
 Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications

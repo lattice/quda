@@ -383,7 +383,7 @@ namespace quda {
   /**
      double caxpyXmayNormCuda(float a, float *x, float *y, n){}
    
-     First performs the operation y[i] = a*x[i] + y[i]
+     First performs the operation y[i] += a*x[i]
      Second performs the operator x[i] -= a*z[i]
      Third returns the norm of x
   */
@@ -395,7 +395,7 @@ namespace quda {
 #endif
     Float2 a;
     caxpyxmaznormx(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { Caxpy_(a, x, y); x-= a.x*z; sum += norm2_(x); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { Caxpy_(a, x, y); Caxpy_(-a, z, x); sum += norm2_(x); }
     static int streams() { return 5; } //! total number of input and output streams
     static int flops() { return 10; } //! flops per element
   };
