@@ -189,7 +189,7 @@ namespace quda {
 
 
   // Creates a block-ordered version of a ColorSpinorField, with parity blocking (for staggered fields)
-  // N.B.: same as above but parity are separated.
+  // N.B.: same as above but parity are separated (chirality).
   template <bool toBlock, int nVec, class Complex, class FieldOrder>
   void blockCBOrderV(Complex *out, FieldOrder &in,
 		   const int *geo_map, const int *geo_bs,
@@ -229,17 +229,13 @@ namespace quda {
 
 	for (int v=0; v<in.Nvec(); v++) {
 	  for (int c=0; c<in.Ncolor(); c++) {
-
-	    int chirality = (x[0]+x[1]+x[2]+x[3])%2; // chirality is the fine-grid parity flag
-
 	    int index = offset +                                // geo block
-	      chirality * nVec * geoBlockSize * in.Ncolor() + // chiral block
+	      parity * nVec * geoBlockSize * in.Ncolor() + // chiral block
 	                     v * geoBlockSize * in.Ncolor() + // vector
 	                          blockOffset * in.Ncolor() + // local geometry
 	                                                       c;   // color
-
-	  if (toBlock) out[index] = in(i, 0, c, v); // going to block order
-	  else in(i, 0, c, v) = out[index]; // coming from block order
+	  if (toBlock) out[index] = in(parity, x_cb, 0, c, v); // going to block order
+	  else in(parity, x_cb, 0, c, v) = out[index]; // coming from block order
 	    
 	  check[count++] = index;
         }
@@ -262,10 +258,9 @@ namespace quda {
   template <typename sumFloat, typename Float, int N>
   void blockGramSchmidt(complex<Float> *v, int nBlocks, int blockSize) {
     
-    for (int b=0; b<nBlocks; b++) {
-      for (int jc=0; jc<N; jc++) {
-      
-	for (int ic=0; ic<jc; ic++) {
+    for (int b=0; b<nBlocks; b++){
+      for (int jc=0; jc<N; jc++){
+	for (int ic=0; ic<jc; ic++){
 	  // Calculate dot product.
 	  complex<Float> dot = 0.0;
 	  for (int i=0; i<blockSize; i++) 
@@ -307,11 +302,11 @@ namespace quda {
     int geo_blocksize = 1;
     for (int d = 0; d < V.Ndim(); d++) geo_blocksize *= geo_bs[d];
 
-    int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
-    int chiralBlocks = (V.Nspin() == 1) ? 2 : vOrder.Nspin() / spin_bs; //always 2 for staggered. 
-    int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
-    
     if(V.Nspin() != 1){//FIXME : this is not good, think about a separate parameter to distinguish staggered stuff!
+      int blocksize = geo_blocksize * vOrder.Ncolor() * spin_bs; 
+      int chiralBlocks = vOrder.Nspin() / spin_bs; 
+      int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;
+
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
     
       blockOrderV<true,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);
@@ -319,7 +314,9 @@ namespace quda {
       blockOrderV<false,nVec>(Vblock, vOrder, geo_map, geo_bs, spin_bs, V);    
     }
     else{
-      blocksize /= chiralBlocks; //for staggered chiral block size is a parity block size   
+      int blocksize = (geo_blocksize * vOrder.Ncolor()) / 2; //parity block size
+      int chiralBlocks = 2; 
+      int numblocks = (V.Volume()/geo_blocksize) * chiralBlocks;   
 
       printfQuda("Block Orthogonalizing %d blocks of %d length and width %d\n", numblocks, blocksize, nVec);
 
