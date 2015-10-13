@@ -684,7 +684,7 @@ namespace quda {
 						   QudaFieldLocation new_location) {
     ColorSpinorParam coarseParam(*this);
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
-    coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin 
+    coarseParam.nSpin = (nSpin != 1) ? nSpin / spinBlockSize : 2; //for staggered coarseParam.nSpin = 2  
 
     coarseParam.nColor = Nvec;
     coarseParam.siteSubset = QUDA_FULL_SITE_SUBSET; // coarse grid is always full

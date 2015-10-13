@@ -37,9 +37,9 @@ namespace quda {
   template <typename Float, int coarseColor, class Coarse>
   __device__ __host__ inline void prolongate2TopLevelStaggered(complex<Float> out[2*coarseColor], const Coarse &in, 
 					     int parity, int x_cb, int parity_coarse, int x_coarse_cb) {
-    for (int s = 0; s < 2; s++) {
+    for (int s = 0; s < 2; s++) { //fine spin is in fact the fine-grid parity index
       for (int c = 0; c < coarseColor; c++) {
-        out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, s, c); //spin_map[s] -> s, i.e. if spin_map is a fine grid spin map, then we need direct mapping
+        out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, s, c); 
       }
     }
     return;
@@ -238,11 +238,6 @@ namespace quda {
       for (int s=0; s<fineSpin; s++) 
         if (mapper(s) != spin_map[s]) errorQuda("Spin map does not match spin_mapper");
     }
-
-    // first check that the spin_map matches the spin_mapper
-    spin_mapper<fineSpin,coarseSpin> mapper;
-    for (int s=0; s<fineSpin; s++) 
-      if (mapper(s) != spin_map[s]) errorQuda("Spin map does not match spin_mapper");
 
     if (nVec == 2) {
       Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse);

@@ -30,7 +30,7 @@ namespace quda {
     for (int d = 0; d < ndim; d++)
     {
        this->geo_bs[d] = geo_bs[d];
-       if(B[0]->Nspin() == 1 && geo_bs[d] < 4) errorQuda("Too small block size in %d direction for spin=1 field (must be >= 4) %d\n", d, geo_bs[d]);
+       if(B[0]->Nspin() == 1 && geo_bs[d] < 4) errorQuda("Too small block size in %d direction for the staggered field (must be >= 4) %d\n", d, geo_bs[d]);
     }
 
     if (B[0]->X(0) == geo_bs[0]) 
@@ -112,7 +112,7 @@ namespace quda {
 
     createGeoMap(geo_bs);
 
-    // allocate the fine-to-coarse spin map (don't need it for top level staggered.)
+    // allocate the fine-to-coarse spin map (underfined for the top level staggered.)
     if (param.nSpin != 1){
       spin_map = static_cast<int*>(safe_malloc(B[0]->Nspin()*sizeof(int)));
       createSpinMap(spin_bs);
@@ -204,6 +204,8 @@ namespace quda {
 
   // compute the fine spin to coarse spin map
   void Transfer::createSpinMap(int spin_bs) {
+
+    if(!spin_map) errorQuda("\nSpin map is underfined (was not allocated).\n");
 
     for (int s=0; s<B[0]->Nspin(); s++) {
       spin_map[s] = s / spin_bs;

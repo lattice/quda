@@ -72,7 +72,9 @@ namespace quda {
     /** The spin blocking */
     int spin_bs;
 
-    /** The mapping onto coarse spin from fine spin */
+    /** The mapping onto coarse spin from fine spin 
+        A.S.: For the top-level staggered this map is underfined (NULL) 
+        and is trivial one-to-one for the other levels*/
     int *spin_map;
 
     /** The length of the fine lattice */
@@ -141,7 +143,7 @@ namespace quda {
      * @param Nvec Number of null-space vectors
      * @param d The Dirac operator to which these null-space vectors correspond
      * @param geo_bs The geometric block sizes to use
-     * @param spin_bs The spin block sizes to use
+     * @param spin_bs The spin block sizes to use (default is 1)
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
     Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs=1, bool enable_gpu=true);

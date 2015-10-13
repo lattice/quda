@@ -8,7 +8,7 @@ namespace quda {
 
   using namespace quda::colorspinor;
 
-//ok for staggered: nSpin = 1 will work as well. Accessors do allow this case as well.
+//ok for staggered: nSpin = 1 will work as well, that is, Accessors work fine for nSpin=1.
 
   // copy the null-space vectors into the V-field
   template <int nSpin, int nColor, int nVec, class V, class B>
@@ -226,8 +226,6 @@ namespace quda {
 	//Take the block-ordered offset from the coarse grid offset (geo_map) 
 	//A.S.: geo_map introduced for the full site ordering, so ok to use it for the offset
 	int offset = geo_map[i]*nVec*geoBlockSize*in.Ncolor();
-
-	const int s = 0;
 
 	for (int v=0; v<in.Nvec(); v++) {
 	  for (int c=0; c<in.Ncolor(); c++) {
