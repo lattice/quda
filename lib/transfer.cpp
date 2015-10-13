@@ -267,6 +267,10 @@ namespace quda {
     Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
 
     out = *output; // copy result to out field (aliasing handled automatically)
+
+    // only need to synchronize if we're transferring from GPU to CPU
+    if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
+      cudaDeviceSynchronize();
   }
 
 } // namespace quda

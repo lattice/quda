@@ -201,7 +201,6 @@ namespace quda {
 	} else {
 	  errorQuda("Block size not instantiated");
 	}
-	cudaDeviceSynchronize();
       }
     }
 

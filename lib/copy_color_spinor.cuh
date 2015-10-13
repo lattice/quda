@@ -145,10 +145,11 @@ namespace quda {
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x >= volume) return;
+
     RegTypeIn in[Ns*Nc*2];
     RegTypeOut out[Ns*Nc*2];
     inOrder.load(in, x);
-    // if (x >= volume) return; all load and save routines are index safe (needed for shared variants)
     basis(out, in);
     outOrder.save(out, x);
   }
@@ -161,22 +162,12 @@ namespace quda {
     const ColorSpinorField &meta; // this reference is for meta data only
 
   private:
-    unsigned int sharedBytesPerThread() const { 
-      size_t regSize = sizeof(FloatOut) > sizeof(FloatIn) ? sizeof(FloatOut) : sizeof(FloatIn);
-      return Ns*Nc*2*regSize;
-    }
+    unsigned int sharedBytesPerThread() const { return 0; }
 
-    // the minimum shared memory per block is (block+1) because we pad to avoid bank conflicts
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return (param.block.x+1)*sharedBytesPerThread(); }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return meta.VolumeCB(); }
-    bool advanceBlockDim(TuneParam &param) const {
-      bool advance = Tunable::advanceBlockDim(param);
-      param.shared_bytes = sharedBytesPerThread() * (param.block.x+1); // FIXME: use sharedBytesPerBlock
-      return advance;
-    }
-
 
   public:
     PackSpinor(OutOrder &out, const InOrder &in, Basis &basis, const ColorSpinorField &meta) 
