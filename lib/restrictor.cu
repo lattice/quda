@@ -34,8 +34,10 @@ namespace quda {
     { }
   };
 
+
   /**
      Rotates from the fine-color basis into the coarse-color basis.
+     A.S.: also works for staggered (fineSpin = 1)
   */
   template <typename Float, int fineSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
   __device__ __host__ void rotateCoarseColor(complex<Float> out[fineSpin*coarseColor], 
@@ -69,18 +71,22 @@ namespace quda {
 	int x_coarse = arg.fine_to_coarse[x];
 	int parity_coarse = (x_coarse >= arg.out.Volume()/2) ? 1 : 0;
 	int x_coarse_cb = x_coarse - parity_coarse*arg.out.Volume()/2;
+	
+	for (int s=0; s<fineSpin; s++) 
+	  for (int c=0; c<coarseColor; c++)
+	    arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarseColor+c];
 
-        //spin map is undefined for Spin 1 fine level field, treat at separately	
         if(fineSpin == 1)
         {
            int staggered_coarse_spin = parity; //0 if fine parity even, 1 otherwise
-           Float sign = parity == 0 ? +1.0 : -1.0; // sign due to (v{\dagger} \eta_5 * in)
-           for (int c=0; c<coarseColor; c++) arg.out(parity_coarse,x_coarse_cb, staggered_coarse_spin,c) += (sign*tmp[c]);
+           for (int c=0; c<coarseColor; c++)
+	      arg.out(parity_coarse,x_coarse_cb,staggered_coarse_spin,c) += tmp[c];
         }
         else
         {
-	  for (int s=0; s<fineSpin; s++) for (int c=0; c<coarseColor; c++)
-	    arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarseColor+c];
+	  for (int s=0; s<fineSpin; s++) 
+	    for (int c=0; c<coarseColor; c++)
+	      arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarseColor+c];
         }
       }
     }
@@ -118,38 +124,57 @@ namespace quda {
     rotateCoarseColor<Float,fineSpin,fineColor,coarseColor>(tmp, arg.in, arg.V, parity, x_fine_cb);
 
     complex<Float> reduced[coarseSpin * coarseColor];
-    for (int i=0; i<coarseSpin*coarseColor; i++) reduced[i] = 0.0;
+    for (int i=0; i<coarseSpin*coarseColor; i++) reduced[i] = 0.0;//Why the class constructor does not initialize it to zero?
 
-    if(fineSpin == 1)
-    { 
-      int staggered_coarse_spin = parity; //0 if block parity and fine parity coincides, 1 otherwise
-      for (int v=0; v<coarseColor; v++) { 
-        __shared__ typename BlockReduce::TempStorage temp_storage;
-	reduced[staggered_coarse_spin*coarseColor+v] += 
-	BlockReduce(temp_storage).Sum( tmp[coarseColor+v] );
+    if(fineSpin != 1)
+    {
+      // first lets coarsen spin locally
+      for (int s=0; s<fineSpin; s++) {
+        for (int v=0; v<coarseColor; v++) {
+	  reduced[arg.spin_map(s)*coarseColor+v] += tmp[s*coarseColor+v];
+        }
+      }
+
+      // now lets coarse geometry across threads
+      typedef cub::BlockReduce<complex<Float>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
+      __shared__ typename BlockReduce::TempStorage temp_storage;
+      for (int s=0; s<coarseSpin; s++) {
+        for (int v=0; v<coarseColor; v++) {
+	  reduced[s*coarseColor+v] = BlockReduce(temp_storage).Sum( reduced[s*coarseColor+v] );
+	  __syncthreads();
+        }
       }
     }
-    else
+    else//staggered block (temporary hack)
     {
-      for (int s=0; s<fineSpin; s++) {
-        for (int v=0; v<coarseColor; v++) { 
-	  __shared__ typename BlockReduce::TempStorage temp_storage;
-	  reduced[arg.spin_map(s)*coarseColor+v] += 
-	   BlockReduce(temp_storage).Sum( tmp[s*coarseColor+v] );
+      
+      for (int s=0; s<coarseSpin; s++) {
+        for (int v=0; v<coarseColor; v++) {
+	  reduced[s*coarseColor+v] += (s == parity) ? tmp[v] : 0.0;
+        }
+      }
+
+      // now lets coarse geometry across threads
+      typedef cub::BlockReduce<complex<Float>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
+      __shared__ typename BlockReduce::TempStorage temp_storage;
+      for (int s=0; s<coarseSpin; s++) {
+        for (int v=0; v<coarseColor; v++) {
+	  reduced[s*coarseColor+v] = BlockReduce(temp_storage).Sum( reduced[s*coarseColor+v] );
+	  __syncthreads();
         }
       }
     }
 
-    Float sign = (fineSpin != 1) ? + 1.0 : (( parity == 0) ?  +1.0 : -1.0);
-
     if (threadIdx.x==0 && threadIdx.y == 0) {
       for (int s=0; s<coarseSpin; s++) { // hard code coarse spin to 2 for now
 	for (int v=0; v<coarseColor; v++) {
-	  arg.out(parity_coarse, x_coarse_cb, s, v) = sign*reduced[s*coarseColor+v];
+	  arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarseColor+v];
 	}
       }
 
     }
+
+    return;
 
   }
 

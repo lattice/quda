@@ -34,24 +34,25 @@ namespace quda {
      Applies the grid prolongation operator (coarse to the top level fine grid)
   */
 
-  template <typename Float, int coarseColor, class Coarse>
-  __device__ __host__ inline void prolongate2TopLevelStaggered(complex<Float> out[2*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, int parity_coarse, int x_coarse_cb) {
-    for (int s = 0; s < 2; s++) { //fine spin is in fact the fine-grid parity index
+  template <typename Float, int coarseSpin, int coarseColor, class Coarse>
+  __device__ __host__ inline void prolongate2TopLevelStaggered(complex<Float> out[coarseSpin*coarseColor], const Coarse &in, 
+					     int parity_coarse, int x_coarse_cb) {
+    for (int p = 0; p < coarseSpin; p++) { //coarse-grid spin is transformed into the fine-grid parity index
       for (int c = 0; c < coarseColor; c++) {
-        out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, s, c); 
+        int staggered_coarse_spin = p;
+        out[p*coarseColor+c] = in(parity_coarse, x_coarse_cb, staggered_coarse_spin, c); 
       }
     }
     return;
   }
 
   /**
-     Applies the grid prolongation operator (coarse to fine)
+     Applies the grid prolongation operator (coarse to fine spin dof)
   */
 
   template <typename Float, int fineSpin, int coarseColor, class Coarse, typename S>
   __device__ __host__ inline void prolongate(complex<Float> out[fineSpin*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, int parity_coarse, int x_coarse_cb, const S& spin_map) {
+					     int parity_coarse, int x_coarse_cb, const S& spin_map) {
     for (int s=0; s<fineSpin; s++) {
       for (int c=0; c<coarseColor; c++) {
 	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map(s), c);
@@ -65,12 +66,12 @@ namespace quda {
      Rotates from the coarse-color basis into the fine-color basis.  This
      is the second step of applying the prolongator (only for the prolongation to the top level grid!).
   */
-  template <typename Float, int fineColor, int coarseColor, class FineColor, class Rotator>
-  __device__ __host__ inline void rotateFineColorTopLevelStaggered(FineColor &out, const complex<Float> in[2*coarseColor],
-						  const Rotator &V, int parity, int x_cb, int parity_coarse) {
+  template <typename Float, int coarseSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
+  __device__ __host__ inline void rotateFineColorTopLevelStaggered(FineColor &out, const complex<Float> in[coarseSpin*coarseColor],
+						  const Rotator &V, int parity, int x_cb) {
     for (int i=0; i<out.Ncolor(); i++) out(parity, x_cb, 0, i) = 0.0;
 
-    int staggered_coarse_spin = parity; 
+    int staggered_coarse_spin = parity;
 
     for (int i=0; i<fineColor; i++) {
       for (int j=0; j<coarseColor; j++) { 
@@ -82,7 +83,7 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
   __device__ __host__ inline void rotateFineColor(FineColor &out, const complex<Float> in[fineSpin*coarseColor],
-						  const Rotator &V, int parity, int x_cb, int parity_coarse) {
+						  const Rotator &V, int parity, int x_cb) {
     for (int s=0; s<out.Nspin(); s++) 
       for (int i=0; i<out.Ncolor(); i++) out(parity, x_cb, s, i) = 0.0;
     
@@ -108,15 +109,16 @@ namespace quda {
 
         if(fineSpin == 1)//staggered top level
         {
-          complex<Float> tmp[2*coarseColor];
-	  prolongate2TopLevelStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb);
-	  rotateFineColorTopLevelStaggered<Float,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+          //if(coarseSpin != 2) errorQuda("\nIncorrect coarse spin number\n"); 
+          complex<Float> tmp[coarseSpin*coarseColor];
+	  prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
+	  rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
         }
         else//also for staggered if the fine grid is NOT a top level grid.
         {
           complex<Float> tmp[fineSpin*coarseColor];
-	  prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb, arg.spin_map);
-	  rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+	  prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb, arg.spin_map);
+	  rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
         }
       }
     }
