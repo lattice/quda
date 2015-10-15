@@ -1175,6 +1175,10 @@ namespace quda {
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N> { typedef gauge::FloatNOrder<short, N, 4, 9> type; };
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N> { typedef gauge::FloatNOrder<short, N, 4, 8> type; };
 
+  template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
+
 } // namespace quda
 
 #endif // _GAUGE_ORDER_H
