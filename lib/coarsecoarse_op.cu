@@ -66,7 +66,6 @@ namespace quda {
                   const int *xc_size, const int *geo_bs, int spin_bs, int s_col) {
 
     const int nDim = 4;
-    const Float half = 0.5;
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
     int coarse_size = 1;
@@ -201,7 +200,6 @@ namespace quda {
   void createCoarseClover(coarseGauge &X, F &V, fineGauge &C, int ndim, const int *x_size, const int *xc_size, const int *geo_bs, int spin_bs)  {
 
     const int nDim = 4;
-    const Float half = 0.5;
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
     int coarse_size = 1;

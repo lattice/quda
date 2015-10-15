@@ -35,7 +35,7 @@ namespace quda {
   */
   template <class T>
   void constant(T &t, int k, int s, int c) {
-    for (int parity; parity<t.Nparity(); parity++) {
+    for (int parity=0; parity<t.Nparity(); parity++) {
       for (int x_cb=0; x_cb<t.VolumeCB(); x_cb++) {
 	// set all color-spin components to zero
 	for (int s2=0; s2<t.Nspin(); s2++) {

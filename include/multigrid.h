@@ -205,15 +205,6 @@ namespace quda {
        @param in The residual vector (or equivalently the right hand side vector)
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    /**
-       This applies the V-cycle to the residual vector returning the residual vector
-       @param out The solution vector
-       @param in The residual vector (or equivalently the right hand side vector)
-     */
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) {
-      operator()(static_cast<ColorSpinorField&>(out), static_cast<ColorSpinorField&>(in));
-    }
   };
 
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);

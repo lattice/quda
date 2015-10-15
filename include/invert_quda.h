@@ -483,20 +483,6 @@ namespace quda {
       void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
-
-  // multigrid solver
-  class alphaSA : public Solver {
-
-  protected:
-    const DiracMatrix &mat;
-
-  public:
-    alphaSA(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-    virtual ~alphaSA() { ; }
-
-    void operator()(ColorSpinorField **out, ColorSpinorField &in);
-  };
-
   class MultiShiftSolver {
 
   protected:
