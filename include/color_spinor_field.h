@@ -608,6 +608,7 @@ namespace quda {
     //cpuColorSpinorField();
     cpuColorSpinorField(const cpuColorSpinorField&);
     cpuColorSpinorField(const ColorSpinorField&);
+    cpuColorSpinorField(const ColorSpinorField&, const ColorSpinorParam&);
     cpuColorSpinorField(const ColorSpinorParam&);
     virtual ~cpuColorSpinorField();
 

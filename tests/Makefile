@@ -51,7 +51,7 @@ TESTS = su3_test pack_test blas_test dslash_test invert_test		\
 	multigrid_invert_test $(DIRAC_TEST) $(STAGGERED_DIRAC_TEST)	\
 	$(FATLINK_TEST) $(GAUGE_FORCE_TEST) $(FERMION_FORCE_TEST)	\
 	$(UNITARIZE_LINK_TEST) $(HISQ_PATHS_FORCE_TEST)			\
-	$(HISQ_UNITARIZE_FORCE_TEST) $(GAUGE_ALG_TEST) multigrid_test
+	$(HISQ_UNITARIZE_FORCE_TEST) $(GAUGE_ALG_TEST)
 
 all: $(TESTS)
 
@@ -103,15 +103,11 @@ hisq_paths_force_test: hisq_paths_force_test.o hisq_force_reference.o hisq_force
 hisq_unitarize_force_test: hisq_unitarize_force_test.o hisq_force_reference.o test_util.o misc.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
 
-multigrid_test: wilson_dslash_reference.o multigrid_test.o test_util.o misc.o $(QIO_UTIL) $(QUDA)
-	$(CXX) $(LDFLAGS) $^  -o $@  $(LDFLAGS)
-
 clean:
 	-rm -f *.o dslash_test invert_test deflation_test staggered_dslash_test	\
 	staggered_invert_test su3_test pack_test blas_test llfat_test	\
 	gauge_force_test fermion_force_test hisq_paths_force_test	\
-	hisq_unitarize_force_test unitarize_link_test multigrid_test	\
-	multigrid_invert_test
+	hisq_unitarize_force_test unitarize_link_test multigrid_invert_test
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $< -c -o $@

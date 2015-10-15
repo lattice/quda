@@ -66,6 +66,30 @@ namespace quda {
     }
   }
 
+  /*
+    This is special case constructor used to create parity subset references with in a full field
+   */
+  cpuColorSpinorField::cpuColorSpinorField(const ColorSpinorField &src, const ColorSpinorParam &param) : 
+    ColorSpinorField(src), init(false), reference(false) {
+
+    // can only overide if we parity subset reference special case
+    if ( param.create == QUDA_REFERENCE_FIELD_CREATE &&
+	 src.SiteSubset() == QUDA_FULL_SITE_SUBSET &&
+	 param.siteSubset == QUDA_PARITY_SITE_SUBSET &&
+	 typeid(src) == typeid(cpuColorSpinorField) ) {
+      reset(param);
+    } else {
+      errorQuda("Undefined behaviour"); // else silent bug possible?
+    }
+
+    if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
+      v = (void*)src.V();
+      norm = (void*)src.Norm();
+    }
+
+    create(param.create);
+  }
+
   cpuColorSpinorField::~cpuColorSpinorField() {
     destroy();
   }
@@ -113,8 +137,6 @@ namespace quda {
     ghost_norm_length = 0;
     total_length = length;
     total_norm_length = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*stride : stride;
-    bytes = total_length * precision; // includes pads and ghost zones
-    bytes = ALIGNMENT_ADJUST(bytes);
 
     if (pad != 0) errorQuda("Non-zero pad not supported");  
     if (precision == QUDA_HALF_PRECISION) errorQuda("Half precision not supported");
@@ -138,7 +160,7 @@ namespace quda {
       init = true;
     }
  
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+    if (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) {
       ColorSpinorParam param(*this);
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       param.nDim = nDim;
@@ -147,13 +169,17 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
       param.norm = norm;
-      even = new cpuColorSpinorField(param);
-      odd = new cpuColorSpinorField(param);
+      even = new cpuColorSpinorField(*this, param);
+      odd = new cpuColorSpinorField(*this, param);
 
       // need this hackery for the moment (need to locate the odd pointers half way into the full field)
       (dynamic_cast<cpuColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
       if (precision == QUDA_HALF_PRECISION)
 	(dynamic_cast<cpuColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+
+      if (bytes != 2*even->Bytes() || bytes != 2*odd->Bytes())
+	errorQuda("dual-parity fields should have double the size of a single-parity field (%lu,%lu,%lu)\n",
+		  bytes, even->Bytes(), odd->Bytes());
     }
 
   }

@@ -165,7 +165,8 @@ namespace quda {
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
+   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
+     errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
 
     pad = Pad;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -306,9 +307,9 @@ namespace quda {
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-  if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2) errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
+    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
+      errorQuda("Must be two flavors for non-degenerate twisted mass spinor (provided with %d)\n", x[4]);
 
-  
     if (param.pad != 0) pad = param.pad;
 
     if (param.siteSubset == QUDA_FULL_SITE_SUBSET){
@@ -332,7 +333,7 @@ namespace quda {
     real_length = volume*nColor*nSpin*2;
 
     bytes = total_length * precision; // includes pads and ghost zones
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     if (precision == QUDA_HALF_PRECISION) {
       norm_bytes = total_norm_length * sizeof(float);
@@ -553,24 +554,32 @@ namespace quda {
   const ColorSpinorField& ColorSpinorField::Even() const {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return even subset of %d subset", siteSubset);
+    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
     return *even;
   }
 
   const ColorSpinorField& ColorSpinorField::Odd() const {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
     return *odd;
   }
 
   ColorSpinorField& ColorSpinorField::Even() {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return even subset of %d subset", siteSubset);
+    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
     return *even;
   }
 
   ColorSpinorField& ColorSpinorField::Odd() {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return odd subset of %d subset", siteSubset);
+    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
     return *odd;
   }
 
