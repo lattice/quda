@@ -233,11 +233,7 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(void) const
   {
-    if (this->siteSubset == QUDA_FULL_SITE_SUBSET){
-      errorQuda("Full spinor is not supported in alllocateGhostBuffer\n");
-    }
-
-    int num_faces = 1;
+     int num_faces = 1;
     if(nSpin == 1) num_faces = 3; // staggered
 
     int spinor_size = 2*nSpin*nColor*precision;
@@ -245,7 +241,7 @@ namespace quda {
 
     // resize face only if requested size is larger than previously allocated one
     for (int i=0; i<nDimComms; i++) {
-      size_t nbytes = num_faces*surfaceCB[i]*spinor_size;
+      size_t nbytes = siteSubset*num_faces*surfaceCB[i]*spinor_size;
       resize = (nbytes > ghostFaceBytes[i]) ? true : resize;
       ghostFaceBytes[i] = (nbytes > ghostFaceBytes[i]) ? nbytes : ghostFaceBytes[i];
     }
@@ -294,7 +290,6 @@ namespace quda {
 
   void cpuColorSpinorField::exchangeGhost(QudaParity parity, int dagger) const
   {
-
     // allocate ghost buffer if not yet allocated
     allocateGhostBuffer();
 

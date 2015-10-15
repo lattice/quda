@@ -15,6 +15,7 @@ namespace quda {
     const int nDim;
     const int nFace;
     const int parity;
+    const int nParity;
     const int dagger;
     const QudaDWFPCType pc_type;
 
@@ -25,11 +26,13 @@ namespace quda {
 	volumeCB(a.VolumeCB()),
 	nDim(a.Ndim()),
 	nFace(a.Nspin() == 1 ? 3 : 1),
-	parity(parity), dagger(dagger),
+	parity(parity),
+	nParity(a.SiteSubset()),
+	dagger(dagger),
 	pc_type(a.DWFPCtype())
     {
       for (int d=0; d<nDim; d++) X[d] = a.X(d);
-      X[0] *= 2; // set to full lattice size
+      X[0] *= (nParity == 1) ? 2 : 1; // set to full lattice dimensions
       X[4] = (nDim == 5) ? a.X(4) : 1; // set fifth dimension correctly
     }
 
@@ -85,36 +88,37 @@ namespace quda {
   }
 
   template <typename Float, int Ns, int Nc, typename Arg>
-  __host__ void packGhost(Arg &arg, int cb_idx) {
+  __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity) {
     typedef typename mapper<Float>::type RegType;
-    const int spinor_size = 2*Ns*Nc*sizeof(Float);
 
     const int *X = arg.X;
     int x[5] = { };
-    if (arg.nDim == 5)  getCoords5(x, cb_idx, X, arg.parity, arg.pc_type);
-    else getCoords(x, cb_idx, X, arg.parity);
+    if (arg.nDim == 5)  getCoords5(x, cb_idx, X, parity, arg.pc_type);
+    else getCoords(x, cb_idx, X, parity);
 
-    const void *v = arg.v;
-    void **ghost = arg.ghost;
     RegType tmp[2*Ns*Nc];
 
 #pragma unroll
-    for (int dim; dim<4; dim++) {
+    for (int dim=0; dim<4; dim++) {
       if (x[dim] < arg.nFace){
-	arg.field.load(tmp, cb_idx);
-	arg.field.saveGhost(tmp, ghostFaceIndex<0>(x,dim,arg), dim, 0);
+	arg.field.load(tmp, cb_idx, spinor_parity);
+	arg.field.saveGhost(tmp, ghostFaceIndex<0>(x,dim,arg), dim, 0, spinor_parity);
       }
       
       if (x[dim] >= X[dim] - arg.nFace){
-	arg.field.load(tmp, cb_idx);
-	arg.field.saveGhost(tmp, ghostFaceIndex<1>(x,dim,arg), dim, 1);
+	arg.field.load(tmp, cb_idx, spinor_parity);
+	arg.field.saveGhost(tmp, ghostFaceIndex<1>(x,dim,arg), dim, 1, spinor_parity);
       }
     }
   }
 
   template <typename Float, int Ns, int Nc, typename Arg>
   void GenericPackGhost(Arg &arg) {
-    for (int i=0; i<arg.volumeCB; i++) packGhost<Float,Ns,Nc>(arg, i);
+    for (int parity=0; parity<arg.nParity; parity++) {
+      parity = (arg.nParity == 2) ? parity : arg.parity;
+      const int spinor_parity = (arg.nParity == 2) ? parity : 0;
+      for (int i=0; i<arg.volumeCB; i++) packGhost<Float,Ns,Nc>(arg, i, parity, spinor_parity);
+    }
   }
 
   template <typename Float, QudaFieldOrder order, int Ns, int Nc>
@@ -173,9 +177,6 @@ namespace quda {
 
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
-    if (a.SiteSubset() == QUDA_FULL_SITE_SUBSET){
-      errorQuda("Full spinor is not supported in packGhost for cpu");
-    }
     if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
       errorQuda("Field order %d not supported", a.FieldOrder());
     }

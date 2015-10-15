@@ -881,16 +881,16 @@ namespace quda {
 	}
       }
 
-	virtual ~LegacyOrder() { ; }
-
-	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
-	  for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
-	}
-
-	__device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
-	  for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
-	}
-
+      virtual ~LegacyOrder() { ; }
+      
+      __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
+	for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
+      }
+      
+      __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
+	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
+      }
+      
       __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dummy, int dir, 
 						  int dim, int g, int parity, const int R[]) const {
 	for (int i=0; i<length; i++) {
@@ -898,16 +898,16 @@ namespace quda {
 	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
 	}
       }
-
-	__device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
-						    int dir, int dim, int g, int parity, const int R[]) {
-	  for (int i=0; i<length; i++) {
-	    ghost[dim]
-	      [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
-	  }
+      
+      __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
+						  int dir, int dim, int g, int parity, const int R[]) {
+	for (int i=0; i<length; i++) {
+	  ghost[dim]
+	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
 	}
+      }
 
-      };
+    };
 
     /**
        struct to define QDP ordered gauge fields: 
