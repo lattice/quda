@@ -314,7 +314,7 @@ namespace quda {
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector* >(field)[x + parity*offset + stride*i] = vecTmp;
+	    reinterpret_cast< Vector* >(field + parity*offset)[x + stride*i] = vecTmp;
 	  }
 	}
 
@@ -541,7 +541,6 @@ namespace quda {
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,Ns,Nc> { typedef colorspinor::SpaceColorSpinorOrder<T, Ns, Nc> type; };
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,Ns,Nc> { typedef colorspinor::SpaceSpinorColorOrder<T, Ns, Nc> type; };
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_FLOAT2_FIELD_ORDER,Ns,Nc> { typedef colorspinor::FloatNOrder<T, Ns, Nc, 2> type; };
-
 
 } // namespace quda
 
