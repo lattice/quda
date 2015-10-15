@@ -21,8 +21,10 @@ namespace quda {
     int dim[4];   // full lattice dimensions
     int commDim[4]; // whether a given dimension is partitioned or not
 
+    bool staggered_coarse_dslash;
+
     CoarseDslashArg(F &out, const F &inA, const F &inB, const G &Y, const G &X, Float kappa, int parity)
-      : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity), nFace(1) { 
+      : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity), nFace(1), staggered_coarse_dslash(false) { 
       for (int i=0; i<4; i++) {
 	dim[i] = inA.X(i);
 	commDim[i] = comm_dim_partitioned(i);
@@ -105,6 +107,71 @@ namespace quda {
     for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out[s*Nc+c] *= -(Float)2.0*arg.kappa;
   }
 
+
+  /**
+     A.S.: staggered coarse dslash has more sparse structure
+     Applies the coarse dslash on a given parity and checkerboard site index
+
+     @param out The result -2 * kappa * Dslash in
+     @param Y The coarse gauge field
+     @param kappa Kappa value
+     @param in The input field
+     @param parity The site parity
+     @param x_cb The checkerboarded site index
+   */
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc>
+  __device__ __host__ inline void ks_dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity) {
+    const int their_spinor_parity = (arg.inA.Nparity() == 2) ? (parity+1)&1 : 0;
+
+    int coord[nDim];
+    getCoords(coord, x_cb, arg.dim, parity);
+
+    for(int d = 0; d < nDim; d++) { //Ndim
+      //Forward link - compute fwd offset for spinor fetch
+      {
+	/*if (coord[d] + arg.nFace >= arg.in.X(d) && arg.commDim[d]) {
+	// load from ghost
+	} else {
+	linkIndexP1(coord, arg.X(), d);
+	}*/
+	int fwd_idx = linkIndexP1(coord, arg.dim, d);
+
+	complex<Float> in[Ns*Nc];
+	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++)
+	  in[s*Nc+c] = arg.inA(their_spinor_parity, fwd_idx, s, c);
+
+        for(int c_row = 0; c_row < Nc; c_row++) { //Color row
+	  for(int c_col = 0; c_col < Nc; c_col++) { //Color column
+		out[0*Nc+c_row] -= arg.Y(d, parity, x_cb, 0, 1, c_row, c_col) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+		out[1*Nc+c_row] -= arg.Y(d, parity, x_cb, 1, 0, c_row, c_col) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+	  } //Color column
+	} //Color row
+      }
+
+      //Backward link - compute back offset for spinor and gauge fetch
+      {
+	/*if (coord[d] - arg.nFace < 0) {
+	// load from ghost
+	} else {
+	linkIndexM1(coord, arg.X(), d);
+	}*/
+	int back_idx = linkIndexM1(coord, arg.dim, d);
+
+	complex<Float> in[Ns*Nc];
+	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++)
+	  in[s*Nc+c] = arg.inA(their_spinor_parity, back_idx, s, c);
+
+        for(int c_row = 0; c_row < Nc; c_row++) { //Color row
+	  for(int c_col = 0; c_col < Nc; c_col++) { //Color column
+	      out[0*Nc+c_row] += conj(arg.Y(d,(parity+1)&1, back_idx, 1, 0, c_col, c_row)) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+              out[1*Nc+c_row] += conj(arg.Y(d,(parity+1)&1, back_idx, 0, 1, c_col, c_row)) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+	  } //Color column
+	} //Color row
+      } //nDim
+    }
+  }
+
+
   /**
      Applies the coarse clover matrix on a given parity and
      checkerboard site index
@@ -152,7 +219,12 @@ namespace quda {
       for(int x_cb = 0; x_cb < arg.inA.VolumeCB(); x_cb++) { //Volume
 	complex <Float> out[Ns*Nc];// = { };
 	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out[s*Nc+c] = 0.0;
-	dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+
+        if(!staggered_coarse_dslash) 
+	  dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+        else
+	  ks_dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+
 	clover<Float,F,G,Ns,Nc>(out, arg, x_cb, parity);
 
 	const int my_spinor_parity = (arg.inA.Nparity() == 2) ? parity : 0;
@@ -181,7 +253,11 @@ namespace quda {
     complex<Float> out[Ns*Nc];// = { };
     for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out[s*Nc+c] = 0.0;
 
-    dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+    if(!staggered_coarse_dslash) 
+      dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+    else
+      ks_dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+
     clover<Float,F,G,Ns,Nc>(out, arg, x_cb, parity);
 
     const int my_spinor_parity = (blockDim.y == 2) ? parity : 0;
