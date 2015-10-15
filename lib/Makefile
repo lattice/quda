@@ -43,8 +43,8 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	pgauge_exchange.o pgauge_init.o pgauge_heatbath.o random.o	\
 	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
 	pgauge_det_trace.o clover_outer_product.o			\
-	clover_sigma_outer_product.o extract_gauge_ghost_mg.o		\
-	copy_gauge_mg.o color_spinor_pack.o
+	clover_sigma_outer_product.o qcharge_quda.o			\
+	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -67,7 +67,7 @@ BLAS_INLN = blas_core.h blas_mixed_core.h
 REDUCE_INLN = reduce_core.h reduce_mixed_core.h multi_reduce_core.h
 
 # These are only inlined into cuda_color_spinor_field.cu
-CSF_INLN = 
+CSF_INLN =
 
 # These are only inlined into dslash_quda.cu
 DSLASH_INLN = dslash_constants.h dslash_textures.h io_spinor.h	\
@@ -157,10 +157,19 @@ HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH)),cuda_versio
 
 
 DGITVERSION =
+GITVERSION =
 ifeq ($(strip $(GIT)), git)
 	GITVERSION = $(shell git describe --long --dirty 2> /dev/null)
 ifneq ($(GITVERSION),)
 	  DGITVERSION = -DGITVERSION=\"$(GITVERSION)\"
+endif
+endif
+
+ifeq ($(QUDA_DEBUG),true)
+ifeq ($(GITVERSION),)
+	DGITVERSION = -DGITVERSION=\"debug\"
+else
+	DGITVERSION= -DGITVERSION=\"$(GITVERSION)-debug\"
 endif
 endif
 
@@ -177,19 +186,12 @@ all: $(QUDA)
 $(QUDA): $(QUDA_OBJS) version.o ../make.inc
 	ar cru $@  version.o $(QUDA_OBJS)
 
+
+# The file generate/gen.py imports all the code generators
+# if you create a new code generator please register it there
 gen:
-	$(PYTHON) generate/dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_dslash_gen.py
-	$(PYTHON) generate/dw_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_dw_dslash_cuda_gen.py
-	$(PYTHON) generate/ndeg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_ndeg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/deg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_deg_tm_dslash_cuda_gen.py
-	$(PYTHON) generate/deg_tmc_dslash_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_deg_tmc_dslash_cuda_gen.py
-	$(PYTHON) generate/dw_dslash_4D_cuda_gen.py
-	$(PYTHON) generate/fused_exterior_dw_dslash_4D_cuda_gen.py
+	$(PYTHON) generate/gen.py
+
 
 mpi_nvtx:
 	$(PYTHON) generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
@@ -197,14 +199,16 @@ mpi_nvtx:
 clean:
 	-rm -f *.o $(QUDA)
 
+.PHONY: version.o
 version.o: version.cpp $(HDRS) $(QUDA_OBJS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
+
 
 interface_quda.o: interface_quda.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
 
 tune.o: tune.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
+	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $(DGITVERSION) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@

@@ -50,6 +50,10 @@ namespace quda {
     a.y = 0.0;
   }
 
+  __device__ inline void zero(double &a) {
+    a = 0.0;
+  }
+
   __device__ unsigned int count = 0;
   __shared__ bool isLastBlockDone;
 

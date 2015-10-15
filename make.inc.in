@@ -15,7 +15,7 @@ PYTHON = @QUDA_PYTHON@	  # python 2.5 or later required for 'make gen'
 
 # compilation options
 HOST_DEBUG = @HOST_DEBUG@			# compile host debug code
-DEVICE_DEBUG = @DEVICE_DEBUG@		# compile device debug code for cuda-gdb 
+DEVICE_DEBUG = @DEVICE_DEBUG@		# compile device debug code for cuda-gdb
 VERBOSE = @VERBOSE@			# display kernel register useage
 BLAS_TEX = @BLAS_TEX@			# enable texture reads in BLAS?
 FERMI_DBLE_TEX = @FERMI_DBLE_TEX@		# enable double-precision texture reads on Fermi?
@@ -95,15 +95,12 @@ NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
 
 INC = -I$(CUDA_INSTALL_PATH)/include
 
-COPT = -std=c++11
-NVCCOPT = -std=c++11
-
 ifeq ($(strip $(CPU_ARCH)), x86_64)
   ifeq ($(strip $(OS)), osx)
-    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart 
-    NVCCOPT += -m64
+    LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart
+    NVCCOPT = -m64
   else
-    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart 
+    LIB = -L$(CUDA_INSTALL_PATH)/lib64 -lcudart
   endif
 else
   LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32
@@ -118,9 +115,9 @@ NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 
 TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
 ifneq ($(TESLA_ARCH),true)
-  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false 
+  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
 else
-  NVCCOPT += 
+  NVCCOPT +=
 endif
 
 ifeq ($(strip $(GIT)), git)
@@ -159,7 +156,7 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
-endif 
+endif
 
 ifeq ($(strip $(BUILD_QIO)), yes)
   INC += -DHAVE_QIO -I$(QIO_HOME)/include
@@ -177,22 +174,22 @@ ifeq ($(strip $(INTERFACE_NVTX)), yes)
   COPT += -DINTERFACE_NVTX
   ifneq ($(strip $(MPI_NVTX)), yes)
     LIB += -lnvToolsExt
-  endif 
+  endif
 endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
-  
-  LIB += -fopenmp -L$(MAGMA_HOME)/lib -lmagma 
-  LIB += -L$(LAPACK_HOME) -llapack -lf77blas -lgfortran 
+
+  LIB += -fopenmp -L$(MAGMA_HOME)/lib -lmagma
+  LIB += -L$(LAPACK_HOME) -llapack -lf77blas -lgfortran
   LIB += -L$(ATLAS_HOME)/lib -lcblas -latlas
   LIB += -L$(CUDA_INSTALL_PATH)/lib64 -lcublas
 
 else
-  MAGMA_INCLUDE = 
-  MAGMA_FLAGS   = 
+  MAGMA_INCLUDE =
+  MAGMA_FLAGS   =
 endif
 
 ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
@@ -258,8 +255,8 @@ ifeq ($(strip $(BUILD_FATLINK)), yes)
 endif
 
 ifeq ($(strip $(BUILD_HISQLINK)), yes)
-  ifneq ($(strip $(BUILD_FATLINK)), yes) 
-    NVCCOPT += -DGPU_FATLINK 
+  ifneq ($(strip $(BUILD_FATLINK)), yes)
+    NVCCOPT += -DGPU_FATLINK
     COPT    += -DGPU_FATLINK
   endif
   NVCCOPT += -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS
@@ -292,13 +289,17 @@ ifeq ($(strip $(BUILD_GAUGE_ALG)), yes)
   LIB += -lcufft -lcurand
 endif
 
+QUDA_DEBUG = false
+
 ifeq ($(strip $(HOST_DEBUG)), yes)
   NVCCOPT += -g -DHOST_DEBUG
   COPT += -g -fno-inline -DHOST_DEBUG
+  QUDA_DEBUG = true
 endif
 
 ifeq ($(strip $(DEVICE_DEBUG)), yes)
   NVCCOPT += -G
+  QUDA_DEBUG = true
 endif
 
 ifeq ($(strip $(VERBOSE)), yes)
@@ -387,15 +388,15 @@ ifeq ($(strip $(USE_QDPJIT)), yes)
   INC += -I$(QDP_INSTALL_PATH)/include
 
   CFLAGS = -Wall -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall $(COPT) $(INC) $(QDPXX_CXXFLAGS)
-  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-  NVCCFLAGS = $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  CXXFLAGS = -Wall -std=c++11 $(COPT) $(INC) $(QDPXX_CXXFLAGS)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
+  NVCCFLAGS = -std=c++11 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 else
   CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall -O3 $(COPT) $(INC)
-  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc 
-  NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  CXXFLAGS = -Wall -std=c++11 -O3 $(COPT) $(INC)
+  NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
+  NVCCFLAGS = -std=c++11 -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 endif
 
