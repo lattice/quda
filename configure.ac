@@ -280,7 +280,7 @@ AC_ARG_WITH(qdp,
 
 
 AC_ARG_ENABLE(magma,
-  AC_HELP_STRING([--enable-magma], [ Build with MAGMA (requires pkg-config to detect magma)y]),
+  AC_HELP_STRING([--enable-magma], [ Build with MAGMA (requires pkg-config to detect magma)]),
   [ build_magma=${enableval}],
   [ build_magma="no" ]
 )
