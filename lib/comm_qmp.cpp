@@ -16,6 +16,15 @@ struct MsgHandle_s {
 
 static int gpuid = -1;
 
+// this is a work around (in the absence of C++11) to do a compile
+// time check that the size of float and int are the same.  Since we
+// are reinterpretting a float as an int, this property is required.
+template <typename A, typename B>
+inline void static_assert_equal_size()
+{
+  typedef char sizeof_float_must_equal_sizeof_int[sizeof(A) == sizeof(B) ? 1 : -1];
+  (void) sizeof(sizeof_float_must_equal_sizeof_int);
+}
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
@@ -35,7 +44,33 @@ void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *m
   Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
   comm_set_default_topology(topo);
 
-  // determine which GPU this process will use (FIXME: adopt the scheme in comm_mpi.cpp)
+  // determine which GPU this rank will use
+  char *hostname = comm_hostname();
+  char *hostname_recv_buf = (char *)safe_malloc(128*comm_size());
+
+  // Abuse reductions to emulate all-gather.  We need to copy the
+  // local hostname to all other nodes
+  for (int i=0; i<comm_size(); i++) {
+    int data[128];
+    for (int j=0; j<128; j++) {
+      data[j] = (i == comm_rank()) ? hostname[j] : 0;
+    }
+    // check nasty int to float hack is valid
+    static_assert_equal_size<float,int>();
+    QMP_sum_float_array(reinterpret_cast<float*>(&data), 128);
+
+    for (int j=0; j<128; j++) {
+      hostname_recv_buf[i*128 + j] = data[j];
+    }
+  }
+
+  gpuid = 0;
+  for (int i = 0; i < comm_rank(); i++) {
+    if (!strncmp(hostname, &hostname_recv_buf[128*i], 128)) {
+      gpuid++;
+    }
+  }
+  host_free(hostname_recv_buf);
 
   int device_count;
   cudaGetDeviceCount(&device_count);

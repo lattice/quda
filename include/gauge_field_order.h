@@ -882,16 +882,16 @@ namespace quda {
 	}
       }
 
-	virtual ~LegacyOrder() { ; }
-
-	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
-	  for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
-	}
-
-	__device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
-	  for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
-	}
-
+      virtual ~LegacyOrder() { ; }
+      
+      __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
+	for (int i=0; i<length; i++) v[i] = ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i];
+      }
+      
+      __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
+	for (int i=0; i<length; i++) ghost[dir][(parity*faceVolumeCB[dir] + x)*length + i] = v[i];
+      }
+      
       __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dummy, int dir, 
 						  int dim, int g, int parity, const int R[]) const {
 	for (int i=0; i<length; i++) {
@@ -899,16 +899,16 @@ namespace quda {
 	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i];
 	}
       }
-
-	__device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
-						    int dir, int dim, int g, int parity, const int R[]) {
-	  for (int i=0; i<length; i++) {
-	    ghost[dim]
-	      [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
-	  }
+      
+      __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
+						  int dir, int dim, int g, int parity, const int R[]) {
+	for (int i=0; i<length; i++) {
+	  ghost[dim]
+	    [(((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g)*length + i] = v[i];
 	}
+      }
 
-      };
+    };
 
     /**
        struct to define QDP ordered gauge fields: 
@@ -1175,6 +1175,10 @@ namespace quda {
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N> { typedef gauge::FloatNOrder<short, N, 4, 12> type; };
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N> { typedef gauge::FloatNOrder<short, N, 4, 9> type; };
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N> { typedef gauge::FloatNOrder<short, N, 4, 8> type; };
+
+  template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
+  template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
 
 } // namespace quda
 

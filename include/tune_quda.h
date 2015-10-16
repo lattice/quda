@@ -57,7 +57,7 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = 256; // FIXME: set a reasonable value for blas currently
+	const unsigned int max_blocks = 2*deviceProp.multiProcessorCount;
 	const int step = 1;
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {

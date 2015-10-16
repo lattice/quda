@@ -14,6 +14,7 @@
 #endif
 
 //#define LAUNCH_TIMER
+extern char* gitversion;
 
 namespace quda { static TuneKey last_key; }
 
@@ -22,7 +23,7 @@ quda::TuneKey getLastTuneKey() { return quda::last_key; }
 
 namespace quda {
   typedef std::map<TuneKey, TuneParam> map;
-  
+
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
   static std::string resource_path;
   static map tunecache;
@@ -35,6 +36,8 @@ namespace quda {
   static const std::string quda_version = STR(QUDA_VERSION_MAJOR) "." STR(QUDA_VERSION_MINOR) "." STR(QUDA_VERSION_SUBMINOR);
 #undef STR
 #undef STR_
+
+
 
   /**
    * Deserialize tunecache from an istream, useful for reading a file or receiving from other nodes.
@@ -142,7 +145,7 @@ namespace quda {
       warningQuda("Caching of tuned parameters will be disabled.");
       return;
     } else if (stat(path, &pstat) || !S_ISDIR(pstat.st_mode)) {
-      warningQuda("The path \"%s\" specified by QUDA_RESOURCE_PATH does not exist or is not a directory.", path); 
+      warningQuda("The path \"%s\" specified by QUDA_RESOURCE_PATH does not exist or is not a directory.", path);
       warningQuda("Caching of tuned parameters will be disabled.");
       return;
     } else {
@@ -167,24 +170,30 @@ namespace quda {
 	ls >> token;
 	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 	ls >> token;
+  #ifdef GITVERSION
+	if (token.compare(gitversion)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+  #else
+  if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+  #endif
+  ls >> token;
 	if (token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
 
-      
+
 	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
 	getline(cache_file, line); // eat the blank line
-      
+
 	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
 	getline(cache_file, line); // eat the description line
-      
+
 	deserializeTuneCache(cache_file);
 
-	cache_file.close();      
+	cache_file.close();
 	initial_cache_size = tunecache.size();
 
 	if (verbosity >= QUDA_SUMMARIZE) {
 	  printfQuda("Loaded %d sets of cached parameters from %s\n", static_cast<int>(initial_cache_size), cache_path.c_str());
 	}
-      
+
 
       } else {
 	warningQuda("Cache file not found.  All kernels will be re-tuned (if tuning is enabled).");
@@ -238,13 +247,19 @@ namespace quda {
 
       cache_path = resource_path + "/tunecache.tsv";
       cache_file.open(cache_path.c_str());
-    
+
       if (verbosity >= QUDA_SUMMARIZE) {
 	printfQuda("Saving %d sets of cached parameters to %s\n", static_cast<int>(tunecache.size()), cache_path.c_str());
       }
-    
+
       time(&now);
-      cache_file << "tunecache\t" << quda_version << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
+      cache_file << "tunecache\t" << quda_version;
+#ifdef GITVERSION
+       cache_file << "\t" << gitversion;
+#else
+       cache_file << "\t" << quda_version;
+#endif
+      cache_file << "\t" << quda_hash << "\t# Last updated " << ctime(&now) << std::endl;
       cache_file << "volume\tname\taux\tblock.x\tblock.y\tblock.z\tgrid.x\tgrid.y\tgrid.z\tshared_bytes\tcomment" << std::endl;
       serializeTuneCache(cache_file);
       cache_file.close();
@@ -392,9 +407,9 @@ namespace quda {
 	}
 	if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
 	  if (error == cudaSuccess)
-	    printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), 
+	    printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
 		       tunable.perfString(elapsed_time).c_str());
-	  else 
+	  else
 	    printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
 	}
 	tuning = tunable.advanceTuneParam(param);

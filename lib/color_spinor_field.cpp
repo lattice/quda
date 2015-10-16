@@ -302,7 +302,7 @@ namespace quda {
 
     volume = 1;
     for (int d=0; d<nDim; d++) {
-      if (param.x[0] != 0) x[d] = param.x[d];
+      if (param.x[d] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
@@ -554,32 +554,32 @@ namespace quda {
   const ColorSpinorField& ColorSpinorField::Even() const {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return even subset of %d subset", siteSubset);
-    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
     return *even;
   }
 
   const ColorSpinorField& ColorSpinorField::Odd() const {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return odd subset of %d subset", siteSubset);
-    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
     return *odd;
   }
 
   ColorSpinorField& ColorSpinorField::Even() {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return even subset of %d subset", siteSubset);
-    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
     return *even;
   }
 
   ColorSpinorField& ColorSpinorField::Odd() {
     if (siteSubset != QUDA_FULL_SITE_SUBSET)
       errorQuda("Cannot return odd subset of %d subset", siteSubset);
-    if (siteSubset == QUDA_QDPJIT_FIELD_ORDER)
-      errorQuda("Cannot return even subset of QDPJIT field", fieldOrder);
+    if (fieldOrder == QUDA_QDPJIT_FIELD_ORDER)
+      errorQuda("Cannot return even subset of QDPJIT field");
     return *odd;
   }
 

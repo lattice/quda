@@ -314,17 +314,18 @@ namespace quda {
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast<RegVector*>(tmp)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector* >(field)[x + parity*offset + stride*i] = vecTmp;
+	    reinterpret_cast< Vector* >(field + parity*offset)[x + stride*i] = vecTmp;
 	  }
 	}
 
 	// no parity argument since we only presently exchange single parity field
 	// add support for half-precision ghosts
-	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir) const {
+	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
 #pragma unroll
           for (int i=0; i<M; i++) {
 	    // first do vectorized copy from memory into registers
-	    Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir], i*faceVolumeCB[dir]+x);
+	    Vector vecTmp = vector_load<Vector>(ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N,
+						i*faceVolumeCB[dim]+x);
 	    // second do vectorized copy converting into register type
 	    copy(reinterpret_cast< RegVector* >(v)[i], vecTmp);
           }
@@ -332,14 +333,15 @@ namespace quda {
 
 	// no parity argument since we only presently exchange single parity field
 	// add support for half-precision ghosts
-	__device__ __host__ inline void saveGhost(RegType v[length], int x, int dim, int dir) const {
+	__device__ __host__ inline void saveGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
 #pragma unroll
           for (int i=0; i<M; i++) {
 	    Vector vecTmp;
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast< RegVector* >(v)[i]);
 	    // second do vectorized copy into memory
-	    reinterpret_cast< Vector*>(ghost[2*dim+dir])[i*faceVolumeCB[dir]+x] = vecTmp;
+	    reinterpret_cast< Vector*>
+	      (ghost[2*dim+dir]+parity*faceVolumeCB[dim]*M*N)[i*faceVolumeCB[dim]+x] = vecTmp;
           }
 	}
 
@@ -390,21 +392,21 @@ namespace quda {
 	  }
 	}
 
-	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir) const {
+	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		v[(s*Nc+c)*2+z] = ghost[2*dim+dir][((x*Nc + c)*Ns + s)*2 + z];
+		v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Nc + c)*Ns + s)*2 + z];
 	      }
 	    }
 	  }
 	}
 
-	__device__ __host__ inline void saveGhost(const RegType v[length], int x, int dim, int dir) {
+	__device__ __host__ inline void saveGhost(const RegType v[length], int x, int dim, int dir, int parity=0) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		ghost[2*dim+dir][((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
+		ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
 	      }
 	    }
 	  }
@@ -457,21 +459,21 @@ namespace quda {
 	  }
 	}
 
-	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir) const {
+	__device__ __host__ inline void loadGhost(RegType v[length], int x, int dim, int dir, int parity=0) const {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		v[(s*Nc+c)*2+z] = ghost[2*dim+dir][((x*Ns + s)*Nc + c)*2 + z];
+		v[(s*Nc+c)*2+z] = ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z];
 	      }
 	    }
 	  }
 	}
 
-	__device__ __host__ inline void saveGhost(const RegType v[length], int x, int dim, int dir) {
+	__device__ __host__ inline void saveGhost(const RegType v[length], int x, int dim, int dir, int parity=0) {
 	  for (int s=0; s<Ns; s++) {
 	    for (int c=0; c<Nc; c++) {
 	      for (int z=0; z<2; z++) {
-		ghost[2*dim+dir][((x*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
+		ghost[2*dim+dir][(((parity*faceVolumeCB[dim]+x)*Ns + s)*Nc + c)*2 + z] = v[(s*Nc+c)*2+z];
 	      }
 	    }
 	  }
@@ -541,7 +543,6 @@ namespace quda {
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,Ns,Nc> { typedef colorspinor::SpaceColorSpinorOrder<T, Ns, Nc> type; };
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,Ns,Nc> { typedef colorspinor::SpaceSpinorColorOrder<T, Ns, Nc> type; };
   template<typename T, int Ns, int Nc> struct colorspinor_order_mapper<T,QUDA_FLOAT2_FIELD_ORDER,Ns,Nc> { typedef colorspinor::FloatNOrder<T, Ns, Nc, 2> type; };
-
 
 } // namespace quda
 
