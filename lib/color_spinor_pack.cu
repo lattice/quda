@@ -205,7 +205,9 @@ namespace quda {
   template <typename Float, QudaFieldOrder order, int Ns>
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
     
-    if (a.Ncolor() == 3) {
+    if (a.Ncolor() == 2) {
+      genericPackGhost<Float,order,Ns,2>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 3) {
       genericPackGhost<Float,order,Ns,3>(ghost, a, parity, dagger);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
