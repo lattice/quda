@@ -17,14 +17,15 @@ namespace quda {
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
+    bool is_staggered = ( typeid(*dirac).name() == typeid(DiracStaggered).name() ) || ( typeid(*dirac).name() == typeid((DiracImprovedStaggered).name() );
     if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
       if (!enable_gpu)
 	errorQuda("Cannot apply coarse grid operator on GPU since enable_gpu has not been set");
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, is_staggered);
       //ApplyCoarse(out.Even(), in.Odd(), in.Even(), *Y_d, *X_d, kappa, QUDA_EVEN_PARITY);
       //ApplyCoarse(out.Odd(), in.Even(), in.Odd(), *Y_d, *X_d, kappa, QUDA_ODD_PARITY);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa);
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, is_staggered);
       //ApplyCoarse(out.Even(), in.Odd(), in.Even(), *Y_h, *X_h, kappa, QUDA_EVEN_PARITY);
       //ApplyCoarse(out.Odd(), in.Even(), in.Odd(), *Y_h, *X_h, kappa, QUDA_ODD_PARITY);
     }

@@ -212,7 +212,7 @@ namespace quda {
   void CoarseKSOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField *fat_links, const cudaGaugeField *long_links);
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY);
+		   const GaugeField &Y, const GaugeField &X, double kappa, bool is_staggered = false, int parity = QUDA_INVALID_PARITY);
 
   void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, 
 		      const cpuGaugeField &clover, double kappa);

@@ -26,10 +26,12 @@ namespace quda {
     int commDim[4]; // whether a given dimension is partitioned or not
     int nFace;  // hard code to 1 for now
 
+    bool staggered_coarse_dslash;//staggered coarse dslash has more sparse structure.
+
     CoarseDslashArg(F &out, const F &inA, const F &inB, const G &Y, const G &X,
-		    Float kappa, int parity, const ColorSpinorField &meta)
+		    Float kappa, int parity, const ColorSpinorField &meta, bool is_staggered)
       : out(out), inA(inA), inB(inB), Y(Y), X(X), kappa(kappa), parity(parity),
-	nParity(meta.SiteSubset()), volumeCB(meta.VolumeCB()), nFace(1) {
+	nParity(meta.SiteSubset()), volumeCB(meta.VolumeCB()), nFace(1), staggered_coarse_dslash(is_staggered) {
       for (int i=0; i<4; i++) {
 	dim[i] = meta.X(i);
 	commDim[i] = comm_dim_partitioned(i);
@@ -165,42 +167,71 @@ namespace quda {
     for(int d = 0; d < nDim; d++) { //Ndim
       //Forward link - compute fwd offset for spinor fetch
       {
-	/*if (coord[d] + arg.nFace >= arg.in.X(d) && arg.commDim[d]) {
-	// load from ghost
-	} else {
-	linkIndexP1(coord, arg.X(), d);
-	}*/
-	int fwd_idx = linkIndexP1(coord, arg.dim, d);
-
 	complex<Float> in[Ns*Nc];
+	complex<Float> Y[Ns*Nc][Ns*Nc];
+#ifdef LEGACY_SPINOR
+	int fwd_idx = linkIndexP1(coord, arg.dim, d);
 	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++)
 	  in[s*Nc+c] = arg.inA(their_spinor_parity, fwd_idx, s, c);
+#else
+	int fwd_idx = linkIndexP1(coord, arg.dim, d);
+	arg.inA.load(reinterpret_cast<Float*>(in), fwd_idx, their_spinor_parity);
+#endif // LEGACY_SPINOR
+
+#ifdef LEGACY_GAUGE
+	for (int s_row=0; s_row<Ns; s_row++)
+	  for (int c_row=0; c_row<Nc; c_row++)
+	    for (int s_col=0; s_col<Ns; s_col++)
+	      for (int c_col=0; c_col<Nc; c_col++)
+		Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, (parity+1)&1, x_cb, s_row, s_col, c_row, c_col);
+#else
+	//if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+	// load from ghost
+	//} else {
+	arg.Y.load(reinterpret_cast<Float*>(Y), x_cb, d, (parity+1)&1);
+	  //}
+#endif // LEGACY_GAUGE
 
         for(int c_row = 0; c_row < Nc; c_row++) { //Color row
 	  for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-		out[0*Nc+c_row] -= arg.Y(d, parity, x_cb, 0, 1, c_row, c_col) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
-		out[1*Nc+c_row] -= arg.Y(d, parity, x_cb, 1, 0, c_row, c_col) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+		out[0*Nc+c_row] -= Y(d, parity, x_cb, 0, 1, c_row, c_col) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+		out[1*Nc+c_row] -= Y(d, parity, x_cb, 1, 0, c_row, c_col) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
 	  } //Color column
 	} //Color row
       }
 
       //Backward link - compute back offset for spinor and gauge fetch
       {
-	/*if (coord[d] - arg.nFace < 0) {
-	// load from ghost
-	} else {
-	linkIndexM1(coord, arg.X(), d);
-	}*/
-	int back_idx = linkIndexM1(coord, arg.dim, d);
-
 	complex<Float> in[Ns*Nc];
+	complex<Float> Y[Ns*Nc][Ns*Nc];
+	int gauge_idx;
+	int back_idx = linkIndexM1(coord, arg.dim, d);
+#ifdef LEGACY_SPINOR
 	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++)
 	  in[s*Nc+c] = arg.inA(their_spinor_parity, back_idx, s, c);
+#else
+	arg.inA.load(reinterpret_cast<Float*>(in), back_idx, their_spinor_parity);
+#endif // LEGACY_SPINOR
+
+	gauge_idx = back_idx;
+#ifdef LEGACY_GAUGE
+	for (int s_row=0; s_row<Ns; s_row++)
+	  for (int c_row=0; c_row<Nc; c_row++)
+	    for (int s_col=0; s_col<Ns; s_col++)
+	      for (int c_col=0; c_col<Nc; c_col++)
+		Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, (parity+1)&1, gauge_idx, s_row, s_col, c_row, c_col);
+#else
+	//if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	// load from ghost
+        //} else {
+	arg.Y.load(reinterpret_cast<Float*>(Y), gauge_idx, d, (parity+1)&1);
+	  //}
+#endif // LEGACY_GAUGE
 
         for(int c_row = 0; c_row < Nc; c_row++) { //Color row
 	  for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-	      out[0*Nc+c_row] += conj(arg.Y(d,(parity+1)&1, back_idx, 1, 0, c_col, c_row)) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
-              out[1*Nc+c_row] += conj(arg.Y(d,(parity+1)&1, back_idx, 0, 1, c_col, c_row)) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+	      out[0*Nc+c_row] += conj(Y(d,(parity+1)&1, back_idx, 1, 0, c_col, c_row)) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+              out[1*Nc+c_row] += conj(Y(d,(parity+1)&1, back_idx, 0, 1, c_col, c_row)) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
 	  } //Color column
 	} //Color row
       } //nDim
@@ -263,7 +294,12 @@ namespace quda {
   {
     complex <Float> out[Ns*Nc];
     for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out[s*Nc+c] = 0.0;
-    dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+
+    if(!staggered_coarse_dslash) 
+      dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+    else
+      ks_dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
+
     clover<Float,F,G,Ns,Nc>(out, arg, x_cb, parity);
 
     const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -365,7 +401,7 @@ namespace quda {
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseColor, int coarseSpin, QudaFieldLocation location>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,  const GaugeField &Y, const GaugeField &X,
-		   double kappa, int parity) {
+		   double kappa, bool is_staggered, int parity) {
 #ifdef LEGACY_SPINOR
     typedef typename colorspinor::FieldOrderCB<Float,coarseSpin,coarseColor,1,csOrder> F;
 #else
@@ -383,14 +419,14 @@ namespace quda {
     F inAccessorB(const_cast<ColorSpinorField&>(inB));
     G yAccessor(const_cast<GaugeField&>(Y));
     G xAccessor(const_cast<GaugeField&>(X));
-    CoarseDslashArg<Float,F,G> arg(outAccessor, inAccessorA, inAccessorB, yAccessor, xAccessor, (Float)kappa, parity, inA);
+    CoarseDslashArg<Float,F,G> arg(outAccessor, inAccessorA, inAccessorB, yAccessor, xAccessor, (Float)kappa, parity, inA, is_staggered);
     CoarseDslash<Float,F,G,4,coarseSpin,coarseColor> dslash(arg, inA);
     dslash.apply(0);
   }
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseColor, int coarseSpin>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,  const GaugeField &Y, const GaugeField &X,
-		   double kappa, int parity) {
+		   double kappa, bool is_staggered, int parity) {
     if (inA.Location() == QUDA_CUDA_FIELD_LOCATION) {
       ApplyCoarse<Float,csOrder,gOrder,coarseColor,coarseSpin,QUDA_CUDA_FIELD_LOCATION>(out, inA, inB, Y, X, kappa, parity);
     } else {
@@ -401,7 +437,7 @@ namespace quda {
   // template on the number of coarse colors
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity) {
+		   const GaugeField &Y, const GaugeField &X, double kappa, bool is_staggered, int parity) {
     if (inA.Nspin() != 2)
       errorQuda("Unsupported number of coarse spins %d\n",inA.Nspin());
 
@@ -441,7 +477,7 @@ namespace quda {
   //Note factor of 2*kappa compensates for the factor of 1/2 already
   //absorbed into the Y matrices.
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity) {
+		   const GaugeField &Y, const GaugeField &X, double kappa, bool is_staggered, int parity) {
 #ifdef GPU_MULTIGRID
     if (Y.Precision() != inA.Precision() || Y.Precision() != inB.Precision() ||
 	X.Precision() != Y.Precision() || Y.Precision() != out.Precision())
