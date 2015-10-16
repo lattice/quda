@@ -435,7 +435,7 @@ namespace quda {
     size_t bytes[4];
 
     const int Ninternal = 2*nColor*nSpin;
-    for (int i=0; i<nDimComms; i++) bytes[i] = nFace*surfaceCB[i]*Ninternal*precision;
+    for (int i=0; i<nDimComms; i++) bytes[i] = siteSubset*nFace*surfaceCB[i]*Ninternal*precision;
 
     void *send_fwd[4];
     void *send_back[4];
@@ -613,6 +613,10 @@ namespace quda {
   const void* ColorSpinorField::GhostNorm(const int i) const{
     if(siteSubset != QUDA_PARITY_SITE_SUBSET) errorQuda("Site Subset %d is not supported",siteSubset);
     return ghostNorm[i];
+  }
+
+  void* const* ColorSpinorField::Ghost() const {
+    return ghost_fixme;
   }
 
   /*

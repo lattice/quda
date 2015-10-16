@@ -216,6 +216,8 @@ namespace quda {
     int total_length; // total length of spinor (physical + pad + ghost)
     int total_norm_length; // total length of norm
 
+    mutable void *ghost_fixme[2*QUDA_MAX_DIM];
+
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
 
@@ -344,6 +346,11 @@ namespace quda {
     void* GhostNorm(const int i);
     const void* GhostNorm(const int i) const;
     
+    /**
+       Return array of pointers to the ghost zones (ordering dim*2+dir)
+     */
+    void* const* Ghost() const;
+
     const ColorSpinorField& Even() const;
     const ColorSpinorField& Odd() const;
 
@@ -381,9 +388,7 @@ namespace quda {
 
     friend class cpuColorSpinorField;
 
-    private:
-    //void *v; // the field elements
-    //void *norm; // the normalization field
+  private:
     bool alloc; // whether we allocated memory
     bool init;
 
@@ -396,17 +401,17 @@ namespace quda {
 #endif
 
 #ifdef GPU_COMMS  // This is a hack for half precision.
-   // Since the ghost data and ghost norm data are not contiguous, 
-   // separate MPI calls are needed when using GPUDirect RDMA.
-   void *my_fwd_norm_face[2][QUDA_MAX_DIM];
-   void *my_back_norm_face[2][QUDA_MAX_DIM];
-   void *from_fwd_norm_face[2][QUDA_MAX_DIM];
-   void *from_back_norm_face[2][QUDA_MAX_DIM];
+    // Since the ghost data and ghost norm data are not contiguous,
+    // separate MPI calls are needed when using GPUDirect RDMA.
+    void *my_fwd_norm_face[2][QUDA_MAX_DIM];
+    void *my_back_norm_face[2][QUDA_MAX_DIM];
+    void *from_fwd_norm_face[2][QUDA_MAX_DIM];
+    void *from_back_norm_face[2][QUDA_MAX_DIM];
 
-   MsgHandle ***mh_recv_norm_fwd[2];
-   MsgHandle ***mh_recv_norm_back[2];
-   MsgHandle ***mh_send_norm_fwd[2];
-   MsgHandle ***mh_send_norm_back[2];
+    MsgHandle ***mh_recv_norm_fwd[2];
+    MsgHandle ***mh_recv_norm_back[2];
+    MsgHandle ***mh_send_norm_fwd[2];
+    MsgHandle ***mh_send_norm_back[2];
 #endif
 
     bool reference; // whether the field is a reference or not
@@ -441,7 +446,7 @@ namespace quda {
     /** How many faces we are communicating in this communicator */
     int nFaceComms; //FIXME - currently can only support one nFace in a field at once
 
-    public:
+  public:
 
     static int bufferIndex;
 	
@@ -463,6 +468,8 @@ namespace quda {
     /** Destroy the communication handlers and buffers */
     void destroyComms();
     void allocateGhostBuffer(int nFace);
+    /** Ghost buffer allocation for the generic packer*/
+    void allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const;
     static void freeGhostBuffer(void);
 
     /**

@@ -156,22 +156,19 @@ namespace quda {
 
   double computeQCharge(GaugeField& Fmunu, QudaFieldLocation location){
 
+    double charge = 0;
 #ifdef GPU_GAUGE_TOOLS
-    if(Fmunu.Precision() == QUDA_HALF_PRECISION){
-      errorQuda("Half precision not supported\n");
-    }
-
     if (Fmunu.Precision() == QUDA_SINGLE_PRECISION){
-      return computeQCharge<float>(Fmunu, location);
+      charge = computeQCharge<float>(Fmunu, location);
     } else if(Fmunu.Precision() == QUDA_DOUBLE_PRECISION) {
-      return computeQCharge<double>(Fmunu, location);
+      charge = computeQCharge<double>(Fmunu, location);
     } else {
       errorQuda("Precision %d not supported", Fmunu.Precision());
     }
-    return;
 #else
     errorQuda("Gauge tools are not build");
 #endif
+    return charge;
 
   }
 

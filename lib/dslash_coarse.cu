@@ -493,6 +493,9 @@ namespace quda {
     // check all locations match
     Location(out, inA, inB, Y, X);
 
+    int dummy = 0; // ignored
+    inA.exchangeGhost((QudaParity)(1-parity), dummy);
+
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
       ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity);
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {

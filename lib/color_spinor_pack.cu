@@ -1,6 +1,7 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
+#include <tune_quda.h>
 
 namespace quda {
 
@@ -39,7 +40,7 @@ namespace quda {
   };
 
   template <int dir, typename Arg>
-  __device__ __host__ inline int ghostFaceIndex(const int x[], int dim, Arg arg) {
+  __device__ __host__ inline int ghostFaceIndex(const int x[], int dim, const Arg &arg) {
     const int *X = arg.X;
     int index;
     switch(dim) {
@@ -88,7 +89,7 @@ namespace quda {
   }
 
   template <typename Float, int Ns, int Nc, typename Arg>
-  __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity) {
+  __device__ __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity) {
     typedef typename mapper<Float>::type RegType;
 
     const int *X = arg.X;
@@ -97,6 +98,7 @@ namespace quda {
     else getCoords(x, cb_idx, X, parity);
 
     RegType tmp[2*Ns*Nc];
+    // FIXME make partitioning optional
 
 #pragma unroll
     for (int dim=0; dim<4; dim++) {
@@ -121,25 +123,91 @@ namespace quda {
     }
   }
 
+  template <typename Float, int Ns, int Nc, typename Arg>
+  __global__ void GenericPackGhostKernel(Arg arg) {
+    int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
+    if (x_cb >= arg.volumeCB) return;
+    const int parity = (blockDim.y == 2) ? threadIdx.y : arg.parity;
+    const int spinor_parity = (blockDim.y == 2) ? parity : 0;
+    packGhost<Float,Ns,Nc>(arg, x_cb, parity, spinor_parity);
+  }
+
+  template <typename Float, int Ns, int Nc, typename Arg>
+  class GenericPackGhostLauncher : public Tunable {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &meta;
+
+    long long flops() const { return 0; }
+    long long bytes() const {
+      // FIXME take into account paritioning
+      size_t totalBytes = 0;
+      for (int d=0; d<4; d++) {
+	totalBytes += 2*arg.nFace*2*Ns*Nc*meta.SurfaceCB(d)*meta.Precision();
+      }
+      return totalBytes;
+    }
+
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+    bool tuneGridDim() const { return false; }
+    unsigned int minThreads() const { return arg.volumeCB; }
+
+    bool advanceTuneParam(TuneParam &param) const
+    {
+      bool rtn = Tunable::advanceTuneParam(param);
+      param.block.y = arg.nParity;
+      return rtn;
+    }
+
+    virtual void initTuneParam(TuneParam &param) const
+    {
+      Tunable::initTuneParam(param);
+      param.block.y = arg.nParity;
+    }
+
+    /** sets default values for when tuning is disabled */
+    virtual void defaultTuneParam(TuneParam &param) const
+    {
+      Tunable::defaultTuneParam(param);
+      param.block.y = arg.nParity;
+    }
+
+  public:
+    GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta) : arg(arg), meta(meta) { }
+    virtual ~GenericPackGhostLauncher() { }
+
+    void apply(const cudaStream_t &stream) {
+      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
+	GenericPackGhost<Float,Ns,Nc,Arg>(arg);
+      } else {
+	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	GenericPackGhostKernel<Float,Ns,Nc,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+      }
+    }
+
+    TuneKey tuneKey() const {
+      return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString());
+    }
+  };
+
   template <typename Float, QudaFieldOrder order, int Ns, int Nc>
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
     typedef typename colorspinor_order_mapper<Float,order,Ns,Nc>::type Q;
     Q field(a, (Float*)0, (float*)0, (Float**)ghost);
     PackGhostArg<Q> arg(field, ghost, a, parity, dagger);
-    
-    if (a.Ncolor() == 3) {
-      GenericPackGhost<Float,Ns,3>(arg);
-    } else {
-      errorQuda("Unsupported nColor = %d", a.Ncolor());
-    }
-
+    GenericPackGhostLauncher<Float,Ns,Nc,PackGhostArg<Q> > launch(arg, a);
+    launch.apply(0);
   }
 
   template <typename Float, QudaFieldOrder order, int Ns>
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
     
-    if (a.Ncolor() == 3) {
+    if (a.Ncolor() == 2) {
+      genericPackGhost<Float,order,Ns,2>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 3) {
       genericPackGhost<Float,order,Ns,3>(ghost, a, parity, dagger);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
