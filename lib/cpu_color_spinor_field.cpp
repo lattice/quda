@@ -6,23 +6,6 @@
 #include <color_spinor_field.h>
 #include <comm_quda.h> // for comm_drand()
 
-/*
-  Maybe this will be useful at some point
-
-  #define myalloc(type, n, m0) (type *) aligned_malloc(n*sizeof(type), m0)
-
-  #define ALIGN 16
-  void *
-  aligned_malloc(size_t n, void **m0)
-  {
-  size_t m = (size_t) safe_malloc(n+ALIGN);
-  *m0 = (void*)m;
-  size_t r = m % ALIGN;
-  if(r) m += (ALIGN - r);
-  return (void *)m;
-  }
-*/
-
 namespace quda {
 
   int cpuColorSpinorField::initGhostFaceBuffer =0;
@@ -233,7 +216,7 @@ namespace quda {
 
   void cpuColorSpinorField::allocateGhostBuffer(void) const
   {
-     int num_faces = 1;
+    int num_faces = 1;
     if(nSpin == 1) num_faces = 3; // staggered
 
     int spinor_size = 2*nSpin*nColor*precision;
@@ -256,7 +239,6 @@ namespace quda {
       }
       initGhostFaceBuffer = 1;
     }
-
   }
 
 
@@ -294,23 +276,20 @@ namespace quda {
     allocateGhostBuffer();
 
     void **sendbuf = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
-    void **ghost  = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
 
     for (int i=0; i<nDimComms; i++) {
       sendbuf[2*i + 0] = backGhostFaceSendBuffer[i];
       sendbuf[2*i + 1] = fwdGhostFaceSendBuffer[i];
-      ghost[2*i + 0] = backGhostFaceBuffer[i];
-      ghost[2*i + 1] = fwdGhostFaceBuffer[i];
+      ghost_fixme[2*i + 0] = backGhostFaceBuffer[i];
+      ghost_fixme[2*i + 1] = fwdGhostFaceBuffer[i];
     }
 
     packGhost(sendbuf, parity, dagger);
 
     int nFace = (nSpin == 1) ? 3 : 1;
-    exchange(ghost, sendbuf, nFace);
+    exchange(ghost_fixme, sendbuf, nFace);
 
     host_free(sendbuf);
-    host_free(ghost);
   }
-
 
 } // namespace quda

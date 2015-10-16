@@ -28,11 +28,6 @@ namespace quda {
   void* cudaColorSpinorField::backGhostFaceBuffer[2][QUDA_MAX_DIM]; //pointers to ghostFaceBuffer
   size_t cudaColorSpinorField::ghostFaceBytes = 0;
 
-  /*cudaColorSpinorField::cudaColorSpinorField() : 
-    ColorSpinorField(), v(0), norm(0), alloc(false), init(false) {
-
-    }*/
-
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) : 
     ColorSpinorField(param), alloc(false), init(true), texInit(false), 
     initComms(false), bufferMessageHandler(0), nFaceComms(0) {
@@ -523,9 +518,9 @@ namespace quda {
     }
 
     // only allocate if not already allocated or buffer required is bigger than previously
-    if(initGhostFaceBuffer == 0 || faceBytes > ghostFaceBytes){    
+    if(initGhostFaceBuffer == 0 || faceBytes > ghostFaceBytes) {
 
-      if (initGhostFaceBuffer){
+      if (initGhostFaceBuffer) {
         for(int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]); 
       }
 
@@ -548,10 +543,49 @@ namespace quda {
       for(int b=0; b<2; ++b) fwdGhostFaceBuffer[b][i] = (void*)(((char*)ghostFaceBuffer[b]) + offset);
       offset += nFace*ghostFace[i]*Nint*precision;
       if (precision == QUDA_HALF_PRECISION) offset += nFace*ghostFace[i]*sizeof(float);
-    }   
-    
+    }
   }
 
+  void cudaColorSpinorField::allocateGhostBuffer(void *send_buf[], void *recv_buf[]) const
+  {
+    int num_faces = 1;
+    if(nSpin == 1) num_faces = 3; // staggered
+
+    int spinor_size = 2*nSpin*nColor*precision;
+
+    // resize face only if requested size is larger than previously allocated one
+    size_t faceBytes = 0;
+    for (int i=0; i<nDimComms; i++) {
+      faceBytes += 2*siteSubset*num_faces*surfaceCB[i]*spinor_size;
+    }
+
+    if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes) {
+
+      if (initGhostFaceBuffer) {
+	for (int b=0; b<2; ++b) device_free(ghostFaceBuffer[b]);
+      }
+
+      if (faceBytes > 0) {
+	for (int b=0; b<2; ++b) ghostFaceBuffer[b] = device_malloc(faceBytes);
+	initGhostFaceBuffer = 1;
+	ghostFaceBytes = faceBytes;
+      }
+
+    }
+
+    size_t offset = 0;
+    for (int i=0; i<nDimComms; i++) {
+      // use first buffer for recv and second for send
+      recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
+      send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+      offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+
+      recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
+      send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+      offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+    }
+
+  }
 
   void cudaColorSpinorField::freeGhostBuffer(void)
   {
@@ -1368,7 +1402,17 @@ namespace quda {
   }
  
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int dagger) const {
-    errorQuda("Not implemented");
+    void **send = static_cast<void**>(safe_malloc(nDimComms * 2 * sizeof(void*)));
+
+    // allocate ghost buffer if not yet allocated
+    allocateGhostBuffer(send, ghost_fixme);
+
+    genericPackGhost(send, *this, parity, dagger);
+
+    int nFace = (nSpin == 1) ? 3 : 1;
+    exchange(ghost_fixme, send, nFace);
+
+    host_free(send);
   }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {
@@ -1465,7 +1509,7 @@ namespace quda {
     //memset(&resDesc, 0, sizeof(resDesc));
     cudaGetTextureObjectResourceDesc(&resDesc, this->Tex());
     printfQuda("\nDevice pointer: %p\n", resDesc.res.linear.devPtr);
-    printfQuda("\nVolume (in bytes): %d\n", resDesc.res.linear.sizeInBytes);
+    printfQuda("\nVolume (in bytes): %lu\n", resDesc.res.linear.sizeInBytes);
     if (resDesc.resType == cudaResourceTypeLinear) printfQuda("\nResource type: linear \n");
     checkCudaError();
 #endif

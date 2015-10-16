@@ -615,6 +615,10 @@ namespace quda {
     return ghostNorm[i];
   }
 
+  void* const* ColorSpinorField::Ghost() const {
+    return ghost_fixme;
+  }
+
   /*
     Convert from 1-dimensional index to the n-dimensional spatial index.
     With full fields, we assume that the field is even-odd ordered.  The
