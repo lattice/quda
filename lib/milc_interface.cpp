@@ -219,8 +219,6 @@ static  void invalidateGaugeQuda() {
   invalidate_quda_gauge = true;
 }
 
-
-
 #ifdef GPU_FATLINK
 
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
@@ -240,8 +238,12 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
   computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
   qudamilc_called<false>(__func__);
-  // require loadGaugeQuda to be called in subsequent solve
-//  invalidateGaugeQuda(); 
+
+  // requires loadGaugeQuda to be called in subequent solver
+  invalidateGaugeQuda();
+
+  // this flags that we are using QUDA to create the HISQ links
+  create_quda_gauge = true;
 }
 
 
@@ -268,8 +270,6 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
   // this flags that we are using QUDA to create the HISQ links
   create_quda_gauge = true;
-
-  return;
 }
 
 #endif
@@ -839,6 +839,11 @@ void qudaMultishiftInvert(int external_precision,
 
   const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1) {
+    invalidateGaugeQuda();
+  }
+
   if(invalidate_quda_gauge || !create_quda_gauge ){
     const int fat_pad  = getFatLinkPadding(localDim);
     gaugeParam.type = QUDA_GENERAL_LINKS;
@@ -952,6 +957,11 @@ void qudaInvert(int external_precision,
   const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION; 
   const int fat_pad  = getFatLinkPadding(localDim);
   const int long_pad = 3*fat_pad;
+
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1) {
+    invalidateGaugeQuda();
+  }
 
   if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;

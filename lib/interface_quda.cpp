@@ -3616,12 +3616,9 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
     gParamMom.reconstruct = QUDA_RECONSTRUCT_10;
     gParamMom.link_type = QUDA_ASQTAD_MOM_LINKS;
     gParamMom.precision = qudaGaugeParam->cuda_prec;
+    gParamMom.create = QUDA_ZERO_FIELD_CREATE;
     cudaMom = new cudaGaugeField(gParamMom);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);
-
-    profileGaugeForce.TPSTART(QUDA_PROFILE_H2D);
-    cudaMom->loadCPUField(*cpuMom, QUDA_CPU_FIELD_LOCATION);
-    profileGaugeForce.TPSTOP(QUDA_PROFILE_H2D);
   }
 
   // actually do the computation
