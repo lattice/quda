@@ -54,6 +54,7 @@ extern double tol_hq; // heavy-quark tolerance for inverter
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaMatPCType matpc_type; // preconditioning type
 
+extern int niter; // max solver iterations
 extern char latfile[];
 
 extern void usage(char** );
@@ -180,8 +181,8 @@ int main(int argc, char **argv)
   }
 
   // offsets used only by multi-shift solver
-  inv_param.num_offset = 4;
-  double offset[4] = {0.01, 0.02, 0.03, 0.04};
+  inv_param.num_offset = 12;
+  double offset[12] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
   inv_param.inv_type = inv_type;
@@ -237,7 +238,7 @@ int main(int argc, char **argv)
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
-  inv_param.maxiter = 10000;
+  inv_param.maxiter = niter;
   inv_param.reliable_delta = 1e-1;
   inv_param.use_sloppy_partial_accumulator = 0;
   inv_param.max_res_increase = 1;
@@ -256,7 +257,7 @@ int main(int argc, char **argv)
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 

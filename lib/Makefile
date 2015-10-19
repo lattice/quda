@@ -150,10 +150,19 @@ HASH = \"cpu_arch=$(strip $(CPU_ARCH)),gpu_arch=$(strip $(GPU_ARCH)),cuda_versio
 
 
 DGITVERSION =
+GITVERSION =
 ifeq ($(strip $(GIT)), git)
 	GITVERSION = $(shell git describe --long --dirty 2> /dev/null)
 ifneq ($(GITVERSION),)
 	  DGITVERSION = -DGITVERSION=\"$(GITVERSION)\"
+endif
+endif
+
+ifeq ($(QUDA_DEBUG),true)
+ifeq ($(GITVERSION),)
+	DGITVERSION = -DGITVERSION=\"debug\"
+else
+	DGITVERSION= -DGITVERSION=\"$(GITVERSION)-debug\"
 endif
 endif
 
@@ -183,14 +192,16 @@ mpi_nvtx:
 clean:
 	-rm -f *.o $(QUDA)
 
+.PHONY: version.o
 version.o: version.cpp $(HDRS) $(QUDA_OBJS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
+
 
 interface_quda.o: interface_quda.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) $(DGITVERSION) $< -c -o $@
 
 tune.o: tune.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $< -c -o $@
+	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $(DGITVERSION) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
 	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
