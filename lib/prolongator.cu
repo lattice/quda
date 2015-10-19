@@ -138,14 +138,14 @@ namespace quda {
     if(fineSpin == 1)
     {
       complex<Float> tmp[2*coarseColor];
-      prolongate2TopLevelStaggered<Float,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb);
-      rotateFineColorTopLevelStaggered<Float,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+      prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
+      rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
     }
     else
     {
       complex<Float> tmp[fineSpin*coarseColor];
-      prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, parity_coarse, x_coarse_cb, arg.spin_map);
-      rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb, parity_coarse);
+      prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb, arg.spin_map);
+      rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
     }
   }
   

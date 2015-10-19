@@ -676,7 +676,7 @@ namespace quda {
     const int nSpin = X.NspinCoarse();
     if (nSpin != 2) errorQuda("\nWrong coarse spin degrees.\n");
 
-    Float kap = (Float) k;//mass term
+    Float kap = (Float) m;//mass term
     complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
 	
     for (int parity=0; parity<2; parity++) {
@@ -849,22 +849,21 @@ namespace quda {
 
  //Calculates the coarse gauge field: separated from coarseSpin = 2 computations:
   template<typename Float, typename F, typename coarseGauge, typename fineGauge>
-  void calculateKSY(coarseGauge &Y, coarseGauge &X, F *UV, F *UVL, F &V, fineGauge *FL, fineGauge *LL, const int *x_size, double k) {
+  void calculateKSY(coarseGauge &Y, coarseGauge &X, F *UV, F *UVL, F &V, fineGauge *FL, fineGauge *LL, const int *x_size, const int *xc_size,  double k) {
 
     if (FL->Ndim() != 4) errorQuda("Number of dimensions not supported");
 
-    if ( LL ) (LL->Ndim() != 4) errorQuda("Number of long links dimensions not supported");
+    if ( LL ) if(LL->Ndim() != 4) errorQuda("Number of long links dimensions not supported");
 
     const int nDim = 4;
 
-    const int *xc_size = Y.Field().X();
     int geo_bs[QUDA_MAX_DIM]; 
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
 
     for(int d = 0; d < nDim; d++) 
     {
       //First calculate UV
-      setZero<Float,F>(UV);
+      setZero<Float,F>(*UV);
 
       printfQuda("Computing %d UV and VUV\n", d);
       //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y
@@ -882,7 +881,7 @@ namespace quda {
         computeKSVUV<Float,3>(Y, X, UV, UVL, V, FL->Ncolor(), x_size, xc_size, geo_bs);
       }
 
-      printf("UV2[%d] = %e\n", d, UV.norm2());
+      printf("UV2[%d] = %e\n", d, UV->norm2());
       printf("Y2[%d] = %e\n", d, Y.norm2(d));
     }
 
@@ -914,12 +913,12 @@ namespace quda {
     if(l != NULL) {
       gFine lAccessor(const_cast<GaugeField&>(*l));
       F uvlAccessor(const_cast<ColorSpinorField&>(*uv_long));
-      calculateKSY<Float>(yAccessor, xAccessor, &uvAccessor, &uvlAccessor, vAccessor, &fAccessor, &lAccessor, f->X(), k);
+      calculateKSY<Float>(yAccessor, xAccessor, &uvAccessor, &uvlAccessor, vAccessor, &fAccessor, &lAccessor, f->X(), Y.X(), k);
     }
     else {
       gFine *lAccessor = NULL;
       F *uvlAccessor = NULL;
-      calculateKSY<Float>(yAccessor, xAccessor, &uvAccessor, uvlAccessor, vAccessor, &fAccessor, lAccessor, f->X(), k);
+      calculateKSY<Float>(yAccessor, xAccessor, &uvAccessor, uvlAccessor, vAccessor, &fAccessor, lAccessor, f->X(),Y.X(), k);
     }    
   }
 

@@ -159,7 +159,7 @@ namespace quda {
    */
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc>
   __device__ __host__ inline void ks_dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity) {
-    const int their_spinor_parity = (arg.inA.Nparity() == 2) ? (parity+1)&1 : 0;
+    const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
     int coord[nDim];
     getCoords(coord, x_cb, arg.dim, parity);
@@ -194,8 +194,8 @@ namespace quda {
 
         for(int c_row = 0; c_row < Nc; c_row++) { //Color row
 	  for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-		out[0*Nc+c_row] -= Y(d, parity, x_cb, 0, 1, c_row, c_col) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
-		out[1*Nc+c_row] -= Y(d, parity, x_cb, 1, 0, c_row, c_col) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+		out[0*Nc+c_row] -= Y[0*Nc+c_row][1*Nc+c_col] * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+		out[1*Nc+c_row] -= Y[1*Nc+c_row][0*Nc+c_col] * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
 	  } //Color column
 	} //Color row
       }
@@ -230,8 +230,8 @@ namespace quda {
 
         for(int c_row = 0; c_row < Nc; c_row++) { //Color row
 	  for(int c_col = 0; c_col < Nc; c_col++) { //Color column
-	      out[0*Nc+c_row] += conj(Y(d,(parity+1)&1, back_idx, 1, 0, c_col, c_row)) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
-              out[1*Nc+c_row] += conj(Y(d,(parity+1)&1, back_idx, 0, 1, c_col, c_row)) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+	      out[0*Nc+c_row] += conj(Y[1*Nc+c_col][0*Nc+c_row]) * in[1*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+              out[1*Nc+c_row] += conj(Y[0*Nc+c_col][1*Nc+c_row]) * in[0*Nc+c_col]; //arg.inA(their_spinor_parity, back_idx, s_col, c_col);
 	  } //Color column
 	} //Color row
       } //nDim
@@ -295,7 +295,7 @@ namespace quda {
     complex <Float> out[Ns*Nc];
     for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++) out[s*Nc+c] = 0.0;
 
-    if(!staggered_coarse_dslash) 
+    if(!arg.staggered_coarse_dslash) 
       dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
     else
       ks_dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity);
@@ -428,9 +428,9 @@ namespace quda {
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,  const GaugeField &Y, const GaugeField &X,
 		   double kappa, bool is_staggered, int parity) {
     if (inA.Location() == QUDA_CUDA_FIELD_LOCATION) {
-      ApplyCoarse<Float,csOrder,gOrder,coarseColor,coarseSpin,QUDA_CUDA_FIELD_LOCATION>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<Float,csOrder,gOrder,coarseColor,coarseSpin,QUDA_CUDA_FIELD_LOCATION>(out, inA, inB, Y, X, kappa,is_staggered, parity);
     } else {
-      ApplyCoarse<Float,csOrder,gOrder,coarseColor,coarseSpin,QUDA_CPU_FIELD_LOCATION>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<Float,csOrder,gOrder,coarseColor,coarseSpin,QUDA_CPU_FIELD_LOCATION>(out, inA, inB, Y, X, kappa,is_staggered, parity);
     }
   }
 
@@ -442,9 +442,9 @@ namespace quda {
       errorQuda("Unsupported number of coarse spins %d\n",inA.Nspin());
 
     if (inA.Ncolor() == 2) { 
-      ApplyCoarse<Float,csOrder,gOrder,2,2>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<Float,csOrder,gOrder,2,2>(out, inA, inB, Y, X, kappa,is_staggered, parity);
     } else if (inA.Ncolor() == 24) { 
-      ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa,is_staggered, parity);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -452,7 +452,7 @@ namespace quda {
 
   template <typename Float>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity) {
+		   const GaugeField &Y, const GaugeField &X, double kappa, bool is_staggered, int parity) {
 
     if (Y.FieldOrder() != X.FieldOrder())
       errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
@@ -461,9 +461,9 @@ namespace quda {
       errorQuda("Field order mismatch Y = %d, X = %d", Y.FieldOrder(), X.FieldOrder());
 
     if (inA.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Y.FieldOrder() == QUDA_FLOAT2_GAUGE_ORDER) {
-      ApplyCoarse<Float,QUDA_FLOAT2_FIELD_ORDER, QUDA_FLOAT2_GAUGE_ORDER>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<Float,QUDA_FLOAT2_FIELD_ORDER, QUDA_FLOAT2_GAUGE_ORDER>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else if (inA.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && Y.FieldOrder() == QUDA_QDP_GAUGE_ORDER) {
-      ApplyCoarse<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,QUDA_QDP_GAUGE_ORDER>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,QUDA_QDP_GAUGE_ORDER>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else {
       errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
     }
@@ -497,9 +497,9 @@ namespace quda {
     inA.exchangeGhost((QudaParity)(1-parity), dummy);
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
-      ApplyCoarse<double>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<double>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
-      ApplyCoarse<float>(out, inA, inB, Y, X, kappa, parity);
+      ApplyCoarse<float>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }

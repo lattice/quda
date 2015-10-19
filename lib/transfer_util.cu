@@ -240,6 +240,8 @@ namespace quda {
 	  check[count++] = index;
         }
       }
+     }
+    }
 
     if (count != checkLength) {
       errorQuda("Number of elements packed %d does not match expected value %d nvec=%d ncolor=%d", 
