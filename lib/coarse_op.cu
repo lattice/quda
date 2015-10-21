@@ -508,7 +508,11 @@ namespace quda {
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
     typedef typename clover::FieldOrder<Float,fineColor,fineSpin,clOrder> cFine;
 
-    F vAccessor(const_cast<ColorSpinorField&>(T.Vectors()));
+    const ColorSpinorField &v = T.Vectors();
+    int dummy = 0;
+    v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+
+    F vAccessor(const_cast<ColorSpinorField&>(v));
     F uvAccessor(const_cast<ColorSpinorField&>(uv));
     gFine gAccessor(const_cast<GaugeField&>(g));
     gCoarse yAccessor(const_cast<GaugeField&>(Y));
@@ -596,6 +600,7 @@ namespace quda {
       errorQuda("Unsupported precision mix");
 
     printfQuda("Computing Y field......\n");
+
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
       calculateY<double>(Y, X, uv, T, g, c, kappa);
     } else if (Y.Precision() == QUDA_SINGLE_PRECISION) {
