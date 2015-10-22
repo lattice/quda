@@ -522,6 +522,42 @@ extern "C" {
 		   void* link);
 
   /**
+   * Evaluate the momentum contribution to the Hybrid Monte Carlo
+   * action.  The momentum field is assumed to be in MILC order.  MILC
+   * convention is applied, subtracting 4.0 from each momentum matrix
+   * to increased stability.
+   *
+   * @param precision Precision of the field (2 - double, 1 - single)
+   * @param momentum The momentum field
+   * @return momentum action
+   */
+  double qudaMomAction(int precision, 
+		       void *momentum);
+
+  /**
+   * Apply the staggered phase factors to the gauge field.  If the
+   * imaginary chemical potential is non-zero then the phase factor
+   * exp(imu/T) will be applied to the links in the temporal
+   * direction.
+   *
+   * @param prec Precision of the gauge field
+   * @param gauge_h The gauge field
+   * @param flag Whether to apply to remove the staggered phase
+   * @param i_mu Imaginary chemical potential
+   */
+  void qudaRephase(int prec, void *gauge, int flag, double i_mu);
+  
+  /**
+   * Project the input field on the SU(3) group.  If the target
+   * tolerance is not met, this routine will give a runtime error.
+   *
+   * @param prec Precision of the gauge field
+   * @param gauge_h The gauge field to be updated
+   * @param tol The tolerance to which we iterate
+   */
+  void qudaUnitarizeSU3(int prec, void *gauge, double tol);
+  
+  /**
    * Compute the clover force contributions in each dimension mu given
    * the array solution fields, and compute the resulting momentum
    * field.

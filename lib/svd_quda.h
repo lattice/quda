@@ -1,9 +1,12 @@
+#include <float.h>
+
 #ifndef _SVD_QUDA_H_
 #define _SVD_QUDA_H_
 
 #define DEVICEHOST __device__ __host__
 #define SVDPREC 1e-11
 #define LOG2 0.69314718055994530942
+#define INVALID_DOUBLE (-DBL_MAX)
 
 
 //namespace quda{
@@ -14,7 +17,7 @@ typename RealTypeId<Cmplx>::Type cabs(const Cmplx & z)
 {
   typename RealTypeId<Cmplx>::Type max, ratio, square;
   if(fabs(z.x) > fabs(z.y)){ max = z.x; ratio = z.y/max; }else{ max=z.y; ratio = z.x/max; }
-  square = max*max*(1.0 + ratio*ratio);
+  square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
@@ -32,7 +35,7 @@ template<class T, class U>
 inline DEVICEHOST typename PromoteTypeId<T,U>::Type quadSum(const T & a, const U & b){
   typename PromoteTypeId<T,U>::Type ratio, square, max;
   if(fabs(a) > fabs(b)){ max = a; ratio = b/a; }else{ max=b; ratio = a/b; }
-  square = max*max*(1.0 + ratio*ratio);
+  square = (max != 0.0) ? max*max*(1.0 + ratio*ratio) : 0.0;
   return sqrt(square);
 }
 
@@ -291,6 +294,12 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
   typename RealTypeId<Cmplx>::Type beta;
   Cmplx w, tau, z;
 
+  // Set them to values that would never be set.  If at the end of the
+  // below algorithmic flow, these values have been preserved then we
+  // know that the input matrix was the unit matrix
+  u(0,0).x = INVALID_DOUBLE;
+  v(0,0).x = INVALID_DOUBLE;
+
   if(norm1 == 0 && mat(0,0).y == 0){
     p = mat;
   }else{
@@ -378,16 +387,21 @@ void getRealBidiagMatrix(const Matrix<Cmplx,3> & mat,
     v = v*temp;
   }
 
-
   // Step 5: build the third left reflector
   if( p(2,2).y != 0.0 ){
     beta = p(2,2).x > 0.0 ? -cabs(p(2,2)) : cabs(p(2,2));
     temp(2,2) = p(2,2)/beta;
     u = u*temp;
   }
+
+  // unit matrix
+  if (u(0,0).x == INVALID_DOUBLE && v(0,0).x == INVALID_DOUBLE) {
+    u = mat;
+    v = mat;
+  }
+
   return;
 }
-
 
 
 template<class Real>
@@ -605,7 +619,6 @@ void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
     it++;
   } while( (b(0,1) != 0.0 || b(1,2) != 0.0) && it < max_it);
 
-
   for(int i=0; i<3; ++i){
     if( b(i,i) < 0.0) {
       b(i,i) *= -1;
@@ -628,6 +641,7 @@ void computeSVD(const Matrix<Cmplx,3> & m,
 {
 
   getRealBidiagMatrix<Cmplx>(m, u, v);
+
   Matrix<typename RealTypeId<Cmplx>::Type,3> bd, u_real, v_real;
   // Make real
   for(int i=0; i<3; ++i){
@@ -649,5 +663,6 @@ void computeSVD(const Matrix<Cmplx,3> & m,
 
 //} // end namespace quda
 
+#undef INVALID_DOUBLE
 
 #endif // _SVD_QUDA_H

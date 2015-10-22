@@ -379,11 +379,8 @@ namespace quda {
     if (alloc) {
       device_free(v);
       if (precision == QUDA_HALF_PRECISION) device_free(norm);
-      if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-	delete even;
-	delete odd;
-      }
-      else{
+
+      if (siteSubset != QUDA_FULL_SITE_SUBSET) {
         //! for deflated solvers:
         if (eigv_dim > 0) 
         {
@@ -392,6 +389,11 @@ namespace quda {
         } 
       }
       alloc = false;
+    }
+
+    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+      delete even;
+      delete odd;
     }
 
 #ifdef USE_TEXTURE_OBJECTS

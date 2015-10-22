@@ -6,6 +6,8 @@
 #include <face_quda.h>
 #include <gauge_field.h>
 
+#include <worker.h>
+
 namespace quda {
 
   /**
@@ -143,6 +145,7 @@ namespace quda {
      @param in Input field
    */
   void gamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in);
+
 }
 
 #endif // _DSLASH_QUDA_H

@@ -1,5 +1,7 @@
 #include <gauge_field_order.h>
 #include <comm_quda.h>
+#include <complex_quda.h>
+#include <index_helper.cuh>
 
 /**
    This code has not been checked.  In particular, I suspect it is
@@ -15,15 +17,21 @@ namespace quda {
   struct GaugePhaseArg {
     Order order;
     int X[4];
-    int volume;
+    int threads;
     Float tBoundary;
-    GaugePhaseArg(const Order &order, const int *X_, QudaTboundary tBoundary_) 
-      : order(order) {
-      volume = 1;
-      for (int d=0; d<4; d++) {
-	X[d] = X_[d];
-	volume *= X[d];
-      }
+    Float i_mu;
+    complex<Float> i_mu_phase;
+    GaugePhaseArg(const Order &order, const GaugeField &u) 
+      : order(order), threads(u.VolumeCB()), i_mu(u.iMu())
+    {
+      // if staggered phases are applied, then we are removing them
+      // else we are applying them
+      Float dir = u.StaggeredPhaseApplied() ? -1.0 : 1.0;
+
+      i_mu_phase = complex<Float>( cos(M_PI * u.iMu() / (u.X()[3]*comm_dim(3)) ), 
+				   dir * sin(M_PI * u.iMu() / (u.X()[3]*comm_dim(3))) );
+
+      for (int d=0; d<4; d++) X[d] = u.X()[d];
 
       // only set the boundary condition on the last time slice of nodes
 #ifdef MULTI_GPU
@@ -31,11 +39,11 @@ namespace quda {
 #else
       bool last_node_in_t = true;
 #endif
-      tBoundary = (Float)(last_node_in_t ? tBoundary_ : QUDA_PERIODIC_T);
-      printf("node=%d Tboundary = %e\n", comm_rank(), tBoundary);
+      tBoundary = (Float)(last_node_in_t ? u.TBoundary() : QUDA_PERIODIC_T);
     }
     GaugePhaseArg(const GaugePhaseArg &arg) 
-      : order(arg.order), tBoundary(arg.tBoundary), volume(arg.volume) {
+      : order(arg.order), tBoundary(arg.tBoundary), threads(arg.threads), 
+	i_mu(arg.i_mu), i_mu_phase(arg.i_mu_phase) {
       for (int d=0; d<4; d++) X[d] = arg.X[d];
     }
   };
@@ -82,61 +90,54 @@ namespace quda {
   }
 
   template <typename Float, int length, QudaStaggeredPhase phaseType, int dim, typename Arg>
-  __device__ __host__ void gaugePhase(int xh, int y, int z, int t, int parity, Arg &arg) {
+  __device__ __host__ void gaugePhase(int indexCB, int parity, Arg &arg) {
     typedef typename mapper<Float>::type RegType;
-    int indexCB = ((t*arg.X[2] + z)*arg.X[1] + y)*(arg.X[0]>>1) + xh;
-    int x = 2*xh + parity;
-    Float phase = getPhase<dim,Float,phaseType>(x, y, z, t, arg);
-    //printf("dim=%d xh=%d y=%d z=%d t=%d parity = %d phase = %e\n",
-    //	   dim, xh, y, z, t, parity, phase);
+
+    int x[4];
+    getCoords(x, indexCB, arg.X, parity);
+
+    RegType phase = getPhase<dim,Float,phaseType>(x[0], x[1], x[2], x[3], arg);
     RegType u[length];
     arg.order.load(u, indexCB, dim, parity);
     for (int i=0; i<length; i++) u[i] *= phase;
+
+    // apply imaginary chemical potential if needed
+    if (dim==3 && arg.i_mu != 0.0) {
+      complex<RegType>* v = reinterpret_cast<complex<RegType>*>(u);
+      for (int i=0; i<length/2; i++) v[i] *= arg.i_mu_phase;
+    }
+
     arg.order.save(u, indexCB, dim, parity);
   }
 
   /**
      Generic CPU staggered phase application
-     NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
   void gaugePhase(Arg &arg) {  
     for (int parity=0; parity<2; parity++) {
-      for (int t=0; t<arg.X[3]; t++) {
-	for (int z=0; z<arg.X[2]; z++) {
-	  for (int y=0; y<arg.X[1]; y++) {
-	    for (int xh=0; xh<arg.X[0]>>1; xh++) {
-	      gaugePhase<Float,length,phaseType,0>(xh, y, z, t, parity, arg);
-	      gaugePhase<Float,length,phaseType,1>(xh, y, z, t, parity, arg);
-	      gaugePhase<Float,length,phaseType,2>(xh, y, z, t, parity, arg);
-	      gaugePhase<Float,length,phaseType,3>(xh, y, z, t, parity, arg);
-	    }
-	  }
-	}
+      for (int indexCB=0; indexCB < arg.threads; indexCB++) {
+	gaugePhase<Float,length,phaseType,0>(indexCB, parity, arg);
+	gaugePhase<Float,length,phaseType,1>(indexCB, parity, arg);
+	gaugePhase<Float,length,phaseType,2>(indexCB, parity, arg);
+	gaugePhase<Float,length,phaseType,3>(indexCB, parity, arg);
       }
-    } // parity
+    }
   }
 
   /**
      Generic GPU staggered phase application
-     NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
   __global__ void gaugePhaseKernel(Arg arg) {  
-    int X = blockIdx.x * blockDim.x + threadIdx.x; 	
-    if (X >= (arg.volume>>1)) return;
+    int indexCB = blockIdx.x * blockDim.x + threadIdx.x; 	
+    if (indexCB >= arg.threads) return;
     int parity = blockIdx.y;
 
-    int tzy = X   / (arg.X[0]>>1);
-    int xh  = X   - tzy*(arg.X[0]>>1);
-    int tz  = tzy / arg.X[1];
-    int y   = tzy - tz*arg.X[1];
-    int t   = tz  / arg.X[2];
-    int z   = tz  - t * arg.X[2];
-    gaugePhase<Float,length,phaseType,0>(xh, y, z, t, parity, arg);
-    gaugePhase<Float,length,phaseType,1>(xh, y, z, t, parity, arg);
-    gaugePhase<Float,length,phaseType,2>(xh, y, z, t, parity, arg);
-    gaugePhase<Float,length,phaseType,3>(xh, y, z, t, parity, arg);
+    gaugePhase<Float,length,phaseType,0>(indexCB, parity, arg);
+    gaugePhase<Float,length,phaseType,1>(indexCB, parity, arg);
+    gaugePhase<Float,length,phaseType,2>(indexCB, parity, arg);
+    gaugePhase<Float,length,phaseType,3>(indexCB, parity, arg);
   }
 
   template <typename Float, int length, QudaStaggeredPhase phaseType, typename Arg>
@@ -150,7 +151,7 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0 ;}
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.volume>>1; }
+    unsigned int minThreads() const { return arg.threads; }
 
   public:
     GaugePhase(Arg &arg, const GaugeField &meta, QudaFieldLocation location) 
@@ -159,6 +160,17 @@ namespace quda {
     }
     virtual ~GaugePhase() { ; }
   
+    bool advanceBlockDim(TuneParam &param) const {
+      bool rtn = Tunable::advanceBlockDim(param);
+      param.grid.y = 2;
+      return rtn;
+    }
+    
+    void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      param.grid.y = 2;
+    }
+
     void apply(const cudaStream_t &stream) {
       if (location == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -174,6 +186,9 @@ namespace quda {
       return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
+    void preTune() { arg.order.save(); }
+    void postTune() { arg.order.load(); }
+
     std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
       std::stringstream ps;
       ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
@@ -182,24 +197,24 @@ namespace quda {
     }
 
     long long flops() const { return 0; } 
-    long long bytes() const { return arg.volume * 2 * arg.order.Bytes(); } // volume * i/o * vec size
+    long long bytes() const { return 2 * arg.threads * 2 * arg.order.Bytes(); } // parity * e/o volume * i/o * vec size
   };
 
 
   template <typename Float, int length, typename Order>
-  void gaugePhase(Order order, const GaugeField &u,  QudaFieldLocation location) {  
+  void gaugePhase(Order order, const GaugeField &u,  QudaFieldLocation location) {
     if (u.StaggeredPhase() == QUDA_MILC_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
+      GaugePhaseArg<Float,Order> arg(order, u);
       GaugePhase<Float,length,QUDA_MILC_STAGGERED_PHASE,
 		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
     } else if (u.StaggeredPhase() == QUDA_CPS_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
+      GaugePhaseArg<Float,Order> arg(order, u);
       GaugePhase<Float,length,QUDA_CPS_STAGGERED_PHASE,
 		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
     } else if (u.StaggeredPhase() == QUDA_TIFR_STAGGERED_PHASE) {
-      GaugePhaseArg<Float,Order> arg(order, u.X(), u.TBoundary());
+      GaugePhaseArg<Float,Order> arg(order, u);
       GaugePhase<Float,length,QUDA_TIFR_STAGGERED_PHASE,
 		 GaugePhaseArg<Float,Order> > phase(arg, u, location);
       phase.apply(0);
@@ -220,12 +235,8 @@ namespace quda {
 
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  gaugePhase<short,length>(FloatNOrder<short,length,2,19>(u), u, location);
-	} else {
-	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  gaugePhase<Float,length>(G(u), u, location);
-	}
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
+	gaugePhase<Float,length>(G(u), u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	gaugePhase<Float,length>(G(u), u, location);
