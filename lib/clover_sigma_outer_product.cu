@@ -123,10 +123,10 @@ namespace quda {
     }
   
     long long flops() const { 
-      ((long long)arg.length)*(0 + 144 + 36); // spin_mu_nu + spin trace + multiply-add
+      return ((long long)arg.length)*(0 + 144 + 36); // spin_mu_nu + spin trace + multiply-add
     }
     long long bytes() const { 
-      ((long long)arg.length)*(arg.inA.Bytes() + arg.inB.Bytes() + 2*arg.oprod.Bytes());
+      return ((long long)arg.length)*(arg.inA.Bytes() + arg.inB.Bytes() + 2*arg.oprod.Bytes());
     }
   
     TuneKey tuneKey() const { 

@@ -379,8 +379,6 @@ int y[4] = {};
 
 int full_idx=0;
 #ifdef MULTI_GPU
-  int x0h;
-  int x0odd;
   bool active = false;
   int dim = dimFromFaceIndex (idx, param);
     
@@ -393,8 +391,6 @@ int full_idx=0;
   }else if(dim == 3){
     coordsFromFaceIndexStaggered<NFACE,2>(y, idx, param.parity, EXTERIOR_KERNEL_T, X);
   }
-
-  int za,zb; 
 
   const int half_volume = (X[0]*X[1]*X[2]*X[3] >> 1);
   full_idx = ((y[3]*X[2] +y[2])*X[1] +y[1])*X[0]+y[0];
@@ -1183,6 +1179,8 @@ if (active){
 
 
 // undefine to prevent warning when precision is changed
+#undef time_boundary
+
 #undef spinorFloat
 #undef spinorFloat2
 #undef SHARED_STRIDE

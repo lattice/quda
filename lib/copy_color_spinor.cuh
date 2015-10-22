@@ -52,8 +52,10 @@ namespace quda {
       __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
 	int s1[4] = {1, 2, 3, 0};
 	int s2[4] = {3, 0, 1, 2};
-	RegTypeOut K1[4] = {kP, -kP, -kP, -kP};
-	RegTypeOut K2[4] = {kP, -kP, kP, kP};
+	RegTypeOut K1[4] = {static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(-kP), 
+			    static_cast<RegTypeOut>(-kP), static_cast<RegTypeOut>(-kP)};
+	RegTypeOut K2[4] = {static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(-kP), 
+			    static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(kP)};
 	for (int s=0; s<Ns; s++) {
 	  for (int c=0; c<Nc; c++) {
 	    for (int z=0; z<2; z++) {
@@ -72,8 +74,10 @@ namespace quda {
       __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
 	int s1[4] = {1, 2, 3, 0};
 	int s2[4] = {3, 0, 1, 2};
-	RegTypeOut K1[4] = {-kU, kU,  kU,  kU};
-	RegTypeOut K2[4] = {-kU, kU, -kU, -kU};
+	RegTypeOut K1[4] = {static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(kU),
+			    static_cast<RegTypeOut>(kU),  static_cast<RegTypeOut>(kU)};
+	RegTypeOut K2[4] = {static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(kU),
+			    static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(-kU)};
 	for (int s=0; s<Ns; s++) {
 	  for (int c=0; c<Nc; c++) {
 	    for (int z=0; z<2; z++) {
@@ -92,8 +96,10 @@ namespace quda {
     __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
 	int s1[4] = {0, 1, 0, 1};
 	int s2[4] = {2, 3, 2, 3};
-	RegTypeOut K1[4] = {-kP, -kP, kP, kP};
-	RegTypeOut K2[4] = { kP,  kP, kP, kP};
+	RegTypeOut K1[4] = {static_cast<RegTypeOut>(-kP), static_cast<RegTypeOut>(-kP),
+			    static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(kP)};
+	RegTypeOut K2[4] = {static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(kP),
+			    static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(kP)};
 	for (int s=0; s<Ns; s++) {
 	  for (int c=0; c<Nc; c++) {
 	    for (int z=0; z<2; z++) {
@@ -112,8 +118,10 @@ namespace quda {
     __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
 	int s1[4] = {0, 1, 0, 1};
 	int s2[4] = {2, 3, 2, 3};
-	RegTypeOut K1[4] = {-kU, -kU,  kU,  kU};
-	RegTypeOut K2[4] = { kU,  kU,  kU,  kU};
+	RegTypeOut K1[4] = {static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(-kU),
+			    static_cast<RegTypeOut>(kU), static_cast<RegTypeOut>(kU)};
+	RegTypeOut K2[4] = {static_cast<RegTypeOut>(kU),static_cast<RegTypeOut>(kU),
+			    static_cast<RegTypeOut>(kU), static_cast<RegTypeOut>(kU)};
 	for (int s=0; s<Ns; s++) {
 	  for (int c=0; c<Nc; c++) {
 	    for (int z=0; z<2; z++) {

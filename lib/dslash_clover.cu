@@ -29,7 +29,10 @@ namespace quda {
   namespace clover {
 
 #undef GPU_STAGGERED_DIRAC // do not delete - hack for Tesla architecture
+
+#ifndef GPU_DOMAIN_WALL_DIRAC
 #define GPU_DOMAIN_WALL_DIRAC // do not delete - work around for CUDA 6.5 alignment bug
+#endif
 
 #include <dslash_constants.h>
 #include <dslash_textures.h>
