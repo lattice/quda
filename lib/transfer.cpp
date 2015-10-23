@@ -32,9 +32,13 @@ namespace quda {
     if (B[0]->X(0) == geo_bs[0]) 
       errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);
 
-    for (int d = 0; d < ndim; d++) 
+    for (int d = 0; d < ndim; d++) {
       if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
 	errorQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d\n", d, B[d]->X(d)/geo_bs[d]);
+
+      if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
+	errorQuda("cannot parition dim[%d]=%d with block length %d\n", d, B[0]->X(d), geo_bs[d]);
+    }
 
     char block_str[128];
     sprintf(block_str, "%d", geo_bs[0]);
