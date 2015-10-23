@@ -53,37 +53,20 @@ namespace quda {
    */
   template <class P>
   void sin(P &p, int d, int n) {
-    for (int t=0; t<p.X(3); t++) {
-      for (int z=0; z<p.X(2); z++) {
-	for (int y=0; y<p.X(1); y++) {
-	  for (int x=0; x<p.X(0); x++) {
-	    double mode;
-	    switch (d) {
-	    case 0:
-	      mode = n * (double)x / p.X(0);
-	      break;
-	    case 1:
-	      mode = n * (double)y / p.X(1);
-	      break;
-	    case 2:
-	      mode = n * (double)z / p.X(2);
-	      break;
-	    case 3:
-	      mode = n * (double)t / p.X(3);
-	      break;
-	    }
-	    double k = sin (M_PI * mode);
+    int coord[4];
+    int X[4] = { p.X(0), p.X(1), p.X(2), p.X(3)};
+    X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
 
-	    int offset = ((t*p.X(2)+z)*p.X(1) + y)*p.X(0) + x;
-	    int offset_h = offset / p.Nparity();
-	    int parity = offset % p.Nparity();
-	    int linear_index = parity * p.VolumeCB() + offset_h;
+    for (int parity=0; parity<p.Nparity(); parity++) {
+      for (int x_cb=0; x_cb<p.VolumeCB(); x_cb++) {
+	getCoords(coord, x_cb, X, parity);
 
-	    for (int s=0; s<p.Nspin(); s++) 
-	      for (int c=0; c<p.Ncolor(); c++) 
-		p(parity, linear_index, s, c) = k;
-	  }
-	}
+	double mode = n * (double)coord[d] / X[d];
+	double k = sin (M_PI * mode);
+
+	for (int s=0; s<p.Nspin(); s++)
+	  for (int c=0; c<p.Ncolor(); c++)
+	    p(parity, x_cb, s, c) = k;
       }
     }
   }
