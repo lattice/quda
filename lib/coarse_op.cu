@@ -909,7 +909,11 @@ namespace quda {
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
     typedef typename gauge::FieldOrder<Float,coarseSpin*coarseColor,1,gOrder> gCoarse;
 
-    F vAccessor(const_cast<ColorSpinorField&>(T.Vectors()));
+    const ColorSpinorField &v = T.Vectors();
+    int dummy = 0;
+    v.exchangeGhost(QUDA_INVALID_PARITY, dummy);
+
+    F vAccessor(const_cast<ColorSpinorField&>(v));
     F uvAccessor(const_cast<ColorSpinorField&>(*uv));
     gFine fAccessor(const_cast<GaugeField&>(*f));
     gCoarse yAccessor(const_cast<GaugeField&>(Y));
