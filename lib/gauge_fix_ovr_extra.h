@@ -4,7 +4,7 @@
 
 #ifdef MULTI_GPU
 #include <map>
-#include <quda_internal.h> some conflicts with thrust library
+#include <quda_internal.h>
 
 
 namespace quda {

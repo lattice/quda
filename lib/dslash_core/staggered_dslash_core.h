@@ -1210,6 +1210,8 @@ WRITE_SPINOR(out, sid, param.sp_stride);
 
 
 // undefine to prevent warning when precision is changed
+#undef time_boundary
+
 #undef spinorFloat
 #undef spinorFloat2
 #undef SHARED_STRIDE

@@ -36,57 +36,7 @@ namespace quda {
       X[0] *= (nParity == 1) ? 2 : 1; // set to full lattice dimensions
       X[4] = (nDim == 5) ? a.X(4) : 1; // set fifth dimension correctly
     }
-
   };
-
-  template <int dir, typename Arg>
-  __device__ __host__ inline int ghostFaceIndex(const int x[], int dim, const Arg &arg) {
-    const int *X = arg.X;
-    int index;
-    switch(dim) {
-    case 0:
-      switch(dir) {
-      case 0:
-	index = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
-	break;
-      case 1:
-	index = ((x[0]-X[0]+arg.nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
-	break;
-      }
-      break;
-    case 1:
-      switch(dir) {
-      case 0:
-	index = (x[1]*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
-	break;
-      case 1:
-	index = ((x[1]-X[1]+arg.nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
-	break;
-      }
-      break;
-    case 2:
-      switch(dir) {
-      case 0:
-	index = (x[2]*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-	break;
-      case 1:
-	index = ((x[2]-X[2]+arg.nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
-	break;
-      }
-      break;
-    case 3:
-      switch(dir) {
-      case 0:
-	index = (x[3]*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
-	break;
-      case 1:
-	index  = ((x[3]-X[3]+arg.nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
-	break;
-      }
-      break;
-    }
-    return index;
-  }
 
   template <typename Float, int Ns, int Nc, typename Arg>
   __device__ __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity) {
@@ -104,12 +54,12 @@ namespace quda {
     for (int dim=0; dim<4; dim++) {
       if (x[dim] < arg.nFace){
 	arg.field.load(tmp, cb_idx, spinor_parity);
-	arg.field.saveGhost(tmp, ghostFaceIndex<0>(x,dim,arg), dim, 0, spinor_parity);
+	arg.field.saveGhost(tmp, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), dim, 0, spinor_parity);
       }
       
       if (x[dim] >= X[dim] - arg.nFace){
 	arg.field.load(tmp, cb_idx, spinor_parity);
-	arg.field.saveGhost(tmp, ghostFaceIndex<1>(x,dim,arg), dim, 1, spinor_parity);
+	arg.field.saveGhost(tmp, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), dim, 1, spinor_parity);
       }
     }
   }
@@ -208,6 +158,10 @@ namespace quda {
     if (a.Ncolor() == 2) {
       genericPackGhost<Float,order,Ns,2>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 3) {
+      genericPackGhost<Float,order,Ns,3>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 4) {
+      genericPackGhost<Float,order,Ns,3>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 6) {
       genericPackGhost<Float,order,Ns,3>(ghost, a, parity, dagger);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());

@@ -32,7 +32,6 @@ namespace quda {
       bool last_node_in_t = true;
 #endif
       tBoundary = (Float)(last_node_in_t ? tBoundary_ : QUDA_PERIODIC_T);
-      printf("node=%d Tboundary = %e\n", comm_rank(), tBoundary);
     }
     GaugePhaseArg(const GaugePhaseArg &arg) 
       : order(arg.order), tBoundary(arg.tBoundary), volume(arg.volume) {

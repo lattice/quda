@@ -182,7 +182,7 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    QudaPrecision prec = csParam.precision;
+    double tol = std::pow(10.0, -2*csParam.precision);
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -199,7 +199,7 @@ namespace quda {
       deviation = blas::xmyNorm(*tmp1, *tmp2);
       printfQuda("deviation = %e\n", deviation);
 
-      if (deviation > pow(1.0,-2*prec)) errorQuda("failed");
+      if (deviation > tol) errorQuda("failed");
     }
 #if 0
     printfQuda("Checking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", 
@@ -226,7 +226,7 @@ namespace quda {
 
     deviation = blas::xmyNorm(*x_coarse, *r_coarse);
     printfQuda("deviation = %e\n", deviation);
-    if (deviation > pow(1.0,-2*prec) ) errorQuda("failed");
+    if (deviation > tol ) errorQuda("failed");
 
     printfQuda("\n");
     printfQuda("Comparing native coarse operator to emulated operator\n");
@@ -258,7 +258,7 @@ namespace quda {
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     deviation = blas::xmyNorm(*x_coarse, *r_coarse);
     printfQuda("deviation = %e\n\n", deviation);
-    if (deviation > pow(1.0, -2*prec)) errorQuda("failed");
+    if (deviation > tol) errorQuda("failed");
     
     delete tmp1;
     delete tmp2;

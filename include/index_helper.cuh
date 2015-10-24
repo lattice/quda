@@ -147,4 +147,60 @@ namespace quda {
     return 2 * cb_index + x1odd;  
   }
   
+  /**
+     Compute the checkerboarded index into the ghost field
+     corresponding to full (local) site index x[]
+     @param x local site
+     @param X local lattice dimensions
+     @param dim dimension
+     @param depth of ghost
+  */
+  template <int dir>
+  __device__ __host__ inline int ghostFaceIndex(const int x[], const int X[], int dim, int nFace) {
+    int index;
+    switch(dim) {
+    case 0:
+      switch(dir) {
+      case 0:
+	index = (x[0]*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1])+x[2]*X[1] + x[1])>>1;
+	break;
+      case 1:
+	index = ((x[0]-X[0]+nFace)*X[4]*X[3]*X[2]*X[1] + x[4]*X[3]*X[2]*X[1] + x[3]*(X[2]*X[1]) + x[2]*X[1] + x[1])>>1;
+	break;
+      }
+      break;
+    case 1:
+      switch(dir) {
+      case 0:
+	index = (x[1]*X[4]*X[3]*X[2]*X[0] + x[4]*X[3]*X[2]*X[0] + x[3]*X[2]*X[0]+x[2]*X[0]+x[0])>>1;
+	break;
+      case 1:
+	index = ((x[1]-X[1]+nFace)*X[4]*X[3]*X[2]*X[0] +x[4]*X[3]*X[2]*X[0]+ x[3]*X[2]*X[0] + x[2]*X[0] + x[0])>>1;
+	break;
+      }
+      break;
+    case 2:
+      switch(dir) {
+      case 0:
+	index = (x[2]*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	break;
+      case 1:
+	index = ((x[2]-X[2]+nFace)*X[4]*X[3]*X[1]*X[0] + x[4]*X[3]*X[1]*X[0] + x[3]*X[1]*X[0] + x[1]*X[0] + x[0])>>1;
+	break;
+      }
+      break;
+    case 3:
+      switch(dir) {
+      case 0:
+	index = (x[3]*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0]+x[0])>>1;
+	break;
+      case 1:
+	index  = ((x[3]-X[3]+nFace)*X[4]*X[2]*X[1]*X[0] + x[4]*X[2]*X[1]*X[0] + x[2]*X[1]*X[0]+x[1]*X[0] + x[0])>>1;
+	break;
+      }
+      break;
+    }
+    return index;
+  }
+
 } // namespace quda

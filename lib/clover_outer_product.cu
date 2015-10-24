@@ -174,7 +174,7 @@ namespace quda {
   // Get the  coordinates for the exterior kernels
   __device__ void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
   {
-    unsigned int Xh[2] = {X[0]/2, X[1]/2};
+    int Xh[2] = {X[0]/2, X[1]/2};
     switch(dir){
     case 0:
       x[2] = cb_idx/Xh[1] % X[2];
@@ -403,16 +403,16 @@ namespace quda {
   
     long long flops() const { 
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	((long long)arg.length)*4*(24 + 144 + 234); // spin project + spin trace + multiply-add
+	return ((long long)arg.length)*4*(24 + 144 + 234); // spin project + spin trace + multiply-add
       } else {
-	((long long)arg.length)*(144 + 234); // spin trace + multiply-add
+	return ((long long)arg.length)*(144 + 234); // spin trace + multiply-add
       }
     }
     long long bytes() const { 
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	((long long)arg.length)*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB_shift.Bytes() + arg.inD_shift.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes())); 
+	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB_shift.Bytes() + arg.inD_shift.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes())); 
       } else {
-	((long long)arg.length)*(arg.inA.Bytes() + arg.inB_shift.Bytes()/2 + arg.inC.Bytes() + arg.inD_shift.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes()); 
+	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inB_shift.Bytes()/2 + arg.inC.Bytes() + arg.inD_shift.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes()); 
       }
     }
   

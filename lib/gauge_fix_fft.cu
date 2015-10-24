@@ -32,7 +32,7 @@ namespace quda {
 
 
 #ifdef GAUGEFIXING_DONT_USE_GX
-#warning Don't use precalculated g(x)
+#warning Not using precalculated g(x)
 #else
 #warning Using precalculated g(x)
 #endif

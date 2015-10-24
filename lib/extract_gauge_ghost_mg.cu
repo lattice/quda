@@ -38,10 +38,10 @@ namespace quda {
     void extractGhost(const GaugeField &u, Float **Ghost) {
 
     if (u.Reconstruct() != QUDA_RECONSTRUCT_NO) 
-      errorQuda("Reconstruct %d not supported");
+      errorQuda("Reconstruct %d not supported", u.Reconstruct());
 
     if (u.LinkType() != QUDA_GENERAL_LINKS)
-      errorQuda("Link type not supported");
+      errorQuda("Link type %d not supported", u.LinkType());
 
     if (u.Ncolor() == 4) {
       extractGhost<Float, 4>(u, Ghost);

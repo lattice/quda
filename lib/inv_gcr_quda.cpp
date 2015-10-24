@@ -381,6 +381,7 @@ namespace quda {
 	k = 0;
 
 	if ( !convergence(r2, heavy_quark_res, stop, param.tol_hq) ) {
+	  printf("restart\n");
 	  restart++; // restarting if residual is still too great
 
 	  PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
@@ -418,11 +419,10 @@ namespace quda {
     mat(r, x);
     double true_res = blas::xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
-#if (__COMPUTE_CAPABILITY__ >= 200)
-    param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
-#else
-    param.true_res_hq = 0.0;
-#endif   
+    if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL && __COMPUTE_CAPABILITY__ >= 200)
+      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
+    else
+      param.true_res_hq = 0.0;
 
     param.gflops += gflops;
     param.iter += total_iter;

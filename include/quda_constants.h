@@ -14,7 +14,7 @@
  * @brief Maximum number of dimensions supported by QUDA.  In practice, no
  *        routines make use of more than 5.
  */
-#define QUDA_MAX_DIM 5
+#define QUDA_MAX_DIM 6
 
 /**
  * @def QUDA_MAX_MULTI_SHIFT
