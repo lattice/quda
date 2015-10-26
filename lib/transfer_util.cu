@@ -127,8 +127,8 @@ namespace quda {
     // Run through the fine grid and do the block ordering
     for (int parity = 0; parity<in.Nparity(); parity++) {
       for (int x_cb=0; x_cb<in.VolumeCB(); x_cb++) {
-	int i = in.Nparity()*x_cb + parity;
-      
+	int i = parity*in.VolumeCB() + x_cb;
+
 	// Get fine grid coordinates
 	V.LatticeIndex(x, i);
 	
@@ -179,11 +179,10 @@ namespace quda {
     // need non-quadratic check
     for (int i=0; i<checkLength; i++) {
       for (int j=0; j<i; j++) {
-	//if (check[i] == check[j]) errorQuda("Collision detected in block ordering\n");
+      if (check[i] == check[j]) errorQuda("Collision detected in block ordering\n");
       }
     }
     */
-
     delete []check;
   }
 
@@ -209,7 +208,7 @@ namespace quda {
     // Run through the fine grid and do the block ordering
     for (int parity = 0; parity<in.Nparity(); parity++) {
       for (int x_cb=0; x_cb<in.VolumeCB(); x_cb++) {
-	int i = in.Nparity()*x_cb + parity;
+	int i = parity*in.VolumeCB() + x_cb;
 
 	// Get fine grid coordinates
 	V.LatticeIndex(x, i);
