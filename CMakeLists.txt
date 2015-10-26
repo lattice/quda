@@ -169,7 +169,7 @@ else(BUILD_MAGMA)
 endif(BUILD_MAGMA)
 
 if(BUILD_SSTEP)
-  add_definitions(-DBUILD_SSTEP)
+  add_definitions(-DSSTEP)
 endif()
 
 if(POSIX_THREADS)
