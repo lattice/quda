@@ -52,7 +52,7 @@ namespace quda {
      Insert a sinusoidal wave sin ( n * (x[d] / X[d]) * pi ) in dimension d
    */
   template <class P>
-  void sin(P &p, int d, int n) {
+  void sin(P &p, int d, int n, int offset) {
     int coord[4];
     int X[4] = { p.X(0), p.X(1), p.X(2), p.X(3)};
     X[0] *= (p.Nparity() == 1) ? 2 : 1; // need full lattice dims
@@ -62,7 +62,7 @@ namespace quda {
 	getCoords(coord, x_cb, X, parity);
 
 	double mode = n * (double)coord[d] / X[d];
-	double k = sin (M_PI * mode);
+	double k = (double)offset + sin (M_PI * mode);
 
 	for (int s=0; s<p.Nspin(); s++)
 	  for (int c=0; c<p.Ncolor(); c++)
@@ -78,7 +78,7 @@ namespace quda {
     if (sourceType == QUDA_RANDOM_SOURCE) random(A);
     else if (sourceType == QUDA_POINT_SOURCE) point(A, x, s, c);
     else if (sourceType == QUDA_CONSTANT_SOURCE) constant(A, x, s, c);
-    else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s);
+    else if (sourceType == QUDA_SINUSOIDAL_SOURCE) sin(A, x, s, c);
     else errorQuda("Unsupported source type %d", sourceType);
   }
 
