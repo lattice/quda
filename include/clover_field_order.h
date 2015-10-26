@@ -186,8 +186,8 @@ namespace quda {
 	 * @param s_col col spin index
 	 * @param c_col col color index
 	 */
-	__device__ __host__ inline const complex<Float> operator()(int d, int parity, int x, int s_row, 
-								    int s_col, int c_row, int c_col) const {
+	__device__ __host__ inline const complex<Float> operator()(int parity, int x, int s_row,
+								   int s_col, int c_row, int c_col) const {
 	  return accessor(parity, x, s_row, s_col, c_row, c_col);
 	}
 	
@@ -201,7 +201,7 @@ namespace quda {
 	 * @param c_col col color index
 	 */
 	/*
-	__device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int s_row, 
+	__device__ __host__ inline complex<Float>& operator()(int parity, int x, int s_row,
 							     int s_col, int c_row, int c_col) {
 	  //errorQuda("Clover accessor not implemented as a lvalue");
 	  return accessor(parity, x, s_row, s_col, c_row, c_col);
