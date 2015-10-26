@@ -38,8 +38,8 @@ namespace quda {
 					     int parity, int x_cb, const int *geo_map, const S& spin_map, int fineVolume) {
     int x = parity*fineVolume/2 + x_cb;
     int x_coarse = geo_map[x];
-    int parity_coarse = (x_coarse >= in.Volume()/2) ? 1 : 0;
-    int x_coarse_cb = x_coarse - parity_coarse*in.Volume()/2;
+    int parity_coarse = (x_coarse >= in.VolumeCB()) ? 1 : 0;
+    int x_coarse_cb = x_coarse - parity_coarse*in.VolumeCB();
 
     for (int s=0; s<fineSpin; s++) {
       for (int c=0; c<coarseColor; c++) {
@@ -72,7 +72,7 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   void Prolongate(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.out.Volume()/2; x_cb++) {
+      for (int x_cb=0; x_cb<arg.out.VolumeCB(); x_cb++) {
 	complex<Float> tmp[fineSpin*coarseColor];
 	prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.Volume());
 	rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
@@ -84,7 +84,7 @@ namespace quda {
   __global__ void ProlongateKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity=threadIdx.y; //parity is within the block
-    if (x_cb >= arg.out.Volume()/2) return;
+    if (x_cb >= arg.out.VolumeCB()) return;
 
     complex<Float> tmp[fineSpin*coarseColor];
     prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.Volume());
@@ -103,7 +103,7 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.out.Volume()/2; } // fine parity is the block y dimension
+    unsigned int minThreads() const { return arg.out.VolumeCB(); } // fine parity is the block y dimension
 
   public:
     ProlongateLaunch(Arg &arg, const ColorSpinorField &fine, const ColorSpinorField &coarse, 
@@ -136,13 +136,13 @@ namespace quda {
 
     void initTuneParam(TuneParam &param) const {
       Tunable::initTuneParam(param);
-      param.grid = dim3( ((arg.out.Volume()/2)+param.block.x-1) / param.block.x, 1, 1);
+      param.grid = dim3( ((arg.out.VolumeCB())+param.block.x-1) / param.block.x, 1, 1);
     }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
       Tunable::defaultTuneParam(param);
-      param.grid = dim3( ((arg.out.Volume()/2)+param.block.x-1) / param.block.x, 1, 1);
+      param.grid = dim3( ((arg.out.VolumeCB())+param.block.x-1) / param.block.x, 1, 1);
     }
 
     long long bytes() const {
@@ -196,12 +196,14 @@ namespace quda {
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                   int nVec, const int *fine_to_coarse, const int *spin_map) {
 
-    if (in.Nspin() == 1) {
-      Prolongate<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, spin_map);
-    } else if (in.Nspin() == 2) {
+    if (in.Nspin() == 2) {
       Prolongate<Float,fineSpin,fineColor,2,order>(out, in, v, nVec, fine_to_coarse, spin_map);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (in.Nspin() == 1) {
+      Prolongate<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, spin_map);
+#endif
     } else {
-      errorQuda("Coarse spin > 2 is not supported (%d)", in.Nspin());
+      errorQuda("Coarse spin %d is not supported (%d)", in.Nspin());
     }
   }
 
@@ -230,8 +232,10 @@ namespace quda {
       Prolongate<Float,4,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Nspin() == 2) {
       Prolongate<Float,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+#ifdef GPU_STAGGERED_DIRAC
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+#endif
     } else {
       errorQuda("Unsupported nSpin %d", out.Nspin());
     }

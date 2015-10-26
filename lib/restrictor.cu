@@ -54,21 +54,21 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   void Restrict(Arg arg) {
     for (int parity_coarse=0; parity_coarse<2; parity_coarse++) 
-      for (int x_coarse_cb=0; x_coarse_cb<arg.out.Volume()/2; x_coarse_cb++)
+      for (int x_coarse_cb=0; x_coarse_cb<arg.out.VolumeCB(); x_coarse_cb++)
 	for (int s=0; s<coarseSpin; s++) 
 	  for (int c=0; c<coarseColor; c++)
 	    arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
 
     // loop over fine degrees of freedom
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.in.Volume()/2; x_cb++) {
+      for (int x_cb=0; x_cb<arg.in.VolumeCB(); x_cb++) {
 	complex<Float> tmp[fineSpin*coarseColor];
 	rotateCoarseColor<Float,fineSpin,fineColor,coarseColor>(tmp, arg.in, arg.V, parity, x_cb);
 
-	int x = parity*arg.in.Volume()/2 + x_cb;
+	int x = parity*arg.in.VolumeCB() + x_cb;
 	int x_coarse = arg.fine_to_coarse[x];
-	int parity_coarse = (x_coarse >= arg.out.Volume()/2) ? 1 : 0;
-	int x_coarse_cb = x_coarse - parity_coarse*arg.out.Volume()/2;
+	int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
+	int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 	
 	for (int s=0; s<fineSpin; s++) 
 	  for (int c=0; c<coarseColor; c++)
@@ -90,8 +90,8 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg, int block_size>
   __global__ void RestrictKernel(Arg arg) {
     int x_coarse = blockIdx.x;
-    int parity_coarse = x_coarse >= arg.out.Volume()/2 ? 1 : 0;
-    int x_coarse_cb = x_coarse - parity_coarse*arg.out.Volume()/2;
+    int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
+    int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 
     // obtain fine index from this look up table
     // since both parities map to the same block, each thread block must do both parities
@@ -103,7 +103,7 @@ namespace quda {
     // and that fine-point-id is parity ordered
     int x_fine = arg.coarse_to_fine[ (blockIdx.x*blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x];
     int parity = threadIdx.y;
-    int x_fine_cb = x_fine - parity*arg.in.Volume()/2;
+    int x_fine_cb = x_fine - parity*arg.in.VolumeCB();
 
     complex<Float> tmp[fineSpin*coarseColor];
     rotateCoarseColor<Float,fineSpin,fineColor,coarseColor>(tmp, arg.in, arg.V, parity, x_fine_cb);
@@ -157,7 +157,7 @@ namespace quda {
   public:
     RestrictLaunch(Arg &arg, const ColorSpinorField &coarse, const ColorSpinorField &fine, 
 		   const QudaFieldLocation location) : arg(arg), location(location), 
-	block_size((arg.in.Volume()/2)/arg.out.Volume()) { 
+	block_size((arg.in.VolumeCB())/arg.out.Volume()) {
       strcpy(vol, coarse.VolString());
       strcat(vol, ",");
       strcat(vol, fine.VolString());
@@ -183,7 +183,7 @@ namespace quda {
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 128) {
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,128>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else {
 	  errorQuda("Block size not instantiated");
 	}
@@ -256,13 +256,15 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
                 int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
 
-    if (out.Nspin() > 2) errorQuda("coarseSpin is not supported");
-
-    if (in.Nspin() == 1) {
-      Restrict<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, coarse_to_fine, spin_map);
-    } else {
+    if (out.Nspin() == 2) {
       Restrict<Float,fineSpin,fineColor,2,order>(out, in, v, nVec, fine_to_coarse, coarse_to_fine, spin_map);
-    } 
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (out.Nspin() == 1) {
+      Restrict<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, coarse_to_fine, spin_map);
+#endif
+    } else {
+      errorQuda("Unsupported nSpin %d", out.Nspin());
+    }
   }
 
   template <typename Float, int fineSpin, QudaFieldOrder order>
@@ -290,8 +292,10 @@ namespace quda {
       Restrict<Float,4,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Nspin() == 2) {
       Restrict<Float,2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+#if GPU_STAGGERED_DIRAC
     } else if (in.Nspin() == 1) {
       Restrict<Float,1,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+#endif
     } else {
       errorQuda("Unsupported nSpin %d", in.Nspin());
     }
