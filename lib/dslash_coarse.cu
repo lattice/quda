@@ -74,12 +74,12 @@ namespace quda {
 	  for (int c_row=0; c_row<Nc; c_row++)
 	    for (int s_col=0; s_col<Ns; s_col++)
 	      for (int c_col=0; c_col<Nc; c_col++)
-		Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, (parity+1)&1, x_cb, s_row, s_col, c_row, c_col);
+		Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, parity, x_cb, s_row, s_col, c_row, c_col);
 #else
 	//if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	// load from ghost
 	//} else {
-	arg.Y.load(reinterpret_cast<Float*>(Y), x_cb, d, (parity+1)&1);
+	arg.Y.load(reinterpret_cast<Float*>(Y), x_cb, d, parity);
 	  //}
 #endif // LEGACY_GAUGE
 
