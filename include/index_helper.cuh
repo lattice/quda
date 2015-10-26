@@ -157,7 +157,7 @@ namespace quda {
   */
   template <int dir>
   __device__ __host__ inline int ghostFaceIndex(const int x[], const int X[], int dim, int nFace) {
-    int index;
+    int index = 0;
     switch(dim) {
     case 0:
       switch(dir) {
