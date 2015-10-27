@@ -62,9 +62,9 @@ namespace quda {
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
 
 #ifdef GPU_MULTIGRID
-    if (in.Ncolor() == 4) {
+    if (in.Ncolor() == 48) {
       // we are doing gauge field packing
-      const int Nc = 4;
+      const int Nc = 48;
       copyGauge<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else 
 #endif // GPU_MULTIGRID
