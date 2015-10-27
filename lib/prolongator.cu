@@ -203,7 +203,7 @@ namespace quda {
       Prolongate<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, spin_map);
 #endif
     } else {
-      errorQuda("Coarse spin %d is not supported (%d)", in.Nspin());
+      errorQuda("Coarse spin %d is not supported", in.Nspin());
     }
   }
 

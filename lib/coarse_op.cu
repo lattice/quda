@@ -156,25 +156,52 @@ namespace quda {
   //s = fine spin
   //c' = coarse color
   //c = fine color
-  //FIXME: N.B. Only works if color-spin field and gauge field are parity ordered in the same way.  Need LatticeIndex function for generic ordering
-  template<typename Float, int dir, typename F, typename fineGauge>
-  void computeUV(F &UV, const F &V, const fineGauge &G, int ndim, const int *x_size) {
+  template<typename Float, int dim, typename F, typename fineGauge>
+  void computeUV(F &UV, const F &V, const fineGauge &G, int ndim, const int *x_size, const int *comm_dim) {
 
-    int coord[ndim];
+    int coord[5];
+    coord[4] = 0;
     for (int parity=0; parity<2; parity++) {
       for (int x_cb=0; x_cb<V.VolumeCB(); x_cb++) {
 	getCoords(coord, x_cb, x_size, parity);
-	int y_cb = linkIndexP1(coord, x_size, dir);
 
-	for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
-	  for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
-	    for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
-	      for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
-		UV(parity, x_cb, s, ic, ic_c) += G(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y_cb, s, jc, ic_c);
-	      }  //Fine color columns
-	    }  //Fine color rows
-	  }  //Coarse color
-	}  //Fine Spin
+	if ( comm_dim[dim] && (coord[dim] + 1 >= x_size[dim]) ) {
+	  int nFace = 1;
+	  int ghost_idx = ghostFaceIndex<1>(coord, x_size, dim, nFace);
+
+	  for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
+	    for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
+	      for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
+		for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
+		  UV(parity, x_cb, s, ic, ic_c) += G(dim, parity, x_cb, ic, jc) * V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
+		  int y_cb = linkIndexP1(coord, x_size, dim);
+		  complex<Float> ghost = V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
+		  complex<Float> bulk = V((parity+1)&1, y_cb, s, jc, ic_c);
+
+		  if (ghost != bulk) {
+		    printf("s=%d ic_c=%d ic=%d jc=%d bulk = %e %e ghost = %e %e\n",
+			   s, ic_c, ic, jc, bulk.real(), bulk.imag(), ghost.real(), ghost.imag());
+		  }
+
+		}  //Fine color columns
+	      }  //Fine color rows
+	    }  //Coarse color
+	  }  //Fine Spin
+
+	} else {
+	  int y_cb = linkIndexP1(coord, x_size, dim);
+
+	  for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin
+	    for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
+	      for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
+		for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
+		  UV(parity, x_cb, s, ic, ic_c) += G(dim, parity, x_cb, ic, jc) * V((parity+1)&1, y_cb, s, jc, ic_c);
+		}  //Fine color columns
+	      }  //Fine color rows
+	    }  //Coarse color
+	  }  //Fine Spin
+
+	}
 
       } // c/b volume
     } // parity
@@ -395,12 +422,19 @@ namespace quda {
   //Calculates the coarse gauge field
   template<typename Float, typename F, typename coarseGauge, typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineClover *C,
-		  const int *x_size, const int *xc_size, double kappa) {
+		  const int *xx_size, const int *xc_size, double kappa) {
     if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
     const QudaGammaBasis basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
+
+    int x_size[5];
+    for (int i=0; i<4; i++) x_size[i] = xx_size[i];
+    x_size[4] = 1;
+
+    int comm_dim[nDim];
+    for (int i=0; i<nDim; i++) comm_dim[i] = comm_dim_partitioned(i);
 
     int geo_bs[QUDA_MAX_DIM]; 
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
@@ -413,19 +447,19 @@ namespace quda {
       printfQuda("Computing %d UV and VUV\n", d);
       //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y
       if (d==0) {
-        computeUV<Float,0>(UV, V, G, nDim, x_size);
+        computeUV<Float,0>(UV, V, G, nDim, x_size, comm_dim);
         Gamma<Float, basis, 0> gamma;
         computeVUV<Float,0>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       } else if (d==1) {
-        computeUV<Float,1>(UV, V, G, nDim, x_size);
+        computeUV<Float,1>(UV, V, G, nDim, x_size, comm_dim);
         Gamma<Float, basis, 1> gamma;
         computeVUV<Float,1>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       } else if (d==2) {
-        computeUV<Float,2>(UV, V, G, nDim, x_size);
+        computeUV<Float,2>(UV, V, G, nDim, x_size, comm_dim);
         Gamma<Float, basis, 2> gamma;
         computeVUV<Float,2>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       } else {
-        computeUV<Float,3>(UV, V, G, nDim, x_size);
+        computeUV<Float,3>(UV, V, G, nDim, x_size, comm_dim);
         Gamma<Float, basis, 3> gamma;
         computeVUV<Float,3>(Y, X, UV, V, gamma, G, x_size, xc_size, geo_bs, spin_bs);
       }
