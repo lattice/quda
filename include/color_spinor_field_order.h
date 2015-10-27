@@ -10,7 +10,6 @@
  * ordering.  Currently this is used for cpu fields only with limited
  * ordering support, but this will be expanded for device ordering
  *  also.
- * A.S.: accessors seems to be generic, no modifications needed for the staggered case
  */
 
 #include <register_traits.h>
@@ -31,6 +30,16 @@ namespace quda {
       }
     };
 
+    template<typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order> struct GhostAccessorCB {
+      GhostAccessorCB(const ColorSpinorField &) { }
+      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const {
+#ifndef __CUDA_ARCH__
+	errorQuda("Not implemented");
+#endif
+	return 0;
+      }
+    };
+
     template<typename Float, int nSpin, int nColor, int nVec> 
       struct AccessorCB<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> { 
       const int offset_cb;
@@ -39,14 +48,17 @@ namespace quda {
       { return parity*offset_cb + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
     };
 
-    template<typename Float, int nSpin, int nColor, int nVec> 
-      struct AccessorCB<Float,nSpin,nColor,nVec,QUDA_SPACE_COLOR_SPIN_FIELD_ORDER> { 
-      const int offset_cb;
-    AccessorCB(const ColorSpinorField &field) : offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
-      __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const 
-      {	return parity*offset_cb + ((x_cb*nColor+c)*nSpin+s)*nVec+v; }
+    template<typename Float, int nSpin, int nColor, int nVec>
+      struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> {
+      int ghostOffset[4];
+      GhostAccessorCB(const ColorSpinorField &a) {
+	for (int d=0; d<4; d++) {
+	  ghostOffset[d] = a.Nface()*a.SurfaceCB(d)*a.Ncolor()*a.Nspin();
+	}
+      }
+      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
     };
-
 
     template<int nSpin, int nColor, int nVec, int N> 
       __device__ __host__ inline int indexFloatN2(int parity, int x_cb, int s, int c, int v, int stride, int offset_cb) {
@@ -67,22 +79,27 @@ namespace quda {
       { return indexFloatN2<nSpin,nColor,nVec,(int)QUDA_FLOAT2_FIELD_ORDER>(parity,x_cb,s,c,v,stride,offset_cb); }
     };
 
-    template<typename Float, int nSpin, int nColor, int nVec> 
-      struct AccessorCB<Float,nSpin,nColor,nVec,QUDA_FLOAT4_FIELD_ORDER> { 
-      const int stride;
-      const size_t offset_cb;
-
-    AccessorCB(const ColorSpinorField &field): stride(field.Stride()), 
-	offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
-      __device__ __host__ inline int index(int parity,int x_cb, int s, int c, int v) const 
-      { return indexFloatN2<nSpin,nColor,(int)QUDA_FLOAT4_FIELD_ORDER>(parity,x_cb,s,c,v,stride,offset_cb); }
+    template<typename Float, int nSpin, int nColor, int nVec>
+      struct GhostAccessorCB<Float,nSpin,nColor,nVec,QUDA_FLOAT2_FIELD_ORDER> {
+      int faceVolumeCB[4];
+      int ghostOffset[4];
+      GhostAccessorCB(const ColorSpinorField &a) {
+	for (int d=0; d<4; d++) {
+	  faceVolumeCB[d] = a.Nface()*a.SurfaceCB(d);
+	  ghostOffset[d] = faceVolumeCB[d]*nColor*nSpin;
+	}
+      }
+      __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
+      { return indexFloatN2<nSpin,nColor,nVec,(int)QUDA_FLOAT2_FIELD_ORDER>(parity,x_cb,s,c,v,faceVolumeCB[dim],ghostOffset[dim]); }
     };
+
 
     template <typename Float, int nSpin, int nColor, int nVec, QudaFieldOrder order>
       class FieldOrderCB {
 
     protected:
       complex<Float> *v;
+      complex<Float> *ghost[8];
       mutable int x[QUDA_MAX_DIM];
       const int volume;
       const int volumeCB;
@@ -90,6 +107,7 @@ namespace quda {
       const QudaGammaBasis gammaBasis;
       const QudaSiteSubset siteSubset;
       const AccessorCB<Float,nSpin,nColor,nVec,order> accessor;
+      const GhostAccessorCB<Float,nSpin,nColor,nVec,order> ghostAccessor;
       const int nParity;
 
     public:
@@ -102,8 +120,14 @@ namespace quda {
 	volume(field.Volume()), volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
 	siteSubset(field.SiteSubset()),	nParity(field.SiteSubset()),
-	accessor(field)
-      { for (int d=0; d<QUDA_MAX_DIM; d++) x[d]=field.X(d); }
+	accessor(field), ghostAccessor(field)
+      { 
+	for (int d=0; d<4; d++) {
+	  x[d]=field.X(d); 
+	  ghost[2*d+0] = static_cast<complex<Float>*>(field.Ghost()[2*d+0]);
+	  ghost[2*d+1] = static_cast<complex<Float>*>(field.Ghost()[2*d+1]);
+	}
+      }
 
       /**
        * Destructor for the FieldOrderCB class
@@ -111,45 +135,52 @@ namespace quda {
       virtual ~FieldOrderCB() { ; }
 
       /**
-       * Read-only complex-member accessor function
+       * Read-only complex-member accessor function.  The last
+       * parameter n is only used for indexed into the packed
+       * null-space vectors.
        * @param x 1-d checkerboard site index
        * @param s spin index
        * @param c color index
+       * @param v vector number
        */
-      __device__ __host__ const complex<Float>& operator()(int parity, int x_cb, int s, int c) const 
-      {	return v[accessor.index(parity,x_cb,s,c,0)]; }
+      __device__ __host__ inline const complex<Float>& operator()(int parity, int x_cb, int s, int c, int n=0) const
+      {	return v[accessor.index(parity,x_cb,s,c,n)]; }
 
       /**
-       * Writable complex-member accessor function
-       * @param x 1-d checkerboardsite index
+       * Writable complex-member accessor function.  The last
+       * parameter n is only used for indexed into the packed
+       * null-space vectors.
+       * @param x 1-d checkerboard site index
        * @param s spin index
        * @param c color index
+       * @param v vector number
        */
-      __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c) 
-      { return v[accessor.index(parity,x_cb,s,c,0)]; }
-
+      __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c, int n=0)
+      { return v[accessor.index(parity,x_cb,s,c,n)]; }
 
       /**
-       * Read-only complex-member accessor function (for mg prolongator)
+       * Read-only complex-member accessor function for the ghost
+       * zone.  The last parameter n is only used for indexed into the
+       * packed null-space vectors.
+       * @param x 1-d checkerboard site index
+       * @param s spin index
+       * @param c color index
+       * @param v vector number
+       */
+      __device__ __host__ inline const complex<Float>& Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
+      {	return ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]; }
+
+      /**
+       * Writable complex-member accessor function for the ghost zone.
+       * The last parameter n is only used for indexed into the packed
+       * null-space vectors.
        * @param x 1-d checkerboard site index
        * @param s spin index
        * @param c color index
        * @param n vector number
        */
-      __device__ __host__ inline const complex<Float>& operator()(int parity, int x_cb, int s, int c, int n) const { 
-	return v[accessor.index(parity,x_cb,s,c,n)]; 
-      }
-
-      /**
-       * Writable complex-member accessor function (for mg prolongator)
-       * @param x 1-d checkerboard site index
-       * @param s spin index
-       * @param c color index
-       * @param n vector number
-       */
-      __device__ __host__ inline complex<Float>& operator()(int parity, int x_cb, int s, int c, int n) { 
-	return v[accessor.index(parity,x_cb,s,c,n)]; 
-      }
+      __device__ __host__ inline complex<Float>& Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0)
+      { return ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)]; }
 
       /**
 	 Convert from 1-dimensional index to the n-dimensional spatial index.

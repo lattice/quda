@@ -28,6 +28,17 @@ namespace quda {
       }
     };
 
+    template<typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order> struct GhostAccessor {
+      mutable complex<Float> dummy;
+      GhostAccessor(const GaugeField &) { }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
+#ifndef __CUDA_ARCH__
+	errorQuda("Not implemented");
+#endif
+	return dummy;
+      }
+    };
+
     template<typename Float, int nColor, int nSpinCoarse>
       struct Accessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> {
       complex <Float> *u[QUDA_MAX_DIM];
@@ -36,8 +47,22 @@ namespace quda {
 	for (int d=0; d<U.Geometry(); d++)
 	  u[d] = static_cast<complex<Float>**>(const_cast<void*>(U.Gauge_p()))[d]; 
       }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const 
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
+    };
+
+    template<typename Float, int nColor, int nSpinCoarse>
+      struct GhostAccessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> {
+      complex<Float> *ghost[4];
+      int ghostOffset[4];
+      GhostAccessor(const GaugeField &U) {
+	for (int d=0; d<4; d++) {
+	  ghost[d] = static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
+	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
+	}
+      }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      { return ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col]; }
     };
 
     template<int nColor, int N>
@@ -63,6 +88,15 @@ namespace quda {
       { return u[indexFloatN<nColor,QUDA_FLOAT2_GAUGE_ORDER>(d, parity, x, row, col, stride, cb_offset)]; }
     };
 
+    template<typename Float, int nColor, int nSpinCoarse>
+      struct GhostAccessor<Float,nColor,nSpinCoarse,QUDA_FLOAT2_GAUGE_ORDER> {
+      const int volumeCB;
+      Accessor<Float,nColor,nSpinCoarse,QUDA_FLOAT2_GAUGE_ORDER> accessor;
+    GhostAccessor(const GaugeField &U) : volumeCB(U.VolumeCB()), accessor(U) {  }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      { return accessor(d, parity, x+volumeCB, row, col); }
+    };
+
 
     /**
        This is a template driven generic gauge field accessor.  To
@@ -82,6 +116,7 @@ namespace quda {
 	complex<Float> **u;
 	
 	const Accessor<Float,nColor,nSpinCoarse,order> accessor;
+	const GhostAccessor<Float,nColor,nSpinCoarse,order> ghostAccessor;
 
       public:
 	/** 
@@ -90,7 +125,7 @@ namespace quda {
 	 */
       FieldOrder(GaugeField &U) : volumeCB(U.VolumeCB()),
 	  nDim(U.Ndim()), geometry(U.Geometry()),
-	  u(static_cast<complex<Float>**>(U.Gauge_p())), accessor(U)
+	  u(static_cast<complex<Float>**>(U.Gauge_p())), accessor(U), ghostAccessor(U)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	    errorQuda("GaugeField ordering not supported with reconstruction");
@@ -119,6 +154,28 @@ namespace quda {
 	 */
 	__device__ __host__ complex<Float>& operator() (int d, int parity, int x, int row, int col) 
 	{ return accessor(d,parity,x,row,col); }
+
+	/**
+	 * Read-only complex-member accessor function for the ghost zone
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param row row index
+	 * @param c column index
+	 */
+	__device__ __host__ const complex<Float>& Ghost(int d, int parity, int x, int row, int col) const
+	{ return ghostAccessor(d,parity,x,row,col); }
+
+	/**
+	 * Writable complex-member accessor function for the ghost zone
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param row row index
+	 * @param c column index
+	 */
+	__device__ __host__ complex<Float>& Ghost(int d, int parity, int x, int row, int col)
+	{ return ghostAccessor(d,parity,x,row,col); }
 
     	/**
 	 * Specialized read-only complex-member accessor function (for coarse gauge field)
@@ -149,7 +206,37 @@ namespace quda {
 							     int s_col, int c_row, int c_col) {
 	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
 	}
-	
+
+    	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ inline const complex<Float>& Ghost(int d, int parity, int x, int s_row,
+							     int s_col, int c_row, int c_col) const {
+	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+
+	/**
+	 * Specialized read-only complex-member accessor function (for coarse gauge field ghost zone)
+	 * @param d dimension index
+	 * @param parity Parity index
+	 * @param x 1-d site index
+	 * @param s_row row spin index
+	 * @param c_row row color index
+	 * @param s_col col spin index
+	 * @param c_col col color index
+	 */
+	__device__ __host__ inline complex<Float>& Ghost(int d, int parity, int x, int s_row,
+							     int s_col, int c_row, int c_col) {
+	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+
 	/** Returns the number of field colors */
 	__device__ __host__ inline int Ncolor() const { return nColor; }
 
