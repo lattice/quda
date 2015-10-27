@@ -671,7 +671,7 @@ namespace quda {
     complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
 	
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++) {
+      for (int x_cb=0; x_cb<X.VolumeCB(); x_cb++) {
 
 	for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
 	  for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
@@ -711,52 +711,33 @@ namespace quda {
     return;
   }
 
-  //added HISQ links
+  //added HISQ links (single GPU support)
   template<typename Float, int dir, typename F, typename fineGauge>
   void computeKSUV(F *UV, F *UVL, const F &V, const fineGauge *FL, const fineGauge *LL, int ndim, const int *x_size) 
   {
-    int coord[QUDA_MAX_DIM];
+    int coord[QUDA_MAX_DIM] = {0};
 
     const int stag_sp = 0;
      
     for (int parity=0; parity<2; parity++) {
-      int x_cb = 0;
-      for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
-	for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
-	  for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
-	    for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
-	      int coord_tmp  = coord[dir];
-              int coord3[4] = {coord[0], coord[1], coord[2], coord[3]} ; 
+      for( int x_cb = 0; x_cb < V.VolumeCB(); x_cb++){
+         getCoords(coord, x_cb, x_size, parity);
 
-	      //Shift the V field w/respect to G (must be on full field coords)
-	      int oddBit = (parity + coord[1] + coord[2] + coord[3]) & 1;
-	      if (dir==0) coord[0] = 2*coord[0] + oddBit;
-              //!
- 	      coord[dir]   = (coord[dir]+1)%x_size[dir];
-              if(LL != NULL) coord3[dir] = (coord3[dir]+3)%x_size[dir];
+         int y_cb  = linkIndexP1(coord, x_size, dir);
+         int y3_cb = (LL != NULL) ? linkIndexP3(coord, x_size, dir) : 0;
 
-	      if (dir==0) {coord[0] /= 2; coord3[0] /= 2;}
-
-	      int y_cb = ((coord[3]*x_size[2]+coord[2])*x_size[1]+coord[1])*(x_size[0]/2) + coord[0];
-              int y3_cb = (LL != NULL) ? (((coord3[3]*x_size[2]+coord3[2])*x_size[1]+coord3[1])*(x_size[0]/2) + coord3[0]) : 0;
-
-	      for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
-                for(int ic = 0; ic < FL->Ncolor(); ic++) { //Fine Color rows of gauge field
-		   for(int jc = 0; jc < FL->Ncolor(); jc++) {  //Fine Color columns of gauge field
-		      (*UV)(parity, x_cb, stag_sp, ic, ic_c) += (*FL)(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y_cb, stag_sp, jc, ic_c);//mind transformation to the opposite parity field: in UVU operation.
-                      if(LL != NULL) (*UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*LL)(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y3_cb, stag_sp, jc, ic_c);
-		   }  //Fine color columns
-		}  //Fine color rows
-	      }  //Coarse color
-
-	      coord[dir] = coord_tmp; //restore
-	      x_cb++;
-	    }
+	 for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
+             for(int ic = 0; ic < FL->Ncolor(); ic++) { //Fine Color rows of gauge field
+		 for(int jc = 0; jc < FL->Ncolor(); jc++) {  //Fine Color columns of gauge field
+		    (*UV)(parity, x_cb, stag_sp, ic, ic_c) += (*FL)(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y_cb, stag_sp, jc, ic_c);//mind transformation to the opposite parity field: in UVU operation.
+                    if(LL != NULL) (*UVL)(parity, x_cb, stag_sp, ic, ic_c) += (*LL)(dir, parity, x_cb, ic, jc) * V((parity+1)&1, y3_cb, stag_sp, jc, ic_c);
+		 }  //Fine color columns
+	      }  //Fine color rows
 	  }
-	}
-      }
+       }// x_cb
     } // parity
 
+    return;
   }  //UV
 
   //KS (also HISQ) operator:
@@ -767,7 +748,9 @@ namespace quda {
     const int nDim = 4;
     Float half = -0.5;
     int coarse_size = 1;
+
     for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
+
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
 
@@ -779,60 +762,47 @@ namespace quda {
 
     //#pragma omp parallel for 
     for (int parity=0; parity<2; parity++) {
-      int x_cb = 0;
-      for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
-        if(dir == 3) eta *= -1.0;
-	for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
-          if(dir >= 2) eta *= -1.0;
-	  for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
-            if(dir >= 1) eta *= -1.0;
-	    for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
+      for( int x_cb = 0; x_cb < UV->VolumeCB(); x_cb++){
+         getCoords(coord, x_cb, x_size, parity);
 
-	      int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
-	      coord[0] = 2*coord[0] + oddBit;
-	      for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
+         for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
 
-	      //Check to see if we are on the edge of a block, i.e.
-	      //if this color matrix connects adjacent blocks.  If
-	      //adjacent site is in same block, M = X, else M = Y
-	      bool isDiagonal = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? true : false;
-              //
-	      bool isDiagonal_long = (UVL == NULL) ? false : (((coord[dir]+3)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? true : false;
+	 //Check to see if we are on the edge of a block, i.e.
+	 //if this color matrix connects adjacent blocks.  If
+	 //adjacent site is in same block, M = X, else M = Y
+	 bool isDiagonal = (((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? true : false;
+         //
+	 bool isDiagonal_long = (UVL == NULL) ? false : (((coord[dir]+3)%x_size[dir])/geo_bs[dir] == coord_coarse[dir]) ? true : false;
 
-	      coarseGauge *M =  isDiagonal ? &X : &Y;
-              coarseGauge *M_L = (UVL == NULL) ? NULL : (isDiagonal_long ? &X : &Y);
+	 coarseGauge *M =  isDiagonal ? &X : &Y;
+         coarseGauge *M_L = (UVL == NULL) ? NULL : (isDiagonal_long ? &X : &Y);
 	      
-              const int dim_index      = isDiagonal ? 0 : dir;
-              const int dim_index_long = isDiagonal_long ? 0 : dir;
+         const int dim_index      = isDiagonal ? 0 : dir;
+         const int dim_index_long = isDiagonal_long ? 0 : dir;
 
-	      int coarse_parity = 0;
-	      for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
-	      coarse_parity &= 1;
-	      coord_coarse[0] /= 2;
-	      int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
+	 int coarse_parity = 0;
+	 for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
+	 coarse_parity &= 1;
+	 coord_coarse[0] /= 2;
+	 int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
 	      
-	      //printf("(%d,%d)\n", coarse_x_cb, coarse_parity);
+	 //printf("(%d,%d)\n", coarse_x_cb, coarse_parity);
+	 coord[0] /= 2;
 
-	      coord[0] /= 2;
+         int coarse_spin_row = parity == 0 ? 0 : 1  ;
+         int coarse_spin_col = (1 - coarse_spin_row); 
 
-              int coarse_spin_row = parity == 0 ? 0 : 1  ;
-              int coarse_spin_col = (1 - coarse_spin_row); 
+         half *= eta; //multiply by sing factor 
 
-              half *= eta; //multiply by sing factor 
-
-              for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
-		for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
-		  for(int ic = 0; ic < nfinecolors; ic++) { //Sum over fine color
-		      (*M)(dim_index,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += half*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UV)(parity, x_cb, stag_sp, ic, jc_c);
-                      if(UVL != NULL) (*M_L)(dim_index_long,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += half*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UVL)(parity, x_cb, stag_sp, ic, jc_c);
-		  } //Fine color
-		} //Coarse Color column
-	      } //Coarse Color row
-	      x_cb++;
-	    } // coord[0]
-	  } // coord[1]
-	} // coord[2]
-      } // coord[3]
+         for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
+           for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
+	     for(int ic = 0; ic < nfinecolors; ic++) { //Sum over fine color
+		(*M)(dim_index,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += half*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UV)(parity, x_cb, stag_sp, ic, jc_c);
+                 if(UVL != NULL) (*M_L)(dim_index_long,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += half*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UVL)(parity, x_cb, stag_sp, ic, jc_c);
+	     } //Fine color
+	   } //Coarse Color column
+	 } //Coarse Color row
+      } // x_cb
     } // parity
     
     return;

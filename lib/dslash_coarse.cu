@@ -198,7 +198,7 @@ namespace quda {
   __device__ __host__ inline void ks_dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
-    int coord[nDim];
+    int coord[nDim] = {0};
     getCoords(coord, x_cb, arg.dim, parity);
 
     for(int d = 0; d < nDim; d++) { //Ndim
@@ -206,13 +206,26 @@ namespace quda {
       {
 	complex<Float> in[Ns*Nc];
 	complex<Float> Y[Ns*Nc][Ns*Nc];
+	int fwd_idx = linkIndexP1(coord, arg.dim, d);
 #ifdef LEGACY_SPINOR
-	int fwd_idx = linkIndexP1(coord, arg.dim, d);
-	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++)
-	  in[s*Nc+c] = arg.inA(their_spinor_parity, fwd_idx, s, c);
+	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+	  int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+	  for (int s=0; s<Ns; s++)
+	    for (int c=0; c<Nc; c++)
+	      in[s*Nc+c] = arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s, c);
+	} else {
+	  for (int s=0; s<Ns; s++)
+	    for (int c=0; c<Nc; c++)
+	      in[s*Nc+c] = arg.inA(their_spinor_parity, fwd_idx, s, c);
+	}
+
 #else
-	int fwd_idx = linkIndexP1(coord, arg.dim, d);
-	arg.inA.load(reinterpret_cast<Float*>(in), fwd_idx, their_spinor_parity);
+	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
+	  int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+	  arg.inA.loadGhost(reinterpret_cast<Float*>(in), ghost_idx, d, 1, their_spinor_parity);
+	} else {
+	  arg.inA.load(reinterpret_cast<Float*>(in), fwd_idx, their_spinor_parity);
+	}
 #endif // LEGACY_SPINOR
 
 #ifdef LEGACY_GAUGE
@@ -220,13 +233,9 @@ namespace quda {
 	  for (int c_row=0; c_row<Nc; c_row++)
 	    for (int s_col=0; s_col<Ns; s_col++)
 	      for (int c_col=0; c_col<Nc; c_col++)
-		Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, (parity+1)&1, x_cb, s_row, s_col, c_row, c_col);
+		Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, parity, x_cb, s_row, s_col, c_row, c_col);
 #else
-	//if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
-	// load from ghost
-	//} else {
-	arg.Y.load(reinterpret_cast<Float*>(Y), x_cb, d, (parity+1)&1);
-	  //}
+	arg.Y.load(reinterpret_cast<Float*>(Y), x_cb, d, parity);
 #endif // LEGACY_GAUGE
 
         for(int c_row = 0; c_row < Nc; c_row++) { //Color row
@@ -244,25 +253,51 @@ namespace quda {
 	int gauge_idx;
 	int back_idx = linkIndexM1(coord, arg.dim, d);
 #ifdef LEGACY_SPINOR
-	for (int s=0; s<Ns; s++) for (int c=0; c<Nc; c++)
-	  in[s*Nc+c] = arg.inA(their_spinor_parity, back_idx, s, c);
+	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	  int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+	  for (int s=0; s<Ns; s++)
+	    for (int c=0; c<Nc; c++)
+	      in[s*Nc+c] = arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx, s, c);
+	} else {
+	  for (int s=0; s<Ns; s++)
+	    for (int c=0; c<Nc; c++)
+	      in[s*Nc+c] = arg.inA(their_spinor_parity, back_idx, s, c);
+	}
 #else
-	arg.inA.load(reinterpret_cast<Float*>(in), back_idx, their_spinor_parity);
+	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	  int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+	  arg.inA.loadGhost(reinterpret_cast<Float*>(in), ghost_idx, d, 0, their_spinor_parity);
+	} else {
+	  arg.inA.load(reinterpret_cast<Float*>(in), back_idx, their_spinor_parity);
+	}
 #endif // LEGACY_SPINOR
 
 	gauge_idx = back_idx;
 #ifdef LEGACY_GAUGE
-	for (int s_row=0; s_row<Ns; s_row++)
-	  for (int c_row=0; c_row<Nc; c_row++)
-	    for (int s_col=0; s_col<Ns; s_col++)
-	      for (int c_col=0; c_col<Nc; c_col++)
-		Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, (parity+1)&1, gauge_idx, s_row, s_col, c_row, c_col);
+	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	  int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+	  for (int s_row=0; s_row<Ns; s_row++)
+	    for (int c_row=0; c_row<Nc; c_row++)
+	      for (int s_col=0; s_col<Ns; s_col++)
+		for (int c_col=0; c_col<Nc; c_col++) {
+		  Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y.Ghost(d, (parity+1)&1, ghost_idx, s_row, s_col, c_row, c_col);
+		}
+
+	} else {
+	  for (int s_row=0; s_row<Ns; s_row++)
+	    for (int c_row=0; c_row<Nc; c_row++)
+	      for (int s_col=0; s_col<Ns; s_col++)
+		for (int c_col=0; c_col<Nc; c_col++)
+		  Y[s_row*Nc+c_row][s_col*Nc+c_col] = arg.Y(d, (parity+1)&1, gauge_idx, s_row, s_col, c_row, c_col);
+	}
 #else
-	//if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
-	// load from ghost
-        //} else {
-	arg.Y.load(reinterpret_cast<Float*>(Y), gauge_idx, d, (parity+1)&1);
-	  //}
+	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
+	  // load from ghost
+	  int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+	  arg.Y.loadGhost(reinterpret_cast<Float*>(Y), ghost_idx, d, (parity+1)&1);
+        } else {
+	  arg.Y.load(reinterpret_cast<Float*>(Y), gauge_idx, d, (parity+1)&1);
+	}
 #endif // LEGACY_GAUGE
 
         for(int c_row = 0; c_row < Nc; c_row++) { //Color row
