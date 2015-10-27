@@ -301,8 +301,8 @@ namespace quda {
 	volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
 	{
 	  for (int i=0; i<4; i++) {
-	    ghost[2*i] = ghost_ ? ghost_[2*i] : 0;
-	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : 0;
+	    ghost[2*i+0] = ghost_ ? ghost_[2*i+0] : static_cast<Float*>(a.Ghost()[2*i+0]);
+	    ghost[2*i+1] = ghost_ ? ghost_[2*i+1] : static_cast<Float*>(a.Ghost()[2*i+1]);
 	    faceVolumeCB[i] = a.SurfaceCB(i)*a.Nface();
 	  }
 	}
