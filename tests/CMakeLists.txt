@@ -50,7 +50,7 @@ target_link_libraries(pack_test ${TEST_LIBS})
 cuda_add_executable(blas_test blas_test.cu)
 target_link_libraries(blas_test ${TEST_LIBS})
 
-if(${BUILD_FATLINK} OR {BUILD_HISQLINK})
+if(${BUILD_FATLINK} OR ${BUILD_HISQLINK})
   cuda_add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
 endif()
