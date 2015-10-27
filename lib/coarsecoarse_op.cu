@@ -4,58 +4,47 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <complex_quda.h>
+#include <index_helper.cuh>
 
 namespace quda {
 
   //Compute "coarse coarse" UV
   //FIXME: Should be merged with computeUV to avoid code duplication.  Use C++ traits.
-  template<typename Float, int dir, typename F, typename fineGauge>
-  void computeUVcoarse(F &UV, const F &V, const fineGauge &G, int ndim, const int *x_size, int s_col) {
+  template<typename Float, int dim, typename F, typename fineGauge>
+  void computeUVcoarse(F &UV, const F &V, const fineGauge &G, int ndim, const int *x_size, int s_col, const int *comm_dim) {
         
-    int coord[QUDA_MAX_DIM];
+    int coord[5];
+    coord[4] = 0;
+
     for (int parity=0; parity<2; parity++) {
-      int x_cb = 0;
-      for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
-        for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
-          for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
-            for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
-              int coord_tmp = coord[dir];
+      for (int x_cb=0; x_cb<V.VolumeCB(); x_cb++) {
+	getCoords(coord, x_cb, x_size, parity);
 
-              //Shift the V field w/respect to G (must be on full field coords)
-              int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
-              //if (dir==0) coord[0] = 2*coord[0] + oddBit;
-              coord[0] = 2*coord[0] + oddBit;
-	      int offset_index = 0;	
-	      UV.OffsetIndex(offset_index,coord);
-              //printfQuda("parity = %d x_cb = %d UV.OffsetIndex = %d\n",parity, x_cb, offset_index);
-              coord[dir] = (coord[dir]+1)%x_size[dir];
-              V.OffsetIndex(offset_index,coord);
-              //if (dir==0) coord[0] /= 2;
-              coord[0] /= 2;
-              int y_cb = ((coord[3]*x_size[2]+coord[2])*x_size[1]+coord[1])*(x_size[0]/2) + coord[0];
-              //printfQuda("parity = %d y_cb = %d V.OffsetIndex = %d\n",(parity+1)&1, y_cb,offset_index);
-
-
-                for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin row
-                    for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
-                      for(int ic = 0; ic < G.NcolorCoarse(); ic++) { //Fine Color rows of gauge field
-                        for(int jc = 0; jc < G.NcolorCoarse(); jc++) {  //Fine Color columns of gauge field
-			 //printfQuda("UV(%d,%d,%d,%d,%d)= %e %e\n",parity, x_cb, s, ic, ic_c, UV(parity, x_cb, s, ic, ic_c).real(), UV(parity, x_cb, s, ic, ic_c).imag());
-                         //printfQuda("V(%d,%d,%d,%d,%d)= %e %e\n",(parity+1)&1, y_cb, s_col, jc, ic_c, V((parity+1)&1, y_cb, s, jc, ic_c).real(), V((parity+1)&1, y_cb, s, jc, ic_c).imag());
-			 //printfQuda("G(%d,%d,%d,%d,%d,%d,%d)= %e %e\n",dir,parity,x_cb,ic,jc,s,s_col,G(dir,parity,x_cb,ic,jc,s,s_col).real(),G(dir,parity,x_cb,ic,jc,s,s_col).imag());
-                          UV(parity, x_cb, s, ic, ic_c) += G(dir, parity, x_cb, s, s_col, ic, jc) * V((parity+1)&1, y_cb, s_col, jc, ic_c);
-                         //printfQuda("UV(%d,%d,%d,%d,%d)= %e %e\n",parity, x_cb, s, ic, ic_c, UV(parity, x_cb, s, ic, ic_c).real(), UV(parity, x_cb, s, ic, ic_c).imag());
-                        }  //Fine color columns
-                      }  //Fine color rows
-                    }  //Coarse color
-                }  //Fine Spin row
-
-              coord[dir] = coord_tmp; //restore
-              x_cb++;
-            }
-          }
-        }
-      }
+	if ( comm_dim[dim] && (coord[dim] + 1 >= x_size[dim]) ) {
+	  int nFace = 1;
+	  int ghost_idx = ghostFaceIndex<1>(coord, x_size, dim, nFace);
+	  for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin row
+	    for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
+	      for(int ic = 0; ic < G.NcolorCoarse(); ic++) { //Fine Color rows of gauge field
+		for(int jc = 0; jc < G.NcolorCoarse(); jc++) {  //Fine Color columns of gauge field
+		  UV(parity, x_cb, s, ic, ic_c) += G(dim, parity, x_cb, s, s_col, ic, jc) * V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c);
+		}  //Fine color columns
+	      }  //Fine color rows
+	    }  //Coarse color
+	  }  //Fine Spin row
+	} else {
+	  int y_cb = linkIndexP1(coord, x_size, dim);
+	  for(int s = 0; s < V.Nspin(); s++) {  //Fine Spin row
+	    for(int ic_c = 0; ic_c < V.Nvec(); ic_c++) {  //Coarse Color
+	      for(int ic = 0; ic < G.NcolorCoarse(); ic++) { //Fine Color rows of gauge field
+		for(int jc = 0; jc < G.NcolorCoarse(); jc++) {  //Fine Color columns of gauge field
+		  UV(parity, x_cb, s, ic, ic_c) += G(dim, parity, x_cb, s, s_col, ic, jc) * V((parity+1)&1, y_cb, s_col, jc, ic_c);
+		}  //Fine color columns
+	      }  //Fine color rows
+	    }  //Coarse color
+	  }  //Fine Spin row
+	}
+      } // c/b volume
     } // parity
 
   }  //UV
@@ -262,11 +251,18 @@ namespace quda {
 
   template<typename Float, typename F, typename coarseGauge, typename fineGauge>
   void calculateYcoarse(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineGauge &C,
-			const int *x_size, const int *xc_size, double kappa) {
+			const int *xx_size, const int *xc_size, double kappa) {
     if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
 
     if (G.Ndim() != 4) errorQuda("Number of dimensions not supported");
     const int nDim = 4;
+
+    int x_size[5];
+    for (int i=0; i<4; i++) x_size[i] = xx_size[i];
+    x_size[4] = 1;
+
+    int comm_dim[nDim];
+    for (int i=0; i<nDim; i++) comm_dim[i] = comm_dim_partitioned(i);
 
     int geo_bs[QUDA_MAX_DIM]; 
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
@@ -280,16 +276,16 @@ namespace quda {
         printfQuda("Computing %d UV and VUV s=%d\n", d, s);
         //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y
         if (d==0) {
-          computeUVcoarse<Float,0>(UV, V, G, nDim, x_size, s);
+          computeUVcoarse<Float,0>(UV, V, G, nDim, x_size, s, comm_dim);
           computeVUVcoarse<Float,0>(Y, X, UV, V, G, x_size, xc_size, geo_bs, spin_bs, s);
         } else if (d==1) {
-          computeUVcoarse<Float,1>(UV, V, G, nDim, x_size, s);
+          computeUVcoarse<Float,1>(UV, V, G, nDim, x_size, s, comm_dim);
           computeVUVcoarse<Float,1>(Y, X, UV, V, G, x_size, xc_size, geo_bs, spin_bs, s);
         } else if (d==2) {
-          computeUVcoarse<Float,2>(UV, V, G, nDim, x_size, s);
+          computeUVcoarse<Float,2>(UV, V, G, nDim, x_size, s, comm_dim);
           computeVUVcoarse<Float,2>(Y, X, UV, V, G, x_size, xc_size, geo_bs, spin_bs, s);
         } else {
-          computeUVcoarse<Float,3>(UV, V, G, nDim, x_size, s);
+          computeUVcoarse<Float,3>(UV, V, G, nDim, x_size, s, comm_dim);
           computeVUVcoarse<Float,3>(Y, X, UV, V, G, x_size, xc_size, geo_bs, spin_bs, s);
         }
       }

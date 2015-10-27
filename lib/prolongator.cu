@@ -100,12 +100,12 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   void Prolongate(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<arg.out.Volume()/2; x_cb++) {
+      for (int x_cb=0; x_cb<arg.out.VolumeCB(); x_cb++) {
 
-        int x = parity*arg.out.Volume()/2 + x_cb;
+        int x = parity*arg.out.VolumeCB() + x_cb;
         int x_coarse = arg.geo_map[x];
-        int parity_coarse = (x_coarse >= arg.in.Volume()/2) ? 1 : 0;
-        int x_coarse_cb = x_coarse - parity_coarse*arg.in.Volume()/2;
+        int parity_coarse = (x_coarse >= arg.in.VolumeCB()) ? 1 : 0;
+        int x_coarse_cb = x_coarse - parity_coarse*arg.in.VolumeCB();
 
         if(fineSpin == 1)//staggered top level
         {
@@ -129,7 +129,7 @@ namespace quda {
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity=threadIdx.y; //parity is within the block
-    if (x_cb >= arg.out.Volume()/2) return;
+    if (x_cb >= arg.out.VolumeCB()) return;
 
     int x = parity*arg.out.Volume()/2 + x_cb;
     int x_coarse = arg.geo_map[x];
@@ -161,7 +161,7 @@ namespace quda {
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.out.Volume()/2; } // fine parity is the block y dimension
+    unsigned int minThreads() const { return arg.out.VolumeCB(); } // fine parity is the block y dimension
 
   public:
     ProlongateLaunch(Arg &arg, const ColorSpinorField &fine, const ColorSpinorField &coarse, 
@@ -194,13 +194,13 @@ namespace quda {
 
     void initTuneParam(TuneParam &param) const {
       Tunable::initTuneParam(param);
-      param.grid = dim3( ((arg.out.Volume()/2)+param.block.x-1) / param.block.x, 1, 1);
+      param.grid = dim3( ((arg.out.VolumeCB())+param.block.x-1) / param.block.x, 1, 1);
     }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
       Tunable::defaultTuneParam(param);
-      param.grid = dim3( ((arg.out.Volume()/2)+param.block.x-1) / param.block.x, 1, 1);
+      param.grid = dim3( ((arg.out.VolumeCB())+param.block.x-1) / param.block.x, 1, 1);
     }
 
     long long bytes() const {
@@ -258,8 +258,12 @@ namespace quda {
 
     if (in.Nspin() == 2) {
       Prolongate<Float,fineSpin,fineColor,2,order>(out, in, v, nVec, fine_to_coarse, spin_map);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (in.Nspin() == 1) {
+      Prolongate<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, spin_map);
+#endif
     } else {
-      errorQuda("Coarse spin != 2 is not supported (%d)", in.Nspin());
+      errorQuda("Coarse spin %d is not supported", in.Nspin());
     }
   }
 
@@ -288,8 +292,10 @@ namespace quda {
       Prolongate<Float,4,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Nspin() == 2) {
       Prolongate<Float,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+#ifdef GPU_STAGGERED_DIRAC
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+#endif
     } else {
       errorQuda("Unsupported nSpin %d", out.Nspin());
     }

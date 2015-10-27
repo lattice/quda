@@ -7,7 +7,7 @@ namespace quda {
 
   /** This is the template driver for extractGhost */
   template <typename Float, int Nc>
-    void extractGhost(const GaugeField &u, Float **Ghost) {    
+    void extractGhostMG(const GaugeField &u, Float **Ghost) {
 
     const int length = 2*Nc*Nc;
 
@@ -35,16 +35,16 @@ namespace quda {
 
   /** This is the template driver for extractGhost */
   template <typename Float>
-    void extractGhost(const GaugeField &u, Float **Ghost) {
+    void extractGhostMG(const GaugeField &u, Float **Ghost) {
 
     if (u.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Reconstruct %d not supported", u.Reconstruct());
 
-    if (u.LinkType() != QUDA_GENERAL_LINKS)
+    if (u.LinkType() != QUDA_COARSE_LINKS)
       errorQuda("Link type %d not supported", u.LinkType());
 
     if (u.Ncolor() == 4) {
-      extractGhost<Float, 4>(u, Ghost);
+      extractGhostMG<Float, 4>(u, Ghost);
     } else {
       errorQuda("Ncolor = %d not supported", u.Ncolor());
     }
@@ -53,9 +53,9 @@ namespace quda {
   void extractGaugeGhostMG(const GaugeField &u, void **ghost) {
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-      extractGhost(u, (double**)ghost);
+      extractGhostMG(u, (double**)ghost);
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
-      extractGhost(u, (float**)ghost);
+      extractGhostMG(u, (float**)ghost);
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }

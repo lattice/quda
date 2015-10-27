@@ -193,7 +193,8 @@ namespace quda {
 
       transfer->R(*r_coarse, *tmp1);
       transfer->P(*tmp2, *r_coarse);
-      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P^\\dagger P v_k = %e\n", 
+
+      printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
 		 i, blas::norm2(*tmp1), blas::norm2(*r_coarse), blas::norm2(*tmp2));
 
       deviation = blas::xmyNorm(*tmp1, *tmp2);
@@ -233,27 +234,35 @@ namespace quda {
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     blas::zero(*tmp_coarse);
     blas::zero(*r_coarse);
-    #if 1
+#if 1
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
-    #else
+#else
     for(int s = 0; s < tmp_coarse->Nspin(); s++)
       for(int c=0; c < tmp_coarse->Ncolor(); c++) 
 	tmp_coarse->Source(QUDA_POINT_SOURCE,0,s,c);
-    #endif
+#endif
     transfer->P(*tmp1, *tmp_coarse);
     param.matResidual(*tmp2,*tmp1);	
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
-    #if 0
-    if(param.level == 0) {
-      printfQuda("x_coarse\n");
-      //static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(0);
-      for (int x=0; x<x_coarse->Volume(); x++) if(x<2) static_cast<cpuColorSpinorField*>(x_coarse)->PrintVector(x);
-      printfQuda("r_coarse\n");
-      for (int x=0; x<r_coarse->Volume(); x++) if(x<2) static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(x);
-      //static_cast<cpuColorSpinorField*>(r_coarse)->PrintVector(0);
+#if 0 // enable to print out emualted and actual coarse-grid operator vectors for bebugging
+    {
+      printfQuda("emulated\n");
+      ColorSpinorParam param(*x_coarse);
+      param.location = QUDA_CPU_FIELD_LOCATION;
+      param.create = QUDA_NULL_FIELD_CREATE;
+      param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+
+      cpuColorSpinorField *v1 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(param));
+      *v1 = *x_coarse;
+      for (int x=0; x<x_coarse->Volume(); x++) v1->PrintVector(x);
+
+      printfQuda("actual\n");
+      cpuColorSpinorField *v2 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(param));
+      *v2 = *r_coarse;
+      for (int x=0; x<r_coarse->Volume(); x++) v2->PrintVector(x);
     }
-    #endif
+#endif
 
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
     deviation = blas::xmyNorm(*x_coarse, *r_coarse);
@@ -282,6 +291,7 @@ namespace quda {
 
       (*presmoother)(x, b);
 
+#if 1
       // FIXME - residual computation should be in the previous smoother
       param.matResidual(*r, x);
       double r2 = blas::xmyNorm(b, *r);
@@ -313,6 +323,7 @@ namespace quda {
 	printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
 		   blas::norm2(x), blas::norm2(*r));
       }
+#endif
 
       // do the post smoothing
       (*postsmoother)(x,b);
@@ -368,8 +379,8 @@ namespace quda {
 	ColorSpinorField *tmp = ColorSpinorField::Create(csParam);
 	for (int s=i; s<4; s+=2) {
 	  for (int c=0; c<B[i]->Ncolor(); c++) {
-	    tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
-	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, 2);
+            tmp->Source(QUDA_CONSTANT_SOURCE, 1, s, c);
+	    //tmp->Source(QUDA_SINUSOIDAL_SOURCE, 3, s, 2); // sin in dim 3, mode s, offset = 2
 	    blas::xpy(*tmp,*B[i]);
 	  }
 	}

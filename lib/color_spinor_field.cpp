@@ -39,9 +39,11 @@ namespace quda {
 
   void ColorSpinorField::createGhostZone() {
 
-    if (!createSpinorGhost) {
+    if (!createSpinorGhost || typeid(*this) == typeid(cpuColorSpinorField)) {
       total_length = length;
-      total_norm_length = 2*stride;
+      total_norm_length = (precision == QUDA_HALF_PRECISION) ? 2*stride : 0;
+      ghost_length = 0;
+      ghost_norm_length = 0;
       return;
     }
 
@@ -119,13 +121,11 @@ namespace quda {
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       total_length = length + 2*ghost_length; // 2 ghost zones in a full field
-      total_norm_length = 2*(stride + ghost_norm_length); // norm length = 2*stride
+      total_norm_length = (precision == QUDA_HALF_PRECISION) ? 2*(stride + ghost_norm_length) : 0; // norm length = 2*stride
     } else {
       total_length = length + ghost_length;
       total_norm_length = (precision == QUDA_HALF_PRECISION) ? stride + ghost_norm_length : 0; // norm length = stride
     }
-
-    if (precision != QUDA_HALF_PRECISION) total_norm_length = 0;
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
       printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
@@ -182,7 +182,7 @@ namespace quda {
     createGhostZone();
 
     bytes = total_length * precision; // includes pads and ghost zones
-    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
+    bytes = (siteSubset == QUDA_FULL_SITE_SUBSET && fieldOrder != QUDA_QDPJIT_FIELD_ORDER) ? 2*ALIGNMENT_ADJUST(bytes/2) : ALIGNMENT_ADJUST(bytes);
 
     norm_bytes = total_norm_length * sizeof(float);
     norm_bytes = (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(norm_bytes/2) : ALIGNMENT_ADJUST(norm_bytes);
