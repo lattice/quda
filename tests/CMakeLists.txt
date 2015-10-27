@@ -52,7 +52,7 @@ target_link_libraries(blas_test ${TEST_LIBS})
 
 if(${BUILD_FATLINK} OR ${BUILD_HISQLINK})
   cuda_add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)
-  target_link_libraries(staggered_dslash_test ${TEST_LIBS})
+  target_link_libraries(llfat_test ${TEST_LIBS})
 endif()
 
 if(${BUILD_HISQLINK})
