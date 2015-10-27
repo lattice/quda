@@ -306,7 +306,7 @@ namespace quda {
       }
 
       dim3 blockDim_ll(2*BLOCK_DIM, 1, 1);
-      dim3 halfGridDim_ll((Vh+blockDim.x-1)/blockDim_ll.x,1,1);
+      dim3 halfGridDim_ll((Vh+blockDim_ll.x-1)/blockDim_ll.x,1,1);
 
       llfat_kernel_param_t kparam;
       llfat_kernel_param_t kparam_1g;
