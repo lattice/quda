@@ -1,5 +1,6 @@
 #include <string.h>
 #include <multigrid.h>
+#include <algorithm>
 
 namespace quda {
 
@@ -61,6 +62,7 @@ namespace quda {
     gParam.nDim = ndim;
     gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+    gParam.nFace = 1;
 
     gParam.geometry = QUDA_VECTOR_GEOMETRY;
     Y_h = new cpuGaugeField(gParam);
@@ -73,10 +75,13 @@ namespace quda {
     if (enable_gpu) {
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
       gParam.geometry = QUDA_VECTOR_GEOMETRY;
+      int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2],x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
+      gParam.pad = gParam.nFace * pad;
       Y_d = new cudaGaugeField(gParam);
       Y_d->copy(*Y_h);
 
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
+      gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       X_d = new cudaGaugeField(gParam);
       X_d->copy(*X_h);
     }
