@@ -3323,7 +3323,7 @@ namespace quda {
       gParam.create = QUDA_NULL_FIELD_CREATE;
       gParam.reconstruct = QUDA_RECONSTRUCT_NO;
       gParam.geometry = QUDA_SCALAR_GEOMETRY; // only require a scalar matrix field for the staple
-      gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+      gParam.setPrecision(gParam.precision);
 #ifdef MULTI_GPU
       if(method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME) gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
 #else
@@ -3398,7 +3398,6 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   // create the host fatlink
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.order = QUDA_MILC_GAUGE_ORDER;
   gParam.gauge = fatlink;
   cpuGaugeField cpuFatLink(gParam);
   gParam.gauge = longlink;
@@ -3406,31 +3405,26 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
   gParam.gauge = ulink;
   cpuGaugeField cpuUnitarizedLink(gParam);
 
+  // create the host sitelink
+  gParam.link_type = param->type;
+  gParam.gauge     = inlink;
+  cpuGaugeField cpuInLink(gParam);
+
   // create the device fatlink 
   gParam.pad    = param->llfat_ga_pad;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.link_type = QUDA_GENERAL_LINKS;
-  gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
+  gParam.setPrecision(param->cuda_prec);
   cudaFatLink = new cudaGaugeField(gParam);
+  if(ulink) cudaUnitarizedLink = new cudaGaugeField(gParam);
   if(longlink) cudaLongLink = new cudaGaugeField(gParam);
-  if(ulink){
-    cudaUnitarizedLink = new cudaGaugeField(gParam);
-  }
-  // create the host sitelink  
-  gParam.pad = 0; 
-  gParam.create    = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.link_type = param->type;
-  gParam.order = QUDA_MILC_GAUGE_ORDER;
-  gParam.gauge     = inlink;
-  cpuGaugeField cpuInLink(gParam);
 
-
+  gParam.reconstruct = param->reconstruct;
+  gParam.setPrecision(param->cuda_prec);
   gParam.pad         = param->site_ga_pad;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.link_type   = param->type;
-  gParam.reconstruct = param->reconstruct;    
-  gParam.order       = (param->reconstruct == QUDA_RECONSTRUCT_12) ? QUDA_FLOAT4_GAUGE_ORDER : QUDA_FLOAT2_GAUGE_ORDER;
   cudaGaugeField* cudaInLink = new cudaGaugeField(gParam);
 
   if(method == QUDA_COMPUTE_FAT_EXTENDED_VOLUME){
@@ -3463,7 +3457,7 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
     copyExtendedGauge(*cudaInLinkEx, *cudaInLink, QUDA_CUDA_FIELD_LOCATION);
 #ifdef MULTI_GPU
     int R[4] = {2, 2, 2, 2}; 
-    cudaInLinkEx->exchangeExtendedGhost(R,true); // instead of exchange_cpu_sitelink_ex 
+    cudaInLinkEx->exchangeExtendedGhost(R,true);
 #endif
     profileFatLink.TPSTOP(QUDA_PROFILE_COMMS);
   } // Initialise and load siteLinks

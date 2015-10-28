@@ -44,6 +44,10 @@ namespace quda {
 
       }
 
+      if (cudaLongLink->Reconstruct() != QUDA_RECONSTRUCT_NO) {
+	errorQuda("Long-link must have no reconstruction set");
+      }
+
       int nStream=9;
       cudaStream_t stream[nStream];
       for(int i = 0;i < nStream; i++){
@@ -71,7 +75,7 @@ namespace quda {
         errorQuda("Multi-GPU long-link calculation requires extended gauge field\n");
 #else 
       if(cudaLongLink)
-        computeLongLinkCuda((void*)cudaLongLink->Even_p(), (void*)cudaLongLink->Odd_p(),
+        computeLongLinkCuda((void*)cudaLongLink->Even_p(), (void*)cudaLongLink->Odd_p()
             (const void*)cudaSiteLink.Even_p(), (const void*)cudaSiteLink.Odd_p(),
             act_path_coeff[1], recon, prec, halfGridDim, kparam);
 #endif
