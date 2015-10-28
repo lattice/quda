@@ -244,6 +244,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
   // this flags that we are using QUDA to create the HISQ links
   create_quda_gauge = true;
+  qudamilc_called<false>(__func__);
 }
 
 
@@ -270,6 +271,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
   // this flags that we are using QUDA to create the HISQ links
   create_quda_gauge = true;
+  qudamilc_called<false>(__func__);
 }
 
 #endif
