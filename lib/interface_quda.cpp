@@ -2290,7 +2290,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.mass_normalization   = QUDA_KAPPA_NORMALIZATION;
    inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
    //
-   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
+   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
    inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
 
    inv_param.inv_type_precondition = QUDA_INVALID_INVERTER;
@@ -2371,7 +2371,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    ColorSpinorParam xParam(csParam, inv_param);
    xParam.create     = QUDA_COPY_FIELD_CREATE;
 
-   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+   //profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 
    // Generate sources and launch bicgstab for each source:
    for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec)
@@ -2397,7 +2397,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
      SolverParam solverParam(inv_param);
      solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
-     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+     Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mPre, profileInvert);
      (*solve)(*out, *in);
      solverParam.updateInvertParam(inv_param);
      delete solve;
@@ -2445,7 +2445,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
-  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+  //profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
   return;
 }

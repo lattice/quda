@@ -95,7 +95,7 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+//      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
       warningQuda("inverting on zero-field source\n");
       if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
