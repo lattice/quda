@@ -85,12 +85,12 @@ void inline qudamilc_called(const char * func){
 
 void qudaInit(QudaInitArgs_t input)
 {
-  qudamilc_called<true>(__func__);
   if(initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
+  qudamilc_called<true>(__func__);
   qudaSetLayout(input.layout);
   initialized = true;
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
 
 }
 
@@ -98,7 +98,7 @@ void qudaFinalize()
 {
   qudamilc_called<true>(__func__);
   endQuda();
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
 }
 
 /**
@@ -244,6 +244,7 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
   // this flags that we are using QUDA to create the HISQ links
   create_quda_gauge = true;
+  qudamilc_called<false>(__func__);
 }
 
 
@@ -270,6 +271,7 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
   // this flags that we are using QUDA to create the HISQ links
   create_quda_gauge = true;
+  qudamilc_called<false>(__func__);
 }
 
 #endif
