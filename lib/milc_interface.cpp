@@ -85,12 +85,12 @@ void inline qudamilc_called(const char * func){
 
 void qudaInit(QudaInitArgs_t input)
 {
-  qudamilc_called<true>(__func__);
   if(initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
+  qudamilc_called<true>(__func__);
   qudaSetLayout(input.layout);
   initialized = true;
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
 
 }
 
@@ -98,7 +98,7 @@ void qudaFinalize()
 {
   qudamilc_called<true>(__func__);
   endQuda();
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
 }
 
 /**
