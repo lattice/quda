@@ -75,7 +75,7 @@ namespace quda {
         errorQuda("Multi-GPU long-link calculation requires extended gauge field\n");
 #else 
       if(cudaLongLink)
-        computeLongLinkCuda((void*)cudaLongLink->Even_p(), (void*)cudaLongLink->Odd_p()
+        computeLongLinkCuda((void*)cudaLongLink->Even_p(), (void*)cudaLongLink->Odd_p(),
             (const void*)cudaSiteLink.Even_p(), (const void*)cudaSiteLink.Odd_p(),
             act_path_coeff[1], recon, prec, halfGridDim, kparam);
 #endif
