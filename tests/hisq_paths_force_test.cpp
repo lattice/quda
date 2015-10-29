@@ -537,7 +537,6 @@ hisq_force_end()
   static int 
 hisq_force_test(void)
 {
-  tune = false;
   if (tune) setTuning(QUDA_TUNE_YES);
   setVerbosity(QUDA_VERBOSE);
 

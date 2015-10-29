@@ -40,6 +40,17 @@ namespace quda {
   void unitarizeLinksQuda(cudaGaugeField& outfield, int *fails);
   
   bool isUnitary(const cpuGaugeField& field, double max_error);
+
+  /**
+   * @brief Project the input gauge field onto the SU(3) group.  This
+   * is a destructive operation.  The number of link failures is
+   * reported so appropriate action can be taken.
+   *
+   * @param U Gauge field that we are projecting onto SU(3)
+   * @param tol Tolerance to which the iterative algorithm works
+   * @param fails Number of link failures (device pointer)
+   */
+  void projectSU3(cudaGaugeField &U, double tol, int *fails);
   
 } // namespace quda
 

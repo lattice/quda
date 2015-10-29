@@ -10,6 +10,7 @@
 #include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
+#include "malloc_quda.h"
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
@@ -70,44 +71,20 @@ llfat_test(int test)
      | QUDA_FAT_PRESERVE_COMM_MEM;
      */
   qudaGaugeParam.preserve_gauge =0;
-  void* fatlink;
-  if (cudaMallocHost((void**)&fatlink, 4*V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
-    errorQuda("ERROR: cudaMallocHost failed for fatlink\n");
-  }
-
-  void* longlink;
-  if (cudaMallocHost((void**)&longlink, 4*V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
-    errorQuda("ERROR: cudaMallocHost failed for longlink\n");
-  } // page-locked memory
+  void* fatlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
+  void* longlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
 
   void* sitelink[4];
-  for(int i=0;i < 4;i++){
-    if (cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*gSize) == cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for sitelink\n");
-    }
-  }
+  for(int i=0;i < 4;i++) sitelink[i] = pinned_malloc(V*gaugeSiteSize*gSize);
 
   void* sitelink_ex[4];
-  for(int i=0;i < 4;i++){
-    if (cudaMallocHost((void**)&sitelink_ex[i], V_ex*gaugeSiteSize*gSize) ==  cudaErrorMemoryAllocation) {
-      errorQuda("ERROR: cudaMallocHost failed for sitelink_ex\n");
-    }
-  }
-
+  for(int i=0;i < 4;i++) sitelink_ex[i] = pinned_malloc(V_ex*gaugeSiteSize*gSize);
 
   void* milc_sitelink;
-  milc_sitelink = (void*)malloc(4*V*gaugeSiteSize*gSize);
-  if(milc_sitelink == NULL){
-    errorQuda("ERROR: allocating milc_sitelink failed\n");
-  }
+  milc_sitelink = (void*)safe_malloc(4*V*gaugeSiteSize*gSize);
 
   void* milc_sitelink_ex;
-  milc_sitelink_ex = (void*)malloc(4*V_ex*gaugeSiteSize*gSize);
-  if(milc_sitelink_ex == NULL){
-    errorQuda("Error: allocating milc_sitelink failed\n");
-  }
-
-
+  milc_sitelink_ex = (void*)safe_malloc(4*V_ex*gaugeSiteSize*gSize);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
 
@@ -184,14 +161,7 @@ llfat_test(int test)
   //the first one is for creating the cpu/cuda data structures
   struct timeval t0, t1;
 
-
-  void** sitelink_ptr; 
   QudaComputeFatMethod method = (test) ? QUDA_COMPUTE_FAT_EXTENDED_VOLUME : QUDA_COMPUTE_FAT_STANDARD;
-  if(gauge_order == QUDA_QDP_GAUGE_ORDER){
-    sitelink_ptr = (test) ? (void**)sitelink_ex : (void**)sitelink;
-  }else{
-    sitelink_ptr = (test) ? (void**)milc_sitelink_ex : (void**)milc_sitelink;
-  }
   void* longlink_ptr = longlink;
 #ifdef MULTI_GPU
   if(!test) longlink_ptr = NULL; // Have to have an extended volume for the long-link calculation
@@ -201,18 +171,13 @@ llfat_test(int test)
   computeKSLinkQuda(fatlink, longlink_ptr, NULL, milc_sitelink, act_path_coeff, &qudaGaugeParam, method);
   gettimeofday(&t1, NULL);
 
-
   double secs = TDIFF(t0,t1);
 
   void* fat_reflink[4];
   void* long_reflink[4];
   for(int i=0;i < 4;i++){
-    fat_reflink[i] = malloc(V*gaugeSiteSize*gSize);
-    if(fat_reflink[i] == NULL){
-      errorQuda("ERROR; allocate fat_reflink[%d] failed\n", i);
-    }
-    long_reflink[i] = malloc(V*gaugeSiteSize*gSize);
-    if(long_reflink[i] == NULL) errorQuda("ERROR; allocate long_reflink[%d] failed\n", i);
+    fat_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
+    long_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
   }
 
   if (verify_results){
@@ -236,11 +201,7 @@ llfat_test(int test)
     // so it is 3*2*Vs_t
     int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
     for(int i=0;i < 4; i++){
-      ghost_sitelink[i] = malloc(8*Vs[i]*gaugeSiteSize*gSize);
-      if (ghost_sitelink[i] == NULL){
-        printf("ERROR: malloc failed for ghost_sitelink[%d] \n",i);
-        exit(1);
-      }
+      ghost_sitelink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
     }
 
     /*
@@ -266,11 +227,7 @@ llfat_test(int test)
               break;
             }
           }
-          ghost_sitelink_diag[nu*4+mu] = malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-          if(ghost_sitelink_diag[nu*4+mu] == NULL){
-            errorQuda("malloc failed for ghost_sitelink_diag\n");
-          }
-
+          ghost_sitelink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
           memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
         }
 
@@ -280,7 +237,6 @@ llfat_test(int test)
     exchange_cpu_sitelink(qudaGaugeParam.X, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
     llfat_reference_mg(fat_reflink, sitelink, ghost_sitelink, ghost_sitelink_diag, qudaGaugeParam.cpu_prec, coeff);
   
-
     {
       int R[4] = {2,2,2,2};
       exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, sitelink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
@@ -297,16 +253,8 @@ llfat_test(int test)
   void* myfatlink[4];
   void* mylonglink[4];
   for(int i=0;i < 4;i++){
-    myfatlink[i] = malloc(V*gaugeSiteSize*gSize);
-    if(myfatlink[i] == NULL){
-      printf("Error: malloc failed for myfatlink[%d]\n", i);
-      exit(1);
-    }
-    mylonglink[i] = malloc(V*gaugeSiteSize*gSize);
-    if(mylonglink[i] == NULL){
-      printf("Error: malloc failed for mylonglink[%d]\n", i);
-      exit(1);
-    }
+    myfatlink[i] = safe_malloc(V*gaugeSiteSize*gSize);
+    mylonglink[i] = safe_malloc(V*gaugeSiteSize*gSize);
     memset(myfatlink[i], 0, V*gaugeSiteSize*gSize);
     memset(mylonglink[i], 0, V*gaugeSiteSize*gSize);
   }
@@ -370,35 +318,32 @@ llfat_test(int test)
 
 
   for(int i=0;i < 4;i++){
-    free(myfatlink[i]);
+    host_free(myfatlink[i]);
+    host_free(mylonglink[i]);
   }
 
 #ifdef MULTI_GPU
   if (verify_results){
-    int i;
-    for(i=0;i < 4;i++){
-      free(ghost_sitelink[i]);
-    }
-    for(i=0;i <4; i++){
+    for(int i=0; i<4; i++){
+      host_free(ghost_sitelink[i]);
       for(int j=0;j <4; j++){
-        if (i==j){
-          continue;
-        }
-        free(ghost_sitelink_diag[i*4+j]);
+        if (i==j) continue;
+        host_free(ghost_sitelink_diag[i*4+j]);
       }
     }
   }
 #endif
 
   for(int i=0;i < 4; i++){
-    cudaFreeHost(sitelink[i]);
-    cudaFreeHost(sitelink_ex[i]);
-    free(fat_reflink[i]);
+    host_free(sitelink[i]);
+    host_free(sitelink_ex[i]);
+    host_free(fat_reflink[i]);
+    host_free(long_reflink[i]);
   }
-  cudaFreeHost(fatlink);
-  cudaFreeHost(longlink);
-  if(milc_sitelink) free(milc_sitelink);
-  if(milc_sitelink_ex) free(milc_sitelink_ex);
+  host_free(fatlink);
+  host_free(longlink);
+  if(milc_sitelink) host_free(milc_sitelink);
+  if(milc_sitelink_ex) host_free(milc_sitelink_ex);
 #ifdef MULTI_GPU
   exchange_llfat_cleanup();
 #endif

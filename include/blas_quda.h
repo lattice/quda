@@ -32,6 +32,7 @@ namespace quda {
   void copyCuda(cudaColorSpinorField &dst, const cudaColorSpinorField &src);
 
   double axpyNormCuda(const double &a, cudaColorSpinorField &x, cudaColorSpinorField &y);
+  double norm1Cuda(const cudaColorSpinorField &b);
   double normCuda(const cudaColorSpinorField &b);
   double reDotProductCuda(cudaColorSpinorField &a, cudaColorSpinorField &b);
   void reDotProductCuda(double* result, std::vector<cudaColorSpinorField*>& a, std::vector<cudaColorSpinorField*>& b);

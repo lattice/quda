@@ -29,6 +29,12 @@ char *getPrintBuffer();
 
 // Note that __func__ is part of C++11 and has long been supported by GCC.
 
+#define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0)
+#define printfZero(...)	do {						\
+    if (threadIdx.x + blockDim.x*blockIdx.x==0) printf(__VA_ARGS__);	\
+  } while (0)
+
+
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \

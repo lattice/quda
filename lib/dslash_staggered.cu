@@ -133,7 +133,7 @@ namespace quda {
       dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
     }
     void *gauge0, *gauge1;
-    bindFatGaugeTex(gauge, parity, &gauge0, &gauge1);
+    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
 
     if (in->Precision() != gauge.Precision()) {
       errorQuda("Mixing precisions gauge=%d and spinor=%d not supported",
@@ -173,7 +173,7 @@ namespace quda {
     delete dslashImp;
 
     delete dslash;
-    unbindFatGaugeTex(gauge);
+    unbindGaugeTex(gauge);
 
     checkCudaError();
 

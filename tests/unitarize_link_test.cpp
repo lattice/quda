@@ -32,6 +32,8 @@ extern void usage(char** argv);
 
 extern int device;
 
+extern bool tune;
+
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
 static bool reunit_svd_only  = false;
@@ -63,7 +65,7 @@ unitarize_link_test()
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
   initQuda(device);
-  setTuning(QUDA_TUNE_YES);
+  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
 
   cpu_prec = prec;
   gSize = cpu_prec;  

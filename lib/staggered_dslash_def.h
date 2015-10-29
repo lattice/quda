@@ -721,8 +721,13 @@
 #define FATLINK0TEX param.gauge0Tex
 #define FATLINK1TEX param.gauge1Tex
 #else
+#if (DD_IMPROVED == 1)
 #define FATLINK0TEX fatGauge0TexDouble
 #define FATLINK1TEX fatGauge1TexDouble
+#else
+#define FATLINK0TEX gauge0TexDouble2
+#define FATLINK1TEX gauge1TexDouble2
+#endif
 #endif // USE_TEXTURE_OBJECTS
 #endif
 
@@ -801,8 +806,18 @@
 #define FATLINK0TEX param.gauge0Tex
 #define FATLINK1TEX param.gauge1Tex
 #else
+#if (DD_IMPROVED == 1)
 #define FATLINK0TEX fatGauge0TexSingle
 #define FATLINK1TEX fatGauge1TexSingle
+#else
+#if (DD_FAT_RECON == 18)
+#define FATLINK0TEX gauge0TexSingle2
+#define FATLINK1TEX gauge1TexSingle2
+#else
+#define FATLINK0TEX gauge0TexSingle4
+#define FATLINK1TEX gauge1TexSingle4
+#endif
+#endif // DD_IMPROVED
 #endif
 #else
 #define FATLINK0TEX fatGauge0
@@ -890,8 +905,20 @@
 #define LONGPHASE0TEX param.longPhase0Tex
 #define LONGPHASE1TEX param.longPhase1Tex
 #else
+
+#if (DD_IMPROVED == 1)
 #define FATLINK0TEX fatGauge0TexHalf
 #define FATLINK1TEX fatGauge1TexHalf
+#else
+#if (DD_FAT_RECON == 18)
+#define FATLINK0TEX gauge0TexHalf2
+#define FATLINK1TEX gauge1TexHalf2
+#else
+#define FATLINK0TEX gauge0TexHalf4
+#define FATLINK1TEX gauge1TexHalf4
+#endif
+#endif // DD_IMPROVED
+
 #if (DD_LONG_RECON ==18)
 #define LONGLINK0TEX longGauge0TexHalf_norecon
 #define LONGLINK1TEX longGauge1TexHalf_norecon

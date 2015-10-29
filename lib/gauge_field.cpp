@@ -3,13 +3,46 @@
 
 namespace quda {
 
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(),
+    nColor(3),
+    nFace(u.Nface()),
+    reconstruct(u.Reconstruct()),
+    order(u.Order()),
+    fixed(u.GaugeFixed()),
+    link_type(u.LinkType()),
+    t_boundary(u.TBoundary()),
+    anisotropy(u.Anisotropy()),
+    tadpole(u.Tadpole()),
+    scale(u.Scale()),
+    gauge(NULL),
+    create(QUDA_NULL_FIELD_CREATE),
+    geometry(u.Geometry()),
+    pinned(0),
+    compute_fat_link_max(false),
+    ghostExchange(u.GhostExchange()),
+    staggeredPhaseType(u.StaggeredPhase()),
+    staggeredPhaseApplied(u.StaggeredPhaseApplied()),
+    i_mu(u.iMu())
+      {
+	precision = u.Precision();
+	nDim = u.Ndim();
+	pad = u.Pad();
+	siteSubset = QUDA_FULL_SITE_SUBSET;
+
+	for(int dir=0; dir<nDim; ++dir) {
+	  x[dir] = u.X()[dir];
+	  r[dir] = u.X()[dir];
+	}
+      }
+
+
   GaugeField::GaugeField(const GaugeFieldParam &param) :
     LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
     geometry(param.geometry), reconstruct(param.reconstruct), order(param.order), 
     fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
     anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
     create(param.create), ghostExchange(param.ghostExchange), 
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied)
+    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
   {
     if (nColor != 3) errorQuda("nColor must be 3, not %d\n", nColor);
     if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d", nDim);

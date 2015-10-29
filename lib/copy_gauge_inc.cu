@@ -43,6 +43,29 @@ namespace quda {
     }
   }
 
+  /**
+     Check whether the field contains Nans
+  */
+  template <typename Float, int length, typename Arg>
+  void checkNan(Arg arg) {  
+    typedef typename mapper<Float>::type RegType;
+
+    for (int parity=0; parity<2; parity++) {
+
+      for (int d=0; d<arg.geometry; d++) {
+	for (int x=0; x<arg.volume/2; x++) {
+	  RegType u[length];
+	  arg.in.load(u, x, d, parity);
+	  for (int i=0; i<length; i++) 
+	    if (isnan(u[i])) 
+	      errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
+	}
+      }
+
+    }
+  }
+
+
   /** 
       Generic CUDA gauge reordering and packing.  Adopts a similar form as
       the CPU version, using the same inlined functions.
@@ -188,6 +211,10 @@ namespace quda {
     CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder, volume, faceVolumeCB, nDim, geometry);
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
+#ifdef HOST_DEBUG
+      checkNan<FloatIn, length>(arg);
+#endif
+
       if (type == 0 || type == 2) {
 	copyGauge<FloatOut, FloatIn, length>(arg);
       }
