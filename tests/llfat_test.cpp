@@ -10,6 +10,7 @@
 #include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
+#include "malloc_quda.h"
 
 #ifdef MULTI_GPU
 #include "face_quda.h"
