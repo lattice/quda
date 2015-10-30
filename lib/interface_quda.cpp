@@ -5456,6 +5456,7 @@ void plaqQuda (double plq[3])
     data = extendedGaugeResident;
   } else {
     int y[4];
+    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
     for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
     int pad = 0;
     GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
@@ -5465,11 +5466,11 @@ void plaqQuda (double plq[3])
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gaugePrecise->TBoundary();
     gParamEx.nFace = 1;
+    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     
     data = new cudaGaugeField(gParamEx);
     
     copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
     profilePlaq.TPSTOP(QUDA_PROFILE_INIT);  
 
     profilePlaq.TPSTART(QUDA_PROFILE_COMMS);
@@ -5506,6 +5507,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   if (extendedGaugeResident == NULL)
   {
     int y[4];
+    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
     for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
     int pad = 0;
     GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
@@ -5515,11 +5517,11 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gaugePrecise->TBoundary();
     gParamEx.nFace = 1;
+    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
 
     extendedGaugeResident = new cudaGaugeField(gParamEx);
 
     copyExtendedGauge(*extendedGaugeResident, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
     extendedGaugeResident->exchangeExtendedGhost(R,true);
   }
 #endif
