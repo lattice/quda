@@ -27,14 +27,13 @@ struct KernelArg : public ReduceArg<double2> {
     : ReduceArg<double2>(), dataOr(dataOr) {
 #ifdef MULTI_GPU
     for(int dir=0; dir<4; ++dir){
-      if(comm_dim_partitioned(dir)) border[dir] = data.R()[dir];
-      else border[dir] = 0;
+      border[dir] = data.R()[dir];
+      X[dir] = data.X()[dir] - border[dir]*2;
     }
-    for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;
 #else
     for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
-    threads = data.VolumeCB();
+    threads = X[0]*X[1]*X[2]*X[3]/2;
   }
   double2 getValue(){return result_h[0];}
 };
