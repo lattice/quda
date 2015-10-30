@@ -43,7 +43,9 @@ namespace quda {
     if (u.LinkType() != QUDA_COARSE_LINKS)
       errorQuda("Link type %d not supported", u.LinkType());
 
-    if (u.Ncolor() == 48) {
+    if (u.Ncolor() == 4) {
+      extractGhostMG<Float, 4>(u, Ghost);
+    } else if (u.Ncolor() == 48) {
       extractGhostMG<Float, 48>(u, Ghost);
     } else {
       errorQuda("Ncolor = %d not supported", u.Ncolor());
