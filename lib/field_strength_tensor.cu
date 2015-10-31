@@ -334,10 +334,10 @@ namespace quda {
 	  errorQuda("Reconstruction type %d not supported", gauge.Reconstruct());
 	}
       } else {
-	errorQuda("Gauge field order %d not supported", gauge.Precision());
+	errorQuda("Gauge field order %d not supported", gauge.Order());
       }
     } else {
-      errorQuda("Fmunu field order %d not supported", Fmunu.Precision());
+      errorQuda("Fmunu field order %d not supported", Fmunu.Order());
     }
     
   }

@@ -107,25 +107,6 @@ namespace quda {
     q(8) = y31*conj(wl31) + y32*conj(wl32) + y33*conj(wl33);
   }
 
-  /**
-     Direct port of TIFR vmcm2 routine
-     Vector matrix multiply: b = (a^\dag).b
-  */
-  template <typename complex, typename Cmplx>
-  __device__ __host__ void vmcm2(Matrix<Cmplx,3> a, Matrix<Cmplx,3> &b) {
-    complex c[9];
-    c[0] = conj(a(0))*b(0)+conj(a(1))*b(1) + conj(a(2))*b(2);
-    c[3] = conj(a(0))*b(3)+conj(a(1))*b(4) + conj(a(2))*b(5);
-    c[6] = conj(a(0))*b(6)+conj(a(1))*b(7) + conj(a(2))*b(8);
-    c[1] = conj(a(3))*b(0)+conj(a(4))*b(1) + conj(a(5))*b(2);
-    c[4] = conj(a(3))*b(3)+conj(a(4))*b(4) + conj(a(5))*b(5);
-    c[7] = conj(a(3))*b(6)+conj(a(4))*b(7) + conj(a(5))*b(8);
-    c[2] = conj(a(6))*b(0)+conj(a(7))*b(1) + conj(a(8))*b(2);
-    c[5] = conj(a(6))*b(3)+conj(a(7))*b(4) + conj(a(8))*b(5);
-    c[8] = conj(a(6))*b(6)+conj(a(7))*b(7) + conj(a(8))*b(8);
-    for (int i=0; i<9; i++) b(i) = c[i];
-  }
-
   template<typename Cmplx, typename Gauge, typename Mom, int N, 
 	   bool conj_mom, bool exact>
   __device__ __host__  void updateGaugeFieldCompute
@@ -161,7 +142,6 @@ namespace quda {
 	  link = mom * link;
 	} else {
 	  link = conj(mom) * link;
-	  //vmcm2<complex<real> >(mom, link);
 	}
 
 	result = link;

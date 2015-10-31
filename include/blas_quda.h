@@ -24,6 +24,8 @@ namespace quda {
     extern unsigned long long bytes;
 
     double norm2(const ColorSpinorField &a);
+    double norm1(const ColorSpinorField &b);
+  
     void zero(ColorSpinorField &a);
     void copy(ColorSpinorField &dst, const ColorSpinorField &src);
 

@@ -104,6 +104,11 @@ namespace quda {
     cudaEvent_t scatterEnd[Nstream];
     cudaEvent_t dslashStart;
     cudaEvent_t dslashEnd;
+
+
+    // FIX this is a hack from hell
+    // Auxiliary work that can be done while waiting on comms to finis
+    Worker *aux_worker;
   }
 
   void createDslashEvents()
@@ -122,6 +127,8 @@ namespace quda {
 #ifdef PTHREADS
     cudaEventCreateWithFlags(&interiorDslashEnd, cudaEventDisableTiming);
 #endif
+
+    aux_worker = NULL;
 
     checkCudaError();
   }
