@@ -17,10 +17,10 @@ namespace quda {
   namespace gauge {
     
 
-    template<typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order> struct Accessor {
+    template<typename Float, int nColor, QudaGaugeFieldOrder order> struct Accessor {
       mutable complex<Float> dummy;
-      Accessor(const GaugeField &) { }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
+      Accessor(const GaugeField &, void *gauge_=0, void **ghost_=0) { }
+      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
 #ifndef __CUDA_ARCH__
 	errorQuda("Not implemented");
 #endif
@@ -28,10 +28,10 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor, int nSpinCoarse, QudaGaugeFieldOrder order> struct GhostAccessor {
+    template<typename Float, int nColor, QudaGaugeFieldOrder order> struct GhostAccessor {
       mutable complex<Float> dummy;
-      GhostAccessor(const GaugeField &) { }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
+      GhostAccessor(const GaugeField &, void *gauge_=0, void **ghost_=0) { }
+      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const {
 #ifndef __CUDA_ARCH__
 	errorQuda("Not implemented");
 #endif
@@ -39,34 +39,47 @@ namespace quda {
       }
     };
 
-    template<typename Float, int nColor, int nSpinCoarse>
-      struct Accessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> {
+    template<typename Float, int nColor>
+      struct Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> {
       complex <Float> *u[QUDA_MAX_DIM];
       const size_t cb_offset;
-    Accessor(const GaugeField &U) : cb_offset((U.Bytes()>>1) / (sizeof(complex<Float>)*U.Geometry())) {
+    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      : cb_offset((U.Bytes()>>1) / (sizeof(complex<Float>)*U.Geometry())) {
 	for (int d=0; d<U.Geometry(); d++)
-	  u[d] = static_cast<complex<Float>**>(const_cast<void*>(U.Gauge_p()))[d]; 
+	  u[d] = gauge_ ? static_cast<complex<Float>**>(gauge_)[d] :
+	    static_cast<complex<Float>**>(const_cast<void*>(U.Gauge_p()))[d];
       }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+    Accessor(const Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> &a) : cb_offset(a.cb_offset) {
+	for (int d=0; d<QUDA_MAX_DIM; d++)
+	  u[d] = a.u[d];
+      }
+      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
     };
 
-    template<typename Float, int nColor, int nSpinCoarse>
-      struct GhostAccessor<Float,nColor,nSpinCoarse,QUDA_QDP_GAUGE_ORDER> {
+    template<typename Float, int nColor>
+      struct GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> {
       complex<Float> *ghost[4];
       int ghostOffset[4];
-      GhostAccessor(const GaugeField &U) {
+      GhostAccessor(const GaugeField &U, void *gauge_=0, void **ghost_=0) {
 	for (int d=0; d<4; d++) {
-	  ghost[d] = static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
+	  ghost[d] = ghost_ ? static_cast<complex<Float>*>(ghost_[d]) :
+	    static_cast<complex<Float>*>(const_cast<void*>(U.Ghost()[d]));
 	  ghostOffset[d] = U.Nface()*U.SurfaceCB(d)*U.Ncolor()*U.Ncolor();
 	}
       }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      GhostAccessor(const GhostAccessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> &a) {
+	for (int d=0; d<4; d++) {
+	  ghost[d] = a.ghost[d];
+	  ghostOffset[d] = a.ghostOffset[d];
+	}
+      }
+      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col]; }
     };
 
     template<int nColor, int N>
-      __device__ __host__ inline int indexFloatN(int dir, int parity, int x_cb, int row, int col, int stride, int offset_cb) {
+      __device__ __host__ int indexFloatN(int dir, int parity, int x_cb, int row, int col, int stride, int offset_cb) {
       const int M = (2*nColor*nColor) / N;
       int j = ((row*nColor+col)*2) / N; // factor of two for complexity
       int i = ((row*nColor+col)*2) % N;
@@ -75,25 +88,30 @@ namespace quda {
       return index;
     };
 
-    template<typename Float, int nColor, int nSpinCoarse>
-      struct Accessor<Float,nColor,nSpinCoarse,QUDA_FLOAT2_GAUGE_ORDER> {
-      complex <Float> *u;
+    template<typename Float, int nColor>
+      struct Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> {
+      complex<Float> *u;
       const size_t cb_offset;
       const int stride;
-    Accessor(const GaugeField &U)
-      : u(static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
+    Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
+      : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
+	  static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
 	cb_offset( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride())
 	{  }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a): u(a.u), cb_offset(a.cb_offset), stride(a.stride) {  }
+      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return u[indexFloatN<nColor,QUDA_FLOAT2_GAUGE_ORDER>(d, parity, x, row, col, stride, cb_offset)]; }
     };
 
-    template<typename Float, int nColor, int nSpinCoarse>
-      struct GhostAccessor<Float,nColor,nSpinCoarse,QUDA_FLOAT2_GAUGE_ORDER> {
+    template<typename Float, int nColor>
+      struct GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> {
       const int volumeCB;
-      Accessor<Float,nColor,nSpinCoarse,QUDA_FLOAT2_GAUGE_ORDER> accessor;
-    GhostAccessor(const GaugeField &U) : volumeCB(U.VolumeCB()), accessor(U) {  }
-      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> accessor;
+    GhostAccessor(const GaugeField &U, void *gauge_, void **ghost_=0)
+      : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_) {  }
+    GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
+      : volumeCB(a.volumeCB), accessor(a.accessor) {  }
+      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return accessor(d, parity, x+volumeCB, row, col); }
     };
 
@@ -111,25 +129,28 @@ namespace quda {
 	const int volumeCB;
 	const int nDim;
 	const int geometry;
-	static const int nColorCoarse = nColor / nSpinCoarse;
+	static constexpr int nColorCoarse = nColor / nSpinCoarse;
 
-	complex<Float> **u;
-	
-	const Accessor<Float,nColor,nSpinCoarse,order> accessor;
-	const GhostAccessor<Float,nColor,nSpinCoarse,order> ghostAccessor;
+	const Accessor<Float,nColor,order> accessor;
+	const GhostAccessor<Float,nColor,order> ghostAccessor;
 
       public:
 	/** 
 	 * Constructor for the FieldOrder class
 	 * @param field The field that we are accessing
 	 */
-      FieldOrder(GaugeField &U) : volumeCB(U.VolumeCB()),
-	  nDim(U.Ndim()), geometry(U.Geometry()),
-	  u(static_cast<complex<Float>**>(U.Gauge_p())), accessor(U), ghostAccessor(U)
+      FieldOrder(GaugeField &U, void *gauge_=0, void **ghost_=0)
+      : volumeCB(U.VolumeCB()), nDim(U.Ndim()), geometry(U.Geometry()),
+	  accessor(U, gauge_, ghost_), ghostAccessor(U, gauge_, ghost_)
 	{
 	  if (U.Reconstruct() != QUDA_RECONSTRUCT_NO) 
 	    errorQuda("GaugeField ordering not supported with reconstruction");
 	}
+
+      FieldOrder(const FieldOrder &o) : volumeCB(o.volumeCB),
+	  nDim(o.nDim), geometry(o.geometry),
+	  accessor(o.accessor), ghostAccessor(o.ghostAccessor)
+	{ }
 	
 	virtual ~FieldOrder() { ; } 
     
