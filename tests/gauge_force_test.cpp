@@ -520,16 +520,20 @@ gauge_force_test(void)
   if (tune) {
     printfQuda("Tuning...\n");
     setTuning(QUDA_TUNE_YES);
+    computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
+			  loop_coeff_d, num_paths, max_length, eb3,
+			  &qudaGaugeParam);
+    memcpy(mom, refmom, 4*V*momSiteSize*gSize); // restore initial momentum for correctness
+    printfQuda("...done\n");
   }
-  
+
   struct timeval t0, t1;
-  double timeinfo[3];
   /* Multiple execution to exclude warmup time in the first run*/
   for (int i =0;i < attempts; i++){
     gettimeofday(&t0, NULL);
     computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
 			  loop_coeff_d, num_paths, max_length, eb3,
-			  &qudaGaugeParam, timeinfo);
+			  &qudaGaugeParam);
     gettimeofday(&t1, NULL);
   }
  
@@ -562,10 +566,8 @@ gauge_force_test(void)
   }  
 
   double perf = 1.0* flops*V/(total_time*1e+9);
-  double kernel_perf = 1.0*flops*V/(timeinfo[1]*1e+9);
-  printf("init and cpu->gpu time: %.2f ms, kernel time: %.2f ms, gpu->cpu and cleanup time: %.2f  total time =%.2f ms\n", 
-	 timeinfo[0]*1e+3, timeinfo[1]*1e+3, timeinfo[2]*1e+3, total_time*1e+3);
-  printf("kernel performance: %.2f GFLOPS, overall performance : %.2f GFLOPS\n", kernel_perf, perf);
+  printf("total time =%.2f ms\n", total_time*1e+3);
+  printf("overall performance : %.2f GFLOPS\n",perf);
   
   for(int dir = 0; dir < 4; dir++){
     for(int i=0;i < num_paths; i++) host_free(input_path_buf[dir][i]);

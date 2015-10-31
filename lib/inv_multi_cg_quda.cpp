@@ -20,7 +20,76 @@
  *
  */
 
+#include <worker.h>
+
 namespace quda {
+
+  /**
+     This worker class is used to update the shifted p and x vectors.
+     These updates take place in the subsequent dslash application in
+     the next iteration, while we're waiting on communication to
+     complete.  This results in improved strong scaling of the
+     multi-shift solver.
+
+     Since the natrix-vector consists of multiple dslash applications,
+     we partition the shifts between these successive dslash
+     applicaitons for optimal communications hiding.
+   */
+  class ShiftUpdate : public Worker {
+
+    ColorSpinorField *r;
+    std::vector<ColorSpinorField*> p;
+    std::vector<ColorSpinorField*> x;
+
+    double *alpha;
+    double *beta;
+    double *zeta;
+    double *zeta_old;
+
+    const int j_low;
+    int n_shift;
+
+    /**
+       How much to partition the shifted update.  Assuming the
+       operator is (M^\dagger M), this means four applications of
+       dslash for Wilson type operators and two applications for
+       staggered
+    */
+    int n_update; 
+
+  public:
+    ShiftUpdate(ColorSpinorField *r, std::vector<ColorSpinorField*> p, std::vector<ColorSpinorField*> x,
+		double *alpha, double *beta, double *zeta, double *zeta_old, int j_low, int n_shift) :
+      r(r), p(p), x(x), alpha(alpha), beta(beta), zeta(zeta), zeta_old(zeta_old), j_low(j_low), 
+      n_shift(n_shift), n_update( (r->Nspin()==4) ? 4 : 2 ) {
+      
+    }
+    virtual ~ShiftUpdate() { }
+    
+    void updateNshift(int new_n_shift) { n_shift = new_n_shift; }
+    void updateNupdate(int new_n_update) { n_update = 1; }
+    
+    // note that we can't set the stream parameter here so it is
+    // ignored.  This is more of a future design direction to consider
+    void apply(const cudaStream_t &stream) {      
+      static int count = 0;
+
+      // on the first call do the first half of the update
+      for (int j= (count*n_shift)/n_update+1; j<=((count+1)*n_shift)/n_update && j<n_shift; j++) {
+	beta[j] = beta[j_low] * zeta[j] * alpha[j] /  ( zeta_old[j] * alpha[j_low] );
+	// update p[i] and x[i]
+	blas::axpyBzpcx(alpha[j], *(p[j]), *(x[j]), zeta[j], *r, beta[j]);
+      }
+      
+      if (++count == n_update) count = 0;
+    }
+    
+  };
+
+  // this is the Worker pointer that the dslash uses to launch the shifted updates
+  namespace dslash {
+    extern Worker* aux_worker;
+  }  
 
   MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param,
 			     TimeProfile &profile) 
@@ -89,6 +158,8 @@ namespace quda {
       return;
     }
     
+    // this is the limit of precision possible
+    const double prec_tol = pow(10.,(-2*(int)b.Precision()+1));
 
     double *zeta = new double[num_offset];
     double *zeta_old = new double[num_offset];
@@ -144,8 +215,9 @@ namespace quda {
 	x_sloppy[i] = new cudaColorSpinorField(*x[i], csParam);
     }
   
-    cudaColorSpinorField **p = new cudaColorSpinorField*[num_offset];  
-    for (int i=0; i<num_offset; i++) p[i]= new cudaColorSpinorField(*r_sloppy);    
+    std::vector<ColorSpinorField*> p;
+    p.resize(num_offset);
+    for (int i=0; i<num_offset; i++) p[i] = new cudaColorSpinorField(*r_sloppy);    
   
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     cudaColorSpinorField* Ap = new cudaColorSpinorField(*r_sloppy, csParam);
@@ -206,6 +278,11 @@ namespace quda {
     int rUpdate = 0;
     blas::flops = 0;
 
+    bool aux_update = false;
+
+    // now create the worker class for updating the shifted solutions and gradient vectors
+    ShiftUpdate shift_update(r_sloppy, p, x_sloppy, alpha, beta, zeta, zeta_old, j_low, num_offset_now);
+    
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -213,7 +290,16 @@ namespace quda {
       printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     
     while (r2[0] > stop[0] &&  k < param.maxiter) {
+
+      if (aux_update) dslash::aux_worker = &shift_update;
       matSloppy(*Ap, *p[0], tmp1, tmp2);
+      dslash::aux_worker = NULL;
+      aux_update = false;
+
+      // update number of shifts now instead of end of previous
+      // iteration so that all shifts are updated during the dslash
+      shift_update.updateNshift(num_offset_now);
+
       // FIXME - this should be curried into the Dirac operator
       if (r->Nspin()==4) blas::axpy(offset[0], *p[0], *Ap); 
 
@@ -249,11 +335,15 @@ namespace quda {
 	// update p[0] and x[0]
 	blas::axpyZpbx(alpha[0], *p[0], *x_sloppy[0], *r_sloppy, beta[0]);	
 
-	for (int j=1; j<num_offset_now; j++) {
+	// this should trigger the shift update in the subsequent sloppy dslash
+	aux_update = true;
+	//shift_update.apply(0);
+	//shift_update.apply(0);
+	/*for (int j=1; j<num_offset_now; j++) {
 	  beta[j] = beta[j_low] * zeta[j] * alpha[j] / (zeta_old[j] * alpha[j_low]);
 	  // update p[i] and x[i]
 	  blas::axpyBzpcx(alpha[j], *p[j], *x_sloppy[j], zeta[j], *r_sloppy, beta[j]);
-	}
+	  }*/
       } else {
 	for (int j=0; j<num_offset_now; j++) {
 	  blas::axpy(alpha[j], *p[j], *x_sloppy[j]);
@@ -271,7 +361,6 @@ namespace quda {
 	blas::copy(*r_sloppy, *r);            
 
 	// break-out check if we have reached the limit of the precision
-
 	if (sqrt(r2[reliable_shift]) > r0Norm[reliable_shift]) { // reuse r0Norm for this
 	  resIncrease++;
 	  resIncreaseTotal[reliable_shift]++;
@@ -308,24 +397,36 @@ namespace quda {
       }    
 
       // now we can check if any of the shifts have converged and remove them
+      int converged = 0;
       for (int j=1; j<num_offset_now; j++) {
         if (zeta[j] == 0.0) {
-          num_offset_now--;
+          converged++;
           if (getVerbosity() >= QUDA_VERBOSE)
-              printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k + 1);
-        }
-        else {
-	r2[j] = zeta[j] * zeta[j] * r2[0];
-	if (r2[j] < stop[j]) {
-            num_offset_now--;
-	  if (getVerbosity() >= QUDA_VERBOSE)
-	    printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
+              printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
+        } else {
+	  r2[j] = zeta[j] * zeta[j] * r2[0];
+	  if (r2[j] < stop[j] || sqrt(r2[j] / b2) < prec_tol) {
+	    converged++;
+	    if (getVerbosity() >= QUDA_VERBOSE)
+	      printfQuda("MultiShift CG: Shift %d converged after %d iterations\n", j, k+1);
           }
 	}
       }
+      num_offset_now -= converged;
 
-      k++;
+      // this ensure we do the update on any shifted systems that
+      // happen to converge when the un-shifted system converges
+      if ( (r2[0] <= stop[0] ||  k == param.maxiter) && aux_update == true) {
+	if (getVerbosity() >= QUDA_VERBOSE) 
+	  printfQuda("Convergence of unshifted system so trigger shiftUpdate\n");
+	
+	// set worker to do all updates at once
+	shift_update.updateNupdate(1);
+	shift_update.apply(0);
+      }
       
+      k++;
+
       if (getVerbosity() >= QUDA_VERBOSE) 
 	printfQuda("MultiShift CG: %d iterations, <r,r> = %e, |r|/|b| = %e\n", k, r2[0], sqrt(r2[0]/b2));
     }
@@ -393,7 +494,6 @@ namespace quda {
   
     delete r;
     for (int i=0; i<num_offset; i++) delete p[i];
-    delete []p;
 
     if (reliable) for (int i=0; i<num_offset; i++) delete y[i];
 

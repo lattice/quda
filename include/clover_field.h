@@ -292,19 +292,6 @@ namespace quda {
    */
   void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, int mu, int nu, double coeff, QudaParity parity, int conjugate);
 
-
-  /**
-     Update the momentum field from the force field
-
-     mom = mom - [force]_TA
-
-     where [A]_TA means the traceless anti-hermitian projection of A
-
-     @param mom Momentum field
-     @param force Force field
-   */
-  void updateMomentum(cudaGaugeField &mom, cudaGaugeField &force);
-
 } // namespace quda
 
 #endif // _CLOVER_QUDA_H

@@ -718,7 +718,6 @@ namespace quda {
 
     };
 
-
   template <typename Float, int length, int N, int reconLen>
     struct FloatNOrder {
       typedef typename mapper<Float>::type RegType;
@@ -1286,6 +1285,39 @@ namespace quda {
   template<typename T, QudaGaugeFieldOrder order, int Nc> struct gauge_order_mapper { };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_QDP_GAUGE_ORDER,Nc> { typedef gauge::QDPOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
+
+
+  // experiments in reducing template instantation boilerplate
+  // can this be replaced with a C++11 variant that uses variadic templates?
+
+#define INSTANTIATE_RECONSTRUCT(func, g, ...)				\
+  {									\
+    if (!data.isNative())						\
+      errorQuda("Field order %d and precision %d is not native", g.Order(), g.Precision()); \
+    if( g.Reconstruct() == QUDA_RECONSTRUCT_NO) {			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_12){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_8){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else {								\
+      errorQuda("Reconstruction type %d of gauge field not supported", g.Reconstruct()); \
+    }									\
+  }
+  
+#define INSTANTIATE_PRECISION(func, lat, ...)				\
+  {									\
+    if (lat.Precision() == QUDA_DOUBLE_PRECISION) {			\
+      func<double>(lat, __VA_ARGS__);					\
+    } else if(lat.Precision() == QUDA_SINGLE_PRECISION) {		\
+      func<float>(lat, __VA_ARGS__);					\
+    } else {								\
+      errorQuda("Precision %d not supported", lat.Precision());		\
+    }									\
+  }
 
 } // namespace quda
 

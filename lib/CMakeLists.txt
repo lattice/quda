@@ -38,7 +38,7 @@ set (QUDA_OBJS
 	pgauge_init.cu pgauge_heatbath.cu random.cu
 	gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
 	pgauge_det_trace.cu clover_outer_product.cu
-	clover_sigma_outer_product.cu qcharge_quda.cu
+	clover_sigma_outer_product.cu momentum.cu qcharge_quda.cu
   version.cpp
 )
 
@@ -61,6 +61,8 @@ cuda_add_library(quda STATIC ${QUDA_OBJS})
 if(GITVERSION)
   ADD_DEPENDENCIES(quda git_version)
 endif()
+ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+
 
 add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

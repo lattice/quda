@@ -403,6 +403,10 @@ public:
     }
   }
 
+  /*void launch_auxiliary(cudaStream_t &stream) {
+    auxiliary.apply(stream);
+    }*/
+  
   /*
     per direction / dimension flops
     spin project flops = Nc * Ns

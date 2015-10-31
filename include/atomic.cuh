@@ -10,6 +10,9 @@
    avoid confusion when resolving the native atomicAdd functions.
  */
 
+#if defined(__CUDA_ARCH__) 
+
+#if __COMPUTE_CAPABILITY__ < 600
 /**
    Implementation of double-precision atomic addition using compare
    and swap.
@@ -28,6 +31,7 @@ static inline __device__ double atomicAdd(double *addr, double val){
   
   return old;
 }
+#endif
 
 /**
    Implementation of double2 atomic addition using two
@@ -42,3 +46,5 @@ static inline __device__ double2 atomicAdd(double2 *addr, double2 val){
   old.y = atomicAdd((double*)addr + 1, val.y);
   return old;
 }
+
+#endif

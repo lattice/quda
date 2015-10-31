@@ -25,7 +25,19 @@ extern "C" {
   int comm_rank_displaced(const Topology *topo, const int displacement[]);
   void comm_set_default_topology(Topology *topo);
   Topology *comm_default_topology(void);
+
+  /**
+     Return the number of processes in the dimension dim
+     @param dim Dimension which we are querying
+     @return Length of process dimensions
+   */
   int comm_dim(int dim);
+
+  /**
+     Return the coording of this process in the dimension dim
+     @param dim Dimension which we are querying
+     @return Coordinate of this process
+   */
   int comm_coord(int dim);
 
   /**

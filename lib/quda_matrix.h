@@ -1068,5 +1068,30 @@ namespace quda{
 #endif
     }
 
+  template<class Cmplx>
+  __device__ __host__
+  bool isUnitary(const Matrix<Cmplx,3>& matrix, double max_error)
+  {
+    const Matrix<Cmplx,3> identity = conj(matrix)*matrix;
+
+    for(int i=0; i<3; ++i){
+      if( fabs(identity(i,i).x - 1.0) > max_error || fabs(identity(i,i).y) > max_error) return false;
+      for(int j=i+1; j<3; ++j){
+	if( fabs(identity(i,j).x) > max_error || fabs(identity(i,j).y) > max_error
+	    ||  fabs(identity(j,i).x) > max_error || fabs(identity(j,i).y) > max_error ){
+	  return false;
+	}
+      }
+    }
+
+    for (int i=0; i<3; i++) {
+      for (int j=0; j<3; j++) {
+	if (isnan(matrix(i,j).x) || isnan(matrix(i,j).y)) return false;
+      }
+    }
+
+    return true;
+  }
+
 } // end namespace quda
 #endif // _QUDA_MATRIX_H_
