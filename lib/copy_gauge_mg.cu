@@ -1,27 +1,47 @@
 #include <gauge_field_order.h>
+
+#define FINE_GRAINED_ACCESS
+
 #include <copy_gauge_helper.cuh>
 
 namespace quda {
   
   template <typename FloatOut, typename FloatIn, int length, typename InOrder>
-  void copyGauge(const InOrder &inOrder, GaugeField &out, QudaFieldLocation location, 
-		 FloatOut *Out, FloatOut **outGhost, int type) {
+  void copyGaugeMG(const InOrder &inOrder, GaugeField &out, QudaFieldLocation location,
+		   FloatOut *Out, FloatOut **outGhost, int type) {
     if (out.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Reconstruct type %d not supported", out.Reconstruct());
 
     int faceVolumeCB[QUDA_MAX_DIM];
     for (int i=0; i<4; i++) faceVolumeCB[i] = out.SurfaceCB(i) * out.Nface(); 
     if (out.isNative()) {
+
+#ifdef FINE_GRAINED_ACCESS
+      typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER> G;
+      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(), faceVolumeCB,
+					 out.Ndim(), out.Geometry(), out, location, type);
+#else
       typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO,length>::type G;
       copyGauge<FloatOut,FloatIn,length>
 	(G(out,Out,outGhost), inOrder, out.Volume(), faceVolumeCB,
 	 out.Ndim(), out.Geometry(), out, location, type);
+#endif
+
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>
-	(QDPOrder<FloatOut,length>(out, Out, outGhost), inOrder, out.Volume(), 
-	 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+
+#ifdef FINE_GRAINED_ACCESS
+      typedef typename gauge::FieldOrder<FloatOut,Ncolor(length),1,QUDA_QDP_GAUGE_ORDER> G;
+      copyGauge<FloatOut,FloatIn,length>(G(out,(void*)Out,(void**)outGhost), inOrder, out.Volume(),
+					 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+#else
+      typedef typename QDPOrder<FloatOut,length> G;
+      copyGauge<FloatOut,FloatIn,length>(G(out, Out, outGhost), inOrder, out.Volume(),
+					 faceVolumeCB, out.Ndim(), out.Geometry(), out, location, type);
+#endif
+
+
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -33,20 +53,36 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn, int length>
-    void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
-		   FloatOut *Out, FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
+    void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
+		     FloatOut *Out, FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
+
+
+    printf("Ncolor = %d\n", Ncolor(length)); fflush(stdout);
+
     if (in.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Reconstruct type %d not supported", in.Reconstruct());
 
     // reconstruction only supported on FloatN fields currently
     if (in.isNative()) {      
-      typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
-      copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
+#ifdef FINE_GRAINED_ACCESS
+      typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_FLOAT2_GAUGE_ORDER> G;
+      copyGaugeMG<FloatOut,FloatIn,length> (G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, location, Out, outGhost, type);
+#else
+      typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO,length>::type G;
+      copyGaugeMG<FloatOut,FloatIn,length> (G(in, In,inGhost), out, location, Out, outGhost, type);
+#endif
     } else if (in.Order() == QUDA_QDP_GAUGE_ORDER) {
 
 #ifdef BUILD_QDP_INTERFACE
-      copyGauge<FloatOut,FloatIn,length>(QDPOrder<FloatIn,length>(in, In, inGhost), 
-					 out, location, Out, outGhost, type);
+
+#ifdef FINE_GRAINED_ACCESS
+      typedef typename gauge::FieldOrder<FloatIn,Ncolor(length),1,QUDA_QDP_GAUGE_ORDER> G;
+      copyGaugeMG<FloatOut,FloatIn,length>(G(const_cast<GaugeField&>(in),(void*)In,(void**)inGhost), out, location, Out, outGhost, type);
+#else
+      typedef typename QDPOrder<FloatIn,length> G;
+      copyGaugeMG<FloatOut,FloatIn,length>(G(in, In, inGhost), out, location, Out, outGhost, type);
+#endif
+
 #else
       errorQuda("QDP interface has not been built\n");
 #endif
@@ -62,10 +98,14 @@ namespace quda {
 		   FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
 
 #ifdef GPU_MULTIGRID
-    if (in.Ncolor() == 48) {
+    if (in.Ncolor() == 4) {
+      // we are doing gauge field packing
+      const int Nc = 4;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 48) {
       // we are doing gauge field packing
       const int Nc = 48;
-      copyGauge<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else 
 #endif // GPU_MULTIGRID
     {

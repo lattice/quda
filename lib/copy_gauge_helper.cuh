@@ -22,6 +22,12 @@ namespace quda {
     }
   };
 
+  __host__ __device__ inline constexpr int ct_sqrt(int n, int i = 1){
+    return n == i ? n : (i * i < n ? ct_sqrt(n, i + 1) : i);
+  }
+
+  __host__ __device__ inline constexpr int Ncolor(int length) { return ct_sqrt(length/2); }
+
   /**
      Generic CPU gauge reordering and packing 
   */
@@ -34,11 +40,18 @@ namespace quda {
 
       for (int d=0; d<arg.geometry; d++) {
 	for (int x=0; x<arg.volume/2; x++) {
+#ifdef FINE_GRAINED_ACCESS
+	  for (int i=0; i<Ncolor(length); i++)
+	    for (int j=0; j<Ncolor(length); j++) {
+	      arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+	    }
+#else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
 	  arg.in.load(in, x, d, parity);
 	  for (int i=0; i<length; i++) out[i] = in[i];
 	  arg.out.save(out, x, d, parity);
+#endif
 	}
       }
 
@@ -60,11 +73,17 @@ namespace quda {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	if (x >= arg.volume/2) return;
 
+#ifdef FINE_GRAINED_ACCESS
+	for (int i=0; i<Ncolor(length); i++)
+	  for (int j=0; j<Ncolor(length); j++)
+	    arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+#else
 	RegTypeIn in[length];
 	RegTypeOut out[length];
 	arg.in.load(in, x, d, parity);
 	for (int i=0; i<length; i++) out[i] = in[i];
 	arg.out.save(out, x, d, parity);
+#endif
       }
     }
   }
@@ -81,11 +100,17 @@ namespace quda {
 
       for (int d=0; d<arg.nDim; d++) {
 	for (int x=0; x<arg.faceVolumeCB[d]; x++) {
+#ifdef FINE_GRAINED_ACCESS
+	  for (int i=0; i<Ncolor(length); i++)
+	    for (int j=0; j<Ncolor(length); j++)
+	      arg.out.Ghost(d, parity, x, i, j) = arg.in.Ghost(d, parity, x, i, j);
+#else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
 	  arg.in.loadGhost(in, x, d, parity); // assumes we are loading 
 	  for (int i=0; i<length; i++) out[i] = in[i];
 	  arg.out.saveGhost(out, x, d, parity);
+#endif
 	}
       }
 
@@ -106,11 +131,17 @@ namespace quda {
     for (int parity=0; parity<2; parity++) {
       for (int d=0; d<arg.nDim; d++) {
 	if (x < arg.faceVolumeCB[d]) {
+#ifdef FINE_GRAINED_ACCESS
+	  for (int i=0; i<Ncolor(length); i++)
+	    for (int j=0; j<Ncolor(length); j++)
+	      arg.out.Ghost(d, parity, x, i, j) = arg.in.Ghost(d, parity, x, i, j);
+#else
 	  RegTypeIn in[length];
 	  RegTypeOut out[length];
 	  arg.in.loadGhost(in, x, d, parity); // assumes we are loading 
 	  for (int i=0; i<length; i++) out[i] = in[i];
 	  arg.out.saveGhost(out, x, d, parity);
+#endif
 	}
       }
 
@@ -137,7 +168,9 @@ namespace quda {
 	faceMax = (arg.faceVolumeCB[d] > faceMax ) ? arg.faceVolumeCB[d] : faceMax;
       }
       size = isGhost ? faceMax : arg.volume/2;
+#ifndef FINE_GRAINED_ACCESS
       writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
+#endif
     }
 
     virtual ~CopyGauge() { ; }
@@ -173,7 +206,7 @@ namespace quda {
 	sites = 0;
 	for (int d=0; d<4; d++) sites += arg.faceVolumeCB[d];
       }
-#if __COMPUTE_CAPABILITY__ >= 200
+#if __COMPUTE_CAPABILITY__ >= 200 && !defined(FINE_GRAINED_ACCESS)
       return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
 			    + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
 #else      
@@ -184,7 +217,7 @@ namespace quda {
 
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder>
-    void copyGauge(OutOrder outOrder, const InOrder inOrder, int volume, const int *faceVolumeCB, 
+    void copyGauge(OutOrder &&outOrder, const InOrder &inOrder, int volume, const int *faceVolumeCB,
 		   int nDim, int geometry, const GaugeField &out, QudaFieldLocation location, int type) {
 
     CopyGaugeArg<OutOrder,InOrder> arg(outOrder, inOrder, volume, faceVolumeCB, nDim, geometry);
