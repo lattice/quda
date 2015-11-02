@@ -56,9 +56,6 @@ namespace quda {
     void copyGaugeMG(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 		     FloatOut *Out, FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
 
-
-    printf("Ncolor = %d\n", Ncolor(length)); fflush(stdout);
-
     if (in.Reconstruct() != QUDA_RECONSTRUCT_NO) 
       errorQuda("Reconstruct type %d not supported", in.Reconstruct());
 
