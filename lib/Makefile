@@ -44,7 +44,9 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
 	pgauge_det_trace.o clover_outer_product.o			\
 	clover_sigma_outer_product.o momentum.o qcharge_quda.o		\
-	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o
+	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
+	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
+	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
