@@ -179,6 +179,9 @@ namespace quda {
     // temporary fields used for verification
     ColorSpinorParam csParam(*r);
     csParam.create = QUDA_NULL_FIELD_CREATE;
+
+    if(param.B[0]->Nspin() == 1)  csParam.gammaBasis = param.B[0]->GammaBasis();
+
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
