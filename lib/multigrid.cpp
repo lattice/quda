@@ -35,9 +35,9 @@ namespace quda {
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
-      param_presmooth->tol = 1e-3;
+      param_presmooth->tol = 1e-1;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-3;
+      param_presmooth->delta = 1e-1;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
 				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
@@ -343,7 +343,7 @@ namespace quda {
   //supports seperate reading or single file read
   void loadVectors(std::vector<ColorSpinorField*> &B) {
     const int Nvec = B.size();
-    printfQuda("Start loading %d vectors from %s\n", Nvec, vecfile);
+    printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile);
 
 
     void **V = new void*[Nvec];
@@ -354,14 +354,14 @@ namespace quda {
       }
     }
     
-    if (strcmp(vecfile,"")!=0) {
+    if (strcmp(vec_infile,"")!=0) {
 #if 0
-      read_spinor_field(vecfile, &V[0], B[0]->Precision(), B[0]->X(), 
+      read_spinor_field(vec_infile, &V[0], B[0]->Precision(), B[0]->X(), 
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 #else 
       for (int i=0; i<Nvec; i++) {
 	char filename[256];
-	sprintf(filename, "%s.%d", vecfile, i);
+	sprintf(filename, "%s.%d", vec_infile, i);
 	printf("Reading vector %d from file %s\n", i, filename);
 	read_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(), 
 			  B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
@@ -397,6 +397,36 @@ namespace quda {
     }
 
     printfQuda("Done loading vectors\n");
+  }
+
+  void saveVectors(std::vector<ColorSpinorField*> &B) {
+    const int Nvec = B.size();
+    printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
+
+    void **V = new void*[Nvec];
+    for (int i=0; i<Nvec; i++) {
+      V[i] = B[i]->V();
+      if (V[i] == NULL) {
+	printfQuda("Could not allocate V[%d]\n", i);
+      }
+    }
+
+    if (strcmp(vec_outfile,"")!=0) {
+#if 0
+      write_spinor_field(vec_outfile, &V[0], B[0]->Precision(), B[0]->X(),
+			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
+#else
+      for (int i=0; i<Nvec; i++) {
+	char filename[256];
+	sprintf(filename, "%s.%d", vec_outfile, i);
+	printf("Saving vector %d to file %s\n", i, filename);
+	write_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(),
+			   B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
+      }
+#endif
+    }
+
+    printfQuda("Done saving vectors\n");
   }
 
 }
