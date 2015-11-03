@@ -2467,8 +2467,12 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 //   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
    // check the gauge fields have been created
-   cudaGaugeField *cudaGauge = checkGauge(&inv_param);
-
+   //cudaGaugeField *cudaGauge = checkGauge(&inv_param);
+   //WARNING!!! :  new checkGauge routine cannot be used here. 
+   //We assume that gauge field check was done in multigridQuda, and just assign pointers. 
+   //This must be fix in the future. 
+   cudaGaugeField *cudaGauge = (mg_inv_param->dslash_type != QUDA_STAGGERED_DSLASH) ? gaugePrecise : gaugeFatPrecise;
+  
    checkInvertParam(&inv_param);
 
    // It was probably a bad design decision to encode whether the system is even/odd preconditioned (PC) in
