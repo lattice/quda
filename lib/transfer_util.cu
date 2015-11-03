@@ -53,13 +53,12 @@ namespace quda {
   template <typename Float, int nSpin, QudaFieldOrder order>
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (B[0]->Ncolor()*Nvec != V.Ncolor()) errorQuda("Something wrong here");
-    if (B[0]->Ncolor() == 3) {
-      FillV<Float,nSpin,3,order>(V,B,Nvec);
-    } 
-    else if(B[0]->Ncolor() == 2) {
+
+    if (B[0]->Ncolor() == 2) {
       FillV<Float,nSpin,2,order>(V,B,Nvec);
-    }
-    else if(B[0]->Ncolor() == 24) {
+    } else if(B[0]->Ncolor() == 3) {
+      FillV<Float,nSpin,3,order>(V,B,Nvec);
+    } else if(B[0]->Ncolor() == 24) {
       FillV<Float,nSpin,24,order>(V,B,Nvec);
     } else {
       errorQuda("Unsupported nColor %d", B[0]->Ncolor());
@@ -70,14 +69,13 @@ namespace quda {
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (V.Nspin() == 4) {
       FillV<Float,4,order>(V,B,Nvec);
-    } 
-    else if (V.Nspin() == 2) {
+    } else if (V.Nspin() == 2) {
       FillV<Float,2,order>(V,B,Nvec);
-    }
-    else if (V.Nspin() == 1) {
-      FillV<Float,1,order>(V,B,Nvec); //ok for staggered
-    }
-    else {
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (V.Nspin() == 1) {
+      FillV<Float,1,order>(V,B,Nvec);
+#endif
+    } else {
       errorQuda("Unsupported nSpin %d", V.Nspin());
     }
   }
