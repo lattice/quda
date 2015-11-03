@@ -185,7 +185,7 @@ namespace quda {
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,128>
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else {
-	  errorQuda("Block size not instantiated");
+	  errorQuda("Block size %d not instantiated", block_size);
 	}
       }
     }

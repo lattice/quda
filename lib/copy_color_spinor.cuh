@@ -188,7 +188,7 @@ namespace quda {
   
     void apply(const cudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	packSpinor<FloatOut, FloatIn, Nc, Nc>(out, in, basis, meta.VolumeCB());
+	packSpinor<FloatOut, FloatIn, Ns, Nc>(out, in, basis, meta.VolumeCB());
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	packSpinorKernel<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis>

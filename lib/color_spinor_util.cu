@@ -278,8 +278,12 @@ namespace quda {
       FieldOrderCB<Float,2,24,1,order> A(a);
       print_vector(A, x);
     }
+    else if (a.Ncolor() == 6 && a.Nspin() == 4) {
+      FieldOrderCB<Float,4,6,1,order> A(a);
+      print_vector(A, x);
+    }
     else if (a.Ncolor() == 72 && a.Nspin() == 4) {
-      FieldOrderCB<Float,2,24,1,order> A(a);
+      FieldOrderCB<Float,4,72,1,order> A(a);
       print_vector(A, x);
     }
     else if (a.Ncolor() == 576 && a.Nspin() == 2) {
