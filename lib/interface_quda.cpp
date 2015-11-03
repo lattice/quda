@@ -2402,7 +2402,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    ColorSpinorParam csParam(*B[0]);//
    csParam.create = QUDA_NULL_FIELD_CREATE;
    //
-   csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+   csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
    //bParam.setPrecision(bParam.precision);
    csParam.location = QUDA_CUDA_FIELD_LOCATION;
    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;//UKQCD
@@ -2416,8 +2416,8 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.verbosity   = QUDA_VERBOSE;
 
    inv_param.gcrNkrylov  = 10;
-   inv_param.maxiter  = 35;
-   inv_param.tol      = 1e-3;
+   inv_param.maxiter  = 500;
+   inv_param.tol      = 5e-4;
 
    inv_param.use_init_guess      = QUDA_USE_INIT_GUESS_YES;
    // removed this from QudaInvertParam so set this by hand below for now
