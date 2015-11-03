@@ -2401,9 +2401,8 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 
    ColorSpinorParam csParam(*B[0]);//
    csParam.create = QUDA_NULL_FIELD_CREATE;
-   //
-   csParam.fieldOrder = (csParam.precision == QUDA_DOUBLE_PRECISION) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-   //bParam.setPrecision(bParam.precision);
+
+   csParam.setPrecision(csParam.precision);
    csParam.location = QUDA_CUDA_FIELD_LOCATION;
    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;//UKQCD
 
@@ -2416,8 +2415,8 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.verbosity   = QUDA_VERBOSE;
 
    inv_param.gcrNkrylov  = 10;
-   inv_param.maxiter  = 35;
-   inv_param.tol      = 1e-3;
+   inv_param.maxiter  = 500;
+   inv_param.tol      = 5e-4;
 
    inv_param.use_init_guess      = QUDA_USE_INIT_GUESS_YES;
    // removed this from QudaInvertParam so set this by hand below for now
@@ -2456,15 +2455,14 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
    inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-   inv_param.tune = QUDA_TUNE_YES;
+   inv_param.tune = getTuning();
 
    inv_param.sp_pad = 0; // 24*24*24/2;
    inv_param.cl_pad = 0; // 24*24*24/2;
 
    inv_param.kappa   = mg_inv_param->kappa;//1.0 / (2.0 * (1 + 3/anisotropy + mass));
-///////////////////////////////////////////////////
+
    pushVerbosity(inv_param.verbosity);
-//   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
    // check the gauge fields have been created
    cudaGaugeField *cudaGauge = checkGauge(&inv_param);
@@ -2555,7 +2553,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 
      *curr_nullvec = *x;
 
-//BEGIN orthogonalization:
+     // global orthoonormalization of the generated null-space vectors
      Complex alpha = Complex(0.0, 0.0);
 
      for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != nullvec; ++prevvec)//row id
@@ -2573,8 +2571,6 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
      else
         errorQuda("\nCannot orthogonalize ??th vector\n");
 
-//END
-
      delete b;
      delete x;
 
@@ -2586,6 +2582,8 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 
   popVerbosity();
 
+  saveVectors(B);
+
   // FIXME: added temporarily so that the cache is written out even if a long benchmarking job gets interrupted
   saveTuneCache(getVerbosity());
 
@@ -2594,8 +2592,6 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
   return;
 }
 
-
-#define LOAD_NVECS
 
 void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
 {

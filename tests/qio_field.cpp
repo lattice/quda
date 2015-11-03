@@ -8,8 +8,7 @@ int lattice_dim;
 int lattice_size[4];
 int this_node;
 
-QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar,
-			    char *myname){
+QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar) {
   QIO_String *xml_file_in;
   QIO_Reader *infile;
   QIO_Iflag iflag;
@@ -23,19 +22,18 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar,
   /* Open the file for reading */
   infile = QIO_open_read(xml_file_in, filename, &layout, NULL, &iflag);
   if(infile == NULL){
-    printfQuda("%s(%d): QIO_open_read returns NULL.\n",myname,this_node);
+    printfQuda("%s(%d): QIO_open_read returns NULL.\n",__func__,this_node);
     return NULL;
   }
 
-  printfQuda("%s: QIO_open_read done.\n",myname);
-  printfQuda("%s: User file info is \"%s\"\n", myname, QIO_string_ptr(xml_file_in));
+  printfQuda("%s: QIO_open_read done.\n",__func__);
+  printfQuda("%s: User file info is \"%s\"\n", __func__, QIO_string_ptr(xml_file_in));
 
   QIO_string_destroy(xml_file_in);
   return infile;
 }
 
-QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar,
-			     int ildgstyle, char *myname){
+QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int ildgstyle){
   QIO_String *xml_file_out;
   char xml_write_file[] = "Dummy user file XML";
   QIO_Writer *outfile;
@@ -59,12 +57,12 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar,
   outfile = QIO_open_write(xml_file_out, filename, volfmt, &layout, 
 			   &filesys, &oflag);
   if(outfile == NULL){
-    printfQuda("%s(%d): QIO_open_write returns NULL.\n",myname,this_node);
+    printfQuda("%s(%d): QIO_open_write returns NULL.\n",__func__,this_node);
     return NULL;
   }
 
-  printfQuda("%s: QIO_open_write done.\n",myname);
-  printfQuda("%s: User file info is \"%s\"\n", myname, QIO_string_ptr(xml_file_out));
+  printfQuda("%s: QIO_open_write done.\n",__func__);
+  printfQuda("%s: User file info is \"%s\"\n", __func__, QIO_string_ptr(xml_file_out));
 
   QIO_string_destroy(xml_file_out);
   return outfile;
@@ -72,7 +70,6 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar,
 
 /* get QIO record precision */
 QudaPrecision get_prec(QIO_Reader *infile) {
-  const char* myname="get_prec";
   char dummy[100] = "";
   QIO_RecordInfo *rec_info = QIO_create_record_info(0, NULL, NULL, 0, dummy, dummy, 0, 0, 0, 0);
   QIO_String *xml_file = QIO_string_create();
@@ -81,14 +78,14 @@ QudaPrecision get_prec(QIO_Reader *infile) {
   QIO_destroy_record_info(rec_info);
   QIO_string_destroy(xml_file);
 
-  printfQuda("%s: QIO_read_record_data returns status %d\n", myname, status);
-  if (status != QIO_SUCCESS)  { printfQuda("get_prec failed\n"); exit(0); }
+  printfQuda("%s: QIO_read_record_data returns status %d\n", __func__, status);
+  if (status != QIO_SUCCESS)  { errorQuda("get_prec failed\n"); }
 
   return (prec == 70) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
 }
 
 template <int len>
-int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, char *myname)
+int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec)
 {
   QIO_String *xml_record_in;
   QIO_RecordInfo rec_info;
@@ -120,58 +117,17 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
     }
   }
 
-  printfQuda("%s: QIO_read_record_data returns status %d\n", myname, status);
+  printfQuda("%s: QIO_read_record_data returns status %d\n", __func__, status);
   if (status != QIO_SUCCESS) return 1;
   return 0;
 }
 
-template <int len>
-int write_field(QIO_Writer *infile, int count, void *field_out[], QudaPrecision file_prec, QudaPrecision cpu_prec, char *myname)
+int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec)
 {
-  QIO_String *xml_record_out;
-  QIO_RecordInfo rec_info;
-  int status;
-  
-  /* Query the precision */
-  size_t rec_size = file_prec*count*len;
-
-  /* Create the record XML */
-  xml_record_out = QIO_string_create();
-
-  /* Read the field record and convert to cpu precision*/
-  if (cpu_prec == QUDA_DOUBLE_PRECISION) {
-    if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(infile, &rec_info, xml_record_out, vgetM<double,double,len>, 
-			 rec_size, QUDA_DOUBLE_PRECISION, field_out);
-    } else {
-      status = QIO_write(infile, &rec_info, xml_record_out, vgetM<double,float,len>, 
-			 rec_size, QUDA_SINGLE_PRECISION, field_out);
-    }
-  } else {
-    if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(infile, &rec_info, xml_record_out, vgetM<float,double,len>, 
-			 rec_size, QUDA_DOUBLE_PRECISION, field_out);
-    } else {
-      status = QIO_write(infile, &rec_info, xml_record_out, vgetM<float,float,len>, 
-			 rec_size, QUDA_SINGLE_PRECISION, field_out);
-    }
-  }
-
-  printfQuda("%s: QIO_write_record_data returns status %d\n", myname, status);
-  if (status != QIO_SUCCESS) return 1;
-  return 0;
+  return read_field<18>(infile, count, field_in, cpu_prec);
 }
 
-int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, char *myname)
-{
-  return read_field<18>(infile, count, field_in, cpu_prec, myname);
-}
-
-void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[]) {
-  char myname[] = "qio_load";
-
-  this_node = mynode();
-
+void set_layout(const int *X) {
   /* Lattice dimensions */
   lattice_dim = 4;
   int lattice_volume = 1;
@@ -182,8 +138,8 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
 
   /* Set the mapping of coordinates to nodes */
   if(setup_layout(lattice_size, 4, QMP_get_number_of_nodes())!=0)
-    { printfQuda("Setup layout failed\n"); exit(0); }
-  printfQuda("%s layout set for %d nodes\n", myname, QMP_get_number_of_nodes());
+    { errorQuda("Setup layout failed\n"); }
+  printfQuda("%s layout set for %d nodes\n", __func__, QMP_get_number_of_nodes());
   int sites_on_node = num_sites(this_node);
 
   /* Build the layout structure */
@@ -197,47 +153,36 @@ void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precisi
   layout.sites_on_node   = sites_on_node;
   layout.this_node       = this_node;
   layout.number_of_nodes = QMP_get_number_of_nodes();
+}
+
+void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[]) {
+  this_node = mynode();
+
+  set_layout(X);
 
   /* Open the test file for reading */
-  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL, myname);
-  if(infile == NULL) { printfQuda("Open file failed\n"); exit(0); }
+  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL);
+  if(infile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Read the su3 field record */
-  printfQuda("%s: reading su3 field\n",myname); fflush(stdout);
-  int status = read_su3_field(infile, 4, gauge, precision, myname);
-  if(status) { printfQuda("read_su3_field failed %d\n", status); exit(0); }
+  printfQuda("%s: reading su3 field\n",__func__); fflush(stdout);
+  int status = read_su3_field(infile, 4, gauge, precision);
+  if(status) { errorQuda("read_su3_field failed %d\n", status); }
 
   /* Close the file */
   QIO_close_read(infile);
-  printfQuda("%s: Closed file for reading\n",myname);  
+  printfQuda("%s: Closed file for reading\n",__func__);  
     
 }
 
 // count is the number of vectors
 // Ninternal is the size of the "inner struct" (24 for Wilson spinor)
-int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], QudaPrecision cpu_prec, char *myname)
+int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], QudaPrecision cpu_prec)
 {
   int status = 0;
   switch (Ninternal) {
   case 24:
-    status = read_field<24>(infile, count, field_in, cpu_prec, myname);
-    break;
-  default:
-    errorQuda("Undefined %d", Ninternal);
-  }    
-
-  return status;
-}
-
-// count is the number of vectors
-// Ninternal is the size of the "inner struct" (24 for Wilson spinor)
-int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[], 
-		QudaPrecision file_prec, QudaPrecision cpu_prec, char *myname)
-{
-  int status = 0;
-  switch (Ninternal) {
-  case 24:
-    status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, myname);
+    status = read_field<24>(infile, count, field_in, cpu_prec);
     break;
   default:
     errorQuda("Undefined %d", Ninternal);
@@ -248,94 +193,127 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
 
 void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, 
 		       int nColor, int nSpin, int Nvec, int argc, char *argv[]) {
-  char myname[] = "qio_load";
-
   this_node = mynode();
 
-  /* Lattice dimensions */
-  lattice_dim = 4;
-  int lattice_volume = 1;
-  for (int d=0; d<4; d++) {
-    lattice_size[d] = comm_dim(d)*X[d];
-    lattice_volume *= lattice_size[d];
-  }
-
-  /* Set the mapping of coordinates to nodes */
-  if(setup_layout(lattice_size, 4, QMP_get_number_of_nodes())!=0)
-    { printfQuda("Setup layout failed\n"); exit(0); }
-  printfQuda("%s layout set for %d nodes\n", myname, QMP_get_number_of_nodes());
-  int sites_on_node = num_sites(this_node);
-
-  /* Build the layout structure */
-  layout.node_number     = node_number;
-  layout.node_index      = node_index;
-  layout.get_coords      = get_coords;
-  layout.num_sites       = num_sites;
-  layout.latsize         = lattice_size;
-  layout.latdim          = lattice_dim;
-  layout.volume          = lattice_volume;
-  layout.sites_on_node   = sites_on_node;
-  layout.this_node       = this_node;
-  layout.number_of_nodes = QMP_get_number_of_nodes();
+  set_layout(X);
 
   /* Open the test file for reading */
-  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL, myname);
-  if(infile == NULL) { printfQuda("Open file failed\n"); exit(0); }
+  QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL);
+  if(infile == NULL) { errorQuda("Open file failed\n"); }
 
   /* Read the spinor field record */
-  printfQuda("%s: reading %d vector fields\n", myname, Nvec); fflush(stdout);
-  int status = read_field(infile, 2*nSpin*nColor, Nvec, V, precision, myname);
-  if(status) { printfQuda("read_spinor_fields failed %d\n", status); exit(0); }
+  printfQuda("%s: reading %d vector fields\n", __func__, Nvec); fflush(stdout);
+  int status = read_field(infile, 2*nSpin*nColor, Nvec, V, precision);
+  if(status) { errorQuda("read_spinor_fields failed %d\n", status); }
 
   /* Close the file */
   QIO_close_read(infile);
-  printfQuda("%s: Closed file for reading\n",myname);  
+  printfQuda("%s: Closed file for reading\n",__func__);      
+}
+
+template <int len>
+int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision file_prec, 
+		QudaPrecision cpu_prec, int nSpin, int nColor, const char *type)
+{
+  QIO_String *xml_record_out;
+  char xml_write_field[] = "Dummy user record XML for SU(N) field";
+  QIO_RecordInfo *rec_info;
+  int status;
+  
+  // Create the record info for the field
+  if (file_prec != QUDA_DOUBLE_PRECISION && file_prec != QUDA_SINGLE_PRECISION)
+    errorQuda("Error, file_prec=%d not supported", file_prec);
     
+  const char *precision = (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F";
+  
+  int *lower = new int[count];
+  int *upper = new int[count];
+
+  for (int d=0; d<count; d++) {
+    lower[d] = 0;
+    upper[d] = lattice_size[d];
+  }
+
+  rec_info = QIO_create_record_info(QIO_FIELD, lower, upper, count, const_cast<char*>(type), 
+				    const_cast<char*>(precision), nColor, nSpin, file_prec*len, count);
+  
+  delete []upper;
+  delete []lower;
+
+
+  /* Create the record XML */
+  xml_record_out = QIO_string_create();
+  // Create the record XML for the field
+  xml_record_out = QIO_string_create();
+  QIO_string_set(xml_record_out,xml_write_field);
+
+  /* Write the field record converting to desired file precision*/
+  size_t rec_size = file_prec*count*len;
+  if (cpu_prec == QUDA_DOUBLE_PRECISION) {
+    if (file_prec == QUDA_DOUBLE_PRECISION) {
+      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<double,double,len>, 
+			 rec_size, QUDA_DOUBLE_PRECISION, field_out);
+    } else {
+      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<double,float,len>, 
+			 rec_size, QUDA_SINGLE_PRECISION, field_out);
+    }
+  } else {
+    if (file_prec == QUDA_DOUBLE_PRECISION) {
+      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<float,double,len>, 
+			 rec_size, QUDA_DOUBLE_PRECISION, field_out);
+    } else {
+      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<float,float,len>, 
+			 rec_size, QUDA_SINGLE_PRECISION, field_out);
+    }
+  }
+
+  printfQuda("%s: QIO_write_record_data returns status %d\n", __func__, status);
+  QIO_destroy_record_info(rec_info);
+  QIO_string_destroy(xml_record_out);
+
+  if (status != QIO_SUCCESS) return 1;
+  return 0;
+}
+    
+// count is the number of vectors
+// Ninternal is the size of the "inner struct" (24 for Wilson spinor)
+int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[], 
+		QudaPrecision file_prec, QudaPrecision cpu_prec, 
+		int nSpin, int nColor, const char *type)
+{
+  int status = 0;
+  switch (Ninternal) {
+  case 24:
+    status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+    break;
+  default:
+    errorQuda("Undefined %d", Ninternal);
+  }    
+
+  return status;
 }
 
 void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, 
 		       int nColor, int nSpin, int Nvec, int argc, char *argv[]) {
-  char myname[] = "qio_save";
-
   this_node = mynode();
 
-  /* Lattice dimensions */
-  lattice_dim = 4;
-  int lattice_volume = 1;
-  for (int d=0; d<4; d++) {
-    lattice_size[d] = comm_dim(d)*X[d];
-    lattice_volume *= lattice_size[d];
-  }
+  set_layout(X);
 
-  /* Set the mapping of coordinates to nodes */
-  if(setup_layout(lattice_size, 4, QMP_get_number_of_nodes())!=0)
-    { printfQuda("Setup layout failed\n"); exit(0); }
-  printfQuda("%s layout set for %d nodes\n", myname, QMP_get_number_of_nodes());
-  int sites_on_node = num_sites(this_node);
+  QudaPrecision file_prec = precision;
 
-  /* Build the layout structure */
-  layout.node_number     = node_number;
-  layout.node_index      = node_index;
-  layout.get_coords      = get_coords;
-  layout.num_sites       = num_sites;
-  layout.latsize         = lattice_size;
-  layout.latdim          = lattice_dim;
-  layout.volume          = lattice_volume;
-  layout.sites_on_node   = sites_on_node;
-  layout.this_node       = this_node;
-  layout.number_of_nodes = QMP_get_number_of_nodes();
+  char type[128];
+  sprintf(type, "QUDA_%sNs%dNc%d_ColorSpinorField", (file_prec == QUDA_DOUBLE_PRECISION) ? "D" : "F", nSpin, nColor);
 
   /* Open the test file for reading */
-  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, QIO_PARALLEL, QIO_ILDGNO, myname);
+  QIO_Writer *outfile = open_test_output(filename, QIO_SINGLEFILE, QIO_PARALLEL, QIO_ILDGNO);
   if(outfile == NULL) { printfQuda("Open file failed\n"); exit(0); }
 
   /* Read the spinor field record */
-  printfQuda("%s: writing %d vector fields\n", myname, Nvec); fflush(stdout);
-  int status = write_field(outfile, 2*nSpin*nColor, Nvec, V, precision, precision, myname);
-  if(status) { printfQuda("write_spinor_fields failed %d\n", status); exit(0); }
+  printfQuda("%s: writing %d vector fields\n", __func__, Nvec); fflush(stdout);
+  int status = write_field(outfile, 2*nSpin*nColor, Nvec, V, precision, precision, nSpin, nColor, type);
+  if(status) { errorQuda("write_spinor_fields failed %d\n", status); }
 
   /* Close the file */
   QIO_close_write(outfile);
-  printfQuda("%s: Closed file for writing\n",myname);  
-    
+  printfQuda("%s: Closed file for writing\n",__func__);
 }

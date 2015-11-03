@@ -400,18 +400,18 @@ namespace quda {
   }
 
   void saveVectors(std::vector<ColorSpinorField*> &B) {
-    const int Nvec = B.size();
-    printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
-
-    void **V = new void*[Nvec];
-    for (int i=0; i<Nvec; i++) {
-      V[i] = B[i]->V();
-      if (V[i] == NULL) {
-	printfQuda("Could not allocate V[%d]\n", i);
-      }
-    }
-
     if (strcmp(vec_outfile,"")!=0) {
+      const int Nvec = B.size();
+      printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
+
+      void **V = static_cast<void**>(safe_malloc(Nvec*sizeof(void*)));
+      for (int i=0; i<Nvec; i++) {
+	V[i] = B[i]->V();
+	if (V[i] == NULL) {
+	  printfQuda("Could not allocate V[%d]\n", i);
+	}
+      }
+
 #if 0
       write_spinor_field(vec_outfile, &V[0], B[0]->Precision(), B[0]->X(),
 			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
@@ -424,9 +424,11 @@ namespace quda {
 			   B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
       }
 #endif
+
+      host_free(V);
+      printfQuda("Done saving vectors\n");
     }
 
-    printfQuda("Done saving vectors\n");
   }
 
 }

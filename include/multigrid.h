@@ -13,6 +13,7 @@ namespace quda {
 
   // FIXME - these definitions are strictly temporary
   void loadVectors(std::vector<ColorSpinorField*> &B);
+  void saveVectors(std::vector<ColorSpinorField*> &B);
 
   // forward declarations
   class MG;
