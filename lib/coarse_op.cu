@@ -863,7 +863,7 @@ namespace quda {
 
     typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder> F;
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
-    typedef typename gauge::FieldOrder<Float,coarseSpin*coarseColor,1,gOrder> gCoarse;
+    typedef typename gauge::FieldOrder<Float,coarseSpin*coarseColor,coarseSpin,gOrder> gCoarse;
 
     const ColorSpinorField &v = T.Vectors();
     int dummy = 0;
