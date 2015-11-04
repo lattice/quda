@@ -84,12 +84,12 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
   __device__ __host__ inline void rotateFineColor(FineColor &out, const complex<Float> in[fineSpin*coarseColor],
 						  const Rotator &V, int parity, int x_cb) {
-    for (int s=0; s<out.Nspin(); s++) 
-      for (int i=0; i<out.Ncolor(); i++) out(parity, x_cb, s, i) = 0.0;
+    for (int s=0; s<fineSpin; s++)
+      for (int i=0; i<fineColor; i++) out(parity, x_cb, s, i) = 0.0;
     
-    for (int i=0; i<fineColor; i++) {
-      for (int s=0; s<fineSpin; s++) {
-	for (int j=0; j<coarseColor; j++) { 
+    for (int s=0; s<fineSpin; s++) {
+      for (int i=0; i<fineColor; i++) {
+	for (int j=0; j<coarseColor; j++) {
 	  // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 	  out(parity, x_cb, s, i) += V(parity, x_cb, s, i, j) * in[s*coarseColor + j];
 	}

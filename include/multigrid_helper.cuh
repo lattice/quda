@@ -13,7 +13,7 @@ namespace quda {
    */
   template <int fineSpin, int coarseSpin>
   struct spin_mapper {
-     const int spin_block_size = (fineSpin != 1) ? fineSpin / coarseSpin : 1;
+    static constexpr int spin_block_size = (fineSpin != 1) ? fineSpin / coarseSpin : 1;
 
     /**
        Return the coarse spin coordinate from the fine spin coordinate (trivial opertion for the top level staggered field)

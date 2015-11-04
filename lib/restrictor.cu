@@ -40,9 +40,10 @@ namespace quda {
      A.S.: also works for staggered (fineSpin = 1)
   */
   template <typename Float, int fineSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
-  __device__ __host__ void rotateCoarseColor(complex<Float> out[fineSpin*coarseColor], 
-					     const FineColor &in, const Rotator &V, int parity, int x_cb) {
-    for (int s=0; s<fineSpin; s++) for (int i=0; i<coarseColor; i++) out[s*coarseColor+i] = 0.0;
+  __device__ __host__ inline void rotateCoarseColor(complex<Float> out[fineSpin*coarseColor],
+						    const FineColor &in, const Rotator &V, int parity, int x_cb) {
+    for (int s=0; s<fineSpin; s++)
+      for (int i=0; i<coarseColor; i++) out[s*coarseColor+i] = 0.0;
 
     for (int i=0; i<coarseColor; i++) { // coarse color
       for (int s=0; s<fineSpin; s++) {
@@ -214,7 +215,13 @@ namespace quda {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	tp.block.y = 2; // need factor of two for fine parity with in the block
 
-	if (block_size == 8) {
+	if (block_size == 2) {
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,2>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 4) {
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,4>
+	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	} else if (block_size == 8) {
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,8>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 16) {
