@@ -1597,6 +1597,7 @@ int mg_levels = 2;
 
 int nu_pre = 2;
 int nu_post = 2;
+bool generate_nullspace = true;
 
 int geo_block_size[] = {4, 4, 4, 4, 4};
 
@@ -1659,6 +1660,7 @@ void usage(char** argv )
   printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
   printf("    --mg-block-size <x y z t>                 # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
+  printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
   printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
   printf("    --help                                    # Print out this message\n"); 
@@ -2277,6 +2279,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mass= atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-generate-nullspace") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      generate_nullspace = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      generate_nullspace = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid generate nullspace type\n");
+      exit(1);
+    }
+
     i++;
     ret = 0;
     goto out;

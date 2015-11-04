@@ -49,6 +49,7 @@ extern int niter;
 extern int nvec;
 extern int mg_levels;
 
+extern bool generate_nullspace;
 extern int nu_pre;
 extern int nu_post;
 extern int geo_block_size[];
@@ -299,7 +300,8 @@ int main(int argc, char **argv)
   // coarse grid solver is GCR
   mg_param.smoother[mg_levels-1] = QUDA_GCR_INVERTER;
 
-  mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_NO;
+  mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
+    : QUDA_COMPUTE_NULL_VECTOR_NO;
 
   // declare the dimensions of the communication grid
   initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
