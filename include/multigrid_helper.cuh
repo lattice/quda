@@ -8,7 +8,7 @@ namespace quda {
    */
   template <int fineSpin, int coarseSpin>
   struct spin_mapper {
-    const int spin_block_size = fineSpin / coarseSpin;
+    static constexpr int spin_block_size = fineSpin / coarseSpin;
 
     /**
        Return the coarse spin coordinate from the fine spin coordinate
