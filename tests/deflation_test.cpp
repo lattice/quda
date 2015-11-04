@@ -42,7 +42,8 @@ extern QudaPrecision prec;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern double tol; // tolerance for inverter
-
+extern double mass;
+extern double anisotropy;
 
 extern char latfile[];
 
@@ -118,7 +119,7 @@ int main(int argc, char **argv)
   gauge_param.X[3] = tdim;
   inv_param.Ls = 1;
 
-  gauge_param.anisotropy = 1.0;
+  gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -134,7 +135,6 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.4086;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
