@@ -134,7 +134,7 @@ namespace quda {
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 	for(int c_row = 0; c_row < Nc; c_row++) //Color row
 	   for(int c_col = 0; c_col < Nc; c_col++) //Color column
-	      out[c_row] -= *(arg.Y(d, parity, x_cb, s_row, s_col, c_row, c_col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+	      out[c_row] -= (arg.Y(d, parity, x_cb, s_row, s_col, c_row, c_col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
       }
       //Backward link - compute back offset for spinor and gauge fetch
       {
