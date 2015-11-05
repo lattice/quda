@@ -60,8 +60,8 @@ namespace quda {
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
     };
 
-    template<int nSpin, int nColor, int nVec, int N> 
-      __device__ __host__ inline int indexFloatN2(int parity, int x_cb, int s, int c, int v, int stride, int offset_cb) {
+    template<int nSpin, int nColor, int nVec, int N>
+      __device__ __host__ inline int indexFloatN(int parity, int x_cb, int s, int c, int v, int stride, int offset_cb) {
       int j = (((s*nColor+c)*nVec+v)*2) / N; // factor of two for complexity
       int i = (((s*nColor+c)*nVec+v)*2) % N;      
       int index = ((j*stride+x_cb)*2+i) / 2; // back to a complex offset
@@ -76,7 +76,7 @@ namespace quda {
     AccessorCB(const ColorSpinorField &field): stride(field.Stride()), 
 	offset_cb((field.Bytes()>>1) / sizeof(complex<Float>)) { }
       __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const 
-      { return indexFloatN2<nSpin,nColor,nVec,(int)QUDA_FLOAT2_FIELD_ORDER>(parity,x_cb,s,c,v,stride,offset_cb); }
+      { return parity*offset_cb + ((s*nColor+c)*nVec+v)*stride+x_cb; }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -90,7 +90,7 @@ namespace quda {
 	}
       }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
-      { return indexFloatN2<nSpin,nColor,nVec,(int)QUDA_FLOAT2_FIELD_ORDER>(parity,x_cb,s,c,v,faceVolumeCB[dim],ghostOffset[dim]); }
+      { return parity*ghostOffset[dim] + ((s*nColor+c)*nVec+v)*faceVolumeCB[dim] + x_cb; }
     };
 
 
