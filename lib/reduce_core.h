@@ -434,6 +434,14 @@ template <typename ReduceType, typename Float, int nSpin, QudaFieldOrder order,
     value = genericReduce<ReduceType,Float,nSpin,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 6) {
     value = genericReduce<ReduceType,Float,nSpin,6,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Ncolor() == 8) {
+    value = genericReduce<ReduceType,Float,nSpin,8,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Ncolor() == 12) {
+    value = genericReduce<ReduceType,Float,nSpin,12,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Ncolor() == 16) {
+    value = genericReduce<ReduceType,Float,nSpin,16,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  } else if (x.Ncolor() == 20) {
+    value = genericReduce<ReduceType,Float,nSpin,20,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 24) {
     value = genericReduce<ReduceType,Float,nSpin,24,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Ncolor() == 72) {
@@ -450,12 +458,14 @@ template <typename ReduceType, typename Float, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
-  if (x.Nspin() == 1) {
-    value = genericReduce<ReduceType,Float,1,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+  if (x.Nspin() == 4) {
+    value = genericReduce<ReduceType,Float,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Nspin() == 2) {
     value = genericReduce<ReduceType,Float,2,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
-  } else if (x.Nspin() == 4) {
-    value = genericReduce<ReduceType,Float,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+#ifdef GPU_STAGGERED_DIRAC
+  } else if (x.Nspin() == 1) {
+    value = genericReduce<ReduceType,Float,1,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
+#endif
   } else {
     errorQuda("nSpin = %d not implemeneted",x.Nspin());
   }

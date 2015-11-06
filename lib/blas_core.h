@@ -173,6 +173,16 @@ template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int write
     genericBlas<Float,nSpin,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 3) {
     genericBlas<Float,nSpin,3,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 4) {
+    genericBlas<Float,nSpin,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 8) {
+    genericBlas<Float,nSpin,8,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 12) {
+    genericBlas<Float,nSpin,12,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 16) {
+    genericBlas<Float,nSpin,16,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  } else if (x.Ncolor() == 20) {
+    genericBlas<Float,nSpin,20,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Ncolor() == 24) {
     genericBlas<Float,nSpin,24,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else {
@@ -182,12 +192,14 @@ template <typename Float, int nSpin, QudaFieldOrder order, int writeX, int write
 
 template <typename Float, QudaFieldOrder order, int writeX, int writeY, int writeZ, int writeW, typename Functor>
   void genericBlas(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, Functor f) {
-  if (x.Nspin() == 1) {
-    genericBlas<Float,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+  if (x.Nspin() == 4) {
+    genericBlas<Float,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
   } else if (x.Nspin() == 2) {
     genericBlas<Float,2,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
-  } else if (x.Nspin() == 4) {
-    genericBlas<Float,4,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+#ifdef GPU_STAGGERED_DIRAC
+  } else if (x.Nspin() == 1) {
+    genericBlas<Float,1,order,writeX,writeY,writeZ,writeW,Functor>(x, y, z, w, f);
+#endif
   } else {
     errorQuda("nSpin = %d not implemeneted",x.Nspin());
   }
