@@ -202,35 +202,22 @@ namespace quda {
     }
   }
 
-  template <typename Float, int fineSpin, int fineColor, QudaFieldOrder order>
-  void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                  int nVec, const int *fine_to_coarse, const int *spin_map) {
-
-    if (in.Nspin() == 2) {
-      Prolongate<Float,fineSpin,fineColor,2,order>(out, in, v, nVec, fine_to_coarse, spin_map);
-#ifdef GPU_STAGGERED_DIRAC
-    } else if (in.Nspin() == 1) {
-      Prolongate<Float,fineSpin,fineColor,1,order>(out, in, v, nVec, fine_to_coarse, spin_map);
-#endif
-    } else {
-      errorQuda("Coarse spin %d is not supported", in.Nspin());
-    }
-  }
-
   template <typename Float, int fineSpin, QudaFieldOrder order>
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
 		  int Nvec, const int *fine_to_coarse, const int *spin_map) {
 
+    if (in.Nspin() != 2) errorQuda("Coarse spin %d is not supported", in.Nspin());
+
     if (out.Ncolor() == 3) {
-      Prolongate<Float,fineSpin,3,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,3,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 2) {
-      Prolongate<Float,fineSpin,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,2,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 8) {
-      Prolongate<Float,fineSpin,8,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,8,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 24) {
-      Prolongate<Float,fineSpin,24,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,24,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 48) {
-      Prolongate<Float,fineSpin,48,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+      Prolongate<Float,fineSpin,48,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else {
       errorQuda("Unsupported nColor %d", out.Ncolor());
     }
