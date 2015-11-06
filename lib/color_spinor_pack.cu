@@ -163,6 +163,12 @@ namespace quda {
       genericPackGhost<Float,order,Ns,4>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 6) {
       genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 12) {
+      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 16) {
+      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 20) {
+      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 24) {
       genericPackGhost<Float,order,Ns,24>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 72) {
@@ -180,8 +186,10 @@ namespace quda {
       genericPackGhost<Float,order,4>(ghost, a, parity, dagger);
     } else if (a.Nspin() == 2) {
       genericPackGhost<Float,order,2>(ghost, a, parity, dagger);
+#ifdef GPU_STAGGERED_DIRAC
     } else if (a.Nspin() == 1) {
       genericPackGhost<Float,order,1>(ghost, a, parity, dagger);
+#endif
     } else {
       errorQuda("Unsupported nSpin = %d", a.Nspin());
     }
@@ -206,6 +214,13 @@ namespace quda {
     if (a.FieldOrder() == QUDA_QOP_DOMAIN_WALL_FIELD_ORDER) {
       errorQuda("Field order %d not supported", a.FieldOrder());
     }
+
+    // only do packing if one of the dimensions is partitioned
+    // FIXME enabling this will break reference dslash
+    //bool partitioned;
+    //for (int d=0; d<4; d++)
+    //if (comm_dim_partitioned(d)) partiitoned = true;
+    //if (!partitioned) return;
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       genericPackGhost<double>(ghost, a, parity, dagger);
