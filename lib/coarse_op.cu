@@ -177,12 +177,12 @@ namespace quda {
 		  int y_cb = linkIndexP1(coord, x_size, dim);
 		  complex<Float> ghost = V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
 		  complex<Float> bulk = V((parity+1)&1, y_cb, s, jc, ic_c);
-
+#if 0
 		  if (ghost != bulk) {
 		    printf("s=%d ic_c=%d ic=%d jc=%d bulk = %e %e ghost = %e %e\n",
 			   s, ic_c, ic, jc, bulk.real(), bulk.imag(), ghost.real(), ghost.imag());
 		  }
-
+#endif
 		}  //Fine color columns
 	      }  //Fine color rows
 	    }  //Coarse color
@@ -524,6 +524,16 @@ namespace quda {
 
     if (coarseColor == 2) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, T, g, c, kappa);
+    } else if (coarseColor == 4) {
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,4,coarseSpin>(Y, X, uv, T, g, c, kappa);
+    } else if (coarseColor == 8) {
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,8,coarseSpin>(Y, X, uv, T, g, c, kappa);
+    } else if (coarseColor == 12) {
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,12,coarseSpin>(Y, X, uv, T, g, c, kappa);
+    } else if (coarseColor == 16) {
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,16,coarseSpin>(Y, X, uv, T, g, c, kappa);
+    } else if (coarseColor == 20) {
+      calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,20,coarseSpin>(Y, X, uv, T, g, c, kappa);
     } else if (coarseColor == 24) {
       calculateY<Float,csOrder,gOrder,clOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, c, kappa);
     } else {

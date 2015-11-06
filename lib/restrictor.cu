@@ -175,13 +175,7 @@ namespace quda {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	tp.block.y = 2; // need factor of two for fine parity with in the block
 
-	if (block_size == 2) {
-	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,2>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (block_size == 4) {
-	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,4>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-	} else if (block_size == 8) {
+	if (block_size == 8) {
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,8>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 16) {
@@ -249,6 +243,16 @@ namespace quda {
 
     if (nVec == 2) {
       Restrict<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+    } else if (nVec == 4) {
+      Restrict<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+    } else if (nVec == 8) {
+      Restrict<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+    } else if (nVec == 12) {
+      Restrict<Float,fineSpin,fineColor,coarseSpin,12,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+    } else if (nVec == 16) {
+      Restrict<Float,fineSpin,fineColor,coarseSpin,16,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+    } else if (nVec == 20) {
+      Restrict<Float,fineSpin,fineColor,coarseSpin,20,order>(out, in, v, fine_to_coarse, coarse_to_fine);
     } else if (nVec == 24) {
       Restrict<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, coarse_to_fine);
     } else if (nVec == 48) {
@@ -281,6 +285,8 @@ namespace quda {
       Restrict<Float,fineSpin,3,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 2) {
       Restrict<Float,fineSpin,2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (in.Ncolor() == 8) {
+      Restrict<Float,fineSpin,8,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 24) {
       Restrict<Float,fineSpin,24,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 48) {

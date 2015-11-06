@@ -183,6 +183,16 @@ namespace quda {
 
     if (nVec == 2) {
       Prolongate<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse);
+    } else if (nVec == 4) {
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse);
+    } else if (nVec == 8) {
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse);
+    } else if (nVec == 12) {
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,12,order>(out, in, v, fine_to_coarse);
+    } else if (nVec == 16) {
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,16,order>(out, in, v, fine_to_coarse);
+    } else if (nVec == 20) {
+      Prolongate<Float,fineSpin,fineColor,coarseSpin,20,order>(out, in, v, fine_to_coarse);
     } else if (nVec == 24) {
       Prolongate<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse);
     } else if (nVec == 48) {
@@ -215,6 +225,8 @@ namespace quda {
       Prolongate<Float,fineSpin,3,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 2) {
       Prolongate<Float,fineSpin,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+    } else if (out.Ncolor() == 8) {
+      Prolongate<Float,fineSpin,8,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 24) {
       Prolongate<Float,fineSpin,24,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 48) {

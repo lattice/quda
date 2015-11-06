@@ -39,6 +39,16 @@ namespace quda {
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec) {
     if (Nvec == 2) {
       FillV<Float,nSpin,nColor,2,order>(V,B);
+    } else if (Nvec == 4) {
+      FillV<Float,nSpin,nColor,4,order>(V,B);
+    } else if (Nvec == 8) {
+      FillV<Float,nSpin,nColor,8,order>(V,B);
+    } else if (Nvec == 12) {
+      FillV<Float,nSpin,nColor,12,order>(V,B);
+    } else if (Nvec == 16) {
+      FillV<Float,nSpin,nColor,16,order>(V,B);
+    } else if (Nvec == 20) {
+      FillV<Float,nSpin,nColor,20,order>(V,B);
     } else if (Nvec == 24) {
       FillV<Float,nSpin,nColor,24,order>(V,B);
     } else if (Nvec == 48) {
@@ -58,6 +68,8 @@ namespace quda {
       FillV<Float,nSpin,2,order>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 3) {
       FillV<Float,nSpin,3,order>(V,B,Nvec);
+    } else if(B[0]->Ncolor() == 8) {
+      FillV<Float,nSpin,8,order>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 24) {
       FillV<Float,nSpin,24,order>(V,B,Nvec);
     } else {
@@ -339,6 +351,16 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, const int *geo_map, int spin_bs) {
     if (Nvec == 2) {
       BlockOrthogonalize<Float,nSpin,nColor,2,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 4) {
+      BlockOrthogonalize<Float,nSpin,nColor,4,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 8) {
+      BlockOrthogonalize<Float,nSpin,nColor,8,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 12) {
+      BlockOrthogonalize<Float,nSpin,nColor,12,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 16) {
+      BlockOrthogonalize<Float,nSpin,nColor,16,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 20) {
+      BlockOrthogonalize<Float,nSpin,nColor,20,order>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 24) {
       BlockOrthogonalize<Float,nSpin,nColor,24,order>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 48) {
@@ -356,6 +378,9 @@ namespace quda {
     }
     else if (V.Ncolor()/Nvec == 2) {
       BlockOrthogonalize<Float,nSpin,2,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    }
+    else if (V.Ncolor()/Nvec == 8) {
+      BlockOrthogonalize<Float,nSpin,8,order>(V, Nvec, geo_bs, geo_map, spin_bs);
     }
     else if (V.Ncolor()/Nvec == 24) {
       BlockOrthogonalize<Float,nSpin,24,order>(V, Nvec, geo_bs, geo_map, spin_bs);
