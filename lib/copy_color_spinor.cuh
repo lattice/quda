@@ -427,4 +427,36 @@ namespace quda {
     
   }
 
+#ifdef GPU_MULTIGRID
+#define INSTANTIATE_COLOR						\
+  switch(src.Ncolor()) {						\
+  case 1:								\
+    CopyGenericColorSpinor<1>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 2:								\
+    CopyGenericColorSpinor<2>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 4:								\
+    CopyGenericColorSpinor<4>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 6:								\
+    CopyGenericColorSpinor<6>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 9:								\
+    CopyGenericColorSpinor<9>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 24:								\
+    CopyGenericColorSpinor<24>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 72:								\
+    CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  default:								\
+    errorQuda("Ncolors=%d not supported", src.Ncolor());		\
+  }
+#else
+#define INSTANTIATE_COLOR
+#endif
+
+
 } // namespace quda
