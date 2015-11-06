@@ -2781,8 +2781,6 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
   Solver *K = new MG(mgParam, profileInvert);
   profileInvert.TPSTOP(QUDA_PROFILE_INIT);
 
-  //(*K)(*out, *in);
-
   SolverParam solverParam(*param);
   printfQuda("Creating GCR solver with MG preconditioner\n");
   Solver *solve = new GCR(m, *K, mSloppy, mPre, solverParam, profileInvert);
