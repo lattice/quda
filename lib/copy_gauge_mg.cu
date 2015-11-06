@@ -96,11 +96,24 @@ namespace quda {
 
 #ifdef GPU_MULTIGRID
     if (in.Ncolor() == 4) {
-      // we are doing gauge field packing
       const int Nc = 4;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 8) {
+      const int Nc = 8;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 16) {
+      const int Nc = 16;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 24) {
+      const int Nc = 24;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 32) {
+      const int Nc = 32;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
+    } else  if (in.Ncolor() == 40) {
+      const int Nc = 40;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else  if (in.Ncolor() == 48) {
-      // we are doing gauge field packing
       const int Nc = 48;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else 

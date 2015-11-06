@@ -194,6 +194,7 @@ namespace quda {
       // for full fields then set parity from loop else use arg setting
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
+      //#pragma omp parallel for
       for(int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { //Volume
 	for (int s=0; s<2; s++) {
 	  coarseDslash<Float,F,G,nDim,Ns,Nc>(arg, x_cb, parity, s);
@@ -211,8 +212,8 @@ namespace quda {
     if (x_cb >= arg.volumeCB) return;
 
     // for full fields then set parity from y thread index else use arg setting
-    int parity = (blockDim.y == 2) ? threadIdx.y : arg.parity;
-    int s = threadIdx.z;
+    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    int s = blockDim.z*blockIdx.z + threadIdx.z;
 
     coarseDslash<Float,F,G,nDim,Ns,Nc>(arg, x_cb, parity, s);
   }
@@ -224,7 +225,10 @@ namespace quda {
     CoarseDslashArg<Float,F,G> &arg;
     const ColorSpinorField &meta;
 
-    long long flops() const { return 0; }
+    long long flops() const
+    {
+      return ((2*nDim+1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*arg.nParity*arg.volumeCB;
+    }
     long long bytes() const
     {
       return arg.out.Bytes() + 8*arg.inA.Bytes() + arg.inB.Bytes() + arg.nParity*(8*arg.Y.Bytes() + arg.X.Bytes());
@@ -234,27 +238,63 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.volumeCB; }
 
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      dim3 block = param.block;
+      dim3 grid = param.grid;
+      bool ret = Tunable::advanceBlockDim(param);
+      param.block.y = block.y; param.block.z = block.z;
+      param.grid.y = grid.y; param.grid.z = grid.z;
+
+      if (ret) { // we advanced the block.x so we're done
+	return true;
+      } else { // block.x (spacetime) was reset
+
+	if (param.block.y == 1 && arg.nParity == 2) { // advance parity
+	  param.block.y = arg.nParity;
+	  param.grid.y = 1;
+	  return true;
+	} else {
+	  // reset parity
+	  param.block.y = 1;
+	  param.grid.y = arg.nParity;
+
+	  if (param.block.z == 1) { // advance spin
+	    param.block.z = 2;
+	    param.grid.z = 1;
+	    return true;
+	  } else { // we cannot advance so let's reset
+	    param.block.z = 1;
+	    param.grid.z = 2;
+	    return false;
+	  }
+	}
+      }
+    }
+
     bool advanceTuneParam(TuneParam &param) const 
     {
       bool rtn = Tunable::advanceTuneParam(param);
-      param.block.y = arg.nParity;
-      param.block.z = 2;
       return rtn;
     }
 
     virtual void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.block.y = arg.nParity;
-      param.block.z = 2;
+      param.block.y = 1;
+      param.grid.y = arg.nParity;
+      param.block.z = 1;
+      param.grid.z = 2;
     }
 
     /** sets default values for when tuning is disabled */
     virtual void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
-      param.block.y = arg.nParity;
-      param.block.z = 2;
+      param.block.y = 1;
+      param.grid.y = arg.nParity;
+      param.block.z = 1;
+      param.grid.z = 2;
     }
 
 
@@ -324,10 +364,20 @@ namespace quda {
     if (inA.Nspin() != 2)
       errorQuda("Unsupported number of coarse spins %d\n",inA.Nspin());
 
-    if (inA.Ncolor() == 2) { 
-      ApplyCoarse<Float,csOrder,gOrder,2,2>(out, inA, inB, Y, X, kappa,is_staggered, parity);
-    } else if (inA.Ncolor() == 24) { 
-      ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa,is_staggered, parity);
+    if (inA.Ncolor() == 2) {
+      ApplyCoarse<Float,csOrder,gOrder,2,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 4) {
+      ApplyCoarse<Float,csOrder,gOrder,4,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 8) {
+      ApplyCoarse<Float,csOrder,gOrder,8,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 12) {
+      ApplyCoarse<Float,csOrder,gOrder,12,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 16) {
+      ApplyCoarse<Float,csOrder,gOrder,16,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 20) {
+      ApplyCoarse<Float,csOrder,gOrder,20,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 24) {
+      ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

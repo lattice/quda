@@ -43,7 +43,7 @@ namespace quda {
     template<typename Float, int nColor>
       struct Accessor<Float,nColor,QUDA_QDP_GAUGE_ORDER> {
       complex <Float> *u[QUDA_MAX_DIM];
-      const size_t cb_offset;
+      const int cb_offset;
     Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
       : cb_offset((U.Bytes()>>1) / (sizeof(complex<Float>)*U.Geometry())) {
 	for (int d=0; d<U.Geometry(); d++)
@@ -54,7 +54,7 @@ namespace quda {
 	for (int d=0; d<QUDA_MAX_DIM; d++)
 	  u[d] = a.u[d];
       }
-      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return u[d][ parity*cb_offset + (x*nColor + row)*nColor + col]; }
     };
 
@@ -75,16 +75,16 @@ namespace quda {
 	  ghostOffset[d] = a.ghostOffset[d];
 	}
       }
-      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x, int row, int col) const
       { return ghost[d][ parity*ghostOffset[d] + (x*nColor + row)*nColor + col]; }
     };
 
     template<int nColor, int N>
-      __device__ __host__ int indexFloatN(int dir, int parity, int x_cb, int row, int col, int stride, int offset_cb) {
-      const int M = (2*nColor*nColor) / N;
+      __device__ __host__ inline int indexFloatN(int dim, int parity, int x_cb, int row, int col, int stride, int offset_cb) {
+      constexpr int M = (2*nColor*nColor) / N;
       int j = ((row*nColor+col)*2) / N; // factor of two for complexity
       int i = ((row*nColor+col)*2) % N;
-      int index = ((x_cb + dir*stride*M + j*stride)*2+i) / 2; // back to a complex offset
+      int index = ((x_cb + dim*stride*M + j*stride)*2+i) / 2; // back to a complex offset
       index += parity*offset_cb;
       return index;
     };
@@ -92,16 +92,16 @@ namespace quda {
     template<typename Float, int nColor>
       struct Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> {
       complex<Float> *u;
-      const size_t cb_offset;
+      const int offset_cb;
       const int stride;
     Accessor(const GaugeField &U, void *gauge_=0, void **ghost_=0)
       : u(gauge_ ? static_cast<complex<Float>*>(gauge_) :
 	  static_cast<complex<Float>*>(const_cast<void*>(U.Gauge_p()))),
-	cb_offset( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride())
+	offset_cb( (U.Bytes()>>1) / sizeof(complex<Float>)), stride(U.Stride())
 	{  }
-    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a): u(a.u), cb_offset(a.cb_offset), stride(a.stride) {  }
-      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
-      { return u[indexFloatN<nColor,QUDA_FLOAT2_GAUGE_ORDER>(d, parity, x, row, col, stride, cb_offset)]; }
+    Accessor(const Accessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a): u(a.u), offset_cb(a.offset_cb), stride(a.stride) {  }
+      __device__ __host__ inline complex<Float>& operator()(int dim, int parity, int x_cb, int row, int col) const
+      { return u[parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb]; }
     };
 
     template<typename Float, int nColor>
@@ -112,8 +112,8 @@ namespace quda {
       : volumeCB(U.VolumeCB()), accessor(U, gauge_, ghost_) {  }
     GhostAccessor(const GhostAccessor<Float,nColor,QUDA_FLOAT2_GAUGE_ORDER> &a)
       : volumeCB(a.volumeCB), accessor(a.accessor) {  }
-      __device__ __host__ complex<Float>& operator()(int d, int parity, int x, int row, int col) const
-      { return accessor(d, parity, x+volumeCB, row, col); }
+      __device__ __host__ inline complex<Float>& operator()(int d, int parity, int x_cb, int row, int col) const
+      { return accessor(d, parity, x_cb+volumeCB, row, col); }
     };
 
 

@@ -88,6 +88,16 @@ namespace quda {
       genericSource<Float,nSpin,2,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 3) {
       genericSource<Float,nSpin,3,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 4) {
+      genericSource<Float,nSpin,4,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 8) {
+      genericSource<Float,nSpin,8,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 12) {
+      genericSource<Float,nSpin,12,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 16) {
+      genericSource<Float,nSpin,16,order>(a,sourceType, x, s, c);
+    } else if (a.Ncolor() == 20) {
+      genericSource<Float,nSpin,20,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 24) {
       genericSource<Float,nSpin,24,order>(a,sourceType, x, s, c);
     } else {

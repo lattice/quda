@@ -109,13 +109,8 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
-  // initialize QMP or MPI
-#if defined(QMP_COMMS)
-  QMP_thread_level_t tl;
-  QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
-#elif defined(MPI_COMMS)
-  MPI_Init(&argc, &argv);
-#endif
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
 
   // call srand() with a rank-dependent seed
   initRand();
@@ -303,9 +298,6 @@ int main(int argc, char **argv)
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
 
-  // declare the dimensions of the communication grid
-  initCommsGridQuda(4, gridsize_from_cmdline, NULL, NULL);
-
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -375,15 +367,12 @@ int main(int argc, char **argv)
   memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
   memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
 
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION)
-  {
-    for (int i=0; i<3; i++) ((float*)spinorIn)[(niter*3+i)*2+0] = 1.0;
-    //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-  }
-  else
-  {
-    for (int i=0; i<3; i++) ((double*)spinorIn)[(niter*3+i)*2+0] = 1.0;
-    //for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+    //((float*)spinorIn)[0] = 1.0;
+    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+  } else {
+    //((double*)spinorIn)[0] = 1.0;
+    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
   }
 
   // start the timer
