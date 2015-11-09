@@ -174,10 +174,10 @@ namespace quda {
 	      for(int ic = 0; ic < G.Ncolor(); ic++) { //Fine Color rows of gauge field
 		for(int jc = 0; jc < G.Ncolor(); jc++) {  //Fine Color columns of gauge field
 		  UV(parity, x_cb, s, ic, ic_c) += G(dim, parity, x_cb, ic, jc) * V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
+#if 0
 		  int y_cb = linkIndexP1(coord, x_size, dim);
 		  complex<Float> ghost = V.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c);
 		  complex<Float> bulk = V((parity+1)&1, y_cb, s, jc, ic_c);
-#if 0
 		  if (ghost != bulk) {
 		    printf("s=%d ic_c=%d ic=%d jc=%d bulk = %e %e ghost = %e %e\n",
 			   s, ic_c, ic, jc, bulk.real(), bulk.imag(), ghost.real(), ghost.imag());
