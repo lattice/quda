@@ -18,7 +18,7 @@
     if (a.Precision() != b.Precision())					\
       errorQuda("precisions do not match: %d %d", a.Precision(), b.Precision()); \
     if (a.Length() != b.Length())					\
-      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+      errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
     if (a.Stride() != b.Stride())					\
       errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
   }
@@ -26,7 +26,7 @@
 #define checkLength(a, b)						\
   {									\
     if (a.Length() != b.Length())					\
-      errorQuda("lengths do not match: %d %d", a.Length(), b.Length());	\
+      errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
     if (a.Stride() != b.Stride())					\
       errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
   }
