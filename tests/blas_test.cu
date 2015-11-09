@@ -98,8 +98,8 @@ bool skip_kernel(int precision, int kernel) {
 void initFields(int prec)
 {
   // precisions used for the source field in the copyCuda() benchmark
-  QudaPrecision high_aux_prec;
-  QudaPrecision low_aux_prec;
+  QudaPrecision high_aux_prec = QUDA_INVALID_PRECISION;
+  QudaPrecision low_aux_prec = QUDA_INVALID_PRECISION;
 
   ColorSpinorParam param;
   param.nColor = Ncolor;
@@ -159,6 +159,8 @@ void initFields(int prec)
     high_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_HALF_PRECISION;
     break;
+  default:
+    errorQuda("Precision option not defined");
   }
 
   checkCudaError();
