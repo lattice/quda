@@ -46,8 +46,8 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc>
-  __device__ __host__ inline void dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row) {
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
+  __device__ __host__ inline void dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
     int coord[5];
@@ -61,23 +61,32 @@ namespace quda {
 	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	  int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
 
-	  for(int c_row = 0; c_row < Nc; c_row++) //Color row
+	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
+	    int c_row = color_block + color_local; // global color index
+	    int row = s_row*Nc + c_row;
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
 	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
-	      for(int c_col = 0; c_col < Nc; c_col++) //Color column
-		out[c_row] += sign*(arg.Y(d, parity, x_cb, s_row, s_col, c_row, c_col)) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col);
+	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
+		int col = s_col*Nc + c_col;
+		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col);
+	      }
 	    }
-
+	  }
 	} else {
 
-	  for(int c_row = 0; c_row < Nc; c_row++) //Color row
+	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
+	    int c_row = color_block + color_local; // global color index
+	    int row = s_row*Nc + c_row;
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
 	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
-	      for(int c_col = 0; c_col < Nc; c_col++) //Color column
-		out[c_row] += sign*(arg.Y(d, parity, x_cb, s_row, s_col, c_row, c_col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
+		int col = s_col*Nc + c_col;
+		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+	      }
 	    }
-
+	  }
 	}
+
       }
 
       //Backward link - compute back offset for spinor and gauge fetch
@@ -86,16 +95,25 @@ namespace quda {
 	const int gauge_idx = back_idx;
 	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
 	  const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
-	  for (int c_row=0; c_row<Nc; c_row++)
+	  for (int color_local=0; color_local<Mc; color_local++) {
+	    int c_row = color_block + color_local;
+	    int row = s_row*Nc + c_row;
 	    for (int s_col=0; s_col<Ns; s_col++)
-	      for (int c_col=0; c_col<Nc; c_col++)
-		out[c_row] += conj(arg.Y.Ghost(d, (parity+1)&1, ghost_idx, s_row, s_col, c_row, c_col)) * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col);
-
+	      for (int c_col=0; c_col<Nc; c_col++) {
+		int col = s_col*Nc + c_col;
+		out[color_local] += conj(arg.Y.Ghost(d, (parity+1)&1, ghost_idx, col, row)) * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col);
+	      }
+	  }
 	} else {
-	    for(int c_row = 0; c_row < Nc; c_row++)
-	      for(int s_col = 0; s_col < Ns; s_col++)
-		for(int c_col = 0; c_col < Nc; c_col++)
-		  out[c_row] += conj(arg.Y(d, (parity+1)&1, gauge_idx, s_col, s_row, c_col, c_row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+	  for(int color_local = 0; color_local < Mc; color_local++) {
+	    int c_row = color_block + color_local;
+	    int row = s_row*Nc + c_row;
+	    for(int s_col = 0; s_col < Ns; s_col++)
+	      for(int c_col = 0; c_col < Nc; c_col++) {
+		int col = s_col*Nc + c_col;
+		out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+	      }
+	  }
 
 	}
 
@@ -103,7 +121,7 @@ namespace quda {
     }
 
     // apply kappa
-    for (int c=0; c<Nc; c++) out[c] *= -(Float)2.0*arg.kappa;
+    for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -(Float)2.0*arg.kappa;
   }
 
   /**
@@ -116,33 +134,42 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
-  template <typename Float, typename F, typename G, int Ns, int Nc>
-  __device__ __host__ inline void clover(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s) {
+  template <typename Float, typename F, typename G, int Ns, int Nc, int Mc>
+  __device__ __host__ inline void clover(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block) {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
-    for(int c = 0; c < Nc; c++) //Color out
+    // M is number of colors per thread
+    for(int color_local = 0; color_local < Mc; color_local++) {//Color out
+      int c = color_block + color_local; // global color index
+      int row = s*Nc + c;
       for(int s_col = 0; s_col < Ns; s_col++) //Spin in
-	for(int c_col = 0; c_col < Nc; c_col++) //Color in
+	for(int c_col = 0; c_col < Nc; c_col++) { //Color in
 	  //Factor of 2*kappa and diagonal addition now incorporated in X
-	  out[c] += arg.X(0, parity, x_cb, s, s_col, c, c_col) * arg.inB(spinor_parity, x_cb, s_col, c_col);
+	  int col = s_col*Nc + c_col;
+	  out[color_local] += arg.X(0, parity, x_cb, row, col) * arg.inB(spinor_parity, x_cb, s_col, c_col);
+	}
+    }
 
   }
 
   //out(x) = M*in = \sum_mu Y_{-\mu}(x)in(x+mu) + Y^\dagger_mu(x-mu)in(x-mu)
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc>
-  __device__ __host__ inline void coarseDslash(CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s)
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
+  __device__ __host__ inline void coarseDslash(CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block)
   {
-    complex <Float> out[Nc];
-    for (int c=0; c<Nc; c++) out[c] = 0.0;
-    dslash<Float,F,G,nDim,Ns,Nc>(out, arg, x_cb, parity, s);
-    clover<Float,F,G,Ns,Nc>(out, arg, x_cb, parity, s);
+    complex <Float> out[Mc];
+    for (int c=0; c<Mc; c++) out[c] = 0.0;
+    dslash<Float,F,G,nDim,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
+    clover<Float,F,G,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
 
     const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
-    for (int c=0; c<Nc; c++) arg.out(my_spinor_parity, x_cb, s, c) = out[c];
+    for (int color_local=0; color_local<Mc; color_local++) {
+      int c = color_block + color_local; // global color index
+      arg.out(my_spinor_parity, x_cb, s, c) = out[color_local];
+    }
   }
 
   // CPU kernel for applying the coarse Dslash to a vector
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc>
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
   void coarseDslash(CoarseDslashArg<Float,F,G> arg)
   {
     for (int parity= 0; parity < arg.nParity; parity++) {
@@ -152,7 +179,9 @@ namespace quda {
       //#pragma omp parallel for
       for(int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { //Volume
 	for (int s=0; s<2; s++) {
-	  coarseDslash<Float,F,G,nDim,Ns,Nc>(arg, x_cb, parity, s);
+	  for (int color_block=0; color_block<Nc; color_block+=Mc) { // Mc=Nc means all colors in a thread
+	    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc>(arg, x_cb, parity, s, color_block);
+	  }
 	}
       }//VolumeCB
     } // parity
@@ -160,7 +189,7 @@ namespace quda {
   }
 
   // GPU Kernel for applying the coarse Dslash to a vector
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc>
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
   __global__ void coarseDslashKernel(CoarseDslashArg<Float,F,G> arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
@@ -168,12 +197,14 @@ namespace quda {
 
     // for full fields then set parity from y thread index else use arg setting
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
-    int s = blockDim.z*blockIdx.z + threadIdx.z;
+    int sM = blockDim.z*blockIdx.z + threadIdx.z;
+    int s = sM / (Nc/Mc);
+    int color_block = (sM % (Nc/Mc)) * Mc;
 
-    coarseDslash<Float,F,G,nDim,Ns,Nc>(arg, x_cb, parity, s);
+    coarseDslash<Float,F,G,nDim,Ns,Nc,Mc>(arg, x_cb, parity, s, color_block);
   }
 
-  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc>
+  template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
   class CoarseDslash : public Tunable {
 
   protected:
@@ -214,15 +245,24 @@ namespace quda {
 	  param.block.y = 1;
 	  param.grid.y = arg.nParity;
 
-	  if (param.block.z == 1) { // advance spin
-	    param.block.z = 2;
-	    param.grid.z = 1;
+	  // let's try to advance spin/block-color
+	  while(param.block.z <= 2* (Nc/Mc)) {
+	    param.block.z++;
+	    if ( (2*(Nc/Mc)) % param.block.z == 0) {
+	      param.grid.z = (2 * (Nc/Mc)) / param.block.z;
+	      break;
+	    }
+	  }
+
+	  // we can advance spin/block-color since this is valid
+	  if (param.block.z <= 2 * (Nc/Mc)) { //
 	    return true;
-	  } else { // we cannot advance so let's reset
+	  } else { // we have run off the end so let's reset
 	    param.block.z = 1;
-	    param.grid.z = 2;
+	    param.grid.z = 2 * (Nc/Mc);
 	    return false;
 	  }
+
 	}
       }
     }
@@ -239,7 +279,7 @@ namespace quda {
       param.block.y = 1;
       param.grid.y = arg.nParity;
       param.block.z = 1;
-      param.grid.z = 2;
+      param.grid.z = 2*(Nc/Mc);
     }
 
     /** sets default values for when tuning is disabled */
@@ -249,7 +289,7 @@ namespace quda {
       param.block.y = 1;
       param.grid.y = arg.nParity;
       param.block.z = 1;
-      param.grid.z = 2;
+      param.grid.z = 2*(Nc/Mc);
     }
 
 
@@ -272,10 +312,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	coarseDslash<Float,F,G,nDim,Ns,Nc>(arg);
+	coarseDslash<Float,F,G,nDim,Ns,Nc,Mc>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	coarseDslashKernel<Float,F,G,nDim,Ns,Nc> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	coarseDslashKernel<Float,F,G,nDim,Ns,Nc,Mc> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
 
@@ -298,7 +338,9 @@ namespace quda {
     G yAccessor(const_cast<GaugeField&>(Y));
     G xAccessor(const_cast<GaugeField&>(X));
     CoarseDslashArg<Float,F,G> arg(outAccessor, inAccessorA, inAccessorB, yAccessor, xAccessor, (Float)kappa, parity, inA);
-    CoarseDslash<Float,F,G,4,coarseSpin,coarseColor> dslash(arg, inA);
+
+    const int colors_per_thread = 2;
+    CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread> dslash(arg, inA);
     dslash.apply(0);
   }
 
