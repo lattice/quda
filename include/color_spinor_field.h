@@ -189,8 +189,8 @@ namespace quda {
 
     QudaDWFPCType PCtype; // used to select preconditioning method in DWF
 
-    int real_length; // physical length only
-    int length; // length including pads, but not ghost zone - used for BLAS
+    size_t real_length; // physical length only
+    size_t length; // length including pads, but not ghost zone - used for BLAS
 
     void *v; // the field elements
     void *norm; // the normalization field
@@ -200,8 +200,8 @@ namespace quda {
     int eigv_id;
     int eigv_volume;       // volume of a single eigenvector 
     int eigv_stride;       // stride of a single eigenvector
-    int eigv_real_length;  // physical length of a single eigenvector
-    int eigv_length;       // length including pads (but not ghost zones)
+    size_t eigv_real_length;  // physical length of a single eigenvector
+    size_t eigv_length;       // length including pads (but not ghost zones)
 
     // multi-GPU parameters
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
@@ -211,10 +211,10 @@ namespace quda {
     int ghostOffset[QUDA_MAX_DIM]; // offsets to each ghost zone
     int ghostNormOffset[QUDA_MAX_DIM]; // offsets to each ghost zone for norm field
 
-    int ghost_length; // length of ghost zone
-    int ghost_norm_length; // length of ghost zone for norm
-    int total_length; // total length of spinor (physical + pad + ghost)
-    int total_norm_length; // total length of norm
+    size_t ghost_length; // length of ghost zone
+    size_t ghost_norm_length; // length of ghost zone for norm
+    size_t total_length; // total length of spinor (physical + pad + ghost)
+    size_t total_norm_length; // total length of norm
 
     mutable void *ghost_fixme[2*QUDA_MAX_DIM];
 
@@ -225,10 +225,10 @@ namespace quda {
     //multi_GPU parameters:
     
     //ghost pointers are always for single eigenvector..
-    int eigv_total_length;
-    int eigv_total_norm_length;
-    int eigv_ghost_length;
-    int eigv_ghost_norm_length;
+    size_t eigv_total_length;
+    size_t eigv_total_norm_length;
+    size_t eigv_ghost_length;
+    size_t eigv_ghost_norm_length;
 
     size_t eigv_bytes;      // size in bytes of spinor field
     size_t eigv_norm_bytes; // makes no sense but let's keep it...
@@ -272,9 +272,9 @@ namespace quda {
     int Ndim() const { return nDim; }
     const int* X() const { return x; }
     int X(int d) const { return x[d]; }
-    int RealLength() const { return real_length; }
-    int Length() const { return length; }
-    int TotalLength() const { return total_length; }
+    size_t RealLength() const { return real_length; }
+    size_t Length() const { return length; }
+    size_t TotalLength() const { return total_length; }
     int Stride() const { return stride; }
     int Volume() const { return volume; }
     int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
@@ -322,13 +322,13 @@ namespace quda {
     int EigvId() const { return eigv_id; }
     int EigvVolume() const { return eigv_volume; }
     int EigvStride() const { return eigv_stride; }
-    int EigvLength() const { return eigv_length; }
-    int EigvRealLength() const { return eigv_real_length; } 
-    int EigvTotalLength() const { return eigv_total_length; }
+    size_t EigvLength() const { return eigv_length; }
+    size_t EigvRealLength() const { return eigv_real_length; }
+    size_t EigvTotalLength() const { return eigv_total_length; }
     
     size_t EigvBytes() const { return eigv_bytes; }
     size_t EigvNormBytes() const { return eigv_norm_bytes; }
-    int EigvGhostLength() const { return eigv_ghost_length; }
+    size_t EigvGhostLength() const { return eigv_ghost_length; }
 
     QudaDWFPCType DWFPCtype() const { return PCtype; }
 
@@ -337,7 +337,7 @@ namespace quda {
     QudaFieldOrder FieldOrder() const { return fieldOrder; }
     QudaGammaBasis GammaBasis() const { return gammaBasis; }
 
-    int GhostLength() const { return ghost_length; }
+    size_t GhostLength() const { return ghost_length; }
     const int *GhostFace() const { return ghostFace; }  
     int GhostOffset(const int i) const { return ghostOffset[i]; }  
     int GhostNormOffset(const int i ) const { return ghostNormOffset[i]; }  

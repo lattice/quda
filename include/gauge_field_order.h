@@ -400,21 +400,21 @@ namespace quda {
 						    QudaGhostExchange ghostExchange) {
 	if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED) {
 	  if ( idx >= X[3]*X[2]*X[1]*X[0]/2 ) { // halo region on the first time slice
-	    return isFirstTimeSlice ? tBoundary : 1.0;
+	    return isFirstTimeSlice ? static_cast<Float>(tBoundary) : static_cast<Float>(1.0);
 	  } else if ( idx >= (X[3]-1)*X[0]*X[1]*X[2]/2 ) { // last link on the last time slice
-	    return isLastTimeSlice ? tBoundary : 1.0;
+	    return isLastTimeSlice ? static_cast<Float>(tBoundary) : static_cast<Float>(1.0);
 	  } else {
-	    return 1.0;
+	    return static_cast<Float>(1.0);
 	  }
 	} else {
 	  if ( idx >= (R[3]-1)*X[0]*X[1]*X[2]/2 && idx < R[3]*X[0]*X[1]*X[2]/2 ) {
 	    // the boundary condition is on the R[3]-1 time slice
-	    return isFirstTimeSlice ? tBoundary : 1.0;
+	    return isFirstTimeSlice ? static_cast<Float>(tBoundary) : static_cast<Float>(1.0);
 	  } else if ( idx >= (X[3]-R[3]-1)*X[0]*X[1]*X[2]/2 && idx < (X[3]-R[3])*X[0]*X[1]*X[2]/2 ) { 
 	    // the boundary condition lies on the X[3]-R[3]-1 time slice
-	    return isLastTimeSlice ? tBoundary : 1.0;
+	    return isLastTimeSlice ? static_cast<Float>(tBoundary) : static_cast<Float>(1.0);
 	  } else {
-	    return 1.0;
+	    return static_cast<Float>(1.0);
 	  }
 	}
       }

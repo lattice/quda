@@ -412,7 +412,7 @@ namespace quda {
          //Matrix<T,2> a = generate_su2_matrix<T4, T>(ap, localState);
          Matrix<T,2> a = generate_su2_matrix_milc<T>(ap, localState);
          r = mulsu2UVDagger<T>( a, r);
-         mul_block_sun<T>( r, U, id); * /
+         mul_block_sun<T>( r, U, id); */
          /*
            a0 = complex( r(0,0), r(1,1) );
            a1 = complex( r(1,0), r(0,1) );

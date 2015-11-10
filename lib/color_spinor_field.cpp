@@ -128,8 +128,8 @@ namespace quda {
     }
 
     if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-      printfQuda("ghost length = %d, ghost norm length = %d\n", ghost_length, ghost_norm_length);
-      printfQuda("total length = %d, total norm length = %d\n", total_length, total_norm_length);
+      printfQuda("ghost length = %lu, ghost norm length = %lu\n", ghost_length, ghost_norm_length);
+      printfQuda("total length = %lu, total norm length = %lu\n", total_length, total_norm_length);
     }
 
   } // createGhostZone
@@ -535,7 +535,7 @@ namespace quda {
   // For kernels with precision conversion built in
   void ColorSpinorField::checkField(const ColorSpinorField &a, const ColorSpinorField &b) {
     if (a.Length() != b.Length()) {
-      errorQuda("checkSpinor: lengths do not match: %d %d", a.Length(), b.Length());
+      errorQuda("checkSpinor: lengths do not match: %lu %lu", a.Length(), b.Length());
     }
 
     if (a.Ncolor() != b.Ncolor()) {

@@ -449,6 +449,7 @@ template <typename ReduceType, typename Float, int nSpin, QudaFieldOrder order,
   } else if (x.Ncolor() == 576) {
     value = genericReduce<ReduceType,Float,nSpin,576,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);    
   } else {
+    zero(value);
     errorQuda("nColor = %d not implemeneted",x.Ncolor());
   }
   return value;

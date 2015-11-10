@@ -221,30 +221,34 @@ namespace quda {
       PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, PreserveBasis<FloatOut, FloatIn, Ns, Nc> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
+#ifndef BUILD_LIMITED_COPY
     } else if (dstBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
-      NonRelBasis<FloatOut, FloatIn, Ns, Nc> basis;
-      PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelBasis<FloatOut, FloatIn, Ns, Nc> >
+      if (Nc != 3) errorQuda("Can only change basis with Ncolor = 4, not Ncolor = %d", Nc);
+      NonRelBasis<FloatOut, FloatIn, 4, 3> basis;
+      PackSpinor<FloatOut, FloatIn, 4, 3, OutOrder, InOrder, NonRelBasis<FloatOut, FloatIn, 4, 3> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
     } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && dstBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
-      RelBasis<FloatOut, FloatIn, Ns, Nc> basis;
-      PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, RelBasis<FloatOut, FloatIn, Ns, Nc> >
+      if (Nc != 3) errorQuda("Can only change basis with Ncolor = 4, not Ncolor = %d", Nc);
+      RelBasis<FloatOut, FloatIn, 4, 3> basis;
+      PackSpinor<FloatOut, FloatIn, 4, 3, OutOrder, InOrder, RelBasis<FloatOut, FloatIn, 4, 3> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
-#ifndef BUILD_LIMITED_COPY
     } else if (dstBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_CHIRAL_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
-      ChiralToNonRelBasis<FloatOut, FloatIn, Ns, Nc> basis;
-      PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, ChiralToNonRelBasis<FloatOut, FloatIn, Ns, Nc> >
+      if (Nc != 3) errorQuda("Can only change basis with Ncolor = 4, not Ncolor = %d", Nc);
+      ChiralToNonRelBasis<FloatOut, FloatIn, 4, 3> basis;
+      PackSpinor<FloatOut, FloatIn, 4, 3, OutOrder, InOrder, ChiralToNonRelBasis<FloatOut, FloatIn, 4, 3> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
       errorQuda("Not enabled");
     } else if (srcBasis == QUDA_UKQCD_GAMMA_BASIS && dstBasis == QUDA_CHIRAL_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
-      NonRelToChiralBasis<FloatOut, FloatIn, Ns, Nc> basis;
-      PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelToChiralBasis<FloatOut, FloatIn, Ns, Nc> >
+      if (Nc != 3) errorQuda("Can only change basis with Ncolor = 4, not Ncolor = %d", Nc);
+      NonRelToChiralBasis<FloatOut, FloatIn, 4, 3> basis;
+      PackSpinor<FloatOut, FloatIn, 4, 3, OutOrder, InOrder, NonRelToChiralBasis<FloatOut, FloatIn, 4, 3> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
 #endif
@@ -445,8 +449,20 @@ namespace quda {
   case 9:								\
     CopyGenericColorSpinor<9>(dst, src, location, dst_ptr, src_ptr);	\
     break;								\
+  case 12:								\
+    CopyGenericColorSpinor<12>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 16:								\
+    CopyGenericColorSpinor<16>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
   case 24:								\
     CopyGenericColorSpinor<24>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 36:								\
+    CopyGenericColorSpinor<36>(dst, src, location, dst_ptr, src_ptr);	\
+    break;								\
+  case 48:								\
+    CopyGenericColorSpinor<48>(dst, src, location, dst_ptr, src_ptr);	\
     break;								\
   case 72:								\
     CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr);	\

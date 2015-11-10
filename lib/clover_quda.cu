@@ -38,31 +38,31 @@ namespace quda {
     }
   };
 
+  /*
+    Put into clover order
+    Upper-left block (chirality index 0)
+       /                                                                                \
+       |  1 + c*I*(F[0,1] - F[2,3]) ,     c*I*(F[1,2] - F[0,3]) + c*(F[0,2] + F[1,3])   |
+       |                                                                                |
+       |  c*I*(F[1,2] - F[0,3]) - c*(F[0,2] + F[1,3]),   1 - c*I*(F[0,1] - F[2,3])      |
+       |                                                                                |
+       \                                                                                /
 
-  // Put into clover order 
-  // Upper-left block (chirality index 0)
-  //     /                                                                                \
-  //     |  1 + c*I*(F[0,1] - F[2,3]) ,     c*I*(F[1,2] - F[0,3]) + c*(F[0,2] + F[1,3])   |
-  //     |                                                                                |
-  //     |  c*I*(F[1,2] - F[0,3]) - c*(F[0,2] + F[1,3]),   1 - c*I*(F[0,1] - F[2,3])      |
-  //     |                                                                                |
-  //     \                                                                                / 
+       /
+       | 1 - c*I*(F[0] - F[5]),   -c*I*(F[2] - F[3]) - c*(F[1] + F[4])
+       |
+       |  -c*I*(F[2] -F[3]) + c*(F[1] + F[4]),   1 + c*I*(F[0] - F[5])
+       |
+       \
 
-  //     /
-  //     | 1 - c*I*(F[0] - F[5]),   -c*I*(F[2] - F[3]) - c*(F[1] + F[4])  
-  //     |
-  //     |  -c*I*(F[2] -F[3]) + c*(F[1] + F[4]),   1 + c*I*(F[0] - F[5])  
-  //     |
-  //     \
-  // 
-  // Lower-right block (chirality index 1)
-  //
-  //     /                                                                  \
-  //     |  1 - c*I*(F[0] + F[5]),  -c*I*(F[2] + F[3]) - c*(F[1] - F[4])    |
-  //     |                                                                  |
-  //     |  -c*I*(F[2]+F[3]) + c*(F[1]-F[4]),     1 + c*I*(F[0] + F[5])     |
-  //     \                                                                  / 
-  //
+     Lower-right block (chirality index 1)
+
+       /                                                                  \
+       |  1 - c*I*(F[0] + F[5]),  -c*I*(F[2] + F[3]) - c*(F[1] - F[4])    |
+       |                                                                  |
+       |  -c*I*(F[2]+F[3]) + c*(F[1]-F[4]),     1 + c*I*(F[0] + F[5])     |
+       \                                                                  /
+  */
 
   // Core routine for constructing clover term from field strength
   template<typename Float, typename Clover, typename Fmunu>
