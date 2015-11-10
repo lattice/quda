@@ -73,10 +73,6 @@ namespace quda {
 	int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
 	int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
 	
-	for (int s=0; s<fineSpin; s++) 
-	  for (int c=0; c<coarseColor; c++)
-	    arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarseColor+c];
-
         if(fineSpin == 1)
         {
            int staggered_coarse_spin = parity; //0 if fine parity even, 1 otherwise
