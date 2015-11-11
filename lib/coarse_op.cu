@@ -672,12 +672,12 @@ namespace quda {
   /**** Begin staggered version of the above ****/
 
   template<typename Float, typename Gauge>
-  void createKSCoarseLocal(Gauge &X, int ndim, const int *xc_size, double m) {
+  void createKSCoarseLocal(Gauge &X, int ndim, const int *xc_size, double k) {
     const int nColor = X.NcolorCoarse();
     const int nSpin = X.NspinCoarse();
     if (nSpin != 2) errorQuda("\nWrong coarse spin degrees.\n");
 
-    Float kap = (Float) m;//mass term
+    Float _2m = (Float) k;//mass term
     complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
 	
     for (int parity=0; parity<2; parity++) {
@@ -701,13 +701,13 @@ namespace quda {
             for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
               //diagonal elements
 	      if(s_row == s_col){
-                X(0,parity,x_cb, parity, parity, ic_c,ic_c) += (parity == 0) ? +m : -m;//dioganal mass term
+                X(0,parity,x_cb, parity, parity, ic_c,ic_c) += (parity == 0) ? + _2m : -_2m;//dioganal mass term
                 continue;
               }
               //off-diagonal elements
 	      for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
 		//Transpose color part
-		X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) = (+X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)-conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));//always minus sign?
+		X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) = (-X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)+conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
 	      } //Color column
 	    } //Color row
 	  } //Spin column
@@ -756,7 +756,6 @@ namespace quda {
 		  const int *x_size, const int *xc_size, const int *geo_bs) {
 
     const int nDim = 4;
-    Float half = -0.5;
     int coarse_size = 1;
 
     for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
@@ -766,8 +765,6 @@ namespace quda {
 
     // paralleling this requires care with respect to race conditions
     // on CPU, parallelize over dimension not parity
-    Float eta = dir == 0 ? 1.0 : -1.0;
-
     const int stag_sp = 0;
 
     //#pragma omp parallel for 
@@ -775,7 +772,16 @@ namespace quda {
       for( int x_cb = 0; x_cb < UV->VolumeCB(); x_cb++){
          getCoords(coord, x_cb, x_size, parity);
 
-         for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
+         Float eta = 1.0;
+
+         for(int d = 0; d < nDim; d++) 
+         {
+           if(d <= dir){
+             const int coord_par = (d == 0) ? 0 : coord[d-1] & 1;
+             eta *= (1.0 - coord_par*2.0);
+           }
+           coord_coarse[d] = coord[d]/geo_bs[d];
+         }
 
 	 //Check to see if we are on the edge of a block, i.e.
 	 //if this color matrix connects adjacent blocks.  If
@@ -802,13 +808,11 @@ namespace quda {
          int coarse_spin_row = parity == 0 ? 0 : 1  ;
          int coarse_spin_col = (1 - coarse_spin_row); 
 
-         half *= eta; //multiply by sing factor 
-
          for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
            for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
 	     for(int ic = 0; ic < nfinecolors; ic++) { //Sum over fine color
-		(*M)(dim_index,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += half*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UV)(parity, x_cb, stag_sp, ic, jc_c);
-                 if(UVL != NULL) (*M_L)(dim_index_long,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += half*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UVL)(parity, x_cb, stag_sp, ic, jc_c);
+		(*M)(dim_index,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += eta*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UV)(parity, x_cb, stag_sp, ic, jc_c);
+                 if(UVL != NULL) (*M_L)(dim_index_long,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += eta*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UVL)(parity, x_cb, stag_sp, ic, jc_c);
 	     } //Fine color
 	   } //Coarse Color column
 	 } //Coarse Color row
@@ -907,6 +911,16 @@ namespace quda {
 
     if (coarseColor == 2) {
       calculateKSY<Float,csOrder,gOrder,fineColor,2, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+    } else if (coarseColor == 4) {
+      calculateKSY<Float,csOrder,gOrder,fineColor,4, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+    } else if (coarseColor == 8) {
+      calculateKSY<Float,csOrder,gOrder,fineColor,8, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+    } else if (coarseColor == 12) {
+      calculateKSY<Float,csOrder,gOrder,fineColor,12, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+    } else if (coarseColor == 16) {
+      calculateKSY<Float,csOrder,gOrder,fineColor,16, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
+    } else if (coarseColor == 20) {
+      calculateKSY<Float,csOrder,gOrder,fineColor,20, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 24) {
       calculateKSY<Float,csOrder,gOrder,fineColor,24, coarseSpin>(Y, X, uv, uv_long, T, f, l, k);
     } else if (coarseColor == 48) {
