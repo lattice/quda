@@ -51,70 +51,48 @@ namespace quda {
 
   template<typename Float, int dir, typename F, typename coarseGauge, typename fineGauge>
   void computeVUVcoarse(coarseGauge &Y, coarseGauge &X, const F &UV, const F &V, 
-                  const fineGauge &G, const int *x_size, 
-                  const int *xc_size, const int *geo_bs, int spin_bs, int s_col) {
+			const fineGauge &G, const int *x_size,
+			const int *xc_size, const int *geo_bs, int spin_bs, int s_col) {
 
     const int nDim = 4;
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
     int coarse_size = 1;
     for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
-    //for(int d = 0; d<nDim; d++) printfQuda("geo_bs[%d] = %d\n",d,geo_bs[d]);
+
     for (int parity=0; parity<2; parity++) {
-      int x_cb = 0;
-      for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
-        for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
-          for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
-            for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
+      for (int x_cb=0; x_cb<UV.VolumeCB(); x_cb++) {
+	getCoords(coord, x_cb, x_size, parity);
+	for (int d=0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
 
-              int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
-              coord[0] = 2*coord[0] + oddBit;
-              for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
-
-              //Check to see if we are on the edge of a block, i.e.
-              //if this color matrix connects adjacent blocks.  If
-              //adjacent site is in same block, M = X, else M = Y
-              const bool isDiagonal = ((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir] ? true : false;
-              coarseGauge &M =  isDiagonal ? X : Y;
-              const int dim_index = isDiagonal ? 0 : dir;
+	//Check to see if we are on the edge of a block, i.e.
+	//if this color matrix connects adjacent blocks.  If
+	//adjacent site is in same block, M = X, else M = Y
+	const bool isDiagonal = ((coord[dir]+1)%x_size[dir])/geo_bs[dir] == coord_coarse[dir] ? true : false;
+	coarseGauge &M =  isDiagonal ? X : Y;
+	const int dim_index = isDiagonal ? 0 : dir;
               
-              int coarse_parity = 0;
-              for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
-              coarse_parity &= 1;
-              coord_coarse[0] /= 2;
-              int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
-              //printfQuda("x_cb = %d parity = %d coarse_x_cb = %d, coarse_parity = %d isDiagonal=%d\n",x_cb, parity, coarse_x_cb, coarse_parity, isDiagonal);
-              //printf("(%d,%d)\n", coarse_x_cb, coarse_parity);
+	int coarse_parity = 0;
+	for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
+	coarse_parity &= 1;
+	coord_coarse[0] /= 2;
+	int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
 
-              coord[0] /= 2;
-	      //printfQuda("V.Nspin() = %d, Y.NcolorCoarse() = %d, G.NcolorCoarse() = %d\n", V.Nspin(), Y.NcolorCoarse(), G.NcolorCoarse());
+	coord[0] /= 2;
 
-                for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin row
+	for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin row
 
-                    for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
-                      for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
-		      	//printfQuda("s=%d s_col=%d ic_c = %d jc_c = %d G.NcolorCoarse() = %d\n",s,s_col,ic_c,jc_c,G.NcolorCoarse());
+	  for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
+	    for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
+	      for(int ic = 0; ic < G.NcolorCoarse(); ic++) { //Sum over fine color
+		M(dim_index,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c) +=
+		  conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s, ic, jc_c);
+	      } //Fine color
+	    } //Coarse Color column
+	  } //Coarse Color row
+	} //Fine spin
 
-                        for(int ic = 0; ic < G.NcolorCoarse(); ic++) { //Sum over fine color
-			//printfQuda("M(%d,%d,%d,%d,%d,%d,%d) = %e %e\n", dim_index,coarse_parity,coarse_x_cb, s, s_col, ic_c, jc_c, M(dim_index,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c).real(), M(dim_index,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c).imag());
-			//printfQuda("isDiagonal = %d\n",isDiagonal);
-
-                        M(dim_index,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c) +=
-                          conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s, ic, jc_c);
-                        //printfQuda("M(%d,%d,%d,%d,%d,%d,%d) = %e %e\n", dim_index,coarse_parity,coarse_x_cb, s, s_col, ic_c, jc_c, M(dim_index,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c).real(), M(dim_index,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c).imag());
-                        //printfQuda("UV(%d,%d,%d,%d,%d)= %e %e\n",parity, x_cb, s, ic, jc_c, UV(parity, x_cb, s, ic, jc_c).real(), UV(parity, x_cb, s, ic, jc_c).imag());
-			//printfQuda("V(%d,%d,%d,%d,%d)= %e %e\n",parity, x_cb, s, ic, ic_c, V(parity, x_cb, s, ic, ic_c).real(), V(parity, x_cb, s, ic, ic_c).imag());
-
-                        } //Fine color
-                      } //Coarse Color column
-                    } //Coarse Color row
-                } //Fine spin
-                 
-              x_cb++;
-            } // coord[0]
-          } // coord[1]
-        } // coord[2]
-      } // coord[3]
+      } // c/b volume
     } // parity
 
   }
@@ -123,15 +101,13 @@ namespace quda {
   //Adds the reverse links to the coarse diagonal term, which is just
   //the conjugate of the existing coarse diagonal term but with
   //plus/minus signs for off-diagonal spin components
-  template<typename Float, typename Gauge>
+  template<typename Float, int nSpin, int nColor, typename Gauge>
   void createCoarseLocal(Gauge &X, int ndim, const int *xc_size, double kappa) {
-    const int nColor = X.NcolorCoarse();
-    const int nSpin = X.NspinCoarse();
     Float kap = (Float) kappa;
-    complex<Float> *Xlocal = new complex<Float>[nSpin*nSpin*nColor*nColor];
+    complex<Float> Xlocal[nSpin*nSpin*nColor*nColor];
 	
     for (int parity=0; parity<2; parity++) {
-      for (int x_cb=0; x_cb<X.Volume()/2; x_cb++) {
+      for (int x_cb=0; x_cb<X.VolumeCB(); x_cb++) {
 
 	for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
 	  for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
@@ -149,7 +125,7 @@ namespace quda {
 	for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
 	  for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
 	    
-	    const Float sign = (s_row == s_col) ? 1.0 : -1.0;
+	    const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
 		  
 	    for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
 	      for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
@@ -163,8 +139,6 @@ namespace quda {
 
       } // x_cb
     } //parity
-
-    delete []Xlocal;
 
   }
 
@@ -195,61 +169,41 @@ namespace quda {
     for(int d = 0; d<nDim; d++) coarse_size *= xc_size[d];
 
     for (int parity=0; parity<2; parity++) {
-      int x_cb = 0;
-      for (coord[3]=0; coord[3]<x_size[3]; coord[3]++) {
-        for (coord[2]=0; coord[2]<x_size[2]; coord[2]++) {
-          for (coord[1]=0; coord[1]<x_size[1]; coord[1]++) {
-            for (coord[0]=0; coord[0]<x_size[0]/2; coord[0]++) {
+      for (int x_cb = 0; x_cb<C.VolumeCB(); x_cb++) {
+	getCoords(coord, x_cb, x_size, parity);
+	for (int d=0; d<nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
 
-              int oddBit = (parity + coord[1] + coord[2] + coord[3])&1;
-              coord[0] = 2*coord[0] + oddBit;
-              for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
-              int coarse_parity = 0;
-              for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
-              coarse_parity &= 1;
-              coord_coarse[0] /= 2;
-              int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
-              
-              coord[0] /= 2;
+	int coarse_parity = 0;
+	for (int d=0; d<nDim; d++) coarse_parity += coord_coarse[d];
+	coarse_parity &= 1;
+	coord_coarse[0] /= 2;
+	int coarse_x_cb = ((coord_coarse[3]*xc_size[2]+coord_coarse[2])*xc_size[1]+coord_coarse[1])*(xc_size[0]/2) + coord_coarse[0];
 
-              //If Nspin = 4, then the clover term has structure C_{\mu\nu} = \gamma_{\mu\nu}C^{\mu\nu} 
-	      //FIXME Not implemented yet.
-              if(V.Nspin() == 4) {
-		        errorQuda("Fine-> coarse clover not yet implemented");
-              }
-              //If Nspin != 4, then spin structure is a dense matrix
-              //N.B. assumes that no further spin blocking is done in this case.
-              else {
-	        //printf("C.Ncolor() = %d C.NcolorCoarse() = %d\n",C.Ncolor(), C.NcolorCoarse());
-                for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin row
-                  for(int s_col = 0; s_col < V.Nspin(); s_col++) { //Loop over fine spin column
+	coord[0] /= 2;
 
-                    for(int ic_c = 0; ic_c < X.NcolorCoarse(); ic_c++) { //Coarse Color row
-                      for(int jc_c = 0; jc_c < X.NcolorCoarse(); jc_c++) { //Coarse Color column
-		      
-                        for(int ic = 0; ic < C.NcolorCoarse(); ic++) { //Sum over fine color row
-                          for(int jc = 0; jc < C.NcolorCoarse(); jc++) {  //Sum over fine color column
-			  //printfQuda("coord[0] = %d, coord[1] = %d, coord[2] = %d, coord[3] = %d, x_size[0] = %d, x_size[1] = %d, x_size[2] = %d, x_size[3] = %d, coarse_parity=%d, coarse_x_cb = %d, s=%d, s_col=%d, ic_c = %d, jc_c = %d, parity = %d, x_cb = %d, ic = %d, jc = %d, V.Nspin() = %d\n",coord[0], coord[1], coord[2], coord[3], x_size[0], x_size[1], x_size[2], x_size[3], coarse_parity, coarse_x_cb, s, s_col, ic_c, jc_c, parity, x_cb, ic, jc, V.Nspin());
-                          X(0,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c) += conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col, ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
-                          } //Fine color column
-                        }  //Fine color row
-                      } //Coarse Color column
-                    } //Coarse Color row
-                  }  //Fine spin column
-                } //Fine spin
-                 
-              }
+	//If Nspin != 4, then spin structure is a dense matrix
+	//N.B. assumes that no further spin blocking is done in this case.
+	for(int s = 0; s < V.Nspin(); s++) { //Loop over fine spin row
+	  for(int s_col = 0; s_col < V.Nspin(); s_col++) { //Loop over fine spin column
+	    for(int ic_c = 0; ic_c < X.NcolorCoarse(); ic_c++) { //Coarse Color row
+	      for(int jc_c = 0; jc_c < X.NcolorCoarse(); jc_c++) { //Coarse Color column
+		for(int ic = 0; ic < C.NcolorCoarse(); ic++) { //Sum over fine color row
+		  for(int jc = 0; jc < C.NcolorCoarse(); jc++) {  //Sum over fine color column
+		    X(0,coarse_parity,coarse_x_cb,s,s_col,ic_c,jc_c) += conj(V(parity, x_cb, s, ic, ic_c)) * C(0, parity, x_cb, s, s_col, ic, jc) * V(parity, x_cb, s_col, jc, jc_c);
+		  } //Fine color column
+		}  //Fine color row
+	      } //Coarse Color column
+	    } //Coarse Color row
+	  }  //Fine spin column
+	} //Fine spin
 
-              x_cb++;
-            } // coord[0]
-          } // coord[1]
-        } // coord[2]
-      } // coord[3]
+      } // c/b volume
     } // parity
 
   }
 
-  template<typename Float, typename F, typename coarseGauge, typename fineGauge>
+  template<typename Float, int coarseSpin, int coarseColor,
+	   typename F, typename coarseGauge, typename fineGauge>
   void calculateYcoarse(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineGauge &C,
 			const int *xx_size, const int *xc_size, double kappa) {
     if (UV.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS) errorQuda("Gamma basis not supported");
@@ -294,56 +248,10 @@ namespace quda {
     }
 
     printfQuda("Computing coarse diagonal\n");
-    createCoarseLocal<Float>(X, nDim, xc_size, kappa);
-   #if 0
-    for(int parity = 0; parity <= 1; parity++) {
-    for(int i = 0; i < X.Volume()/2; i++) {
-      for(int s = 0; s < X.NspinCoarse(); s++) {
-        for(int s_col = 0; s_col < X.NspinCoarse(); s_col++) {
-          for(int c = 0; c < X.NcolorCoarse(); c++) {
-            for(int c_col = 0; c_col < X.NcolorCoarse(); c_col++) {
-              printfQuda("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
-			 X(0,parity,i,s,s_col,c,c_col).real(),
-			 X(0,parity,i,s,s_col,c,c_col).imag());
-            }
-          }
-        }
-      }
-    }
-  }
-#endif
+    createCoarseLocal<Float,coarseSpin,coarseColor>(X, nDim, xc_size, kappa);
+
     createCoarseClover<Float>(X, V, C, nDim, x_size, xc_size, geo_bs, spin_bs);
     printfQuda("X2 = %e\n", X.norm2(0));
-
-    #if 0
-     for(int d = 0; d < 4; d++) {
-     for(int parity = 0; parity <= 1; parity++) {
-      for(int i = 0; i < Y.Volume()/2; i++) {
-        for(int s = 0; s < Y.NspinCoarse(); s++) {
-          for(int s_col = 0; s_col < Y.NspinCoarse(); s_col++) {
-            for(int c = 0; c < Y.NcolorCoarse(); c++) {
-              for(int c_col = 0; c_col < Y.NcolorCoarse(); c_col++) {
-                printfQuda("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d Y(d) = %e %e\n",d,parity,i,s,s_col,c,c_col,Y(d,parity,i,s,s_col,c,c_col).real(),Y(d,parity,i,s,s_col,c,c_col).imag());
-              }}}}}}}
-    #endif
-    #if 0
-    for(int parity = 0; parity <= 1; parity++) {
-    for(int i = 0; i < X.Volume()/2; i++) {
-      for(int s = 0; s < X.NspinCoarse(); s++) {
-        for(int s_col = 0; s_col < X.NspinCoarse(); s_col++) {
-          for(int c = 0; c < X.NcolorCoarse(); c++) {
-            for(int c_col = 0; c_col < X.NcolorCoarse(); c_col++) {
-              printfQuda("d=%d parity=%d i=%d s=%d s_col=%d c=%d c_col=%d X = %e %e\n",nDim,parity,i,s,s_col,c,c_col,
-			 X(0,parity,i,s,s_col,c,c_col).real(),
-			 X(0,parity,i,s,s_col,c,c_col).imag());
-            }
-          }
-        }
-      }
-    }
-  }
-#endif
-
   }
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, 
@@ -364,7 +272,8 @@ namespace quda {
     gCoarse yAccessor(const_cast<GaugeField&>(Y));
     gCoarse xAccessor(const_cast<GaugeField&>(X)); 
 
-    calculateYcoarse<Float>(yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cloverAccessor, g.X(), Y.X(), kappa);
+    calculateYcoarse<Float,coarseSpin,coarseColor>
+      (yAccessor, xAccessor, uvAccessor, vAccessor, gAccessor, cloverAccessor, g.X(), Y.X(), kappa);
   }
 
 
@@ -452,7 +361,7 @@ namespace quda {
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
 
-    #if 0
+#if 0
     GaugeFieldParam gf_param(gauge.X(), precision, gauge.Reconstruct(), pad, gauge.Geometry());
     gf_param.order = QUDA_QDP_GAUGE_ORDER;
     gf_param.fixed = gauge.GaugeFixed();
@@ -467,7 +376,7 @@ namespace quda {
 
     //Copy the cuda gauge field to the cpu
     gauge.saveCPUField(g, QUDA_CPU_FIELD_LOCATION);
-    #endif
+#endif
 
 
     //Create a field UV which holds U*V.  Has the same structure as V.
