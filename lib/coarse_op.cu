@@ -831,6 +831,7 @@ namespace quda {
     {
       //First calculate UV
       setZero<Float,F>(*UV);
+      if( LL ) setZero<Float,F>(*UVL);
 
       printfQuda("Computing %d UV and VUV\n", d);
       //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y

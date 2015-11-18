@@ -2415,7 +2415,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 
    inv_param.gcrNkrylov  = 10;
    inv_param.maxiter  = 500;
-   inv_param.tol      = 5e-4;
+   inv_param.tol      = 1e-4;
 
    inv_param.use_init_guess      = QUDA_USE_INIT_GUESS_YES;
    // removed this from QudaInvertParam so set this by hand below for now
@@ -2460,7 +2460,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.cl_pad = 0; // 24*24*24/2;
 
    inv_param.kappa   = mg_inv_param->kappa;//1.0 / (2.0 * (1 + 3/anisotropy + mass));
-   if(mg_inv_param->dslash_type != QUDA_STAGGERED_DSLASH && mg_inv_param->dslash_type != QUDA_ASQTAD_DSLASH) inv_param.mass = mg_inv_param->mass;//for staggered only
+   if(mg_inv_param->dslash_type == QUDA_STAGGERED_DSLASH || mg_inv_param->dslash_type == QUDA_ASQTAD_DSLASH) inv_param.mass = mg_inv_param->mass;//for staggered only
 
    pushVerbosity(inv_param.verbosity);
 
@@ -2469,7 +2469,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    //WARNING!!! :  new checkGauge routine cannot be used here. 
    //We assume that gauge field check was done in multigridQuda, and just assign pointers. 
    //This must be fix in the future. 
-   cudaGaugeField *cudaGauge = (mg_inv_param->dslash_type != QUDA_STAGGERED_DSLASH) ? gaugePrecise : gaugeFatPrecise;
+   cudaGaugeField *cudaGauge = (mg_inv_param->dslash_type != QUDA_STAGGERED_DSLASH && mg_inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? gaugePrecise : gaugeFatPrecise;
   
    checkInvertParam(&inv_param);
 
