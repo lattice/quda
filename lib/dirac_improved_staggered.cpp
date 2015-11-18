@@ -98,12 +98,8 @@ namespace quda {
   // Full staggered operator
   void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in.Even());
-
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp1, 2*mass);  
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp1, 2*mass);
-  
-    deleteTmp(&tmp1, reset);
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
+    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
   }
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -152,7 +148,7 @@ namespace quda {
   grid , this one is trivial but let's keep it for the moment
   */
 
-  void DiracImprovedStaggered::createKSCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
+  void DiracImprovedStaggered::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
     CoarseKSOp(T, Y, X, &fatGauge, &longGauge,  2*mass);//
   }
 

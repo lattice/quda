@@ -130,12 +130,16 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
 
   gaugeParam->scale = dslash_type == QUDA_STAGGERED_DSLASH ? 1.0 : -1.0/(24.0*tadpole_coeff*tadpole_coeff);
 
-  gaugeParam->t_boundary = QUDA_ANTI_PERIODIC_T;
+  gaugeParam->t_boundary = QUDA_PERIODIC_T;//QUDA_ANTI_PERIODIC_T;
+#ifndef USE_QDP_LINKS
   gaugeParam->gauge_order = QUDA_MILC_GAUGE_ORDER;
+#else
+  gaugeParam->gauge_order = QUDA_QDP_GAUGE_ORDER;
+#endif
   gaugeParam->ga_pad = X1*X2*X3/2;
 
   inv_param->verbosity = QUDA_VERBOSE;
-  inv_param->mass = -0.5;//mass;
+  inv_param->mass = mass;
 
   // outer solver parameters
   inv_param->inv_type = QUDA_GCR_INVERTER;
@@ -197,7 +201,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
   inv_param->dslash_type = dslash_type;
 
   inv_param->tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
-  inv_param->sp_pad = X1*X2*X3/2;
+  inv_param->sp_pad = 0;//X1*X2*X3/2;
   inv_param->use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
   inv_param->input_location = QUDA_CPU_FIELD_LOCATION;
@@ -262,6 +266,7 @@ void mg_test(void)
   construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec, 
 				 &gaugeParam, dslash_type);
 
+#ifndef USE_QDP_LINKS
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
       for(int j=0; j<gaugeSiteSize; ++j){
@@ -275,7 +280,7 @@ void mg_test(void)
       }
     }
   }
-
+#endif
 
   ColorSpinorParam csParam;
   csParam.nColor=3;
@@ -316,12 +321,20 @@ void mg_test(void)
   gaugeParam.type = dslash_type == QUDA_STAGGERED_DSLASH ? 
     QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
+#ifndef USE_QDP_LINKS
   GaugeFieldParam cpuFatParam(fatlink, gaugeParam);
+#else
+  GaugeFieldParam cpuFatParam(qdp_fatlink, gaugeParam);
+#endif
   cpuFat = new cpuGaugeField(cpuFatParam);
   ghost_fatlink = (void**)cpuFat->Ghost();
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
+#ifndef USE_QDP_LINKS
   GaugeFieldParam cpuLongParam(longlink, gaugeParam);
+#else
+  GaugeFieldParam cpuLongParam(qdp_longlink, gaugeParam);
+#endif
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
@@ -341,14 +354,22 @@ void mg_test(void)
     gaugeParam.reconstruct= gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
   gaugeParam.cuda_prec_precondition = QUDA_HALF_PRECISION;
+#ifndef USE_QDP_LINKS
   loadGaugeQuda(fatlink, &gaugeParam);
+#else
+  loadGaugeQuda(qdp_fatlink, &gaugeParam);
+#endif
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
     gaugeParam.ga_pad = link_pad;
     gaugeParam.reconstruct= link_recon;
     gaugeParam.reconstruct_sloppy = link_recon_sloppy;
+#ifndef USE_QDP_LINKS
     loadGaugeQuda(longlink, &gaugeParam);
+#else
+    loadGaugeQuda(qdp_longlink, &gaugeParam);
+#endif
   }
 
   double time0 = -((double)clock()); // Start the timer
@@ -367,7 +388,7 @@ void mg_test(void)
 
   time0 += clock(); 
   time0 /= CLOCKS_PER_SEC;
-
+/*
 #ifdef MULTI_GPU    
   matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
           out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
@@ -391,7 +412,7 @@ void mg_test(void)
         time0, inv_param.secs, inv_param.iter, inv_param.secs,
         inv_param.gflops/inv_param.secs);
   }
-
+*/
   end();
 }
 

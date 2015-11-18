@@ -577,7 +577,7 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual void createKSCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
   // Even-odd preconditioned staggered

@@ -2460,6 +2460,7 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
    inv_param.cl_pad = 0; // 24*24*24/2;
 
    inv_param.kappa   = mg_inv_param->kappa;//1.0 / (2.0 * (1 + 3/anisotropy + mass));
+   if(mg_inv_param->dslash_type != QUDA_STAGGERED_DSLASH && mg_inv_param->dslash_type != QUDA_ASQTAD_DSLASH) inv_param.mass = mg_inv_param->mass;//for staggered only
 
    pushVerbosity(inv_param.verbosity);
 
@@ -2830,6 +2831,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
   saveTuneCache(getVerbosity());
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+//printfQuda("\nHERE\n");
 }
 
 void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)

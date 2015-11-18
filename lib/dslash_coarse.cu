@@ -62,7 +62,6 @@ namespace quda {
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	  int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-
 	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	    int c_row = color_block + color_local; // global color index
 	    int row = s_row*Nc + c_row;
@@ -131,32 +130,33 @@ namespace quda {
      A.S.: staggered coarse dslash has more sparse structure
      Applies the coarse dslash on a given parity and checkerboard site index
 
-     @param out The result -2 * kappa * Dslash in
+     @param out The result Dslash_s in
      @param Y The coarse gauge field
-     @param kappa Kappa value
      @param in The input field
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
+//#define CHECK_STAGGERED
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
   __device__ __host__ inline void ks_dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
 
-    int coord[nDim] = {0};
+    int coord[5];
     getCoords(coord, x_cb, arg.dim, parity);
+    coord[4] = 0;
+
     const int s_col = (1 - s_row);//s_col = 1 if s_row = 0, and  s_col = 0 if s_row = 1.
 
     for(int d = 0; d < nDim; d++) { //Ndim
       //Forward link - compute fwd offset for spinor fetch
       {
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-
         for(int color_local = 0; color_local < Mc; color_local++) { //Color row
           int c_row = color_block + color_local; // global color index
           int row = s_row*Nc + c_row;
 	  for(int c_col = 0; c_col < Nc; c_col++){ //Color column
              int col = s_col*Nc + c_col;
-	     out[color_local] -= (arg.Y(d, parity, x_cb, s_row, s_col, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
+	     out[color_local] -= (arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
           }
         }
       }
@@ -169,7 +169,7 @@ namespace quda {
           int row = s_row*Nc + c_row;
 	  for(int c_col = 0; c_col < Nc; c_col++){
              int col = s_col*Nc + c_col;
-	     out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, s_col, s_row, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
+	     out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
           }  
         }
       } 

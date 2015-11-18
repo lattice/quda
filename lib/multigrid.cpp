@@ -70,6 +70,7 @@ namespace quda {
 	csParam.setPrecision(csParam.precision);
 	csParam.gammaBasis = param.level > 0 ? QUDA_DEGRAND_ROSSI_GAMMA_BASIS: QUDA_UKQCD_GAMMA_BASIS;
       }
+      if(param.B[0]->Nspin() == 1)  csParam.gammaBasis = param.B[0]->GammaBasis();//We need this hack for staggered.
       r = ColorSpinorField::Create(csParam);
     }
 
@@ -84,7 +85,6 @@ namespace quda {
 
       // create coarse residual vector
       r_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
-
       // create coarse solution vector
       x_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
 
@@ -95,8 +95,11 @@ namespace quda {
       DiracParam diracParam;
       diracParam.transfer = transfer;
       diracParam.dirac = const_cast<Dirac*>(param.matResidual.Expose());
-      diracParam.kappa = param.matResidual.Expose()->Kappa();
-      printfQuda("Kappa = %e\n", diracParam.kappa);
+      if (param.B[0]->Nspin() != 1)
+      {
+        diracParam.kappa = param.matResidual.Expose()->Kappa();
+        printfQuda("Kappa = %e\n", diracParam.kappa);
+      }
       diracCoarse = new DiracCoarse(diracParam);
       matCoarse = new DiracM(*diracCoarse);
 
@@ -185,7 +188,7 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    double tol = std::pow(10.0, -2*csParam.precision);
+    double tol = std::pow(10.0, -2*(csParam.precision-2));
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -245,7 +248,7 @@ namespace quda {
 	tmp_coarse->Source(QUDA_POINT_SOURCE,0,s,c);
 #endif
     transfer->P(*tmp1, *tmp_coarse);
-    param.matResidual(*tmp2,*tmp1);	
+    param.matResidual(*tmp2,*tmp1);
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
 #if 0 // enable to print out emualted and actual coarse-grid operator vectors for bebugging
@@ -282,6 +285,8 @@ namespace quda {
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     setOutputPrefix(prefix);
 
+    if(r->Stride() != x.Stride()) errorQuda("\nMismatched padding is not supported.\n"); 
+
     if ( debug ) {
       printfQuda("entering V-cycle with x2=%e, r2=%e\n", blas::norm2(x), blas::norm2(b));
     }
@@ -298,7 +303,6 @@ namespace quda {
       // FIXME - residual computation should be in the previous smoother
       param.matResidual(*r, x);
       double r2 = blas::xmyNorm(b, *r);
-
       // restrict to the coarse grid
       transfer->R(*r_coarse, *r);
       if ( debug ) {

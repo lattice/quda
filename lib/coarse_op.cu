@@ -701,14 +701,14 @@ namespace quda {
             for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
               //diagonal elements
 	      if(s_row == s_col){
-                X(0,parity,x_cb, parity, parity, ic_c,ic_c) += (parity == 0) ? + _2m : -_2m;//dioganal mass term
-                continue;
+                X(0,parity,x_cb, s_row, s_col, ic_c,ic_c) = _2m;
+              }else{
+                //off-diagonal elements
+	        for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
+		  //Transpose color part
+		  X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) = (-X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)+conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
+	        } //Color column
               }
-              //off-diagonal elements
-	      for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
-		//Transpose color part
-		X(0,parity,x_cb,s_row,s_col,ic_c,jc_c) = (-X(0,parity,x_cb,s_row,s_col,ic_c,jc_c)+conj(Xlocal[((nSpin*s_row+s_col)*nColor+jc_c)*nColor+ic_c]));
-	      } //Color column
 	    } //Color row
 	  } //Spin column
 	} //Spin row
@@ -725,7 +725,8 @@ namespace quda {
   template<typename Float, int dir, typename F, typename fineGauge>
   void computeKSUV(F *UV, F *UVL, const F &V, const fineGauge *FL, const fineGauge *LL, int ndim, const int *x_size) 
   {
-    int coord[QUDA_MAX_DIM] = {0};
+    int coord[5];
+    coord[4] = 0;
 
     const int stag_sp = 0;
      
@@ -772,16 +773,7 @@ namespace quda {
       for( int x_cb = 0; x_cb < UV->VolumeCB(); x_cb++){
          getCoords(coord, x_cb, x_size, parity);
 
-         Float eta = 1.0;
-
-         for(int d = 0; d < nDim; d++) 
-         {
-           if(d <= dir){
-             const int coord_par = (d == 0) ? 0 : coord[d-1] & 1;
-             eta *= (1.0 - coord_par*2.0);
-           }
-           coord_coarse[d] = coord[d]/geo_bs[d];
-         }
+         for(int d = 0; d < nDim; d++) coord_coarse[d] = coord[d]/geo_bs[d];
 
 	 //Check to see if we are on the edge of a block, i.e.
 	 //if this color matrix connects adjacent blocks.  If
@@ -811,8 +803,8 @@ namespace quda {
          for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
            for(int jc_c = 0; jc_c < Y.NcolorCoarse(); jc_c++) { //Coarse Color column
 	     for(int ic = 0; ic < nfinecolors; ic++) { //Sum over fine color
-		(*M)(dim_index,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += eta*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UV)(parity, x_cb, stag_sp, ic, jc_c);
-                 if(UVL != NULL) (*M_L)(dim_index_long,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += eta*conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UVL)(parity, x_cb, stag_sp, ic, jc_c);
+		(*M)(dim_index,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UV)(parity, x_cb, stag_sp, ic, jc_c);
+                 if(UVL != NULL) (*M_L)(dim_index_long,coarse_parity,coarse_x_cb,coarse_spin_row, coarse_spin_col,ic_c,jc_c) += conj(V(parity, x_cb, stag_sp, ic, ic_c)) * (*UVL)(parity, x_cb, stag_sp, ic, jc_c);
 	     } //Fine color
 	   } //Coarse Color column
 	 } //Coarse Color row
@@ -936,6 +928,7 @@ namespace quda {
   void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
     if (f->Ncolor() == 3) {
       if( l ) if( f->Ncolor() != l->Ncolor() ) errorQuda("Unsupported number of colors %d\n", l->Ncolor());
+
       calculateKSY<Float,csOrder,gOrder, 3>(Y, X, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported number of colors %d\n", f->Ncolor());
@@ -946,6 +939,7 @@ namespace quda {
   void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
     if (f->FieldOrder() == QUDA_QDP_GAUGE_ORDER) {
       if( l ) if( l->FieldOrder() != QUDA_QDP_GAUGE_ORDER ) errorQuda("Unsupported field order for long links %d\n", l->FieldOrder());
+
       calculateKSY<Float,csOrder,QUDA_QDP_GAUGE_ORDER>(Y, X, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported field order %d\n", f->FieldOrder());
@@ -955,6 +949,7 @@ namespace quda {
  template <typename Float>
   void calculateKSY(GaugeField &Y, GaugeField &X, ColorSpinorField *uv, ColorSpinorField *uv_long, const Transfer &T, GaugeField *f, GaugeField *l, double k) {
     if (T.Vectors().FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
+
       calculateKSY<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>(Y, X, uv, uv_long, T, f, l, k);
     } else {
       errorQuda("Unsupported field order %d\n", T.Vectors().FieldOrder());
@@ -1031,8 +1026,8 @@ namespace quda {
       long_param.siteSubset = QUDA_FULL_SITE_SUBSET;
       //
       l = new cpuGaugeField(fat_param);
-
-      cpuColorSpinorField *uv_long = new cpuColorSpinorField(UVparam);
+      //
+      uv_long = new cpuColorSpinorField(UVparam);
       //Copy the cuda gauge field to the cpu
       long_links->saveCPUField(*l, QUDA_CPU_FIELD_LOCATION);
     }
