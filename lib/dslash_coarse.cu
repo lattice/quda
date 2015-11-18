@@ -136,7 +136,6 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
-//#define CHECK_STAGGERED
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
   __device__ __host__ inline void ks_dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;

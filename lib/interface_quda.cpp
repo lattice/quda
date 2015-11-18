@@ -2831,7 +2831,6 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
   saveTuneCache(getVerbosity());
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-//printfQuda("\nHERE\n");
 }
 
 void invertMDQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
