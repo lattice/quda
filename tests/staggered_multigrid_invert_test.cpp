@@ -90,8 +90,8 @@ namespace quda {
 static void end();
 
 template<typename Float>
-void constructSpinorField(Float *res) {
-  for(int i = 0; i < Vh; i++) {
+void constructSpinorField(Float *res, const int Vol) {
+  for(int i = 0; i < Vol; i++) {
     for (int s = 0; s < 1; s++) {
       for (int m = 0; m < 3; m++) {
         res[i*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
@@ -289,11 +289,10 @@ void mg_test(void)
   for(int d = 0; d < 4; d++) {
     csParam.x[d] = gaugeParam.X[d];
   }
-  csParam.x[0] /= 2;
-
+  
   csParam.precision = inv_param.cpu_prec;
   csParam.pad = 0;
-  csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
+  csParam.siteSubset =  QUDA_FULL_SITE_SUBSET;// QUDA_PARITY_SITE_SUBSET;//
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   csParam.fieldOrder  = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
@@ -303,10 +302,12 @@ void mg_test(void)
   ref = new cpuColorSpinorField(csParam);  
   tmp = new cpuColorSpinorField(csParam);  
 
+  if(csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) csParam.x[0] /= 2;
+
   if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    constructSpinorField((float*)in->V());    
+    constructSpinorField((float*)in->V(), in->Volume());    
   }else{
-    constructSpinorField((double*)in->V());
+    constructSpinorField((double*)in->V(), in->Volume());
   }
 
 #ifdef MULTI_GPU

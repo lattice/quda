@@ -47,6 +47,8 @@ namespace quda {
       extractGhostMG<Float, 4>(u, Ghost);
     } else if (u.Ncolor() == 48) {
       extractGhostMG<Float, 48>(u, Ghost);
+    } else if (u.Ncolor() == 96) {
+      extractGhostMG<Float, 96>(u, Ghost);
     } else {
       errorQuda("Ncolor = %d not supported", u.Ncolor());
     }

@@ -18,8 +18,9 @@ namespace quda {
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-//    bool is_staggered = false;// (( typeid(*dirac).name() == typeid(DiracStaggered).name() ) || ( typeid(*dirac).name() == typeid((DiracImprovedStaggered).name() ));
-    bool is_staggered = true;
+    bool is_staggered = false;
+    if( typeid(*dirac).name() == typeid(DiracStaggered).name() || typeid(*dirac).name() == typeid(DiracImprovedStaggered).name() ) is_staggered = true;
+
     if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
       if (!enable_gpu)
 	errorQuda("Cannot apply coarse grid operator on GPU since enable_gpu has not been set");

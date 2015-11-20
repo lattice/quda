@@ -2,7 +2,7 @@ include ../make.inc
 
 QUDA = libquda.a
 
-QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
+QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o	ks_coarse_op.o	\
 	coarsecoarse_op.o multigrid.o transfer.o transfer_util.o	\
 	prolongator.o restrictor.o gauge_phase.o timer.o malloc.o	\
 	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\

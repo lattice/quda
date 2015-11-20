@@ -136,6 +136,7 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
+//#define CHECK_STAGGERED
   template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int Mc>
   __device__ __host__ inline void ks_dslash(complex<Float> out[], CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s_row, int color_block) {
     const int their_spinor_parity = (arg.nParity == 2) ? (parity+1)&1 : 0;
@@ -430,8 +431,10 @@ namespace quda {
       ApplyCoarse<Float,csOrder,gOrder,20,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 48) {
+      ApplyCoarse<Float,csOrder,gOrder,48,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else {
-      errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
+      errorQuda("Unsupported number of coarse dof %d\n", inA.Ncolor());
     }
   }
 

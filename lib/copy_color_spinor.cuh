@@ -467,8 +467,11 @@ namespace quda {
   case 72:								\
     CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr);	\
     break;								\
+  case 144:                                                             \
+    CopyGenericColorSpinor<144>(dst, src, location, dst_ptr, src_ptr);  \
+    break;                                                              \
   default:								\
-    errorQuda("Ncolors=%d not supported", src.Ncolor());		\
+    errorQuda("Ncolors=%d NOT supported", src.Ncolor());		\
   }
 #else
 #define INSTANTIATE_COLOR
