@@ -63,33 +63,32 @@ namespace quda {
       }
       blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
       break;
-    case 2: // 
-      for (int i=0; i<k-2; i+=3) { // 5 (k-1) memory transactions here
-	for (int j=i; j<i+3; j++) beta[j][k] = blas::cDotProduct(*Ap[j], *Ap[k]);
-	blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
-      }
-    
-      if (k%3 != 0) { // need to update the remainder
-	if ((k - 3*(k/3)) % 2 == 0) {
-	  beta[k-2][k] = blas::cDotProduct(*Ap[k-2], *Ap[k]);
-	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	  blas::caxpbypz(beta[k-2][k], *Ap[k-2], beta[k-1][k], *Ap[k-1], *Ap[k]);
-	} else {
-	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	  blas::caxpy(beta[k-1][k], *Ap[k-1], *Ap[k]);
-	}
-      }
-
-      break;
-    case 3:
+    case 2: // two-way pipelining
       for (int i=0; i<k-1; i+=2) {
 	for (int j=i; j<i+2; j++) beta[j][k] = blas::cDotProduct(*Ap[j], *Ap[k]);
 	blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
       }
-    
+
       if (k%2 != 0) { // need to update the remainder
 	beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	blas::caxpy(beta[k-1][k], *Ap[k-1], *Ap[k]);
+	blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+      }
+      break;
+    case 3: // three-way pipelining
+      for (int i=0; i<k-2; i+=3) { // 5 (k-1) memory transactions here
+	for (int j=i; j<i+3; j++) beta[j][k] = blas::cDotProduct(*Ap[j], *Ap[k]);
+	blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
+      }
+
+      if (k%3 != 0) { // need to update the remainder
+	if ((k%3) % 2 == 0) {
+	  beta[k-2][k] = blas::cDotProduct(*Ap[k-2], *Ap[k]);
+	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	  blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
+	} else {
+	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	  blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+	}
       }
       break;
     default:
