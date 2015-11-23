@@ -29,10 +29,10 @@ namespace quda {
     GaugeAPEArg(GaugeOr &origin, GaugeDs &dest, const GaugeField &data, const Float alpha, const Float tolerance) 
       : origin(origin), dest(dest), alpha(alpha), tolerance(tolerance) {
 #ifdef MULTI_GPU
-        for(int dir=0; dir<4; ++dir){
-          border[dir] = 2;
-        }
-        for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;
+      for ( int dir = 0; dir < 4; ++dir ) {
+        border[dir] = data.R()[dir];
+        X[dir] = data.X()[dir] - border[dir] * 2;
+      } 
 #else
         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif

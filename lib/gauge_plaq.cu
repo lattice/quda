@@ -27,7 +27,7 @@ namespace quda {
 
 #ifdef MULTI_GPU
         for(int dir=0; dir<4; ++dir){
-          border[dir] = 2;
+          border[dir] = data.R()[dir];
 	  X[dir] = data.X()[dir] - border[dir]*2;
         }
 #else
