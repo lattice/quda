@@ -44,7 +44,7 @@ namespace quda {
 
       }
 
-      if (cudaLongLink->Reconstruct() != QUDA_RECONSTRUCT_NO) {
+      if (cudaLongLink && cudaLongLink->Reconstruct() != QUDA_RECONSTRUCT_NO) {
 	errorQuda("Long-link must have no reconstruction set");
       }
 
