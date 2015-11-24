@@ -1,5 +1,3 @@
-#ifdef SSTEP
-
 template <int N, typename ReduceType, typename SpinorX, typename SpinorY, 
          typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 struct MultiReduceArg {
@@ -513,5 +511,3 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
     checkCudaError();
     return;
   }
-
-#endif // SSTEP

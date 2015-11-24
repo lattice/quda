@@ -45,10 +45,27 @@ namespace quda {
 
   }
 
-  void orthoDir(Complex **beta, std::vector<ColorSpinorField*> Ap, int k) {
-    int type = 1;
+  void computeBeta(Complex **beta, std::vector<ColorSpinorField*> Ap, int i, int N, int k) {
+    Complex *Beta = new Complex[N];
+    std::vector<cudaColorSpinorField*> a(N), b(N);
+    for (int j=0; j<N; j++) {
+      a[j] = static_cast<cudaColorSpinorField*>(Ap[i+j]);
+      b[j] = static_cast<cudaColorSpinorField*>(Ap[k]);
+      printfQuda("i=%d k=%d j=%d a=%d b=%d \n", i, k, j, a[j]->Precision(), b[j]->Precision());
+    }
+    blas::cDotProduct(Beta, a, b); // vectorized dot product
+    for (int j=0; j<N; j++) beta[i+j][k] = Beta[j];
+    delete [] Beta;
+  }
 
-    switch (type) {
+  void orthoDir(Complex **beta, std::vector<ColorSpinorField*> Ap, int k, int pipeline) {
+    // Vectorized dot product only has limited support so work around
+    if (Ap[0]->Location() == QUDA_CPU_FIELD_LOCATION ||
+	Ap[0]->Nspin() == 2 || pipeline == 0) pipeline = 1;
+
+    pipeline = 1; // FIXME vectorized dot product seems unreliable so disable for now
+
+    switch (pipeline) {
     case 0: // no kernel fusion
       for (int i=0; i<k; i++) { // 5 (k-1) memory transactions here
 	beta[i][k] = blas::cDotProduct(*(Ap[i]), *(Ap[k]));
@@ -64,35 +81,42 @@ namespace quda {
       blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
       break;
     case 2: // two-way pipelining
-      for (int i=0; i<k-1; i+=2) {
-	for (int j=i; j<i+2; j++) beta[j][k] = blas::cDotProduct(*Ap[j], *Ap[k]);
-	blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
-      }
+      {
+	const int N = 2;
+	for (int i=0; i<k-(N-1); i+=N) {
+	  printf("pre 2-way\n");
+	  computeBeta(beta, Ap, i, N, k);
+	  blas::caxpbypz(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], *Ap[k]);
+	}
 
-      if (k%2 != 0) { // need to update the remainder
-	beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
-      }
-      break;
-    case 3: // three-way pipelining
-      for (int i=0; i<k-2; i+=3) { // 5 (k-1) memory transactions here
-	for (int j=i; j<i+3; j++) beta[j][k] = blas::cDotProduct(*Ap[j], *Ap[k]);
-	blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
-      }
-
-      if (k%3 != 0) { // need to update the remainder
-	if ((k%3) % 2 == 0) {
-	  beta[k-2][k] = blas::cDotProduct(*Ap[k-2], *Ap[k]);
-	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
-	  blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
-	} else {
+	if (k%N != 0) { // need to update the remainder
 	  beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
 	  blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
 	}
       }
       break;
+    case 3: // three-way pipelining
+      {
+	const int N = 3;
+	for (int i=0; i<k-(N-1); i+=N) { // 5 (k-1) memory transactions here
+	  printf("pre 3-way\n");
+	  computeBeta(beta, Ap, i, N, k);
+	  blas::caxpbypczpw(-beta[i][k], *Ap[i], -beta[i+1][k], *Ap[i+1], -beta[i+2][k], *Ap[i+2], *Ap[k]);
+	}
+
+	if (k%N != 0) { // need to update the remainder
+	  if ((k%N) % 2 == 0) {
+	    computeBeta(beta, Ap, k-2, 2, k);
+	    blas::caxpbypz(-beta[k-2][k], *Ap[k-2], -beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  } else {
+	    beta[k-1][k] = blas::cDotProduct(*Ap[k-1], *Ap[k]);
+	    blas::caxpy(-beta[k-1][k], *Ap[k-1], *Ap[k]);
+	  }
+	}
+      }
+      break;
     default:
-      errorQuda("Orthogonalization type not defined");
+      errorQuda("Pipeline length %d type not defined", pipeline);
     }
 
   }   
@@ -327,7 +351,7 @@ namespace quda {
 		     total_iter, blas::norm2(*Ap[k]), blas::norm2(*p[k]), blas::norm2(rPre));
       }
 
-      orthoDir(beta, Ap, k);
+      orthoDir(beta, Ap, k, param.pipeline);
 
       double3 Apr = blas::cDotProductNormA(*Ap[k], rSloppy);
 

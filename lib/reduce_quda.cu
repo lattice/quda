@@ -497,10 +497,7 @@ namespace quda {
 	return Complex(cdot.x, cdot.y);
       }
 	
-  void cDotProductCuda(Complex* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
-#ifndef SSTEP
-    errorQuda("S-step code not built\n");
-#else
+  void cDotProduct(Complex* result, std::vector<cudaColorSpinorField*>& x, std::vector<cudaColorSpinorField*>& y){
     double2* cdot = new double2[x.size()];
 
     switch(x.size()){
@@ -508,6 +505,15 @@ namespace quda {
         reduce::multiReduceCuda<1,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
         (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
+      case 2:
+        reduce::multiReduceCuda<2,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+      case 3:
+        reduce::multiReduceCuda<3,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
+        (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
+        break;
+#ifdef SSTEP
       case 6:
         reduce::multiReduceCuda<6,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
         (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
@@ -520,14 +526,14 @@ namespace quda {
         reduce::multiReduceCuda<14,double2,QudaSumFloat2,QudaSumFloat,Cdot,0,0,0,0,0,false>
         (cdot, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, x, x);
         break;
-      default:
+#endif // SSTEP
+    default:
         errorQuda("Unsupported vector size\n");
         break;
     }
 
     for(int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
     delete[] cdot;
-#endif
   }
 
   /**
