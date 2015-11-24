@@ -183,7 +183,7 @@ namespace quda {
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
-    if (K) delete K;
+    if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 

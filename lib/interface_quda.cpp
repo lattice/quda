@@ -2360,7 +2360,10 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     double nx = blas::norm2(*x);
    printfQuda("Solution = %g\n",nx);
   }
+
+  profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
   dirac.reconstruct(*x, *b, param->solution_type);
+  profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
   
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
     // rescale the solution
@@ -2600,7 +2603,13 @@ void generateNullVectors(std::vector<ColorSpinorField*> B, QudaInvertParam *mg_i
 void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
 {
   QudaInvertParam *param = mg_param->invert_param;
+  setTuning(param->tune);
+
   if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH) setKernelPackT(true);
+
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) setKernelPackT(true);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -2626,6 +2635,8 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
     (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || 
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   param->spinorGiB = cudaGauge->VolumeCB() * spinorSiteSize;
   if (!pc_solve) param->spinorGiB *= 2;
@@ -2705,7 +2716,7 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
     blas::ax(1.0/sqrt(nb), *x);
   }
 
-  setTuning(param->tune);
+  massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
 
@@ -2715,8 +2726,6 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
     printfQuda("Prepared source = %g\n", nin);   
     printfQuda("Prepared solution = %g\n", nout);   
   }
-
-  massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     double nin = blas::norm2(*in);
@@ -2751,6 +2760,10 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
     errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
   }
 
+  if (!mat_solution && norm_error_solve) {
+    errorQuda("Normal-error solve requires Mat solution");
+  }
+
   if (!direct_solve) errorQuda("Not supported");
 
   DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -2779,18 +2792,19 @@ void multigridQuda(void *hp_x, void *hp_b, QudaMultigridParam *mg_param)
 
   // create the MG preconditioner
   Solver *K = new MG(mgParam, profileInvert);
+
   profileInvert.TPSTOP(QUDA_PROFILE_INIT);
 
   SolverParam solverParam(*param);
   printfQuda("Creating GCR solver with MG preconditioner\n");
   Solver *solve = new GCR(m, *K, mSloppy, mPre, solverParam, profileInvert);
-  //Solver *solve = new GCR(m, mSloppy, mPre, solverParam, profileInvert);
   (*solve)(*out, *in);
   delete solve;
-  // delete K; // GCR presently deletes the preconditioner
   solverParam.updateInvertParam(*param);
 
+  delete K;
   for (int i=0; i<mg_param->n_vec[0]; i++) delete B[i];
+
 
   if (getVerbosity() >= QUDA_VERBOSE){
     double nx = blas::norm2(*x);

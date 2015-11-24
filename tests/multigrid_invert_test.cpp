@@ -221,7 +221,7 @@ int main(int argc, char **argv)
   inv_param.reliable_delta = 1e-2;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_GCR_INVERTER;
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
