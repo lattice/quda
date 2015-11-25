@@ -103,6 +103,7 @@ namespace quda {
 
   }
 
+  // out[i] = D^i in
   void MPCG::computeMatrixPowers(cudaColorSpinorField out[], cudaColorSpinorField &in, int nvec)
   {
     cudaColorSpinorField temp(in);
@@ -113,6 +114,8 @@ namespace quda {
     return;
   }
 
+
+  // MW: out[i]= in[i] for i=0..nsteps, out[i]= D out[i-1]
   void MPCG::computeMatrixPowers(std::vector<cudaColorSpinorField>& out, std::vector<cudaColorSpinorField>& in, int nsteps)
   {
     cudaColorSpinorField temp(in[0]);
@@ -228,7 +231,7 @@ namespace quda {
     cudaColorSpinorField x_prev(x,csParam);
     cudaColorSpinorField x_new(x,csParam);
 
-
+    // currently use fixed s=2
     const int s = 2;
 
     // create the residual array and the matrix powers array
@@ -238,20 +241,26 @@ namespace quda {
     // Set up the first residual
     for(int i=0; i<s; ++i) zeroCuda(R[i]);
 
-
+//
     mat(R[s], x, temp);
     double r2 = xmyNormCuda(b,R[s]);
 
     double stop = stopping(param.tol, b2, param.residual_type);
 
 
-    int it = 0;
+    int it = 0; // s*k+j
     double* d    = new double[2*s+1];
+    zero(d,2*s+1);
     double* d_p1 = new double[2*s+1];
+    zero(d_p1,2*s+1);
     double* d_p2 = new double[2*s+1];
+    zero(d_p2,2*s+1);
     double* g    = new double[2*s+1];
+    zero(g,2*s+1);
     double* g_p1 = new double[2*s+1];
+    zero(g_p1,2*s+1);
     double* g_p2 = new double[2*s+1];
+    zero(g_p2,2*s+1);
     double** G  = new double*[2*s+1];
     for(int i=0; i<(2*s+1); ++i){
       G[i] = new double[2*s+1];
@@ -266,8 +275,10 @@ namespace quda {
     // v[2*s] holds A^(s)r
     cudaColorSpinorField w(b);
 
-    double rAr;
+    //MW: this seems to wrong. If I set it to zero I get nan and otherwise arbitrary results.
+    double rAr=0.;
 
+//    printfQuda("rar init %f \n",rAr);
     //   double gamma_prev = 0.0;
     //   double mu_prev = 0.0;
     //    double rho_prev = 0.0;
@@ -277,7 +288,11 @@ namespace quda {
     double rho_kprev[s];
     double gamma_kprev[s];
 
-    zero(mu,s); 
+    zero(mu,s);
+    zero(rho,s);
+    zero(gamma,s);
+    zero(rho_kprev,s);
+    zero(gamma_kprev,s);
 
     for(int i=0; i<(2*s+1); ++i){
       zero(G[i], (2*s+1)); 
@@ -285,6 +300,7 @@ namespace quda {
 
 
     int k = 0;
+    // outer k loop
     while(!convergence(r2,0.0,stop,0.0) && it < param.maxiter){
       // compute the matrix powers kernel - need to set r[s] above
       computeMatrixPowers(V, R, s); 
@@ -293,20 +309,38 @@ namespace quda {
       R[0] = R[s];
 
       int j = 0;
+      // inner j loop
       while(!convergence(r2,0.0,stop,0.0) && j<s){ 
+        printfQuda("mpcg loop k j %i %i\n",k,j);
+        // if j=0 previous iteration is s-1
         const int prev_idx = j ? j-1 : s-1;
-        cudaColorSpinorField& R_prev = R[prev_idx];
+
+        // References to results from previous iteration
+        cudaColorSpinorField& R_prev = R[prev_idx]; // MW above we set R[0]=R[s] ...
         double& mu_prev    = mu[prev_idx];
         double& rho_prev   = rho[prev_idx];
         double& gamma_prev = gamma[prev_idx];
 
 
+        // setup (j=0 here is j=1 in Eq 5.10, 5.15here)
+        if(j == 0){
 
-        if(j == 0){ 
-          zero(d, 2*s+1); d[s+1] = 1.0;
-          w = V[s+1];
+          // d coefficients for j=0
+          zero(d, 2*s+1); d[s+1] = 1.0; // MW is this right? EQ 510 says 0_{2s+1,1} for k=0, j=0 (note we start at j=0, this corresponds to j=1)
+          // g coefficients for j=0
           zero(g, 2*s+1); g[s] = 1.0;
+
+          w = V[s+1];
+          for(int i=0; i<(2*s+1); ++i){
+          printfQuda("g[%i] %e\t",i,g[i]);
+          }
+          printfQuda("\n");
+          for(int i=0; i<(2*s+1); ++i){
+          printfQuda("d[%i] %e\t",i,d[i]);
+          }
+          printfQuda("\n");
         }else{
+          // j > 0
           if(j==1){ 
             zero(d_p2, 2*s+1);
             if(k > 0){
@@ -314,25 +348,39 @@ namespace quda {
               d_p2[s-1] = (1./gamma_kprev[s-1]);
               d_p2[s]   = (-1./(gamma_kprev[s-1]*rho_kprev[s-1]));
             }
+
             zero(g_p2, 2*s+1);
             if(k > 0) g_p2[s-1] = 1.0;
           }
+
           // compute g coeffs
           for(int i=0; i<(2*s+1); ++i){
             g[i] = rho[j-1]*g_p1[i] - rho[j-1]*gamma[j-1]*d_p1[i] 
                  + (1 - rho[j-1])*g_p2[i];
+          printfQuda("g[%i] %e\t",i,g[i]);
           }
-       
+       printfQuda("\n");
           // compute d coeffs 
           computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_kprev, rho_kprev);
+          for(int i=0; i<(2*s+1); ++i){
+          printfQuda("d[%i] %e\t",i,d[i]);
+          }
+          printfQuda("\n");
           zeroCuda(w); 
           for(int i=0; i<(2*s+1); ++i){
             if(d[i] != 0.) axpyCuda(d[i], V[i], w);
           }
-        }
-
+        } // end j>0
+//        printfQuda(" %i rAr %e \t r2 %f\n",it,rAr,r2);
         computeMuNu(r2, g, G, g, 2*s+1);
         computeMuNu(rAr, g, G, d, 2*s+1);
+        printfQuda(" %i rAr %e \t r2 %f\n",it,rAr,r2);
+        rAr=reDotProductCuda(R[j],w);
+        r2=norm2(R[j]);
+        printfQuda(" %i rAr %e \t r2 %f\n",it,rAr,r2);
+
+
+
 
         mu[j] = r2;
         gamma[j] = r2/rAr;
@@ -394,7 +442,7 @@ namespace quda {
     for(int i=0; i<(2*s+1); ++i){
       delete[] G[i];
     }
-    delete G;
+    delete[] G;
 #endif // sstep
     return;
   }
