@@ -467,7 +467,9 @@ namespace quda {
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
     csParam.setPrecision(csParam.precision); // set to native order
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
-    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+     if(param.B[0]->Nspin() == 1)  csParam.gammaBasis = param.B[0]->GammaBasis();//hack for staggered
+     else csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
     // Generate sources and launch solver for each source:
     for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec) {

@@ -115,8 +115,11 @@ namespace quda {
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
     } else  if (in.Ncolor() == 48) {
       const int Nc = 48;
+      copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type); 
+    } else  if (in.Ncolor() == 96) {
+      const int Nc = 96;
       copyGaugeMG<FloatOut,FloatIn,2*Nc*Nc>(out, in, location, Out, In, outGhost, inGhost, type);
-    } else 
+    } else
 #endif // GPU_MULTIGRID
     {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
