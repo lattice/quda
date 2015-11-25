@@ -17,6 +17,14 @@ namespace quda {
 
     printfQuda("Creating level %d of %d levels\n", param.level+1, param.Nlevel);
 
+    if (param.level == 0) { // null space generation only on level 1 currently
+      if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+	generateNullVectors(param.B);
+      } else {
+	loadVectors(param.B);
+      }
+    }
+
     if (param.level >= QUDA_MAX_MG_LEVEL)
       errorQuda("Level=%d is greater than limit of multigrid recursion depth", param.level+1);
 
@@ -348,7 +356,7 @@ namespace quda {
   }
 
   //supports seperate reading or single file read
-  void loadVectors(std::vector<ColorSpinorField*> &B) {
+  void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
     const int Nvec = B.size();
     printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile);
 
@@ -406,7 +414,7 @@ namespace quda {
     printfQuda("Done loading vectors\n");
   }
 
-  void saveVectors(std::vector<ColorSpinorField*> &B) {
+  void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
     if (strcmp(vec_outfile,"")!=0) {
       const int Nvec = B.size();
       printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
@@ -436,6 +444,76 @@ namespace quda {
       printfQuda("Done saving vectors\n");
     }
 
+  }
+
+  void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {
+    printfQuda("\nGenerate null vectors\n");
+    //Create spinor field parameters:
+
+    SolverParam solverParam(param);
+
+    // set null-space generation options - need to expose these
+    solverParam.maxiter = 500;
+    solverParam.tol = 5e-4;
+    solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    solverParam.delta = 1e-7;
+    solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
+    // end setting null-space generation options
+
+    solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+    solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
+
+    ColorSpinorParam csParam(*B[0]);
+    csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+    csParam.setPrecision(csParam.precision); // set to native order
+    csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
+    csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+
+    // Generate sources and launch solver for each source:
+    for(std::vector<ColorSpinorField*>::iterator nullvec = B.begin() ; nullvec != B.end(); ++nullvec) {
+	cpuColorSpinorField *curr_nullvec = static_cast<cpuColorSpinorField*> (*nullvec);
+	curr_nullvec->Source(QUDA_RANDOM_SOURCE);//random initial guess
+
+	csParam.create = QUDA_ZERO_FIELD_CREATE;
+	ColorSpinorField *b = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+	//copy fields:
+	csParam.create = QUDA_COPY_FIELD_CREATE;
+	ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, csParam));
+
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Prepared source = %g\n", blas::norm2(*x));
+
+	Solver *solve = Solver::create(solverParam, param.matResidual, param.matSmooth, param.matSmooth, profile);
+	(*solve)(*b, *x);
+	delete solve;
+
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", blas::norm2(*x));
+
+	*curr_nullvec = *x;
+
+	// global orthoonormalization of the generated null-space vectors
+	Complex alpha = Complex(0.0, 0.0);
+
+	for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != nullvec; ++prevvec)//row id
+	  {
+	    cpuColorSpinorField *prev_nullvec = static_cast<cpuColorSpinorField*> (*prevvec);
+
+	    alpha = blas::cDotProduct(*prev_nullvec, *curr_nullvec);//<j,i>
+	    Complex scale = Complex(-alpha.real(), -alpha.imag());
+	    blas::caxpy(scale, *prev_nullvec, *curr_nullvec); //i-<j,i>j
+	  }
+
+	alpha = blas::norm2(*curr_nullvec);
+	if (alpha.real() > 1e-16)  blas::ax(1.0 /sqrt(alpha.real()), *curr_nullvec);
+	else errorQuda("\nCannot orthogonalize %d vector\n", nullvec-B.begin());
+
+	delete b;
+	delete x;
+
+      }//stop for-loop:
+
+    saveVectors(B);
+
+    return;
   }
 
 }

@@ -1,5 +1,3 @@
-#ifdef SSTEP
-
 template <int N, typename ReduceType, typename SpinorX, typename SpinorY, 
          typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 struct MultiReduceArg {
@@ -33,14 +31,9 @@ struct MultiReduceArg {
 template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
   typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
   __global__ void multiReduceKernel(MultiReduceArg<N,ReduceType,SpinorX,SpinorY,SpinorZ,SpinorW,SpinorV,Reducer> arg){
-  
     unsigned int tid = threadIdx.x;
     unsigned int gridSize = gridDim.x*blockDim.x;
-    
-
     ReduceType sum[N];
-
-    
 
     for(int i=0; i<N; ++i){
       zero(sum[i]);
@@ -79,8 +72,9 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
 
     // Copy data into shared memory
     for(int i=0; i<N; ++i){
+      if (i>0) __syncthreads();
       if(tid >= warpSize) copytoshared(s, 0, sum[i], block_size);
-      __syncthreads;
+      __syncthreads();
 
       // now reduce using the first warp only
       if(tid < warpSize){
@@ -102,8 +96,8 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
 
       isLastBlockDone = (value == (gridDim.x-1));
     }
-    __syncthreads();
 
+    __syncthreads();
 
     // Finish the reduction if last block
     if(isLastBlockDone){
@@ -121,6 +115,7 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
       ReduceSimpleType *s = sdata + tid;
 
       for(int i=0; i<N; ++i){
+	if (i>0) __syncthreads();
         if(tid >= warpSize) copytoshared(s, 0, sum[i], block_size);
         __syncthreads();
 
@@ -223,20 +218,16 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
       virtual ~MultiReduceCuda(){}
 
       inline TuneKey tuneKey() const {
-        return TuneKey(blasStrings.vol_str, typeid(arg.r).name(), blasStrings.aux_str);
+        return TuneKey(blasStrings.vol_str, typeid(*this).name(), blasStrings.aux_str);
       }
 
       void apply(const cudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         multiReduceLaunch<N,doubleN,ReduceType,ReduceSimpleType,FloatN,M>(result,arg,tp,stream);
-
       }
-
 
 #define BYTES(X) ( arg.X.Precision()*(sizeof(FloatN)/sizeof(((FloatN*)0)->x))*M*arg.X.Stride() )
 #define NORM_BYTES(X) ( (arg.X.Precision() == QUDA_HALF_PRECISION) ? sizeof(float)*arg.length : 0 )
-
-
 
       void preTune() {
         for(int i=0; i<N; ++i){
@@ -520,5 +511,3 @@ template<int N, typename doubleN, typename ReduceType, typename ReduceSimpleType
     checkCudaError();
     return;
   }
-
-#endif // SSTEP

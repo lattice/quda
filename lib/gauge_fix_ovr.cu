@@ -229,7 +229,7 @@ namespace quda {
         border[dir] = data.R()[dir];
       #endif
       }
-      threads = data.VolumeCB();
+      threads = X[0]*X[1]*X[2]*X[3]/2;
     }
     double getAction(){ return result_h[0].x; }
     double getTheta(){ return result_h[0].y; }
@@ -1839,7 +1839,7 @@ namespace quda {
       errorQuda("Precision %d not supported", data.Precision());
     }
 #else
-    errorQuda("Gauge fixinghas not been built");
+    errorQuda("Gauge fixing has not been built");
 #endif // GPU_GAUGE_ALG
   }
 
