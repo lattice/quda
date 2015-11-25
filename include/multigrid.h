@@ -11,10 +11,6 @@ extern char vec_outfile[];
   
 namespace quda {
 
-  // FIXME - these definitions are strictly temporary
-  void loadVectors(std::vector<ColorSpinorField*> &B);
-  void saveVectors(std::vector<ColorSpinorField*> &B);
-
   // forward declarations
   class MG;
   class DiracCoarse;
@@ -31,7 +27,7 @@ namespace quda {
        This is top level instantiation done when we start creating the multigrid operator.
      */
     MGParam(const QudaMultigridParam &param, 
-	    std::vector<ColorSpinorField*> &B, 
+	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix &matResidual, 
 	    DiracMatrix &matSmooth,
 	    int level=0) :
@@ -54,7 +50,7 @@ namespace quda {
       }
 
     MGParam(const MGParam &param, 
-	    const std::vector<ColorSpinorField*> &B, 
+	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix &matResidual, 
 	    DiracMatrix &matSmooth,
 	    int level=0) :
@@ -104,7 +100,7 @@ namespace quda {
     MG *fine;
 
     /** The null space vectors */
-    const std::vector<ColorSpinorField*> &B;
+    std::vector<ColorSpinorField*> &B;
 
     /** Number of pre-smoothing applications to perform */
     int nu_pre;
@@ -207,6 +203,25 @@ namespace quda {
        @param in The residual vector (or equivalently the right hand side vector)
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
+       Load the null space vectors in from file
+       @param B Loaded null-space vectors (pre-allocated)
+    */
+    void loadVectors(std::vector<ColorSpinorField*> &B);
+
+    /**
+       Save the null space vectors in from file
+       @param B Save null-space vectors from here
+    */
+    void saveVectors(std::vector<ColorSpinorField*> &B);
+
+    /**
+       Generate the null-space vectors
+       @param B Generated null-space vectors
+     */
+    void generateNullVectors(std::vector<ColorSpinorField*> B);
+
   };
 
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
