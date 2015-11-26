@@ -149,15 +149,14 @@ void BlasMagmaArgs::OpenMagma(){
 #ifdef MAGMA_LIB
     magma_int_t err = magma_init(); 
 
-    if(err != MAGMA_SUCCESS) printfQuda("\nError: cannot initialize MAGMA library\n");
+    if(err != MAGMA_SUCCESS) errorQuda("\nError: cannot initialize MAGMA library\n");
 
     int major, minor, micro;
 
     magma_version( &major, &minor, &micro);
     printfQuda("\nMAGMA library version: %d.%d\n\n", major,  minor);
 #else
-    printfQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
-    exit(-1);
+    errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif    
 
     return;
@@ -166,7 +165,7 @@ void BlasMagmaArgs::OpenMagma(){
 void BlasMagmaArgs::CloseMagma(){  
 
 #ifdef MAGMA_LIB
-    if(magma_finalize() != MAGMA_SUCCESS) printfQuda("\nError: cannot close MAGMA library\n");
+    if(magma_finalize() != MAGMA_SUCCESS) errorQuda("\nError: cannot close MAGMA library\n");
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif    
