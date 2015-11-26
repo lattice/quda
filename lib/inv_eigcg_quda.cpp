@@ -394,13 +394,15 @@ namespace quda {
   }
 
   // set the required parameters for the initCG solver
-  void fillInitCGSolveParam(SolverParam &initCGparam) {
+  void fillInitCGSolveParam(SolverParam &initCGparam, int use_sloppy_partial_accumulator) {
     initCGparam.iter   = 0;
     initCGparam.gflops = 0;
     initCGparam.secs   = 0;
 
     initCGparam.inv_type        = QUDA_CG_INVERTER;       // use CG solver
     initCGparam.use_init_guess  = QUDA_USE_INIT_GUESS_YES;// use deflated initial guess...
+
+    initCGparam.use_sloppy_partial_accumulator= use_sloppy_partial_accumulator;
   }
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
@@ -423,7 +425,7 @@ namespace quda {
     }
     else
     {
-       fillInitCGSolveParam(initCGparam);
+       fillInitCGSolveParam(initCGparam, param.use_sloppy_partial_accumulator);
        //
        use_eigcg = false;
        //
@@ -1216,20 +1218,7 @@ namespace quda {
 
   void IncEigCG::operator()(cudaColorSpinorField *out, cudaColorSpinorField *in) 
   {
-     const bool use_reduced_vector_set = true;
-
-     const bool use_cg_updates         = false; 
-
-     const int eigcg_min_restarts      = 3;
-
      int eigcg_restarts = 0;
-/*
- * Set internal (iterative refinement) tolerance for the cg solver
- * In general, this is a tunable parameters, e.g.: 
- * 24^3x48 : 5e-3
- * 48^3x96 : 5e-2, works but not perfect, 1e-1 seems to be better...
- */  
-     const double cg_iterref_tol = 5e-2;//this must be external for the end-user tuning!
  
      if(defl_param == 0)
      {
@@ -1243,9 +1232,7 @@ namespace quda {
 
        DeleteEigCGSearchSpace();
        //
-       initCGparam.use_sloppy_partial_accumulator=0;
-
-       fillInitCGSolveParam(initCGparam);
+       fillInitCGSolveParam(initCGparam, param.use_sloppy_partial_accumulator);
 
      }
 
@@ -1321,16 +1308,15 @@ namespace quda {
 
            Solver *initCG = 0;
 
-           initCGparam.tol       = cg_iterref_tol;
+           fillInitCGSolveParam(initCGparam, param.use_sloppy_partial_accumulator);
+           initCGparam.tol       = param.cg_iterref_tol;
            initCGparam.precision = eigcg_precision;//the same as eigcg
            //
            initCGparam.precision_sloppy = QUDA_HALF_PRECISION; //don't need it ...   
-           initCGparam.use_sloppy_partial_accumulator=0;   //more stable single-half solver
-
-           fillInitCGSolveParam(initCGparam);
+           initCGparam.use_sloppy_partial_accumulator=0;   //enforce this value to garantee a more stable single-half solver
 
            //too messy..
-           bool cg_updates    = (use_cg_updates || (eigcg_restarts < eigcg_min_restarts) || (defl_param->cur_dim == defl_param->tot_dim) || (stop_div_r2 > cg_iterref_tol));
+           bool cg_updates    = (param.use_cg_updates || (eigcg_restarts < param.eigcg_min_restarts) || (defl_param->cur_dim == defl_param->tot_dim) || (stop_div_r2 > param.cg_iterref_tol));
 
            bool eigcg_updates = !cg_updates;
 
@@ -1371,7 +1357,7 @@ namespace quda {
 
               if(eigcg_updates) 
               {
-                 if(((eigcg_restarts >= eigcg_min_restarts) || (stop_div_r2 < cg_iterref_tol)) && (defl_param->cur_dim < defl_param->tot_dim))
+                 if(((eigcg_restarts >= param.eigcg_min_restarts) || (stop_div_r2 < param.cg_iterref_tol)) && (defl_param->cur_dim < defl_param->tot_dim))
                  {
                    SaveEigCGRitzVecs(defl_param);//accumulate
                    //
@@ -1381,7 +1367,7 @@ namespace quda {
                  else 
                  {
                    if(!initCG && (r2 > stop)) initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
-                   //param.tol     = cg_iterref_tol;
+                   //param.tol     = param.cg_iterref_tol;
                    cg_updates    = true;
 
                    eigcg_updates = false;
@@ -1440,29 +1426,15 @@ namespace quda {
 
         Solver *initCG = 0;
 
-        if(use_reduced_vector_set)
+        if(param.use_reduced_vector_set)
        	    DeflateSpinorReduced(*out, *in, defl_param, true);                
         else
 	    DeflateSpinor(*out, *in, defl_param, true);                
 
-        //initCGparam.precision_sloppy = QUDA_HALF_PRECISION;
-
-        const int max_restart_num = 3;//must be external for end-user tuning
-
         int restart_idx  = 0;
 
-        const double inc_tol = 1e-2;//must be external for the end-user tuning 
-
-        //In many cases, there is no need to use full precision accumulator, since low-mode deflation stabilizes 
-        //the mixed precision solver. Moreover, full precision acummulation results in worse performance of the deflated solver, upto 15% in my experiments
-        //However, this parameter should be exposed to the enduser for the performance tuning, just in some rare cases when low-mode deflation will be insufficient 
-        //for stable double-half mixed precision CG.
-        initCGparam.use_sloppy_partial_accumulator = 0;   
- 
-        initCGparam.delta = 1e-2; // might be a bit better than the default value 1e-1 (think about this)
-
         //launch initCG:
-        while((restart_tol > full_tol) && (restart_idx < max_restart_num))//currently just one restart, think about better algorithm for the restarts. 
+        while((restart_tol > full_tol) && (restart_idx < param.max_restart_num))//currently just one restart, think about better algorithm for the restarts. 
         {
           initCGparam.tol = restart_tol; 
 
@@ -1476,7 +1448,7 @@ namespace quda {
 
           xpayCuda(*in, -1, *W); 
 
-          if(use_reduced_vector_set)
+          if(param.use_reduced_vector_set)
 
           	DeflateSpinorReduced(*out, *W, defl_param, false);                
           else
@@ -1488,7 +1460,7 @@ namespace quda {
             printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", initCGparam.iter, initCGparam.secs, initCGparam.gflops);
           }
 
-          double new_restart_tol = restart_tol*inc_tol;
+          double new_restart_tol = restart_tol*param.inc_tol;
 
           restart_tol = (new_restart_tol > full_tol) ? new_restart_tol : full_tol;                               
 
@@ -1526,13 +1498,11 @@ namespace quda {
 
         DeleteEigCGSearchSpace();
 
-        if(use_reduced_vector_set){
+        if(param.use_reduced_vector_set){
 
           const int max_nev = defl_param->cur_dim;//param.m;
 
-          double eigenval_tol = 1e-1;
-
-          LoadEigenvectors(defl_param, max_nev, eigenval_tol);
+          LoadEigenvectors(defl_param, max_nev, param.eigenval_tol);
 
           printfQuda("\n...done. \n");
         }

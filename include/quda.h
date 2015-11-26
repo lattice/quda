@@ -245,15 +245,34 @@ extern "C" {
     QudaResidualType residual_type;
 
     /**Parameters for deflated solvers*/
-    QudaPrecision cuda_prec_ritz; /**< The precision of the Ritz vectors */
-
+    /** The precision of the Ritz vectors */
+    QudaPrecision cuda_prec_ritz; 
+    /** How many vectors to compute after one solve 
+     *  for eigCG recommended values 8 or 16 
+    */
     int nev;
-
+    /** EeigCG  : Search space dimension 
+     *  gmresdr : Krylov subspace dimension  
+    */
     int max_search_dim;//for magma library this parameter must be multiple 16?
-
+    /** For systems with many RHS: current RHS index */
     int rhs_idx;
-
-    int deflation_grid;//total deflation space is nev*deflation_grid
+    /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
+    int deflation_grid;
+    /** eigCG: specifies whether to use reduced eigenvector set */
+    bool    use_reduced_vector_set;
+    /** eigCG: selection criterion for the reduced eigenvector set */
+    double  eigenval_tol;
+    /** mixed precision eigCG tuning parameter:  whether to use cg refinement corrections in the incremental stage */
+    bool    use_cg_updates;
+    /** mixed precision eigCG tuning parameter:  tolerance for cg refinement corrections in the incremental stage */
+    double  cg_iterref_tol;
+    /** mixed precision eigCG tuning parameter:  minimum search vector space restarts */
+    int     eigcg_min_restarts;
+    /** initCG tuning parameter:  maximum restarts */
+    int     max_restart_num;
+    /** initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle */
+    double  inc_tol;
 
     /** Whether to make the solution vector(s) after the solve */
     int make_resident_solution;

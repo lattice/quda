@@ -193,6 +193,13 @@ int main(int argc, char **argv)
     inv_param.deflation_grid = 24;//to test the stuff
     inv_param.cuda_prec_ritz = cuda_prec_sloppy;
     inv_param.tol_restart = 5e+3*inv_param.tol;//think about this...
+    inv_param.use_reduced_vector_set = true;
+    inv_param.use_cg_updates = false;
+    inv_param.cg_iterref_tol = 5e-2;
+    inv_param.eigcg_min_restarts = 3;
+    inv_param.max_restart_num = 3;
+    inv_param.inc_tol = 1e-2;
+    inv_param.eigenval_tol = 1e-2;
   }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     inv_param.nev = 31;

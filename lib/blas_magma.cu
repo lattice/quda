@@ -4,6 +4,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <util_quda.h>
+
 #ifndef MAX
 #define MAX(a, b) (a > b) ? a : b;
 #endif
@@ -123,11 +125,11 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
 {
 #ifdef MAGMA_LIB
     // for test only:
-    if(scols != crows) printf("\nError: wrong dimensions\n"), exit(-1);
+    if(scols != crows) errorQuda("\nError: wrong dimensions\n");
 
     const int block_size = 16;
 
-    if (ccols % block_size != 0) printf("\nError: wrong dimensions\n"), exit(-1);
+    if (ccols % block_size != 0) errorQuda("\nError: wrong dimensions\n");
 
     // Setup execution parameters (column-major format):
     dim3 threads(block_size, block_size);
@@ -147,14 +149,14 @@ void BlasMagmaArgs::OpenMagma(){
 #ifdef MAGMA_LIB
     magma_int_t err = magma_init(); 
 
-    if(err != MAGMA_SUCCESS) printf("\nError: cannot initialize MAGMA library\n");
+    if(err != MAGMA_SUCCESS) printfQuda("\nError: cannot initialize MAGMA library\n");
 
     int major, minor, micro;
 
     magma_version( &major, &minor, &micro);
-    printf("\nMAGMA library version: %d.%d\n\n", major,  minor);
+    printfQuda("\nMAGMA library version: %d.%d\n\n", major,  minor);
 #else
-    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
+    printfQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
     exit(-1);
 #endif    
 
@@ -164,10 +166,9 @@ void BlasMagmaArgs::OpenMagma(){
 void BlasMagmaArgs::CloseMagma(){  
 
 #ifdef MAGMA_LIB
-    if(magma_finalize() != MAGMA_SUCCESS) printf("\nError: cannot close MAGMA library\n");
+    if(magma_finalize() != MAGMA_SUCCESS) printfQuda("\nError: cannot close MAGMA library\n");
 #else
-    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
-    exit(-1);
+    errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif    
 
     return;
@@ -182,13 +183,12 @@ void BlasMagmaArgs::CloseMagma(){
     magma_int_t dev_info = magma_getdevice_arch();//mostly to check whether magma is intialized...
     if(dev_info == 0)  exit(-1);
 
-    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+    printfQuda("\nMAGMA will use device architecture %d.\n", dev_info);
 
     alloc = false;
     init  = true;
 #else
-    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
-    exit(-1);
+    errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif    
 
     return;
@@ -206,7 +206,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec)
 
     if(dev_info == 0)  exit(-1);
 
-    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+    printfQuda("\nMAGMA will use device architecture %d.\n", dev_info);
 
     const int complex_prec = 2*prec;
 
@@ -225,8 +225,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec)
     alloc = true;
 
 #else
-    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
-    exit(-1);
+    errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif    
 
     return;
@@ -244,7 +243,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, cons
 
     if(dev_info == 0)  exit(-1);
 
-    printf("\nMAGMA will use device architecture %d.\n", dev_info);
+    printfQuda("\nMAGMA will use device architecture %d.\n", dev_info);
 
     const int complex_prec = 2*prec;
 
@@ -275,8 +274,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, cons
     alloc = true;
 
 #else
-    printf("\nError: MAGMA library was not compiled, check your compilation options...\n");
-    exit(-1);
+    errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
 #endif    
 
     return;
@@ -311,7 +309,7 @@ BlasMagmaArgs::~BlasMagmaArgs()
 void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, bool host)
 {
 #ifdef MAGMA_LIB
-     if(prob_size > m) printf("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m), exit(-1);
+     if(prob_size > m) errorQuda("\nError in MagmaHEEVD (problem size cannot exceed given search space %d), exit ...\n", m);
 
      cudaPointerAttributes ptr_attr;
 
@@ -320,17 +318,17 @@ void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, 
        //check if dTvecm is a device pointer..
        cudaPointerGetAttributes(&ptr_attr, dTvecm);
 
-       if(ptr_attr.memoryType != cudaMemoryTypeDevice || ptr_attr.devicePointer == NULL ) printf("Error in MagmaHEEVD, no device pointer found."), exit(-1);
+       if(ptr_attr.memoryType != cudaMemoryTypeDevice || ptr_attr.devicePointer == NULL ) errorQuda("Error in MagmaHEEVD, no device pointer found.");
 
        if(prec == 4)
        {
          magma_cheevd_gpu(_cV, _cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)W2, ldm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
-         if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
+         if(info != 0) errorQuda("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n");
        }
        else
        {
          magma_zheevd_gpu(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)W2, ldm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
-         if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
+         if(info != 0) errorQuda("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n");
        }
      }
      else
@@ -338,17 +336,17 @@ void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, 
        //check if dTvecm is a device pointer..
        cudaPointerGetAttributes(&ptr_attr, dTvecm);
 
-       if(ptr_attr.memoryType != cudaMemoryTypeHost || ptr_attr.hostPointer == NULL ) printf("Error in MagmaHEEVD, no host pointer found."), exit(-1);
+       if(ptr_attr.memoryType != cudaMemoryTypeHost || ptr_attr.hostPointer == NULL ) errorQuda("Error in MagmaHEEVD, no host pointer found.");
 
        if(prec == 4)
        {
          magma_cheevd(_cV, _cU, prob_size, (magmaFloatComplex*)dTvecm, ldm, (float*)hTvalm, (magmaFloatComplex*)lwork, llwork, (float*)rwork, lrwork, iwork, liwork, &info);
-         if(info != 0) printf("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n"), exit(-1);
+         if(info != 0) errorQuda("\nError in MagmaHEEVD (magma_cheevd_gpu), exit ...\n");
        }
        else
        {
          magma_zheevd(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
-         if(info != 0) printf("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n"), exit(-1);
+         if(info != 0) errorQuda("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n");
        }
      }   
 #endif
@@ -365,32 +363,32 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
         magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
 
         magma_cgeqrf_gpu(m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTau, &info);
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cgeqrf_gpu), exit ...\n"), exit(-1);
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cgeqrf_gpu), exit ...\n");
 
         //compute dTevecm0=QHTmQ
         //get TQ product:
         magma_cunmqr_gpu(_cR, _cN, m, m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info); 
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n"), exit(-1);
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n");
              	
         //get QHT product:
         magma_cunmqr_gpu(_cL, _cC, m, l, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n"), exit(-1);  
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n");  
      }
      else
      {
         magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
 
         magma_zgeqrf_gpu(m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTau, &info);
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zgeqrf_gpu), exit ...\n"), exit(-1);
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zgeqrf_gpu), exit ...\n");
 
         //compute dTevecm0=QHTmQ
         //get TQ product:
         magma_zunmqr_gpu(_cR, _cN, m, m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info); 
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
              	
         //get QHT product:
         magma_zunmqr_gpu(_cL, _cC, m, l, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);  
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");  
 
      }
 #endif
@@ -401,7 +399,7 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm)
 {
 #ifdef MAGMA_LIB 
-       if( (vld % 32) != 0) printf("\nError: leading dimension must be multiple of the warp size\n"), exit(-1);
+       if( (vld % 32) != 0) errorQuda("\nError: leading dimension must be multiple of the warp size\n");
 
        const int cvprec = 2*vprec;
 
@@ -424,19 +422,19 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
          magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
          magma_cunmqr_gpu(_cL, _cN, m, l, l, (magmaFloatComplex*)dTevecm, ldm, (magmaFloatComplex*)hTau, (magmaFloatComplex*)dTm, ldm, (magmaFloatComplex*)W, sideLR, (magmaFloatComplex*)dTau, nb, &info);
         
-         if(info != 0) printf("\nError in RestartV (magma_cunmqr_gpu), exit ...\n"), exit(-1); 
+         if(info != 0) errorQuda("\nError in RestartV (magma_cunmqr_gpu), exit ...\n"); 
        }
        else
        {
          magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
          magma_zunmqr_gpu(_cL, _cN, m, l, l, (magmaDoubleComplex*)dTevecm, ldm, (magmaDoubleComplex*)hTau, (magmaDoubleComplex*)dTm, ldm, (magmaDoubleComplex*)W, sideLR, (magmaDoubleComplex*)dTau, nb, &info);
 
-         if(info != 0) printf("\nError in RestartV (magma_zunmqr_gpu), exit ...\n"), exit(-1); 
+         if(info != 0) errorQuda("\nError in RestartV (magma_zunmqr_gpu), exit ...\n"); 
        }
 
        if(vprec == 4)
        {
-         if(prec == vprec) printf("\nError: option is not currently supported, exit ...\n"), exit(-1);
+         if(prec == vprec) errorQuda("\nError: option is not currently supported, exit ...\n");
 
          for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
          {
@@ -485,12 +483,12 @@ void BlasMagmaArgs::SolveProjMatrix(void* rhs, const int ldn, const int n, void*
        if (prec == 4)
        {
           err = magma_cgesv(n, 1, (magmaFloatComplex*)tmp, ldH, ipiv, (magmaFloatComplex*)rhs, ldn, &info);
-          if(err != 0) printf("\nError in SolveProjMatrix (magma_cgesv), exit ...\n"), exit(-1);
+          if(err != 0) errorQuda("\nError in SolveProjMatrix (magma_cgesv), exit ...\n");
        }
        else
        {
           err = magma_zgesv(n, 1, (magmaDoubleComplex*)tmp, ldH, ipiv, (magmaDoubleComplex*)rhs, ldn, &info);
-          if(err != 0) printf("\nError in SolveProjMatrix (magma_zgesv), exit ...\n"), exit(-1);
+          if(err != 0) errorQuda("\nError in SolveProjMatrix (magma_zgesv), exit ...\n");
        }
 
        magma_free_pinned(tmp);
@@ -515,12 +513,12 @@ void BlasMagmaArgs::SolveGPUProjMatrix(void* rhs, const int ldn, const int n, vo
        if (prec == 4)
        {
           err = magma_cgesv_gpu(n, 1, (magmaFloatComplex*)tmp, ldH, ipiv, (magmaFloatComplex*)rhs, ldn, &info);
-          if(err != 0) printf("\nError in SolveGPUProjMatrix (magma_cgesv), exit ...\n"), exit(-1);
+          if(err != 0) errorQuda("\nError in SolveGPUProjMatrix (magma_cgesv), exit ...\n");
        }
        else
        {
           err = magma_zgesv_gpu(n, 1, (magmaDoubleComplex*)tmp, ldH, ipiv, (magmaDoubleComplex*)rhs, ldn, &info);
-          if(err != 0) printf("\nError in SolveGPUProjMatrix (magma_zgesv), exit ...\n"), exit(-1);
+          if(err != 0) errorQuda("\nError in SolveGPUProjMatrix (magma_zgesv), exit ...\n");
        }
 
        magma_free(tmp);
@@ -589,7 +587,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
         magma_zgeqrf_gpu(n, k, (magmaDoubleComplex *)dQR, ldqr, (magmaDoubleComplex *)htau, (magmaDoubleComplex *)dtau, &info);//identical to zgeqrf?
 
         magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, &qW, lwork, dtau, nb, &info); 
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
 
         lwork = (magma_int_t) MAGMA_Z_REAL(qW);
 
@@ -597,7 +595,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
 
         //get TQ product:
         magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, hW, lwork, dtau, nb, &info); 
-        if(info != 0) printf("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n"), exit(-1);
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
 
         magma_free_cpu(hW);
 
@@ -631,7 +629,7 @@ bool cmp_eigen_nrms (SortedEval v1, SortedEval v2)
 
 void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals)
 {
-  if (prec == 4) printf("\nSingle precision is currently not supported.\n"), exit(-1);
+  if (prec == 4) errorQuda("\nSingle precision is currently not supported.\n");
 
   std::vector<SortedEval> sorted_evals_cntr;
 
@@ -673,7 +671,7 @@ void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const
 
   magma_zgeqrf(_m, _nev, (magmaDoubleComplex *)evmat, _ldm, (magmaDoubleComplex *)tau, &qwork, lwork, &info);
 
-  if( (info != 0 ) ) printf( "Error: MAGMA_ZGEQRF, info %d\n",info), exit(-1);
+  if( (info != 0 ) ) errorQuda( "Error: MAGMA_ZGEQRF, info %d\n",info);
 
   lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
 
@@ -681,7 +679,7 @@ void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const
 
   magma_zgeqrf(_m, _nev, (magmaDoubleComplex *)evmat, _ldm, (magmaDoubleComplex *)tau, work, lwork, &info);
 
-  if( (info != 0 ) ) printf( "Error: ZGEQRF, info %d\n",info), exit(-1);
+  if( (info != 0 ) ) errorQuda( "Error: ZGEQRF, info %d\n",info);
 
   if(work) magma_free_cpu(work);
 #endif
@@ -721,7 +719,7 @@ const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
 
   magma_zunmqr(_s, _t, _h, _n, _k, (magmaDoubleComplex *)QR, _ldqr, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldh, &qwork, lwork, &info);
 
-  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+  if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
   lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
 
@@ -729,7 +727,7 @@ const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
 
   magma_zunmqr(_s, _t, _h, _n, _k, (magmaDoubleComplex *)QR, _ldqr, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldh, work, lwork, &info);
 
-  if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+  if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
   if(work) magma_free_cpu(work);
 #endif
@@ -760,7 +758,7 @@ void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * c
 
   magma_zgesv(_m, I_ONE, (magmaDoubleComplex *)conjH, _ldH, ipiv, (magmaDoubleComplex *)em, _ldH, &info);
 
-  if( (info != 0 ) ) printf( "Error: DGESV, info %d\n",info), exit(-1);
+  if( (info != 0 ) ) errorQuda( "Error: DGESV, info %d\n",info);
 
 //make this cleaner!
   //check solution:
@@ -812,7 +810,7 @@ void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int
   //Get optimal work:
   magma_zgeev(_l, _r, _m, (magmaDoubleComplex *)harmH, _ldH, (magmaDoubleComplex *)evalues, NULL, _ldv, (magmaDoubleComplex *)vr, _ldv, &qwork, lwork, rwork, &info);
 
-  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+  if( (info != 0 ) ) errorQuda( "Error: ZGEEVX, info %d\n",info);
 
   lwork = (magma_int_t) MAGMA_Z_REAL(qwork);
 
@@ -821,7 +819,7 @@ void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int
   //now get eigenpairs:
   magma_zgeev(_l, _r, _m, (magmaDoubleComplex *)harmH, _ldH, (magmaDoubleComplex *)evalues, NULL, _ldv, (magmaDoubleComplex *)vr, _ldv, work, lwork, rwork, &info);
 
-  if( (info != 0 ) ) printf( "Error: ZGEEVX, info %d\n",info), exit(-1);
+  if( (info != 0 ) ) errorQuda( "Error: ZGEEVX, info %d\n",info);
 
   if(rwork)  magma_free_cpu(rwork);
   //
@@ -837,11 +835,10 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 #ifdef MAGMA_LIB
     if(prec == 4)
     {
-       printf("\nError: single precision is not currently supported\n");
-       exit(-1);
+       errorQuda("\nError: single precision is not currently supported\n");
     }
 
-    if( (vld % 32) != 0) printf("\nError: leading dimension must be multiple of the warp size\n"), exit(-1);
+    if( (vld % 32) != 0) errorQuda("\nError: leading dimension must be multiple of the warp size\n");
 
     int nev  = (max_nev - 1); //(nev+1) - 1 for GMRESDR
 
@@ -902,14 +899,14 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
    
     magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
 
-    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
     lwork = (int) qwork.real();
     work = new Complex[lwork];
 
     magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, (magmaDoubleComplex *)work, lwork, &info);
 
-    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
     //Copy (nev+1) vectors on the device:
     cudaMemcpy(dQmat, Qmat, (max_nev)*ldh*cprec, cudaMemcpyDefault);
@@ -920,7 +917,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
       {
         if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
 
-//printf("\nBuffer block : %d\n", bufferBlock);
+//printfQuda("\nBuffer block : %d\n", bufferBlock);
 
         magmaDoubleComplex *ptrV = &(((magmaDoubleComplex*)dV)[blockOffset]);
 
@@ -955,7 +952,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
 
-    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
     delete[] work;
     lwork = (int) qwork.real();
@@ -963,7 +960,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     magma_zunmqr(_s, _t, _mp1, _m, _k, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)work, lwork, &info);
 
-    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
     //Pdagger_{k+1} PrevRes
     lwork = -1;
@@ -973,7 +970,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
 
-    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
     delete [] work;
     lwork = (int) qwork.real();
@@ -981,7 +978,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     magma_zunmqr(_s, _t, _mp1, _k, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)H, _ldm, (magmaDoubleComplex *)work, lwork, &info);
 
-    if( (info != 0 ) ) printf( "Error: ZUNMQR, info %d\n",info), exit(-1);
+    if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
 
     const int len = ldh - nev-1;
     for(int i = 0; i < nev; i++) memset(&(((Complex*)H)[ldh*i+nev+1]), 0, len*sizeof(Complex) );

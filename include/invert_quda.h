@@ -156,6 +156,14 @@ namespace quda {
     int m;//Dimension of the search space
     int deflation_grid;
     int rhs_idx;
+
+    bool    use_reduced_vector_set;
+    bool    use_cg_updates;
+    double  cg_iterref_tol;
+    int     eigcg_min_restarts;
+    int     max_restart_num;
+    double  inc_tol;
+    double  eigenval_tol;
     
     /**
        Constructor that matches the initial values to that of the
@@ -176,7 +184,9 @@ namespace quda {
       Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0) 
+      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0),
+      use_reduced_vector_set(param.use_reduced_vector_set), use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
+      eigcg_min_restarts(param.eigcg_min_restarts), inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol)
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
