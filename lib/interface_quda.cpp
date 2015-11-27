@@ -5466,6 +5466,7 @@ void plaqQuda (double plq[3])
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
     gParamEx.t_boundary = gaugePrecise->TBoundary();
     gParamEx.nFace = 1;
+    gParamEx.tadpole = gaugePrecise->Tadpole();
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     
     data = new cudaGaugeField(gParamEx);
