@@ -5534,19 +5534,23 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 #ifdef MULTI_GPU
     int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
     for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+    GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
 #else
     for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
+    GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
 #endif
 
-  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-      pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
   gParam.create = QUDA_ZERO_FIELD_CREATE;
   gParam.order = gaugePrecise->Order();
   gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParam.t_boundary = gaugePrecise->TBoundary();
   gParam.nFace = 1;
   gParam.tadpole = gaugePrecise->Tadpole();
+#ifdef MULTI_GPU
   for(int dir=0; dir<4; ++dir) gParam.r[dir] = R[dir];
+#endif
 
   if (gaugeSmeared == NULL) {
     gaugeSmeared = new cudaGaugeField(gParam);
