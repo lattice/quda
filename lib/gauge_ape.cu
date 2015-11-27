@@ -61,7 +61,7 @@ namespace quda {
 
     setZero(&staple);
 
-    for (int mu=0; mu<4; mu++) {
+    for (int mu=0; mu<3; mu++) {  // I believe most users won't want to include time staples in smearing
       if (mu == dir) {
         continue;
       }
