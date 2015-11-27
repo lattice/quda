@@ -497,7 +497,7 @@ namespace quda {
 
 	alpha = blas::norm2(*curr_nullvec);
 	if (alpha.real() > 1e-16)  blas::ax(1.0 /sqrt(alpha.real()), *curr_nullvec);
-	else errorQuda("\nCannot orthogonalize %d vector\n", nullvec-B.begin());
+	else errorQuda("\nCannot orthogonalize %ld vector\n", nullvec-B.begin());
 
 	delete b;
 	delete x;
