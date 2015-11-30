@@ -5864,20 +5864,22 @@ double qChargeCuda ()
   } else {
     if (!gaugeSmeared) {
       int y[4];
-      for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 4;
+      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+      for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
       int pad = 0;
       GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
       gParamEx.create = QUDA_ZERO_FIELD_CREATE;
       gParamEx.order = gaugePrecise->Order();
       gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
       gParamEx.t_boundary = gaugePrecise->TBoundary();
       gParamEx.nFace = 1;
+      gParamEx.tadpole = gaugePrecise->Tadpole();
+      for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
 
       data = new cudaGaugeField(gParamEx);
 
       copyExtendedGauge(*data, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-      int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
       data->exchangeExtendedGhost(R,true);
       extendedGaugeResident = data;
       cudaDeviceSynchronize();
