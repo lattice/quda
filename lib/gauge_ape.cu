@@ -132,18 +132,19 @@ namespace quda {
 
       int dx[4] = {0, 0, 0, 0};
       for (int dir=0; dir < 3; dir++) {				//Only spatial dimensions are smeared
-        Matrix<Cmplx,3> U, S;
+        Matrix<Cmplx,3> U, S, TestU, I;
 
         computeStaple<Float,GaugeOr,GaugeDs,Cmplx>(arg,idx,parity,dir,S);
 
         arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity);
 
-	U  = U * (1. - arg.alpha);
-	S  = S * (arg.alpha/4.);	// This is 2*(SmearDims - 1), for 3D smearing = 4
+        S  = S * (arg.alpha/((Float) (2.*(nDim - 1.))));
+        setIdentity(&I);
 
-	U  = U + S;
+        TestU  = I*(1.-arg.alpha) + S*conj(U);
+        polarSu3<Cmplx,Float>(TestU, arg.tolerance);
+        U = TestU*U;
 
-        polarSu3<Cmplx,Float>(U, arg.tolerance);
         arg.dest.save((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity); 
     }
   }
