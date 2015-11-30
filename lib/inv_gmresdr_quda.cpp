@@ -983,7 +983,7 @@ namespace quda {
 
        ctmp2_p   = new cudaColorSpinorField(csParam);
 
-       sloppy_mat = matDefl;
+       sloppy_mat = const_cast<DiracMatrix*> (matDefl);
 
        use_deflated_cycles = false;
      }
@@ -1000,7 +1000,7 @@ namespace quda {
    profile->TPSTART(QUDA_PROFILE_EPILOGUE);
 
    param.secs = profile->Last(QUDA_PROFILE_COMPUTE);
-   double gflops = (quda::blas_flops + mat.flops())*1e-9;
+   double gflops = (quda::blas_flops + mat->flops())*1e-9;
    reduceDouble(gflops);
    param.gflops = gflops;
    param.iter += tot_iters;
@@ -1015,7 +1015,7 @@ namespace quda {
 
    // reset the flops counters
    quda::blas_flops = 0;
-   mat.flops();
+   mat->flops();
 
    profile->TPSTOP(QUDA_PROFILE_EPILOGUE);
    profile->TPSTART(QUDA_PROFILE_FREE);
@@ -1087,7 +1087,7 @@ namespace quda {
 
         csParam.setPrecision(QUDA_HALF_PRECISION);
 
-        sloppy_mat = matDefl;
+        sloppy_mat = const_cast<DiracMatrix*> (matDefl);
         r_sloppy = new cudaColorSpinorField(r, csParam);
         x_sloppy = new cudaColorSpinorField(x, csParam);
      } 
@@ -1291,7 +1291,7 @@ namespace quda {
    profile->TPSTART(QUDA_PROFILE_EPILOGUE);
 
    param.secs = profile->Last(QUDA_PROFILE_COMPUTE);
-   double gflops = (quda::blas_flops + mat.flops())*1e-9;
+   double gflops = (quda::blas_flops + mat->flops())*1e-9;
    reduceDouble(gflops);
    param.gflops = gflops;
    param.iter += tot_iters;
@@ -1306,7 +1306,7 @@ namespace quda {
 
    // reset the flops counters
    quda::blas_flops = 0;
-   mat.flops();
+   mat->flops();
 
    profile->TPSTOP(QUDA_PROFILE_EPILOGUE);
    profile->TPSTART(QUDA_PROFILE_FREE);

@@ -946,7 +946,7 @@ extern "C" {
   * Clean deflation solver resources.
   *
   **/
-  void destroyDeflationQuda(QudaInvertParam *param, void *_h_u = NULL, double *inv_eigenvals = NULL);
+  void destroyDeflationQuda(QudaInvertParam *param, const int *X = NULL, void *_h_u = NULL, double *inv_eigenvals = NULL);
 
 #ifdef __cplusplus
 }

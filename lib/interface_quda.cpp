@@ -3258,7 +3258,7 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void destroyDeflationQuda(QudaInvertParam *param, void *_h_u, double *inv_eigenvals)
+void destroyDeflationQuda(QudaInvertParam *param, const int *X,  void *_h_u, double *inv_eigenvals)
 {
    SolverParam solverParam(*param);
    DeflatedSolver *solve = DeflatedSolver::create(solverParam, NULL, NULL, NULL, NULL, NULL);

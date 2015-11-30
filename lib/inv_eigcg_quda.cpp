@@ -605,7 +605,7 @@ namespace quda {
          //
          int _2nev = eigcg_args->RestartVm(Vm->V(), cldn, clen, Vm->Precision()); 
 
-         if(getVerbosity() >= QUDA_DEBUG_VERBOSE) eigcg_args->CheckEigenvalues(Vm, matDefl, eigvRestart);          
+         if(getVerbosity() >= QUDA_DEBUG_VERBOSE) eigcg_args->CheckEigenvalues(Vm, *matDefl, eigvRestart);          
 
          //Fill-up diagonal elements of the matrix T
          eigcg_args->FillLanczosDiag(_2nev);
@@ -797,12 +797,12 @@ namespace quda {
 
      cudaColorSpinorField tmp (*W, csParam);
 
-     cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
+     cudaColorSpinorField *tmp2_p = !matDefl->isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
      cudaColorSpinorField &tmp2   = *tmp2_p;
 
      for (int j = dpar->cur_dim; j < (dpar->cur_dim+addednev); j++)//
      {
-       matDefl(*W, dpar->cudaRitzVectors->Eigenvec(j), tmp, tmp2);//precision must match!
+       (*matDefl)(*W, dpar->cudaRitzVectors->Eigenvec(j), tmp, tmp2);//precision must match!
 
        //off-diagonal:
        for (int i = 0; i < j; i++)//row id
@@ -859,14 +859,14 @@ namespace quda {
 
      cudaColorSpinorField tmp (*W, csParam);
 
-     cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
+     cudaColorSpinorField *tmp2_p = !matDefl->isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
      cudaColorSpinorField &tmp2   = *tmp2_p;
 
      for(int i = 0; i < nevs_to_print; i++)//newnev
      {
          for(int j = 0; j < curr_evals; j++) caxpyCuda(projm[i*dpar->ld+j], dpar->cudaRitzVectors->Eigenvec(j), *W);
 
-         matDefl(*W2, *W, tmp, tmp2);
+         (*matDefl)(*W2, *W, tmp, tmp2);
 
 	 double3 dotnorm = cDotProductNormACuda(*W, *W2);
 	 double norm2W = dotnorm.z;
@@ -943,7 +943,7 @@ namespace quda {
 
      cudaColorSpinorField tmp (*W, csParam);
 
-     cudaColorSpinorField *tmp2_p = !matDefl.isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
+     cudaColorSpinorField *tmp2_p = !matDefl->isStaggered() ? new cudaColorSpinorField(*W, csParam) : &tmp;
      cudaColorSpinorField &tmp2   = *tmp2_p;
 
      if(eigcg_alloc == false){//or : search_space_prec != ritz_precision
@@ -975,7 +975,7 @@ namespace quda {
        
          if(getVerbosity() >= QUDA_VERBOSE)
          {
-             matDefl(*W2, *W, tmp, tmp2);
+             (*matDefl)(*W2, *W, tmp, tmp2);
 
 	     double3 dotnorm = cDotProductNormACuda(*W, *W2);
 	     double norm2W = dotnorm.z;
@@ -1324,7 +1324,7 @@ namespace quda {
 
            bool eigcg_updates = !cg_updates;
 
-           if(cg_updates) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, profile);
+           if(cg_updates) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, *profile);
 
            //start the main loop:
            while(r2 > stop)
@@ -1370,7 +1370,7 @@ namespace quda {
                  }
                  else 
                  {
-                   if(!initCG && (r2 > stop)) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, profile);
+                   if(!initCG && (r2 > stop)) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, *profile);
                    //param.tol     = param.cg_iterref_tol;
                    cg_updates    = true;
 
@@ -1442,7 +1442,7 @@ namespace quda {
         {
           initCGparam.tol = restart_tol; 
 
-          initCG = new CG(*mat, *matCGSloppy, initCGparam, profile);
+          initCG = new CG(*mat, *matCGSloppy, initCGparam, *profile);
 
           (*initCG)(*out, *in);           
 
@@ -1475,7 +1475,7 @@ namespace quda {
 
         initCGparam.tol = full_tol; 
 
-        initCG = new CG(*mat, *matCGSloppy, initCGparam, profile);
+        initCG = new CG(*mat, *matCGSloppy, initCGparam, *profile);
 
         (*initCG)(*out, *in);           
 
