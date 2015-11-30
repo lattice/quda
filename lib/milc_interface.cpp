@@ -1105,10 +1105,7 @@ void qudaEigCGInvert(int external_precision,
 
   int quark_offset = getColorVectorOffset(local_parity, false, localDim);//gaugeParam.X - > localDim
 
-  if(rhs_idx < deflation_grid)
-    incrementalEigQuda(((char*)solution + quark_offset*host_precision),  ((char*)source + quark_offset*host_precision),  &invertParam, ritzVects, ritzVals, 0);
-  else
-    incrementalEigQuda(((char*)solution + quark_offset*host_precision),  ((char*)source + quark_offset*host_precision),  &invertParam, ritzVects, ritzVals, last_rhs_flag);
+  incrementalEigQuda(((char*)solution + quark_offset*host_precision),  ((char*)source + quark_offset*host_precision),  &invertParam, ritzVects, ritzVals);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -1117,6 +1114,8 @@ void qudaEigCGInvert(int external_precision,
 
   if(last_rhs_flag) 
   {
+    destroyDeflationQuda(&invertParam, localDim, ritzVects, ritzVals);
+
     closeMagma();
     //
     freeGaugeQuda();
@@ -1564,10 +1563,7 @@ void qudaEigCGCloverInvert(int external_precision,
     //}
   }
 
-  if(rhs_idx < deflation_grid)
-    incrementalEigQuda(solution,  source,  &invertParam, ritzVects, ritzVals, 0);
-  else
-    incrementalEigQuda(solution,  source,  &invertParam, ritzVects, ritzVals, last_rhs_flag);
+  incrementalEigQuda(solution,  source,  &invertParam, ritzVects, ritzVals);
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
@@ -1576,6 +1572,8 @@ void qudaEigCGCloverInvert(int external_precision,
 
   if(last_rhs_flag) 
   {
+    destroyDeflationQuda(&invertParam, localDim, ritzVects, ritzVals);
+    //
     closeMagma();
     //
     qudaFreeGaugeField();
