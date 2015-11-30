@@ -5504,42 +5504,18 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     errorQuda("Gauge field must be loaded");
   }
 
-#ifdef MULTI_GPU
-  if (extendedGaugeResident == NULL)
-  {
-    int y[4];
-    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
-    for(int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
-    int pad = 0;
-    GaugeFieldParam gParamEx(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
-    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-    gParamEx.order = gaugePrecise->Order();
-    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParamEx.t_boundary = gaugePrecise->TBoundary();
-    gParamEx.nFace = 1;
-    gParamEx.tadpole = gaugePrecise->Tadpole();
-    for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
-
-    extendedGaugeResident = new cudaGaugeField(gParamEx);
-
-    copyExtendedGauge(*extendedGaugeResident, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
-    extendedGaugeResident->exchangeExtendedGhost(R,true);
-  }
-#endif
-
   int pad = 0;
   int y[4];
 
 #ifdef MULTI_GPU
-    int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
-    for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
-    GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
+  int R[4] = {2,2,2,2}; // radius of the extended region in each dimension / direction
+  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir] + 2 * R[dir];
+  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+                         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_EXTENDED);
 #else
-    for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
-    GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
-        pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
+  for (int dir=0; dir<4; ++dir) y[dir] = gaugePrecise->X()[dir];
+  GaugeFieldParam gParam(y, gaugePrecise->Precision(), gaugePrecise->Reconstruct(),
+                         pad, QUDA_VECTOR_GEOMETRY, QUDA_GHOST_EXCHANGE_NO);
 #endif
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -5548,20 +5524,23 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   gParam.t_boundary = gaugePrecise->TBoundary();
   gParam.nFace = 1;
   gParam.tadpole = gaugePrecise->Tadpole();
+
 #ifdef MULTI_GPU
   for(int dir=0; dir<4; ++dir) gParam.r[dir] = R[dir];
 #endif
 
-  if (gaugeSmeared == NULL) {
-    gaugeSmeared = new cudaGaugeField(gParam);
+  if (gaugeSmeared != NULL) {
+    delete gaugeSmeared;
   }
 
-  #ifdef MULTI_GPU
-    copyExtendedGauge(*gaugeSmeared, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-    gaugeSmeared->exchangeExtendedGhost(R,true);
-  #else
-    gaugeSmeared->copy(*gaugePrecise);
-  #endif
+  gaugeSmeared = new cudaGaugeField(gParam);
+
+#ifdef MULTI_GPU
+  copyExtendedGauge(*gaugeSmeared, *gaugePrecise, QUDA_CUDA_FIELD_LOCATION);
+  gaugeSmeared->exchangeExtendedGhost(R,true);
+#else
+  gaugeSmeared->copy(*gaugePrecise);
+#endif
 
   cudaGaugeField *cudaGaugeTemp = NULL;
   cudaGaugeTemp = new cudaGaugeField(gParam);
@@ -5572,21 +5551,18 @@ void performAPEnStep(unsigned int nSteps, double alpha)
   }
 
   for (unsigned int i=0; i<nSteps; i++) {
-    #ifdef MULTI_GPU
-      copyExtendedGauge(*cudaGaugeTemp, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-      cudaGaugeTemp->exchangeExtendedGhost(R,true);
-      APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha, QUDA_CUDA_FIELD_LOCATION);
-    #else
       cudaGaugeTemp->copy(*gaugeSmeared);
+#ifdef MULTI_GPU
+      cudaGaugeTemp->exchangeExtendedGhost(R,true);
+#endif
       APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha, QUDA_CUDA_FIELD_LOCATION);
-    #endif
   }
 
   delete cudaGaugeTemp;
 
-  #ifdef MULTI_GPU
-    gaugeSmeared->exchangeExtendedGhost(R,true);
-  #endif
+#ifdef MULTI_GPU
+  gaugeSmeared->exchangeExtendedGhost(R,true);
+#endif
 
   if (getVerbosity() == QUDA_VERBOSE) {
     double3 plq = plaquette(*gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
