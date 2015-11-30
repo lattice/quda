@@ -139,7 +139,7 @@ namespace quda {
         arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity);
 
 	U  = U * (1. - arg.alpha);
-	S  = S * (arg.alpha/6.);
+	S  = S * (arg.alpha/4.);	// This is 2*(SmearDims - 1), for 3D smearing = 4
 
 	U  = U + S;
 
