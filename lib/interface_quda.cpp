@@ -3001,7 +3001,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 }
 
 
-void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals, int last_rhs)
+void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h_u, double *inv_eigenvals)
 {
   setTuning(param->tune);
 
@@ -3180,21 +3180,11 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
     SolverParam solverParam(*param);
 
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mDeflate, profileInvert);  
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, &m, &mSloppy, &mHalf, &mDeflate, &profileInvert);  
     
     (*solve)(out, in);//run solver
 
     solverParam.updateInvertParam(*param);//will update rhs_idx as well...
-    
-    if(last_rhs || param->inv_type == QUDA_EIGCG_INVERTER)
-    {
-      if(_h_u) solve->StoreRitzVecs(_h_u, inv_eigenvals, X, param, param->nev); 
-      printfQuda("\nDelete incremental EigCG solver resources...\n");
-      //clean resources:
-      solve->CleanResources();
-      // 
-      printfQuda("\n...done.\n");
-    }
 
     delete solve;
   }
@@ -3204,13 +3194,11 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
     //DiracMdagM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);//use for tests only.
     SolverParam solverParam(*param);
 
-    DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mHalf, profileInvert);  //mDeflate - > mHalf
+    DeflatedSolver *solve = DeflatedSolver::create(solverParam, &m, &mSloppy, &mHalf, &mHalf, &profileInvert);  //mDeflate - > mHalf
     
     (*solve)(out, in);//run solver
 
     solverParam.updateInvertParam(*param);//will update rhs_idx as well...
-
-    solve->CleanResources();    
 
     delete solve;
 
@@ -3219,18 +3207,12 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   {
      DiracM m(dirac), mSloppy(diracSloppy), mHalf(diracHalf), mDeflate(diracDeflate);
      SolverParam solverParam(*param);
-     DeflatedSolver *solve = DeflatedSolver::create(solverParam, m, mSloppy, mHalf, mHalf, profileInvert);
+     DeflatedSolver *solve = DeflatedSolver::create(solverParam, &m, &mSloppy, &mHalf, &mHalf, &profileInvert);
 
      (*solve)(out, in);//run solver
      solverParam.updateInvertParam(*param);//will update rhs_idx as well...
-
-    if(last_rhs)
-    {
-      printfQuda("\nCleaning resources for the GMRES(DR)-Proj solver\n");
-      solve->CleanResources();
-    }
    
-    delete solve;
+     delete solve;
   }
   else
   {
@@ -3274,6 +3256,27 @@ void incrementalEigQuda(void *_h_x, void *_h_b, QudaInvertParam *param, void *_h
   saveTuneCache(getVerbosity());
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void destroyDeflationQuda(QudaInvertParam *param, void *_h_u, double *inv_eigenvals)
+{
+   SolverParam solverParam(*param);
+   DeflatedSolver *solve = DeflatedSolver::create(solverParam, NULL, NULL, NULL, NULL, NULL);
+
+   if(param->inv_type == QUDA_INC_EIGCG_INVERTER || param->inv_type == QUDA_EIGCG_INVERTER){
+      if(_h_u) solve->StoreRitzVecs(_h_u, inv_eigenvals, X, param, param->nev); 
+      printfQuda("\nDelete incremental EigCG solver resources...\n");
+      //clean resources:
+      solve->CleanResources();
+      // 
+      printfQuda("\n...done.\n");
+   }
+   else 
+   {
+      solve->CleanResources();
+   }
+   
+   return; 
 }
 
 

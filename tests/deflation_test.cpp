@@ -411,7 +411,7 @@ int main(int argc, char **argv)
 
     double time1 = -((double)clock());
 
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, 0);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL);
 
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -429,8 +429,6 @@ int main(int argc, char **argv)
 //***
   const int projection_runs = (inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) ? 4 : 0; 
 
-  int last_rhs  = 0;
-
   if(inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER) inv_param.max_search_dim = 96;//resize Krylov subspace dimension, not strictly necessary
 
   for(int is = inv_param.deflation_grid; is < (inv_param.deflation_grid+projection_runs); is++)
@@ -447,11 +445,9 @@ int main(int argc, char **argv)
       for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
-    if(is == (inv_param.deflation_grid+projection_runs-1)) last_rhs = 1;
-
     double time1 = -((double)clock());
 
-    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL, last_rhs);
+    incrementalEigQuda(spinorOut, spinorIn, &inv_param, NULL, NULL);
   
     time1 += clock();
     time1 /= CLOCKS_PER_SEC;
@@ -463,6 +459,8 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
+
+  destroyDeflationQuda(&inv_param);
 
   closeMagma();
     

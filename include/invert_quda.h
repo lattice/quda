@@ -550,14 +550,14 @@ namespace quda {
 
   protected:
     SolverParam &param;
-    TimeProfile &profile;
+    TimeProfile *profile;
 
     //WARNING: eigcg_precision may not coinside with param.precision and param.precision_sloppy (both used for the initCG).
     //
     QudaPrecision eigcg_precision;//may be double or single.
 
   public:
-    DeflatedSolver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) 
+    DeflatedSolver(SolverParam &param, TimeProfile *profile) : param(param), profile(profile) 
     { 
        eigcg_precision = param.precision_sloppy;//for mixed presicion use param.precision_sloppy 
     }
@@ -572,7 +572,7 @@ namespace quda {
     virtual void CleanResources() = 0;
 
     // solver factory
-    static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDeflate, TimeProfile &profile);
+    static DeflatedSolver* create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile);
 
     bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
 		     const double &hq_tol);
@@ -597,25 +597,26 @@ namespace quda {
   class IncEigCG : public DeflatedSolver {
 
   private:
-    DiracMatrix &mat;
-    DiracMatrix &matSloppy;
+    DiracMatrix *mat;
+    DiracMatrix *matSloppy;
 
-    DiracMatrix &matCGSloppy;
+    DiracMatrix *matCGSloppy;
 
-    const DiracMatrix &matDefl;
+    const DiracMatrix *matDefl;
 
     QudaPrecision search_space_prec;
     cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
     SolverParam initCGparam; // parameters for initCG solver
-    TimeProfile &profile;    //time profile for initCG solver
+    TimeProfile *profile;    //time profile for initCG solver
 
     bool eigcg_alloc;
     bool use_eigcg;
 
   public:
 
-    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
+    IncEigCG(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
+    IncEigCG(SolverParam &param);
 
     virtual ~IncEigCG();
 
@@ -663,17 +664,17 @@ namespace quda {
 
   private:
 
-    DiracMatrix &mat;
+    DiracMatrix *mat;
 
-    DiracMatrix &matSloppy;
+    DiracMatrix *matSloppy;
 
-    const DiracMatrix &matDefl;
+    const DiracMatrix *matDefl;
 
     QudaPrecision gmres_space_prec;
 
     cudaColorSpinorField *Vm;//arnoldi basis vectors, size (m+1) 
 
-    TimeProfile &profile;    //time profile for initCG solver
+    TimeProfile *profile;    //time profile for initCG solver
 
     GMResDRArgs *args;
 
@@ -681,7 +682,8 @@ namespace quda {
 
   public:
 
-    GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
+    GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
+    GMResDR(SolverParam &param);
 
     virtual ~GMResDR();
 

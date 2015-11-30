@@ -494,7 +494,7 @@ namespace quda {
  }
 
 
- GMResDR::GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
+ GMResDR::GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile) :
     DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matDefl(matDefl), gmres_space_prec(QUDA_INVALID_PRECISION), 
     Vm(0), profile(profile), args(0), gmres_alloc(false)
  {
@@ -512,9 +512,14 @@ namespace quda {
      return;
  }
 
+ GMResDR::GMResDR(SolverParam &param) :
+    DeflatedSolver(param, NULL), mat(NULL), matSloppy(NULL), matDefl(NULL), gmres_space_prec(QUDA_INVALID_PRECISION), 
+    Vm(0), profile(NULL), args(0), gmres_alloc(false) { }
+
+
  GMResDR::~GMResDR() {
 
-    delete args;
+    if(args) delete args;
 
     if(gmres_alloc) 
     {
@@ -621,9 +626,9 @@ namespace quda {
 
     bool mixed_precision_GMResDR = (param.precision != param.precision_sloppy);
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    profile->TPSTART(QUDA_PROFILE_INIT);
 
-    DiracMatrix *sloppy_mat = &matSloppy;
+    DiracMatrix *sloppy_mat = matSloppy;
 
     cudaColorSpinorField r(*in); //high precision residual 
     // 
@@ -662,8 +667,8 @@ namespace quda {
     //Allocate Vm array:
     if(gmres_alloc == false) AllocateKrylovSubspace(csParam);
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    profile->TPSTOP(QUDA_PROFILE_INIT);
+    profile->TPSTART(QUDA_PROFILE_PREAMBLE);
 
     const int m         = args->m;
     const int ldH       = args->ldm;
@@ -688,7 +693,7 @@ namespace quda {
     const double normb = norm2(*in);  
     double stop = param.tol*param.tol* normb;	/* Relative to b tolerance */
 
-    mat(r, *out, y);
+    (*mat)(r, *out, y);
     //
     double r2 = xmyNormCuda(*in, r);//compute residual
 
@@ -720,8 +725,8 @@ namespace quda {
 
     PrintStats("GMResDR:", tot_iters, r2, b2, heavy_quark_res);
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    profile->TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile->TPSTART(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
 
     while(j < m)//we allow full cycle
@@ -794,7 +799,7 @@ namespace quda {
       zeroCuda(*x_sloppy);
     }
 
-   mat(r, x, y);
+   (*mat)(r, x, y);
    //
    r2 = xmyNormCuda(*in, r);//compute full precision residual
 
@@ -950,7 +955,7 @@ namespace quda {
        zeroCuda(*x_sloppy2);
      }
 
-     mat(r, x, y);
+     (*mat)(r, x, y);
      //
      double ext_r2 = xmyNormCuda(*in, r);//compute full precision residual
 
@@ -978,7 +983,7 @@ namespace quda {
 
        ctmp2_p   = new cudaColorSpinorField(csParam);
 
-       sloppy_mat = const_cast<DiracMatrix*> (&matDefl);
+       sloppy_mat = matDefl;
 
        use_deflated_cycles = false;
      }
@@ -991,17 +996,17 @@ namespace quda {
 
    }//end of deflated restarts
 
-   profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+   profile->TPSTOP(QUDA_PROFILE_COMPUTE);
+   profile->TPSTART(QUDA_PROFILE_EPILOGUE);
 
-   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+   param.secs = profile->Last(QUDA_PROFILE_COMPUTE);
    double gflops = (quda::blas_flops + mat.flops())*1e-9;
    reduceDouble(gflops);
    param.gflops = gflops;
    param.iter += tot_iters;
 
    // compute the true residuals
-   mat(r, x, y);
+   (*mat)(r, x, y);
    //matSloppy(r, x, tmp, tmp2);
 
    param.true_res = sqrt(xmyNormCuda(*in, r) / b2);
@@ -1012,8 +1017,8 @@ namespace quda {
    quda::blas_flops = 0;
    mat.flops();
 
-   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-   profile.TPSTART(QUDA_PROFILE_FREE);
+   profile->TPSTOP(QUDA_PROFILE_EPILOGUE);
+   profile->TPSTART(QUDA_PROFILE_FREE);
 
    delete [] givensH;
 
@@ -1041,7 +1046,7 @@ namespace quda {
 
    delete tmp2_p;
 
-   profile.TPSTOP(QUDA_PROFILE_FREE);
+   profile->TPSTOP(QUDA_PROFILE_FREE);
 
    return;
  } 
@@ -1050,7 +1055,7 @@ namespace quda {
  {
      bool mixed_precision_gmres = enforce_mixed_precision || (param.precision != param.precision_sloppy);
 
-     profile.TPSTART(QUDA_PROFILE_INIT);
+     profile->TPSTART(QUDA_PROFILE_INIT);
 
      DiracMatrix *sloppy_mat;
 
@@ -1082,13 +1087,13 @@ namespace quda {
 
         csParam.setPrecision(QUDA_HALF_PRECISION);
 
-        sloppy_mat = const_cast<DiracMatrix*>(&matDefl);
+        sloppy_mat = matDefl;
         r_sloppy = new cudaColorSpinorField(r, csParam);
         x_sloppy = new cudaColorSpinorField(x, csParam);
      } 
      else 
      {
-        sloppy_mat = &matSloppy;
+        sloppy_mat = matSloppy;
         r_sloppy = &r;
         x_sloppy = &x;
      }
@@ -1110,8 +1115,8 @@ namespace quda {
        AllocateKrylovSubspace(csParam);
      }
 
-     profile.TPSTOP(QUDA_PROFILE_INIT);
-     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+     profile->TPSTOP(QUDA_PROFILE_INIT);
+     profile->TPSTART(QUDA_PROFILE_PREAMBLE);
 
      const int m         = args->m;
      const int ldH       = args->ldm;
@@ -1135,7 +1140,7 @@ namespace quda {
      const double normb = norm2(*in);  
      double stop = param.tol*param.tol* normb;	/* Relative to b tolerance */
 
-     mat(r, *out, y);
+     (*mat)(r, *out, y);
      //
      double r2 = xmyNormCuda(*in, r);//compute residual
 
@@ -1156,8 +1161,8 @@ namespace quda {
 
      PrintStats("GMRES-Proj:", tot_iters, r2, b2, heavy_quark_res);
 
-     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-     profile.TPSTART(QUDA_PROFILE_COMPUTE);
+     profile->TPSTOP(QUDA_PROFILE_PREAMBLE);
+     profile->TPSTART(QUDA_PROFILE_COMPUTE);
      blas_flops = 0;
 
 //BEGIN PROJECTED RESTARTS:
@@ -1272,7 +1277,7 @@ namespace quda {
        zeroCuda(*x_sloppy);
      }
 
-     mat(r, x, y);
+     (*mat)(r, x, y);
      //
      double ext_r2 = xmyNormCuda(*in, r);//compute full precision residual
 
@@ -1282,17 +1287,17 @@ namespace quda {
 
    }//end of deflated restarts
 
-   profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+   profile->TPSTOP(QUDA_PROFILE_COMPUTE);
+   profile->TPSTART(QUDA_PROFILE_EPILOGUE);
 
-   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+   param.secs = profile->Last(QUDA_PROFILE_COMPUTE);
    double gflops = (quda::blas_flops + mat.flops())*1e-9;
    reduceDouble(gflops);
    param.gflops = gflops;
    param.iter += tot_iters;
 
    // compute the true residuals
-   mat(r, x, y);
+   (*mat)(r, x, y);
    //matSloppy(r, x, tmp, tmp2);
 
    param.true_res = sqrt(xmyNormCuda(*in, r) / b2);
@@ -1303,8 +1308,8 @@ namespace quda {
    quda::blas_flops = 0;
    mat.flops();
 
-   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-   profile.TPSTART(QUDA_PROFILE_FREE);
+   profile->TPSTOP(QUDA_PROFILE_EPILOGUE);
+   profile->TPSTART(QUDA_PROFILE_FREE);
 
     delete [] givensH;
 
@@ -1330,7 +1335,7 @@ namespace quda {
 
    delete tmp2_p;
 
-   profile.TPSTOP(QUDA_PROFILE_FREE);
+   profile->TPSTOP(QUDA_PROFILE_FREE);
 
    return;
 

@@ -405,7 +405,7 @@ namespace quda {
     initCGparam.use_sloppy_partial_accumulator= use_sloppy_partial_accumulator;
   }
 
-  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile) :
+  IncEigCG::IncEigCG(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile) :
     DeflatedSolver(param, profile), mat(mat), matSloppy(matSloppy), matCGSloppy(matCGSloppy), matDefl(matDefl), search_space_prec(QUDA_INVALID_PRECISION), 
     Vm(0), initCGparam(param), profile(profile), eigcg_alloc(false)
   {
@@ -438,6 +438,10 @@ namespace quda {
     return;
   }
 
+  IncEigCG::IncEigCG(SolverParam &param) :
+    DeflatedSolver(param, NULL), mat(NULL), matSloppy(NULL), matCGSloppy(NULL), matDefl(NULL), search_space_prec(QUDA_INVALID_PRECISION), 
+    Vm(0), initCGparam(param), profile(NULL), eigcg_alloc(false) {  }
+
   IncEigCG::~IncEigCG() {
 
     if(eigcg_alloc)   delete Vm;
@@ -453,13 +457,13 @@ namespace quda {
 
     if (eigcg_precision != x.Precision()) errorQuda("\nInput/output field precision is incorrect (solver precision: %u spinor precision: %u).\n", eigcg_precision, x.Precision());
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    profile->TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
     const double b2 = norm2(b);
 
     if(b2 == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      profile->TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
       param.true_res = 0.0;
@@ -484,10 +488,10 @@ namespace quda {
     //double r2 = xmyNormCuda(b, r);//compute residual
 
     // tmp2 only needed for multi-gpu Wilson-like kernels
-    cudaColorSpinorField *tmp2_p = (!mat.isStaggered()) ? new cudaColorSpinorField(x, csParam) : &tmp;
+    cudaColorSpinorField *tmp2_p = (!mat->isStaggered()) ? new cudaColorSpinorField(x, csParam) : &tmp;
     cudaColorSpinorField &tmp2 = *tmp2_p;
 
-    matSloppy(r, x, tmp, tmp2);
+    (*matSloppy)(r, x, tmp, tmp2);
 
     double r2 = xmyNormCuda(b, r);//compute residual
 
@@ -498,8 +502,8 @@ namespace quda {
     const bool use_heavy_quark_res = 
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    profile->TPSTOP(QUDA_PROFILE_INIT);
+    profile->TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double r2_old;
     double stop = b2*param.tol*param.tol; // stopping condition of solver
@@ -514,8 +518,8 @@ namespace quda {
 
     int eigvRestart = 0;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    profile->TPSTOP(QUDA_PROFILE_PREAMBLE);
+    profile->TPSTART(QUDA_PROFILE_COMPUTE);
     blas_flops = 0;
 
 //eigCG specific code:
@@ -583,7 +587,7 @@ namespace quda {
       if (l == param.m) copyCuda(Ap0, Ap);
 
       //mat(Ap, p, tmp, tmp2); // tmp as tmp
-      matSloppy(Ap, p, tmp, tmp2);  
+      (*matSloppy)(Ap, p, tmp, tmp2);  
 
       //construct the Lanczos matrix:
       if(l > 0){
@@ -653,11 +657,11 @@ namespace quda {
 //Free eigcg resources:
     delete eigcg_args;
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    profile->TPSTOP(QUDA_PROFILE_COMPUTE);
+    profile->TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops())*1e-9;
+    param.secs = profile->Last(QUDA_PROFILE_COMPUTE);
+    double gflops = (quda::blas_flops + mat->flops())*1e-9;
     reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
@@ -671,7 +675,7 @@ namespace quda {
 
     // compute the true residuals
     //mat(r, x, y);
-    matSloppy(r, x, tmp, tmp2);
+    (*matSloppy)(r, x, tmp, tmp2);
 
     param.true_res = sqrt(xmyNormCuda(b, r) / b2);
 #if (__COMPUTE_CAPABILITY__ >= 200)
@@ -683,17 +687,17 @@ namespace quda {
 
     // reset the flops counters
     quda::blas_flops = 0;
-    mat.flops();
+    mat->flops();
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    profile->TPSTOP(QUDA_PROFILE_EPILOGUE);
+    profile->TPSTART(QUDA_PROFILE_FREE);
 
     if (&tmp2 != &tmp) delete tmp2_p;
 
 //Clean EigCG resources:
     if(search_space_prec != param.precision_sloppy)  delete v0;
 
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    profile->TPSTOP(QUDA_PROFILE_FREE);
 
     return eigvRestart;
   }
@@ -1298,7 +1302,7 @@ namespace quda {
            //launch again eigcg:
            copyCuda(*out, *outSloppy);
            //
-           mat(r, *out, y);  //here we can use y as tmp
+           (*mat)(r, *out, y);  //here we can use y as tmp
            //
            double r2 = xmyNormCuda(*in, r);//new residual (and RHS)
            //
@@ -1320,7 +1324,7 @@ namespace quda {
 
            bool eigcg_updates = !cg_updates;
 
-           if(cg_updates) initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
+           if(cg_updates) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, profile);
 
            //start the main loop:
            while(r2 > stop)
@@ -1347,7 +1351,7 @@ namespace quda {
               //
               xpyCuda(y, *out);
               //
-              mat(r, *out, y);
+              (*mat)(r, *out, y);
               //
               r2 = xmyNormCuda(*in, r);
               //
@@ -1366,7 +1370,7 @@ namespace quda {
                  }
                  else 
                  {
-                   if(!initCG && (r2 > stop)) initCG = new CG(matSloppy, matCGSloppy, initCGparam, profile);
+                   if(!initCG && (r2 > stop)) initCG = new CG(*matSloppy, *matCGSloppy, initCGparam, profile);
                    //param.tol     = param.cg_iterref_tol;
                    cg_updates    = true;
 
@@ -1438,13 +1442,13 @@ namespace quda {
         {
           initCGparam.tol = restart_tol; 
 
-          initCG = new CG(mat, matCGSloppy, initCGparam, profile);
+          initCG = new CG(*mat, *matCGSloppy, initCGparam, profile);
 
           (*initCG)(*out, *in);           
 
           delete initCG;
 
-          mat(*W, *out, tmp);
+          (*mat)(*W, *out, tmp);
 
           xpayCuda(*in, -1, *W); 
 
@@ -1471,7 +1475,7 @@ namespace quda {
 
         initCGparam.tol = full_tol; 
 
-        initCG = new CG(mat, matCGSloppy, initCGparam, profile);
+        initCG = new CG(*mat, *matCGSloppy, initCGparam, profile);
 
         (*initCG)(*out, *in);           
 
@@ -1517,7 +1521,7 @@ namespace quda {
      cudaColorSpinorField   *tmp2    = new cudaColorSpinorField(cudaParam);
            
      
-     mat(*final_r, *out, *tmp2);
+     (*mat)(*final_r, *out, *tmp2);
 
      param.true_res = sqrt(xmyNormCuda(*in, *final_r) / norm2(*in));
     
