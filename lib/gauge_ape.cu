@@ -138,7 +138,7 @@ namespace quda {
 
         arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity);
 
-        S  = S * (arg.alpha/((Float) (2.*(nDim - 1.))));
+        S  = S * (arg.alpha/((Float) (2.*(3. - 1.))));
         setIdentity(&I);
 
         TestU  = I*(1.-arg.alpha) + S*conj(U);
