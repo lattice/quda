@@ -532,7 +532,7 @@ namespace quda {
         break;
     }
 
-    for(int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
+    for (unsigned int i=0; i<x.size(); ++i) result[i] = Complex(cdot[i].x,cdot[i].y);
     delete[] cdot;
   }
 
@@ -728,7 +728,7 @@ namespace quda {
 	Float2 a;
 	Float2 b;
 	ReduceType aux;
-	HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+	HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { }
 	
 	__device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 	
@@ -768,7 +768,7 @@ namespace quda {
 	Float2 a;
 	Float2 b;
 	ReduceType aux;
-	xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+	xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { }
 	
 	__device__ __host__ void pre() { aux.x = 0; aux.y = 0; }
 	
