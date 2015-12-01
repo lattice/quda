@@ -43,7 +43,7 @@ namespace quda {
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
-      param_presmooth->tol = 1e-1;
+      param_presmooth->tol = 2e-1;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-1;
     }
@@ -190,7 +190,7 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    double tol = std::pow(10.0, -2*csParam.precision);
+    double tol = std::pow(10.0, 3-2*csParam.precision);
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -205,9 +205,8 @@ namespace quda {
       printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
 		 i, blas::norm2(*tmp1), blas::norm2(*r_coarse), blas::norm2(*tmp2));
 
-      deviation = blas::xmyNorm(*tmp1, *tmp2);
-      printfQuda("deviation = %e\n", deviation);
-
+      deviation = sqrt( blas::xmyNorm(*tmp1, *tmp2) / blas::norm2(*tmp1) );
+      printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("failed");
     }
 #if 0
@@ -233,8 +232,8 @@ namespace quda {
     transfer->R(*r_coarse, *tmp2);
     printfQuda("Vector norms %e %e (fine tmp %e) ", blas::norm2(*x_coarse), blas::norm2(*r_coarse), blas::norm2(*tmp2));
 
-    deviation = blas::xmyNorm(*x_coarse, *r_coarse);
-    printfQuda("deviation = %e\n", deviation);
+    deviation = sqrt( blas::xmyNorm(*x_coarse, *r_coarse) / blas::norm2(*x_coarse) );
+    printfQuda("L2 relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("failed");
 
     printfQuda("\n");
@@ -242,18 +241,14 @@ namespace quda {
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     blas::zero(*tmp_coarse);
     blas::zero(*r_coarse);
-#if 1
+
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
-#else
-    for(int s = 0; s < tmp_coarse->Nspin(); s++)
-      for(int c=0; c < tmp_coarse->Ncolor(); c++) 
-	tmp_coarse->Source(QUDA_POINT_SOURCE,0,s,c);
-#endif
     transfer->P(*tmp1, *tmp_coarse);
-    param.matResidual(*tmp2,*tmp1);	
+    param.matResidual(*tmp2,*tmp1);
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
-#if 0 // enable to print out emualted and actual coarse-grid operator vectors for bebugging
+
+#if 0 // enable to print out emulated and actual coarse-grid operator vectors for bebugging
     {
       printfQuda("emulated\n");
       ColorSpinorParam param(*x_coarse);
@@ -273,8 +268,8 @@ namespace quda {
 #endif
 
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
-    deviation = blas::xmyNorm(*x_coarse, *r_coarse);
-    printfQuda("deviation = %e\n\n", deviation);
+    deviation = sqrt( blas::xmyNorm(*x_coarse, *r_coarse) / blas::norm2(*x_coarse) );
+    printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
     
     delete tmp1;
@@ -370,7 +365,7 @@ namespace quda {
       for (int i=0; i<Nvec; i++) {
 	char filename[256];
 	sprintf(filename, "%s.%d", vec_infile, i);
-	printf("Reading vector %d from file %s\n", i, filename);
+	printfQuda("Reading vector %d from file %s\n", i, filename);
 	read_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(), 
 			  B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
       }
