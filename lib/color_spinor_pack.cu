@@ -164,11 +164,11 @@ namespace quda {
     } else if (a.Ncolor() == 6) {
       genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 12) {
-      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,12>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 16) {
-      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,16>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 20) {
-      genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+      genericPackGhost<Float,order,Ns,20>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 24) {
       genericPackGhost<Float,order,Ns,24>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 72) {
