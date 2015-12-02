@@ -1,5 +1,4 @@
-#define BUILD_LIMITED_COPY
-#include <copy_color_spinor.cuh>
+#include <copy_color_spinor_mg.cuh>
 
 namespace quda {
   
