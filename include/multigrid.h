@@ -320,7 +320,7 @@ namespace quda {
 
       delete mgParam;
 
-      for (int i=0; i<B.size(); i++) delete B[i];
+      for (unsigned int i=0; i<B.size(); i++) delete B[i];
 
       delete m;
       delete mSloppy;

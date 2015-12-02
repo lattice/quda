@@ -214,6 +214,8 @@ namespace quda {
       Prolongate<Float,fineSpin,2,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 8) {
       Prolongate<Float,fineSpin,8,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
+    } else if (out.Ncolor() == 16) {
+      Prolongate<Float,fineSpin,16,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 24) {
       Prolongate<Float,fineSpin,24,2,order>(out, in, v, Nvec, fine_to_coarse, spin_map);
     } else if (out.Ncolor() == 48) {

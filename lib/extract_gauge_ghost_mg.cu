@@ -45,6 +45,8 @@ namespace quda {
 
     if (u.Ncolor() == 4) {
       extractGhostMG<Float, 4>(u, Ghost);
+    } else if (u.Ncolor() == 32) {
+      extractGhostMG<Float, 32>(u, Ghost);
     } else if (u.Ncolor() == 48) {
       extractGhostMG<Float, 48>(u, Ghost);
     } else {
