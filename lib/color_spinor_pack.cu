@@ -3,6 +3,8 @@
 #include <index_helper.cuh>
 #include <tune_quda.h>
 
+#define FINE_GRAINED_ACCESS
+
 namespace quda {
 
   template <typename Field>
@@ -47,19 +49,38 @@ namespace quda {
     if (arg.nDim == 5)  getCoords5(x, cb_idx, X, parity, arg.pc_type);
     else getCoords(x, cb_idx, X, parity);
 
-    RegType tmp[2*Ns*Nc];
     // FIXME make partitioning optional
 
 #pragma unroll
     for (int dim=0; dim<4; dim++) {
       if (x[dim] < arg.nFace){
+#ifdef FINE_GRAINED_ACCESS
+	for (int s=0; s<Ns; s++) {
+	  for (int c=0; c<Nc; c++) {
+	    arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), s, c)
+	      = arg.field(spinor_parity, cb_idx, s, c);
+	  }
+	}
+#else
+	RegType tmp[2*Ns*Nc];
 	arg.field.load(tmp, cb_idx, spinor_parity);
 	arg.field.saveGhost(tmp, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), dim, 0, spinor_parity);
+#endif
       }
       
       if (x[dim] >= X[dim] - arg.nFace){
+#ifdef FINE_GRAINED_ACCESS
+	for (int s=0; s<Ns; s++) {
+	  for (int c=0; c<Nc; c++) {
+	    arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), s, c)
+	      = arg.field(spinor_parity, cb_idx, s, c);
+	  }
+	}
+#else
+	RegType tmp[2*Ns*Nc];
 	arg.field.load(tmp, cb_idx, spinor_parity);
 	arg.field.saveGhost(tmp, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), dim, 1, spinor_parity);
+#endif
       }
     }
   }
@@ -145,8 +166,14 @@ namespace quda {
   template <typename Float, QudaFieldOrder order, int Ns, int Nc>
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
+#ifdef FINE_GRAINED_ACCESS
+    typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
+    Q field(a, 0, ghost);
+#else
     typedef typename colorspinor_order_mapper<Float,order,Ns,Nc>::type Q;
     Q field(a, (Float*)0, (float*)0, (Float**)ghost);
+#endif
+
     PackGhostArg<Q> arg(field, ghost, a, parity, dagger);
     GenericPackGhostLauncher<Float,Ns,Nc,PackGhostArg<Q> > launch(arg, a);
     launch.apply(0);
@@ -171,8 +198,14 @@ namespace quda {
       genericPackGhost<Float,order,Ns,20>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 24) {
       genericPackGhost<Float,order,Ns,24>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 48) {
+      genericPackGhost<Float,order,Ns,48>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 72) {
       genericPackGhost<Float,order,Ns,72>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 256) {
+      genericPackGhost<Float,order,Ns,256>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 576) {
+      genericPackGhost<Float,order,Ns,576>(ghost, a, parity, dagger);
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());
     }
