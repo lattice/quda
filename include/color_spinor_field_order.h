@@ -115,8 +115,9 @@ namespace quda {
        * Constructor for the FieldOrderCB class
        * @param field The field that we are accessing
        */
-    FieldOrderCB(const ColorSpinorField &field, void **ghost_=0)
-      : v(static_cast<complex<Float>*>(const_cast<void*>(field.V()))), 
+    FieldOrderCB(const ColorSpinorField &field, void *v_=0, void **ghost_=0)
+      : v(v_? static_cast<complex<Float>*>(const_cast<void*>(v_))
+	  : static_cast<complex<Float>*>(const_cast<void*>(field.V()))),
 	volume(field.Volume()), volumeCB(field.VolumeCB()),
 	nDim(field.Ndim()), gammaBasis(field.GammaBasis()), 
 	siteSubset(field.SiteSubset()),	nParity(field.SiteSubset()),
