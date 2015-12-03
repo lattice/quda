@@ -341,7 +341,7 @@ int main(int argc, char **argv)
 
   double *inverse_ritzVals = 0;
 
-  const int defl_dim  = inv_param.deflation_grid*inv_param.nev;
+  const int defl_dim  = (inv_param.inv_type != QUDA_GMRESDR_INVERTER && inv_param.inv_type != QUDA_GMRESDR_PROJ_INVERTER) ?  inv_param.deflation_grid*inv_param.nev : inv_param.nev;
 
   size_t bytes = defl_dim*((long long)Vh)*spinorSiteSize*sSize*inv_param.Ls;
 
