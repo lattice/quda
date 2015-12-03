@@ -4,6 +4,9 @@
 
 namespace quda {  
 
+  static bool use_solver_residual = false;
+  static bool debug = false;
+
   MG::MG(MGParam &param, TimeProfile &profile_global) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), 
       profile_global(profile_global),
@@ -35,7 +38,7 @@ namespace quda {
 
     param_presmooth->inv_type = param.smoother;
     if (param_presmooth->level < param.Nlevel) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
-    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
@@ -57,7 +60,7 @@ namespace quda {
       
       param_postsmooth->inv_type = param.smoother;
       if (param_postsmooth->level == 1) param_postsmooth->inv_type_precondition = QUDA_GCR_INVERTER;
-      param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+      param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       param_postsmooth->maxiter = param.nu_post;
       param_postsmooth->Nkrylov = 4;
@@ -277,8 +280,6 @@ namespace quda {
     delete tmp_coarse;
   }
 
-  bool debug = false;
-
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     setOutputPrefix(prefix);
 
@@ -292,12 +293,18 @@ namespace quda {
       // do the pre smoothing
       if ( debug ) printfQuda("pre-smoothing b2=%e\n", blas::norm2(b));
 
-      (*presmoother)(x, b);
+      *r = b; // copy source vector since we will overwrite source with iterated residual
+      (*presmoother)(x, *r);
 
-#if 1
-      // FIXME - residual computation should be in the previous smoother
-      param.matResidual(*r, x);
-      double r2 = blas::xmyNorm(b, *r);
+      double r2 = 0.0;
+      if (use_solver_residual) {
+	if (debug) r2 = blas::norm2(*r);
+      } else {
+	// recompute residual if needed, e.g., if doing DD or low-precision preconditioner
+	param.matResidual(*r, x);
+	if (debug) r2 = blas::xmyNorm(b, *r);
+	else blas::axpby(1.0, b, -1.0, *r);
+      }
 
       // restrict to the coarse grid
       transfer->R(*r_coarse, *r);
@@ -326,10 +333,10 @@ namespace quda {
 	printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
 		   blas::norm2(x), blas::norm2(*r));
       }
-#endif
 
       // do the post smoothing
-      (*postsmoother)(x,b);
+      *r = b;
+      (*postsmoother)(x, *r);
     } else { // do the coarse grid solve
       (*presmoother)(x, b);
     }
