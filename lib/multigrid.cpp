@@ -4,7 +4,7 @@
 
 namespace quda {  
 
-  static bool use_solver_residual = false;
+  static bool use_solver_residual = true;
   static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global) 
