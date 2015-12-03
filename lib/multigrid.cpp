@@ -193,7 +193,7 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    double tol = std::pow(10.0, 3-2*csParam.precision);
+    double tol = std::pow(10.0, 4-2*csParam.precision);
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -352,6 +352,7 @@ namespace quda {
 
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
+    profile.TPSTART(QUDA_PROFILE_IO);
     const int Nvec = B.size();
     printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile);
 
@@ -407,9 +408,11 @@ namespace quda {
     }
 
     printfQuda("Done loading vectors\n");
+    profile.TPSTOP(QUDA_PROFILE_IO);
   }
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
+    profile.TPSTART(QUDA_PROFILE_IO);
     if (strcmp(vec_outfile,"")!=0) {
       const int Nvec = B.size();
       printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
@@ -437,6 +440,7 @@ namespace quda {
 
       host_free(V);
       printfQuda("Done saving vectors\n");
+      profile.TPSTOP(QUDA_PROFILE_IO);
     }
 
   }
