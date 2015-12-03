@@ -387,7 +387,14 @@ int main(int argc, char **argv)
   // load the clover term, if desired
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-  multigridQuda(spinorOut, spinorIn, &mg_param);
+  // setup the multigrid solver
+  void *mg_preconditioner = newMultigridQuda(&mg_param);
+  inv_param.preconditioner = mg_preconditioner;
+
+  invertQuda(spinorOut, spinorIn, &inv_param);
+
+  // free the multigrid solver
+  destroyMultigridQuda(mg_preconditioner);
 
   // stop the timer
   time0 += clock();

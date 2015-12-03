@@ -221,7 +221,6 @@ namespace quda {
       PackSpinor<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, PreserveBasis<FloatOut, FloatIn, Ns, Nc> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
-#ifndef BUILD_LIMITED_COPY
     } else if (dstBasis == QUDA_UKQCD_GAMMA_BASIS && srcBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
       if (Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
       if (Nc != 3) errorQuda("Can only change basis with Ncolor = 4, not Ncolor = %d", Nc);
@@ -251,7 +250,6 @@ namespace quda {
       PackSpinor<FloatOut, FloatIn, 4, 3, OutOrder, InOrder, NonRelToChiralBasis<FloatOut, FloatIn, 4, 3> >
 	pack(outOrder, inOrder, basis, out, location);
       pack.apply(0);
-#endif
     } else {
       errorQuda("Basis change not supported");
     }
@@ -268,7 +266,8 @@ namespace quda {
       ColorSpinor outOrder(out, Out, outNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
-    } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) { // hack for single-precision null-space matrix field
+    } else if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
+      // this is needed for single-precision mg for changing basis in the transfer
       typedef typename colorspinor::FloatNOrder<float, 4, Nc, 2> ColorSpinor;
       ColorSpinor outOrder(out, (float*)Out, outNorm);
       genericCopyColorSpinor<float,FloatIn,4,Nc>
@@ -277,7 +276,6 @@ namespace quda {
       SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
-#ifndef BUILD_LIMITED_COPY
     } else if (out.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
@@ -290,7 +288,6 @@ namespace quda {
 	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
 #else
       errorQuda("QDPJIT interface has not been built\n");
-#endif
 #endif
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", out.FieldOrder(), Ns, Nc);
@@ -308,14 +305,14 @@ namespace quda {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
       ColorSpinor inOrder(in, In, inNorm);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-    } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) { // hack for single-precision null-space matrix field
+    } else if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && Ns == 4) {
+      // this is needed for single-precision mg for changing basis in the transfer
       typedef typename colorspinor::FloatNOrder<float, 4, Nc, 2> ColorSpinor;
       ColorSpinor inOrder(in, (float*)In, inNorm);
       genericCopyColorSpinor<FloatOut,float,4,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       SpaceSpinorColorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
-#ifndef BUILD_LIMITED_COPY
     } else if (in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER) {
       SpaceColorSpinorOrder<FloatIn, Ns, Nc> inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
@@ -326,7 +323,6 @@ namespace quda {
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), location, Out, outNorm);
 #else
       errorQuda("QDPJIT interface has not been built\n");
-#endif
 #endif
     } else {
       errorQuda("Order %d not defined (Ns=%d, Nc=%d)", in.FieldOrder(), Ns, Nc);
@@ -430,52 +426,5 @@ namespace quda {
     }
     
   }
-
-#ifdef GPU_MULTIGRID
-#define INSTANTIATE_COLOR						\
-  switch(src.Ncolor()) {						\
-  case 1:								\
-    CopyGenericColorSpinor<1>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 2:								\
-    CopyGenericColorSpinor<2>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 4:								\
-    CopyGenericColorSpinor<4>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 6:								\
-    CopyGenericColorSpinor<6>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 9:								\
-    CopyGenericColorSpinor<9>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 12:								\
-    CopyGenericColorSpinor<12>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 16:								\
-    CopyGenericColorSpinor<16>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 24:								\
-    CopyGenericColorSpinor<24>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 36:								\
-    CopyGenericColorSpinor<36>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 48:								\
-    CopyGenericColorSpinor<48>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 72:								\
-    CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr);	\
-    break;								\
-  case 144:                                                             \
-    CopyGenericColorSpinor<144>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                                                              \
-  default:								\
-    errorQuda("Ncolors=%d NOT supported", src.Ncolor());		\
-  }
-#else
-#define INSTANTIATE_COLOR
-#endif
-
 
 } // namespace quda

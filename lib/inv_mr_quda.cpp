@@ -134,42 +134,42 @@ namespace quda {
     } else {
       if (c2 > 0.0) blas::ax(sqrt(c2), x);
     }
+    if (c2 > 0.0) blas::ax(sqrt(c2), r);
 
     if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
-        profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-        profile.TPSTART(QUDA_PROFILE_EPILOGUE);
-	param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-  
-	double gflops = (blas::flops + mat.flops())*1e-9;
-	reduceDouble(gflops);
-	
-	param.gflops += gflops;
-	param.iter += k;
-	
-	// compute the iterated relative residual
-	r2 = blas::norm2(r) * c2 / b2;
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+      param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
-	// calculate the true residual
-	if (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
+      double gflops = (blas::flops + mat.flops())*1e-9;
+      reduceDouble(gflops);
 
-	  mat(r, x, tmp);
-	  double true_res = blas::xmyNorm(b, r);
-	  param.true_res = sqrt(true_res / b2);
+      param.gflops += gflops;
+      param.iter += k;
 
-	  if (getVerbosity() >= QUDA_SUMMARIZE) {
-	    printfQuda("MR: Converged after %d iterations, relative residual: iterated = %e, true = %e\n",
-		       k, sqrt(r2), param.true_res);
-	  }
-	} else {
-	  if (getVerbosity() >= QUDA_SUMMARIZE) {
-	    printfQuda("MR: Converged after %d iterations, relative residual: iterated = %e\n", k, sqrt(r2));
-	  }
+      // compute the iterated relative residual
+      if (getVerbosity() >= QUDA_SUMMARIZE) r2 = blas::norm2(r) / b2;
+
+      // calculate the true residual
+      if (param.preserve_source == QUDA_PRESERVE_SOURCE_YES) {
+	mat(r, x, tmp);
+	double true_res = blas::xmyNorm(b, r);
+	param.true_res = sqrt(true_res / b2);
+
+	if (getVerbosity() >= QUDA_SUMMARIZE) {
+	  printfQuda("MR: Converged after %d iterations, relative residual: iterated = %e, true = %e\n",
+		     k, sqrt(r2), param.true_res);
 	}
+      } else {
+	if (getVerbosity() >= QUDA_SUMMARIZE) {
+	  printfQuda("MR: Converged after %d iterations, relative residual: iterated = %e\n", k, sqrt(r2));
+	}
+      }
 
-	// reset the flops counters
-	blas::flops = 0;
-	mat.flops();
-        profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+      // reset the flops counters
+      blas::flops = 0;
+      mat.flops();
+      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
 
     globalReduce = true; // renable global reductions for outer solver

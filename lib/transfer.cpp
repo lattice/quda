@@ -125,7 +125,6 @@ namespace quda {
     // orthogonalize the blocks
     printfQuda("Transfer: block orthogonalizing\n");
     BlockOrthogonalize(*V_h, Nvec, geo_bs, fine_to_coarse_h, spin_bs);
-    printfQuda("Transfer: V block orthonormal check %g\n", blas::norm2(*V_h));
     //for (int x=0; x<Vh->Volume(); x++) static_cast<cpuColorSpinorField*>(Vh)->PrintVector(x);
     //printfQuda("Vh->Volume() = %d Vh->Nspin() = %d Vh->Ncolor = %d Vh->Length() = %d\n", Vh->Volume(), Vh->Nspin(), Vh->Ncolor(), Vh->Length());
 

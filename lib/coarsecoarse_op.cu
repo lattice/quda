@@ -289,6 +289,8 @@ namespace quda {
       calculateYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,2,coarseSpin>(Y, X, uv, T, g, clover, kappa);
     } else if (coarseColor == 8) {
       calculateYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,8,coarseSpin>(Y, X, uv, T, g, clover, kappa);
+    } else if (coarseColor == 16) {
+      calculateYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,16,coarseSpin>(Y, X, uv, T, g, clover, kappa);
     } else if (coarseColor == 24) {
       calculateYcoarse<Float,csOrder,gOrder,fineColor,fineSpin,24,coarseSpin>(Y, X, uv, T, g, clover, kappa);
     } else {
@@ -315,6 +317,8 @@ namespace quda {
       calculateYcoarse<Float,csOrder,gOrder,2>(Y, X, uv, T, g, clover, kappa);
     } else if (g.Ncolor()/uv.Nspin() == 8) {
       calculateYcoarse<Float,csOrder,gOrder,8>(Y, X, uv, T, g, clover, kappa);
+    } else if (g.Ncolor()/uv.Nspin() == 16) {
+      calculateYcoarse<Float,csOrder,gOrder,16>(Y, X, uv, T, g, clover, kappa);
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }

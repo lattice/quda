@@ -70,6 +70,8 @@ namespace quda {
       FillV<Float,nSpin,3,order>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 8) {
       FillV<Float,nSpin,8,order>(V,B,Nvec);
+    } else if(B[0]->Ncolor() == 16) {
+      FillV<Float,nSpin,16,order>(V,B,Nvec);
     } else if(B[0]->Ncolor() == 24) {
       FillV<Float,nSpin,24,order>(V,B,Nvec);
     } else {
@@ -374,6 +376,9 @@ namespace quda {
     }
     else if (V.Ncolor()/Nvec == 8) {
       BlockOrthogonalize<Float,nSpin,8,order>(V, Nvec, geo_bs, geo_map, spin_bs);
+    }
+    else if (V.Ncolor()/Nvec == 16) {
+      BlockOrthogonalize<Float,nSpin,16,order>(V, Nvec, geo_bs, geo_map, spin_bs);
     }
     else if (V.Ncolor()/Nvec == 24) {
       BlockOrthogonalize<Float,nSpin,24,order>(V, Nvec, geo_bs, geo_map, spin_bs);

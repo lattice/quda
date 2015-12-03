@@ -163,6 +163,9 @@ namespace quda {
     /** Storage for the parameter struct for the post-smoother */
     MGParam *param_postsmooth;
 
+    /** The fine-grid representation of the null space vectors */
+    std::vector<ColorSpinorField*> *B;
+
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField*> *B_coarse;
 
@@ -287,6 +290,49 @@ namespace quda {
 
     virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
 
+  };
+
+  /**
+     This is an object that captures an entire MG preconditioner
+     state.  A bit of a hack at the moment, this is used to allow us
+     to store and reuse the mg solver between solves.  This is use by
+     the newMultigridQuda and destroyMultigridQuda interface functions.
+   */
+  struct multigrid_solver {
+    Dirac *d;
+    Dirac *dSloppy;
+    Dirac *dPre;
+
+    DiracM *m;
+    DiracM *mSloppy;
+    DiracM *mPre;
+
+    std::vector<ColorSpinorField*> B;
+
+    MGParam *mgParam;
+
+    MG *mg;
+    TimeProfile &profile;
+
+    multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile);
+
+    virtual ~multigrid_solver() {
+      profile.TPSTART(QUDA_PROFILE_FREE);
+      delete mg;
+
+      delete mgParam;
+
+      for (unsigned int i=0; i<B.size(); i++) delete B[i];
+
+      delete m;
+      delete mSloppy;
+      delete mPre;
+
+      delete d;
+      delete dSloppy;
+      delete dPre;
+      profile.TPSTOP(QUDA_PROFILE_FREE);
+    }
   };
 
 } // namespace quda

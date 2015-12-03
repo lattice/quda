@@ -461,6 +461,7 @@ template <typename ReduceType, typename Float, QudaFieldOrder order,
   int writeX, int writeY, int writeZ, int writeW, int writeV, typename R>
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
+  zero(value);
   if (x.Nspin() == 4) {
     value = genericReduce<ReduceType,Float,4,order,writeX,writeY,writeZ,writeW,writeV,R>(x, y, z, w, v, r);
   } else if (x.Nspin() == 2) {
@@ -480,6 +481,7 @@ template <typename ReduceType, typename Float,
   ReduceType genericReduce(ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, 
 			   ColorSpinorField &w, ColorSpinorField &v, R r) {
   ReduceType value;
+  zero(value);
   if (x.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
     value = genericReduce<ReduceType,Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,writeX,writeY,writeZ,writeW,writeV,R>
       (x, y, z, w, v, r);

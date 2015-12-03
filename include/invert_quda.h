@@ -23,6 +23,12 @@ namespace quda {
      * QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      */
     QudaInverterType inv_type_precondition;
+
+
+    /**
+     * Preconditioner instance, e.g., multigrid
+     */
+    void *preconditioner;
     
     /**
      * Whether to use the L2 relative residual, L2 absolute residual
@@ -173,7 +179,7 @@ namespace quda {
        @param param The QudaInvertParam instance from which the values are copied
      */
     SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type), 
-      inv_type_precondition(param.inv_type_precondition), 
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
       delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
       max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
@@ -248,7 +254,9 @@ namespace quda {
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
-    // solver factory
+    /**
+       Solver factory
+    */
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			  DiracMatrix &matPrecon, TimeProfile &profile);
 

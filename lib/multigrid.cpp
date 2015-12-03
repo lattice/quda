@@ -4,6 +4,9 @@
 
 namespace quda {  
 
+  static bool use_solver_residual = true;
+  static bool debug = false;
+
   MG::MG(MGParam &param, TimeProfile &profile_global) 
     : Solver(param, profile), param(param), presmoother(0), postsmoother(0), 
       profile_global(profile_global),
@@ -35,7 +38,7 @@ namespace quda {
 
     param_presmooth->inv_type = param.smoother;
     if (param_presmooth->level < param.Nlevel) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
-    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+    param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
@@ -43,7 +46,7 @@ namespace quda {
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 100;
       param_presmooth->maxiter = 1000;
-      param_presmooth->tol = 1e-1;
+      param_presmooth->tol = 2e-1;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_presmooth->delta = 1e-1;
     }
@@ -57,7 +60,7 @@ namespace quda {
       
       param_postsmooth->inv_type = param.smoother;
       if (param_postsmooth->level == 1) param_postsmooth->inv_type_precondition = QUDA_GCR_INVERTER;
-      param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_YES;
+      param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       param_postsmooth->maxiter = param.nu_post;
       param_postsmooth->Nkrylov = 4;
@@ -196,7 +199,7 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    double tol = std::pow(10.0, -2*(csParam.precision-2));
+    double tol = std::pow(10.0, 3-2*csParam.precision);
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -211,9 +214,8 @@ namespace quda {
       printfQuda("Vector %d: norms v_k = %e P^\\dagger v_k = %e P P^\\dagger v_k = %e\n",
 		 i, blas::norm2(*tmp1), blas::norm2(*r_coarse), blas::norm2(*tmp2));
 
-      deviation = blas::xmyNorm(*tmp1, *tmp2);
-      printfQuda("deviation = %e\n", deviation);
-
+      deviation = sqrt( blas::xmyNorm(*tmp1, *tmp2) / blas::norm2(*tmp1) );
+      printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("failed");
     }
 #if 0
@@ -239,8 +241,8 @@ namespace quda {
     transfer->R(*r_coarse, *tmp2);
     printfQuda("Vector norms %e %e (fine tmp %e) ", blas::norm2(*x_coarse), blas::norm2(*r_coarse), blas::norm2(*tmp2));
 
-    deviation = blas::xmyNorm(*x_coarse, *r_coarse);
-    printfQuda("deviation = %e\n", deviation);
+    deviation = sqrt( blas::xmyNorm(*x_coarse, *r_coarse) / blas::norm2(*x_coarse) );
+    printfQuda("L2 relative deviation = %e\n", deviation);
     if (deviation > tol ) errorQuda("failed");
 
     printfQuda("\n");
@@ -248,18 +250,14 @@ namespace quda {
     ColorSpinorField *tmp_coarse = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, param.mg_global.location[param.level+1]);
     blas::zero(*tmp_coarse);
     blas::zero(*r_coarse);
-#if 1
+
     tmp_coarse->Source(QUDA_RANDOM_SOURCE);
-#else
-    for(int s = 0; s < tmp_coarse->Nspin(); s++)
-      for(int c=0; c < tmp_coarse->Ncolor(); c++) 
-	tmp_coarse->Source(QUDA_POINT_SOURCE,0,s,c);
-#endif
     transfer->P(*tmp1, *tmp_coarse);
     param.matResidual(*tmp2,*tmp1);
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
-#if 0 // enable to print out emualted and actual coarse-grid operator vectors for bebugging
+
+#if 0 // enable to print out emulated and actual coarse-grid operator vectors for bebugging
     {
       printfQuda("emulated\n");
       ColorSpinorParam param(*x_coarse);
@@ -279,16 +277,14 @@ namespace quda {
 #endif
 
     printfQuda("Vector norms Emulated=%e Native=%e ", blas::norm2(*x_coarse), blas::norm2(*r_coarse));
-    deviation = blas::xmyNorm(*x_coarse, *r_coarse);
-    printfQuda("deviation = %e\n\n", deviation);
+    deviation = sqrt( blas::xmyNorm(*x_coarse, *r_coarse) / blas::norm2(*x_coarse) );
+    printfQuda("L2 relative deviation = %e\n\n", deviation);
     if (deviation > tol) errorQuda("failed");
     
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
   }
-
-  bool debug = false;
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     setOutputPrefix(prefix);
@@ -305,12 +301,19 @@ namespace quda {
       // do the pre smoothing
       if ( debug ) printfQuda("pre-smoothing b2=%e\n", blas::norm2(b));
 
-      (*presmoother)(x, b);
+      *r = b; // copy source vector since we will overwrite source with iterated residual
+      (*presmoother)(x, *r);
 
-#if 1
-      // FIXME - residual computation should be in the previous smoother
-      param.matResidual(*r, x);
-      double r2 = blas::xmyNorm(b, *r);
+      double r2 = 0.0;
+      if (use_solver_residual) {
+	if (debug) r2 = blas::norm2(*r);
+      } else {
+	// recompute residual if needed, e.g., if doing DD or low-precision preconditioner
+	param.matResidual(*r, x);
+	if (debug) r2 = blas::xmyNorm(b, *r);
+	else blas::axpby(1.0, b, -1.0, *r);
+      }
+
       // restrict to the coarse grid
       transfer->R(*r_coarse, *r);
       if ( debug ) {
@@ -338,10 +341,10 @@ namespace quda {
 	printfQuda("after coarse-grid correction x2 = %e, r2 = %e\n", 
 		   blas::norm2(x), blas::norm2(*r));
       }
-#endif
 
       // do the post smoothing
-      (*postsmoother)(x,b);
+      *r = b;
+      (*postsmoother)(x, *r);
     } else { // do the coarse grid solve
       (*presmoother)(x, b);
     }
@@ -377,7 +380,7 @@ namespace quda {
       for (int i=0; i<Nvec; i++) {
 	char filename[256];
 	sprintf(filename, "%s.%d", vec_infile, i);
-	printf("Reading vector %d from file %s\n", i, filename);
+	printfQuda("Reading vector %d from file %s\n", i, filename);
 	read_spinor_field(filename, &V[i], B[i]->Precision(), B[i]->X(), 
 			  B[i]->Ncolor(), B[i]->Nspin(), 1, 0,  (char**)0);
       }
@@ -506,7 +509,7 @@ namespace quda {
 
 	alpha = blas::norm2(*curr_nullvec);
 	if (alpha.real() > 1e-16)  blas::ax(1.0 /sqrt(alpha.real()), *curr_nullvec);
-	else errorQuda("\nCannot orthogonalize %d vector\n", nullvec-B.begin());
+	else errorQuda("\nCannot orthogonalize %ld vector\n", nullvec-B.begin());
 
 	delete b;
 	delete x;

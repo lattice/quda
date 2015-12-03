@@ -314,6 +314,8 @@ namespace quda {
       Restrict<Float,fineSpin,2, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 8) {
       Restrict<Float,fineSpin,8, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    } else if (in.Ncolor() == 16) {
+      Restrict<Float,fineSpin,16, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 24) {
       Restrict<Float,fineSpin,24, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
     } else if (in.Ncolor() == 48) {
