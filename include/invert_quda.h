@@ -167,32 +167,38 @@ namespace quda {
     int deflation_grid;
     int rhs_idx;
     
+    QudaVerbosity verbosity_precondition; //! verbosity to use for preconditioner
+
+    bool compute_true_res; //! whether to compute the true residual or not at the end
+
     /**
        Default constructor
      */
-    SolverParam() { ; }
-    
+    SolverParam() : verbosity_precondition(QUDA_SILENT), compute_true_res(true) { ; }
 
     /**
        Constructor that matches the initial values to that of the
        QudaInvertParam instance
        @param param The QudaInvertParam instance from which the values are copied
      */
-    SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type), 
+    SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
-      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
-      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
+      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
+      heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
       true_res(param.true_res), true_res_hq(param.true_res_hq),
-      maxiter(param.maxiter), iter(param.iter), 
-      precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
-      precision_precondition(param.cuda_prec_precondition), 
+      maxiter(param.maxiter), iter(param.iter),
+      precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
+      precision_precondition(param.cuda_prec_precondition),
       preserve_source(param.preserve_source), num_offset(param.num_offset), 
-      Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
-      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
+      Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
+      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0) 
+      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
+      deflation_grid(param.deflation_grid), rhs_idx(0), verbosity_precondition(param.verbosity_precondition),
+      compute_true_res(true)
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -423,6 +429,32 @@ namespace quda {
 
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
+
+    /**
+       The size of the Krylov space that GCR uses
+     */
+    int nKrylov;
+
+    Complex *alpha;
+    Complex **beta;
+    double *gamma;
+
+    /**
+       Solver uses lazy allocation: this flag to determine whether we have allocated.
+     */
+    bool init;
+
+    ColorSpinorField *rp;       //! residual vector
+    ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField *tmpp;     //! temporary for mat-vec
+    ColorSpinorField *x_sloppy; //! sloppy solution vector
+    ColorSpinorField *r_sloppy; //! sloppy residual vector
+    ColorSpinorField *r_pre;    //! residual passed to preconditioner
+    ColorSpinorField *p_pre;    //! preconditioner result
+    ColorSpinorField *rM;       //! residual vector for doing multi-cycle preconditioning
+
+    std::vector<ColorSpinorField*> p;  // GCR direction vectors
+    std::vector<ColorSpinorField*> Ap; // mat * direction vectors
 
   public:
     GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,

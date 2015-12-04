@@ -44,11 +44,12 @@ namespace quda {
     param_presmooth->Nkrylov = 4;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
     if (param.level==param.Nlevel-1) {
-      param_presmooth->Nkrylov = 100;
+      param_presmooth->Nkrylov = 20;
       param_presmooth->maxiter = 1000;
       param_presmooth->tol = 2e-1;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-1;
+      param_presmooth->delta = 1e-2;
+      param_presmooth->compute_true_res = false;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
 				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
