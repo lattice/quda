@@ -176,7 +176,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
   inv_param->gcrNkrylov = 20;
 
   // domain decomposition preconditioner parameters
-  inv_param->inv_type_precondition = QUDA_GCR_INVERTER;
+  inv_param->inv_type_precondition = QUDA_MG_INVERTER;
   inv_param->schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param->precondition_cycle = 1;
   inv_param->tol_precondition = 1e-1;
@@ -385,7 +385,14 @@ void mg_test(void)
 
   printfQuda("\nMass %le\n", mg_param.invert_param->mass);
 
-  multigridQuda(out->V(), in->V(), &mg_param);
+  // setup the multigrid solver
+  void *mg_preconditioner = newMultigridQuda(&mg_param);
+  inv_param.preconditioner = mg_preconditioner;
+  
+  invertQuda(out->V(), in->V(), &inv_param);
+  // free the multigrid solver
+  destroyMultigridQuda(mg_preconditioner);
+  //multigridQuda(out->V(), in->V(), &mg_param);
 
   time0 += clock(); 
   time0 /= CLOCKS_PER_SEC;
