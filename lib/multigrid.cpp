@@ -488,7 +488,7 @@ namespace quda {
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", blas::norm2(*x));
 
 	Solver *solve = Solver::create(solverParam, param.matResidual, param.matSmooth, param.matSmooth, profile);
-	(*solve)(*b, *x);
+	(*solve)(*x, *b);
 	delete solve;
 
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", blas::norm2(*x));
