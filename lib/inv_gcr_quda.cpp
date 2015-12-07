@@ -154,7 +154,8 @@ namespace quda {
 
   GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
 	   TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param)
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
+    nKrylov(param.Nkrylov), init(false)
   {
 
     fillInnerSolveParam(Kparam, param);
@@ -172,18 +173,58 @@ namespace quda {
     else 
       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
 
+    p.resize(nKrylov);
+    Ap.resize(nKrylov);
+
+    alpha = new Complex[nKrylov];
+    beta = new Complex*[nKrylov];
+    for (int i=0; i<nKrylov; i++) beta[i] = new Complex[nKrylov];
+    gamma = new double[nKrylov];
   }
 
   GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
 	   SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param)
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
+    nKrylov(param.Nkrylov), init(false)
   {
+    p.resize(nKrylov);
+    Ap.resize(nKrylov);
 
+    alpha = new Complex[nKrylov];
+    beta = new Complex*[nKrylov];
+    for (int i=0; i<nKrylov; i++) beta[i] = new Complex[nKrylov];
+    gamma = new double[nKrylov];
   }
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
+    delete []alpha;
+    for (int i=0; i<nKrylov; i++) delete []beta[i];
+    delete []beta;
+    delete []gamma;
+
     if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
+
+    if (param.precondition_cycle > 1) delete rM;
+
+    if (param.precision_sloppy != param.precision) {
+      delete x_sloppy;
+      delete r_sloppy;
+    }
+
+    if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
+      delete p_pre;
+      delete r_pre;
+    }
+
+    for (int i=0; i<nKrylov; i++) {
+      delete p[i];
+      delete Ap[i];
+    }
+
+    delete tmpp;
+    delete rp;
+    delete yp;
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -191,68 +232,58 @@ namespace quda {
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
-    int Nkrylov = param.Nkrylov; // size of Krylov space
+    if (!init) {
+      ColorSpinorParam csParam(x);
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      rp = ColorSpinorField::Create(csParam);
 
-    ColorSpinorParam csParam(x);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    ColorSpinorField *rp = ColorSpinorField::Create(csParam); ColorSpinorField &r = *rp;
+      // high precision accumulator
+      yp = ColorSpinorField::Create(csParam);
 
-    // high precision accumulator
-    ColorSpinorField *yp = ColorSpinorField::Create(csParam); ColorSpinorField &y = *yp;
-
-    // create sloppy fields used for orthogonalization
-    csParam.setPrecision(param.precision_sloppy);
-    std::vector<ColorSpinorField*> p;
-    std::vector<ColorSpinorField*> Ap;
-    p.resize(Nkrylov);
-    Ap.resize(Nkrylov);
-    for (int i=0; i<Nkrylov; i++) {
-      p[i] = ColorSpinorField::Create(csParam);
-      Ap[i] = ColorSpinorField::Create(csParam);
-    }
-
-    ColorSpinorField *tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
-    ColorSpinorField &tmp = *tmpp;
-
-    ColorSpinorField *x_sloppy, *r_sloppy;
-    if (param.precision_sloppy != param.precision) {
+      // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy = ColorSpinorField::Create(csParam);
-      r_sloppy = ColorSpinorField::Create(csParam);
-    } else {
-      x_sloppy = &x;
-      r_sloppy = &r;
+      for (int i=0; i<nKrylov; i++) {
+	p[i] = ColorSpinorField::Create(csParam);
+	Ap[i] = ColorSpinorField::Create(csParam);
+      }
+
+      tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
+
+      if (param.precision_sloppy != param.precision) {
+	csParam.setPrecision(param.precision_sloppy);
+	x_sloppy = ColorSpinorField::Create(csParam);
+	r_sloppy = ColorSpinorField::Create(csParam);
+      } else {
+	x_sloppy = &x;
+	r_sloppy = rp;
+      }
+
+      // these low precision fields are used by the inner solver
+      if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
+	csParam.setPrecision(param.precision_precondition);
+	p_pre = ColorSpinorField::Create(csParam);
+	r_pre = ColorSpinorField::Create(csParam);
+      } else {
+	p_pre = NULL;
+	r_pre = r_sloppy;
+      }
+
+      if (param.precondition_cycle > 1) {
+	ColorSpinorParam rParam(*r_sloppy);
+	rM = ColorSpinorField::Create(rParam);
+      }
+      init = true;
     }
 
+    ColorSpinorField &r = *rp;
+    ColorSpinorField &y = *yp;
     ColorSpinorField &xSloppy = *x_sloppy;
     ColorSpinorField &rSloppy = *r_sloppy;
-
-    // these low precision fields are used by the inner solver
-    bool precMatch = true;
-    ColorSpinorField *r_pre, *p_pre;
-    if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
-      csParam.setPrecision(param.precision_precondition);
-      p_pre = ColorSpinorField::Create(csParam);
-      r_pre = ColorSpinorField::Create(csParam);
-      precMatch = false;
-    } else {
-      p_pre = NULL;
-      r_pre = r_sloppy;
-    }
     ColorSpinorField &rPre = *r_pre;
+    ColorSpinorField &tmp = *tmpp;
+    blas::zero(y);
 
-    ColorSpinorField *rM = NULL;
-    if (param.precondition_cycle > 1) {
-      ColorSpinorParam rParam(rSloppy);
-      rParam.create = QUDA_NULL_FIELD_CREATE; 
-      rM = ColorSpinorField::Create(rParam);
-      *rM = rSloppy;
-    }
-
-    Complex *alpha = new Complex[Nkrylov];
-    Complex **beta = new Complex*[Nkrylov];
-    for (int i=0; i<Nkrylov; i++) beta[i] = new Complex[Nkrylov];
-    double *gamma = new double[Nkrylov];
+    bool precMatch = (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) ? false : true;
 
     // compute parity of the node
     int parity = 0;
@@ -272,6 +303,7 @@ namespace quda {
       blas::copy(r, b);
       r2 = b2;
       blas::zero(x); // defensive measure in case solution isn't already zero
+      if (&x != &xSloppy) blas::zero(xSloppy);
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -333,8 +365,10 @@ namespace quda {
 	    blas::copy(rPre, *rM);
 	  }
 
+	  pushVerbosity(param.verbosity_precondition);
 	  if ((parity+m)%2 == 0 || param.schwarz_type == QUDA_ADDITIVE_SCHWARZ) (*K)(pPre, rPre);
 	  else blas::copy(pPre, rPre);
+	  popVerbosity();
 
 	  // relaxation p = omega*p + (1-omega)*r
 	  //if (param.omega!=1.0) blas::axpby((1.0-param.omega), rPre, param.omega, pPre);
@@ -375,9 +409,9 @@ namespace quda {
 
       PrintStats("GCR", total_iter, r2, b2, heavy_quark_res);
    
-      // update since Nkrylov or maxiter reached, converged or reliable update required
-      // note that the heavy quark residual will by definition only be checked every Nkrylov steps
-      if (k==Nkrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) { 
+      // update since nKrylov or maxiter reached, converged or reliable update required
+      // note that the heavy quark residual will by definition only be checked every nKrylov steps
+      if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
 	// update the solution vector
 	updateSolution(xSloppy, alpha, beta, gamma, k, p);
@@ -436,15 +470,17 @@ namespace quda {
       warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("GCR: number of restarts = %d\n", restart);
-  
-    // Calculate the true residual
-    mat(r, x);
-    double true_res = blas::xmyNorm(b, r);
-    param.true_res = sqrt(true_res / b2);
-    if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL && __COMPUTE_CAPABILITY__ >= 200)
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
-    else
-      param.true_res_hq = 0.0;
+
+    if (param.compute_true_res) {
+      // Calculate the true residual
+      mat(r, x);
+      double true_res = blas::xmyNorm(b, r);
+      param.true_res = sqrt(true_res / b2);
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL && __COMPUTE_CAPABILITY__ >= 200)
+	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
+      else
+	param.true_res_hq = 0.0;
+    }
 
     param.gflops += gflops;
     param.iter += total_iter;
@@ -459,32 +495,6 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
     PrintSummary("GCR", total_iter, r2, b2);
-
-    if (param.precondition_cycle > 1) delete rM;
-
-    if (param.precision_sloppy != param.precision) {
-      delete x_sloppy;
-      delete r_sloppy;
-    }
-
-    if (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) {
-      delete p_pre;
-      delete r_pre;
-    }
-
-    for (int i=0; i<Nkrylov; i++) {
-      delete p[i];
-      delete Ap[i];
-    }
-
-    delete tmpp;
-    delete rp;
-    delete yp;
-
-    delete []alpha;
-    for (int i=0; i<Nkrylov; i++) delete []beta[i];
-    delete []beta;
-    delete []gamma;
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
 

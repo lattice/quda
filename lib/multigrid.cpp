@@ -44,11 +44,12 @@ namespace quda {
     param_presmooth->Nkrylov = 4;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
     if (param.level==param.Nlevel-1) {
-      param_presmooth->Nkrylov = 100;
+      param_presmooth->Nkrylov = 20;
       param_presmooth->maxiter = 1000;
       param_presmooth->tol = 2e-1;
       param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      param_presmooth->delta = 1e-1;
+      param_presmooth->delta = 1e-2;
+      param_presmooth->compute_true_res = false;
     }
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
 				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
@@ -199,7 +200,7 @@ namespace quda {
     ColorSpinorField *tmp1 = ColorSpinorField::Create(csParam);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
-    double tol = std::pow(10.0, 3-2*csParam.precision);
+    double tol = std::pow(10.0, 4-2*csParam.precision);
 
     printfQuda("\n");
     printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
@@ -360,6 +361,7 @@ namespace quda {
 
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
+    profile.TPSTART(QUDA_PROFILE_IO);
     const int Nvec = B.size();
     printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile);
 
@@ -415,9 +417,11 @@ namespace quda {
     }
 
     printfQuda("Done loading vectors\n");
+    profile.TPSTOP(QUDA_PROFILE_IO);
   }
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
+    profile.TPSTART(QUDA_PROFILE_IO);
     if (strcmp(vec_outfile,"")!=0) {
       const int Nvec = B.size();
       printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
@@ -445,6 +449,7 @@ namespace quda {
 
       host_free(V);
       printfQuda("Done saving vectors\n");
+      profile.TPSTOP(QUDA_PROFILE_IO);
     }
 
   }
