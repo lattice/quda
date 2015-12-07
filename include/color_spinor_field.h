@@ -123,16 +123,16 @@ namespace quda {
     void setPrecision(QudaPrecision precision) {
       // is the current status in native field order?
       bool native = false;
-      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1) && 
+      if ( ((this->precision == QUDA_DOUBLE_PRECISION || nSpin==1 || nSpin==2) &&
 	    (fieldOrder == QUDA_FLOAT2_FIELD_ORDER)) ||
-	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION) && 
-	    (nSpin==4 || nSpin==2) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
+	   ((this->precision == QUDA_SINGLE_PRECISION || this->precision == QUDA_HALF_PRECISION) &&
+	    (nSpin==4) && fieldOrder == QUDA_FLOAT4_FIELD_ORDER) ) { native = true; }
 	   
       this->precision = precision;
 
       // if this is a native field order, let's preserve that status, else keep the same field order
-      if (native) fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? 
-	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER; 
+      if (native) fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ?
+	QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
     }
 
     void print() {

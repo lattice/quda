@@ -464,8 +464,13 @@ namespace quda {
     solverParam.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;
 
     ColorSpinorParam csParam(*B[0]);
+
+    // to force setting the field to be native first set to double-precision native order
+    // then use the setPrecision method to set to native order
     csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    csParam.setPrecision(csParam.precision); // set to native order
+    csParam.precision = QUDA_DOUBLE_PRECISION;
+    csParam.setPrecision(B[0]->Precision());
+
     csParam.location = QUDA_CUDA_FIELD_LOCATION; // hard code to GPU location for null-space generation for now
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
@@ -480,7 +485,7 @@ namespace quda {
 	csParam.create = QUDA_COPY_FIELD_CREATE;
 	ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, csParam));
 
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Prepared source = %g\n", blas::norm2(*x));
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", blas::norm2(*x));
 
 	Solver *solve = Solver::create(solverParam, param.matResidual, param.matSmooth, param.matSmooth, profile);
 	(*solve)(*b, *x);
@@ -491,19 +496,16 @@ namespace quda {
 	*curr_nullvec = *x;
 
 	// global orthoonormalization of the generated null-space vectors
-	Complex alpha = Complex(0.0, 0.0);
-
 	for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != nullvec; ++prevvec)//row id
 	  {
 	    cpuColorSpinorField *prev_nullvec = static_cast<cpuColorSpinorField*> (*prevvec);
 
-	    alpha = blas::cDotProduct(*prev_nullvec, *curr_nullvec);//<j,i>
-	    Complex scale = Complex(-alpha.real(), -alpha.imag());
-	    blas::caxpy(scale, *prev_nullvec, *curr_nullvec); //i-<j,i>j
+	    Complex alpha = blas::cDotProduct(*prev_nullvec, *curr_nullvec);//<j,i>
+	    blas::caxpy(-alpha, *prev_nullvec, *curr_nullvec); //i-<j,i>j
 	  }
 
-	alpha = blas::norm2(*curr_nullvec);
-	if (alpha.real() > 1e-16)  blas::ax(1.0 /sqrt(alpha.real()), *curr_nullvec);
+	double nrm2 = blas::norm2(*curr_nullvec);
+	if (nrm2 > 1e-16)  blas::ax(1.0 /sqrt(nrm2), *curr_nullvec);
 	else errorQuda("\nCannot orthogonalize %ld vector\n", nullvec-B.begin());
 
 	delete b;
