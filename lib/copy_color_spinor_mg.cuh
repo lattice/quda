@@ -100,11 +100,11 @@ namespace quda {
 				QudaFieldLocation location, FloatOut *Out) {
 
     if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<float, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
+      typedef typename colorspinor::FieldOrderCB<FloatOut, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
       ColorSpinor outOrder(out, Out);
-      genericCopyColorSpinor<float,FloatIn,Ns,Nc>(outOrder, inOrder, out, location);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out, location);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<float, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
+      typedef typename colorspinor::FieldOrderCB<FloatOut, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
       ColorSpinor outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(outOrder, inOrder, out, location);
     } else {
@@ -119,11 +119,11 @@ namespace quda {
 				QudaFieldLocation location, FloatOut *Out, FloatIn *In) {
 
     if (in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<float, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
-      ColorSpinor inOrder(in, (float*)In);
-      genericCopyColorSpinor<FloatOut,float,Ns,Nc>(inOrder, out, location, Out);
+      typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_FLOAT2_FIELD_ORDER> ColorSpinor;
+      ColorSpinor inOrder(in, In);
+      genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, location, Out);
     } else if (in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
-      typedef typename colorspinor::FieldOrderCB<float, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
+      typedef typename colorspinor::FieldOrderCB<FloatIn, Ns, Nc, 1, QUDA_SPACE_SPIN_COLOR_FIELD_ORDER> ColorSpinor;
       ColorSpinor inOrder(in, In);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, location, Out);
     } else {
