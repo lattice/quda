@@ -53,6 +53,8 @@ namespace quda {
       FillV<Float,nSpin,nColor,24,order>(V,B);
     } else if (Nvec == 48) {
       FillV<Float,nSpin,nColor,48,order>(V,B);
+    } else if (Nvec == 96) {
+      FillV<Float,nSpin,nColor,96,order>(V,B);
     } else {
       errorQuda("Unsupported Nvec %d", Nvec);
     }
@@ -360,6 +362,8 @@ namespace quda {
       BlockOrthogonalize<Float,nSpin,nColor,24,order>(V, geo_bs, geo_map, spin_bs);
     } else if (Nvec == 48) {
       BlockOrthogonalize<Float,nSpin,nColor,48,order>(V, geo_bs, geo_map, spin_bs);
+    } else if (Nvec == 96) {
+      BlockOrthogonalize<Float,nSpin,nColor,96,order>(V, geo_bs, geo_map, spin_bs);
     } else {
       errorQuda("Unsupported nVec %d\n", Nvec);
     }

@@ -202,10 +202,14 @@ namespace quda {
       genericPackGhost<Float,order,Ns,48>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 72) {
       genericPackGhost<Float,order,Ns,72>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 96) {
+      genericPackGhost<Float,order,Ns,96>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 144) {
       genericPackGhost<Float,order,Ns,144>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 256) {
       genericPackGhost<Float,order,Ns,256>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 288) {
+      genericPackGhost<Float,order,Ns,288>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 576) {
       genericPackGhost<Float,order,Ns,576>(ghost, a, parity, dagger);
     } else {

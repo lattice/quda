@@ -461,7 +461,7 @@ namespace quda {
     SolverParam solverParam(param);
 
     // set null-space generation options - need to expose these
-    solverParam.maxiter = 500;
+    solverParam.maxiter = 1000;
     solverParam.tol = 5e-4;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7;
@@ -501,9 +501,26 @@ namespace quda {
 	(*solve)(*x, *b);
 	delete solve;
 
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", blas::norm2(*x));
-
 	*curr_nullvec = *x;
+
+        if (getVerbosity() >= QUDA_VERBOSE)
+        {
+        //
+          csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+  	  ColorSpinorField *t = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
+
+          double nrm_1 = blas::norm2(*x);
+          printfQuda("Solution = %g\n", nrm_1);
+
+          //check null vector quality:
+          param.matResidual(*b, *x, *t);
+
+          double nrm_2 = blas::norm2(*b);
+          printfQuda("Null vector check = %g\n", nrm_2 / nrm_1);
+
+          delete t;
+        }
 
 	// global orthoonormalization of the generated null-space vectors
 	for (std::vector<ColorSpinorField*>::iterator prevvec = B.begin(); prevvec != nullvec; ++prevvec)//row id

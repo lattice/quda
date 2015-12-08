@@ -433,6 +433,8 @@ namespace quda {
       ApplyCoarse<Float,csOrder,gOrder,24,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else if (inA.Ncolor() == 48) {
       ApplyCoarse<Float,csOrder,gOrder,48,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
+    } else if (inA.Ncolor() == 96) {
+      ApplyCoarse<Float,csOrder,gOrder,96,2>(out, inA, inB, Y, X, kappa, is_staggered, parity);
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", inA.Ncolor());
     }
