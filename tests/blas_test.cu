@@ -180,13 +180,19 @@ void initFields(int prec)
   // check for successful allocation
   checkCudaError();
 
-  *vD = *vH;
-  *wD = *wH;
-  *xD = *xH;
-  *yD = *yH;
-  *zD = *zH;
-  *hD = *hH;
-  *lD = *lH;
+  // only do copy if not doing half precision with mg
+  bool flag = !(param.nSpin == 2 &&
+		(prec == 0 || low_aux_prec == QUDA_HALF_PRECISION) );
+
+  if ( flag ) {
+    *vD = *vH;
+    *wD = *wH;
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *hD = *hH;
+    *lD = *lH;
+  }
 }
 
 
