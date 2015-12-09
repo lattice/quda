@@ -382,7 +382,7 @@ invert_test(void)
 #define NUM_OFFSETS 12
 
       {    
-        double masses[NUM_OFFSETS] ={0.002, 0.0021, 0.0064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
+        double masses[NUM_OFFSETS] ={0.02, 0.021, 0.064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
         inv_param.num_offset = NUM_OFFSETS;
         // these can be set independently
         for (int i=0; i<inv_param.num_offset; i++) {

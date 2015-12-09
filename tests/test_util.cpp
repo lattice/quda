@@ -1576,7 +1576,7 @@ int gridsize_from_cmdline[4] = {1,1,1,1};
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 char latfile[256] = "";
 bool tune = true;
-int niter = 10;
+int niter = 100;
 int test_type = 0;
 QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;

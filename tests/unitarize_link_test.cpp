@@ -32,6 +32,8 @@ extern void usage(char** argv);
 
 extern int device;
 
+extern bool tune;
+
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
 static bool reunit_svd_only  = false;
@@ -45,7 +47,7 @@ extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
+static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static size_t gSize;
 
@@ -63,7 +65,7 @@ unitarize_link_test()
   QudaGaugeParam qudaGaugeParam = newQudaGaugeParam();
 
   initQuda(device);
-  setTuning(QUDA_TUNE_YES);
+  setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
 
   cpu_prec = prec;
   gSize = cpu_prec;  
@@ -97,6 +99,10 @@ unitarize_link_test()
 
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
+
+  if (gauge_order != QUDA_MILC_GAUGE_ORDER)
+    errorQuda("Unsupported gauge order %d", gauge_order);
+
   qudaGaugeParam.gauge_order = gauge_order;
   qudaGaugeParam.type=QUDA_WILSON_LINKS;
   qudaGaugeParam.reconstruct = link_recon;
@@ -179,14 +185,8 @@ unitarize_link_test()
 		    QUDA_COMPUTE_FAT_STANDARD);
 
 
-  void* fatlink_2d[4];
-  for(int dir=0; dir<4; ++dir){
-    fatlink_2d[dir] = (char*)fatlink + dir*V*gaugeSiteSize*gSize;
-  }
-
-
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
-  gParam.gauge  = fatlink_2d;
+  gParam.gauge  = fatlink;
   cpuGaugeField *cpuOutLink  = new cpuGaugeField(gParam);
 
   

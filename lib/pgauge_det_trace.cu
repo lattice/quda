@@ -27,14 +27,13 @@ struct KernelArg : public ReduceArg<double2> {
     : ReduceArg<double2>(), dataOr(dataOr) {
 #ifdef MULTI_GPU
     for(int dir=0; dir<4; ++dir){
-      if(comm_dim_partitioned(dir)) border[dir] = data.R()[dir];
-      else border[dir] = 0;
+      border[dir] = data.R()[dir];
+      X[dir] = data.X()[dir] - border[dir]*2;
     }
-    for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;
 #else
     for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
-    threads = X[0]*X[1]*X[2]*X[3];
+    threads = X[0]*X[1]*X[2]*X[3]/2;
   }
   double2 getValue(){return result_h[0];}
 };
@@ -50,6 +49,7 @@ template<class Cmplx>
 template<int blockSize, typename Float, typename Gauge, int NCOLORS, int functiontype>
 __global__ void compute_Value(KernelArg<Gauge> arg){
   int idx = threadIdx.x + blockIdx.x*blockDim.x;
+  int parity = threadIdx.y;
 
   typedef cub::BlockReduce<double2, blockSize> BlockReduce;
   __shared__ typename BlockReduce::TempStorage temp_storage;
@@ -57,11 +57,6 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   double2 val = make_double2(0.0, 0.0);
   if(idx < arg.threads) {
     typedef typename ComplexTypeId<Float>::Type Cmplx;
-    int parity = 0;
-    if(idx >= arg.threads/2) {
-      parity = 1;
-      idx -= arg.threads/2;
-    }
     int X[4]; 
     #pragma unroll
     for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
@@ -85,21 +80,17 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
     }
   }
 
-  reduce<blockSize>(arg, val);
+  reduce2d<blockSize,2>(arg, val);
 }
 
 
 
 template<typename Float, typename Gauge, int NCOLORS, int functiontype>
-class CalcFunc : Tunable {
+class CalcFunc : TunableLocalParity {
   KernelArg<Gauge> arg;
   TuneParam tp;
   mutable char aux_string[128]; // used as a label in the autotuner
   private:
-  unsigned int sharedBytesPerThread() const { return 0; }
-  unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-  //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-  bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
   unsigned int minThreads() const { return arg.threads; }
 
   public:
@@ -109,20 +100,17 @@ class CalcFunc : Tunable {
   void apply(const cudaStream_t &stream){
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
     arg.result_h[0] = make_double2(0.0, 0.0);
-    LAUNCH_KERNEL(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
+    LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
     cudaDeviceSynchronize();
 
     comm_allreduce_array((double*)arg.result_h, 2);
-    arg.result_h[0].x  /= (double)(4*arg.threads*comm_size());
-    arg.result_h[0].y  /= (double)(4*arg.threads*comm_size());
+    arg.result_h[0].x  /= (double)(4*2*arg.threads*comm_size());
+    arg.result_h[0].y  /= (double)(4*2*arg.threads*comm_size());
   }
 
   TuneKey tuneKey() const {
     std::stringstream vol;
-    vol << arg.X[0] << "x";
-    vol << arg.X[1] << "x";
-    vol << arg.X[2] << "x";
-    vol << arg.X[3];
+    vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
     sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
     return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
     
@@ -133,15 +121,13 @@ class CalcFunc : Tunable {
     ps << "shared=" << param.shared_bytes;
     return ps.str();
   }
-  void preTune(){}
-  void postTune(){}
 
   long long flops() const { 
-    if(NCOLORS==3 && functiontype == 0) return 264LL*arg.threads+2LL*tp.block.x ; 
-    if(NCOLORS==3 && functiontype == 1) return 24LL*arg.threads+2LL*tp.block.x ; 
+    if(NCOLORS==3 && functiontype == 0) return 264LL*2*arg.threads+2LL*tp.block.x ; 
+    if(NCOLORS==3 && functiontype == 1) return 24LL*2*arg.threads+2LL*tp.block.x ; 
     else return 0; 
   }// Only correct if there is no link reconstruction
-  long long bytes() const { return 4LL*NCOLORS * NCOLORS * sizeof(Float)*2*arg.threads + tp.block.x * sizeof(double2); }
+  long long bytes() const { return 4LL*NCOLORS * NCOLORS * sizeof(Float)*2*2*arg.threads + tp.block.x * sizeof(double2); }
 
 }; 
 

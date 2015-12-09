@@ -854,9 +854,9 @@ namespace quda {
       }else if(recon == QUDA_RECONSTRUCT_12){
 
 	computeLongLinkParity12Kernel<0>
-	  <<<halfGridDim, blockDim>>>((float4*)outEven, (float4*)inEven, (float4*)inOdd, (float)coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((float2*)outEven, (float4*)inEven, (float4*)inOdd, (float)coeff, kparam);
 	computeLongLinkParity12Kernel<1>
-	  <<<halfGridDim, blockDim>>>((float4*)outOdd, (float4*)inOdd, (float4*)inEven, (float)coeff, kparam); 
+	  <<<halfGridDim, blockDim>>>((float2*)outOdd, (float4*)inOdd, (float4*)inEven, (float)coeff, kparam);
 
       }else{
 	errorQuda("Reconstruct %d is not supported\n", recon);

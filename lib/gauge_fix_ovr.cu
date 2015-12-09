@@ -229,7 +229,7 @@ namespace quda {
         border[dir] = data.R()[dir];
       #endif
       }
-      threads = X[0] * X[1] * X[2] * X[3];
+      threads = X[0]*X[1]*X[2]*X[3]/2;
     }
     double getAction(){ return result_h[0].x; }
     double getTheta(){ return result_h[0].y; }
@@ -242,15 +242,11 @@ namespace quda {
   template<int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix_quality(GaugeFixQualityArg<Gauge> argQ){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
     if ( idx < argQ.threads ) {
       typedef typename ComplexTypeId<Float>::Type Cmplx;
-      int parity = 0;
-      if ( idx >= argQ.threads / 2 ) {
-        parity = 1;
-        idx -= argQ.threads / 2;
-      }
       int X[4];
     #pragma unroll
       for ( int dr = 0; dr < 4; ++dr ) X[dr] = argQ.X[dr];
@@ -291,7 +287,7 @@ namespace quda {
       //35
       //T=36*gauge_dir+65
     }
-    reduce<blockSize>(argQ, data);
+    reduce2d<blockSize,2>(argQ, data);
   }
 
 
@@ -299,23 +295,12 @@ namespace quda {
    * @brief Tunable object for the gauge fixing quality kernel
    */
   template<typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : Tunable {
+  class GaugeFixQuality : TunableLocalParity {
     GaugeFixQualityArg<Gauge> argQ;
     mutable char aux_string[128]; // used as a label in the autotuner
     private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                        // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return argQ.threads;
-    }
+
+    unsigned int minThreads() const { return argQ.threads; }
 
     public:
     GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
@@ -324,11 +309,11 @@ namespace quda {
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
-      LAUNCH_KERNEL(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
+      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
       cudaDeviceSynchronize();
       if ( comm_size() != 1 ) comm_allreduce_array((double*)argQ.result_h, 2);
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * argQ.threads * comm_size());
-      argQ.result_h[0].y  /= (double)(3 * argQ.threads * comm_size());
+      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads * comm_size());
+      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads * comm_size());
     }
 
     TuneKey tuneKey() const {
@@ -347,16 +332,12 @@ namespace quda {
       ps << "shared=" << param.shared_bytes;
       return ps.str();
     }
-    void preTune(){
-    }
-    void postTune(){
-    }
     long long flops() const {
-      return (36LL * gauge_dir + 65LL) * argQ.threads;
+      return (36LL * gauge_dir + 65LL) * 2 * argQ.threads;
     }                                                                   // Only correct if there is no link reconstruction, no cub reduction accounted also
     //long long bytes() const { return (1)*2*gauge_dir*argQ.dataOr.Bytes(); }//no accounting the reduction!!!! argQ.dataOr.Bytes() return 0....
     long long bytes() const {
-      return 2LL * gauge_dir * argQ.threads * numParams * sizeof(Float);
+      return 2LL * gauge_dir * 2 * argQ.threads * numParams * sizeof(Float);
     }                                                                                   //no accounting the reduction!!!!
 
   };
@@ -1858,7 +1839,7 @@ namespace quda {
       errorQuda("Precision %d not supported", data.Precision());
     }
 #else
-    errorQuda("Gauge fixinghas not been built");
+    errorQuda("Gauge fixing has not been built");
 #endif // GPU_GAUGE_ALG
   }
 

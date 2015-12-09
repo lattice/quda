@@ -453,7 +453,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 
  template <typename VectorType>
    __device__ __host__ VectorType vector_load(void *ptr, int idx) {
-   //#define USE_LDG
+#define USE_LDG
 #if defined(__CUDA_ARCH__) && defined(USE_LDG)
    return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
 #else
@@ -1025,5 +1025,38 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_12,N> { typedef FloatNOrder<short, N, 4, 12> type; };
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_9,N> { typedef FloatNOrder<short, N, 4, 9> type; };
   template<int N> struct gauge_mapper<short,QUDA_RECONSTRUCT_8,N> { typedef FloatNOrder<short, N, 4, 8> type; };
+
+
+  // experiments in reducing template instantation boilerplate
+  // can this be replaced with a C++11 variant that uses variadic templates?
+
+#define INSTANTIATE_RECONSTRUCT(func, g, ...) \ 
+  {									\
+    if (!data.isNative())						\
+      errorQuda("Field order %d and precision %d is not native", g.Order(), g.Precision()); \
+    if( g.Reconstruct() == QUDA_RECONSTRUCT_NO) {			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_12){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_8){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else {								\
+      errorQuda("Reconstruction type %d of gauge field not supported", g.Reconstruct()); \
+    }									\
+  }
+  
+#define INSTANTIATE_PRECISION(func, lat, ...)				\
+  {									\
+    if (lat.Precision() == QUDA_DOUBLE_PRECISION) {			\
+      func<double>(lat, __VA_ARGS__);					\
+    } else if(lat.Precision() == QUDA_SINGLE_PRECISION) {		\
+      func<float>(lat, __VA_ARGS__);					\
+    } else {								\
+      errorQuda("Precision %d not supported", lat.Precision());		\
+    }									\
+  }
 
 } // namespace quda

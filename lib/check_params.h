@@ -92,6 +92,16 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
 
 
 #if defined INIT_PARAM
+  P(staggered_phase_type, QUDA_MILC_STAGGERED_PHASE);
+  P(staggered_phase_applied, 0);
+  P(i_mu, 0.0);
+#else
+  P(staggered_phase_type, QUDA_INVALID_STAGGERED_PHASE);
+  P(staggered_phase_applied, INVALID_INT);
+  P(i_mu, INVALID_DOUBLE);
+#endif
+
+#if defined INIT_PARAM
   P(overlap, 0);
   P(preserve_gauge, 0);
 #else
@@ -103,11 +113,15 @@ void printQudaGaugeParam(QudaGaugeParam *param) {
   P(use_resident_mom, 0);
   P(make_resident_gauge, 0);
   P(make_resident_mom, 0);
+  P(return_gauge, 1);
+  P(return_mom, 1);
 #else
   P(use_resident_gauge, INVALID_INT);
   P(use_resident_mom, INVALID_INT);
   P(make_resident_gauge, INVALID_INT);
   P(make_resident_mom, INVALID_INT);
+  P(return_gauge, INVALID_INT);
+  P(return_mom, INVALID_INT);
 #endif
 
 #ifdef INIT_PARAM

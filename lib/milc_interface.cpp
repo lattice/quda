@@ -49,6 +49,10 @@ static int clover_alloc = 0;
 static bool invalidate_quda_gauge = true;
 static bool create_quda_gauge = false;
 
+static bool invalidate_quda_mom = true;
+
+// set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
+#define MOM_PIPE 0
 
 using namespace quda;
 using namespace quda::fermion_force;
@@ -61,11 +65,11 @@ void  inline qudamilc_called(const char* func, QudaVerbosity verb){
 #ifdef QUDAMILC_VERBOSE
 if (verb >= QUDA_VERBOSE) {
      if(start){
-       printf("QUDA_MILC_INTERFACE: %s (called) \n",func);
+       printfQuda("QUDA_MILC_INTERFACE: %s (called) \n",func);
        PUSH_RANGE(func,1)
      }
      else {
-      printf("QUDA_MILC_INTERFACE: %s (return) \n",func);
+      printfQuda("QUDA_MILC_INTERFACE: %s (return) \n",func);
       POP_RANGE
      }
    }
@@ -81,12 +85,12 @@ void inline qudamilc_called(const char * func){
 
 void qudaInit(QudaInitArgs_t input)
 {
-  qudamilc_called<true>(__func__);
   if(initialized) return;
   setVerbosityQuda(input.verbosity, "", stdout);
+  qudamilc_called<true>(__func__);
   qudaSetLayout(input.layout);
   initialized = true;
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
 
 }
 
@@ -94,7 +98,7 @@ void qudaFinalize()
 {
   qudamilc_called<true>(__func__);
   endQuda();
-    qudamilc_called<false>(__func__);
+  qudamilc_called<false>(__func__);
 }
 
 /**
@@ -215,15 +219,12 @@ static  void invalidateGaugeQuda() {
   invalidate_quda_gauge = true;
 }
 
-
-
 #ifdef GPU_FATLINK
 
 void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
     const double act_path_coeff[6], void* inlink, void* fatlink, void* longlink)
 {
   qudamilc_called<true>(__func__);
- // create_quda_gauge = true;
 
 #ifdef MULTI_GPU  
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_EXTENDED_VOLUME;
@@ -237,14 +238,19 @@ void qudaLoadKSLink(int prec, QudaFatLinkArgs_t fatlink_args,
 
   computeKSLinkQuda(fatlink, longlink, NULL, inlink, const_cast<double*>(act_path_coeff), &param, method);
   qudamilc_called<false>(__func__);
-  // require loadGaugeQuda to be called in subsequent solve
-//  invalidateGaugeQuda(); 
+
+  // requires loadGaugeQuda to be called in subequent solver
+  invalidateGaugeQuda();
+
+  // this flags that we are using QUDA to create the HISQ links
+  create_quda_gauge = true;
+  qudamilc_called<false>(__func__);
 }
 
 
 
 void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
-    const double act_path_coeff[6], void* inlink, void* fatlink, void* ulink)
+			    const double act_path_coeff[6], void* inlink, void* fatlink, void* ulink)
 {
   qudamilc_called<true>(__func__);
 #ifdef MULTI_GPU  
@@ -252,14 +258,20 @@ void qudaLoadUnitarizedLink(int prec, QudaFatLinkArgs_t fatlink_args,
 #else
   QudaComputeFatMethod method = QUDA_COMPUTE_FAT_STANDARD;
 #endif
-
+  
   QudaGaugeParam param = newMILCGaugeParam(localDim,
-      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
-      QUDA_GENERAL_LINKS);
-
+					   (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+					   QUDA_GENERAL_LINKS);
+  
   computeKSLinkQuda(fatlink, NULL, ulink, inlink, const_cast<double*>(act_path_coeff), &param, method);
-    qudamilc_called<false>(__func__);
-  return;
+  qudamilc_called<false>(__func__);
+  
+  // requires loadGaugeQuda to be called in subequent solver
+  invalidateGaugeQuda();
+
+  // this flags that we are using QUDA to create the HISQ links
+  create_quda_gauge = true;
+  qudamilc_called<false>(__func__);
 }
 
 #endif
@@ -278,10 +290,20 @@ void qudaHisqForce(int prec, const double level2_coeff[6], const double fat7_coe
       (prec==1) ?  QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
+  if (!invalidate_quda_mom) {
+    gParam.use_resident_mom = true;
+    gParam.make_resident_mom = true;
+    gParam.return_mom = false;
+  } else {
+    gParam.use_resident_mom = false;
+    gParam.make_resident_mom = false;
+    gParam.return_mom = true;
+  }
+
   long long flops;
   computeHISQForceQuda(milc_momentum, &flops, level2_coeff, fat7_coeff,
-      staple_src, one_link_src, naik_src,
-      w_link, v_link, u_link, &gParam);
+		       staple_src, one_link_src, naik_src,
+		       w_link, v_link, u_link, &gParam);
   qudamilc_called<false>(__func__);
   return;
 }
@@ -330,12 +352,81 @@ void  qudaUpdateU(int prec, double eps, void* momentum, void* link)
       (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
       QUDA_GENERAL_LINKS);
 
+  if (!invalidate_quda_mom) {
+    gaugeParam.use_resident_mom = true;
+    gaugeParam.make_resident_mom = true;
+  } else {
+    gaugeParam.use_resident_mom = false;
+    gaugeParam.make_resident_mom = false;
+  }
 
   updateGaugeFieldQuda(link, momentum, eps, 0, 0, &gaugeParam);
   qudamilc_called<false>(__func__);
   return;
 }
 
+void qudaRephase(int prec, void *gauge, int flag, double i_mu)
+{
+  qudamilc_called<true>(__func__);
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+						QUDA_GENERAL_LINKS);
+
+  gaugeParam.staggered_phase_applied = 1-flag;
+  gaugeParam.staggered_phase_type = QUDA_MILC_STAGGERED_PHASE;
+  gaugeParam.i_mu = i_mu;
+  gaugeParam.t_boundary    = QUDA_ANTI_PERIODIC_T;
+
+  staggeredPhaseQuda(gauge, &gaugeParam);
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+void qudaUnitarizeSU3(int prec, void *gauge, double tol)
+{
+  qudamilc_called<true>(__func__);
+  QudaGaugeParam gaugeParam = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+						QUDA_GENERAL_LINKS);
+
+  projectSU3Quda(gauge, tol, &gaugeParam);
+  qudamilc_called<false>(__func__);
+  return;
+}
+
+double qudaMomAction(int prec, void *momentum)
+{
+  qudamilc_called<true>(__func__);
+
+  QudaGaugeParam momParam = newMILCGaugeParam(localDim,
+      (prec==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION,
+      QUDA_GENERAL_LINKS);
+
+  if (MOM_PIPE) {
+    if (invalidate_quda_mom) {
+      // beginning of trajectory so download the momentum and make
+      // resident
+      momParam.use_resident_mom = false;
+      momParam.make_resident_mom = true;
+      invalidate_quda_mom = false;
+    } else {
+      // end of trajectory so use resident and then invalidate
+      momParam.use_resident_mom = true;
+      momParam.make_resident_mom = false;
+      invalidate_quda_mom = true;
+    }
+  } else { // no momentum residency
+    momParam.use_resident_mom = false;
+    momParam.make_resident_mom = false;
+    invalidate_quda_mom = true;
+  }
+
+  double action = momActionQuda(momentum, &momParam);
+
+  qudamilc_called<false>(__func__);
+
+  return action;
+}
 
 // gauge force code
 static int getVolume(const int dim[4])
@@ -344,69 +435,54 @@ static int getVolume(const int dim[4])
 }
 
 
-  template<class Real>
-static void setLoopCoeffs(const double milc_loop_coeff[3],
-    Real loop_coeff[48])
-{
-  // 6 plaquette terms
-  for(int i=0; i<6; ++i) loop_coeff[i] = milc_loop_coeff[0];      
-
-  // 18 rectangle terms
-  for(int i=0; i<18; ++i) loop_coeff[i+6] = milc_loop_coeff[1];
-
-  for(int i=0; i<24; ++i) loop_coeff[i+24] = milc_loop_coeff[2];
-
-  return;
-}
-
-
-
 static inline int opp(int dir){
   return 7-dir;
 }
 
 
-static void createGaugeForcePaths(int **paths, int dir){
+static void createGaugeForcePaths(int **paths, int dir, int num_loop_types){
 
   int index=0;
   // Plaquette paths
-  for(int i=0; i<4; ++i){
-    if(i==dir) continue;
-    paths[index][0] = i;        paths[index][1] = opp(dir);   paths[index++][2] = opp(i);
-    paths[index][0] = opp(i);   paths[index][1] = opp(dir);   paths[index++][2] = i;
-  }
+  if (num_loop_types >= 1) 
+    for(int i=0; i<4; ++i){
+      if(i==dir) continue;
+      paths[index][0] = i;        paths[index][1] = opp(dir);   paths[index++][2] = opp(i);
+      paths[index][0] = opp(i);   paths[index][1] = opp(dir);   paths[index++][2] = i;
+    }
 
   // Rectangle Paths
-  for(int i=0; i<4; ++i){
-    if(i==dir) continue;
-    paths[index][0] = paths[index][1] = i;       paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = opp(i);
-    index++;  
-    paths[index][0] = paths[index][1] = opp(i);  paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = i;
-    index++;
-    paths[index][0] = dir; paths[index][1] = i; paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = opp(i);
-    index++;
-    paths[index][0] = dir; paths[index][1] = opp(i); paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = i;
-    index++;
-    paths[index][0] = i;  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = opp(i); paths[index][4] = dir; 
-    index++;
-    paths[index][0] = opp(i);  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = i; paths[index][4] = dir; 
-    index++;
-  }
+  if (num_loop_types >= 2) 
+    for(int i=0; i<4; ++i){
+      if(i==dir) continue;
+      paths[index][0] = paths[index][1] = i;       paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = opp(i);
+      index++;  
+      paths[index][0] = paths[index][1] = opp(i);  paths[index][2] = opp(dir); paths[index][3] = paths[index][4] = i;
+      index++;
+      paths[index][0] = dir; paths[index][1] = i; paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = opp(i);
+      index++;
+      paths[index][0] = dir; paths[index][1] = opp(i); paths[index][2] = paths[index][3] = opp(dir); paths[index][4] = i;
+      index++;
+      paths[index][0] = i;  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = opp(i); paths[index][4] = dir; 
+      index++;
+      paths[index][0] = opp(i);  paths[index][1] = paths[index][2] = opp(dir); paths[index][3] = i; paths[index][4] = dir; 
+      index++;
+    }
 
-
-  // Staple paths
-  for(int i=0; i<4; ++i){
-    for(int j=0; j<4; ++j){
-      if(i==dir || j==dir || i==j) continue;
-
-      paths[index][0] = i; paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = opp(j);
-      index++;
-      paths[index][0] = i; paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = j;
-      index++;
-      paths[index][0] = opp(i); paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = opp(j);
-      index++;
-      paths[index][0] = opp(i); paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = j;
-      index++;
+  if (num_loop_types >= 3) {
+    // Staple paths
+    for(int i=0; i<4; ++i){
+      for(int j=0; j<4; ++j){
+	if(i==dir || j==dir || i==j) continue;	
+	paths[index][0] = i; paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = opp(j);
+	index++;
+	paths[index][0] = i; paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = opp(i), paths[index][4] = j;
+	index++;
+	paths[index][0] = opp(i); paths[index][1] = j; paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = opp(j);
+	index++;
+	paths[index][0] = opp(i); paths[index][1] = opp(j); paths[index][2] = opp(dir); paths[index][3] = i, paths[index][4] = j;
+	index++;
+      }
     }
   }
 
@@ -415,55 +491,81 @@ static void createGaugeForcePaths(int **paths, int dir){
 
 
 void qudaGaugeForce( int precision,
-    int num_loop_types,
-    double milc_loop_coeff[3],
-    double eb3,
-    void* milc_sitelink,
-    void* milc_momentum
-    )
+		     int num_loop_types,
+		     double milc_loop_coeff[3],
+		     double eb3,
+		     void* milc_sitelink,
+		     void* milc_momentum )
 {
   qudamilc_called<true>(__func__);
-  const int numPaths = 48;
+
+  int numPaths = 0;
+  switch (num_loop_types) {
+  case 1:
+    numPaths = 6;
+    break;
+  case 2:
+    numPaths = 24;
+    break;
+  case 3:
+    numPaths = 48;
+    break;
+  default:
+    errorQuda("Invalid num_loop_types = %d\n", num_loop_types);
+  }
+
   QudaGaugeParam qudaGaugeParam = newMILCGaugeParam(localDim, 
       (precision==1) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION, 
       QUDA_SU3_LINKS);
 
-  static double loop_coeff[numPaths];
-  static int length[numPaths];
+  double *loop_coeff = static_cast<double*>(safe_malloc(numPaths*sizeof(double)));
+  int *length = static_cast<int*>(safe_malloc(numPaths*sizeof(int)));
 
-  if((milc_loop_coeff[0] != loop_coeff[0]) ||
-      (milc_loop_coeff[1] != loop_coeff[6]) ||
-      (milc_loop_coeff[2] != loop_coeff[24]) ){
-
-    setLoopCoeffs(milc_loop_coeff, loop_coeff);
-    for(int i=0; i<6; ++i)  length[i] = 3;
-    for(int i=6; i<48; ++i) length[i] = 5;
-  }
-
-
+  if (num_loop_types >= 1) for(int i= 0; i< 6; ++i) {
+      loop_coeff[i] = milc_loop_coeff[0];      
+      length[i] = 3;
+    }
+  if (num_loop_types >= 2) for(int i= 6; i<24; ++i) {
+      loop_coeff[i] = milc_loop_coeff[1];
+      length[i] = 5;
+    }
+  if (num_loop_types >= 3) for(int i=24; i<48; ++i) {
+      loop_coeff[i] = milc_loop_coeff[2];
+      length[i] = 5;
+    }
+    
   int** input_path_buf[4];
   for(int dir=0; dir<4; ++dir){
-    input_path_buf[dir] = new int*[numPaths];
+    input_path_buf[dir] = static_cast<int**>(safe_malloc(numPaths*sizeof(int*)));
     for(int i=0; i<numPaths; ++i){
-      input_path_buf[dir][i] = new int[length[i]];
+      input_path_buf[dir][i] = static_cast<int*>(safe_malloc(length[i]*sizeof(int)));
     }
-    createGaugeForcePaths(input_path_buf[dir], dir);
+    createGaugeForcePaths(input_path_buf[dir], dir, num_loop_types);
+  }
+
+  if (!invalidate_quda_mom) {
+    qudaGaugeParam.use_resident_mom = true;
+    qudaGaugeParam.make_resident_mom = true;
+    qudaGaugeParam.return_mom = false;
+  } else {
+    qudaGaugeParam.use_resident_mom = false;
+    qudaGaugeParam.make_resident_mom = false;
+    qudaGaugeParam.return_mom = true;
   }
 
   int max_length = 6;
-  double timeinfo[3];
 
-  memset(milc_momentum, 0, 4*getVolume(localDim)*10*qudaGaugeParam.cpu_prec);
   computeGaugeForceQuda(milc_momentum, milc_sitelink,  input_path_buf, length,
-      loop_coeff, numPaths, max_length, eb3, 
-      &qudaGaugeParam, timeinfo);
+			loop_coeff, numPaths, max_length, eb3, &qudaGaugeParam);
 
   for(int dir=0; dir<4; ++dir){
-    for(int i=0; i<numPaths; ++i){
-      delete[] input_path_buf[dir][i];
-    }
-    delete[] input_path_buf[dir];
+    for(int i=0; i<numPaths; ++i) host_free(input_path_buf[dir][i]);
+    host_free(input_path_buf[dir]);
   }
+
+  host_free(length);
+  host_free(loop_coeff);
+
   qudamilc_called<false>(__func__);
   return;
 }
@@ -681,21 +783,13 @@ void qudaMultishiftInvert(int external_precision,
     int *num_iters)
 {
 
-  // for(int i=0; i<num_offsets; ++i){
-  //   if(target_residual[i] == 0){
-  //     errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
-  //     exit(1);
-  //   }
-  // }
-  // for(int i=0; i<num_offsets; ++i){
-    static const QudaVerbosity verbosity = getVerbosity();
+  static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
-    if(target_residual[0] == 0){
-      errorQuda("qudaMultishiftInvert: target residual cannot be zero\n");
-      exit(1);
-    }
-  // }
+  if(target_residual[0] == 0){
+    errorQuda("qudaMultishiftInvert: zeroth target residual cannot be zero\n");
+    exit(1);
+  }
 
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -712,23 +806,6 @@ void qudaMultishiftInvert(int external_precision,
 
   QudaPrecision device_precision_precondition = device_precision_sloppy;
 
-
-
-
-
-/*
-  if(verbosity >= QUDA_VERBOSE){ 
-    if(quda_precision == 2){
-      printfQuda("Using %s double-precision multi-mass inverter\n", use_mixed_precision?"mixed":"pure");
-    }else if(quda_precision == 1){
-      printfQuda("Using %s single-precision multi-mass inverter\n", use_mixed_precision?"mixed":"pure");
-    }else{
-      errorQuda("Unrecognised precision\n");
-      exit(1);
-    }
-  }
-*/
-
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
   setGaugeParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition, tadpole, &gaugeParam);
 
@@ -737,12 +814,11 @@ void qudaMultishiftInvert(int external_precision,
   invertParam.residual_type = static_cast<QudaResidualType_s>(0);
   invertParam.residual_type = (target_residual[0] != 0) ? static_cast<QudaResidualType_s> ( invertParam.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : invertParam.residual_type;
   invertParam.residual_type = (target_fermilab_residual[0] != 0) ? static_cast<QudaResidualType_s> (invertParam.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : invertParam.residual_type;
-  if (invertParam.residual_type ==QUDA_L2_RELATIVE_RESIDUAL) 
-    printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL only");
-  else{
-    if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+
+  if (verbosity >= QUDA_VERBOSE) {
+    if (invertParam.residual_type & QUDA_L2_RELATIVE_RESIDUAL) 
       printfQuda("Using QUDA_L2_RELATIVE_RESIDUAL");      
-     if (invertParam.residual_type &QUDA_L2_RELATIVE_RESIDUAL) 
+    if (invertParam.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) 
       printfQuda("Using QUDA_HEAVY_QUARK_RESIDUAL"); 
   }
 
@@ -754,7 +830,7 @@ void qudaMultishiftInvert(int external_precision,
   QudaParity local_parity = inv_args.evenodd;
   {
     // need to set this to zero until issue #146 is fixed
-    const double reliable_delta = (use_mixed_precision ? 1e-1 :0.0);//1e-1;
+    const double reliable_delta = (use_mixed_precision ? 1e-1 :0.0);
     setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, device_precision_precondition,
         num_offsets, offset, target_residual, target_fermilab_residual, 
         inv_args.max_iter, reliable_delta, local_parity, verbosity, QUDA_CG_INVERTER, &invertParam);
@@ -765,7 +841,12 @@ void qudaMultishiftInvert(int external_precision,
 
   const QudaPrecision milc_precision = (external_precision==2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
 
-//  if(invalidate_quda_gauge){
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1) {
+    invalidateGaugeQuda();
+  }
+
+  if(invalidate_quda_gauge || !create_quda_gauge ){
     const int fat_pad  = getFatLinkPadding(localDim);
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad;  // don't know if this is correct
@@ -774,11 +855,11 @@ void qudaMultishiftInvert(int external_precision,
 
     const int long_pad = 3*fat_pad;
     gaugeParam.type = QUDA_THREE_LINKS;
-    gaugeParam.ga_pad = long_pad; 
+    gaugeParam.ga_pad = long_pad;
+    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
-
-   // invalidate_quda_gauge = false;
-//  }
+    invalidate_quda_gauge = false;
+  }
 
   void** sln_pointer = (void**)malloc(num_offsets*sizeof(void*));
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X)*host_precision;
@@ -796,8 +877,8 @@ void qudaMultishiftInvert(int external_precision,
     final_fermilab_residual[i] = invertParam.true_res_hq_offset[i];
   } // end loop over number of offsets
 
-  freeGaugeQuda();
- // if(!create_quda_gauge) invalidateGaugeQuda();
+  if(!create_quda_gauge) invalidateGaugeQuda();
+
   qudamilc_called<false>(__func__, verbosity);
   return;
 } // qudaMultiShiftInvert
@@ -879,7 +960,12 @@ void qudaInvert(int external_precision,
   const int fat_pad  = getFatLinkPadding(localDim);
   const int long_pad = 3*fat_pad;
 
-//  if(invalidate_quda_gauge){
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1) {
+    invalidateGaugeQuda();
+  }
+
+  if(invalidate_quda_gauge || !create_quda_gauge){
     gaugeParam.type = QUDA_GENERAL_LINKS;
     gaugeParam.ga_pad = fat_pad; 
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
@@ -891,22 +977,22 @@ void qudaInvert(int external_precision,
     loadGaugeQuda(const_cast<void*>(longlink), &gaugeParam);
 
     invalidate_quda_gauge = false;
-//  }
+  }
 
   int quark_offset = getColorVectorOffset(local_parity, false, gaugeParam.X);
 
   invertQuda(((char*)solution + quark_offset*host_precision), 
-      ((char*)source + quark_offset*host_precision), 
-      &invertParam); 
+	     ((char*)source + quark_offset*host_precision), 
+	     &invertParam); 
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
   *final_residual = invertParam.true_res;
   *final_fermilab_residual = invertParam.true_res_hq;
 
-  freeGaugeQuda();
+  if(!create_quda_gauge) invalidateGaugeQuda();
+
   qudamilc_called<false>(__func__, verbosity);
-//  if(!create_quda_gauge) invalidateGaugeQuda();
   return;
 } // qudaInvert
 

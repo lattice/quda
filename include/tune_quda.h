@@ -57,7 +57,7 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = 256; // FIXME: set a reasonable value for blas currently
+	const unsigned int max_blocks = 2*deviceProp.multiProcessorCount;
 	const int step = 1;
 	param.grid.x += step;
 	if (param.grid.x > max_blocks) {
@@ -71,9 +71,11 @@ namespace quda {
       }
     }
 
+    virtual unsigned int maxBlockSize() const { return deviceProp.maxThreadsDim[0]; }
+
     virtual bool advanceBlockDim(TuneParam &param) const
     {
-      const unsigned int max_threads = deviceProp.maxThreadsDim[0];
+      const unsigned int max_threads = maxBlockSize();
       const unsigned int max_blocks = deviceProp.maxGridSize[0];
       const unsigned int max_shared = deviceProp.sharedMemPerBlock;
       const int step = deviceProp.warpSize;
@@ -240,6 +242,44 @@ namespace quda {
     }
 
   };
+
+  
+  /**
+     This derived class is for algorithms that deploy parity across
+     the y dimension of the thread block with no shared memory tuning.
+     The x threads will typically correspond to the checkboarded
+     volume.
+   */
+  class TunableLocalParity : public Tunable {
+
+  protected:
+    unsigned int sharedBytesPerThread() const { return 0; }
+    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+    // don't tune the grid dimension
+    bool tuneGridDim() const { return false; }
+
+    /**
+       The maximum block size in the x dimension is the total number
+       of threads divided by the size of the y dimension
+     */
+    unsigned int maxBlockSize() const { return deviceProp.maxThreadsPerBlock / 2; }
+
+  public:
+    bool advanceBlockDim(TuneParam &param) const {
+      bool rtn = Tunable::advanceBlockDim(param);
+      param.block.y = 2;
+      return rtn;
+    }
+    
+    void initTuneParam(TuneParam &param) const {
+      Tunable::initTuneParam(param);
+      param.block.y = 2;
+    }
+
+
+  };
+  
 
   void loadTuneCache(QudaVerbosity verbosity);
   void saveTuneCache(QudaVerbosity verbosity);

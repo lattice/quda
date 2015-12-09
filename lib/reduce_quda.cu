@@ -128,11 +128,41 @@ namespace quda {
   };
 
   /**
+     Return the L1 norm of x
+  */
+  __device__ double norm1_(const double2 &a) { return fabs(a.x) + fabs(a.y); }
+  __device__ double norm1_(const float2 &a) { return (double)fabs(a.x) + (double)fabs(a.y); }
+  __device__ double norm1_(const float4 &a) { return (double)fabs(a.x) + (double)fabs(a.y) + (double)fabs(a.z) + (double)fabs(a.w); }
+
+  template <typename ReduceType, typename Float2, typename FloatN>
+#if (__COMPUTE_CAPABILITY__ >= 200)
+  struct Norm1 : public ReduceFunctor<ReduceType, Float2, FloatN> {
+#else
+  struct Norm1 {
+#endif
+    Norm1(const Float2 &a, const Float2 &b) { ; }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,FloatN  &w, FloatN &v) { sum += norm1_(x); }
+    static int streams() { return 1; } //! total number of input and output streams
+    static int flops() { return 2; } //! flops per element
+  };
+
+  double norm1Cuda(const cudaColorSpinorField &x) {
+    cudaColorSpinorField &y = (cudaColorSpinorField&)x; // FIXME
+#ifdef HOST_DEBUG
+    return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm1,0,0,0,0,0,false>
+      (make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
+#else
+    errorQuda("L1 norm kernel only built when HOST_DEBUG is enabled");
+    return 0.0;
+#endif
+  }
+
+  /**
      Return the L2 norm of x
   */
   __device__ double norm2_(const double2 &a) { return a.x*a.x + a.y*a.y; }
-  __device__ float norm2_(const float2 &a) { return (double)a.x*(double)a.x + (double)a.y*(double)a.y; }
-  __device__ float norm2_(const float4 &a) { return (double)a.x*(double)a.x + (double)a.y*(double)a.y +
+  __device__ double norm2_(const float2 &a) { return (double)a.x*(double)a.x + (double)a.y*(double)a.y; }
+  __device__ double norm2_(const float4 &a) { return (double)a.x*(double)a.x + (double)a.y*(double)a.y +
       (double)a.z*(double)a.z + (double)a.w*(double)a.w; }
 
   template <typename ReduceType, typename Float2, typename FloatN>
@@ -157,8 +187,8 @@ namespace quda {
      Return the real dot product of x and y
   */
     __device__ double dot_(const double2 &a, const double2 &b) { return a.x*b.x + a.y*b.y; }
-    __device__ float dot_(const float2 &a, const float2 &b) { return (double)a.x*(double)b.x + (double)a.y*(double)b.y; }
-    __device__ float dot_(const float4 &a, const float4 &b) { return (double)a.x*(double)b.x + (double)a.y*(double)b.y + (double)a.z*(double)b.z + (double)a.w*(double)b.w; }
+    __device__ double dot_(const float2 &a, const float2 &b) { return (double)a.x*(double)b.x + (double)a.y*(double)b.y; }
+    __device__ double dot_(const float4 &a, const float4 &b) { return (double)a.x*(double)b.x + (double)a.y*(double)b.y + (double)a.z*(double)b.z + (double)a.w*(double)b.w; }
 
   template <typename ReduceType, typename Float2, typename FloatN>
 #if (__COMPUTE_CAPABILITY__ >= 200)
@@ -383,7 +413,7 @@ namespace quda {
   /**
      double caxpyXmayNormCuda(float a, float *x, float *y, n){}
    
-     First performs the operation y[i] = a*x[i] + y[i]
+     First performs the operation y[i] += a*x[i]
      Second performs the operator x[i] -= a*z[i]
      Third returns the norm of x
   */
@@ -395,7 +425,7 @@ namespace quda {
 #endif
     Float2 a;
     caxpyxmaznormx(const Float2 &a, const Float2 &b) : a(a) { ; }
-    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { Caxpy_(a, x, y); x-= a.x*z; sum += norm2_(x); }
+    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { Caxpy_(a, x, y); Caxpy_(-a, z, x); sum += norm2_(x); }
     static int streams() { return 5; } //! total number of input and output streams
     static int flops() { return 10; } //! flops per element
   };

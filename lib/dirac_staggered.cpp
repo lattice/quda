@@ -75,12 +75,8 @@ namespace quda {
   // Full staggered operator
   void DiracStaggered::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
   {
-    bool reset = newTmp(&tmp1, in.Even());
-
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, *tmp1, 2*mass);  
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, *tmp1, 2*mass);
-  
-    deleteTmp(&tmp1, reset);
+    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
+    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
   }
 
   void DiracStaggered::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const

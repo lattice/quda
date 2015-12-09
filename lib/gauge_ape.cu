@@ -1,5 +1,6 @@
 #include <quda_internal.h>
 #include <quda_matrix.h>
+#include <su3_project.cuh>
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
@@ -28,119 +29,16 @@ namespace quda {
     GaugeAPEArg(GaugeOr &origin, GaugeDs &dest, const GaugeField &data, const Float alpha, const Float tolerance) 
       : origin(origin), dest(dest), alpha(alpha), tolerance(tolerance) {
 #ifdef MULTI_GPU
-        for(int dir=0; dir<4; ++dir){
-          border[dir] = 2;
-        }
-        for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir] - border[dir]*2;
+      for ( int dir = 0; dir < 4; ++dir ) {
+        border[dir] = data.R()[dir];
+        X[dir] = data.X()[dir] - border[dir] * 2;
+      } 
 #else
         for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
 #endif
 	threads = X[0]*X[1]*X[2]*X[3];
     }
   };
-
- 
-  template <typename Float2, typename Float>
-  __host__ __device__ int checkUnitary(Matrix<Float2,3> in, Matrix<Float2,3> *inv, const Float tol)
-  {
-    computeMatrixInverse(in, inv);
-
-    for (int i=0;i<3;i++)
-      for (int j=0;j<3;j++)
-      {
-        if (fabs(in(i,j).x - (*inv)(j,i).x) > tol)
-          return 1;
-        if (fabs(in(i,j).y + (*inv)(j,i).y) > tol)
-          return 1;
-      }
-    return 0;
-  }
-
-  template <typename Float2>
-  __host__ __device__ int checkUnitaryPrint(Matrix<Float2,3> in, Matrix<Float2,3> *inv)
-  {
-    computeMatrixInverse(in, inv);
-    for (int i=0;i<3;i++)
-      for (int j=0;j<3;j++)
-      {
-        printf("TESTR: %+.3le %+.3le %+.3le\n", in(i,j).x, (*inv)(j,i).x, fabs(in(i,j).x - (*inv)(j,i).x));
-	printf("TESTI: %+.3le %+.3le %+.3le\n", in(i,j).y, (*inv)(j,i).y, fabs(in(i,j).y + (*inv)(j,i).y));
-        cudaDeviceSynchronize();
-        if (fabs(in(i,j).x - (*inv)(j,i).x) > 1e-14)
-          return 1;
-        if (fabs(in(i,j).y + (*inv)(j,i).y) > 1e-14)
-          return 1;
-      }
-    return 0;  
-  }
-
-  template <typename Float2,typename Float>
-  __host__ __device__ void polarSu3(Matrix<Float2,3> *in, Float tol)
-  {
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
-    Matrix<Cmplx,3> inv, out;
-
-    out = *in;
-    computeMatrixInverse(out, &inv);
-
-    do
-    {
-      out = out + conj(inv);
-      out = out*0.5;
-    } while(checkUnitary(out, &inv, tol));
-/*
-    printf("Convergence after %d iterations\n", N);
-    cudaDeviceSynchronize();
-    printf("%+.3lf %+.3lfi    %+.3lf %+.3lfi    %+.3lf %+.3lfi\n", out(0,0).x, out(0,0).y, out(0,1).x, out(0,1).y, out(0,2).x, out(0,2).y);
-    printf("%+.3lf %+.3lfi    %+.3lf %+.3lfi    %+.3lf %+.3lfi\n", out(1,0).x, out(1,0).y, out(1,1).x, out(1,1).y, out(1,2).x, out(1,2).y);
-    printf("%+.3lf %+.3lfi    %+.3lf %+.3lfi    %+.3lf %+.3lfi\n", out(2,0).x, out(2,0).y, out(2,1).x, out(2,1).y, out(2,2).x, out(2,2).y);
-    printf("\n\n");
-    printf("%+.3lf %+.3lfi    %+.3lf %+.3lfi    %+.3lf %+.3lfi\n", inv(0,0).x, inv(0,0).y, inv(0,1).x, inv(0,1).y, inv(0,2).x, inv(0,2).y);
-    printf("%+.3lf %+.3lfi    %+.3lf %+.3lfi    %+.3lf %+.3lfi\n", inv(1,0).x, inv(1,0).y, inv(1,1).x, inv(1,1).y, inv(1,2).x, inv(1,2).y);
-    printf("%+.3lf %+.3lfi    %+.3lf %+.3lfi    %+.3lf %+.3lfi\n", inv(2,0).x, inv(2,0).y, inv(2,1).x, inv(2,1).y, inv(2,2).x, inv(2,2).y);
-    printf("\n\n\n\n");
-    cudaDeviceSynchronize();
-*/
-    Cmplx  det = getDeterminant(out);
-    double mod = det.x*det.x + det.y*det.y;
-    mod = pow(mod, (1./6.));
-    double angle = atan2(det.y, det.x);
-    angle /= -3.;
-    
-    Cmplx cTemp;
-
-    cTemp.x = cos(angle)/mod;
-    cTemp.y = sin(angle)/mod;
-
-//    out = out*cTemp;
-    *in = out*cTemp;
-/*    if (checkUnitary(out, &inv))
-    {
-    	cTemp = getDeterminant(out);
-	printf ("DetX: %+.3lf  %+.3lfi, %.3lf %.3lf\nDetN: %+.3lf  %+.3lfi", det.x, det.y, mod, angle, cTemp.x, cTemp.y);
-        cudaDeviceSynchronize();
-	checkUnitaryPrint(out, &inv);
-	setIdentity(in);
-        *in = *in * 0.5;
-    }
-    else
-    {
-      cTemp = getDeterminant(out);
-//      printf("Det: %+.3lf %+.3lf\n", cTemp.x, cTemp.y);
-      cudaDeviceSynchronize();
-
-      if (fabs(cTemp.x - 1.0) > 1e-8)
-	setIdentity(in);
-      else if (fabs(cTemp.y) > 1e-8)
-      {
-	setIdentity(in);
-        printf("DadadaUnitary failed\n");
-        *in = *in * 0.1;
-      }
-      else
-        *in = out;
-    }*/
-  }
 
 
   template <typename Float, typename GaugeOr, typename GaugeDs, typename Float2>
@@ -163,7 +61,7 @@ namespace quda {
 
     setZero(&staple);
 
-    for (int mu=0; mu<4; mu++) {
+    for (int mu=0; mu<3; mu++) {  // I believe most users won't want to include time staples in smearing
       if (mu == dir) {
         continue;
       }
@@ -234,18 +132,19 @@ namespace quda {
 
       int dx[4] = {0, 0, 0, 0};
       for (int dir=0; dir < 3; dir++) {				//Only spatial dimensions are smeared
-        Matrix<Cmplx,3> U, S;
+        Matrix<Cmplx,3> U, S, TestU, I;
 
         computeStaple<Float,GaugeOr,GaugeDs,Cmplx>(arg,idx,parity,dir,S);
 
         arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity);
 
-	U  = U * (1. - arg.alpha);
-	S  = S * (arg.alpha/6.);
+        S  = S * (arg.alpha/((Float) (2.*(3. - 1.))));
+        setIdentity(&I);
 
-	U  = U + S;
+        TestU  = I*(1.-arg.alpha) + S*conj(U);
+        polarSu3<Cmplx,Float>(TestU, arg.tolerance);
+        U = TestU*U;
 
-        polarSu3<Cmplx,Float>(&U, arg.tolerance);
         arg.dest.save((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity); 
     }
   }

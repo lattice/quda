@@ -494,10 +494,8 @@ namespace quda {
 
   void setGhostSpinor(bool value);
 
-  // Return the L2 norm squared of the gauge field
-  double norm2(const cudaGaugeField &a) {
-
-    if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
+  ColorSpinorParam colorSpinorParam(const cudaGaugeField &a) {
+   if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
         a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
       errorQuda("Not implemented");
 
@@ -533,13 +531,27 @@ namespace quda {
     spinor_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     spinor_param.create = QUDA_REFERENCE_FIELD_CREATE;
     spinor_param.v = (void*)a.Gauge_p();
+    return spinor_param;
+  }
 
+  // Return the L2 norm squared of the gauge field
+  double norm2(const cudaGaugeField &a) {
     // quick hack to disable ghost zone creation which otherwise breaks this mapping on multi-gpu
     setGhostSpinor(false);
-    cudaColorSpinorField b(spinor_param);
+    cudaColorSpinorField b(colorSpinorParam(a));
     setGhostSpinor(true);
 
     return norm2(b);
+  }
+
+  // Return the L1 norm of the gauge field
+  double norm1(const cudaGaugeField &a) {
+    // quick hack to disable ghost zone creation which otherwise breaks this mapping on multi-gpu
+    setGhostSpinor(false);
+    cudaColorSpinorField b(colorSpinorParam(a));
+    setGhostSpinor(true);
+
+    return norm1Cuda(b);
   }
 
 } // namespace quda
