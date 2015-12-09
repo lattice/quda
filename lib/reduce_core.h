@@ -558,27 +558,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
     size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes(), v.NormBytes()};
 
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      if (x.Nspin() == 4){ //wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)      
+      if (x.Nspin() == 4 || x.Nspin() == 2){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
-	Spinor<double2,double2,double2,M,writeX> X(x);
-	Spinor<double2,double2,double2,M,writeY> Y(y);
-	Spinor<double2,double2,double2,M,writeZ> Z(z);
-	Spinor<double2,double2,double2,M,writeW> W(w);
-	Spinor<double2,double2,double2,M,writeV> V(v);
-	Reducer<ReduceType, double2, double2> r(a,b);
-	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	  Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
-	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
-	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
-	reduce.apply(*blas::getStream());
-#else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
-#endif
-      } else if (x.Nspin() == 2){ //coarse grid
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
-	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
+	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 	Spinor<double2,double2,double2,M,writeX> X(x);
 	Spinor<double2,double2,double2,M,writeY> Y(y);
 	Spinor<double2,double2,double2,M,writeZ> Z(z);
@@ -615,7 +598,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       if (x.Nspin() == 4){ //wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)      
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 	Spinor<float4,float4,float4,M,writeX,0> X(x);
 	Spinor<float4,float4,float4,M,writeY,1> Y(y);
@@ -632,27 +615,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else if (x.Nspin() == 2) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
-	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-	Spinor<float2,float2,float2,M,writeX,0> X(x);
-	Spinor<float2,float2,float2,M,writeY,1> Y(y);
-	Spinor<float2,float2,float2,M,writeZ,2> Z(z);
-	Spinor<float2,float2,float2,M,writeW,3> W(w);
-	Spinor<float2,float2,float2,M,writeV,4> V(v);
-	Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,
-	  Spinor<float2,float2,float2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>,
-	  Spinor<float2,float2,float2,M,writeZ,2>, Spinor<float2,float2,float2,M,writeW,3>,
-	  Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
-	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
-	reduce.apply(*blas::getStream());
-#else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
-#endif
-      } else if (x.Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
+      } else if (x.Nspin() == 1 || x.Nspin() == 2) {
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 	Spinor<float2,float2,float2,M,writeX,0> X(x);
 	Spinor<float2,float2,float2,M,writeY,1> Y(y);
 	Spinor<float2,float2,float2,M,writeZ,2> Z(z);
