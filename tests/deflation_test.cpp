@@ -43,6 +43,10 @@ extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision  prec_sloppy;
 extern double tol; // tolerance for inverter
 
+extern QudaInverterType inv_type; // solver type
+
+extern double mass; // mass of Dirac operator
+extern int niter; // max solver iterations
 
 extern char latfile[];
 
@@ -137,7 +141,6 @@ int main(int argc, char **argv)
 
   inv_param.dslash_type = dslash_type;
 
-  double mass = -0.4086;
   inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -179,10 +182,12 @@ int main(int argc, char **argv)
   inv_param.gcrNkrylov = 10;
   inv_param.tol = tol;
 
-//! For deflated solvers only:
-  //inv_param.inv_type = QUDA_EIGCG_INVERTER;
-  //inv_param.inv_type = QUDA_INC_EIGCG_INVERTER;
-  inv_param.inv_type = QUDA_GMRESDR_INVERTER;
+  // set default solver type to incremental eigcg is not set at command line
+  if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
+    inv_type = QUDA_INC_EIGCG_INVERTER;
+
+  //! For deflated solvers only:
+  inv_param.inv_type = inv_type;
 
   inv_param.rhs_idx = 0;
 
@@ -208,7 +213,7 @@ int main(int argc, char **argv)
     inv_param.cuda_prec_ritz = cuda_prec_sloppy;
 //    inv_param.cuda_prec_ritz = cuda_prec_sloppy;//for the mixed precision uncomment this line, be sure that ((inv_param.nev + 1) % 16) = 0 is satisfied
     inv_param.tol_restart = 0.0;//restart is not requested...
-  }  
+  }
 
 #if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
@@ -224,7 +229,7 @@ int main(int argc, char **argv)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
 
-  inv_param.maxiter = 5000;
+  inv_param.maxiter = niter;
   inv_param.reliable_delta = 1e-1; // ignored by multi-shift solver
 
   // domain decomposition preconditioner parameters

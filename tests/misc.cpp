@@ -1001,19 +1001,33 @@ get_solver_type(char* s)
   
   if (strcmp(s, "cg") == 0){
     ret = QUDA_CG_INVERTER;
-  }else if (strcmp(s, "bicgstab") == 0){
+  } else if (strcmp(s, "bicgstab") == 0){
     ret = QUDA_BICGSTAB_INVERTER;
-  }else if (strcmp(s, "gcr") == 0){
+  } else if (strcmp(s, "gcr") == 0){
     ret = QUDA_GCR_INVERTER;
-  }else if (strcmp(s, "pcg") == 0){
+  } else if (strcmp(s, "pcg") == 0){
     ret = QUDA_PCG_INVERTER;
-  }else if (strcmp(s, "mpcg") == 0){
+  } else if (strcmp(s, "mpcg") == 0){
     ret = QUDA_MPCG_INVERTER; 
-  }else if (strcmp(s, "mpbicgstab") == 0){
+  } else if (strcmp(s, "mpbicgstab") == 0){
     ret = QUDA_MPBICGSTAB_INVERTER;
-  }else if (strcmp(s, "mr") == 0){
+  } else if (strcmp(s, "mr") == 0){
     ret = QUDA_MR_INVERTER;
-  }else{
+  } else if (strcmp(s, "sd") == 0){
+    ret = QUDA_SD_INVERTER;
+  } else if (strcmp(s, "eigcg") == 0){
+    ret = QUDA_EIGCG_INVERTER;
+  } else if (strcmp(s, "inc-eigcg") == 0){
+    ret = QUDA_INC_EIGCG_INVERTER;
+  } else if (strcmp(s, "gmresdr") == 0){
+    ret = QUDA_GMRESDR_INVERTER;
+  } else if (strcmp(s, "gmresdr-proj") == 0){
+    ret = QUDA_GMRESDR_PROJ_INVERTER;
+  } else if (strcmp(s, "gmresdr-sh") == 0){
+    ret = QUDA_GMRESDR_SH_INVERTER;
+  } else if (strcmp(s, "fgmresdr") == 0){
+    ret = QUDA_FGMRESDR_INVERTER;
+  } else {
     fprintf(stderr, "Error: invalid solver type\n");	
     exit(1);
   }
@@ -1026,24 +1040,56 @@ get_solver_str(QudaInverterType type)
 {
   const char* ret;
   
-  switch( type){	
+  switch(type){
   case QUDA_CG_INVERTER:
-    ret=  "cg";
+    ret = "cg";
     break;
   case QUDA_BICGSTAB_INVERTER:
-    ret= "bicgstab";
+    ret = "bicgstab";
     break;
   case QUDA_GCR_INVERTER:
-    ret= "gcr";
+    ret = "gcr";
+    break;
+  case QUDA_PCG_INVERTER:
+    ret = "pcg";
+    break;
+  case QUDA_MPCG_INVERTER:
+    ret = "mpcg";
+    break;
+  case QUDA_MPBICGSTAB_INVERTER:
+    ret = "mpbicgstab";
+    break;
+  case QUDA_MR_INVERTER:
+    ret = "mr";
+    break;
+  case QUDA_SD_INVERTER:
+    ret = "sd";
+    break;
+  case QUDA_EIGCG_INVERTER:
+    ret = "eigcg";
+    break;
+  case QUDA_INC_EIGCG_INVERTER:
+    ret = "inc-eigcg";
+    break;
+  case QUDA_GMRESDR_INVERTER:
+    ret = "gmresdr";
+    break;
+  case QUDA_GMRESDR_PROJ_INVERTER:
+    ret = "gmresdr-proj";
+    break;
+  case QUDA_GMRESDR_SH_INVERTER:
+    ret = "gmresdr-sh";
+    break;
+  case QUDA_FGMRESDR_INVERTER:
+    ret = "fgmresdr";
     break;
   default:
-    ret = "unknown";	
+    ret = "unknown";
+    errorQuda("Error: invalid solver type %d\n", type);
     break;
   }
-  
-  
+
   return ret;
-    
 }
 
 const char* 
