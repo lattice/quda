@@ -964,9 +964,6 @@
 
 #ifdef GPU_STAGGERED_DIRAC
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
 // define the kernel
 
 #if (DD_IMPROVED==1)
@@ -1028,8 +1025,6 @@ __global__ void	DD_FUNC(DD_FNAME, DD_FAT_RECON_F, DD_AXPY_F)<EXTERIOR_KERNEL_ALL
 
 
 #endif
-
-#endif // !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0)
 
 #endif // ! GPU_STAGGERED_DIRAC
 

@@ -241,11 +241,7 @@ namespace quda {
     Tunable *gamma5 = 0;
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       gamma5 = new Gamma5Cuda<double2>(out, in);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       gamma5 = new Gamma5Cuda<float4>(out, in);
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
@@ -351,11 +347,7 @@ void cloverCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const Fu
     errorQuda("Mixing clover and spinor precision not supported");
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     clov = new CloverCuda<double2, double2>(out, (double2*)cloverP, (float*)cloverNormP, clover.stride, in);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
     clov = new CloverCuda<float4, float4>(out, (float4*)cloverP, (float*)cloverNormP, clover.stride, in);
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
@@ -475,11 +467,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
   Tunable *twistGamma5 = 0;
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     twistGamma5 = new TwistGamma5Cuda<double2>(out, in, kappa, mu, epsilon, dagger, twist);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
     twistGamma5 = new TwistGamma5Cuda<float4>(out, in, kappa, mu, epsilon, dagger, twist);
   } else if (in->Precision() == QUDA_HALF_PRECISION) {
@@ -629,12 +617,8 @@ void twistCloverGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField
     
 
   if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
     tmClovGamma5 = new TwistCloverGamma5Cuda<double2,double2>
       (out, in, kappa, mu, epsilon, dagger, twist, (double2 *) clover, (float *) cNorm, (double2 *) cloverInv, (float *) cNorm2, clov->stride);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
   } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
     tmClovGamma5 = new TwistCloverGamma5Cuda<float4,float4>
       (out, in, kappa, mu, epsilon, dagger, twist, (float4 *) clover, (float *) cNorm, (float4 *) cloverInv, (float *) cNorm2, clov->stride);

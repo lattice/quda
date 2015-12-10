@@ -2,16 +2,9 @@
 #include <tune_quda.h>
 #include <float_vector.h>
 
-#if (__COMPUTE_CAPABILITY__ >= 130)
 #define QudaSumFloat double
 #define QudaSumFloat2 double2
 #define QudaSumFloat3 double3
-#else
-#define QudaSumFloat doublesingle
-#define QudaSumFloat2 doublesingle2
-#define QudaSumFloat3 doublesingle3
-#include <double_single.h>
-#endif
 
 #define REDUCE_MAX_BLOCKS 65536
 
