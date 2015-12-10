@@ -153,12 +153,7 @@ else
 endif
 endif
 
-# limit maximum number of registers in BLAS routines to increase occupancy
-ifneq ($(TESLA_ARCH),true)
-  MAXREG =
-else
-  MAXREG = --maxrregcount=80
-endif
+
 
 all: $(QUDA)
 
@@ -191,10 +186,10 @@ tune.o: tune.cpp $(HDRS)
 	$(CXX) $(CXXFLAGS) -DQUDA_HASH=$(HASH) $(DGITVERSION) $< -c -o $@
 
 blas_quda.o: blas_quda.cu $(HDRS) $(BLAS_INLN)
-	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 reduce_quda.o: reduce_quda.cu $(HDRS) $(REDUCE_INLN)
-	$(NVCC) $(NVCCFLAGS) $(MAXREG) $< -c -o $@
+	$(NVCC) $(NVCCFLAGS) $< -c -o $@
 
 cuda_color_spinor_field.o: cuda_color_spinor_field.cu $(HDRS) $(CSF_INLN)
 	$(NVCC) $(NVCCFLAGS) $< -c -o $@
