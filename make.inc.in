@@ -108,12 +108,7 @@ COMP_CAP = $(GPU_ARCH:sm_%=%0)
 COPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 
-TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
-ifneq ($(TESLA_ARCH),true)
-  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
-else
-  NVCCOPT +=
-endif
+NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
 
 ifeq ($(strip $(GIT)), git)
   GITCOUNT = $(shell git rev-list -q `git describe -q --abbrev=0 2> /dev/null`..  2> /dev/null | wc -l 2> /dev/null)
