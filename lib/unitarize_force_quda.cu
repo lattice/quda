@@ -386,10 +386,8 @@ static double HOST_REUNIT_SVD_ABS_ERROR;
 #define MAX_DET_ERROR HOST_MAX_DET_ERROR
 #endif
 	  if(fabs(gprod - determinant) > MAX_DET_ERROR){
-#if  (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__ >= 200))
 	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), MAX_DET_ERROR);
 	    printLink(q);
-#endif
 
 #ifdef __CUDA_ARCH__
 	    atomicAdd(unitarization_failed,1);

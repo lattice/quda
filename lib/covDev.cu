@@ -584,12 +584,8 @@ namespace quda
         if(in->Precision() == QUDA_SINGLE_PRECISION)
           covdev = new CovDevCuda<float, float4>(out, &gauge, in, parity, mu);
         else if(in->Precision	() == QUDA_DOUBLE_PRECISION) {
-          #if (__COMPUTE_CAPABILITY__ >= 130)
-            covdev = new CovDevCuda<double, double2>(out, &gauge, in, parity, mu);
-            regSize = sizeof(double);
-          #else
-            errorQuda("Error: Double precision not supported by hardware");
-          #endif
+	  covdev = new CovDevCuda<double, double2>(out, &gauge, in, parity, mu);
+	  regSize = sizeof(double);
         }
         profile.TPSTOP(QUDA_PROFILE_INIT);
 

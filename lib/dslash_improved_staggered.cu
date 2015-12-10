@@ -15,17 +15,10 @@
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
-#elif (__COMPUTE_CAPABILITY__ >= 200)
+#else // Fermi
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#else
-#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-//#define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
@@ -47,7 +40,6 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
-#define STAGGERED_TESLA_HACK
 #undef GPU_NDEG_TWISTED_MASS_DIRAC
 #undef GPU_CLOVER_DIRAC
 #undef GPU_DOMAIN_WALL_DIRAC
@@ -105,19 +97,11 @@ namespace quda {
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
-#if (__COMPUTE_CAPABILITY__ >= 200)
       IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
 				(sFloat*)out->V(), (float*)out->Norm(), 
 				fat0, fat1, long0, long1, phase0, phase1, 
 				(sFloat*)in->V(), (float*)in->Norm(), 
 				(sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
-#else
-      IMPROVED_STAGGERED_DSLASH(gridDim, tp.block, tp.shared_bytes, stream, dslashParam,
-				(sFloat*)out->V(), (float*)out->Norm(), 
-				fat0, fat1, long0, long1,
-				(sFloat*)in->V(), (float*)in->Norm(), 
-				(sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0), a); 
-#endif
     }
 
     int Nface() { return 6; } 
@@ -265,16 +249,12 @@ namespace quda {
     size_t regSize = sizeof(float);
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       dslash = new StaggeredDslashCuda<double2, double2, double2, double>
 	(out, (double2*)fatGauge0, (double2*)fatGauge1,
 	 (double2*)longGauge0, (double2*)longGauge1,
 	 (double*)longPhase0, (double*)longPhase1, 
 	 longGauge.Reconstruct(), in, x, k, dagger);
       regSize = sizeof(double);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new StaggeredDslashCuda<float2, float2, float4, float>
 	(out, (float2*)fatGauge0, (float2*)fatGauge1,

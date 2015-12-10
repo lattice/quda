@@ -565,11 +565,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->cuda_prec != param->cuda_prec_sloppy ||
       param->reconstruct != param->reconstruct_sloppy) {
     sloppy = new cudaGaugeField(gauge_param);
-#if (__COMPUTE_CAPABILITY__ >= 200)
     sloppy->copy(*precise);
-#else
-    sloppy->copy(*in);
-#endif
     param->gaugeGiB += sloppy->GBytes();
   } else {
     sloppy = precise;
@@ -585,11 +581,7 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   if (param->cuda_prec_sloppy != param->cuda_prec_precondition ||
       param->reconstruct_sloppy != param->reconstruct_precondition) {
     precondition = new cudaGaugeField(gauge_param);
-#if (__COMPUTE_CAPABILITY__ >= 200)
     precondition->copy(*sloppy);
-#else
-    precondition->copy(*in);
-#endif
     param->gaugeGiB += precondition->GBytes();
   } else {
     precondition = sloppy;

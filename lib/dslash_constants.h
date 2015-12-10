@@ -8,9 +8,7 @@ enum KernelType {
 };
 
   struct DslashParam {
-#ifndef STAGGERED_TESLA_HACK
     char do_not_delete; // work around for bug in CUDA 6.5
-#endif
     int threads; // the desired number of active threads
     int parity;  // Even-Odd or Odd-Even
     int X[4];
@@ -18,9 +16,7 @@ enum KernelType {
     int Ls;
 #endif
     KernelType kernel_type; //is it INTERIOR_KERNEL, EXTERIOR_KERNEL_X/Y/Z/T
-#ifndef STAGGERED_TESLA_HACK
     int commDim[4]; // Whether to do comms or not
-#endif
     int ghostDim[4]; // Whether a ghost zone has been allocated for a given dimension
     int ghostOffset[QUDA_MAX_DIM];
     int ghostNormOffset[QUDA_MAX_DIM];

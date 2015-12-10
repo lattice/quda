@@ -678,11 +678,7 @@ namespace quda {
     (*matSloppy)(r, x, tmp, tmp2);
 
     param.true_res = sqrt(xmyNormCuda(b, r) / b2);
-#if (__COMPUTE_CAPABILITY__ >= 200)
     param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-#else
-    param.true_res_hq = 0.0;
-#endif      
     PrintSummary("EigCG", k, r2, b2);
 
     // reset the flops counters

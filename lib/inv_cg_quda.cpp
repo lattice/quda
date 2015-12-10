@@ -325,11 +325,7 @@ namespace quda {
     // compute the true residuals
     mat(r, x, y);
     param.true_res = sqrt(xmyNormCuda(b, r) / b2);
-#if (__COMPUTE_CAPABILITY__ >= 200)
     param.true_res_hq = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
-#else
-    param.true_res_hq = 0.0;
-#endif      
 
     PrintSummary("CG", k, r2, b2);
 

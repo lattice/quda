@@ -1236,8 +1236,8 @@ generate_dslash_kernels(arch)
 arch = 130
 generate_dslash_kernels(arch)
 
-arch = 100
-generate_dslash_kernels(arch)
+#arch = 100
+#generate_dslash_kernels(arch)
 
 # generate packing kernels
 dslash = True

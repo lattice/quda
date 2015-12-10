@@ -199,14 +199,9 @@ namespace quda {
 
     Tunable *contract = 0;
 
-    if		(x.Precision() == QUDA_DOUBLE_PRECISION)
-      {
-#if (__COMPUTE_CAPABILITY__ >= 130)
-	contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type);
-#else
-	errorQuda("Double precision not supported on this GPU");
-#endif
-      } else if	(x.Precision() == QUDA_SINGLE_PRECISION) {
+    if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+      contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type);
+    } else if	(x.Precision() == QUDA_SINGLE_PRECISION) {
       contract = new ContractCuda<float4,float2>(x, y, result, parity, contract_type);
     } else if	(x.Precision() == QUDA_HALF_PRECISION) {
       errorQuda("Half precision not supported for gamma5 kernel yet");
@@ -254,11 +249,7 @@ namespace quda {
     Tunable *contract = 0;
 
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       contract = new ContractCuda<double2,double2>(x, y, result, parity, contract_type, nTSlice);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       contract = new ContractCuda<float4,float2>(x, y, result, parity, contract_type, nTSlice);
     } else if (x.Precision() == QUDA_HALF_PRECISION) {

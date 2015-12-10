@@ -36,7 +36,7 @@ namespace quda {
     //#define SHARED_WILSON_DSLASH
     //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
 
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
+#ifdef GPU_TWISTED_CLOVER_DIRAC
 #include <tmc_dslash_def.h>       // Twisted Clover kernels
 #endif
 
@@ -53,7 +53,7 @@ namespace quda {
 
   using namespace twistedclover;
 
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
+#ifdef GPU_TWISTED_CLOVER_DIRAC
   template <typename sFloat, typename gFloat, typename cFloat>
   class TwistedCloverDslashCuda : public SharedDslashCuda {
 
@@ -69,17 +69,12 @@ namespace quda {
   protected:
     unsigned int sharedBytesPerThread() const
     {
-#if (__COMPUTE_CAPABILITY__ >= 200)
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
 	int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
 	return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
       } else {
 	return 0;
       }
-#else
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
-#endif
     }
 
   public:
@@ -259,7 +254,7 @@ namespace quda {
 			       TimeProfile &profile, const QudaDslashPolicy &dslashPolicy)
   {
     inSpinor = (cudaColorSpinorField*)in; // EVIL
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
+#ifdef GPU_TWISTED_CLOVER_DIRAC
     int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
 
     int ghost_threads[4] = {0};
@@ -299,18 +294,13 @@ namespace quda {
     size_t regSize = sizeof(float);
 	
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
-    dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, (float*)cloverNormP,
-								  (double2*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
+      dslash = new TwistedCloverDslashCuda<double2,double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), (double2*)cloverP, (float*)cloverNormP,
+								    (double2*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
 	  
-    regSize = sizeof(double);
-#else
-    errorQuda("Double precision not supported on this GPU");
-#endif
+      regSize = sizeof(double);
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new TwistedCloverDslashCuda<float4,float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), (float4*)cloverP, (float*)cloverNormP,
 								 (float4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
-
     } else if (in->Precision() == QUDA_HALF_PRECISION) {
       dslash = new TwistedCloverDslashCuda<short4,short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), (short4*)cloverP, (float*)cloverNormP,
 								 (short4*)cloverInvP, (float*)cloverInvNormP, clover->stride, in, x, type, kappa, mu, epsilon, k, dagger);
@@ -332,11 +322,7 @@ namespace quda {
     checkCudaError();
 #else
 
-#if (__COMPUTE_CAPABILITY__ < 200)
-  errorQuda("Twisted-clover fermions not supported on pre-Fermi architecture");
-#else
   errorQuda("Twisted clover dslash has not been built");
-#endif
 
 #endif
   }

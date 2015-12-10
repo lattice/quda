@@ -131,17 +131,13 @@ namespace quda {
 
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
-  if(arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
-  else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);
+	if(arg.regularToextended) copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, true>(arg);
+	else copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, false>(arg);
       } else if (location == QUDA_CUDA_FIELD_LOCATION) {
-#if (__COMPUTE_CAPABILITY__ >= 200)
-   if(arg.regularToextended) copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true> 
-    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-   else copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false> 
-    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#else
-  errorQuda("Extended gauge copy not supported on pre-Fermi architecture");
-#endif
+	if(arg.regularToextended) copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, true> 
+				    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	else copyGaugeExKernel<FloatOut, FloatIn, length, OutOrder, InOrder, false> 
+	       <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }
 
@@ -159,12 +155,8 @@ namespace quda {
     long long flops() const { return 0; } 
     long long bytes() const { 
       int sites = 4*arg.volume/2;
-#if (__COMPUTE_CAPABILITY__ >= 200)
       return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
                           + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
-#else
-      return 2 * sites * (  arg.in.Bytes() + arg.out.Bytes() );
-#endif
     } 
   };
 

@@ -165,7 +165,6 @@ namespace quda {
   
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#if (__COMPUTE_CAPABILITY__ >= 200)
       if (!isGhost) {
 	copyGaugeKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
@@ -173,9 +172,6 @@ namespace quda {
 	copyGhostKernel<FloatOut, FloatIn, length, OutOrder, InOrder> 
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
-#else
-      errorQuda("Gauge copy not supported on pre-Fermi architecture");
-#endif
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -194,12 +190,8 @@ namespace quda {
 	sites = 0;
 	for (int d=0; d<4; d++) sites += arg.faceVolumeCB[d];
       }
-#if __COMPUTE_CAPABILITY__ >= 200
       return 2 * sites * (  arg.in.Bytes() + arg.in.hasPhase*sizeof(FloatIn) 
 			    + arg.out.Bytes() + arg.out.hasPhase*sizeof(FloatOut) ); 
-#else      
-      return 2 * sites * (  arg.in.Bytes() + arg.out.Bytes() );
-#endif
     } 
   };
 
@@ -274,7 +266,7 @@ namespace quda {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (G(out,Out,outGhost), inOrder, out.Volume(), faceVolumeCB,
 	   out.Ndim(), out.Geometry(), out, location, type);
-#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
+#ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
         copyGauge<FloatOut,FloatIn,length>
@@ -376,7 +368,7 @@ namespace quda {
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
 	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
-#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
+#ifdef GPU_STAGGERED_DIRAC
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
 	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
@@ -460,12 +452,6 @@ namespace quda {
     if (out.Geometry() != in.Geometry()) {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
     }
-
-#if __COMPUTE_CAPABILITY__ < 200
-    if (in.Reconstruct() == QUDA_RECONSTRUCT_13 || in.Reconstruct() == QUDA_RECONSTRUCT_9 ||
-	out.Reconstruct() == QUDA_RECONSTRUCT_13 || out.Reconstruct() == QUDA_RECONSTRUCT_9)
-      errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
-#endif
 
     if (in.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
       // we are doing gauge field packing

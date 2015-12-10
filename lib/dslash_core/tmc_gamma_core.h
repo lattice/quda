@@ -584,8 +584,6 @@ __device__ double2 operator*(const double &x, const double2 &y)
 #define cinv31_32_im cinv11_12_im
 #define cinv32_32_re cinv12_12_re
 
-#if (__COMPUTE_CAPABILITY__ >= 130)
-
 #define S00_re	I0.x
 #define S00_im	I0.y
 #define S01_re	I1.x
@@ -780,8 +778,6 @@ __global__ void twistCloverGamma5InvKernel(double2 *spinor, float *null, double 
 #undef S32_re
 #undef S32_im
 #undef spinorFloat
-
-#endif // (__COMPUTE_CAPABILITY__ >= 130)
 
 #undef SPINORTEX
 #ifdef USE_TEXTURE_OBJECTS
