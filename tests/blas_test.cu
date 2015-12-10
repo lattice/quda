@@ -30,11 +30,7 @@ extern bool verify_results;
 
 extern void usage(char** );
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
 const int Nkernels = 32;
-#else // exclude Heavy Quark Norm if on Tesla architecture
-const int Nkernels = 31;
-#endif
 
 using namespace quda;
 
@@ -633,12 +629,7 @@ double test(int kernel) {
   return error;
 }
 
-// Only benchmark double precision if supported
-#if (__COMPUTE_CAPABILITY__ >= 130)
 int Nprec = 3;
-#else
-int Nprec = 2;
-#endif
 
 const char *prec_str[] = {"half", "single", "double"};
 

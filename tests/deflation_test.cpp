@@ -215,14 +215,10 @@ int main(int argc, char **argv)
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
-#if __COMPUTE_CAPABILITY__ >= 200
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL | QUDA_HEAVY_QUARK_RESIDUAL);
   inv_param.tol_hq = 1e-3; // specify a tolerance for the residual for heavy quark residual
-#else
-  // Pre Fermi architecture only supports L2 relative residual norm
-  inv_param.residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-#endif
+
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
