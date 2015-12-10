@@ -83,10 +83,6 @@ MPI_HOME=@MPI_HOME@
 QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
 
-MAGMA_HOME=@MAGMA_HOME@
-ATLAS_HOME=@ATLAS_HOME@
-LAPACK_HOME=@LAPACK_HOME@
-
 
 NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
 
@@ -177,15 +173,11 @@ ifeq ($(strip $(INTERFACE_NVTX)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
-  MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
+  MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
-
-  LIB += -fopenmp -L$(MAGMA_HOME)/lib -lmagma
-  LIB += -L$(LAPACK_HOME) -llapack -lf77blas -lgfortran
-  LIB += -L$(ATLAS_HOME)/lib -lcblas -latlas
-  LIB += -L$(CUDA_INSTALL_PATH)/lib64 -lcublas
-
+  LIB += $(shell pkg-config --libs magma)
+  find_package(openmp)
 else
   MAGMA_INCLUDE =
   MAGMA_FLAGS   =

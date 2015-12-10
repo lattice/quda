@@ -156,6 +156,14 @@ namespace quda {
     int m;//Dimension of the search space
     int deflation_grid;
     int rhs_idx;
+
+    bool    use_reduced_vector_set;
+    bool    use_cg_updates;
+    double  cg_iterref_tol;
+    int     eigcg_min_restarts;
+    int     max_restart_num;
+    double  inc_tol;
+    double  eigenval_tol;
     
     /**
        Constructor that matches the initial values to that of the
@@ -176,7 +184,9 @@ namespace quda {
       Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
       tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0) 
+      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0),
+      use_reduced_vector_set(param.use_reduced_vector_set), use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
+      eigcg_min_restarts(param.eigcg_min_restarts), max_restart_num(param.max_restart_num), inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol)
     { 
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -188,7 +198,7 @@ namespace quda {
         m = (m / 16) * 16 + 16;
         warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
       }
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER)){
+      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
     }
@@ -206,12 +216,12 @@ namespace quda {
       param.secs += secs;
       if (offset >= 0) {
 	param.true_res_offset[offset] = true_res_offset[offset];
-	param.iter_res_offset[offset] = iter_res_offset[offset];
+        param.iter_res_offset[offset] = iter_res_offset[offset];
 	param.true_res_hq_offset[offset] = true_res_hq_offset[offset];
       } else {
 	for (int i=0; i<num_offset; i++) {
 	  param.true_res_offset[i] = true_res_offset[i];
-	  param.iter_res_offset[i] = iter_res_offset[i];
+          param.iter_res_offset[i] = iter_res_offset[i];
 	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
 	}
       }
@@ -540,14 +550,14 @@ namespace quda {
 
   protected:
     SolverParam &param;
-    TimeProfile &profile;
+    TimeProfile *profile;
 
     //WARNING: eigcg_precision may not coinside with param.precision and param.precision_sloppy (both used for the initCG).
     //
     QudaPrecision eigcg_precision;//may be double or single.
 
   public:
-    DeflatedSolver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) 
+    DeflatedSolver(SolverParam &param, TimeProfile *profile) : param(param), profile(profile) 
     { 
        eigcg_precision = param.precision_sloppy;//for mixed presicion use param.precision_sloppy 
     }
@@ -562,7 +572,7 @@ namespace quda {
     virtual void CleanResources() = 0;
 
     // solver factory
-    static DeflatedSolver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDeflate, TimeProfile &profile);
+    static DeflatedSolver* create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile);
 
     bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
 		     const double &hq_tol);
@@ -587,25 +597,26 @@ namespace quda {
   class IncEigCG : public DeflatedSolver {
 
   private:
-    DiracMatrix &mat;
-    DiracMatrix &matSloppy;
+    DiracMatrix *mat;
+    DiracMatrix *matSloppy;
 
-    DiracMatrix &matCGSloppy;
+    DiracMatrix *matCGSloppy;
 
-    const DiracMatrix &matDefl;
+    const DiracMatrix *matDefl;
 
     QudaPrecision search_space_prec;
     cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
     SolverParam initCGparam; // parameters for initCG solver
-    TimeProfile &profile;    //time profile for initCG solver
+    TimeProfile *profile;    //time profile for initCG solver
 
     bool eigcg_alloc;
     bool use_eigcg;
 
   public:
 
-    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDefl, SolverParam &param, TimeProfile &profile);
+    IncEigCG(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
+    IncEigCG(SolverParam &param);
 
     virtual ~IncEigCG();
 
@@ -644,6 +655,59 @@ namespace quda {
     void ReportEigenvalueAccuracy(DeflationParam *param, int nevs_to_print);
 
   };
+
+//forward declaration
+ struct GMResDRDeflationParam;
+ class GMResDRArgs; 
+
+ class GMResDR : public DeflatedSolver {
+
+  private:
+
+    DiracMatrix *mat;
+
+    DiracMatrix *matSloppy;
+
+    const DiracMatrix *matDefl;
+
+    QudaPrecision gmres_space_prec;
+
+    cudaColorSpinorField *Vm;//arnoldi basis vectors, size (m+1) 
+
+    TimeProfile *profile;    //time profile for initCG solver
+
+    GMResDRArgs *args;
+
+    bool gmres_alloc;
+
+  public:
+
+    GMResDR(DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matDefl, SolverParam &param, TimeProfile *profile);
+    GMResDR(SolverParam &param);
+
+    virtual ~GMResDR();
+
+    //GMRES-DR solver
+    //void   GmresDRCycle(cudaColorSpinorField &out, cudaColorSpinorField &in, Complex *u);
+    double GMResDRCycle(cudaColorSpinorField &x, double r2, Complex *u, const double stop);
+    //GMRES-DR solver 
+    void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
+    //
+    void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
+    // 
+    void CleanResources(); 
+    //
+    void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
+    //GMRESDR method
+    void RunDeflatedCycles (cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const double tol_threshold);
+    //
+    void RunProjectedCycles(cudaColorSpinorField *out, cudaColorSpinorField *in, GMResDRDeflationParam *dpar, const bool enforce_mixed_precision);
+
+    void AllocateKrylovSubspace(ColorSpinorParam &csParam);
+
+  };
+
+
 
 } // namespace quda
 

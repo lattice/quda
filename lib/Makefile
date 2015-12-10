@@ -4,7 +4,7 @@ QUDA = libquda.a
 
 QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
-	inv_eigcg_quda.o gauge_ape.o gauge_plaq.o inv_gcr_quda.o	\
+	inv_eigcg_quda.o inv_gmresdr_quda.o gauge_ape.o gauge_plaq.o inv_gcr_quda.o	\
 	inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o	\
 	inv_mre.o interface_quda.o util_quda.o color_spinor_field.o	\
 	color_spinor_util.o cpu_color_spinor_field.o			\

@@ -106,6 +106,10 @@ extern "C" {
     QUDA_MPCG_INVERTER,
     QUDA_EIGCG_INVERTER,
     QUDA_INC_EIGCG_INVERTER,
+    QUDA_GMRESDR_INVERTER,
+    QUDA_GMRESDR_PROJ_INVERTER,
+    QUDA_GMRESDR_SH_INVERTER,
+    QUDA_FGMRESDR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -320,6 +324,13 @@ extern "C" {
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
+  // used to select projection method for deflated solvers
+  typedef enum QudaProjectionType_s {
+      QUDA_MINRES_PROJECTION,
+      QUDA_GALERKIN_PROJECTION,
+      QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
+  } QudaProjectionType;
+
   // used to select preconditioning method in domain-wall fermion
   typedef enum QudaDWFPCType_s {
     QUDA_5D_PC,

@@ -279,22 +279,10 @@ AC_ARG_WITH(qdp,
 )
 
 
-AC_ARG_WITH(magma,
-  AC_HELP_STRING([--with-magma=MAGMADIR], [ Specify MAGMA installation directory]),
-  [ magma_home=${withval}; build_magma="yes"],
-  [ magma_home="" ; build_magma="no" ]
-)
-
-AC_ARG_WITH(atlas,
-  AC_HELP_STRING([--with-atlas=ATLASDIR], [ Specify ATLAS installation directory]),
-  [ atlas_home=${withval} ],
-  [ atlas_home="" ]
-)
-
-AC_ARG_WITH(lapack,
-  AC_HELP_STRING([--with-lapack=LAPACKDIR], [ Specify LAPACK installation directory]),
-  [ lapack_home=${withval} ],
-  [ lapack_home="" ]
+AC_ARG_ENABLE(magma,
+  AC_HELP_STRING([--enable-magma], [ Build with MAGMA (requires pkg-config to detect magma)]),
+  [ build_magma=${enableval}],
+  [ build_magma="no" ]
 )
 
 AC_ARG_VAR(NVCCFLAGS, [ Extra flags for NVCC ])
@@ -854,14 +842,6 @@ AC_SUBST( QDP_INSTALL_PATH, [${qdp_home} ])
 AC_MSG_NOTICE([Setting BUILD_MAGMA = ${build_magma}])
 AC_SUBST( BUILD_MAGMA, [${build_magma}])
 
-AC_MSG_NOTICE([Setting MAGMA_HOME = ${magma_home}])
-AC_SUBST( MAGMA_HOME, [${magma_home}])
-
-AC_MSG_NOTICE([Setting ATLAS_HOME = ${atlas_home}])
-AC_SUBST( ATLAS_HOME, [${atlas_home}])
-
-AC_MSG_NOTICE([Setting LAPACK_HOME = ${lapack_home}])
-AC_SUBST( LAPACK_HOME, [${lapack_home}])
 
 AC_CONFIG_FILES(make.inc)
 AC_OUTPUT
