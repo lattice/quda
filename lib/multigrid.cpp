@@ -354,9 +354,10 @@ namespace quda {
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
     profile.TPSTART(QUDA_PROFILE_IO);
+    const char *vec_infile = param.mg_global.vec_infile;
+
     const int Nvec = B.size();
     printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile);
-
 
     void **V = new void*[Nvec];
     for (int i=0; i<Nvec; i++) { 
@@ -414,6 +415,8 @@ namespace quda {
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
     profile.TPSTART(QUDA_PROFILE_IO);
+    const char *vec_outfile = param.mg_global.vec_outfile;
+
     if (strcmp(vec_outfile,"")!=0) {
       const int Nvec = B.size();
       printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);

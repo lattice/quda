@@ -6,9 +6,6 @@
 #include <vector>
 #include <complex_quda.h>
 
-extern char vec_infile[];
-extern char vec_outfile[];
-  
 namespace quda {
 
   // forward declarations

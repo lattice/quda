@@ -324,6 +324,12 @@ extern "C" {
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
 
+    /** Filename prefix where to load the null-space vectors */
+    char vec_infile[256];
+
+    /** Filename prefix for where to save the null-space vectors */
+    char vec_outfile[256];
+
   } QudaMultigridParam;
 
 
