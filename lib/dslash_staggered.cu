@@ -15,21 +15,15 @@
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
-#elif (__COMPUTE_CAPABILITY__ >= 200)
+#else // Fermi
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
-#else
-#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-//#define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
 #endif
+
 #endif // GPU_STAGGERED_DIRAC
 
 #include <quda_internal.h>

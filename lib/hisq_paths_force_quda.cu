@@ -419,9 +419,7 @@ namespace quda {
         field[idx + stride*7]   += coeff*mat[7];
         field[idx + stride*8]   += coeff*mat[8];
 
-#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
         printf("value is  coeff(%f) * mat[0].x(%f)=%f\n", coeff, mat[0].x, field[idx].x);
-#endif
         return;
       }
 

@@ -11,8 +11,6 @@
 #define __PTR   "r"
 #endif
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
-
 namespace quda {
 
   __device__ inline void load_streaming_double2(double2 &a, const double2* addr)
@@ -63,6 +61,5 @@ namespace quda {
 
 } // namespace quda
 
-#endif // COMPUTE_CAPABILITY
 
 

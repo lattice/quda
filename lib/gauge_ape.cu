@@ -168,14 +168,10 @@ namespace quda {
       virtual ~GaugeAPE () {}
 
       void apply(const cudaStream_t &stream){
-        if(location == QUDA_CUDA_FIELD_LOCATION){
-#if (__COMPUTE_CAPABILITY__ >= 200)
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           computeAPEStep<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
-	  errorQuda("GaugeAPE not supported on pre-Fermi architecture");
-#endif
-        }else{
+        } else {
           errorQuda("CPU not supported yet\n");
           //computeAPEStepCPU(arg);
         }

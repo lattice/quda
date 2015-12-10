@@ -69,17 +69,12 @@ namespace quda {
   protected:
     unsigned int sharedBytesPerThread() const
     {
-#if (__COMPUTE_CAPABILITY__ >= 200)
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
 	int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
 	return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
       } else {
 	return 0;
       }
-#else
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
-#endif
     }
 
   public:

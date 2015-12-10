@@ -104,16 +104,12 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
     arg.W.load(w, i);
     arg.V.load(v, i);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.pre();
-#endif
 
 #pragma unroll
     for (int j=0; j<M; j++) arg.r(sum, x[j], y[j], z[j], w[j], v[j]);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.post(sum);
-#endif
 
     arg.X.save(x, i);
     arg.Y.save(y, i);

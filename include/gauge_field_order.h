@@ -472,19 +472,15 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
       int faceVolumeCB[4];
       const int stride;
       const int geometry;
-#if __COMPUTE_CAPABILITY__ >= 200
       const int hasPhase; 
       const size_t phaseOffset;
       void *backup_h; //! host memory for backing up the field when tuning
       size_t bytes;
-#endif
 
     FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0) : 
       reconstruct(u), volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry())
-#if __COMPUTE_CAPABILITY__ >= 200
 	, hasPhase((u.Reconstruct() == QUDA_RECONSTRUCT_9 || u.Reconstruct() == QUDA_RECONSTRUCT_13) ? 1 : 0), 
 	phaseOffset(u.PhaseOffset()), backup_h(0), bytes(u.Bytes())
-#endif
       {
 	if (gauge_) { gauge = gauge_; offset = u.Bytes()/(2*sizeof(Float));
 	} else { gauge = (Float*)u.Gauge_p(); offset = u.Bytes()/(2*sizeof(Float)); }
@@ -498,9 +494,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
     FloatNOrder(const FloatNOrder &order) 
     : reconstruct(order.reconstruct), volumeCB(order.volumeCB), stride(order.stride), 
 	geometry(order.geometry) 
-#if __COMPUTE_CAPABILITY__ >= 200
 	, hasPhase(order.hasPhase), phaseOffset(order.phaseOffset), backup_h(0), bytes(order.bytes)
-#endif
       {
 	gauge = order.gauge;
 	offset = order.offset;
@@ -526,10 +520,8 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
         }
 	
         RegType phase = 0.;
-#if __COMPUTE_CAPABILITY__ >= 200
         if(hasPhase) copy(phase, (gauge+parity*offset)[phaseOffset/sizeof(Float) + stride*dir + x]);
         // The phases come after the ghost matrices
-#endif
         reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);
       }
 
@@ -548,13 +540,11 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	  // second do vectorized copy into memory
 	  reinterpret_cast< Vector* >(gauge + parity*offset)[x + dir*stride*M + stride*i] = vecTmp;
         }
-#if __COMPUTE_CAPABILITY__ >= 200
         if(hasPhase){
           RegType phase;
           reconstruct.getPhase(&phase,v);
           copy((gauge+parity*offset)[phaseOffset/sizeof(Float) + dir*stride + x], static_cast<RegType>(phase/(2.*M_PI))); 
         }        
-#endif
       }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
@@ -569,9 +559,6 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 
 #pragma unroll
           for (int i=0; i<M; i++) {
-#if __COMPUTE_CAPABILITY__ < 200
-	    const int hasPhase = 0;
-#endif
 	    // first do vectorized copy from memory into registers
 	    Vector vecTmp = vector_load<Vector>(ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase), 
 						i*faceVolumeCB[dir]+x);
@@ -579,9 +566,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	    copy(reinterpret_cast< RegVector* >(tmp)[i], vecTmp);
           }
           RegType phase=0.; 
-#if __COMPUTE_CAPABILITY__ >= 200
           if(hasPhase) copy(phase, ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x]); 
-#endif
           reconstruct.Unpack(v, tmp, x, dir, 2.*M_PI*phase);	 
         }
       }
@@ -598,9 +583,7 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 
 #pragma unroll
           for (int i=0; i<M; i++) {
-#if __COMPUTE_CAPABILITY__ < 200
 	    const int hasPhase = 0;
-#endif
 	    Vector vecTmp;
 	    // first do vectorized copy converting into storage type
 	    copy(vecTmp, reinterpret_cast< RegVector* >(tmp)[i]);
@@ -609,21 +592,16 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	      (ghost[dir]+parity*faceVolumeCB[dir]*(M*N + hasPhase))[i*faceVolumeCB[dir]+x] = vecTmp;
           }
 
-#if __COMPUTE_CAPABILITY__ >= 200
           if(hasPhase){
             RegType phase=0.;
             reconstruct.getPhase(&phase, v); 
             copy(ghost[dir][parity*faceVolumeCB[dir]*(M*N + 1) + faceVolumeCB[dir]*M*N + x], static_cast<RegType>(phase/(2.*M_PI)));
           }
-#endif
         }
       }
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int buff_idx, int extended_idx, int dir, 
 						  int dim, int g, int parity, const int R[]) const {
-#if __COMPUTE_CAPABILITY__ < 200
-	const int hasPhase = 0;
-#endif
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	typedef typename VectorType<Float,N>::type Vector;
@@ -647,9 +625,6 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int buff_idx, int extended_idx, 
 						  int dir, int dim, int g, int parity, const int R[]) {
-#if __COMPUTE_CAPABILITY__ < 200
-	const int hasPhase = 0;
-#endif
 	const int M = reconLen / N;
 	RegType tmp[reconLen];
 	// use the extended_idx to determine the boundary condition
@@ -679,24 +654,20 @@ template <> struct VectorType<short, 4>{typedef short4 type; };
 	 used to backup the field to the host when tuning
       */
       void save() {
-#if __COMPUTE_CAPABILITY__ >= 200
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
 	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
 	checkCudaError();
-#endif
       }
       
       /**
 	 restore the field from the host after tuning
       */
       void load() {
-#if __COMPUTE_CAPABILITY__ >= 200
 	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = 0;
 	checkCudaError();
-#endif
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }

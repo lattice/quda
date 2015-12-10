@@ -137,13 +137,9 @@ namespace quda {
     virtual ~ExtractGhost() { ; }
   
     void apply(const cudaStream_t &stream) {
-#if (__COMPUTE_CAPABILITY__ >= 200)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       extractGhostKernel<Float, length, nDim, Order> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#else
-      errorQuda("extractGhost not supported on pre-Fermi architecture");
-#endif
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -295,11 +291,6 @@ namespace quda {
   }
 
   void extractGaugeGhost(const GaugeField &u, void **ghost) {
-
-#if __COMPUTE_CAPABILITY__ < 200
-    if (u.Reconstruct() == QUDA_RECONSTRUCT_13 || u.Reconstruct() == QUDA_RECONSTRUCT_9)
-      errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
-#endif
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
       extractGhost(u, (double**)ghost);

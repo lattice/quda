@@ -25,17 +25,10 @@
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
-#elif (__COMPUTE_CAPABILITY__ >= 200)
+#else // fermi
 //#define DIRECT_ACCESS_FAT_LINK
 //#define DIRECT_ACCESS_LONG_LINK
 #define DIRECT_ACCESS_SPINOR
-//#define DIRECT_ACCESS_ACCUM
-//#define DIRECT_ACCESS_INTER
-//#define DIRECT_ACCESS_PACK
-#else
-#define DIRECT_ACCESS_FAT_LINK
-//#define DIRECT_ACCESS_LONG_LINK
-//#define DIRECT_ACCESS_SPINOR
 //#define DIRECT_ACCESS_ACCUM
 //#define DIRECT_ACCESS_INTER
 //#define DIRECT_ACCESS_PACK
@@ -483,7 +476,7 @@ void twistGamma5Cuda(cudaColorSpinorField *out, const cudaColorSpinorField *in,
 #endif // GPU_TWISTED_MASS_DIRAC
 }
 
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
+#if defined(GPU_TWISTED_CLOVER_DIRAC)
 #include "dslash_core/tmc_gamma_core.h"
 #endif
 
@@ -544,7 +537,7 @@ class TwistCloverGamma5Cuda : public Tunable {
 
     void apply(const cudaStream_t &stream)
     {
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_TWISTED_CLOVER_DIRAC)
+#if defined(GPU_TWISTED_CLOVER_DIRAC)
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       dim3 gridDim( (dslashParam.threads+tp.block.x-1) / tp.block.x, 1, 1);
       if((in->TwistFlavor() == QUDA_TWIST_PLUS) || (in->TwistFlavor() == QUDA_TWIST_MINUS)) {	//Idea for the kernel, two spinor inputs (IN and clover applied IN), on output (Clover applied IN + ig5IN)

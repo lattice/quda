@@ -67,17 +67,12 @@ namespace quda {
   protected:
     unsigned int sharedBytesPerThread() const
     {
-#if (__COMPUTE_CAPABILITY__ >= 200) // Fermi uses shared memory for common input
       if (dslashParam.kernel_type == INTERIOR_KERNEL) { // Interior kernels use shared memory for common iunput
 	int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
 	return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
       } else { // Exterior kernels use no shared memory
 	return 0;
       }
-#else // Pre-Fermi uses shared memory only for pseudo-registers
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
-#endif
     }
 
   public:
