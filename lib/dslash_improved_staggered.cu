@@ -40,7 +40,6 @@ namespace quda {
 #include <dslash_textures.h>
 #include <dslash_index.cuh>
 
-#define STAGGERED_TESLA_HACK
 #undef GPU_NDEG_TWISTED_MASS_DIRAC
 #undef GPU_CLOVER_DIRAC
 #undef GPU_DOMAIN_WALL_DIRAC
