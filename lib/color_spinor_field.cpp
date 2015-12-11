@@ -442,6 +442,9 @@ namespace quda {
     void *recv_fwd[4];
     void *recv_back[4];
 
+    // leave this option in there just in case
+    bool no_comms_fill = false;
+
     for (int i=0; i<nDimComms; i++) {
       if (Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (comm_dim_partitioned(i)) {
@@ -449,7 +452,7 @@ namespace quda {
 	  send_fwd[i]  = sendbuf[2*i + 1];
 	  recv_fwd[i]  =   ghost[2*i + 1];
 	  recv_back[i] =   ghost[2*i + 0];
-	} else {
+	} else if (no_comms_fill) {
 	  memcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i]);
 	  memcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i]);
 	}
@@ -462,7 +465,7 @@ namespace quda {
 	  recv_back[i] = allocatePinned(bytes[i]);
 	  cudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], cudaMemcpyDeviceToHost);
 	  cudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], cudaMemcpyDeviceToHost);
-	} else {
+	} else if (no_comms_fill) {
 	  cudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], cudaMemcpyDeviceToDevice);
 	  cudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], cudaMemcpyDeviceToDevice);
 	}
