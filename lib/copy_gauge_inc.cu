@@ -2,7 +2,7 @@
 #include <copy_gauge_helper.cuh>
 
 namespace quda {
-  
+
   template <typename FloatOut, typename FloatIn, int length, typename InOrder>
   void copyGauge(const InOrder &inOrder, GaugeField &out, QudaFieldLocation location, 
 		 FloatOut *Out, FloatOut **outGhost, int type) {
@@ -30,7 +30,7 @@ namespace quda {
 	copyGauge<FloatOut,FloatIn,length> 
 	  (G(out,Out,outGhost), inOrder, out.Volume(), faceVolumeCB,
 	   out.Ndim(), out.Geometry(), out, location, type);
-#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
+#ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
         copyGauge<FloatOut,FloatIn,length>
@@ -132,7 +132,7 @@ namespace quda {
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
 	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
-#if defined(GPU_STAGGERED_DIRAC) && __COMPUTE_CAPABILITY__ >= 200
+#ifdef GPU_STAGGERED_DIRAC
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
 	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
 	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost), out, location, Out, outGhost, type);
@@ -213,11 +213,9 @@ namespace quda {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
     
-#if __COMPUTE_CAPABILITY__ < 200
-    if (in.Reconstruct() == QUDA_RECONSTRUCT_13 || in.Reconstruct() == QUDA_RECONSTRUCT_9 ||
-	out.Reconstruct() == QUDA_RECONSTRUCT_13 || out.Reconstruct() == QUDA_RECONSTRUCT_9)
-      errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
-#endif
+    if (out.Geometry() != in.Geometry()) {
+      errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
+    }
 
     if (in.LinkType() != QUDA_ASQTAD_MOM_LINKS && out.LinkType() != QUDA_ASQTAD_MOM_LINKS) {
       // we are doing gauge field packing

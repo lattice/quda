@@ -375,9 +375,6 @@
 
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
 #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
 #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
@@ -389,7 +386,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef GPU_TWISTED_MASS_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tm_dslash_dagger_gt200_core.h"
@@ -397,22 +394,12 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "tm_dslash_gt200_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tm_dslash_dagger_gt200_core.h"
 #else
 #include "tm_dslash_gt200_core.h"
-#endif
-
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tm_dslash_dagger_g80_core.h"
-#else
-#include "tm_dslash_g80_core.h"
-#endif
-
 #endif
 
 #endif
@@ -426,7 +413,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 
 #ifdef GPU_TWISTED_MASS_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tm_fused_exterior_dslash_dagger_gt200_core.h"
@@ -434,20 +421,12 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tm_fused_exterior_dslash_gt200_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tm_fused_exterior_dslash_dagger_gt200_core.h"
 #else
 #include "tm_fused_exterior_dslash_gt200_core.h"
-#endif
-
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tm_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "tm_fused_exterior_dslash_g80_core.h"
 #endif
 
 #endif
@@ -472,7 +451,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef GPU_TWISTED_MASS_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tm_dslash_dagger_gt200_core.h"
@@ -480,20 +459,12 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "tm_dslash_gt200_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tm_dslash_dagger_gt200_core.h"
 #else
 #include "tm_dslash_gt200_core.h"
-#endif
-
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tm_dslash_dagger_g80_core.h"
-#else
-#include "tm_dslash_g80_core.h"
 #endif
 
 #endif
@@ -508,7 +479,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 
 #ifdef GPU_TWISTED_MASS_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tm_fused_exterior_dslash_dagger_gt200_core.h"
@@ -516,20 +487,12 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tm_fused_exterior_dslash_gt200_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tm_fused_exterior_dslash_dagger_gt200_core.h"
 #else
 #include "tm_fused_exterior_dslash_gt200_core.h"
-#endif
-
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tm_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "tm_fused_exterior_dslash_g80_core.h"
 #endif
 
 #endif

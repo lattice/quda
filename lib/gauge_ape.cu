@@ -61,7 +61,7 @@ namespace quda {
 
     setZero(&staple);
 
-    for (int mu=0; mu<4; mu++) {
+    for (int mu=0; mu<3; mu++) {  // I believe most users won't want to include time staples in smearing
       if (mu == dir) {
         continue;
       }
@@ -132,18 +132,19 @@ namespace quda {
 
       int dx[4] = {0, 0, 0, 0};
       for (int dir=0; dir < 3; dir++) {				//Only spatial dimensions are smeared
-        Matrix<Cmplx,3> U, S;
+        Matrix<Cmplx,3> U, S, TestU, I;
 
         computeStaple<Float,GaugeOr,GaugeDs,Cmplx>(arg,idx,parity,dir,S);
 
         arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity);
 
-	U  = U * (1. - arg.alpha);
-	S  = S * (arg.alpha/6.);
+        S  = S * (arg.alpha/((Float) (2.*(3. - 1.))));
+        setIdentity(&I);
 
-	U  = U + S;
+        TestU  = I*(1.-arg.alpha) + S*conj(U);
+        polarSu3<Cmplx,Float>(TestU, arg.tolerance);
+        U = TestU*U;
 
-        polarSu3<Cmplx,Float>(U, arg.tolerance);
         arg.dest.save((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity); 
     }
   }
@@ -167,14 +168,10 @@ namespace quda {
       virtual ~GaugeAPE () {}
 
       void apply(const cudaStream_t &stream){
-        if(location == QUDA_CUDA_FIELD_LOCATION){
-#if (__COMPUTE_CAPABILITY__ >= 200)
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           computeAPEStep<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
-	  errorQuda("GaugeAPE not supported on pre-Fermi architecture");
-#endif
-        }else{
+        } else {
           errorQuda("CPU not supported yet\n");
           //computeAPEStepCPU(arg);
         }

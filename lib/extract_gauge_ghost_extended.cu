@@ -216,30 +216,21 @@ namespace quda {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
 	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);
 	} else {
-#if (__COMPUTE_CAPABILITY__ >= 200)
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
 	  extractGhostExKernel<Float,length,nDim,dim,Order,true> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#else
-      errorQuda("extractGhostEx not supported on pre-Fermi architecture");
-#endif
-
 	}
       } else { // we are injecting
 	if (location==QUDA_CPU_FIELD_LOCATION) {
 	  extractGhostEx<Float,length,nDim,dim,Order,false>(arg);
 	} else {
-#if (__COMPUTE_CAPABILITY__ >= 200)
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
 	  extractGhostExKernel<Float,length,nDim,dim,Order,false> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#else
-      errorQuda("extractGhostEx not supported on pre-Fermi architecture");
-#endif
 	}
       }
     }

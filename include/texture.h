@@ -380,7 +380,7 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
       checkTypes<RegType,InterType,StoreType>();
     }
 
-    ~Spinor() { } /* on g80 / gt200 this must not be virtual */
+    ~Spinor() { }
 
     __device__ inline void load(RegType x[], const int i) {
       // load data into registers first using the storage order

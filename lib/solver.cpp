@@ -159,13 +159,22 @@ namespace quda {
   }
 
   // Deflated solver factory
-  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matCGSloppy, DiracMatrix &matDeflate, TimeProfile &profile)
+  DeflatedSolver* DeflatedSolver::create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile)
   {
     DeflatedSolver* solver=0;
 
     if (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) {
       report("Incremental EIGCG");
-      solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
+      if(profile != NULL)
+        solver = new IncEigCG(mat, matSloppy, matCGSloppy, matDeflate, param, profile);
+      else
+        solver = new IncEigCG(param);//hack to clean deflation resources
+    }else if (param.inv_type == QUDA_GMRESDR_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER ){
+      report("GMRESDR");
+      if(profile != NULL)
+        solver = new GMResDR(mat, matSloppy, matDeflate, param, profile);
+      else
+        solver = new GMResDR(param);
     }else{
       errorQuda("Invalid solver type");
     }

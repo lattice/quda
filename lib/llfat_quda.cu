@@ -21,15 +21,9 @@ namespace quda {
 
   using namespace fatlink;
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
 #define SITE_MATRIX_LOAD_TEX 1
 #define MULINK_LOAD_TEX 1
 #define FATLINK_LOAD_TEX 1
-#else
-#define SITE_MATRIX_LOAD_TEX 0
-#define MULINK_LOAD_TEX 1
-#define FATLINK_LOAD_TEX 1
-#endif
 
 #define BLOCK_DIM 64
 

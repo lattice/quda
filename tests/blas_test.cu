@@ -31,11 +31,7 @@ extern bool verify_results;
 
 extern void usage(char** );
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
 const int Nkernels = 32;
-#else // exclude Heavy Quark Norm if on Tesla architecture
-const int Nkernels = 31;
-#endif
 
 using namespace quda;
 
@@ -69,13 +65,7 @@ display_test_info()
   return;  
 }
 
-// Only benchmark double precision if supported
-#if (__COMPUTE_CAPABILITY__ >= 130)
 int Nprec = 3;
-#else
-int Nprec = 2;
-#endif
-
 
 bool skip_kernel(int precision, int kernel) {
   if ( Nspin == 2 && precision == 0) {

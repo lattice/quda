@@ -329,11 +329,7 @@ namespace quda {
       // Calculate the true residual
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
-#if (__COMPUTE_CAPABILITY__ >= 200)
       param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
-#else
-      param.true_res_hq = 0.0;
-#endif
  
       PrintSummary("BiCGstab", k, r2, b2);      
     }

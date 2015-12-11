@@ -254,10 +254,8 @@ namespace{
 #endif
     if(isUnitary(*result,FL_MAX_ERROR)==false)
       {
-#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
 	printf("ERROR: Link unitarity test failed\n");
 	printf("TOLERANCE: %g\n", FL_MAX_ERROR);
-#endif
 	return false;
       }
     return true;
@@ -285,9 +283,7 @@ namespace{
 #undef MAX_ITER	
     if(isUnitarizedLinkConsistent(in,u,0.0000001)==false)
       {
-#if (!defined(__CUDA_ARCH__) || (__COMPUTE_CAPABILITY__>=200))
         printf("ERROR: Unitarized link is not consistent with incoming link\n");
-#endif
 	return false;
       }
     *result = u;

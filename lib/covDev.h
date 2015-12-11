@@ -219,9 +219,6 @@
 	#define SPINOR_HOP 6
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
 	#define DD_CONCAT(n,r,d) n ## r ## d ## Kernel
 	#define DD_FUNC(n,r,d) DD_CONCAT(n,r,d)
 
@@ -274,7 +271,6 @@
 	}
 
 	#undef DD_NAME_F
-#endif
 
 // clean up
 

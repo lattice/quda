@@ -99,11 +99,6 @@ namespace quda {
     if (u.Ncolor() != 3) {
       extractGaugeGhostMG(u, ghost);
     } else {
-#if __COMPUTE_CAPABILITY__ < 200
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_13 || u.Reconstruct() == QUDA_RECONSTRUCT_9)
-	errorQuda("Reconstruct 9/13 not supported on pre-Fermi architecture");
-#endif
-
       if (u.Precision() == QUDA_DOUBLE_PRECISION) {
 	extractGhost(u, (double**)ghost);
       } else if (u.Precision() == QUDA_SINGLE_PRECISION) {

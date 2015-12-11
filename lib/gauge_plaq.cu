@@ -162,7 +162,7 @@ namespace quda {
     }
 
   template<typename Float>
-  double2 plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
+  void plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
     INSTANTIATE_RECONSTRUCT(plaquette<Float>, data, plq, location);
   }
 #endif

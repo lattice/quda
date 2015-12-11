@@ -318,8 +318,7 @@
   out[sid+4*(stride)] = make_short4((short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
   out[sid+5*(stride)] = make_short4((short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
-#define WRITE_SPINOR_DOUBLE2_STR(stride)				\
+#define WRITE_SPINOR_DOUBLE2_STR(stride)			\
   store_streaming_double2(&out[0*stride+sid], o00_re, o00_im);	\
   store_streaming_double2(&out[1*stride+sid], o01_re, o01_im);	\
   store_streaming_double2(&out[2*stride+sid], o02_re, o02_im);	\
@@ -379,11 +378,6 @@
   store_streaming_short4(&out[3*(stride)+sid], (short)o20_re, (short)o20_im, (short)o21_re, (short)o21_im); \
   store_streaming_short4(&out[4*(stride)+sid], (short)o22_re, (short)o22_im, (short)o30_re, (short)o30_im); \
   store_streaming_short4(&out[5*(stride)+sid], (short)o31_re, (short)o31_im, (short)o32_re, (short)o32_im);
-#else
-#define WRITE_SPINOR_DOUBLE2_STR(stride) WRITE_SPINOR_DOUBLE2(stride)
-#define WRITE_SPINOR_FLOAT4_STR(stride) WRITE_SPINOR_FLOAT4(stride)
-#define WRITE_SPINOR_SHORT4_STR(stride) WRITE_SPINOR_SHORT4(stride)
-#endif
 
 // macros used for exterior Wilson Dslash kernels and face packing
 
@@ -664,8 +658,6 @@
   out[sid+2*mystride] = make_short2((short)o02_re, (short)o02_im);
 
 // Non-cache writes to minimize cache polution
-#if (__COMPUTE_CAPABILITY__ >= 200)
-
 #define WRITE_ST_SPINOR_DOUBLE2_STR(out, sid, mystride) \
   store_streaming_double2(&out[0*mystride+sid], o00_re, o00_im);	\
   store_streaming_double2(&out[1*mystride+sid], o01_re, o01_im);	\
@@ -689,13 +681,6 @@
   store_streaming_short2(&g_out[0*mystride+sid], (short)o00_re, (short)o00_im); \
   store_streaming_short2(&g_out[1*mystride+sid], (short)o01_re, (short)o01_im); \
   store_streaming_short2(&g_out[2*mystride+sid], (short)o02_re, (short)o02_im);
-#else
-
-#define WRITE_ST_SPINOR_DOUBLE2_STR() WRITE_ST_SPINOR_DOUBLE2()
-#define WRITE_ST_SPINOR_FLOAT4_STR() WRITE_ST_SPINOR_FLOAT4()
-#define WRITE_ST_SPINOR_SHORT4_STR() WRITE_ST_SPINOR_SHORT4()
-
-#endif
 
 #define READ_AND_SUM_ST_SPINOR_DOUBLE_TEX(spinor,sid) {			\
   double2 tmp0 = fetch_double2((spinor), sid + 0*(param.sp_stride));		\
