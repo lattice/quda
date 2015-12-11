@@ -46,7 +46,7 @@ QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
 	clover_sigma_outer_product.o momentum.o qcharge_quda.o		\
 	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
 	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
-	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o
+	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o ${QIO_UTIL}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -60,7 +60,8 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	random_quda.h pgauge_monte.h unitarization_links.h		\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
 	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
-	su3_project.cuh worker.h transfer.h multigrid.h
+	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
+	qio_util.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h

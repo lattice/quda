@@ -1,6 +1,8 @@
 #ifndef QIO_TEST_H
 #define QIO_TEST_H
 
+#ifdef HAVE_QIO
+
 #include <qmp.h>
 #include <qio.h>
 #define mynode QMP_get_node_number
@@ -36,7 +38,7 @@ void vputM(char *s1, size_t index, int count, void *s2)
 {
   oFloat **field = (oFloat **)s2;
   iFloat *src = (iFloat *)s1;
-  
+
   //For the site specified by "index", move an array of "count" data
   //from the read buffer to an array of fields
 
@@ -44,8 +46,6 @@ void vputM(char *s1, size_t index, int count, void *s2)
     {
       oFloat *dest = field[i] + len*index;
       for (int j=0; j<len; j++) dest[j] = src[i*len+j];
-      //printf("dest %8d src %8d index %8d %8d\n", 
-      //     len*index, i*len, index, len);
     }
 }
 
@@ -77,10 +77,12 @@ float vcompare_R(float *fielda[], float *fieldb[], int count);
 float vcompare_M(suN_matrix *fielda[], suN_matrix *fieldb[], int count);
 float vcompare_r(float arraya[], float arrayb[], int count);
 
-int qio_test(int output_volfmt, int output_serpar, int ildgstyle, 
+int qio_test(int output_volfmt, int output_serpar, int ildgstyle,
 	     int input_volfmt, int input_serpar, int argc, char *argv[]);
 
 int qio_host_test(QIO_Filesystem *fs, int argc, char *argv[]);
 
-#endif /* QIO_TEST_H */
+#endif // HAVE_QIO
 
+
+#endif /* QIO_TEST_H */
