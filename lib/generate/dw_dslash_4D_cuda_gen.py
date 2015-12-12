@@ -915,8 +915,8 @@ def gen_dw():
 def gen_dw_inv():
 
     str = "\n"
-    str += "// workaround for C++11 bug in CUDA 7.0\n"
-    str += "#if CUDA_VERSION >= 7000 && CUDA_VERSION < 7050\n"
+    str += "// workaround for C++11 bug in CUDA 6.5/7.0\n"
+    str += "#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050\n"
     str += "#define POW(a, b) pow(a, (spinorFloat)b)\n"
     str += "#else\n"
     str += "#define POW(a, b) pow(a, b)\n"

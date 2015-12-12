@@ -139,8 +139,8 @@ xs = X/(X1*X2*X3*X4);
  o31_re = 0; o31_im = 0;
  o32_re = 0; o32_im = 0;
 
-// workaround for C++11 bug in CUDA 7.0
-#if CUDA_VERSION >= 7000 && CUDA_VERSION < 7050
+// workaround for C++11 bug in CUDA 6.5/7.0
+#if CUDA_VERSION >= 6050 && CUDA_VERSION < 7050
 #define POW(a, b) pow(a, (spinorFloat)b)
 #else
 #define POW(a, b) pow(a, b)
