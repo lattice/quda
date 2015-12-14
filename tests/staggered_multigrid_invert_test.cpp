@@ -38,6 +38,8 @@ void *longlink;
 void** ghost_fatlink, **ghost_longlink;
 #endif
 
+extern char vec_outfile[];
+
 extern int device;
 extern bool tune;
 
@@ -232,6 +234,8 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
   // coarse grid solver is GCR
   mg_param->smoother[mg_levels-1] = QUDA_GCR_INVERTER;
   mg_param->compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;//default value for staggered.
+
+  strcpy(mg_param->vec_outfile, vec_outfile);
 
   return;
 }
