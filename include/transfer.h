@@ -16,6 +16,17 @@
 
 namespace quda {
 
+  /**
+     The transfer class defines the inter-grid operators that connect
+     fine and coarse grids.  This implements both restriction and
+     prologation methods.  The transfer operator is fully defined at
+     object creation time, and defined by the null-space vectors and
+     the coarsening pattern that are passed to it.
+
+     At present only the restriction (R) and prolongation (P) methods
+     have been offloaded to run on the GPU, with the block
+     orthogonlization yet to be offloaded.
+   */
   class Transfer {
 
   private:
@@ -202,14 +213,49 @@ namespace quda {
 
   };
 
+  /**
+     Helper method that takes a vector of ColorSpinorFields and packes them into a single matrix field.
+     @param V The resulting packed matrix field
+     @param B Vector of ColorSpinorFields to be packed
+     @param Nvec Vector length
+   */
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec);
 
+  /**
+     Block orthogonnalize the matrix field, where the blocks are
+     defined by lookup tables that map the fine grid points to the
+     coarse grid points, and similarly for the spin degrees of
+     freedom.
+     @param V Matrix field to be orthgonalized
+     @param Nvec Vector length
+     @param geo_bs Geometric block size
+     @param fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param spin_bs Spin block size
+   */
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
 			  const int *fine_to_coarse, int spin_bs);
 
+  /**
+     Apply the prolongation operator
+     @param out Resulting fine grid field
+     @param in Input field on coarse grid
+     @param v Matrix field containing the null-space components
+     @param Nvec Number of null-space components
+     @param fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param spin_map Spin blocking lookup table
+   */
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
 		  int Nvec, const int *fine_to_coarse, const int *spin_map);
 
+  /**
+     Apply the restriction operator
+     @param out Resulting coarsened field
+     @param in Input field on fine grid
+     @param v Matrix field containing the null-space components
+     @param Nvec Number of null-space components
+     @param fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param spin_map Spin blocking lookup table
+   */
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
 		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map);
   

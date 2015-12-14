@@ -195,6 +195,12 @@ namespace quda {
      */
     virtual ~MG();
 
+    /**
+       This method verifies the correctness of the MG method.  It checks:
+       1. Null-space vectors are exactly preserved: v_k = P R v_k
+       2. Any coarse vector is exactly preserved on the fine grid: eta_c = R P eta_c
+       3. The emulated coarse Dirac operator matches the native one: D_c = R D P
+     */
     void verify();
 
     /**
@@ -232,6 +238,9 @@ namespace quda {
   void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, 
 		      const cpuGaugeField &clover, double kappa);
 
+  /**
+     This class serves as a front-end to the coarse Dslash operator, similar to the other dslash operators.
+   */
   class DiracCoarse : public Dirac {
 
     const Transfer *transfer; /** restrictor / prolongator defined here */
@@ -266,6 +275,12 @@ namespace quda {
       errorQuda("Not implemented");
     }
 
+    /**
+       This is the only method implemented presently though this will
+       change once even-odd preconditioning is implemented.
+       @param out output vector, out = M * in
+       @param in input vector
+     */
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const {
@@ -283,6 +298,12 @@ namespace quda {
       errorQuda("Not implemented");
     }
 
+    /**
+       Create the coarse operator for this coarse operator
+       @param T Transfer operator that defines the coarse grid
+       @param Y Storage for the coarsened gauge field
+       @param X Storage for the coarsened clover field
+     */
     virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
 
   };
