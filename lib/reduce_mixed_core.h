@@ -48,50 +48,6 @@ template<> __device__ void add<double3,double>(double *s, const int i, const int
 template<> __device__ void add<double3,double>(volatile double *s, const int i, const int j, const int block) 
 { s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
 
-#if (__COMPUTE_CAPABILITY__ < 130)
-__host__ __device__ void zero(doublesingle &x) { x = 0.0; }
-__host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
-__host__ __device__ void zero(doublesingle3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle x, const int block) { s[i] = x; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle x, const int block) { s[i].a.x = x.a.x; s[i].a.y = x.a.y; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; 
-  s[i+2*block].a.x = x.z.a.x; s[i+2*block].a.y = x.z.a.y; }
-__device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
-__device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
-
-template<> __device__ void add<doublesingle,doublesingle>(doublesingle &sum, doublesingle *s, const int i, const int block) 
-{ sum += s[i]; }
-template<> __device__ void add<doublesingle2,doublesingle>(doublesingle2 &sum, doublesingle *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; }
-template<> __device__ void add<doublesingle3,doublesingle>(doublesingle3 &sum, doublesingle *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; sum.z += s[i+2*block]; }
-
-template<> __device__ void add<doublesingle,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-template<> __device__ void add<doublesingle,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-
-template<> __device__ void add<doublesingle2,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-template<> __device__ void add<doublesingle2,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-
-template<> __device__ void add<doublesingle3,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-template<> __device__ void add<doublesingle3,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-#endif
-
 #include <launch_kernel.cuh>
 
 __device__ unsigned int count = 0;
@@ -135,16 +91,12 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
     arg.W.load(w, i);
     arg.V.load(v, i);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.pre();
-#endif
 
 #pragma unroll
     for (int j=0; j<M; j++) arg.r(sum, x[j], y[j], z[j], w[j], v[j]);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.post(sum);
-#endif
 
     arg.X.save(x, i);
     arg.Y.save(y, i);

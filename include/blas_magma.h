@@ -8,14 +8,14 @@
 #include <cuComplex.h>
 #include <stdio.h>
 
-//MAGMA library interface 
+//MAGMA library interface
 //required for (incremental) EigCG solver
 
 
 
    class BlasMagmaArgs{
 
-     typedef std::complex<double> Complex; //same notations
+      typedef std::complex<double> Complex;
 
     private:
 
@@ -25,14 +25,14 @@
       int prec;
       int ldm;//(may include padding)
 
-      //general magma library parameters:	
+      //general magma library parameters:
       int info;
 
       bool init;
       bool alloc;
 
       //magma params/objects:
-      int llwork; 
+      int llwork;
       int lrwork;
       int liwork;
 
@@ -41,7 +41,7 @@
       int htsize;//MIN(l,k)-number of Householder reflectors, but we always have k <= MIN(m,n)
       int dtsize;//
 
-      int lwork_max; 
+      int lwork_max;
 
       void *W;
       void *W2;
@@ -83,7 +83,7 @@
 
       //GPU version of the above
       void SolveGPUProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH);
-      
+
       //Spinor matrix vector product:
       void SpinorMatVec(void *spinorOut, const void *spinorSetIn, const int sld, const int slen, const void *vec, const int vlen);
 
@@ -93,21 +93,8 @@
       void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn);
 
       void MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *pQR, const int ldqr, void *pTau, void *pVm, const int cldn);
-
-      //Pure LAPACK routines (when problem size is very small, no need for MAGMA routines):
-
-      void LapackGESV(void* rhs, const int ldn, const int n, void* H, const int ldh);
-      //Compute right eigenvectors and eigenvalues of a complex non-symm. matrix
-      void LapackRightEV(const int m,  const int ldm, void *Mat, void *harVals, void *harVecs, const int ldv);
-      //
-      void LapackGEQR(const int n, void *Mat, const int m, const int ldm, void *tau);//QR decomposion of a (m by n) matrix, ldm is the leading dimension
-      //
-      void LapackLeftConjUNMQR(const int dh /*number of rows*/, const int n /*number of columns of H*/, const int k /*number of reflectors*/,  void *H, const int ldh, void * QR,  const int ldqr, void *tau) ;//for vectors: n =1
-
-      void LapackRightNotrUNMQR(const int nrowsMat, const int ncolsMat, const int nref, void *QRM, const int ldqr, void *tau, void *Mat, const int ldm);//Apply from the left conjugate QR-decomposed matrix QRM, of size m by n.
       //
       void Sort(const int m, const int ldm, void *eVecs, const int nev, void *unsorted_eVecs, void *eVals);//Sort nev smallest eigenvectors
-
 //new:
       void ComputeQR(const int nev, Complex * evmat, const int m, const int ldm, Complex  *tau);
 
@@ -115,7 +102,7 @@
 
       void Construct_harmonic_matrix(Complex * const harmH, Complex * const conjH, const double beta2, const int m, const int ldH);
 
-      void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv); 
+      void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv);
    };
 
 #endif // _BLAS_MAGMA_H

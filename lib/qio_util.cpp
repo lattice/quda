@@ -6,13 +6,10 @@
 
 void print_m(suN_matrix *a)
 {
-  int i;
-  
-  for ( i=0; i< NCLR; i++)
+  for (int i=0; i< NCLR; i++)
     {
       printf("%f %f %f %f %f %f\n",a->e[i][0].re,a->e[i][0].im,a->e[i][1].re,a->e[i][1].im,a->e[i][2].re,a->e[i][2].im);
     }
-  
   return;
 }
 
@@ -20,16 +17,16 @@ void print_m(suN_matrix *a)
 void vfill_m(suN_matrix *a, int coords[], int rank)
 {
   int i,j;
-  
+
   for ( j=0; j< NCLR; j++)
     for ( i=0; i< NCLR; i++)
       {
 	a->e[j][i].re = 0.0;
 	a->e[j][i].im = 0.0;
       }
-  
+
   for ( j=0; j< NCLR; j++)
-    a->e[j][j].re = 100*rank + coords[0] + 
+    a->e[j][j].re = 100*rank + coords[0] +
       lattice_size[0]*(coords[1] + lattice_size[1]*
 		       (coords[2] + lattice_size[2]*coords[3]));
   return;
@@ -77,13 +74,12 @@ void vdestroy_M (suN_matrix *field[], int count)
     free(field[i]);
 }
 
-
 float vcompare_M (suN_matrix *fielda[], suN_matrix *fieldb[], int count)
 {
   int i,j,k,m;
   float diff;
   float sum2 = 0;
-  
+
   for(k = 0; k < count; k++)for(m = 0; m < num_sites(this_node); m++)
     {
       for ( j=0; j< NCLR; j++)
@@ -107,7 +103,7 @@ void vput_M(char *s1, size_t index, int count, void *s2)
   suN_matrix *dest;
   suN_matrix *src = (suN_matrix *)s1;
   int i;
-  
+
 /* For the site specified by "index", move an array of "count" data
    from the read buffer to an array of fields */
 
@@ -145,8 +141,6 @@ int inside_subset(int x[], int lower[], int upper[])
       status = 0;
       break;
     }
-  
+
   return status;
 }
-
-

@@ -57,6 +57,9 @@ extern int geo_block_size[];
 
 extern QudaInverterType precon_type;
 
+extern char vec_infile[];
+extern char vec_outfile[];
+
 extern void usage(char** );
 
 namespace quda {
@@ -218,7 +221,7 @@ int main(int argc, char **argv)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
   inv_param.maxiter = 10000;
-  inv_param.reliable_delta = 1e-2;
+  inv_param.reliable_delta = 1e-4;
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
@@ -285,9 +288,9 @@ int main(int argc, char **argv)
 
     mg_param.location[i] = QUDA_CPU_FIELD_LOCATION;
   }
-  // only the fine level is on the GPU (for now)
   mg_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
   mg_param.location[1] = QUDA_CUDA_FIELD_LOCATION;
+  mg_param.location[2] = QUDA_CUDA_FIELD_LOCATION;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
@@ -298,6 +301,9 @@ int main(int argc, char **argv)
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
 
+  // set file i/o parameters
+  strcpy(mg_param.vec_infile, vec_infile);
+  strcpy(mg_param.vec_outfile, vec_outfile);
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -362,19 +368,6 @@ int main(int argc, char **argv)
   void *spinorOut = NULL;
   spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
 
-  // create a point source at 0 (in each subvolume...  FIXME)
-  memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-  memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    //((float*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-  } else {
-    //((double*)spinorIn)[0] = 1.0;
-    for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-  }
-
   // start the timer
   double time0 = -((double)clock());
 
@@ -391,7 +384,23 @@ int main(int argc, char **argv)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
-  invertQuda(spinorOut, spinorIn, &inv_param);
+  const int nSrc = 1;
+  for (int i=0; i<nSrc; i++) {
+    // create a point source at 0 (in each subvolume...  FIXME)
+    memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+
+    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
+      //((float*)spinorIn)[i] = 1.0;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+    } else {
+      //((double*)spinorIn)[i] = 1.0;
+      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+    }
+
+    invertQuda(spinorOut, spinorIn, &inv_param);
+  }
 
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);

@@ -66,14 +66,16 @@ namespace quda {
      Rotates from the coarse-color basis into the fine-color basis.  This
      is the second step of applying the prolongator (only for the prolongation to the top level grid!).
   */
-  template <typename Float, int coarseSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
+  template <typename Float, int coarseSpin, int fineColor, int coarseColor, int fine_colors_per_thread, class FineColor, class Rotator>
   __device__ __host__ inline void rotateFineColorTopLevelStaggered(FineColor &out, const complex<Float> in[coarseSpin*coarseColor],
-						  const Rotator &V, int parity, int x_cb) {
-    for (int i=0; i<out.Ncolor(); i++) out(parity, x_cb, 0, i) = 0.0;
+						  const Rotator &V, int parity, int x_cb, int fine_color_block) {
+     for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) 
+       out(parity, x_cb, 0, fine_color_block+fine_color_local) = 0.0;
 
     int staggered_coarse_spin = parity;
 
-    for (int i=0; i<fineColor; i++) {
+    for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) {
+      int i = fine_color_block + fine_color_local; // global fine color index
       for (int j=0; j<coarseColor; j++) { 
 	// V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
  	out(parity, x_cb, 0, i) += V(parity, x_cb, 0, i, j) * in[staggered_coarse_spin*coarseColor + j];
@@ -81,14 +83,17 @@ namespace quda {
     }
   }
 
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, int fine_colors_per_thread,
+	    class FineColor, class Rotator>
   __device__ __host__ inline void rotateFineColor(FineColor &out, const complex<Float> in[fineSpin*coarseColor],
-						  const Rotator &V, int parity, int x_cb) {
+						  const Rotator &V, int parity, int x_cb, int fine_color_block) {
     for (int s=0; s<fineSpin; s++)
-      for (int i=0; i<fineColor; i++) out(parity, x_cb, s, i) = 0.0;
+      for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++)
+	out(parity, x_cb, s, fine_color_block+fine_color_local) = 0.0; // global fine color index
     
     for (int s=0; s<fineSpin; s++) {
-      for (int i=0; i<fineColor; i++) {
+      for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) {
+	int i = fine_color_block + fine_color_local; // global fine color index
 	for (int j=0; j<coarseColor; j++) {
 	  // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 	  out(parity, x_cb, s, i) += V(parity, x_cb, s, i, j) * in[s*coarseColor + j];
@@ -97,7 +102,7 @@ namespace quda {
     }
   }
 
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread, typename Arg>
   void Prolongate(Arg &arg) {
     for (int parity=0; parity<2; parity++) {
       for (int x_cb=0; x_cb<arg.out.VolumeCB(); x_cb++) {
@@ -112,44 +117,52 @@ namespace quda {
           //if(coarseSpin != 2) errorQuda("\nIncorrect coarse spin number\n"); 
           complex<Float> tmp[coarseSpin*coarseColor];
 	  prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
-	  rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
+          for (int fine_color_block=0; fine_color_block<fineColor; fine_color_block+=fine_colors_per_thread) {
+	    rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, x_cb, fine_color_block);
+          }
         }
         else//also for staggered if the fine grid is NOT a top level grid.
         {
           complex<Float> tmp[fineSpin*coarseColor];
 	  prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb, arg.spin_map);
-	  rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
+          for (int fine_color_block=0; fine_color_block<fineColor; fine_color_block+=fine_colors_per_thread) {
+	    rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, x_cb, fine_color_block);
+          }
         }
       }
     }
   }
 
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread, typename Arg>
   __global__ void ProlongateKernel(Arg arg) {
 
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     int parity=threadIdx.y; //parity is within the block
     if (x_cb >= arg.out.VolumeCB()) return;
 
+    int fine_color_block = (blockDim.z*blockIdx.z + threadIdx.z) * fine_colors_per_thread;
+    if (fine_color_block >= fineColor) return;
+
     int x = parity*arg.out.Volume()/2 + x_cb;
     int x_coarse = arg.geo_map[x];
     int parity_coarse = (x_coarse >= arg.in.Volume()/2) ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse*arg.in.Volume()/2;
+
     if(fineSpin == 1)
     {
       complex<Float> tmp[2*coarseColor];
       prolongate2TopLevelStaggered<Float,coarseSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb);
-      rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
+      rotateFineColorTopLevelStaggered<Float,coarseSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, x_cb, fine_color_block);
     }
     else
     {
       complex<Float> tmp[fineSpin*coarseColor];
       prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity_coarse, x_coarse_cb, arg.spin_map);
-      rotateFineColor<Float,fineSpin,fineColor,coarseColor>(arg.out, tmp, arg.V, parity, x_cb);
+      rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>(arg.out, tmp, arg.V, parity, x_cb, fine_color_block);
     }
   }
   
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread, typename Arg>
   class ProlongateLaunch : public Tunable {
 
   protected:
@@ -179,11 +192,11 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	Prolongate<Float,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+	Prolongate<Float,fineSpin,fineColor,coarseSpin,coarseColor,fine_colors_per_thread>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	tp.block.y = 2; // need factor of two for parity with in the block
-	ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg> 
+	ProlongateKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,fine_colors_per_thread,Arg>
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
     }
@@ -192,15 +205,57 @@ namespace quda {
       return TuneKey(vol, typeid(*this).name(), aux);
     }
 
+    /**
+       Specialized variant of advanceBlockDim that tunes for the
+       optimal fine colors per block / grid.
+     */
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      dim3 block = param.block;
+      dim3 grid = param.grid;
+      bool ret = Tunable::advanceBlockDim(param);
+      param.block.y = block.y; param.block.z = block.z;
+      param.grid.y = grid.y; param.grid.z = grid.z;
+
+      if (ret) { // we advanced the block.x so we're done
+	return true;
+      } else { // block.x (spacetime) was reset
+
+	// let's try to advance spin/block-color
+	while(param.block.z <= fineColor/fine_colors_per_thread) {
+	  param.block.z++;
+	  if ( (fineColor/fine_colors_per_thread) % param.block.z == 0) {
+	    param.grid.z = (fineColor/fine_colors_per_thread) / param.block.z;
+	    break;
+	  }
+	}
+
+	// we can advance spin/block-color since this is valid
+	if (param.block.z <= (fineColor/fine_colors_per_thread) ) { //
+	  return true;
+	} else { // we have run off the end so let's reset
+	  param.block.z = 1;
+	  param.grid.z = fineColor/fine_colors_per_thread;
+	  return false;
+	}
+      }
+    }
+
     void initTuneParam(TuneParam &param) const {
       Tunable::initTuneParam(param);
       param.grid = dim3( ((arg.out.VolumeCB())+param.block.x-1) / param.block.x, 1, 1);
+
+      param.block.z = 1;
+      param.grid.z = fineColor / fine_colors_per_thread;
     }
 
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
       Tunable::defaultTuneParam(param);
       param.grid = dim3( ((arg.out.VolumeCB())+param.block.x-1) / param.block.x, 1, 1);
+
+      param.block.z = 1;
+      param.grid.z = fineColor / fine_colors_per_thread;
     }
 
     long long bytes() const {
@@ -222,8 +277,12 @@ namespace quda {
     coarseSpinor In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
+    // for fine grid we keep 3 colors per thread else use fine grained
+    constexpr int fine_colors_per_thread = fineColor == 3 ? fineColor : 1;
+
     Arg arg(Out, In, V, fine_to_coarse);
-    ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> prolongator(arg, out, in, Location(out, in, v));
+    ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, fine_colors_per_thread, Arg>
+      prolongator(arg, out, in, Location(out, in, v));
     prolongator.apply(0);
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();

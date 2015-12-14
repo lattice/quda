@@ -212,14 +212,10 @@ namespace quda {
       virtual ~CloverSigmaTrace() {;}
 
       void apply(const cudaStream_t &stream){
-        if(location == QUDA_CUDA_FIELD_LOCATION){
-#if (__COMPUTE_CAPABILITY__ >= 200)
+        if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           cloverSigmaTraceKernel<Float,Clover1,Clover2,Gauge><<<tp.grid,tp.block,0>>>(arg);
-#else
-	  errorQuda("cloverSigmaTrace not supported on pre-Fermi architecture");
-#endif
-        }else{
+        } else {
           cloverSigmaTrace<Float,Clover1,Clover2,Gauge>(arg);
         }
       }

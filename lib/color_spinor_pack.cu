@@ -21,6 +21,7 @@ namespace quda {
     const int nParity;
     const int dagger;
     const QudaDWFPCType pc_type;
+    int commDim[4]; // whether a given dimension is partitioned or not
 
     PackGhostArg(Field field, void **ghost, const ColorSpinorField &a, int parity, int dagger)
       : field(field),
@@ -37,6 +38,9 @@ namespace quda {
       for (int d=0; d<nDim; d++) X[d] = a.X(d);
       X[0] *= (nParity == 1) ? 2 : 1; // set to full lattice dimensions
       X[4] = (nDim == 5) ? a.X(4) : 1; // set fifth dimension correctly
+      for (int i=0; i<4; i++) {
+	commDim[i] = comm_dim_partitioned(i);
+      }
     }
   };
 
@@ -49,11 +53,9 @@ namespace quda {
     if (arg.nDim == 5)  getCoords5(x, cb_idx, X, parity, arg.pc_type);
     else getCoords(x, cb_idx, X, parity);
 
-    // FIXME make partitioning optional
-
 #pragma unroll
     for (int dim=0; dim<4; dim++) {
-      if (x[dim] < arg.nFace){
+      if (arg.commDim[dim] && x[dim] < arg.nFace){
 #ifdef FINE_GRAINED_ACCESS
 	for (int s=0; s<Ns; s++) {
 	  for (int c=0; c<Nc; c++) {
@@ -68,7 +70,7 @@ namespace quda {
 #endif
       }
       
-      if (x[dim] >= X[dim] - arg.nFace){
+      if (arg.commDim[dim] && x[dim] >= X[dim] - arg.nFace){
 #ifdef FINE_GRAINED_ACCESS
 	for (int s=0; s<Ns; s++) {
 	  for (int c=0; c<Nc; c++) {
@@ -115,6 +117,7 @@ namespace quda {
       // FIXME take into account paritioning
       size_t totalBytes = 0;
       for (int d=0; d<4; d++) {
+	if (!comm_dim_partitioned(d)) continue;
 	totalBytes += 2*arg.nFace*2*Ns*Nc*meta.SurfaceCB(d)*meta.Precision();
       }
       return totalBytes;
@@ -146,7 +149,20 @@ namespace quda {
     }
 
   public:
-    GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta) : arg(arg), meta(meta) { }
+    GenericPackGhostLauncher(Arg &arg, const ColorSpinorField &meta) : arg(arg), meta(meta) {
+      strcpy(aux, meta.AuxString());
+#ifdef MULTI_GPU
+      char comm[5];
+      comm[0] = (arg.commDim[0] ? '1' : '0');
+      comm[1] = (arg.commDim[1] ? '1' : '0');
+      comm[2] = (arg.commDim[2] ? '1' : '0');
+      comm[3] = (arg.commDim[3] ? '1' : '0');
+      comm[4] = '\0';
+      strcat(aux,",comm=");
+      strcat(aux,comm);
+#endif
+    }
+
     virtual ~GenericPackGhostLauncher() { }
 
     void apply(const cudaStream_t &stream) {
@@ -255,11 +271,10 @@ namespace quda {
     }
 
     // only do packing if one of the dimensions is partitioned
-    // FIXME enabling this will break reference dslash
-    //bool partitioned;
-    //for (int d=0; d<4; d++)
-    //if (comm_dim_partitioned(d)) partiitoned = true;
-    //if (!partitioned) return;
+    bool partitioned;
+    for (int d=0; d<4; d++)
+      if (comm_dim_partitioned(d)) partitioned = true;
+    if (!partitioned) return;
 
     if (a.Precision() == QUDA_DOUBLE_PRECISION) {
       genericPackGhost<double>(ghost, a, parity, dagger);

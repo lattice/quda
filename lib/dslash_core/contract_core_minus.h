@@ -6,8 +6,6 @@
 
 #define TOTAL_COMPONENTS 16 
 
-#if (__COMPUTE_CAPABILITY__ >= 130)
-
 #define READ_INTERMEDIATE_SPINOR_DOUBLE(spinor, stride, sp_idx, norm_idx)	   \
   double2 J0	 = spinor[sp_idx + 0*(stride)];   \
   double2 J1	 = spinor[sp_idx + 1*(stride)];   \
@@ -888,8 +886,6 @@ __global__ void contractMinusKernel		(double2 *out, double2 *in1, double2 *in2, 
 #undef	READ_INTERMEDIATE_SPINOR
 
 #undef	SPINOR_HOP
-
-#endif // (__CUDA_ARCH__ >= 130)
 
 
 #define READ_SPINOR_SINGLE(spinor, stride, sp_idx, norm_idx)	   \

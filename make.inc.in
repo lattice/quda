@@ -84,10 +84,6 @@ MPI_HOME=@MPI_HOME@
 QMP_HOME=@QMP_HOME@
 QIO_HOME=@QIO_HOME@
 
-MAGMA_HOME=@MAGMA_HOME@
-ATLAS_HOME=@ATLAS_HOME@
-LAPACK_HOME=@LAPACK_HOME@
-
 
 NUMA_AFFINITY=@NUMA_AFFINITY@   # enable NUMA affinity?
 
@@ -113,12 +109,7 @@ COMP_CAP = $(GPU_ARCH:sm_%=%0)
 COPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 NVCCOPT += -D__COMPUTE_CAPABILITY__=$(COMP_CAP)
 
-TESLA_ARCH = $(shell [ $(COMP_CAP) -lt 200 ] && echo true)
-ifneq ($(TESLA_ARCH),true)
-  NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
-else
-  NVCCOPT +=
-endif
+NVCCOPT += -ftz=true -prec-div=false -prec-sqrt=false
 
 ifeq ($(strip $(GIT)), git)
   GITCOUNT = $(shell git rev-list -q `git describe -q --abbrev=0 2> /dev/null`..  2> /dev/null | wc -l 2> /dev/null)
@@ -178,15 +169,11 @@ ifeq ($(strip $(INTERFACE_NVTX)), yes)
 endif
 
 ifeq ($(strip $(BUILD_MAGMA)), yes)
-  MAGMA_INCLUDE = -I$(CUDA_INSTALL_PATH)/include -I../include -I${MAGMA_HOME}/include
+  MAGMA_INCLUDE = $(shell pkg-config --cflags-only-I magma)
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
-
-  LIB += -fopenmp -L$(MAGMA_HOME)/lib -lmagma
-  LIB += -L$(LAPACK_HOME) -llapack -lf77blas -lgfortran
-  LIB += -L$(ATLAS_HOME)/lib -lcblas -latlas
-  LIB += -L$(CUDA_INSTALL_PATH)/lib64 -lcublas
-
+  LIB += $(shell pkg-config --libs magma)
+  find_package(openmp)
 else
   MAGMA_INCLUDE =
   MAGMA_FLAGS   =

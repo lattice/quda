@@ -18,12 +18,14 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
 
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, bool enable_gpu)
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
+		     bool enable_gpu, TimeProfile &profile)
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
       spin_bs(spin_bs), spin_map(0),
-      enable_gpu(enable_gpu), use_gpu(enable_gpu) // by default we apply the transfer operator accorting to enable_gpu flag but can be overridden
+      enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
+      profile(profile)
   {
     int ndim = B[0]->Ndim();
     this->geo_bs = new int[ndim];
@@ -218,6 +220,7 @@ namespace quda {
 
   // apply the prolongator
   void Transfer::P(ColorSpinorField &out, const ColorSpinorField &in) const {
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
@@ -243,10 +246,13 @@ namespace quda {
     Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map);
 
     out = *output; // copy result to out field (aliasing handled automatically)
+
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
@@ -276,6 +282,8 @@ namespace quda {
     // only need to synchronize if we're transferring from GPU to CPU
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
       cudaDeviceSynchronize();
+
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
 } // namespace quda

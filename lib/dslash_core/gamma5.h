@@ -20,18 +20,17 @@
 #define tmp3_re tmp3.x
 #define tmp3_im tmp3.y
 
-#if (__COMPUTE_CAPABILITY__ >= 130)
 #ifdef DIRECT_ACCESS_WILSON_SPINOR
-	#define READ_SPINOR READ_SPINOR_DOUBLE
-	#define SPINORTEX in
+#define READ_SPINOR READ_SPINOR_DOUBLE
+#define SPINORTEX in
 #else
-	#define READ_SPINOR READ_SPINOR_DOUBLE_TEX
+#define READ_SPINOR READ_SPINOR_DOUBLE_TEX
 
-	#ifdef USE_TEXTURE_OBJECTS
-		#define SPINORTEX param.inTex
-	#else
-		#define SPINORTEX spinorTexDouble
-	#endif	// USE_TEXTURE_OBJECTS
+#ifdef USE_TEXTURE_OBJECTS
+#define SPINORTEX param.inTex
+#else
+#define SPINORTEX spinorTexDouble
+#endif	// USE_TEXTURE_OBJECTS
 #endif
 
 #define	SPINOR_HOP	12
@@ -203,7 +202,6 @@ __global__ void gamma5Kernel(double2 *out, float *outNorm, double2 *in, float *i
 
    return;  
 }
-#endif // (__CUDA_ARCH__ >= 130)
 
 #undef tmp0_re
 #undef tmp0_im

@@ -461,11 +461,7 @@ namespace quda {
       double true_res = blas::xmyNorm(b, *r);
       param.true_res_offset[i] = sqrt(true_res/b2);
       param.iter_res_offset[i] = sqrt(r2[i]/b2);
-#if (__COMPUTE_CAPABILITY__ >= 200)
       param.true_res_hq_offset[i] = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r).z);
-#else
-      param.true_res_hq_offset[i] = 0.0;
-#endif   
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE){

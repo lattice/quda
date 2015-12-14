@@ -67,17 +67,12 @@ namespace quda {
   protected:
     unsigned int sharedBytesPerThread() const
     {
-#if (__COMPUTE_CAPABILITY__ >= 200) // Fermi uses shared memory for common input
       if (dslashParam.kernel_type == INTERIOR_KERNEL) { // Interior kernels use shared memory for common iunput
 	int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
 	return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
       } else { // Exterior kernels use no shared memory
 	return 0;
       }
-#else // Pre-Fermi uses shared memory only for pseudo-registers
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
-#endif
     }
 
   public:
@@ -133,13 +128,9 @@ namespace quda {
     DslashCuda *dslash = 0;
     size_t regSize = sizeof(float);
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       dslash = new WilsonDslashCuda<double2, double2>(out, (double2*)gauge0, (double2*)gauge1, 
 						      gauge.Reconstruct(), in, x, k, dagger);
       regSize = sizeof(double);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new WilsonDslashCuda<float4, float4>(out, (float4*)gauge0, (float4*)gauge1,
 						    gauge.Reconstruct(), in, x, k, dagger);

@@ -46,15 +46,13 @@ template<int block_size, int N, typename ReduceType, typename ReduceSimpleType,
         arg.Z[i].load(z, id);
         arg.W[i].load(w, id);
         arg.V[i].load(v, id);
-#if (__COMPUTE_CAPABILITY__ >= 200)
         arg.r.pre();
-#endif
+
 #pragma unroll
         for (int j=0; j<M; j++) arg.r(sum[i], x[j], y[j], z[j], w[j], v[j]);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
         arg.r.post(sum[i]);
-#endif
+
         arg.X[i].save(x, id);
         arg.Y[i].save(y, id);
         arg.Z[i].save(z, id);

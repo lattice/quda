@@ -456,47 +456,33 @@
 
 #endif
 
-// only build double precision if supported
-#if !(__COMPUTE_CAPABILITY__ < 130 && DD_PREC == 0) 
-
- #define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
- #define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
+#define DD_CONCAT(n,r,d,x) n ## r ## d ## x ## Kernel
+#define DD_FUNC(n,r,d,x) DD_CONCAT(n,r,d,x)
 
 // define the kernel
-//!051013
 template <KernelType kernel_type>
 __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
-     (DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
+(DD_PARAM1, DD_PARAM2, DD_PARAMCLOVER, DD_PARAM3, DD_PARAM4) {
 
- #ifdef GPU_TWISTED_CLOVER_DIRAC
+#ifdef GPU_TWISTED_CLOVER_DIRAC
 
-  #if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
-   #if DD_DAG
-    #include "tmc_dslash_dagger_fermi_core.h"
-   #else
-    #include "tmc_dslash_fermi_core.h"
-   #endif
+#if DD_DAG
+#include "tmc_dslash_dagger_fermi_core.h"
+#else
+#include "tmc_dslash_fermi_core.h"
+#endif
 
-  #elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
-   #if DD_DAG
-    #include "tmc_dslash_dagger_gt200_core.h"
-   #else
-    #include "tmc_dslash_gt200_core.h"
-   #endif
+#if DD_DAG
+#include "tmc_dslash_dagger_gt200_core.h"
+#else
+#include "tmc_dslash_gt200_core.h"
+#endif
 
-  #else  // fall-back is original G80 
-
-   #if DD_DAG
-    #include "tmc_dslash_dagger_g80_core.h"
-   #else
-    #include "tmc_dslash_g80_core.h"
-   #endif
-
-  #endif
-
- #endif
+#endif
 
 }
 
@@ -507,7 +493,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_fermi_core.h"
@@ -515,20 +501,12 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tmc_fused_exterior_dslash_fermi_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
 #else
 #include "tmc_fused_exterior_dslash_gt200_core.h"
-#endif
-
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tmc_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "tmc_fused_exterior_dslash_g80_core.h"
 #endif
 
 #endif
@@ -553,7 +531,7 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tmc_dslash_dagger_fermi_core.h"
@@ -561,20 +539,12 @@ __global__ void	DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)
 #include "tmc_dslash_fermi_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tmc_dslash_dagger_gt200_core.h"
 #else
 #include "tmc_dslash_gt200_core.h"
-#endif
-
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tmc_dslash_dagger_g80_core.h"
-#else
-#include "tmc_dslash_g80_core.h"
 #endif
 
 #endif
@@ -590,7 +560,7 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 
 #ifdef GPU_TWISTED_CLOVER_DIRAC
 
-#if (__COMPUTE_CAPABILITY__ >= 200 && defined(SHARED_WILSON_DSLASH)) // Fermi optimal code
+#ifdef SHARED_WILSON_DSLASH // Fermi optimal code
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_fermi_core.h"
@@ -598,20 +568,12 @@ __global__ void DD_FUNC(DD_NAME_F, DD_RECON_F, DD_DAG_F, DD_XPAY_F)<EXTERIOR_KER
 #include "tmc_fused_exterior_dslash_fermi_core.h"
 #endif
 
-#elif (__COMPUTE_CAPABILITY__ >= 120) // GT200 optimal code
+#else // no shared memory blocking
 
 #if DD_DAG
 #include "tmc_fused_exterior_dslash_dagger_gt200_core.h"
 #else
 #include "tmc_fused_exterior_dslash_gt200_core.h"
-#endif
-
-#else  // fall-back is original G80 
-
-#if DD_DAG
-#include "tmc_fused_exterior_dslash_dagger_g80_core.h"
-#else
-#include "tmc_fused_exterior_dslash_g80_core.h"
 #endif
 
 #endif

@@ -297,13 +297,9 @@ namespace quda {
     size_t regSize = sizeof(float);
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       dslash = new MDWFDslashPCCuda<double2,double2>(out, (double2*)gauge0, (double2*)gauge1, 
 						     gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);
       regSize = sizeof(double);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new MDWFDslashPCCuda<float4,float4>(out, (float4*)gauge0, (float4*)gauge1, 
 						   gauge.Reconstruct(), in, x, m_f, k2, dagger, DS_type);

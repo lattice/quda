@@ -70,9 +70,7 @@ static void setup_qmp_fixed(int len[], int nd, int numnodes) {
       nsquares[i] = 1;
       squaresize[i] = len[i]/nsquares[i];
     }
-    
-  }
-  else {
+  } else {
     for (i=0; i<ndim; i++) {
       nsquares[i] = QMP_get_logical_dimensions()[i];
       squaresize[i] = len[i]/nsquares[i];

@@ -74,17 +74,12 @@ namespace quda {
   protected:
     unsigned int sharedBytesPerThread() const
     {
-#if (__COMPUTE_CAPABILITY__ >= 200)
       if (dslashParam.kernel_type == INTERIOR_KERNEL) {
 	int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
 	return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
       } else {
 	return 0;
       }
-#else
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return DSLASH_SHARED_FLOATS_PER_THREAD * reg_size;
-#endif
     }
   public:
     CloverDslashCuda(cudaColorSpinorField *out,  const gFloat *gauge0, const gFloat *gauge1, 
@@ -203,14 +198,10 @@ namespace quda {
     size_t regSize = sizeof(float);
 
     if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
       dslash = new CloverDslashCuda<double2, double2, double2>
 	(out, (double2*)gauge0, (double2*)gauge1, gauge.Reconstruct(), 
 	 (double2*)cloverP, (float*)cloverNormP, cloverInv.stride, in, x, a, dagger);
       regSize = sizeof(double);
-#else
-      errorQuda("Double precision not supported on this GPU");
-#endif
     } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
       dslash = new CloverDslashCuda<float4, float4, float4>
 	(out, (float4*)gauge0, (float4*)gauge1, gauge.Reconstruct(), 

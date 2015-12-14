@@ -285,11 +285,7 @@ namespace quda {
     virtual ~CloverDerivative() {}
 
     void apply(const cudaStream_t &stream){
-#if __COMPUTE_CAPABILITY__ >= 200
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-#else // tuning not supported on Tesla architecture
-      TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
-#endif
       if(arg.conjugate){
 	cloverDerivativeKernel<Complex,true><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
       }else{
@@ -298,10 +294,8 @@ namespace quda {
     } // apply
 
     // The force field is updated so we must preserve its initial state
-#if __COMPUTE_CAPABILITY__ >= 200
     void preTune() { arg.force.save(); } 
     void postTune(){ arg.force.load(); } 
-#endif
 
     long long flops() const { return 0; }
     long long bytes() const { return (16*arg.gauge.Bytes() + 8*arg.oprod.Bytes() + 4*arg.force.Bytes()) * arg.volumeCB; }

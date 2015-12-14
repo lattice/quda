@@ -34,4 +34,4 @@
  * @brief Maximum number of multi-grid levels.  This number may be
  * changed if need be.
  */
-#define QUDA_MAX_MG_LEVEL 3
+#define QUDA_MAX_MG_LEVEL 4

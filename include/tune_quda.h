@@ -107,8 +107,7 @@ namespace quda {
     /**
      * The goal here is to throttle the number of thread blocks per SM by over-allocating shared memory (in order to improve
      * L2 utilization, etc.).  Note that:
-     * - On Fermi, requesting greater than 16 KB will switch the cache config, so we restrict ourselves to 16 KB for now.
-     * - On GT200 and older, kernel arguments are passed via shared memory, so available space may be smaller than 16 KB.
+     * - On Fermi/Kepler, requesting greater than 16 KB will switch the cache config, so we restrict ourselves to 16 KB for now.
      *   We thus request the smallest amount of dynamic shared memory that guarantees throttling to a given number of blocks,
      *   in order to allow some extra leeway.
      */

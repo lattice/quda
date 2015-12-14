@@ -20,17 +20,21 @@ if(BUILD_MPI)
   LIST(APPEND TEST_LIBS ${MPI_CXX_LIBRARIES})
 endif()
 
+if(BUILD_MAGMA)
+  find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
+  LIST(APPEND TEST_LIBS ${MAGMA})
+endif()
 
 
 if(${BUILD_WILSON_DIRAC} OR ${BUILD_DOMAIN_WALL_DIRAC})
-  cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp ${QIO_UTIL})
+  cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS} )
 
-  cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp ${QIO_UTIL})
+  cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
 endif()
 
-cuda_add_executable(deflation_test deflation_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp ${QIO_UTIL})
+cuda_add_executable(deflation_test deflation_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
 target_link_libraries(deflation_test ${TEST_LIBS})
 
 if(${BUILD_STAGGERED_DIRAC})
@@ -41,7 +45,12 @@ if(${BUILD_STAGGERED_DIRAC})
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
 endif()
 
-cuda_add_executable(su3_test su3_test.cpp ${QIO_UTIL})
+if(${BUILD_MULTIGRID})
+  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+  target_link_libraries(multigrid_invert_test ${TEST_LIBS})
+endif()
+
+cuda_add_executable(su3_test su3_test.cpp)
 target_link_libraries(su3_test ${TEST_LIBS})
 
 cuda_add_executable(pack_test pack_test.cpp)

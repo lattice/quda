@@ -91,7 +91,7 @@ namespace quda {
       // create transfer operator
       printfQuda("start creating transfer operator\n");
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
-			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false);
+			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       //transfer->setTransferGPU(false); // use this to force location of transfer
       printfQuda("end creating transfer operator\n");
 
@@ -361,10 +361,12 @@ namespace quda {
 
   //supports seperate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField*> &B) {
-    profile.TPSTART(QUDA_PROFILE_IO);
+    profile_global.TPSTOP(QUDA_PROFILE_INIT);
+    profile_global.TPSTART(QUDA_PROFILE_IO);
+    const char *vec_infile = param.mg_global.vec_infile;
+
     const int Nvec = B.size();
     printfQuda("Start loading %d vectors from %s\n", Nvec, vec_infile);
-
 
     void **V = new void*[Nvec];
     for (int i=0; i<Nvec; i++) { 
@@ -417,11 +419,15 @@ namespace quda {
     }
 
     printfQuda("Done loading vectors\n");
-    profile.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
   void MG::saveVectors(std::vector<ColorSpinorField*> &B) {
-    profile.TPSTART(QUDA_PROFILE_IO);
+    profile_global.TPSTOP(QUDA_PROFILE_INIT);
+    profile_global.TPSTART(QUDA_PROFILE_IO);
+    const char *vec_outfile = param.mg_global.vec_outfile;
+
     if (strcmp(vec_outfile,"")!=0) {
       const int Nvec = B.size();
       printfQuda("Start saving %d vectors from %s\n", Nvec, vec_outfile);
@@ -449,7 +455,8 @@ namespace quda {
 
       host_free(V);
       printfQuda("Done saving vectors\n");
-      profile.TPSTOP(QUDA_PROFILE_IO);
+      profile_global.TPSTOP(QUDA_PROFILE_IO);
+      profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
 
   }

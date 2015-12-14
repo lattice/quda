@@ -31,11 +31,7 @@ extern bool verify_results;
 
 extern void usage(char** );
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
 const int Nkernels = 32;
-#else // exclude Heavy Quark Norm if on Tesla architecture
-const int Nkernels = 31;
-#endif
 
 using namespace quda;
 
@@ -69,13 +65,7 @@ display_test_info()
   return;  
 }
 
-// Only benchmark double precision if supported
-#if (__COMPUTE_CAPABILITY__ >= 130)
 int Nprec = 3;
-#else
-int Nprec = 2;
-#endif
-
 
 bool skip_kernel(int precision, int kernel) {
   if ( Nspin == 2 && precision == 0) {
@@ -180,13 +170,19 @@ void initFields(int prec)
   // check for successful allocation
   checkCudaError();
 
-  *vD = *vH;
-  *wD = *wH;
-  *xD = *xH;
-  *yD = *yH;
-  *zD = *zH;
-  *hD = *hH;
-  *lD = *lH;
+  // only do copy if not doing half precision with mg
+  bool flag = !(param.nSpin == 2 &&
+		(prec == 0 || low_aux_prec == QUDA_HALF_PRECISION) );
+
+  if ( flag ) {
+    *vD = *vH;
+    *wD = *wH;
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *hD = *hH;
+    *lD = *lH;
+  }
 }
 
 

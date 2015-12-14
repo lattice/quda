@@ -586,9 +586,6 @@ PACKAGE_URL=''
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
-LAPACK_HOME
-ATLAS_HOME
-MAGMA_HOME
 BUILD_MAGMA
 QDP_INSTALL_PATH
 USE_QDPJIT
@@ -744,9 +741,7 @@ with_qmp
 with_qio
 enable_qdp_jit
 with_qdp
-with_magma
-with_atlas
-with_lapack
+enable_magma
 enable_blas_tex
 enable_fermi_double_tex
 enable_numa_affinity
@@ -1373,8 +1368,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-cpu-arch=arch  Set CPU arch: x86 or x86_64 (default: x86_64)
-  --enable-gpu-arch=arch  Set GPU arch: sm_13, sm_20, sm_21, sm_30, sm_35,
-                          sm_50, sm_52 (default: sm_35)
+  --enable-gpu-arch=arch  Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50,
+                          sm_52 (default: sm_35)
   --enable-os=os          Set operating system: linux, osx (default: linux)
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
@@ -1436,6 +1431,8 @@ Optional Features:
                           (default: disabled)
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
                           (default: disabled)
+  --enable-magma          Build with MAGMA (requires pkg-config to detect
+                          magma)
   --enable-blas-tex       Enable texture reads for blas (default: enabled)
   --enable-fermi-double-tex
                           Enable double-precision texture reads on Fermi
@@ -1453,9 +1450,6 @@ Optional Packages:
   --with-qmp=QMPDIR       Specify QMP installation directory
   --with-qio=QIODIR       Specify QIO installation directory
   --with-qdp=QDPDIR       Specify QDP++ installation directory
-  --with-magma=MAGMADIR   Specify MAGMA installation directory
-  --with-atlas=ATLASDIR   Specify ATLAS installation directory
-  --with-lapack=LAPACKDIR Specify LAPACK installation directory
 
 Some influential environment variables:
   CC          C compiler command
@@ -3884,32 +3878,11 @@ fi
 
 
 
-
-# Check whether --with-magma was given.
-if test "${with_magma+set}" = set; then :
-  withval=$with_magma;  magma_home=${withval}; build_magma="yes"
+# Check whether --enable-magma was given.
+if test "${enable_magma+set}" = set; then :
+  enableval=$enable_magma;  build_magma=${enableval}
 else
-   magma_home="" ; build_magma="no"
-
-fi
-
-
-
-# Check whether --with-atlas was given.
-if test "${with_atlas+set}" = set; then :
-  withval=$with_atlas;  atlas_home=${withval}
-else
-   atlas_home=""
-
-fi
-
-
-
-# Check whether --with-lapack was given.
-if test "${with_lapack+set}" = set; then :
-  withval=$with_lapack;  lapack_home=${withval}
-else
-   lapack_home=""
+   build_magma="no"
 
 fi
 
@@ -4057,9 +4030,9 @@ x86 | x86_64 ) ;;
 esac
 
 case ${gpu_arch} in
-sm_13 | sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
+sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
 *)
-  as_fn_error $? " GPU arch must be one of: sm_13, sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
+  as_fn_error $? " GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
   ;;
 esac
 
@@ -4637,20 +4610,6 @@ QDP_INSTALL_PATH=${qdp_home}
 $as_echo "$as_me: Setting BUILD_MAGMA = ${build_magma}" >&6;}
 BUILD_MAGMA=${build_magma}
 
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MAGMA_HOME = ${magma_home}" >&5
-$as_echo "$as_me: Setting MAGMA_HOME = ${magma_home}" >&6;}
-MAGMA_HOME=${magma_home}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting ATLAS_HOME = ${atlas_home}" >&5
-$as_echo "$as_me: Setting ATLAS_HOME = ${atlas_home}" >&6;}
-ATLAS_HOME=${atlas_home}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting LAPACK_HOME = ${lapack_home}" >&5
-$as_echo "$as_me: Setting LAPACK_HOME = ${lapack_home}" >&6;}
-LAPACK_HOME=${lapack_home}
 
 
 ac_config_files="$ac_config_files make.inc"

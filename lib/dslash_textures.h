@@ -7,8 +7,6 @@
 #define TEX1DFETCH(type, tex, idx) tex1Dfetch((tex), idx)
 #endif
 
-#if (__COMPUTE_CAPABILITY__ >= 130)
-
 template<typename Tex>
 static __inline__ __device__ double fetch_double(Tex t, int i)
 {
@@ -28,7 +26,6 @@ static __inline__ __device__ double2 fetch_double2_old(texture<int4, 1> t, int i
   int4 v = tex1Dfetch(t,i);
   return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z));
 }
-#endif //__COMPUTE_CAPABILITY__ >= 130
 
 
 #ifndef USE_TEXTURE_OBJECTS

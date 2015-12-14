@@ -476,7 +476,7 @@ namespace quda {
       mat(r, x);
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
-      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL && __COMPUTE_CAPABILITY__ >= 200)
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL)
 	param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
       else
 	param.true_res_hq = 0.0;

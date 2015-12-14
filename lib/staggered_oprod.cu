@@ -668,7 +668,6 @@ namespace quda {
     cudaColorSpinorField& inA = (parity&1) ? inOdd : inEven;
     cudaColorSpinorField& inB = (parity&1) ? inEven : inOdd;
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     if(inEven.Precision() == QUDA_DOUBLE_PRECISION){
       // 3 sets number of faces in ghost_stride - we need to set this to 1 for naive staggered
       Spinor<double2, double2, double2, 3, 0, 0> spinorA(inA, 3);
@@ -686,10 +685,6 @@ namespace quda {
     } else {
       errorQuda("Unsupported precision: %d\n", inEven.Precision());
     }
-#else
-    errorQuda("Staggered Outer Product not supported on pre-Fermi architecture");
-#endif
-
 
 #else // GPU_STAGGERED_OPROD not defined
    errorQuda("Staggered Outer Product has not been built!"); 

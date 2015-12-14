@@ -78,6 +78,7 @@ set(BUILD_HISQ_FORCE OFF CACHE BOOL "build code for hisq fermion force")
 set(BUILD_GAUGE_TOOLS OFF CACHE BOOL "build auxilary gauge-field tools")
 set(BUILD_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
 set(BUILD_SSTEP OFF CACHE BOOL "build s-step linear solvers")
+set(BUILD_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
 set(BUILD_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
 # Dynamic inversion saves memory but decreases the flops
 set(BUILD_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
@@ -117,6 +118,7 @@ set(QUDA_USE_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 
+
 #########################################################
 # everything below here is processing the setup
 #
@@ -154,23 +156,28 @@ endif()
 
 if (${BUILD_QIO})
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp layout_hyper.c gauge_qio.cpp)
+  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
   FIND_LIBRARY(QIO_LIB qio ${QUDA_QIOHOME}/lib/)
   FIND_LIBRARY(LIME_LIB lime ${QUDA_QIOHOME}/lib/)
   include_directories(${QUDA_QIOHOME}/include)
 endif()
 
 if(BUILD_MAGMA)
-  message(WARNING "Magma support not yet implemented in CMakeLists")
-else(BUILD_MAGMA)
-  #do we need these
-  # MAGMA_INCLUDE
-  # MAGMA_FLAGS
+  add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(MAGMA  magma)
+  include_directories(${MAGMA_INCLUDEDIR})
+  message(${MAGMA_INCLUDEDIR})
+  find_package(OpenMP)
 endif(BUILD_MAGMA)
 
 if(BUILD_SSTEP)
   add_definitions(-DSSTEP)
 endif()
+
+if (BUILD_MULTIGRID)
+  add_definitions(-DGPU_MULTIGRID)
+endif(BUILD_MULTIGRID)
 
 if(POSIX_THREADS)
   add_definitions(-DPTHREADS)
@@ -352,15 +359,16 @@ SET(COMP_CAP "${COMP_CAP}0")
 add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
-# NVCC FLAGS independet off build type
-set(QUDA_NVCC_FLAGS -arch=${GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+# NVCC FLAGS independent off build type
+set(QUDA_NVCC_FLAGS -std=c++11 -arch=${GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
 endif(QUDA_VERBOSE_BUILD)
 
 
-set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -O3 -lineinfo CACHE STRING
+
+set(CUDA_NVCC_FLAGS_DEVEL ${QUDA_NVCC_FLAGS} -Xcompiler -Wno-unknown-pragmas -O3 -lineinfo CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
 set(CUDA_NVCC_FLAGS_RELEASE ${QUDA_NVCC_FLAGS} -O3 -w CACHE STRING
@@ -376,20 +384,21 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
+LIST(APPEND OpenMP_CXX_FLAGS -std=c++11)
 
-set(CMAKE_CXX_FLAGS_DEVEL  "-O3 -Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -w" CACHE STRING
+set(CMAKE_CXX_FLAGS_RELEASE "${OpenMP_CXX_FLAGS} -O3 -w" CACHE STRING
     "Flags used by the C++ compiler during release builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_HOSTDEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_HOSTDEBUG "${OpenMP_CXX_FLAGS} -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during host-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEVICEDEBUG "${OpenMP_CXX_FLAGS} -Wall" CACHE STRING
     "Flags used by the C++ compiler during device-debug builds."
     FORCE )
-set(CMAKE_CXX_FLAGS_DEBUG "-Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
+set(CMAKE_CXX_FLAGS_DEBUG "${OpenMP_CXX_FLAGS} -Wall -g -fno-inline -DHOST_DEBUG" CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 

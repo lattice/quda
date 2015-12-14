@@ -61,52 +61,6 @@ __device__ void warpReduce(ReduceSimpleType* s, ReduceType& sum){
 }
 
 
-
-
-#if (__COMPUTE_CAPABILITY__ < 130)
-__host__ __device__ void zero(doublesingle &x) { x = 0.0; }
-__host__ __device__ void zero(doublesingle2 &x) { x.x = 0.0; x.y = 0.0; }
-__host__ __device__ void zero(doublesingle3 &x) { x.x = 0.0; x.y = 0.0; x.z = 0.0; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle x, const int block) { s[i] = x; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; }
-__device__ void copytoshared(doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i] = x.x; s[i+block] = x.y; s[i+2*block] = x.z; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle x, const int block) { s[i].a.x = x.a.x; s[i].a.y = x.a.y; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle2 x, const int block) 
-{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; }
-__device__ void copytoshared(volatile doublesingle *s, const int i, const doublesingle3 x, const int block) 
-{ s[i].a.x = x.x.a.x; s[i].a.y = x.x.a.y; s[i+block].a.x = x.y.a.x; s[i+block].a.y = x.y.a.y; 
-  s[i+2*block].a.x = x.z.a.x; s[i+2*block].a.y = x.z.a.y; }
-__device__ void copyfromshared(doublesingle &x, const doublesingle *s, const int i, const int block) { x = s[i]; }
-__device__ void copyfromshared(doublesingle2 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; }
-__device__ void copyfromshared(doublesingle3 &x, const doublesingle *s, const int i, const int block) 
-{ x.x = s[i]; x.y = s[i+block]; x.z = s[i+2*block]; }
-
-template<> __device__ void add<doublesingle,doublesingle>(doublesingle &sum, doublesingle *s, const int i, const int block) 
-{ sum += s[i]; }
-template<> __device__ void add<doublesingle2,doublesingle>(doublesingle2 &sum, doublesingle *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; }
-template<> __device__ void add<doublesingle3,doublesingle>(doublesingle3 &sum, doublesingle *s, const int i, const int block) 
-{ sum.x += s[i]; sum.y += s[i+block]; sum.z += s[i+2*block]; }
-
-template<> __device__ void add<doublesingle,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-template<> __device__ void add<doublesingle,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; }
-
-template<> __device__ void add<doublesingle2,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-template<> __device__ void add<doublesingle2,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block];}
-
-template<> __device__ void add<doublesingle3,doublesingle>(doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-template<> __device__ void add<doublesingle3,doublesingle>(volatile doublesingle *s, const int i, const int j, const int block) 
-{ s[i] += s[j]; s[i+block] += s[j+block]; s[i+2*block] += s[j+2*block];}
-#endif
-
 #include <launch_kernel.cuh>
 
 __device__ unsigned int count = 0;
@@ -150,16 +104,12 @@ template <int block_size, typename ReduceType, typename ReduceSimpleType,
     arg.W.load(w, i);
     arg.V.load(v, i);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.pre();
-#endif
 
 #pragma unroll
     for (int j=0; j<M; j++) arg.r(sum, x[j], y[j], z[j], w[j], v[j]);
 
-#if (__COMPUTE_CAPABILITY__ >= 200)
     arg.r.post(sum);
-#endif
 
     arg.X.save(x, i);
     arg.Y.save(y, i);
@@ -560,27 +510,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
     size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes(), v.NormBytes()};
 
     if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      if (x.Nspin() == 4){ //wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)      
+      if (x.Nspin() == 4 || x.Nspin() == 2){ //wilson
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
-	Spinor<double2,double2,double2,M,writeX> X(x);
-	Spinor<double2,double2,double2,M,writeY> Y(y);
-	Spinor<double2,double2,double2,M,writeZ> Z(z);
-	Spinor<double2,double2,double2,M,writeW> W(w);
-	Spinor<double2,double2,double2,M,writeV> V(v);
-	Reducer<ReduceType, double2, double2> r(a,b);
-	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,double2,M,
-	  Spinor<double2,double2,double2,M,writeX>, Spinor<double2,double2,double2,M,writeY>,
-	  Spinor<double2,double2,double2,M,writeZ>, Spinor<double2,double2,double2,M,writeW>,
-	  Spinor<double2,double2,double2,M,writeV>, Reducer<ReduceType, double2, double2> >
-	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
-	reduce.apply(*blas::getStream());
-#else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
-#endif
-      } else if (x.Nspin() == 2){ //coarse grid
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
-	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
+	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 	Spinor<double2,double2,double2,M,writeX> X(x);
 	Spinor<double2,double2,double2,M,writeY> Y(y);
 	Spinor<double2,double2,double2,M,writeZ> Z(z);
@@ -617,7 +550,7 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
       } else { errorQuda("ERROR: nSpin=%d is not supported\n", x.Nspin()); }
     } else if (x.Precision() == QUDA_SINGLE_PRECISION) {
       if (x.Nspin() == 4){ //wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)      
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
 	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
 	Spinor<float4,float4,float4,M,writeX,0> X(x);
 	Spinor<float4,float4,float4,M,writeY,1> Y(y);
@@ -634,27 +567,10 @@ doubleN reduceCuda(const double2 &a, const double2 &b, ColorSpinorField &x,
 #else
 	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-      } else if (x.Nspin() == 2) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
-	const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
-	Spinor<float2,float2,float2,M,writeX,0> X(x);
-	Spinor<float2,float2,float2,M,writeY,1> Y(y);
-	Spinor<float2,float2,float2,M,writeZ,2> Z(z);
-	Spinor<float2,float2,float2,M,writeW,3> W(w);
-	Spinor<float2,float2,float2,M,writeV,4> V(v);
-	Reducer<ReduceType, float2, float2> r(make_float2(a.x, a.y), make_float2(b.x, b.y));
-	ReduceCuda<doubleN,ReduceType,ReduceSimpleType,float2,M,
-	  Spinor<float2,float2,float2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>,
-	  Spinor<float2,float2,float2,M,writeZ,2>, Spinor<float2,float2,float2,M,writeW,3>,
-	  Spinor<float2,float2,float2,M,writeV,4>, Reducer<ReduceType, float2, float2> >
-	  reduce(value, X, Y, Z, W, V, r, reduce_length/(2*M), bytes, norm_bytes);
-	reduce.apply(*blas::getStream());
-#else
-	errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
-#endif
-      } else if (x.Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
+      } else if (x.Nspin() == 1 || x.Nspin() == 2) {
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
 	const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+	if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
 	Spinor<float2,float2,float2,M,writeX,0> X(x);
 	Spinor<float2,float2,float2,M,writeY,1> Y(y);
 	Spinor<float2,float2,float2,M,writeZ,2> Z(z);

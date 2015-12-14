@@ -39,22 +39,26 @@ namespace quda {
      Rotates from the fine-color basis into the coarse-color basis.
      A.S.: also works for staggered (fineSpin = 1)
   */
-  template <typename Float, int fineSpin, int fineColor, int coarseColor, class FineColor, class Rotator>
-  __device__ __host__ inline void rotateCoarseColor(complex<Float> out[fineSpin*coarseColor],
-						    const FineColor &in, const Rotator &V, int parity, int x_cb) {
+  template <typename Float, int fineSpin, int fineColor, int coarseColor, int coarse_colors_per_thread,
+	    class FineColor, class Rotator>
+  __device__ __host__ inline void rotateCoarseColor(complex<Float> out[fineSpin*coarse_colors_per_thread],
+						    const FineColor &in, const Rotator &V, int parity, int x_cb, int coarse_color_block) {
     for (int s=0; s<fineSpin; s++)
-      for (int i=0; i<coarseColor; i++) out[s*coarseColor+i] = 0.0;
+      for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+	out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
+      }
 
-    for (int i=0; i<coarseColor; i++) { // coarse color
+    for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+      int i = coarse_color_block + coarse_color_local;
       for (int s=0; s<fineSpin; s++) {
 	for (int j=0; j<fineColor; j++) {
-	  out[s*coarseColor + i] += conj(V(parity, x_cb, s, j, i)) * in(parity, x_cb, s, j);
+	  out[s*coarse_colors_per_thread + coarse_color_local] += conj(V(parity, x_cb, s, j, i)) * in(parity, x_cb, s, j);
 	}
       }
     }
   }
 
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int coarse_colors_per_thread, typename Arg>
   void Restrict(Arg arg) {
     for (int parity_coarse=0; parity_coarse<2; parity_coarse++) 
       for (int x_coarse_cb=0; x_coarse_cb<arg.out.VolumeCB(); x_coarse_cb++)
@@ -65,31 +69,60 @@ namespace quda {
     // loop over fine degrees of freedom
     for (int parity=0; parity<2; parity++) {
       for (int x_cb=0; x_cb<arg.in.VolumeCB(); x_cb++) {
-	complex<Float> tmp[fineSpin*coarseColor];
-	rotateCoarseColor<Float,fineSpin,fineColor,coarseColor>(tmp, arg.in, arg.V, parity, x_cb);
 
 	int x = parity*arg.in.VolumeCB() + x_cb;
 	int x_coarse = arg.fine_to_coarse[x];
 	int parity_coarse = (x_coarse >= arg.out.VolumeCB()) ? 1 : 0;
 	int x_coarse_cb = x_coarse - parity_coarse*arg.out.VolumeCB();
-	
-        if(fineSpin == 1)
-        {
-           int staggered_coarse_spin = parity; //0 if fine parity even, 1 otherwise
-           for (int c=0; c<coarseColor; c++)
-	      arg.out(parity_coarse,x_coarse_cb,staggered_coarse_spin,c) += tmp[c];
-        }
-        else
-        {
-	  for (int s=0; s<fineSpin; s++) 
-	    for (int c=0; c<coarseColor; c++)
-	      arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarseColor+c];
+
+        for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
+          complex<Float> tmp[fineSpin*coarse_colors_per_thread];
+          rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>(tmp, arg.in, arg.V, parity, x_cb, coarse_color_block);
+
+          if(fineSpin == 1)
+          {
+            int staggered_coarse_spin = parity; //0 if fine parity even, 1 otherwise
+            for (int c=0; c<coarseColor; c++)
+	       arg.out(parity_coarse,x_coarse_cb,staggered_coarse_spin,c) += tmp[c];
+          }
+          else
+          {
+	    for (int s=0; s<fineSpin; s++)
+              for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+                int c = coarse_color_block + coarse_color_local;
+	        arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarse_colors_per_thread+coarse_color_local];
+              }
+          }
         }
       }
     }
 
     return;
   }
+
+  /**
+     struct which acts as a wrapper to a vector of data.
+   */
+  template <typename scalar, int n>
+  struct vector_type {
+    scalar data[n];
+    __device__ __host__ inline scalar& operator[](int i) { return data[i]; }
+    __device__ __host__ inline const scalar& operator[](int i) const { return data[i]; }
+    __device__ __host__ inline static constexpr int size() { return n; }
+    __device__ __host__ vector_type() { for (int i=0; i<n; i++) data[i] = 0.0; }
+  };
+
+  /**
+     functor that defines how to do a multi-vector reduction
+   */
+  template <typename T>
+  struct reduce {
+    __device__ __host__ inline T operator()(const T &a, const T &b) {
+      T sum;
+      for (int i=0; i<sum.size(); i++) sum[i] = a[i] + b[i];
+      return sum;
+    }
+  };
 
   /**
      Here, we ensure that each thread block maps exactly to a
@@ -99,7 +132,8 @@ namespace quda {
      point.  The look up table coarse_to_fine is the mapping to the
      each fine grid point.
   */
-  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg, int block_size>
+  template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int coarse_colors_per_thread,
+	    typename Arg, int block_size>
   __global__ void RestrictKernel(Arg arg) {
     int x_coarse = blockIdx.x;
     int parity_coarse = x_coarse >= arg.out.VolumeCB() ? 1 : 0;
@@ -117,65 +151,65 @@ namespace quda {
     int parity = threadIdx.y;
     int x_fine_cb = x_fine - parity*arg.in.VolumeCB();
 
-    complex<Float> tmp[fineSpin*coarseColor];
-    rotateCoarseColor<Float,fineSpin,fineColor,coarseColor>(tmp, arg.in, arg.V, parity, x_fine_cb);
+    int coarse_color_block = (blockDim.z*blockIdx.z + threadIdx.z) * coarse_colors_per_thread;
+    if (coarse_color_block >= coarseColor) return;
 
-    complex<Float> reduced[coarseSpin * coarseColor];
-    for (int i=0; i<coarseSpin*coarseColor; i++) reduced[i] = 0.0;//Why the class constructor does not initialize it to zero?
+    complex<Float> tmp[fineSpin*coarse_colors_per_thread];
+    rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>(tmp, arg.in, arg.V, parity, x_fine_cb, coarse_color_block);
+
+    typedef vector_type<complex<Float>, coarseSpin*coarse_colors_per_thread> vector;
+    vector reduced;
 
     if(fineSpin != 1)
     {
       // first lets coarsen spin locally
       for (int s=0; s<fineSpin; s++) {
-        for (int v=0; v<coarseColor; v++) {
-	  reduced[arg.spin_map(s)*coarseColor+v] += tmp[s*coarseColor+v];
+        for (int v=0; v<coarse_colors_per_thread; v++) {
+	  reduced[arg.spin_map(s)*coarse_colors_per_thread+v] += tmp[s*coarse_colors_per_thread+v];
         }
       }
 
       // now lets coarse geometry across threads
-      typedef cub::BlockReduce<complex<Float>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
+      typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
       __shared__ typename BlockReduce::TempStorage temp_storage;
-      for (int s=0; s<coarseSpin; s++) {
-        for (int v=0; v<coarseColor; v++) {
-	  reduced[s*coarseColor+v] = BlockReduce(temp_storage).Sum( reduced[s*coarseColor+v] );
-	  __syncthreads();
-        }
-      }
+      reduce<vector> reducer; // reduce functor
+
+      // note this is not safe for blockDim.z > 1
+      reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
     }
     else//staggered block (temporary hack)
     {
       
       for (int s=0; s<coarseSpin; s++) {
-        for (int v=0; v<coarseColor; v++) {
-	  reduced[s*coarseColor+v] += (s == parity) ? tmp[v] : 0.0;
+        for (int v=0; v<coarse_colors_per_thread; v++) {
+	  reduced[s*coarse_colors_per_thread+v] += (s == parity) ? tmp[v] : 0.0;
         }
       }
 
-      // now lets coarse geometry across threads
-      typedef cub::BlockReduce<complex<Float>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
+      // now lets coarsen geometry across threads
+      typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
       __shared__ typename BlockReduce::TempStorage temp_storage;
-      for (int s=0; s<coarseSpin; s++) {
-        for (int v=0; v<coarseColor; v++) {
-	  reduced[s*coarseColor+v] = BlockReduce(temp_storage).Sum( reduced[s*coarseColor+v] );
-	  __syncthreads();
-        }
-      }
+      reduce<vector> reducer; // reduce functor
+
+      // note this is not safe for blockDim.z > 1
+      reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
     }
 
     if (threadIdx.x==0 && threadIdx.y == 0) {
-      for (int s=0; s<coarseSpin; s++) { // hard code coarse spin to 2 for now
-	for (int v=0; v<coarseColor; v++) {
-	  arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarseColor+v];
+      for (int s=0; s<coarseSpin; s++) {
+	for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+	  int v = coarse_color_block + coarse_color_local;
+	  arg.out(parity_coarse, x_coarse_cb, s, v) = reduced[s*coarse_colors_per_thread+coarse_color_local];
 	}
       }
-
     }
 
     return;
 
   }
 
-  template <typename Float, typename Arg, int fineSpin, int fineColor, int coarseSpin, int coarseColor>
+  template <typename Float, typename Arg, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
+	    int coarse_colors_per_thread>
   class RestrictLaunch : public Tunable {
 
   protected:
@@ -206,19 +240,19 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+	Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	tp.block.y = 2; // need factor of two for fine parity with in the block
 
 	if (block_size == 8) {
-	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,8>
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,8>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 16) {
-	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,16>
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,16>
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else if (block_size == 128) {
-	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,Arg,128>
+	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,128>
 	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else {
 	  errorQuda("Block size %d not instantiated", block_size);
@@ -226,12 +260,37 @@ namespace quda {
       }
     }
 
-    // only tune shared memory per thread since grid and block sizes are fixed
-    bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param); }
+    // This block tuning tunes for the optimal amount of color
+    // splitting between blockDim.z and gridDim.z.  However, enabling
+    // blockDim.z > 1 gives incorrect results due to cub reductions
+    // being unable to do independent sliced reductions along
+    // blockDim.z.  So for now we only split between colors per thread
+    // and grid.z.
+    bool advanceBlockDim(TuneParam &param) const
+    {
+      // let's try to advance spin/block-color
+      while(param.block.z <= coarseColor/coarse_colors_per_thread) {
+	param.block.z++;
+	if ( (coarseColor/coarse_colors_per_thread) % param.block.z == 0) {
+	  param.grid.z = (coarseColor/coarse_colors_per_thread) / param.block.z;
+	  break;
+	}
+      }
 
-    TuneKey tuneKey() const {
-      return TuneKey(vol, typeid(*this).name(), aux);
+      // we can advance spin/block-color since this is valid
+      if (param.block.z <= (coarseColor/coarse_colors_per_thread) ) { //
+	return true;
+      } else { // we have run off the end so let's reset
+	param.block.z = 1;
+	param.grid.z = coarseColor/coarse_colors_per_thread;
+	return false;
+      }
     }
+
+    // only tune shared memory per thread (disable tuning for block.z for now)
+    bool advanceTuneParam(TuneParam &param) const { return advanceSharedBytes(param); } //|| advanceBlockDim(param); }
+
+    TuneKey tuneKey() const { return TuneKey(vol, typeid(*this).name(), aux); }
 
     void initTuneParam(TuneParam &param) const { defaultTuneParam(param); }
 
@@ -240,6 +299,9 @@ namespace quda {
       param.block = dim3(block_size, 1, 1);
       param.grid = dim3( (minThreads()+param.block.x-1) / param.block.x, 1, 1);
       param.shared_bytes = 0;
+
+      param.block.z = 1;
+      param.grid.z = coarseColor / coarse_colors_per_thread;
     }
 
     long long bytes() const {
@@ -261,8 +323,11 @@ namespace quda {
     fineSpinor   In(const_cast<ColorSpinorField&>(in));
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
-    Arg arg(Out, In, V, fine_to_coarse,coarse_to_fine);
-    RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor> restrictor(arg, out, in, Location(out, in, v));
+    // this seems like a reasonable value for both fine and coarse grids
+    constexpr int coarse_colors_per_thread = 2;
+
+    Arg arg(Out, In, V, fine_to_coarse, coarse_to_fine);
+    RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread> restrictor(arg, out, in, Location(out, in, v));
     restrictor.apply(0);
 
     if (Location(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();

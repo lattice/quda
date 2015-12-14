@@ -135,6 +135,12 @@ namespace quda {
      */
     void createSpinMap(int spin_bs);
 
+    /**
+     * Reference to profile kept in the corresponding MG instance.
+     * Use this to record restriction and prolongation overhead.
+     */
+    TimeProfile &profile;
+
   public:
 
     /** 
@@ -146,7 +152,8 @@ namespace quda {
      * @param spin_bs The spin block sizes to use (default is 1)
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
      */
-    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs=1, bool enable_gpu=true);
+    Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
+	     bool enable_gpu, TimeProfile &profile);
 
     /** The destructor for Transfer */
     virtual ~Transfer();

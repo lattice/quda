@@ -133,7 +133,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
 
 
   
-#if __COMPUTE_CAPABILITY__ >= 200
   if(tol_hq == 0 && tol == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
@@ -144,16 +143,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param->residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param->residual_type;
 
   inv_param->tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
-#else
-  if(tol == 0){
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
-  }
-  // Pre Fermi architecture only supports L2 relative residual norm
-  inv_param->residual_type = QUDA_L2_RELATIVE_RESIDUAL;
-#endif
-
-
  
   inv_param->Nsteps = 2; 
 
