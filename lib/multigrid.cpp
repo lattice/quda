@@ -447,10 +447,10 @@ namespace quda {
 
       host_free(V);
       printfQuda("Done saving vectors\n");
-      profile_global.TPSTOP(QUDA_PROFILE_IO);
-      profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
 
+    profile_global.TPSTOP(QUDA_PROFILE_IO);
+    profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
   void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {
