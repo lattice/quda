@@ -1,6 +1,7 @@
 #include <string.h>
 #include <multigrid.h>
 #include <algorithm>
+#include <blas_magma.h>
 
 namespace quda {
 
@@ -12,9 +13,11 @@ namespace quda {
   DiracCoarse::~DiracCoarse() {
     if (Y_h) delete Y_h;
     if (X_h) delete X_h;
+    if (Xinv_h) delete Xinv_h;
     if (Y_d) delete Y_d;
     if (X_d) delete X_d;
-  }	
+    if (Xinv_d) delete Xinv_d;
+  }
 
   void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
@@ -69,8 +72,16 @@ namespace quda {
 
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X_h = new cpuGaugeField(gParam);
-    
+    Xinv_h = new cpuGaugeField(gParam);
+
     dirac->createCoarseOp(*transfer,*Y_h,*X_h);
+
+    {
+      // invert the clover matrix field
+      const int n = X_h->Ncolor();
+      BlasMagmaArgs magma(X_h->Precision());
+      magma.BatchInvertMatrix(((float**)Xinv_h->Gauge_p())[0], ((float**)X_h->Gauge_p())[0], n, X_h->Volume());
+    }
 
     if (enable_gpu) {
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
@@ -83,7 +94,9 @@ namespace quda {
       gParam.geometry = QUDA_SCALAR_GEOMETRY;
       gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
       X_d = new cudaGaugeField(gParam);
+      Xinv_d = new cudaGaugeField(gParam);
       X_d->copy(*X_h);
+      Xinv_d->copy(*Xinv_h);
     }
   }
 

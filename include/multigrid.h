@@ -248,9 +248,11 @@ namespace quda {
 
     cpuGaugeField *Y_h; /** CPU copy of coarse gauge field */
     cpuGaugeField *X_h; /** CPU copy of coarse clover term */
+    cpuGaugeField *Xinv_h; /** CPU copy of inverse coarse clover term */
 
     cudaGaugeField *Y_d; /** GPU copy of coarse gauge field */
     cudaGaugeField *X_d; /** GPU copy of coarse clover term */
+    cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
 
     void initializeCoarse();  /** Initialize the coarse gauge field */
 
