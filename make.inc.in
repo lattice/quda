@@ -172,7 +172,6 @@ ifeq ($(strip $(BUILD_MAGMA)), yes)
   MAGMA_FLAGS   = -DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS
   COPT += -fopenmp  -DMAGMA_LIB
   LIB += $(shell pkg-config --libs magma)
-  find_package(openmp)
 else
   MAGMA_INCLUDE =
   MAGMA_FLAGS   =

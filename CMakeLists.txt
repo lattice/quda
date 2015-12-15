@@ -84,7 +84,6 @@ set(BUILD_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for 
 set(BUILD_QIO OFF CACHE BOOL "build QIO code for binary I/O")
 
 # Multi-GPU options
-set(BUILD_MULTI_GPU OFF CACHE BOOL "set to 'yes' to build the multi-GPU code")
 set(BUILD_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
 set(BUILD_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
 set(POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
@@ -126,13 +125,10 @@ set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 # do all the build definitions
 #
 
-if(${BUILD_MULTI_GPU})
+if(${BUILD_MPI} OR ${BUILD_QMP})
   add_definitions(-DMULTI_GPU)
-  if(NOT (${BUILD_MPI} OR ${BUILD_QMP}) )
-    message(FATAL_ERROR "Multi GPU build requires either MPI or QMP")
-  endif()
   find_package(MPI)
-else(${BUILD_MULTI_GPU})
+else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
