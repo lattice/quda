@@ -237,7 +237,7 @@ namespace quda {
     void create(int nDim, const int *x, int Nc, int Ns, QudaTwistFlavorType Twistflavor, 
 		QudaPrecision precision, int pad, QudaSiteSubset subset, 
 		QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis,
-		QudaDWFPCType PCtype, int nev = 0, int evid = -1);
+		QudaDWFPCType PCtype);
     void destroy();  
 
   protected:
