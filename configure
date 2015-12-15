@@ -743,6 +743,7 @@ enable_magma
 enable_blas_tex
 enable_fermi_double_tex
 enable_numa_affinity
+enable_force_ac
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1436,6 +1437,8 @@ Optional Features:
                           (default: enabled)
   --enable-numa-affinity  Enable NUMA affinity support (default: enabled,
                           always disabled on osx target)
+  --enable-force-ac       Force using deprecated autoconf based build system.
+                          (default: disabled)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4010,6 +4013,16 @@ else
 fi
 
 
+# Check whether --enable-force-ac was given.
+if test "${enable_force_ac+set}" = set; then :
+  enableval=$enable_force_ac;  force_ac=${enableval}
+else
+   force_ac="no"
+
+fi
+
+
+
 case ${cpu_arch} in
 x86 | x86_64 ) ;;
 *)
@@ -4585,6 +4598,38 @@ QDP_INSTALL_PATH=${qdp_home}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MAGMA = ${build_magma}" >&5
 $as_echo "$as_me: Setting BUILD_MAGMA = ${build_magma}" >&6;}
 BUILD_MAGMA=${build_magma}
+
+
+if test "X${force_ac}X" = "XnoX";
+  then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:
+    Note that of QUDA 0.8.0 configure (autoconf) is deprecated.
+    Please consider switching to the new cmake based build system.
+    See https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake
+
+    This warning will be turned into an error soon (use --enable-force-ac to turn it off).
+    At some point configure (autoconf) will no longer be maintained and removed from QUDA.
+    " >&5
+$as_echo "$as_me: WARNING:
+    Note that of QUDA 0.8.0 configure (autoconf) is deprecated.
+    Please consider switching to the new cmake based build system.
+    See https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake
+
+    This warning will be turned into an error soon (use --enable-force-ac to turn it off).
+    At some point configure (autoconf) will no longer be maintained and removed from QUDA.
+    " >&2;}
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:
+  If you require --enable-force-ac please file a bug on https://github.com/lattice/quda
+  This will allow us to make sure you can build quda with cmake (required in the future).
+
+  " >&5
+$as_echo "$as_me: WARNING:
+  If you require --enable-force-ac please file a bug on https://github.com/lattice/quda
+  This will allow us to make sure you can build quda with cmake (required in the future).
+
+  " >&2;}
+fi
 
 
 
