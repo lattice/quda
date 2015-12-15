@@ -62,9 +62,19 @@ static int *mcoord;
 static void setup_qmp_fixed(int len[], int nd, int numnodes) {
   int i;
 
-  for (i=0; i<ndim; i++) {
-    nsquares[i] = QMP_get_logical_dimensions()[i];
-    squaresize[i] = len[i]/nsquares[i];
+  //Added by M. Cheng to fix seg fault on single-node case where
+  //QMP topology is not yet declared.
+
+  if(QMP_get_number_of_nodes() == 1) {
+    for (i=0; i<ndim; i++) {
+      nsquares[i] = 1;
+      squaresize[i] = len[i]/nsquares[i];
+    }
+  } else {
+    for (i=0; i<ndim; i++) {
+      nsquares[i] = QMP_get_logical_dimensions()[i];
+      squaresize[i] = len[i]/nsquares[i];
+    }
   }
 
 }
@@ -151,16 +161,17 @@ int setup_layout(int len[], int nd, int numnodes){
    this functionality is included for possible future use.
   */
 
-#if 0
-  if(QMP_get_msg_passing_type()==QMP_GRID) {
-    printf("grid\n");
-    setup_qmp_grid(len, ndim, numnodes);
-  }  else {
-    printf("prime\n");    setup_hyper_prime(len, ndim, numnodes);
+  int create_geom = 0;
+  if (create_geom) {
+    if(QMP_get_msg_passing_type()==QMP_GRID) {
+      printf("grid\n");
+      setup_qmp_grid(len, ndim, numnodes);
+    }  else {
+      printf("prime\n");    setup_hyper_prime(len, ndim, numnodes);
+    }
+  } else {
+    setup_qmp_fixed(len, ndim, numnodes); // use the predetermined geometry
   }
-#else
-  setup_qmp_fixed(len, ndim, numnodes); // use the predetermined geometry
-#endif
 
   /* setup QMP logical topology */
   if(!QMP_logical_topology_is_declared()) {

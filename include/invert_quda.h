@@ -5,6 +5,7 @@
 #include <quda_internal.h>
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
+#include <vector>
 
 namespace quda {
 
@@ -13,7 +14,7 @@ namespace quda {
    */
   struct SolverParam {
     /**
-       Which linear solver to use 
+       Which linear solver to use
     */
     QudaInverterType inv_type;
 
@@ -22,7 +23,13 @@ namespace quda {
      * QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      */
     QudaInverterType inv_type_precondition;
-    
+
+
+    /**
+     * Preconditioner instance, e.g., multigrid
+     */
+    void *preconditioner;
+
     /**
      * Whether to use the L2 relative residual, L2 absolute residual
      * or Fermilab heavy-quark residual, or combinations therein to
@@ -33,12 +40,15 @@ namespace quda {
      *                                     | QUDA_HEAVY_QUARK_RESIDUAL);
      */
     QudaResidualType residual_type;
-    
+
     /**< Whether to use an initial guess in the solver or not */
-    QudaUseInitGuess use_init_guess;       
+    QudaUseInitGuess use_init_guess;
+
+    /**< Whether to solve linear system with zero RHS */
+    QudaComputeNullVector compute_null_vector;
 
     /**< Reliable update tolerance */
-    double delta;           
+    double delta;
 
     /**< Whether to keep the partial solution accumulator in sloppy precision */
     bool use_sloppy_partial_accumulator;
@@ -63,23 +73,23 @@ namespace quda {
     double tol;
 
     /**< Solver tolerance in the L2 residual norm */
-    double tol_restart;             
+    double tol_restart;
 
     /**< Solver tolerance in the heavy quark residual norm */
-    double tol_hq;          
+    double tol_hq;
 
     /**< Actual L2 residual norm achieved in solver */
-    double true_res;        
+    double true_res;
 
     /**< Actual heavy quark residual norm achieved in solver */
-    double true_res_hq;     
-    
+    double true_res_hq;
+
     /**< Maximum number of iterations in the linear solver */
-    int maxiter;            
+    int maxiter;
 
     /**< The number of iterations performed by the solver */
     int iter;
-    
+
     /**< The precision used by the QUDA solver */
     QudaPrecision precision;
 
@@ -89,42 +99,42 @@ namespace quda {
     /**< The precision used by the QUDA preconditioner */
     QudaPrecision precision_precondition;
 
-    /**< Preserve the source or not in the linear solver (deprecated?) */    
-    QudaPreserveSource preserve_source;       
+    /**< Preserve the source or not in the linear solver (deprecated?) */
+    QudaPreserveSource preserve_source;
 
     /**< Domain overlap to use in the preconditioning */
     int overlap_precondition;
 
     // Multi-shift solver parameters
 
-    /**< Number of offsets in the multi-shift solver */    
-    int num_offset; 
+    /**< Number of offsets in the multi-shift solver */
+    int num_offset;
 
     /** Offsets for multi-shift solver */
     double offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each offset */
-    double tol_offset[QUDA_MAX_MULTI_SHIFT];     
+    double tol_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Solver tolerance for each shift when refinement is applied using the heavy-quark residual */
     double tol_hq_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Actual L2 residual norm achieved in solver for each offset */
-    double true_res_offset[QUDA_MAX_MULTI_SHIFT]; 
+    double true_res_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Iterated L2 residual norm achieved in multi shift solver for each offset */
     double iter_res_offset[QUDA_MAX_MULTI_SHIFT];
 
     /** Actual heavy quark residual norm achieved in solver for each offset */
-    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT]; 
+    double true_res_hq_offset[QUDA_MAX_MULTI_SHIFT];
 
 
     /** Number of steps in s-step algorithms */
-    int Nsteps; 
+    int Nsteps;
 
     /** Maximum size of Krylov space used by solver */
     int Nkrylov;
-    
+
     /** Number of preconditioner cycles to perform per iteration */
     int precondition_cycle;
 
@@ -135,10 +145,10 @@ namespace quda {
     int maxiter_precondition;
 
     /** Relaxation parameter used in GCR-DD (default = 1.0) */
-    double omega;           
+    double omega;
 
 
-    
+
     /** Whether to use additive or multiplicative Schwarz preconditioning */
     QudaSchwarzType schwarz_type;
 
@@ -164,30 +174,43 @@ namespace quda {
     int     max_restart_num;
     double  inc_tol;
     double  eigenval_tol;
-    
+
+    QudaVerbosity verbosity_precondition; //! verbosity to use for preconditioner
+
+    bool compute_true_res; //! whether to compute the true residual or not at the end
+
+    /**
+       Default constructor
+     */
+    SolverParam() : verbosity_precondition(QUDA_SILENT), compute_true_res(true) { ; }
+
     /**
        Constructor that matches the initial values to that of the
        QudaInvertParam instance
        @param param The QudaInvertParam instance from which the values are copied
      */
-    SolverParam(QudaInvertParam &param) : inv_type(param.inv_type), 
-      inv_type_precondition(param.inv_type_precondition), 
+    SolverParam(const QudaInvertParam &param) : inv_type(param.inv_type),
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
       residual_type(param.residual_type), use_init_guess(param.use_init_guess),
-      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator), 
-      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total), heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
+      delta(param.reliable_delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
+      heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
       tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
       true_res(param.true_res), true_res_hq(param.true_res_hq),
-      maxiter(param.maxiter), iter(param.iter), 
-      precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy), 
-      precision_precondition(param.cuda_prec_precondition), 
-      preserve_source(param.preserve_source), num_offset(param.num_offset), 
-      Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle), 
-      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition), 
+      maxiter(param.maxiter), iter(param.iter),
+      precision(param.cuda_prec), precision_sloppy(param.cuda_prec_sloppy),
+      precision_precondition(param.cuda_prec_precondition),
+      preserve_source(param.preserve_source), num_offset(param.num_offset),
+      Nsteps(param.Nsteps), Nkrylov(param.gcrNkrylov), precondition_cycle(param.precondition_cycle),
+      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
       omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
-      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim), deflation_grid(param.deflation_grid), rhs_idx(0),
-      use_reduced_vector_set(param.use_reduced_vector_set), use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
-      eigcg_min_restarts(param.eigcg_min_restarts), max_restart_num(param.max_restart_num), inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol)
-    { 
+      precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
+      deflation_grid(param.deflation_grid), rhs_idx(0), use_reduced_vector_set(param.use_reduced_vector_set),
+      use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
+      eigcg_min_restarts(param.eigcg_min_restarts), max_restart_num(param.max_restart_num),
+      inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
+      verbosity_precondition(param.verbosity_precondition), compute_true_res(true)
+    {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
 	tol_offset[i] = param.tol_offset[i];
@@ -246,9 +269,11 @@ namespace quda {
     Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile) { ; }
     virtual ~Solver() { ; }
 
-    virtual void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in) = 0;
+    virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
-    // solver factory
+    /**
+       Solver factory
+    */
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			  DiracMatrix &matPrecon, TimeProfile &profile);
 
@@ -260,32 +285,32 @@ namespace quda {
 
     /**
        Test for solver convergence
-       @param r2 L2 norm squared of the residual 
+       @param r2 L2 norm squared of the residual
        @param hq2 Heavy quark residual
        @param r2_tol Solver L2 tolerance
        @param hq_tol Solver heavy-quark tolerance
      */
-    bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
+    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
 		     const double &hq_tol);
- 
+
     /**
        Test for HQ solver convergence -- ignore L2 residual
-       @param r2 L2 norm squared of the residual 
+       @param r2 L2 norm squared of the residual
        @param hq2 Heavy quark residual
        @param r2_tol Solver L2 tolerance
        @param hq_tol Solver heavy-quark tolerance
      */
-    bool convergenceHQ(const double &r2, const double &hq2, const double &r2_tol, 
+    bool convergenceHQ(const double &r2, const double &hq2, const double &r2_tol,
          const double &hq_tol);
 
     /**
        Test for L2 solver convergence -- ignore HQ residual
-       @param r2 L2 norm squared of the residual 
+       @param r2 L2 norm squared of the residual
        @param hq2 Heavy quark residual
        @param r2_tol Solver L2 tolerance
        @param hq_tol Solver heavy-quark tolerance
      */
-    bool convergenceL2(const double &r2, const double &hq2, const double &r2_tol, 
+    bool convergenceL2(const double &r2, const double &hq2, const double &r2_tol,
          const double &hq_tol);
 
     /**
@@ -293,7 +318,7 @@ namespace quda {
      */
     void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
 
-    /** 
+    /**
 	Prints out the summary of the solver convergence (requires a
 	versbosity of QUDA_SUMMARIZE).  Assumes
 	SolverParam.true_res and SolverParam.true_res_hq has
@@ -313,7 +338,7 @@ namespace quda {
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
 
@@ -329,13 +354,13 @@ namespace quda {
       MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
       virtual ~MPCG();
 
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-  }; 
+      void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  };
 
 
 
   class PreconCG : public Solver {
-    private: 
+    private:
       const DiracMatrix &mat;
       const DiracMatrix &matSloppy;
       const DiracMatrix &matPrecon;
@@ -348,7 +373,7 @@ namespace quda {
                SolverParam &param, TimeProfile &profile);
       virtual ~PreconCG();
 
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+      void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
 
@@ -360,7 +385,7 @@ namespace quda {
     const DiracMatrix &matPrecon;
 
     // pointers to fields to avoid multiple creation overhead
-    cudaColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
+    ColorSpinorField *yp, *rp, *pp, *vp, *tmpp, *tp;
     bool init;
 
   public:
@@ -368,7 +393,7 @@ namespace quda {
 	     SolverParam &param, TimeProfile &profile);
     virtual ~BiCGstab();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class SimpleBiCGstab : public Solver {
@@ -384,9 +409,9 @@ namespace quda {
     SimpleBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
     virtual ~SimpleBiCGstab();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
-  
+
   class MPBiCGstab : public Solver {
 
   private:
@@ -401,7 +426,7 @@ namespace quda {
     MPBiCGstab(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
     virtual ~MPBiCGstab();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
 
@@ -416,32 +441,66 @@ namespace quda {
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
 
+    /**
+       The size of the Krylov space that GCR uses
+     */
+    int nKrylov;
+
+    Complex *alpha;
+    Complex **beta;
+    double *gamma;
+
+    /**
+       Solver uses lazy allocation: this flag to determine whether we have allocated.
+     */
+    bool init;
+
+    ColorSpinorField *rp;       //! residual vector
+    ColorSpinorField *yp;       //! high precision accumulator
+    ColorSpinorField *tmpp;     //! temporary for mat-vec
+    ColorSpinorField *x_sloppy; //! sloppy solution vector
+    ColorSpinorField *r_sloppy; //! sloppy residual vector
+    ColorSpinorField *r_pre;    //! residual passed to preconditioner
+    ColorSpinorField *p_pre;    //! preconditioner result
+    ColorSpinorField *rM;       //! residual vector for doing multi-cycle preconditioning
+
+    std::vector<ColorSpinorField*> p;  // GCR direction vectors
+    std::vector<ColorSpinorField*> Ap; // mat * direction vectors
+
   public:
     GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
 	SolverParam &param, TimeProfile &profile);
+
+    /**
+       @param K Preconditioner
+     */
+    GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
+	SolverParam &param, TimeProfile &profile);
     virtual ~GCR();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class MR : public Solver {
 
   private:
     const DiracMatrix &mat;
-    cudaColorSpinorField *rp;
-    cudaColorSpinorField *Arp;
-    cudaColorSpinorField *tmpp;
+    ColorSpinorField *rp;
+    ColorSpinorField *Arp;
+    ColorSpinorField *tmpp;
+    ColorSpinorField *yp;  //Holds initial guess if applicable
     bool init;
     bool allocate_r;
+    bool allocate_y;
 
   public:
     MR(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
     virtual ~MR();
 
-    void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
-  // Steepest descent solver used as a preconditioner 
+  // Steepest descent solver used as a preconditioner
   class SD : public Solver {
     private:
       const DiracMatrix &mat;
@@ -449,13 +508,13 @@ namespace quda {
       cudaColorSpinorField *r;
       cudaColorSpinorField *y;
       bool init;
-    
-    public: 
+
+    public:
       SD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
       virtual ~SD();
 
 
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
+      void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   // Extended Steepest Descent solver used for overlapping DD preconditioning
@@ -472,21 +531,7 @@ namespace quda {
       XSD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
       virtual ~XSD();
 
-      void operator()(cudaColorSpinorField &out, cudaColorSpinorField &in);
-  };
-
-
-  // multigrid solver
-  class alphaSA : public Solver {
-
-  protected:
-    const DiracMatrix &mat;
-
-  public:
-    alphaSA(DiracMatrix &mat, SolverParam &param, TimeProfile &profile);
-    virtual ~alphaSA() { ; }
-
-    void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
+      void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   class MultiShiftSolver {
@@ -496,11 +541,11 @@ namespace quda {
     TimeProfile &profile;
 
   public:
-    MultiShiftSolver(SolverParam &param, TimeProfile &profile) : 
+    MultiShiftSolver(SolverParam &param, TimeProfile &profile) :
     param(param), profile(profile) { ; }
     virtual ~MultiShiftSolver() { ; }
 
-    virtual void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in) = 0;
+    virtual void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in) = 0;
   };
 
   class MultiShiftCG : public MultiShiftSolver {
@@ -513,7 +558,7 @@ namespace quda {
     MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~MultiShiftCG();
 
-    void operator()(cudaColorSpinorField **out, cudaColorSpinorField &in);
+    void operator()(std::vector<ColorSpinorField*> out, ColorSpinorField &in);
   };
 
   /**
@@ -541,9 +586,10 @@ namespace quda {
        param q The basis vectors multipled by A
        param N The number of basis vectors
        return The residue of this guess.
-    */  
-    void operator()(cudaColorSpinorField &x, cudaColorSpinorField &b, cudaColorSpinorField **p,
-		    cudaColorSpinorField **q, int N);
+    */
+    void operator()(ColorSpinorField &x, ColorSpinorField &b,
+		    std::vector<ColorSpinorField*> p,
+		    std::vector<ColorSpinorField*> q, int N);
   };
 
   class DeflatedSolver {
@@ -557,9 +603,9 @@ namespace quda {
     QudaPrecision eigcg_precision;//may be double or single.
 
   public:
-    DeflatedSolver(SolverParam &param, TimeProfile *profile) : param(param), profile(profile) 
-    { 
-       eigcg_precision = param.precision_sloppy;//for mixed presicion use param.precision_sloppy 
+    DeflatedSolver(SolverParam &param, TimeProfile *profile) : param(param), profile(profile)
+    {
+       eigcg_precision = param.precision_sloppy;//for mixed presicion use param.precision_sloppy
     }
 
     virtual ~DeflatedSolver() { ; }
@@ -574,15 +620,15 @@ namespace quda {
     // solver factory
     static DeflatedSolver* create(SolverParam &param, DiracMatrix *mat, DiracMatrix *matSloppy, DiracMatrix *matCGSloppy, DiracMatrix *matDeflate, TimeProfile *profile);
 
-    bool convergence(const double &r2, const double &hq2, const double &r2_tol, 
+    bool convergence(const double &r2, const double &hq2, const double &r2_tol,
 		     const double &hq_tol);
- 
+
     /**
        Prints out the running statistics of the solver (requires a verbosity of QUDA_VERBOSE)
      */
     void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
 
-    /** 
+    /**
 	Prints out the summary of the solver convergence (requires a
 	versbosity of QUDA_SUMMARIZE).  Assumes
 	SolverParam.true_res and SolverParam.true_res_hq has
@@ -626,7 +672,7 @@ namespace quda {
     //Incremental eigCG solver (for eigcg and initcg calls)
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
 
-    //Compute  u dH^{-1} u^{dagger}b: 
+    //Compute  u dH^{-1} u^{dagger}b:
     void DeflateSpinor(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
     //
     void DeflateSpinorReduced(cudaColorSpinorField &out, cudaColorSpinorField &in, DeflationParam *param, bool set2zero = true);
@@ -648,7 +694,7 @@ namespace quda {
     //
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false);
     //
-    void CleanResources(); 
+    void CleanResources();
 
     void LoadEigenvectors(DeflationParam *param, int max_nevs, double tol = 1e-3);
 
@@ -658,7 +704,7 @@ namespace quda {
 
 //forward declaration
  struct GMResDRDeflationParam;
- class GMResDRArgs; 
+ class GMResDRArgs;
 
  class GMResDR : public DeflatedSolver {
 
@@ -672,7 +718,7 @@ namespace quda {
 
     QudaPrecision gmres_space_prec;
 
-    cudaColorSpinorField *Vm;//arnoldi basis vectors, size (m+1) 
+    cudaColorSpinorField *Vm;//arnoldi basis vectors, size (m+1)
 
     TimeProfile *profile;    //time profile for initCG solver
 
@@ -690,12 +736,12 @@ namespace quda {
     //GMRES-DR solver
     //void   GmresDRCycle(cudaColorSpinorField &out, cudaColorSpinorField &in, Complex *u);
     double GMResDRCycle(cudaColorSpinorField &x, double r2, Complex *u, const double stop);
-    //GMRES-DR solver 
+    //GMRES-DR solver
     void operator()(cudaColorSpinorField *out, cudaColorSpinorField *in);
     //
     void StoreRitzVecs(void *host_buf, double *inv_eigenvals, const int *X, QudaInvertParam *inv_par, const int nev, bool cleanResources = false) {};
-    // 
-    void CleanResources(); 
+    //
+    void CleanResources();
     //
     void PerformProjection(cudaColorSpinorField &x_sloppy, cudaColorSpinorField &r_sloppy, GMResDRDeflationParam *dpar);
     //GMRESDR method

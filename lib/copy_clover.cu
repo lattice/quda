@@ -3,6 +3,8 @@
 
 namespace quda {
 
+  using namespace clover;
+
 #ifdef GPU_CLOVER_DIRAC
 
   /** 
@@ -176,7 +178,6 @@ namespace quda {
   // this is the function that is actually called, from here on down we instantiate all required templates
   void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
 			void *Out, void *In, void *outNorm, void *inNorm) {
-
 #ifdef GPU_CLOVER_DIRAC
     if (out.Precision() == QUDA_HALF_PRECISION && out.Order() > 4) 
       errorQuda("Half precision not supported for order %d", out.Order());
@@ -211,7 +212,6 @@ namespace quda {
 #else
     errorQuda("Clover has not been built");
 #endif
-
   }
 
 

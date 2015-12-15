@@ -7,6 +7,8 @@
 
 namespace quda {
 
+using namespace gauge;
+
 #ifdef GPU_GAUGE_TOOLS
 
   template <typename Mom>

@@ -8,6 +8,8 @@
 
 namespace quda {
 
+  using namespace clover;
+
 #ifdef GPU_CLOVER_DIRAC
 
   template <typename Clover>

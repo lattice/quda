@@ -4,13 +4,7 @@
 #include <clover_field.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-
-namespace CloverOrder {
-  using namespace quda;
 #include <clover_field_order.h>
-} // CloverOrder
-
-
 
 namespace quda {
 
@@ -44,31 +38,31 @@ namespace quda {
     }
   };
 
+  /*
+    Put into clover order
+    Upper-left block (chirality index 0)
+       /                                                                                \
+       |  1 + c*I*(F[0,1] - F[2,3]) ,     c*I*(F[1,2] - F[0,3]) + c*(F[0,2] + F[1,3])   |
+       |                                                                                |
+       |  c*I*(F[1,2] - F[0,3]) - c*(F[0,2] + F[1,3]),   1 - c*I*(F[0,1] - F[2,3])      |
+       |                                                                                |
+       \                                                                                /
 
-  // Put into clover order 
-  // Upper-left block (chirality index 0)
-  //     /                                                                                \
-  //     |  1 + c*I*(F[0,1] - F[2,3]) ,     c*I*(F[1,2] - F[0,3]) + c*(F[0,2] + F[1,3])   |
-  //     |                                                                                |
-  //     |  c*I*(F[1,2] - F[0,3]) - c*(F[0,2] + F[1,3]),   1 - c*I*(F[0,1] - F[2,3])      |
-  //     |                                                                                |
-  //     \                                                                                / 
+       /
+       | 1 - c*I*(F[0] - F[5]),   -c*I*(F[2] - F[3]) - c*(F[1] + F[4])
+       |
+       |  -c*I*(F[2] -F[3]) + c*(F[1] + F[4]),   1 + c*I*(F[0] - F[5])
+       |
+       \
 
-  //     /
-  //     | 1 - c*I*(F[0] - F[5]),   -c*I*(F[2] - F[3]) - c*(F[1] + F[4])  
-  //     |
-  //     |  -c*I*(F[2] -F[3]) + c*(F[1] + F[4]),   1 + c*I*(F[0] - F[5])  
-  //     |
-  //     \
-  // 
-  // Lower-right block (chirality index 1)
-  //
-  //     /                                                                  \
-  //     |  1 - c*I*(F[0] + F[5]),  -c*I*(F[2] + F[3]) - c*(F[1] - F[4])    |
-  //     |                                                                  |
-  //     |  -c*I*(F[2]+F[3]) + c*(F[1]-F[4]),     1 + c*I*(F[0] + F[5])     |
-  //     \                                                                  / 
-  //
+     Lower-right block (chirality index 1)
+
+       /                                                                  \
+       |  1 - c*I*(F[0] + F[5]),  -c*I*(F[2] + F[3]) - c*(F[1] - F[4])    |
+       |                                                                  |
+       |  -c*I*(F[2]+F[3]) + c*(F[1]-F[4]),     1 + c*I*(F[0] + F[5])     |
+       \                                                                  /
+  */
 
   // Core routine for constructing clover term from field strength
   template<typename Float, typename Clover, typename Fmunu>
@@ -231,8 +225,8 @@ namespace quda {
   void computeClover(CloverField &clover, const GaugeField &f, Float cloverCoeff, QudaFieldLocation location){
     if (f.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (clover.isNative()) {
-	typedef typename CloverOrder::quda::clover_mapper<Float>::type C;
-	computeClover(C(clover,0), FloatNOrder<Float,18,2,18>(f), f, cloverCoeff, location);  
+	typedef typename clover_mapper<Float>::type C;
+	computeClover(C(clover,0), gauge::FloatNOrder<Float,18,2,18>(f), f, cloverCoeff, location);  
       } else {
 	errorQuda("Clover field order %d not supported", clover.Order());
       } // clover order

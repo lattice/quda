@@ -178,6 +178,8 @@ namespace quda {
 
     QUDA_PROFILE_CONSTANT, /**< time spent setting CUDA constant parameters */
 
+    QUDA_PROFILE_IO, /**< time spent on file i/o */
+
     QUDA_PROFILE_TOTAL, /**< The total time in seconds for the algorithm. Must be the penultimate type. */
     QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
   };

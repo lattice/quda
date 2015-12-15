@@ -8,14 +8,14 @@
 #include <cuComplex.h>
 #include <stdio.h>
 
-//MAGMA library interface 
+//MAGMA library interface
 //required for (incremental) EigCG solver
 
 
 
    class BlasMagmaArgs{
 
-      typedef std::complex<double> Complex; 
+      typedef std::complex<double> Complex;
 
     private:
 
@@ -25,14 +25,14 @@
       int prec;
       int ldm;//(may include padding)
 
-      //general magma library parameters:	
+      //general magma library parameters:
       int info;
 
       bool init;
       bool alloc;
 
       //magma params/objects:
-      int llwork; 
+      int llwork;
       int lrwork;
       int liwork;
 
@@ -41,7 +41,7 @@
       int htsize;//MIN(l,k)-number of Householder reflectors, but we always have k <= MIN(m,n)
       int dtsize;//
 
-      int lwork_max; 
+      int lwork_max;
 
       void *W;
       void *W2;
@@ -83,7 +83,7 @@
 
       //GPU version of the above
       void SolveGPUProjMatrix(void* rhs, const int ldn, const int n, void* H, const int ldH);
-      
+
       //Spinor matrix vector product:
       void SpinorMatVec(void *spinorOut, const void *spinorSetIn, const int sld, const int slen, const void *vec, const int vlen);
 
@@ -102,7 +102,7 @@
 
       void Construct_harmonic_matrix(Complex * const harmH, Complex * const conjH, const double beta2, const int m, const int ldH);
 
-      void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv); 
+      void Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv);
    };
 
 #endif // _BLAS_MAGMA_H

@@ -47,7 +47,7 @@ namespace quda {
 
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
-        size_t nbytes = nFace * surface[i] * reconstruct * precision;
+        size_t nbytes = nFace * surface[i] * nInternal * precision;
         ghost[i] = nbytes ? device_malloc(nbytes) : NULL;
       }        
     }
@@ -168,16 +168,15 @@ namespace quda {
     void *ghost_[QUDA_MAX_DIM];
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) {
-      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*reconstruct*precision) : ghost[d];
-      send[d] = device_malloc(nFace*surface[d]*reconstruct*precision);
+      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
+      send[d] = device_malloc(nFace*surface[d]*nInternal*precision);
     }
 
     // get the links into contiguous buffers
     extractGaugeGhost(*this, send);
 
     // communicate between nodes
-    FaceBuffer faceBuf(x, nDim, reconstruct, nFace, precision);
-    faceBuf.exchangeLink(ghost_, send, QUDA_CUDA_FIELD_LOCATION);
+    exchange(ghost_, send);
 
     for (int d=0; d<nDim; d++) device_free(send[d]);
 
@@ -199,7 +198,7 @@ namespace quda {
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d) && !no_comms_fill) continue;
       // store both parities and directions in each
-      bytes[d] = surface[d] * R[d] * geometry * reconstruct * precision;
+      bytes[d] = surface[d] * R[d] * geometry * nInternal * precision;
       send_d[d] = device_malloc(2 * bytes[d]);
       recv_d[d] = device_malloc(2 * bytes[d]);
     }
@@ -210,7 +209,7 @@ namespace quda {
     size_t total_bytes = 0;
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-      total_bytes += 4*bytes[d];
+      total_bytes += 4*bytes[d]; // (2 from send/recv) x (2 from fwd/back)
     }
     resizeBufferPinned(total_bytes,0);
 
@@ -218,7 +217,6 @@ namespace quda {
     size_t offset = 0;
     for (int d=0; d<nDim; d++) {
       if (!commDimPartitioned(d)) continue;
-
       recv_h[d] = static_cast<char*>(bufferPinned[0]) + offset;
       send_h[d] = static_cast<char*>(recv_h[d]) + 2*bytes[d];
       offset += 4*bytes[d];
@@ -401,8 +399,8 @@ namespace quda {
      - input and output precisions must match
    */
   template<typename FloatN, typename Float>
-    static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int volumeCB, 
-        int stride, QudaPrecision prec) 
+  static void storeGaugeField(Float* cpuGauge, FloatN *gauge, int bytes, int Nint, 
+			      int volumeCB, int stride, QudaPrecision prec) 
     {  
       cudaStream_t streams[2];
       for (int i=0; i<2; i++) cudaStreamCreate(&streams[i]);
@@ -410,7 +408,7 @@ namespace quda {
       FloatN *even = gauge;
       FloatN *odd = (FloatN*)((char*)gauge + bytes/2);
 
-      size_t datalen = 4*2*volumeCB*gaugeSiteSize*sizeof(Float); // both parities
+      size_t datalen = 4*2*volumeCB*Nint*sizeof(Float); // both parities
       void *unpacked = device_malloc(datalen);
       void *unpackedEven = unpacked;
       void *unpackedOdd = (char*)unpacked + datalen/2;
@@ -426,10 +424,10 @@ namespace quda {
       //unpack odd data kernel
       link_format_gpu_to_cpu((void*)unpackedOdd, (void*)odd, volumeCB, stride, prec, streams[1]);
 #ifdef GPU_DIRECT
-      cudaMemcpyAsync(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
+      cudaMemcpyAsync(cpuGauge + 4*volumeCB*Nint, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost, streams[1]);  
       for(int i=0; i<2; i++) cudaStreamSynchronize(streams[i]);
 #else
-      cudaMemcpy(cpuGauge + 4*volumeCB*gaugeSiteSize, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
+      cudaMemcpy(cpuGauge + 4*volumeCB*Nint, unpackedOdd, datalen/2, cudaMemcpyDeviceToHost);  
 #endif
 
       device_free(unpacked);
@@ -450,10 +448,11 @@ namespace quda {
       if (order != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Only QUDA_FLOAT2_GAUGE_ORDER supported");
       if (cpu.Order() != QUDA_MILC_GAUGE_ORDER) errorQuda("Only QUDA_MILC_GAUGE_ORDER supported");
 
+      // internal degrees of freedom
       if (precision == QUDA_DOUBLE_PRECISION){
-        storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, volumeCB, stride, precision);
+        storeGaugeField((double*)cpu.gauge, (double2*)gauge, bytes, nInternal, volumeCB, stride, precision);
       } else if (precision == QUDA_SINGLE_PRECISION){
-        storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, volumeCB, stride, precision);
+        storeGaugeField((float*)cpu.gauge, (float2*)gauge, bytes, nInternal, volumeCB, stride, precision);
       } else {
         errorQuda("Half precision not supported");
       }
@@ -497,7 +496,10 @@ namespace quda {
   ColorSpinorParam colorSpinorParam(const cudaGaugeField &a) {
    if (a.FieldOrder() == QUDA_QDP_GAUGE_ORDER || 
         a.FieldOrder() == QUDA_QDPJIT_GAUGE_ORDER)
-      errorQuda("Not implemented");
+      errorQuda("Not implemented for this order");
+
+    if (a.LinkType() == QUDA_COARSE_LINKS) 
+      errorQuda("Not implemented for this link type");
 
     int spin = 0;
     switch (a.Geometry()) {
@@ -541,7 +543,7 @@ namespace quda {
     cudaColorSpinorField b(colorSpinorParam(a));
     setGhostSpinor(true);
 
-    return norm2(b);
+    return blas::norm2(b);
   }
 
   // Return the L1 norm of the gauge field
@@ -551,7 +553,7 @@ namespace quda {
     cudaColorSpinorField b(colorSpinorParam(a));
     setGhostSpinor(true);
 
-    return norm1Cuda(b);
+    return blas::norm1(b);
   }
 
 } // namespace quda

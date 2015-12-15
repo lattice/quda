@@ -315,7 +315,7 @@ namespace quda {
   void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge, QudaFieldLocation location) {
     if (Fmunu.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (gauge.isNative()) {
-	typedef FloatNOrder<Float, 18, 2, 18> F;
+	typedef gauge::FloatNOrder<Float, 18, 2, 18> F;
 
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;

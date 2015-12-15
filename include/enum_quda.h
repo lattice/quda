@@ -17,6 +17,7 @@ extern "C" {
     QUDA_GENERAL_LINKS,
     QUDA_THREE_LINKS,
     QUDA_MOMENTUM,
+    QUDA_COARSE_LINKS, // used for coarse-gauge field with multigrid
     QUDA_WILSON_LINKS = QUDA_SU3_LINKS, // used by wilson, clover, twisted mass, and domain wall
     QUDA_ASQTAD_FAT_LINKS = QUDA_GENERAL_LINKS,
     QUDA_ASQTAD_LONG_LINKS = QUDA_THREE_LINKS,
@@ -110,6 +111,7 @@ extern "C" {
     QUDA_GMRESDR_PROJ_INVERTER,
     QUDA_GMRESDR_SH_INVERTER,
     QUDA_FGMRESDR_INVERTER,
+    QUDA_MG_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
@@ -278,8 +280,8 @@ extern "C" {
   
   // Which sites are included
   typedef enum QudaSiteSubset_s {
-    QUDA_FULL_SITE_SUBSET,
-    QUDA_PARITY_SITE_SUBSET,
+    QUDA_PARITY_SITE_SUBSET = 1,
+    QUDA_FULL_SITE_SUBSET = 2,
     QUDA_INVALID_SITE_SUBSET = QUDA_INVALID_ENUM
   } QudaSiteSubset;
   
@@ -321,6 +323,8 @@ extern "C" {
   typedef enum QudaSourceType_s {
     QUDA_POINT_SOURCE,
     QUDA_RANDOM_SOURCE,
+    QUDA_CONSTANT_SOURCE,
+    QUDA_SINUSOIDAL_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
   
@@ -374,6 +378,12 @@ extern "C" {
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
 
+  typedef enum QudaComputeNullVector_s {
+    QUDA_COMPUTE_NULL_VECTOR_NO,    
+    QUDA_COMPUTE_NULL_VECTOR_YES,
+    QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
+  } QudaComputeNullVector;
+
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
     QUDA_FORWARDS = +1,
@@ -396,6 +406,7 @@ extern "C" {
     QUDA_SCALAR_GEOMETRY = 1,
     QUDA_VECTOR_GEOMETRY = 4,
     QUDA_TENSOR_GEOMETRY = 6,
+    QUDA_COARSE_GEOMETRY = 9,
     QUDA_INVALID_GEOMETRY = QUDA_INVALID_ENUM
   } QudaFieldGeometry;
 

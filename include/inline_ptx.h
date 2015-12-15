@@ -60,6 +60,3 @@ namespace quda {
   }
 
 } // namespace quda
-
-
-

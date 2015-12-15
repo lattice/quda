@@ -32,8 +32,8 @@ namespace quda {
   {
     checkFullSpinor(out, in);
 
-    Apply(out.Odd(),  in.Even(), QUDA_ODD_PARITY,  mu);
-    Apply(out.Even(), in.Odd(),  QUDA_EVEN_PARITY, mu);
+    Apply(static_cast<cudaColorSpinorField&>(out.Odd()),  static_cast<const cudaColorSpinorField&>(in.Even()), QUDA_ODD_PARITY,  mu);
+    Apply(static_cast<cudaColorSpinorField&>(out.Even()), static_cast<const cudaColorSpinorField&>(in.Odd()),  QUDA_EVEN_PARITY, mu);
   }
 
   void CovD::checkParitySpinor(const cudaColorSpinorField &out, const cudaColorSpinorField &in) const

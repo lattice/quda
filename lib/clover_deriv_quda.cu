@@ -323,8 +323,8 @@ namespace quda {
     typedef typename ComplexTypeId<Float>::Type Complex;
 
     if (force.Order() == QUDA_FLOAT2_GAUGE_ORDER){
-      typedef FloatNOrder<Float, 18, 2, 18> F;
-      typedef FloatNOrder<Float, 18, 2, 18> O;
+      typedef gauge::FloatNOrder<Float, 18, 2, 18> F;
+      typedef gauge::FloatNOrder<Float, 18, 2, 18> O;
 
       if (gauge.isNative()) {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {

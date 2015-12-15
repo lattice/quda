@@ -879,7 +879,9 @@ namespace quda {
         pack.apply(stream);
       }
       break;
-    }  
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
+    }
   }
 
   template <typename FloatN, typename Float>
@@ -939,7 +941,9 @@ namespace quda {
         pack.apply(stream);
       }
       break;
-    }  
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
+    }
   }
 
 #ifdef GPU_STAGGERED_DIRAC
@@ -1349,7 +1353,9 @@ namespace quda {
         pack.apply(stream);
       }
       break;
-    }  
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
+    }
   }
 
   void packFaceExtendedStaggered(void *buffer, cudaColorSpinorField &field, const int nFace, const int R[],
@@ -1374,7 +1380,8 @@ namespace quda {
         pack.apply(stream);  
       }
       break;
-
+    default:
+      errorQuda("Precision %d not supported", field.Precision());
     } // switch(field.Precision())
   }
 
@@ -1609,7 +1616,9 @@ namespace quda {
 	    pack.apply(stream);
 	  }
 	  break;
-	}  
+	default:
+	  errorQuda("Precision %d not supported", in.Precision());
+	}
       }
     else
       {
@@ -1632,7 +1641,9 @@ namespace quda {
 	    pack.apply(stream);
 	  }
 	  break;
-	}  
+	default:
+	  errorQuda("Precision %d not supported", in.Precision());
+	}
       }
   }
 
@@ -1760,6 +1771,8 @@ namespace quda {
         pack.apply(stream);
       }
       break;
+    default:
+      errorQuda("Precision %d not supported", in.Precision());
     } 
   }
 

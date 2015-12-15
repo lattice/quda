@@ -7,6 +7,8 @@
 #include <register_traits.h>
 #include <float_vector.h>
 
+// FIXME - it would be too hard to get this working on the host as well
+
 //namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -336,9 +338,10 @@ template <typename RegType, typename InterType, typename StoreType, int N, int w
     Spinor() 
   : spinor(0), tex(), norm(0), stride(0) { } // default constructor
 
-    Spinor(const cudaColorSpinorField &x, int nFace = 1) 
-      : spinor((StoreType*)x.V()), tex(&x), norm((float*)x.Norm()),
-      stride(x.Length()/(N*REG_LENGTH)) { 
+  // Spinor must only eveb called with cudaColorSpinorField references!!!!
+ Spinor(const ColorSpinorField &x, int nFace=1) 
+     : spinor((StoreType*)x.V()), tex(&(static_cast<const cudaColorSpinorField&>(x))), norm((float*)x.Norm()),
+       stride(x.Length()/(N*REG_LENGTH)) { 
       checkTypes<RegType,InterType,StoreType>(); 
       for (int d=0; d<4; d++) {
 	ghost_stride[d] = nFace*x.SurfaceCB(d);

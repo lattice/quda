@@ -15,7 +15,7 @@ namespace quda {
   namespace { // anonymous
 #include <texture.h>
   }
-  
+ 
   template<int N>
   void createEventArray(cudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
   {
@@ -174,7 +174,7 @@ namespace quda {
   // Get the  coordinates for the exterior kernels
   __device__ void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
   {
-    unsigned int Xh[2] = {X[0]/2, X[1]/2};
+    int Xh[2] = {X[0]/2, X[1]/2};
     switch(dir){
     case 0:
       x[2] = cb_idx/Xh[1] % X[2];
@@ -403,16 +403,16 @@ namespace quda {
   
     long long flops() const { 
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	((long long)arg.length)*4*(24 + 144 + 234); // spin project + spin trace + multiply-add
+	return ((long long)arg.length)*4*(24 + 144 + 234); // spin project + spin trace + multiply-add
       } else {
-	((long long)arg.length)*(144 + 234); // spin trace + multiply-add
+	return ((long long)arg.length)*(144 + 234); // spin trace + multiply-add
       }
     }
     long long bytes() const { 
       if (arg.kernelType == OPROD_INTERIOR_KERNEL) {
-	((long long)arg.length)*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB_shift.Bytes() + arg.inD_shift.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes())); 
+	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inC.Bytes() + 4*(arg.inB_shift.Bytes() + arg.inD_shift.Bytes() + 2*arg.force.Bytes() + arg.gauge.Bytes())); 
       } else {
-	((long long)arg.length)*(arg.inA.Bytes() + arg.inB_shift.Bytes()/2 + arg.inC.Bytes() + arg.inD_shift.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes()); 
+	return ((long long)arg.length)*(arg.inA.Bytes() + arg.inB_shift.Bytes()/2 + arg.inC.Bytes() + arg.inD_shift.Bytes()/2 + 2*arg.force.Bytes() + arg.gauge.Bytes()); 
       }
     }
   
@@ -532,10 +532,10 @@ namespace quda {
 
     for (int parity=0; parity<2; parity++) {
       
-      cudaColorSpinorField& inA = (parity&1) ? p.Odd() : p.Even();
-      cudaColorSpinorField& inB = (parity&1) ? x.Even(): x.Odd();
-      cudaColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
-      cudaColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
+      ColorSpinorField& inA = (parity&1) ? p.Odd() : p.Even();
+      ColorSpinorField& inB = (parity&1) ? x.Even(): x.Odd();
+      ColorSpinorField& inC = (parity&1) ? x.Odd() : x.Even();
+      ColorSpinorField& inD = (parity&1) ? p.Even(): p.Odd();
       
       if(x.Precision() == QUDA_DOUBLE_PRECISION){
 	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
@@ -543,15 +543,19 @@ namespace quda {
 	Spinor<double2, double2, double2, 12, 0, 0> spinorC(inC);
 	Spinor<double2, double2, double2, 12, 0, 1> spinorD(inD);
 	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
-					  FloatNOrder<double,18, 2, 18>(U),
-					  force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-					  inB.GhostFace(), ghostOffset, coeff);
+	  computeCloverForceCuda<double2>(gauge::FloatNOrder<double, 18, 2, 18>(force), 
+					  gauge::FloatNOrder<double,18, 2, 18>(U),
+					  force, spinorA, spinorB, spinorC, spinorD, 
+					  static_cast<cudaColorSpinorField&>(inB), 
+					  static_cast<cudaColorSpinorField&>(inD), 
+					  parity, inB.GhostFace(), ghostOffset, coeff);
 	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  computeCloverForceCuda<double2>(FloatNOrder<double, 18, 2, 18>(force), 
-					  FloatNOrder<double,18, 2, 12>(U),
-					  force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-					  inB.GhostFace(), ghostOffset, coeff);
+	  computeCloverForceCuda<double2>(gauge::FloatNOrder<double, 18, 2, 18>(force), 
+					  gauge::FloatNOrder<double,18, 2, 12>(U),
+					  force, spinorA, spinorB, spinorC, spinorD, 
+					  static_cast<cudaColorSpinorField&>(inB), 
+					  static_cast<cudaColorSpinorField&>(inD), 
+					  parity, inB.GhostFace(), ghostOffset, coeff);
 	} else {
 	  errorQuda("Unsupported recontruction type");
 	}
@@ -560,15 +564,19 @@ namespace quda {
 	Spinor<float4, float4, float4, 6, 0, 0> spinorA(inA);
 	Spinor<float4, float4, float4, 6, 0, 1> spinorB(inB);
 	if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	  computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
-					 FloatNOrder<float, 18, 2, 18>(U), 
-					 force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-					 inB.GhostFace(), ghostOffset, coeff);
+	  computeCloverForceCuda<float2>(gauge::FloatNOrder<float, 18, 2, 18>(force), 
+					 gauge::FloatNOrder<float, 18, 2, 18>(U), 
+					 force, spinorA, spinorB, spinorC, spinorD, 
+					 static_cast<cudaColorSpinorField&>(inB), 
+					 static_cast<cudaColorSpinorField&>(inD), 
+					 parity, inB.GhostFace(), ghostOffset, coeff);
 	} else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	  computeCloverForceCuda<float2>(FloatNOrder<float, 18, 2, 18>(force), 
-					 FloatNOrder<float, 18, 4, 12>(U), 
-					 force, spinorA, spinorB, spinorC, spinorD, inB, inD, parity, 
-					 inB.GhostFace(), ghostOffset, coeff);
+	  computeCloverForceCuda<float2>(gauge::FloatNOrder<float, 18, 2, 18>(force), 
+					 gauge::FloatNOrder<float, 18, 4, 12>(U), 
+					 force, spinorA, spinorB, spinorC, spinorD, 
+					 static_cast<cudaColorSpinorField&>(inB), 
+					 static_cast<cudaColorSpinorField&>(inD), 
+					 parity, inB.GhostFace(), ghostOffset, coeff);
 	}
 #endif
       } else {

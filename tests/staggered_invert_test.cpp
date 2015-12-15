@@ -70,6 +70,8 @@ extern QudaDslashType dslash_type;
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
 
+extern double mass;
+
 static void end();
 
 template<typename Float>
@@ -433,21 +435,22 @@ invert_test(void)
 #else
           matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
 #endif
-          mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-          double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-          double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-          double hqr = sqrt(HeavyQuarkResidualNormCpu(*spinorOutArray[i], *ref).z);
-          double l2r = sqrt(nrm2/src2);
 
-          printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-              i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
-              inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
+	  mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+	  double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+	  double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+	  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
+	  double l2r = sqrt(nrm2/src2);
+	
+	  printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
+		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
 
-          //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-          if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
-            ret |=1;
-          }
-        }
+	  //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+	  if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
+	    ret |=1;
+	  }
+	}
 
         for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
       }
@@ -460,7 +463,7 @@ invert_test(void)
 
   if (test_type <=2){
 
-    double hqr = sqrt(HeavyQuarkResidualNormCpu(*out, *ref).z);
+    double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
     double l2r = sqrt(nrm2/src2);
 
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",

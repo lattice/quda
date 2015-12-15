@@ -27,9 +27,9 @@ namespace quda {
   DiracTwistedMass::DiracTwistedMass(const DiracTwistedMass &dirac) 
     : DiracWilson(dirac), mu(dirac.mu), epsilon(dirac.epsilon) 
   { 
-    twisted::initConstants(dirac.gauge,profile);
-    ndegtwisted::initConstants(dirac.gauge,profile);
-    dslash_aux::initConstants(dirac.gauge,profile);
+    twisted::initConstants(*dirac.gauge,profile);
+    ndegtwisted::initConstants(*dirac.gauge,profile);
+    dslash_aux::initConstants(*dirac.gauge,profile);
   }
 
   DiracTwistedMass::~DiracTwistedMass() { }
@@ -43,7 +43,7 @@ namespace quda {
   }
 
   // Protected method for applying twist
-  void DiracTwistedMass::twistedApply(cudaColorSpinorField &out, const cudaColorSpinorField &in,
+  void DiracTwistedMass::twistedApply(ColorSpinorField &out, const ColorSpinorField &in,
 				      const QudaTwistGamma5Type twistType) const
   {
     checkParitySpinor(out, in);
@@ -53,21 +53,65 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS) {
       double flavor_mu = in.TwistFlavor() * mu;
-      twistGamma5Cuda(&out, &in, dagger, kappa, flavor_mu, 0.0, twistType);
+      if (Location(out, in) == QUDA_CUDA_FIELD_LOCATION) {
+	twistGamma5Cuda(&static_cast<cudaColorSpinorField&>(out), 
+			&static_cast<const cudaColorSpinorField&>(in),
+			dagger, kappa, flavor_mu, 0.0, twistType);
+      } else {
+	errorQuda("Not implemented");
+      }
       flops += 24ll*in.Volume();
     } else {
       errorQuda("DiracTwistedMass::twistedApply method for flavor doublet is not implemented..\n");  
     }
+	
+    flops += 24ll*in.Volume();
   }
 
 
   // Public method to apply the twist
-  void DiracTwistedMass::Twist(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracTwistedMass::Twist(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     twistedApply(out, in, QUDA_TWIST_GAMMA5_DIRECT);
   }
 
-  void DiracTwistedMass::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracTwistedMass::TwistedDslash(ColorSpinorField &out, const ColorSpinorField &in,
+				       QudaParity parity, QudaTwistDslashType twistDslashType,
+				       double a, double b, double c, double d) const {
+    twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
+			  0, twistDslashType, a, b, c, d, commDim, profile);
+  }
+
+  void DiracTwistedMass::TwistedDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+					   const ColorSpinorField &x, QudaParity parity,
+					   QudaTwistDslashType twistDslashType,
+					   double a, double b, double c, double d) const {
+    twistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
+			  &static_cast<const cudaColorSpinorField&>(x),
+			  twistDslashType, a, b, c, d, commDim, profile);
+  }
+  
+  void DiracTwistedMass::NdegTwistedDslash(ColorSpinorField &out, const ColorSpinorField &in,
+					   QudaParity parity, QudaTwistDslashType twistDslashType,
+					   double a, double b, double c, double d) const {
+    ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
+			  0, twistDslashType, a, b, c, d, commDim, profile);
+  }
+
+  void DiracTwistedMass::NdegTwistedDslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+					       const ColorSpinorField &x, QudaParity parity,
+					       QudaTwistDslashType twistDslashType,
+					       double a, double b, double c, double d) const {
+    ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge,
+			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger,
+			  &static_cast<const cudaColorSpinorField&>(x),
+			  twistDslashType, a, b, c, d, commDim, profile);
+  }
+
+  void DiracTwistedMass::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
     if (in.TwistFlavor() != out.TwistFlavor()) 
@@ -78,7 +122,7 @@ namespace quda {
     }
 
     // We can eliminate this temporary at the expense of more kernels (like clover)
-    cudaColorSpinorField *tmp=0; // this hack allows for tmp2 to be full or parity field
+    ColorSpinorField *tmp=0; // this hack allows for tmp2 to be full or parity field
     if (tmp2) {
       if (tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) tmp = &(tmp2->Even());
       else tmp = tmp2;
@@ -90,21 +134,29 @@ namespace quda {
   
     if(in.TwistFlavor() == QUDA_TWIST_PLUS || in.TwistFlavor() == QUDA_TWIST_MINUS){
       double a = 2.0 * kappa * in.TwistFlavor() * mu;//for direct twist (must be daggered separately)  
-      twistedMassDslashCuda(&out.Odd(), gauge, &in.Even(), QUDA_ODD_PARITY, dagger, &in.Odd(), QUDA_DEG_DSLASH_TWIST_XPAY, a, -kappa, 0.0, 0.0, commDim, profile);
-      twistedMassDslashCuda(&out.Even(), gauge, &in.Odd(), QUDA_EVEN_PARITY, dagger, &in.Even(), QUDA_DEG_DSLASH_TWIST_XPAY, a, -kappa, 0.0, 0.0, commDim, profile);
+
+      TwistedDslashXpay(out.Odd(), in.Even(), in.Odd(), QUDA_ODD_PARITY, 
+			QUDA_DEG_DSLASH_TWIST_XPAY, a, -kappa, 0.0, 0.0);
+
+      TwistedDslashXpay(out.Even(), in.Odd(), in.Even(), QUDA_EVEN_PARITY,
+			QUDA_DEG_DSLASH_TWIST_XPAY, a, -kappa, 0.0, 0.0);
+
       flops += (1320ll+72ll)*in.Volume();
     } else {
       double a = -2.0 * kappa * mu; //for twist 
       double b = -2.0 * kappa * epsilon;//for twist
-      ndegTwistedMassDslashCuda(&out.Odd(), gauge, &in.Even(), QUDA_ODD_PARITY, dagger, &in.Odd(), QUDA_NONDEG_DSLASH, a, b, 1.0, -kappa, commDim, profile);
-      ndegTwistedMassDslashCuda(&out.Even(), gauge, &in.Odd(), QUDA_EVEN_PARITY, dagger, &in.Even(), QUDA_NONDEG_DSLASH, a, b, 1.0, -kappa, commDim, profile);
+      NdegTwistedDslashXpay(out.Odd(), in.Even(), in.Odd(), QUDA_ODD_PARITY,
+			    QUDA_NONDEG_DSLASH, a, b, 1.0, -kappa);
 
+      NdegTwistedDslashXpay(out.Even(), in.Odd(), in.Even(), QUDA_EVEN_PARITY,
+			    QUDA_NONDEG_DSLASH, a, b, 1.0, -kappa);
+				  
       flops += (1320ll+72ll+24ll)*in.Volume();//??
     }
     deleteTmp(&tmp, reset);
   }
 
-  void DiracTwistedMass::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracTwistedMass::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
     bool reset = newTmp(&tmp1, in);
@@ -115,8 +167,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedMass::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-				 cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracTwistedMass::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+				 ColorSpinorField &x, ColorSpinorField &b, 
 				 const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -127,7 +179,7 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracTwistedMass::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracTwistedMass::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				     const QudaSolutionType solType) const
   {
     // do nothing
@@ -152,15 +204,15 @@ namespace quda {
   }
 
   // Public method to apply the inverse twist
-  void DiracTwistedMassPC::TwistInv(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracTwistedMassPC::TwistInv(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    twistedApply(out, in, QUDA_TWIST_GAMMA5_INVERSE);
+    twistedApply(out, in,  QUDA_TWIST_GAMMA5_INVERSE);
   }
 
   // apply hopping term, then inverse twist: (A_ee^-1 D_eo) or (A_oo^-1 D_oe),
   // and likewise for dagger: (D^dagger_eo A_ee^-1) or (D^dagger_oe A_oo^-1)
   void DiracTwistedMassPC::Dslash
-  (cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity) const
+  (ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -177,10 +229,10 @@ namespace quda {
       double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist (not daggered)
       double b = 1.0 / (1.0 + a*a);                     //for invert twist
       if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-	twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0, commDim, profile);
+	TwistedDslash(out, in, parity, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0);
 	flops += 1392ll*in.Volume();
       } else { 
-	twistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, QUDA_DEG_TWIST_INV_DSLASH, a, b, 0.0, 0.0, commDim, profile);	
+	TwistedDslash(out, in, parity, QUDA_DEG_TWIST_INV_DSLASH, a, b, 0.0, 0.0);
         flops += 1392ll*in.Volume();
       }
     } else {//TWIST doublet :
@@ -189,14 +241,15 @@ namespace quda {
       double c = 1.0 / (1.0 + a*a - b*b);//!    
     
       if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        ndegTwistedMassDslashCuda(&out, gauge, &in, parity, dagger, 0, QUDA_NONDEG_DSLASH, a, b, c, 0.0, commDim, profile);
+        NdegTwistedDslash(out, in, parity, QUDA_NONDEG_DSLASH, a, b, c, 0.0);
         flops += (1320ll+120ll)*in.Volume();//per flavor 1320+16*6(rotation per flavor)+24 (scaling per flavor)
       } else {
-        cudaColorSpinorField *doubletTmp=0; 
+        ColorSpinorField *doubletTmp=0; 
         bool reset = newTmp(&doubletTmp, in);
     
-        twistGamma5Cuda(doubletTmp, &in, dagger, -a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a      
-        ndegTwistedMassDslashCuda(&out, gauge, doubletTmp, parity, dagger, 0, QUDA_NONDEG_DSLASH, 0.0, 0.0, 1.0, 0.0, commDim, profile);      //merge this!
+        twistGamma5Cuda(static_cast<cudaColorSpinorField*>(doubletTmp),
+			&static_cast<const cudaColorSpinorField&>(in), dagger, a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a      
+        NdegTwistedDslash(out, *doubletTmp, parity, QUDA_NONDEG_DSLASH, 0.0, 0.0, 1.0, 0.0);
 
         flops += 1440ll*in.Volume();//as for the asymmetric case
 
@@ -207,7 +260,7 @@ namespace quda {
 
   // xpay version of the above
   void DiracTwistedMassPC::DslashXpay
-  (cudaColorSpinorField &out, const cudaColorSpinorField &in, const QudaParity parity, const cudaColorSpinorField &x, const double &k) const
+  (ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, const ColorSpinorField &x, const double &k) const
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
@@ -223,10 +276,10 @@ namespace quda {
       double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist
       double b = k / (1.0 + a*a);                     //for invert twist 
       if (!dagger) {
-        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0, commDim, profile);
+        TwistedDslashXpay(out, in, x, parity, QUDA_DEG_DSLASH_TWIST_INV, a, b, 0.0, 0.0);
         flops += 1416ll*in.Volume();
       } else { // tmp1 can alias in, but tmp2 can alias x so must not use this
-        twistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, QUDA_DEG_TWIST_INV_DSLASH, a, b, 0.0, 0.0, commDim, profile);
+        TwistedDslashXpay(out, in, x, parity, QUDA_DEG_TWIST_INV_DSLASH, a, b, 0.0, 0.0);
         flops += 1416ll*in.Volume();
       }
     } else {//TWIST_DOUBLET:
@@ -236,20 +289,22 @@ namespace quda {
 		
       if (!dagger) {	
         c *= k;//(-kappa*kappa)	  
-        ndegTwistedMassDslashCuda(&out, gauge, &in, parity, dagger, &x, QUDA_NONDEG_DSLASH, a, b, c, 0.0, commDim, profile);
+        NdegTwistedDslashXpay(out, in, x, parity, QUDA_NONDEG_DSLASH, a, b, c, 0.0);
         flops += 1464ll*in.Volume();
       } else {
-        cudaColorSpinorField *doubletTmp=0; 
+        ColorSpinorField *doubletTmp=0; 
         bool reset = newTmp(&doubletTmp, in);
-        twistGamma5Cuda(doubletTmp, &in, dagger, -a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a
-        ndegTwistedMassDslashCuda(&out, gauge, doubletTmp, parity, dagger, &x, QUDA_NONDEG_DSLASH, 0.0, 0.0, k, 0.0, commDim, profile);
+        twistGamma5Cuda(static_cast<cudaColorSpinorField*>(doubletTmp),
+			&static_cast<const cudaColorSpinorField&>(in),
+			dagger, -a, b, c, QUDA_TWIST_GAMMA5_INVERSE);//note a -> -a
+        NdegTwistedDslashXpay(out, *doubletTmp, x, parity, QUDA_NONDEG_DSLASH, 0.0, 0.0, k, 0.0);
         flops += 1464ll*in.Volume();
         deleteTmp(&doubletTmp, reset);	  
       }
     }
   }
 
-  void DiracTwistedMassPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracTwistedMassPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
 
@@ -266,11 +321,11 @@ namespace quda {
         double a = 2.0 * kappa * in.TwistFlavor() * mu;
         if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 	  Dslash(*tmp1, in, QUDA_ODD_PARITY);
-          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_EVEN_PARITY, dagger, &in, QUDA_DEG_DSLASH_TWIST_XPAY, a, kappa2, 0.0, 0.0, commDim, profile); 
+          TwistedDslashXpay(out, *tmp1, in, QUDA_EVEN_PARITY, QUDA_DEG_DSLASH_TWIST_XPAY, a, kappa2, 0.0, 0.0);
           flops += (1320ll+96ll)*in.Volume();	 
         } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
 	  Dslash(*tmp1, in, QUDA_EVEN_PARITY);
-          twistedMassDslashCuda(&out, gauge, tmp1, QUDA_ODD_PARITY, dagger, &in, QUDA_DEG_DSLASH_TWIST_XPAY, a, kappa2, 0.0, 0.0, commDim, profile);
+          TwistedDslashXpay(out, *tmp1, in, QUDA_ODD_PARITY, QUDA_DEG_DSLASH_TWIST_XPAY, a, kappa2, 0.0, 0.0);
           flops += (1320ll+96ll)*in.Volume();
         }else { // symmetric preconditioning
           errorQuda("Invalid matpcType");
@@ -292,11 +347,11 @@ namespace quda {
 	
         if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
 	  Dslash(*tmp1, in, QUDA_ODD_PARITY);
-          ndegTwistedMassDslashCuda(&out, gauge, tmp1, QUDA_EVEN_PARITY, dagger, &in, QUDA_NONDEG_DSLASH, a, b, c, kappa2, commDim, profile);
+          NdegTwistedDslashXpay(out, *tmp1, in, QUDA_EVEN_PARITY, QUDA_NONDEG_DSLASH, a, b, c, kappa2);
           flops += (1464ll)*in.Volume();	 
         } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
           Dslash(*tmp1, in, QUDA_EVEN_PARITY); // fused kernel
-          ndegTwistedMassDslashCuda(&out, gauge, tmp1, QUDA_ODD_PARITY, dagger, &in, QUDA_NONDEG_DSLASH, a, b, c, kappa2, commDim, profile);
+          NdegTwistedDslashXpay(out, *tmp1, in, QUDA_ODD_PARITY, QUDA_NONDEG_DSLASH, a, b, c, kappa2);
           flops += (1464ll)*in.Volume();
         } 
       }
@@ -304,7 +359,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracTwistedMassPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracTwistedMassPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     // need extra temporary because of symmetric preconditioning dagger
     bool reset = newTmp(&tmp2, in);
@@ -313,8 +368,8 @@ namespace quda {
     deleteTmp(&tmp2, reset);
   }
 
-  void DiracTwistedMassPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-				   cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracTwistedMassPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+				   ColorSpinorField &x, ColorSpinorField &b, 
 				   const QudaSolutionType solType) const
   {
     twisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
@@ -375,9 +430,13 @@ namespace quda {
         // src = A_ee^-1(b_e + k D_eo A_oo^-1 b_o)
         src = &(x.Odd());
 	
-        twistGamma5Cuda(src, &b.Odd(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack! 
-        ndegTwistedMassDslashCuda(tmp1, gauge, src, QUDA_EVEN_PARITY, dagger, &b.Even(), QUDA_NONDEG_DSLASH,  0.0, 0.0, kappa, 0.0, commDim, profile);
-        twistGamma5Cuda(src, tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!
+	twistGamma5Cuda(static_cast<cudaColorSpinorField*>(src),
+			&static_cast<const cudaColorSpinorField&>(b.Odd()),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT); // temporal hack
+        NdegTwistedDslashXpay(*tmp1, *src, b.Even(), QUDA_EVEN_PARITY, QUDA_NONDEG_DSLASH,  0.0, 0.0, kappa, 0.0);
+	twistGamma5Cuda(static_cast<cudaColorSpinorField*>(src),
+			static_cast<cudaColorSpinorField*>(tmp1),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT); // temporal hack
 
         sol = &(x.Even()); 
         
@@ -385,17 +444,23 @@ namespace quda {
         // src = A_oo^-1 (b_o + k D_oe A_ee^-1 b_e)    
         src = &(x.Even());
 	
-        twistGamma5Cuda(src, &b.Even(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!                     
-        ndegTwistedMassDslashCuda(tmp1, gauge, src, QUDA_ODD_PARITY, dagger, &b.Odd(),  QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0, commDim, profile);
-        twistGamma5Cuda(src, tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!
+	twistGamma5Cuda(static_cast<cudaColorSpinorField*>(src),
+			&static_cast<const cudaColorSpinorField&>(b.Even()),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT); // temporal hack
+        NdegTwistedDslashXpay(*tmp1, *src, b.Odd(), QUDA_ODD_PARITY, QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0);
+	twistGamma5Cuda(static_cast<cudaColorSpinorField*>(src),
+			static_cast<cudaColorSpinorField*>(tmp1),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT); // temporal hack
     
         sol = &(x.Odd());
       } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // src = b_e + k D_eo A_oo^-1 b_o
         src = &(x.Odd());
 
-        twistGamma5Cuda(tmp1, &b.Odd(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!                           
-        ndegTwistedMassDslashCuda(src, gauge, tmp1, QUDA_EVEN_PARITY, dagger, &b.Even(), QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0, commDim, profile);
+	twistGamma5Cuda(static_cast<cudaColorSpinorField*>(tmp1),
+			&static_cast<const cudaColorSpinorField&>(b.Odd()),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT); // temporal hack
+        NdegTwistedDslashXpay(*src, *tmp1, b.Even(), QUDA_EVEN_PARITY, QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0);
 
         sol = &(x.Even());
     
@@ -403,8 +468,11 @@ namespace quda {
         // src = b_o + k D_oe A_ee^-1 b_e
         src = &(x.Even());
 
-        twistGamma5Cuda(tmp1, &b.Even(), dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);//temporal hack!                           
-        ndegTwistedMassDslashCuda(src, gauge, tmp1, QUDA_ODD_PARITY, dagger, &b.Odd(), QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0, commDim, profile);
+        twistGamma5Cuda(static_cast<cudaColorSpinorField*>(tmp1),
+			&static_cast<const cudaColorSpinorField&>(b.Even()),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT); // temporal hack
+
+        NdegTwistedDslashXpay(*src, *tmp1, b.Odd(), QUDA_ODD_PARITY, QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0);
     
         sol = &(x.Odd());
       } else {
@@ -417,7 +485,7 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
   
-  void DiracTwistedMassPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracTwistedMassPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				       const QudaSolutionType solType) const
   {
     twisted::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda  
@@ -453,15 +521,17 @@ namespace quda {
  
       if (matpcType == QUDA_MATPC_EVEN_EVEN ||  matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
         // x_o = A_oo^-1 (b_o + k D_oe x_e)
-
-        ndegTwistedMassDslashCuda(tmp1, gauge, &x.Even(), QUDA_ODD_PARITY, dagger, &b.Odd(), QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0, commDim, profile);
-        twistGamma5Cuda(&x.Odd(), tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);
- 
+        NdegTwistedDslashXpay(*tmp1, x.Even(), b.Odd(), QUDA_ODD_PARITY, QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0);
+        twistGamma5Cuda(&static_cast<cudaColorSpinorField&>(x.Odd()),
+			static_cast<cudaColorSpinorField*>(tmp1),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);
       } else if (matpcType == QUDA_MATPC_ODD_ODD ||  matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         // x_e = A_ee^-1 (b_e + k D_eo x_o)  
 	
-        ndegTwistedMassDslashCuda(tmp1, gauge, &x.Odd(), QUDA_EVEN_PARITY, dagger, &b.Even(), QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0, commDim, profile);
-        twistGamma5Cuda(&x.Even(), tmp1, dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);      
+        NdegTwistedDslashXpay(*tmp1, x.Odd(), b.Even(), QUDA_EVEN_PARITY, QUDA_NONDEG_DSLASH, 0.0, 0.0, kappa, 0.0);
+        twistGamma5Cuda(&static_cast<cudaColorSpinorField&>(x.Even()),
+			static_cast<cudaColorSpinorField*>(tmp1),
+			dagger, a, bb, c, QUDA_TWIST_GAMMA5_DIRECT);      
       } else {
         errorQuda("MatPCType %d not valid for DiracTwistedMassPC", matpcType);
       }    

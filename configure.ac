@@ -173,6 +173,12 @@ AC_ARG_ENABLE(gauge-alg,
   [ build_gauge_alg="no" ]
 )
 
+AC_ARG_ENABLE(multigrid,
+  AC_HELP_STRING([--enable-multigrid], [ Build multigrid linear solvers (default: disabled)]),
+  [ build_multigrid=${enableval} ],
+  [ build_multigrid="no" ]
+)
+
 AC_ARG_ENABLE(sstep,
   AC_HELP_STRING([--enable-sstep], [ Build s-step linear solvers (default: disabled)]),
   [ build_sstep=${enableval} ],
@@ -537,6 +543,14 @@ yes|no);;
   ;;
 esac
 
+dnl Build multigrid
+case ${build_multigrid} in
+yes|no);;
+*)
+  AC_MSG_ERROR([ invalid value for --enable-multigrid ])
+  ;;
+esac
+
 dnl Build sstep
 case ${build_sstep} in
 yes|no);;
@@ -748,6 +762,9 @@ AC_SUBST( BUILD_GAUGE_TOOLS, [${build_gauge_tools}])
 
 AC_MSG_NOTICE([Setting BUILD_GAUGE_ALG = ${build_gauge_alg} ] )
 AC_SUBST( BUILD_GAUGE_ALG, [${build_gauge_alg}])
+
+AC_MSG_NOTICE([Setting BUILD_MULTIGRID = ${build_multigrid} ] )
+AC_SUBST( BUILD_MULTIGRID, [${build_multigrid}])
 
 AC_MSG_NOTICE([Setting BUILD_SSTEP = ${build_sstep} ] )
 AC_SUBST( BUILD_SSTEP, [${build_sstep}])

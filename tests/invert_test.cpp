@@ -20,7 +20,7 @@
 #include <mpi.h>
 #endif
 
-#include <gauge_qio.h>
+#include <qio_field.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -49,6 +49,7 @@ extern QudaInverterType  inv_type;
 extern QudaInverterType  precon_type;
 extern int multishift; // whether to test multi-shift or standard solver
 extern double mass; // mass of Dirac operator
+extern double anisotropy; // temporal anisotropy
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
@@ -138,10 +139,10 @@ int main(int argc, char **argv)
   gauge_param.X[3] = tdim;
   inv_param.Ls = 1;
 
-  gauge_param.anisotropy = 1.0;
+  gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
@@ -312,7 +313,7 @@ int main(int argc, char **argv)
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {

@@ -111,126 +111,132 @@ public:
 
 /**
    Driver for generic blas routine with four loads and two store.
- */
-template <template <typename Float, typename FloatN> class Functor,
-  int writeX, int writeY, int writeZ, int writeW>
-void blasCuda(const double2 &a, const double2 &b, const double2 &c,
-	      cudaColorSpinorField &x, cudaColorSpinorField &y, 
-	      cudaColorSpinorField &z, cudaColorSpinorField &w) {
-  checkLength(x, y);
-  checkSpinor(x, z);
-  checkSpinor(x, w);
+*/
+ template <template <typename Float, typename FloatN> class Functor,
+   int writeX, int writeY, int writeZ, int writeW>
+   void blasCuda(const double2 &a, const double2 &b, const double2 &c,
+		 ColorSpinorField &x, ColorSpinorField &y, 
+		 ColorSpinorField &z, ColorSpinorField &w) {
+   checkLength(x, y);
+   checkSpinor(x, z);
+   checkSpinor(x, w);
 
-  if (!x.isNative()) {
-    warningQuda("Blas on non-native fields is not supported\n");
-    return;
-  }
+   blasStrings.vol_str = x.VolString();
+   strcpy(blasStrings.aux_tmp, x.AuxString());
+   strcat(blasStrings.aux_tmp, ",");
+   strcat(blasStrings.aux_tmp, y.AuxString());
 
-  blasStrings.vol_str = x.VolString();
-  strcpy(blasStrings.aux_tmp, x.AuxString());
-  strcat(blasStrings.aux_tmp, ",");
-  strcat(blasStrings.aux_tmp, y.AuxString());
+   if (Location(x, y, z, w) == QUDA_CUDA_FIELD_LOCATION) {
+     // FIXME this condition should be outside of the Location test but
+     // Even and Odd must be implemented for cpu fields first
+     if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
+       mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>
+	 (a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
+       mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>
+	 (a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd());
+       return;
+     }
 
-  if (x.SiteSubset() == QUDA_FULL_SITE_SUBSET) {
-    mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Even(), y.Even(), z.Even(), w.Even());
-    mixed::blasCuda<Functor,writeX,writeY,writeZ,writeW>
-      (a, b, c, x.Odd(), y.Odd(), z.Odd(), w.Odd());
-    return;
-  }
+     if (!static_cast<cudaColorSpinorField&>(x).isNative()) {
+       warningQuda("Device blas on non-native fields is not supported\n");
+       return;
+     }
+    
+     // FIXME: use traits to encapsulate register type for shorts -
+     // will reduce template type parameters from 3 to 2
 
-  // FIXME: use traits to encapsulate register type for shorts -
-  // will reduce template type parameters from 3 to 2
 
-  size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
-  size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
+     size_t bytes[] = {x.Bytes(), y.Bytes(), z.Bytes(), w.Bytes()};
+     size_t norm_bytes[] = {x.NormBytes(), y.NormBytes(), z.NormBytes(), w.NormBytes()};
 
-  if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
-    if (x.Nspin() == 4) {
-      const int M = 12;
-      Spinor<double2,double4,float4,M,writeX,0> X(x);
-      Spinor<double2,double2,double2,M,writeY,1> Y(y);
-      Spinor<double2,double4,float4,M,writeZ,2> Z(z);
-      Spinor<double2,double4,float4,M,writeW,3> W(w);
-      Functor<double2, double2> f(a, b, c);
-      BlasCuda<double2,M, Spinor<double2,double4,float4,M,writeX,0>, 
-	Spinor<double2,double2,double2,M,writeY,1>, Spinor<double2,double4,float4,M,writeZ,2>,
-	Spinor<double2,double4,float4,M,writeW,3>, Functor<double2, double2> > 
-	blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
-      blas.apply(*blasStream);
-    } else if (x.Nspin() == 1) {
-      const int M = 3;
-      Spinor<double2,double2,float2,M,writeX,0> X(x);
-      Spinor<double2,double2,double2,M,writeY,1> Y(y);
-      Spinor<double2,double2,float2,M,writeZ,2> Z(z);
-      Spinor<double2,double2,float2,M,writeW,3> W(w);
-      Functor<double2, double2> f(a, b, c);
-      BlasCuda<double2,M,
-	Spinor<double2,double2,float2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
-	Spinor<double2,double2,float2,M,writeZ,2>, Spinor<double2,double2,float2,M,writeW,3>,
-	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
-      blas.apply(*blasStream);
-    }
-  } else if (x.Precision() == QUDA_HALF_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
-    if (x.Nspin() == 4) {
-      const int M = 12;
-      Spinor<double2,double4,short4,M,writeX,0> X(x);
-      Spinor<double2,double2,double2,M,writeY,1> Y(y);
-      Spinor<double2,double4,short4,M,writeZ,2> Z(z);
-      Spinor<double2,double4,short4,M,writeW,3> W(w);
-      Functor<double2, double2> f(a, b, c);
-      BlasCuda<double2,M,
-	Spinor<double2,double4,short4,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
-	Spinor<double2,double4,short4,M,writeZ,2>, Spinor<double2,double4,short4,M,writeW,3>,
-	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
-      blas.apply(*blasStream);
-    } else if (x.Nspin() == 1) {
-      const int M = 3;
-      Spinor<double2,double2,short2,M,writeX,0> X(x);
-      Spinor<double2,double2,double2,M,writeY,1> Y(y);
-      Spinor<double2,double2,short2,M,writeZ,2> Z(z);
-      Spinor<double2,double2,short2,M,writeW,3> W(w);
-      Functor<double2, double2> f(a, b, c);
-      BlasCuda<double2,M,
-	Spinor<double2,double2,short2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
-	Spinor<double2,double2,short2,M,writeZ,2>, Spinor<double2,double2,short2,M,writeW,3>,
-	Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
-      blas.apply(*blasStream);
-    }
-  } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
-    if (x.Nspin() == 4) {
-      const int M = 6;
-      Spinor<float4,float4,short4,M,writeX,0> X(x);
-      Spinor<float4,float4,float4,M,writeY,1> Y(y);
-      Spinor<float4,float4,short4,M,writeZ,2> Z(z);
-      Spinor<float4,float4,short4,M,writeW,3> W(w);
-      Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      BlasCuda<float4,M,
-	Spinor<float4,float4,short4,M,writeX,0>, Spinor<float4,float4,float4,M,writeY,1>,
-	Spinor<float4,float4,short4,M,writeZ,2>, Spinor<float4,float4,short4,M,writeW,3>,
-	Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
-      blas.apply(*blasStream);
-    } else if (x.Nspin() == 1) {
-      const int M = 3;
-      Spinor<float2,float2,short2,M,writeX,0> X(x);
-      Spinor<float2,float2,float2,M,writeY,1> Y(y);
-      Spinor<float2,float2,short2,M,writeZ,2> Z(z);
-      Spinor<float2,float2,short2,M,writeW,3> W(w);
-      Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
-      BlasCuda<float2, M,
-	Spinor<float2,float2,short2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>,
-	Spinor<float2,float2,short2,M,writeZ,2>, Spinor<float2,float2,short2,M,writeW,3>,
-	Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
-      blas.apply(*blasStream);
-    }
-  } else {
-    errorQuda("Not implemented for this precision combination");
-  }
-
-  blas_bytes += Functor<double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
-  blas_flops += Functor<double2,double2>::flops()*(unsigned long long)x.RealLength();
-
-  checkCudaError();
-}
-
-}
+     if (x.Precision() == QUDA_SINGLE_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
+       if (x.Nspin() == 4) {
+	 const int M = 12;
+	 Spinor<double2,double4,float4,M,writeX,0> X(x);
+	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,double4,float4,M,writeZ,2> Z(z);
+	 Spinor<double2,double4,float4,M,writeW,3> W(w);
+	 Functor<double2, double2> f(a, b, c);
+	 BlasCuda<double2,M, Spinor<double2,double4,float4,M,writeX,0>, 
+	   Spinor<double2,double2,double2,M,writeY,1>, Spinor<double2,double4,float4,M,writeZ,2>,
+	   Spinor<double2,double4,float4,M,writeW,3>, Functor<double2, double2> > 
+	   blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
+	 blas.apply(*blasStream);
+       } else if (x.Nspin() == 1) {
+	 const int M = 3;
+	 Spinor<double2,double2,float2,M,writeX,0> X(x);
+	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,double2,float2,M,writeZ,2> Z(z);
+	 Spinor<double2,double2,float2,M,writeW,3> W(w);
+	 Functor<double2, double2> f(a, b, c);
+	 BlasCuda<double2,M,
+	   Spinor<double2,double2,float2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
+	   Spinor<double2,double2,float2,M,writeZ,2>, Spinor<double2,double2,float2,M,writeW,3>,
+	   Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
+	 blas.apply(*blasStream);
+       }
+     } else if (x.Precision() == QUDA_HALF_PRECISION && y.Precision() == QUDA_DOUBLE_PRECISION) {
+       if (x.Nspin() == 4) {
+	 const int M = 12;
+	 Spinor<double2,double4,short4,M,writeX,0> X(x);
+	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,double4,short4,M,writeZ,2> Z(z);
+	 Spinor<double2,double4,short4,M,writeW,3> W(w);
+	 Functor<double2, double2> f(a, b, c);
+	 BlasCuda<double2,M,
+	   Spinor<double2,double4,short4,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
+	   Spinor<double2,double4,short4,M,writeZ,2>, Spinor<double2,double4,short4,M,writeW,3>,
+	   Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
+	 blas.apply(*blasStream);
+       } else if (x.Nspin() == 1) {
+	 const int M = 3;
+	 Spinor<double2,double2,short2,M,writeX,0> X(x);
+	 Spinor<double2,double2,double2,M,writeY,1> Y(y);
+	 Spinor<double2,double2,short2,M,writeZ,2> Z(z);
+	 Spinor<double2,double2,short2,M,writeW,3> W(w);
+	 Functor<double2, double2> f(a, b, c);
+	 BlasCuda<double2,M,
+	   Spinor<double2,double2,short2,M,writeX,0>, Spinor<double2,double2,double2,M,writeY,1>,
+	   Spinor<double2,double2,short2,M,writeZ,2>, Spinor<double2,double2,short2,M,writeW,3>,
+	   Functor<double2, double2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
+	 blas.apply(*blasStream);
+       }
+     } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
+       if (x.Nspin() == 4) {
+	 const int M = 6;
+	 Spinor<float4,float4,short4,M,writeX,0> X(x);
+	 Spinor<float4,float4,float4,M,writeY,1> Y(y);
+	 Spinor<float4,float4,short4,M,writeZ,2> Z(z);
+	 Spinor<float4,float4,short4,M,writeW,3> W(w);
+	 Functor<float2, float4> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+	 BlasCuda<float4,M,
+	   Spinor<float4,float4,short4,M,writeX,0>, Spinor<float4,float4,float4,M,writeY,1>,
+	   Spinor<float4,float4,short4,M,writeZ,2>, Spinor<float4,float4,short4,M,writeW,3>,
+	   Functor<float2, float4> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
+	 blas.apply(*blasStream);
+       } else if (x.Nspin() == 1) {
+	 const int M = 3;
+	 Spinor<float2,float2,short2,M,writeX,0> X(x);
+	 Spinor<float2,float2,float2,M,writeY,1> Y(y);
+	 Spinor<float2,float2,short2,M,writeZ,2> Z(z);
+	 Spinor<float2,float2,short2,M,writeW,3> W(w);
+	 Functor<float2, float2> f(make_float2(a.x, a.y), make_float2(b.x, b.y), make_float2(c.x, c.y));
+	 BlasCuda<float2, M,
+	   Spinor<float2,float2,short2,M,writeX,0>, Spinor<float2,float2,float2,M,writeY,1>,
+	   Spinor<float2,float2,short2,M,writeZ,2>, Spinor<float2,float2,short2,M,writeW,3>,
+	   Functor<float2, float2> > blas(X, Y, Z, W, f, y.Volume(), bytes, norm_bytes);
+	 blas.apply(*blasStream);
+       }
+     } else {
+       errorQuda("Not implemented for this precision combination");
+     }
+   } else { // fields on the cpu
+     errorQuda("Not implemented");
+   }
+   
+   bytes += Functor<double2,double2>::streams()*(unsigned long long)x.RealLength()*x.Precision();
+   flops += Functor<double2,double2>::flops()*(unsigned long long)x.RealLength();
+   
+   checkCudaError();
+ }
+ }

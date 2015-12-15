@@ -17,7 +17,7 @@
 
 #ifdef MAGMA_14
 
-#define _cV 'V' 
+#define _cV 'V'
 #define _cU 'U'
 
 #define _cR 'R'
@@ -30,7 +30,7 @@
 
 #else
 
-#define _cV MagmaVec 
+#define _cV MagmaVec
 #define _cU MagmaUpper
 
 #define _cR MagmaRight
@@ -144,10 +144,10 @@ void sMM_v2(void *outBuff, const int bldm,  void *sMat, const int srows, const i
 #undef BLOCK_SIZE
 
 
-void BlasMagmaArgs::OpenMagma(){ 
+void BlasMagmaArgs::OpenMagma(){
 
 #ifdef MAGMA_LIB
-    magma_int_t err = magma_init(); 
+    magma_int_t err = magma_init();
 
     if(err != MAGMA_SUCCESS) errorQuda("\nError: cannot initialize MAGMA library\n");
 
@@ -157,24 +157,24 @@ void BlasMagmaArgs::OpenMagma(){
     printfQuda("\nMAGMA library version: %d.%d\n\n", major,  minor);
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
-#endif    
+#endif
 
     return;
 }
 
-void BlasMagmaArgs::CloseMagma(){  
+void BlasMagmaArgs::CloseMagma(){
 
 #ifdef MAGMA_LIB
     if(magma_finalize() != MAGMA_SUCCESS) errorQuda("\nError: cannot close MAGMA library\n");
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
-#endif    
+#endif
 
     return;
 }
 
- BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), max_nev(0), prec(prec), ldm(0), info(-1), llwork(0), 
-  lrwork(0), liwork(0), sideLR(0), htsize(0), dtsize(0), lwork_max(0), W(0), W2(0), 
+ BlasMagmaArgs::BlasMagmaArgs(const int prec) : m(0), max_nev(0), prec(prec), ldm(0), info(-1), llwork(0),
+  lrwork(0), liwork(0), sideLR(0), htsize(0), dtsize(0), lwork_max(0), W(0), W2(0),
   hTau(0), dTau(0), lwork(0), rwork(0), iwork(0)
 {
 
@@ -188,14 +188,14 @@ void BlasMagmaArgs::CloseMagma(){
     init  = true;
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
-#endif    
+#endif
 
     return;
 }
 
 
-BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec) 
-  : m(m), max_nev(0),  prec(prec), ldm(ldm), info(-1), sideLR(0), htsize(0), dtsize(0), 
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec)
+  : m(m), max_nev(0),  prec(prec), ldm(ldm), info(-1), sideLR(0), htsize(0), dtsize(0),
   W(0), hTau(0), dTau(0)
 {
 
@@ -211,7 +211,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec)
 
     magma_int_t nbtrd = prec == 4 ? magma_get_chetrd_nb(m) : magma_get_zhetrd_nb(m);//ldm
 
-    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm 
+    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm
     lrwork = 1 + 5*m + 2*m*m;//ldm
     liwork = 3 + 5*m;//ldm
 
@@ -225,14 +225,14 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int ldm, const int prec)
 
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
-#endif    
+#endif
 
     return;
 }
 
 
 
-BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, const int prec) 
+BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, const int prec)
   : m(m), max_nev(max_nev),  prec(prec), ldm(ldm), info(-1)
 {
 
@@ -261,7 +261,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, cons
     magma_malloc_pinned((void**)&W,    sideLR*complex_prec);
     magma_malloc_pinned((void**)&W2,   ldm*m*complex_prec);
 
-    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm 
+    llwork = MAX(m + m*nbtrd, 2*m + m*m);//ldm
     lrwork = 1 + 5*m + 2*m*m;//ldm
     liwork = 3 + 5*m;//ldm
 
@@ -274,7 +274,7 @@ BlasMagmaArgs::BlasMagmaArgs(const int m, const int max_nev, const int ldm, cons
 
 #else
     errorQuda("\nError: MAGMA library was not compiled, check your compilation options...\n");
-#endif    
+#endif
 
     return;
 }
@@ -347,10 +347,10 @@ void BlasMagmaArgs::MagmaHEEVD(void *dTvecm, void *hTvalm, const int prob_size, 
          magma_zheevd(_cV, _cU, prob_size, (magmaDoubleComplex*)dTvecm, ldm, (double*)hTvalm, (magmaDoubleComplex*)lwork, llwork, (double*)rwork, lrwork, iwork, liwork, &info);
          if(info != 0) errorQuda("\nError in MagmaHEEVD (magma_zheevd_gpu), exit ...\n");
        }
-     }   
+     }
 #endif
   return;
-}  
+}
 
 int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 {
@@ -366,12 +366,12 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 
         //compute dTevecm0=QHTmQ
         //get TQ product:
-        magma_cunmqr_gpu(_cR, _cN, m, m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info); 
+        magma_cunmqr_gpu(_cR, _cN, m, m, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n");
-             	
+
         //get QHT product:
         magma_cunmqr_gpu(_cL, _cC, m, l, l, (magmaFloatComplex *)dTvecm, ldm, (magmaFloatComplex *)hTau, (magmaFloatComplex *)dTm, ldm, (magmaFloatComplex *)W, sideLR, (magmaFloatComplex *)dTau, nb, &info);
-        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n");  
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_cunmqr_gpu), exit ...\n");
      }
      else
      {
@@ -382,12 +382,12 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 
         //compute dTevecm0=QHTmQ
         //get TQ product:
-        magma_zunmqr_gpu(_cR, _cN, m, m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info); 
+        magma_zunmqr_gpu(_cR, _cN, m, m, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
-             	
+
         //get QHT product:
         magma_zunmqr_gpu(_cL, _cC, m, l, l, (magmaDoubleComplex *)dTvecm, ldm, (magmaDoubleComplex *)hTau, (magmaDoubleComplex *)dTm, ldm, (magmaDoubleComplex *)W, sideLR, (magmaDoubleComplex *)dTau, nb, &info);
-        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");  
+        if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
 
      }
 #endif
@@ -397,7 +397,7 @@ int BlasMagmaArgs::MagmaORTH_2nev(void *dTvecm, void *dTm)
 
 void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int vprec, void *dTevecm, void *dTm)
 {
-#ifdef MAGMA_LIB 
+#ifdef MAGMA_LIB
        if( (vld % 32) != 0) errorQuda("\nError: leading dimension must be multiple of the warp size\n");
 
        const int cvprec = 2*vprec;
@@ -420,22 +420,22 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
        {
          magma_int_t nb = magma_get_cgeqrf_nb(m);//ldm
          magma_cunmqr_gpu(_cL, _cN, m, l, l, (magmaFloatComplex*)dTevecm, ldm, (magmaFloatComplex*)hTau, (magmaFloatComplex*)dTm, ldm, (magmaFloatComplex*)W, sideLR, (magmaFloatComplex*)dTau, nb, &info);
-        
-         if(info != 0) errorQuda("\nError in RestartV (magma_cunmqr_gpu), exit ...\n"); 
+
+         if(info != 0) errorQuda("\nError in RestartV (magma_cunmqr_gpu), exit ...\n");
        }
        else
        {
          magma_int_t nb = magma_get_zgeqrf_nb(m);//ldm
          magma_zunmqr_gpu(_cL, _cN, m, l, l, (magmaDoubleComplex*)dTevecm, ldm, (magmaDoubleComplex*)hTau, (magmaDoubleComplex*)dTm, ldm, (magmaDoubleComplex*)W, sideLR, (magmaDoubleComplex*)dTau, nb, &info);
 
-         if(info != 0) errorQuda("\nError in RestartV (magma_zunmqr_gpu), exit ...\n"); 
+         if(info != 0) errorQuda("\nError in RestartV (magma_zunmqr_gpu), exit ...\n");
        }
 
        if(vprec == 4)
        {
          if(prec == vprec) errorQuda("\nError: option is not currently supported, exit ...\n");
 
-         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock)
          {
            if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
 
@@ -448,7 +448,7 @@ void BlasMagmaArgs::RestartV(void *dV, const int vld, const int vlen, const int 
        }
        else
        {
-         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+         for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock)
          {
            if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
 
@@ -470,7 +470,7 @@ void BlasMagmaArgs::SolveProjMatrix(void* rhs, const int ldn, const int n, void*
 {
 #ifdef MAGMA_LIB
        const int complex_prec = 2*prec;
-       void *tmp; 
+       void *tmp;
        magma_int_t *ipiv;
        magma_int_t err;
 
@@ -500,7 +500,7 @@ void BlasMagmaArgs::SolveGPUProjMatrix(void* rhs, const int ldn, const int n, vo
 {
 #ifdef MAGMA_LIB
        const int complex_prec = 2*prec;
-       void *tmp; 
+       void *tmp;
        magma_int_t *ipiv;
        magma_int_t err;
 
@@ -532,15 +532,15 @@ void BlasMagmaArgs::SpinorMatVec
 #ifdef MAGMA_LIB
        if (prec == 4)
        {
-           magmaFloatComplex *spmat = (magmaFloatComplex*)spinorSetIn; 
-           magmaFloatComplex *spout = (magmaFloatComplex*)spinorOut; 
+           magmaFloatComplex *spmat = (magmaFloatComplex*)spinorSetIn;
+           magmaFloatComplex *spout = (magmaFloatComplex*)spinorOut;
 
            magmablas_cgemv(_cN, slen, vlen, MAGMA_C_ONE, spmat, sld, (magmaFloatComplex*)vec, 1, MAGMA_C_ZERO, spout, 1);//in colour-major format
        }
        else
        {
-           magmaDoubleComplex *spmat = (magmaDoubleComplex*)spinorSetIn; 
-           magmaDoubleComplex *spout = (magmaDoubleComplex*)spinorOut; 
+           magmaDoubleComplex *spmat = (magmaDoubleComplex*)spinorSetIn;
+           magmaDoubleComplex *spout = (magmaDoubleComplex*)spinorOut;
 
            magmablas_zgemv(_cN, slen, vlen, MAGMA_Z_ONE, spmat, sld, (magmaDoubleComplex*)vec, 1, MAGMA_Z_ZERO, spout, 1);//in colour-major format
        }
@@ -551,8 +551,8 @@ void BlasMagmaArgs::SpinorMatVec
 void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const int nrefls, void *QR, const int ldqr, void *Vm, const int cldn)
 {
 #ifdef MAGMA_LIB
-     magma_int_t m = clen; 
-     magma_int_t n = qrlen; 
+     magma_int_t m = clen;
+     magma_int_t n = qrlen;
      magma_int_t k = nrefls;
 
      magma_int_t lwork = -1;
@@ -585,7 +585,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
         //
         magma_zgeqrf_gpu(n, k, (magmaDoubleComplex *)dQR, ldqr, (magmaDoubleComplex *)htau, (magmaDoubleComplex *)dtau, &info);//identical to zgeqrf?
 
-        magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, &qW, lwork, dtau, nb, &info); 
+        magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, &qW, lwork, dtau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
 
         lwork = (magma_int_t) MAGMA_Z_REAL(qW);
@@ -593,7 +593,7 @@ void BlasMagmaArgs::MagmaRightNotrUNMQR(const int clen, const int qrlen, const i
         magma_malloc_cpu((void**)&hW, lwork*sizeof(magmaDoubleComplex));
 
         //get TQ product:
-        magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, hW, lwork, dtau, nb, &info); 
+        magma_zunmqr_gpu(_cR, _cN, m, n, k, dQR, ldqr, htau, (magmaDoubleComplex *)Vm, cldn, hW, lwork, dtau, nb, &info);
         if(info != 0) errorQuda("\nError in MagmaORTH_2nev (magma_zunmqr_gpu), exit ...\n");
 
         magma_free_cpu(hW);
@@ -618,7 +618,7 @@ struct SortedEval{
    double eval_nrm;
    int    eval_idx;
 
-   SortedEval(double val, int idx) : eval_nrm(val), eval_idx(idx) {}; 
+   SortedEval(double val, int idx) : eval_nrm(val), eval_idx(idx) {};
 };
 
 bool cmp_eigen_nrms (SortedEval v1, SortedEval v2)
@@ -635,10 +635,10 @@ void BlasMagmaArgs::Sort(const int m, const int ldm, void *eVecs, const int nev,
   for(int e = 0; e < m; e++) sorted_evals_cntr.push_back( SortedEval( abs(((std::complex<double>*)eVals)[e]), e ));
 
   std::stable_sort(sorted_evals_cntr.begin(), sorted_evals_cntr.end(), cmp_eigen_nrms);
-  
+
 
   for(int e = 0; e < nev; e++)
-  {  
+  {
     memcpy(&(((std::complex<double>*)eVecs)[ldm*e]), &(((std::complex<double>*)unsorted_eVecs)[ldm*( sorted_evals_cntr[e].eval_idx)]), (ldm)*sizeof(std::complex<double>));
     //set zero in m+1 element:
     ((std::complex<double>*)eVecs)[ldm*e+m] = std::complex<double>(0.0, 0.0);
@@ -656,13 +656,13 @@ void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const
   magma_int_t _m   = m;//matrix size
 
   magma_int_t _nev = nev;//matrix size
- 
+
   magma_int_t _ldm = ldm;
 
-  //Lapack parameters:   
+  //Lapack parameters:
   magma_int_t info  = 0;
 
-  magma_int_t lwork = -1; 
+  magma_int_t lwork = -1;
 
   magmaDoubleComplex *work = NULL;
 
@@ -686,7 +686,7 @@ void BlasMagmaArgs::ComputeQR(const int nev, Complex * evmat, const int m, const
 }
 
 
-void BlasMagmaArgs::LeftConjZUNMQR(const int k /*number of reflectors*/, const int n /*number of columns of H*/, Complex *H, const int dh /*number of rows*/, 
+void BlasMagmaArgs::LeftConjZUNMQR(const int k /*number of reflectors*/, const int n /*number of columns of H*/, Complex *H, const int dh /*number of rows*/,
 const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
 {
 #ifdef MAGMA_LIB
@@ -696,19 +696,19 @@ const int ldh, Complex * QR,  const int ldqr, Complex *tau)//for vectors: n =1
   magma_int_t _n   = n;//vector size
 
   magma_int_t _k   = k;
- 
+
   magma_int_t _ldh = ldh;
 
   magma_int_t _ldqr = ldqr;
 
-  //Lapack parameters:   
+  //Lapack parameters:
   magma_side_t  _s = _cL;//apply QR-matrix from the left
 
-  magma_trans_t _t = _cC;//conjugate 
+  magma_trans_t _t = _cC;//conjugate
 
   magma_int_t info  = 0;
 
-  magma_int_t lwork = -1; 
+  magma_int_t lwork = -1;
 
   magmaDoubleComplex *work = NULL;
 
@@ -747,12 +747,12 @@ void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * c
   magma_int_t I_ONE = 1;
   //
   magma_int_t *ipiv;
-  magma_malloc_cpu((void**)&ipiv, ldH*sizeof(magma_int_t));  
+  magma_malloc_cpu((void**)&ipiv, ldH*sizeof(magma_int_t));
   //
   //Construct H + beta*H^{-H} e_m*e_m^{T}
   // 1. need to solve H^{H}y = e_m;
   Complex *em = new Complex[m];
-  
+
   em[m-1] = beta2;//in fact, we construct beta*em,
 
   magma_zgesv(_m, I_ONE, (magmaDoubleComplex *)conjH, _ldH, ipiv, (magmaDoubleComplex *)em, _ldH, &info);
@@ -766,31 +766,31 @@ void BlasMagmaArgs::Construct_harmonic_matrix(Complex * const harmH, Complex * c
     Complex accum = 0.0;
 
     for (int i = 0; i < m; i++) accum = (accum + harmH[ldH*j+i]*em[(ipiv[i])-1]);
-  } 
+  }
 
   // 2. Construct matrix for harmonic Ritz vectors:
   //    Adjust last column with KroneckerProd((H^{-H}*beta*em)=em, em^{T}=[0,....,1]):
 
-  for(int i = 0; i < m; i++) harmH[ldH*(m-1)+i] += em[i]; 
+  for(int i = 0; i < m; i++) harmH[ldH*(m-1)+i] += em[i];
 
   magma_free_cpu(ipiv);
   //
-  delete [] em; 
+  delete [] em;
 #endif
 
   return;
 }
 
-void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv) 
+void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int m, const int ldH, Complex *vr, Complex *evalues, const int ldv)
 {
 #ifdef MAGMA_LIB
   magma_int_t _m   = m;//matrix size
- 
+
   magma_int_t _ldH = ldH;
 
   magma_int_t _ldv = ldv;
 
-  //Lapack parameters:   
+  //Lapack parameters:
   magma_int_t info = 0;
   //
   magma_vec_t _r = _cV;
@@ -798,13 +798,13 @@ void BlasMagmaArgs::Compute_harmonic_matrix_eigenpairs(Complex *harmH, const int
   magma_vec_t _l = _cNV;//no left eigenvectors
 
   magma_int_t lwork = -1;
- 
+
   magmaDoubleComplex *work = NULL;
 
   magmaDoubleComplex qwork; //parameter to extract optimal size of work
-  
+
   double *rwork = NULL;
-  magma_malloc_cpu((void**)&rwork, 2*_m*sizeof(double)); 
+  magma_malloc_cpu((void**)&rwork, 2*_m*sizeof(double));
 
   //Get optimal work:
   magma_zgeev(_l, _r, _m, (magmaDoubleComplex *)harmH, _ldH, (magmaDoubleComplex *)evalues, NULL, _ldv, (magmaDoubleComplex *)vr, _ldv, &qwork, lwork, rwork, &info);
@@ -848,7 +848,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
     int _kp1 = max_nev;
 
     int _mp1 = (m+1);
- 
+
     int _ldm = ldh;
 
     magma_side_t  _s = _cR;//apply P-matrix from the right
@@ -857,7 +857,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     int info  = 0;
 
-    int lwork = -1; 
+    int lwork = -1;
 
     Complex  *work = NULL;
     Complex qwork; //parameter to extract optimal size of work
@@ -889,13 +889,13 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     Complex *Qmat = new Complex[ldh*_mp1];//need (m+1)x(m+1) matrix on input...
 
-    ComputeQR(l, (Complex*)sortedHarVecs, _mp1, ldh, tau);//lapack version 
-   
+    ComputeQR(l, (Complex*)sortedHarVecs, _mp1, ldh, tau);//lapack version
+
     //max_nev vectors are stored in Qmat (output):
     //restoreOrthVectors(Qmat, max_nev, (Complex*)sortedHarVecs, (m+1), ldh, tau);
     //Load diagonal units
     for(int d = 0; d < (m+1); d++) Qmat[ldh*d+d] = Complex(1.0, 0.0);
-   
+
     magma_zunmqr(_s, _t, _mp1, _mp1, _kp1, (magmaDoubleComplex *)sortedHarVecs, _ldm, (magmaDoubleComplex *)tau, (magmaDoubleComplex *)Qmat, _ldm, (magmaDoubleComplex *)&qwork, lwork, &info);
 
     if( (info != 0 ) ) errorQuda( "Error: ZUNMQR, info %d\n",info);
@@ -912,7 +912,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 
     if(cvprec == sizeof(magmaDoubleComplex))
     {
-      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock)
       {
         if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
 
@@ -929,7 +929,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
     }
     else // low precision field
     {
-      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock) 
+      for (int blockOffset = 0; blockOffset < vlen; blockOffset += bufferBlock)
       {
         if (bufferBlock > (vlen-blockOffset)) bufferBlock = (vlen-blockOffset);
 
@@ -943,7 +943,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
       cudaMemset(&(((magmaFloatComplex*)dV)[vld*max_nev]), 0, (m+1-max_nev)*vld*sizeof(magmaFloatComplex));//= m - nev
     }
 
-    //Construct H_new = Pdagger_{k+1} \bar{H}_{m} P_{k}  
+    //Construct H_new = Pdagger_{k+1} \bar{H}_{m} P_{k}
 
     //bar{H}_{m} P_{k}
 
@@ -993,7 +993,7 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
     delete [] Qmat;
     delete [] tau ;
 #endif
-    return; 
+    return;
 }
 
 
@@ -1008,5 +1008,3 @@ void BlasMagmaArgs::RestartVH(void *dV, const int vlen, const int vld, const int
 #undef _cNV
 
 #endif
-
-

@@ -1077,25 +1077,9 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
   }
 #else
 
-//    void *ghostGauge[4], *sendGauge[4];
-//    for (int d=0; d<4; d++) {
-//      ghostGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
-//      sendGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
-//    }
-
-//    { // Exchange gauge matrices at boundary
-//      set_dim(Z);///?
-//      pack_ghost(gauge, sendGauge, 1, precision);
-//      int nFace = 1;
-//      FaceBuffer faceBuf(Z, 4, gaugeSiteSize, nFace, precision);
-//      faceBuf.exchangeLink(ghostGauge, sendGauge, QUDA_CPU_FIELD_LOCATION);
-//    }
-    
-//BEGINOFNEW    
     GaugeFieldParam gauge_field_param(gauge, gauge_param);
     cpuGaugeField cpu(gauge_field_param);
     void **ghostGauge = (void**)cpu.Ghost();    
-//ENDOFNEW    
   
     // Get spinor ghost fields
     // First wrap the input spinor into a ColorSpinorField
@@ -1124,9 +1108,7 @@ void dw_dslash(void *out, void **gauge, void *in, int oddBit, int daggerBit, Qud
       else if (oddBit == QUDA_ODD_PARITY) otherParity = QUDA_EVEN_PARITY;
       else errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
 
-      int nFace = 1;
-      FaceBuffer faceBuf(Z, 5, mySpinorSiteSize, nFace, precision, Ls);//4 <-> 5
-      faceBuf.exchangeCpuSpinor(inField, otherParity, daggerBit); 
+      inField.exchangeGhost(otherParity, daggerBit);
     }
     void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
     void** back_nbr_spinor = inField.backGhostFaceBuffer;
@@ -1156,25 +1138,9 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
   }
 #else
 
-//    void *ghostGauge[4], *sendGauge[4];
-//    for (int d=0; d<4; d++) {
-//      ghostGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
-//      sendGauge[d] = malloc(faceVolume[d]*gaugeSiteSize*precision);
-//    }
-
-//    { // Exchange gauge matrices at boundary
-//      set_dim(Z);///?
-//      pack_ghost(gauge, sendGauge, 1, precision);
-//      int nFace = 1;
-//      FaceBuffer faceBuf(Z, 4, gaugeSiteSize, nFace, precision);
-//      faceBuf.exchangeLink(ghostGauge, sendGauge, QUDA_CPU_FIELD_LOCATION);
-//    }
-    
-//BEGINOFNEW    
     GaugeFieldParam gauge_field_param(gauge, gauge_param);
     cpuGaugeField cpu(gauge_field_param);
     void **ghostGauge = (void**)cpu.Ghost();    
-//ENDOFNEW    
   
     // Get spinor ghost fields
     // First wrap the input spinor into a ColorSpinorField
@@ -1203,9 +1169,7 @@ void dslash_4_4d(void *out, void **gauge, void *in, int oddBit, int daggerBit, Q
       else if (oddBit == QUDA_ODD_PARITY) otherParity = QUDA_EVEN_PARITY;
       else errorQuda("ERROR: full parity not supported in function %s", __FUNCTION__);
 
-      int nFace = 1;
-      FaceBuffer faceBuf(Z, 5, mySpinorSiteSize, nFace, precision, Ls);//4 <-> 5
-      faceBuf.exchangeCpuSpinor(inField, otherParity, daggerBit); 
+      inField.exchangeGhost(otherParity, daggerBit);
     }
     void** fwd_nbr_spinor = inField.fwdGhostFaceBuffer;
     void** back_nbr_spinor = inField.backGhostFaceBuffer;

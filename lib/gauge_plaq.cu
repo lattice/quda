@@ -157,13 +157,12 @@ namespace quda {
       comm_allreduce_array((double*) arg.result_h, 2);
       arg.result_h[0].x /= 9.*(2*arg.threads*comm_size());
       arg.result_h[0].y /= 9.*(2*arg.threads*comm_size());
-
       plq.x = arg.result_h[0].x;
       plq.y = arg.result_h[0].y;
     }
 
   template<typename Float>
-  double2 plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
+  void plaquette(const GaugeField& data, double2 &plq, QudaFieldLocation location) {
     INSTANTIATE_RECONSTRUCT(plaquette<Float>, data, plq, location);
   }
 #endif

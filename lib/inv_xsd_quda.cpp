@@ -35,7 +35,7 @@ namespace quda {
   }
 
 
-  void XSD::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
+  void XSD::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     if(!init){
      ColorSpinorParam csParam(b);

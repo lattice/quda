@@ -14,8 +14,9 @@
 // google test
 #include <gtest.h>
 
-// Wilson, clover-improved Wilson, and twisted mass are supported.
 extern QudaDslashType dslash_type;
+extern QudaInverterType inv_type;
+extern int nvec;
 extern bool tune;
 extern int device;
 extern int xdim;
@@ -34,14 +35,15 @@ const int Nkernels = 32;
 
 using namespace quda;
 
-cpuColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
-cudaColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
+ColorSpinorField *xH, *yH, *zH, *wH, *vH, *hH, *lH;
+ColorSpinorField *xD, *yD, *zD, *wD, *vD, *hD, *lD;
 int Nspin;
+int Ncolor;
 
 void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
 {
   param.precision = precision;
-  if (Nspin == 1 || precision == QUDA_DOUBLE_PRECISION) {
+  if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else {
     param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
@@ -52,31 +54,45 @@ void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
-  printfQuda("S_dimension T_dimension Nspin\n");
-  printfQuda("%d/%d/%d        %d      %d\n", xdim, ydim, zdim, tdim, Nspin);     
-
+  printfQuda("S_dimension T_dimension Nspin Ncolor\n");
+  printfQuda("%3d /%3d / %3d   %3d      %d     %d\n", xdim, ydim, zdim, tdim, Nspin, Ncolor);
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
-  
   return;  
+}
+
+int Nprec = 3;
+
+bool skip_kernel(int precision, int kernel) {
+  if ( Nspin == 2 && precision == 0) {
+    // avoid half precision tests if doing coarse fields
+    return true;
+  } else if (Nspin == 2 && kernel == 1) {
+    // avoid low-precision copy if doing coarse fields
+    return true;
+  } else if (Ncolor != 3 && kernel == 31) {
+    // only benchmark heavy-quark norm if doing 3 colors
+    return true;
+  } else if ((Nprec < 3) && (kernel == 0)) {
+    // only benchmark high-precision copy() if double is supported
+    return true;
+  }
+
+  return false;
 }
 
 void initFields(int prec)
 {
   // precisions used for the source field in the copyCuda() benchmark
-  QudaPrecision high_aux_prec;
-  QudaPrecision low_aux_prec;
+  QudaPrecision high_aux_prec = QUDA_INVALID_PRECISION;
+  QudaPrecision low_aux_prec = QUDA_INVALID_PRECISION;
 
   ColorSpinorParam param;
-  param.nColor = 3;
-  // set spin according to the type of dslash
-  Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || 
-	   dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
+  param.nColor = Ncolor;
   param.nSpin = Nspin;
   param.nDim = 4; // number of spacetime dimensions
 
@@ -103,13 +119,13 @@ void initFields(int prec)
   hH = new cpuColorSpinorField(param);
   lH = new cpuColorSpinorField(param);
 
-  vH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  wH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  xH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  yH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  zH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  hH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
-  lH->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(xH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(yH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(zH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(hH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
+  static_cast<cpuColorSpinorField*>(lH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
 
   // Now set the parameters for the cuda fields
   //param.pad = xdim*ydim*zdim/2;
@@ -133,6 +149,8 @@ void initFields(int prec)
     high_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_HALF_PRECISION;
     break;
+  default:
+    errorQuda("Precision option not defined");
   }
 
   checkCudaError();
@@ -152,13 +170,19 @@ void initFields(int prec)
   // check for successful allocation
   checkCudaError();
 
-  *vD = *vH;
-  *wD = *wH;
-  *xD = *xH;
-  *yD = *yH;
-  *zD = *zH;
-  *hD = *hH;
-  *lD = *lH;
+  // only do copy if not doing half precision with mg
+  bool flag = !(param.nSpin == 2 &&
+		(prec == 0 || low_aux_prec == QUDA_HALF_PRECISION) );
+
+  if ( flag ) {
+    *vD = *vH;
+    *wD = *wH;
+    *xD = *xH;
+    *yD = *yH;
+    *zD = *zH;
+    *hD = *hH;
+    *lD = *lH;
+  }
 }
 
 
@@ -199,134 +223,134 @@ double benchmark(int kernel, const int niter) {
     switch (kernel) {
 
     case 0:
-      for (int i=0; i < niter; ++i) copyCuda(*yD, *hD);
+      for (int i=0; i < niter; ++i) blas::copy(*yD, *hD);
       break;
 
     case 1:
-      for (int i=0; i < niter; ++i) copyCuda(*yD, *lD);
+      for (int i=0; i < niter; ++i) blas::copy(*yD, *lD);
       break;
       
     case 2:
-      for (int i=0; i < niter; ++i) axpbyCuda(a, *xD, b, *yD);
+      for (int i=0; i < niter; ++i) blas::axpby(a, *xD, b, *yD);
       break;
 
     case 3:
-      for (int i=0; i < niter; ++i) xpyCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::xpy(*xD, *yD);
       break;
 
     case 4:
-      for (int i=0; i < niter; ++i) axpyCuda(a, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::axpy(a, *xD, *yD);
       break;
 
     case 5:
-      for (int i=0; i < niter; ++i) xpayCuda(*xD, a, *yD);
+      for (int i=0; i < niter; ++i) blas::xpay(*xD, a, *yD);
       break;
 
     case 6:
-      for (int i=0; i < niter; ++i) mxpyCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::mxpy(*xD, *yD);
       break;
 
     case 7:
-      for (int i=0; i < niter; ++i) axCuda(a, *xD);
+      for (int i=0; i < niter; ++i) blas::ax(a, *xD);
       break;
 
     case 8:
-      for (int i=0; i < niter; ++i) caxpyCuda(a2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::caxpy(a2, *xD, *yD);
       break;
 
     case 9:
-      for (int i=0; i < niter; ++i) caxpbyCuda(a2, *xD, b2, *yD);
+      for (int i=0; i < niter; ++i) blas::caxpby(a2, *xD, b2, *yD);
       break;
 
     case 10:
-      for (int i=0; i < niter; ++i) cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
+      for (int i=0; i < niter; ++i) blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
       break;
 
     case 11:
-      for (int i=0; i < niter; ++i) axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
+      for (int i=0; i < niter; ++i) blas::axpyBzpcx(a, *xD, *yD, b, *zD, c);
       break;
 
     case 12:
-      for (int i=0; i < niter; ++i) axpyZpbxCuda(a, *xD, *yD, *zD, b);
+      for (int i=0; i < niter; ++i) blas::axpyZpbx(a, *xD, *yD, *zD, b);
       break;
 
     case 13:
-      for (int i=0; i < niter; ++i) caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
+      for (int i=0; i < niter; ++i) blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
       break;
       
     case 14:
-      for (int i=0; i < niter; ++i) cabxpyAxCuda(a, b2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cabxpyAx(a, b2, *xD, *yD);
       break;
 
     case 15:
-      for (int i=0; i < niter; ++i) caxpbypzCuda(a2, *xD, b2, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpbypz(a2, *xD, b2, *yD, *zD);
       break;
 
     case 16:
-      for (int i=0; i < niter; ++i) caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
+      for (int i=0; i < niter; ++i) blas::caxpbypczpw(a2, *xD, b2, *yD, c2, *zD, *wD);
       break;
 
     case 17:
-      for (int i=0; i < niter; ++i) caxpyXmazCuda(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpyXmaz(a2, *xD, *yD, *zD);
       break;
 
       // double
     case 18:
-      for (int i=0; i < niter; ++i) normCuda(*xD);
+      for (int i=0; i < niter; ++i) blas::norm2(*xD);
       break;
 
     case 19:
-      for (int i=0; i < niter; ++i) reDotProductCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::reDotProduct(*xD, *yD);
       break;
 
     case 20:
-      for (int i=0; i < niter; ++i) axpyNormCuda(a, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::axpyNorm(a, *xD, *yD);
       break;
 
     case 21:
-      for (int i=0; i < niter; ++i) xmyNormCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::xmyNorm(*xD, *yD);
       break;
       
     case 22:
-      for (int i=0; i < niter; ++i) caxpyNormCuda(a2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::caxpyNorm(a2, *xD, *yD);
       break;
 
     case 23:
-      for (int i=0; i < niter; ++i) caxpyXmazNormXCuda(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpyXmazNormX(a2, *xD, *yD, *zD);
       break;
 
     case 24:
-      for (int i=0; i < niter; ++i) cabxpyAxNormCuda(a, b2, *xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cabxpyAxNorm(a, b2, *xD, *yD);
       break;
 
     // double2
     case 25:
-      for (int i=0; i < niter; ++i) cDotProductCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cDotProduct(*xD, *yD);
       break;
 
     case 26:
-      for (int i=0; i < niter; ++i) xpaycDotzyCuda(*xD, a, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::xpaycDotzy(*xD, a, *yD, *zD);
       break;
       
     case 27:
-      for (int i=0; i < niter; ++i) caxpyDotzyCuda(a2, *xD, *yD, *zD);
+      for (int i=0; i < niter; ++i) blas::caxpyDotzy(a2, *xD, *yD, *zD);
       break;
 
     // double3
     case 28:
-      for (int i=0; i < niter; ++i) cDotProductNormACuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cDotProductNormA(*xD, *yD);
       break;
 
     case 29:
-      for (int i=0; i < niter; ++i) cDotProductNormBCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::cDotProductNormB(*xD, *yD);
       break;
 
     case 30:
-      for (int i=0; i < niter; ++i) caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      for (int i=0; i < niter; ++i) blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
       break;
 
     case 31:
-      for (int i=0; i < niter; ++i) HeavyQuarkResidualNormCuda(*xD, *yD);
+      for (int i=0; i < niter; ++i) blas::HeavyQuarkResidualNorm(*xD, *yD);
       break;
 
     default:
@@ -345,7 +369,7 @@ double benchmark(int kernel, const int niter) {
   return secs;
 }
 
-#define ERROR(a) fabs(norm2(*a##D) - norm2(*a##H)) / norm2(*a##H)
+#define ERROR(a) fabs(blas::norm2(*a##D) - blas::norm2(*a##H)) / blas::norm2(*a##H)
 
 double test(int kernel) {
 
@@ -357,78 +381,80 @@ double test(int kernel) {
 
   case 0:
     *hD = *hH;
-    copyCuda(*yD, *hD);
-    yH->copy(*hH);
+    blas::copy(*yD, *hD);
+    blas::copy(*yH, *hH);
     error = ERROR(y);
     break;
 
   case 1:
     *lD = *lH;
-    copyCuda(*yD, *lD);
-    yH->copy(*lH);
+    blas::copy(*yD, *lD);
+    blas::copy(*yH, *lH);
     error = ERROR(y);
     break;
       
   case 2:
     *xD = *xH;
     *yD = *yH;
-    axpbyCuda(a, *xD, b, *yD);
-    axpbyCpu(a, *xH, b, *yH);
+    blas::axpby(a, *xD, b, *yD);
+    blas::axpby(a, *xH, b, *yH);
     error = ERROR(y);
     break;
 
   case 3:
     *xD = *xH;
     *yD = *yH;
-    xpyCuda(*xD, *yD);
-    xpyCpu(*xH, *yH);
+    blas::xpy(*xD, *yD);
+    blas::xpy(*xH, *yH);
     error = ERROR(y);
     break;
 
   case 4:
     *xD = *xH;
     *yD = *yH;
-    axpyCuda(a, *xD, *yD);
-    axpyCpu(a, *xH, *yH);
+    blas::axpy(a, *xD, *yD);
+    blas::axpy(a, *xH, *yH);
+    *zH = *yD;
+    printfQuda("axpy check %e %e\n", blas::norm2(*yH), blas::norm2(*zH));
     error = ERROR(y);
     break;
 
   case 5:
     *xD = *xH;
     *yD = *yH;
-    xpayCuda(*xD, a, *yD);
-    xpayCpu(*xH, a, *yH);
+    blas::xpay(*xD, a, *yD);
+    blas::xpay(*xH, a, *yH);
     error = ERROR(y);
     break;
 
   case 6:
     *xD = *xH;
     *yD = *yH;
-    mxpyCuda(*xD, *yD);
-    mxpyCpu(*xH, *yH);
+    blas::mxpy(*xD, *yD);
+    blas::mxpy(*xH, *yH);
     error = ERROR(y);
     break;
 
   case 7:
     *xD = *xH;
-    axCuda(a, *xD);
-    axCpu(a, *xH);
+    blas::ax(a, *xD);
+    blas::ax(a, *xH);
     error = ERROR(x);
     break;
 
   case 8:
     *xD = *xH;
     *yD = *yH;
-    caxpyCuda(a2, *xD, *yD);
-    caxpyCpu(a2, *xH, *yH);
+    blas::caxpy(a2, *xD, *yD);
+    blas::caxpy(a2, *xH, *yH);
     error = ERROR(y);
     break;
 
   case 9:
     *xD = *xH;
     *yD = *yH;
-    caxpbyCuda(a2, *xD, b2, *yD);
-    caxpbyCpu(a2, *xH, b2, *yH);
+    blas::caxpby(a2, *xD, b2, *yD);
+    blas::caxpby(a2, *xH, b2, *yH);
     error = ERROR(y);
     break;
 
@@ -436,8 +462,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    cxpaypbzCuda(*xD, a2, *yD, b2, *zD);
-    cxpaypbzCpu(*xH, a2, *yH, b2, *zH);
+    blas::cxpaypbz(*xD, a2, *yD, b2, *zD);
+    blas::cxpaypbz(*xH, a2, *yH, b2, *zH);
     error = ERROR(z);
     break;
 
@@ -445,8 +471,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    axpyBzpcxCuda(a, *xD, *yD, b, *zD, c);
-    axpyBzpcxCpu(a, *xH, *yH, b, *zH, c);
+    blas::axpyBzpcx(a, *xD, *yD, b, *zD, c);
+    blas::axpyBzpcx(a, *xH, *yH, b, *zH, c);
     error = ERROR(x) + ERROR(y);
     break;
 
@@ -454,8 +480,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    axpyZpbxCuda(a, *xD, *yD, *zD, b);
-    axpyZpbxCpu(a, *xH, *yH, *zH, b);
+    blas::axpyZpbx(a, *xD, *yD, *zD, b);
+    blas::axpyZpbx(a, *xH, *yH, *zH, b);
     error = ERROR(x) + ERROR(y);
     break;
 
@@ -464,16 +490,16 @@ double test(int kernel) {
     *yD = *yH;
     *zD = *zH;
     *wD = *wH;
-    caxpbypzYmbwCuda(a2, *xD, b2, *yD, *zD, *wD);
-    caxpbypzYmbwCpu(a2, *xH, b2, *yH, *zH, *wH);
+    blas::caxpbypzYmbw(a2, *xD, b2, *yD, *zD, *wD);
+    blas::caxpbypzYmbw(a2, *xH, b2, *yH, *zH, *wH);
     error = ERROR(z) + ERROR(y);
     break;
       
   case 14:
     *xD = *xH;
     *yD = *yH;
-    cabxpyAxCuda(a, b2, *xD, *yD);
-    cabxpyAxCpu(a, b2, *xH, *yH);
+    blas::cabxpyAx(a, b2, *xD, *yD);
+    blas::cabxpyAx(a, b2, *xH, *yH);
     error = ERROR(y) + ERROR(x);
     break;
 
@@ -481,8 +507,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {caxpbypzCuda(a2, *xD, b2, *yD, *zD);
-      caxpbypzCpu(a2, *xH, b2, *yH, *zH);
+    {blas::caxpbypz(a2, *xD, b2, *yD, *zD);
+      blas::caxpbypz(a2, *xH, b2, *yH, *zH);
       error = ERROR(z); }
     break;
     
@@ -491,8 +517,8 @@ double test(int kernel) {
     *yD = *yH;
     *zD = *zH;
     *wD = *wH;
-    {caxpbypczpwCuda(a2, *xD, b2, *yD, c2, *zD, *wD);
-      caxpbypczpwCpu(a2, *xH, b2, *yH, c2, *zH, *wH);
+    {blas::caxpbypczpw(a2, *xD, b2, *yD, c2, *zD, *wD);
+      blas::caxpbypczpw(a2, *xH, b2, *yH, c2, *zH, *wH);
       error = ERROR(w); }
     break;
 
@@ -500,44 +526,45 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {caxpyXmazCuda(a, *xD, *yD, *zD);
-     caxpyXmazCpu(a, *xH, *yH, *zH);
+    {blas::caxpyXmaz(a, *xD, *yD, *zD);
+     blas::caxpyXmaz(a, *xH, *yH, *zH);
      error = ERROR(y) + ERROR(x);}
     break;
 
     // double
   case 18:
     *xD = *xH;
-    error = fabs(normCuda(*xD) - normCpu(*xH)) / normCpu(*xH);
+    *yH = *xD;
+    error = fabs(blas::norm2(*xD) - blas::norm2(*xH)) / blas::norm2(*xH);
     break;
     
   case 19:
     *xD = *xH;
     *yD = *yH;
-    error = fabs(reDotProductCuda(*xD, *yD) - reDotProductCpu(*xH, *yH)) / fabs(reDotProductCpu(*xH, *yH));
+    error = fabs(blas::reDotProduct(*xD, *yD) - blas::reDotProduct(*xH, *yH)) / fabs(blas::reDotProduct(*xH, *yH));
     break;
 
   case 20:
     *xD = *xH;
     *yD = *yH;
-    {double d = axpyNormCuda(a, *xD, *yD);
-    double h = axpyNormCpu(a, *xH, *yH);
+    {double d = blas::axpyNorm(a, *xD, *yD);
+    double h = blas::axpyNorm(a, *xH, *yH);
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
   case 21:
     *xD = *xH;
     *yD = *yH;
-    {double d = xmyNormCuda(*xD, *yD);
-    double h = xmyNormCpu(*xH, *yH);
+    {double d = blas::xmyNorm(*xD, *yD);
+    double h = blas::xmyNorm(*xH, *yH);
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
     
   case 22:
     *xD = *xH;
     *yD = *yH;
-    {double d = caxpyNormCuda(a, *xD, *yD);
-    double h = caxpyNormCpu(a, *xH, *yH);
+    {double d = blas::caxpyNorm(a, *xD, *yD);
+    double h = blas::caxpyNorm(a, *xH, *yH);
     error = ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
@@ -545,16 +572,16 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {double d = caxpyXmazNormXCuda(a, *xD, *yD, *zD);
-      double h = caxpyXmazNormXCpu(a, *xH, *yH, *zH);
+    {double d = blas::caxpyXmazNormX(a, *xD, *yD, *zD);
+      double h = blas::caxpyXmazNormX(a, *xH, *yH, *zH);
       error = ERROR(y) + ERROR(x) + fabs(d-h)/fabs(h);}
     break;
 
   case 24:
     *xD = *xH;
     *yD = *yH;
-    {double d = cabxpyAxNormCuda(a, b2, *xD, *yD);
-      double h = cabxpyAxNormCpu(a, b2, *xH, *yH);
+    {double d = blas::cabxpyAxNorm(a, b2, *xD, *yD);
+      double h = blas::cabxpyAxNorm(a, b2, *xH, *yH);
       error = ERROR(x) + ERROR(y) + fabs(d-h)/fabs(h);}
     break;
 
@@ -562,16 +589,16 @@ double test(int kernel) {
   case 25:
     *xD = *xH;
     *yD = *yH;
-    error = abs(cDotProductCuda(*xD, *yD) - cDotProductCpu(*xH, *yH)) / abs(cDotProductCpu(*xH, *yH));
+    error = abs(blas::cDotProduct(*xD, *yD) - blas::cDotProduct(*xH, *yH)) / abs(blas::cDotProduct(*xH, *yH));
     break;
     
   case 26:
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    { quda::Complex d = xpaycDotzyCuda(*xD, a, *yD, *zD);
-      quda::Complex h = xpaycDotzyCpu(*xH, a, *yH, *zH);
-      error =  fabs(norm2(*yD) - norm2(*yH)) / norm2(*yH) + abs(d-h)/abs(h);
+    { quda::Complex d = blas::xpaycDotzy(*xD, a, *yD, *zD);
+      quda::Complex h = blas::xpaycDotzy(*xH, a, *yH, *zH);
+      error =  fabs(blas::norm2(*yD) - blas::norm2(*yH)) / blas::norm2(*yH) + abs(d-h)/abs(h);
     }
     break;
     
@@ -579,8 +606,8 @@ double test(int kernel) {
     *xD = *xH;
     *yD = *yH;
     *zD = *zH;
-    {quda::Complex d = caxpyDotzyCuda(a, *xD, *yD, *zD);
-      quda::Complex h = caxpyDotzyCpu(a, *xH, *yH, *zH);
+    {quda::Complex d = blas::caxpyDotzy(a, *xD, *yD, *zD);
+      quda::Complex h = blas::caxpyDotzy(a, *xH, *yH, *zH);
     error = ERROR(y) + abs(d-h)/abs(h);}
     break;
 
@@ -588,16 +615,16 @@ double test(int kernel) {
   case 28:
     *xD = *xH;
     *yD = *yH;
-    { double3 d = cDotProductNormACuda(*xD, *yD);
-      double3 h = cDotProductNormACpu(*xH, *yH);
+    { double3 d = blas::cDotProductNormA(*xD, *yD);
+      double3 h = blas::cDotProductNormA(*xH, *yH);
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
     
   case 29:
     *xD = *xH;
     *yD = *yH;
-    { double3 d = cDotProductNormBCuda(*xD, *yD);
-      double3 h = cDotProductNormBCpu(*xH, *yH);
+    { double3 d = blas::cDotProductNormB(*xD, *yD);
+      double3 h = blas::cDotProductNormB(*xH, *yH);
       error = fabs(d.x - h.x) / fabs(h.x) + fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
     
@@ -607,8 +634,8 @@ double test(int kernel) {
     *zD = *zH;
     *wD = *wH;
     *vD = *vH;
-    { double3 d = caxpbypzYmbwcDotProductUYNormYCuda(a2, *xD, b2, *yD, *zD, *wD, *vD);
-      double3 h = caxpbypzYmbwcDotProductUYNormYCpu(a2, *xH, b2, *yH, *zH, *wH, *vH);
+    { double3 d = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xD, b2, *yD, *zD, *wD, *vD);
+      double3 h = blas::caxpbypzYmbwcDotProductUYNormY(a2, *xH, b2, *yH, *zH, *wH, *vH);
       error = ERROR(z) + ERROR(y) + fabs(d.x - h.x) / fabs(h.x) + 
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
@@ -616,8 +643,8 @@ double test(int kernel) {
   case 31:
     *xD = *xH;
     *yD = *yH;
-    { double3 d = HeavyQuarkResidualNormCuda(*xD, *yD);
-      double3 h = HeavyQuarkResidualNormCpu(*xH, *yH);
+    { double3 d = blas::HeavyQuarkResidualNorm(*xD, *yD);
+      double3 h = blas::HeavyQuarkResidualNorm(*xH, *yH);
       error = fabs(d.x - h.x) / fabs(h.x) + 
 	fabs(d.y - h.y) / fabs(h.y) + fabs(d.z - h.z) / fabs(h.z); }
     break;
@@ -628,8 +655,6 @@ double test(int kernel) {
 
   return error;
 }
-
-int Nprec = 3;
 
 const char *prec_str[] = {"half", "single", "double"};
 
@@ -678,6 +703,17 @@ int main(int argc, char** argv)
     usage(argv);
   }
 
+  // override spin setting if mg solver is set to test coarse grids
+  if (inv_type == QUDA_MG_INVERTER) {
+    Nspin = 2;
+    Ncolor = nvec;
+  } else {
+    // set spin according to the type of dslash
+    Nspin = (dslash_type == QUDA_ASQTAD_DSLASH || 
+	     dslash_type == QUDA_STAGGERED_DSLASH) ? 1 : 4;
+    Ncolor = 3;
+  }
+
   setSpinorSiteSize(24);
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
@@ -688,25 +724,25 @@ int main(int argc, char** argv)
   setVerbosity(QUDA_SILENT);
 
   for (int prec = 0; prec < Nprec; prec++) {
+    if (Nspin == 2 && prec == 0) continue;
 
     printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", prec_str[prec], niter);
     initFields(prec);
 
     for (int kernel = 0; kernel < Nkernels; kernel++) {
-      // only benchmark "high precision" copyCuda() if double is supported
-      if ((Nprec < 3) && (kernel == 0)) continue;
+      if (skip_kernel(prec, kernel)) continue;
 
       // do the initial tune
       benchmark(kernel, 1);
     
       // now rerun with more iterations to get accurate speed measurements
-      quda::blas_flops = 0;
-      quda::blas_bytes = 0;
+      quda::blas::flops = 0;
+      quda::blas::bytes = 0;
       
       double secs = benchmark(kernel, niter);
       
-      double gflops = (quda::blas_flops*1e-9)/(secs);
-      double gbytes = quda::blas_bytes/(secs*1e9);
+      double gflops = (quda::blas::flops*1e-9)/(secs);
+      double gbytes = quda::blas::bytes/(secs*1e9);
     
       printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
     }
@@ -748,7 +784,10 @@ public:
 TEST_P(BlasTest, verify) {
   int prec = param.x;
   int kernel = param.y;
-  double deviation = test(kernel);
+
+  // certain tests will fail to run for coarse grids so mark these as
+  // failed without running
+  double deviation =  skip_kernel(prec,kernel) ? 1.0 : test(kernel);
   printfQuda("%-35s error = %e\n", names[kernel], deviation);
   double tol = (prec == 2 ? 1e-12 : (prec == 1 ? 1e-5 : 1e-3));
   tol = (kernel < 2) ? 1e-4 : tol; // use different tolerance for copy

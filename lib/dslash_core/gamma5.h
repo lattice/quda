@@ -304,7 +304,7 @@ __global__ void gamma5Kernel(float4 *out, float *outNorm, float4 *in, float *inN
    VOLATILE float4 I3;
    VOLATILE float4 I4;
    VOLATILE float4 I5;
-/*
+
 #if defined(FERMI_NO_DBLE_TEX) || defined (USE_TEXTURE_OBJECTS)
    float4 I0  = spinor[sid + 0 * sp_stride];
    float4 I1  = spinor[sid + 1 * sp_stride];

@@ -142,7 +142,7 @@ namespace quda {
           vp2.push_back(&v[j]);
         }
       }
-      reDotProductCuda(g, vp1, vp2);
+      blas::reDotProduct(g, vp1, vp2);
       int k=0;
       for(int i=0; i<nsteps; ++i){
         for(int j=nsteps; j<dim; j++){
@@ -167,7 +167,7 @@ namespace quda {
     }
 
 
-    reDotProductCuda(d,vp1,vp2); 
+    blas::reDotProduct(d,vp1,vp2); 
 
     for(int i=0; i<num; ++i){
       for(int j=0; j<=i; ++j){
@@ -203,13 +203,13 @@ namespace quda {
   }
 #endif // SSTEP
 
-  void MPCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b) 
+  void MPCG::operator()(ColorSpinorField &x, ColorSpinorField &b) 
   {
 #ifndef SSTEP
     errorQuda("S-step solvers not built\n");
 #else
     // Check to see that we're not trying to invert on a zero-field source    
-    const double b2 = norm2(b);
+    const double b2 = blas::norm2(b);
     if(b2 == 0){
       profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
@@ -236,11 +236,11 @@ namespace quda {
     std::vector<cudaColorSpinorField> V(2*s+1,cudaColorSpinorField(b,csParam));
 
     // Set up the first residual
-    for(int i=0; i<s; ++i) zeroCuda(R[i]);
+    for(int i=0; i<s; ++i) blas::zero(R[i]);
 
 
     mat(R[s], x, temp);
-    double r2 = xmyNormCuda(b,R[s]);
+    double r2 = blas::xmyNorm(b,R[s]);
 
     double stop = stopping(param.tol, b2, param.residual_type);
 
@@ -325,9 +325,9 @@ namespace quda {
        
           // compute d coeffs 
           computeCoeffs(d, d_p1, d_p2, k, j, s, gamma, rho, gamma_kprev, rho_kprev);
-          zeroCuda(w); 
+	  blas::zero(w); 
           for(int i=0; i<(2*s+1); ++i){
-            if(d[i] != 0.) axpyCuda(d[i], V[i], w);
+            if(d[i] != 0.) blas::axpy(d[i], V[i], w);
           }
         }
 
@@ -339,14 +339,14 @@ namespace quda {
         rho[j] = (it==0) ? 1.0 : 1.0/(1.0 - (gamma[j]/gamma_prev)*(mu[j]/mu_prev)*(1.0/rho_prev));  
 
         R[j+1] = R_prev;
-        axCuda((1.0 - rho[j]), R[j+1]);
-        axpyCuda(rho[j], R[j], R[j+1]);
-        axpyCuda(-rho[j]*gamma[j], w, R[j+1]);
+	blas::ax((1.0 - rho[j]), R[j+1]);
+	blas::axpy(rho[j], R[j], R[j+1]);
+	blas::axpy(-rho[j]*gamma[j], w, R[j+1]);
 
         x_new = x_prev;
-        axCuda((1.0 - rho[j]), x_new);
-        axpyCuda(rho[j], x, x_new);
-        axpyCuda(gamma[j]*rho[j], R[j], x_new);
+	blas::ax((1.0 - rho[j]), x_new);
+	blas::axpy(rho[j], x, x_new);
+	blas::axpy(gamma[j]*rho[j], R[j], x_new);
 
 
 
@@ -378,7 +378,7 @@ namespace quda {
 
 
     mat(R[0], x_prev, temp);
-    param.true_res = sqrt(xmyNormCuda(b, R[0]) / b2);
+    param.true_res = sqrt(blas::xmyNorm(b, R[0]) / b2);
 
 
     PrintSummary("MPCG", it, r2, b2);

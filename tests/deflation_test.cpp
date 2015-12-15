@@ -20,7 +20,7 @@
 #include <mpi.h>
 #endif
 
-#include <gauge_qio.h>
+#include <qio_field.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -46,6 +46,7 @@ extern double tol; // tolerance for inverter
 extern QudaInverterType inv_type; // solver type
 
 extern double mass; // mass of Dirac operator
+extern double anisotropy;
 extern int niter; // max solver iterations
 
 extern char latfile[];
@@ -125,7 +126,7 @@ int main(int argc, char **argv)
   gauge_param.X[3] = tdim;
   inv_param.Ls = 1;
 
-  gauge_param.anisotropy = 1.0;
+  gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
@@ -428,7 +429,7 @@ int main(int argc, char **argv)
 
   if( inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) printfQuda("\n Total number of RHS in the incremental stage: %d\n", inv_param.rhs_idx);
 //***
-  const int projection_runs = (inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) ? 4 : 0; 
+  const int projection_runs = (inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER) ? 4 : 0;
 
   if(inv_param.inv_type == QUDA_GMRESDR_PROJ_INVERTER) inv_param.max_search_dim = 96;//resize Krylov subspace dimension, not strictly necessary
 

@@ -4,12 +4,7 @@
 #include <clover_field.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-
-namespace CloverOrder {
-  using namespace quda;
 #include <clover_field_order.h>
-} // CloverOrder
-
 
 namespace quda {
 
@@ -255,7 +250,7 @@ namespace quda {
         QudaFieldLocation location){
 
     if(clover.isNative()) {
-      typedef typename CloverOrder::quda::clover_mapper<Float>::type C;
+      typedef typename clover_mapper<Float>::type C;
       if (gauge.isNative()) {
 	if (gauge.Reconstruct() == QUDA_RECONSTRUCT_NO) {
 	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;

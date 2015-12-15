@@ -430,37 +430,37 @@ public:
     int xpay_flops = 2 * 2 * in->Ncolor() * in->Nspin(); // multiply and add per real component
     int num_dir = 2 * 4;
 
-    long long flops;
+    long long flops_ = 0;
     switch(dslashParam.kernel_type) {
     case EXTERIOR_KERNEL_X:
     case EXTERIOR_KERNEL_Y:
     case EXTERIOR_KERNEL_Z:
     case EXTERIOR_KERNEL_T:
-      flops = (ghost_flops + (x ? xpay_flops : 0)) * 2 * in->GhostFace()[dslashParam.kernel_type];
+      flops_ = (ghost_flops + (x ? xpay_flops : 0)) * 2 * in->GhostFace()[dslashParam.kernel_type];
       break;
     case EXTERIOR_KERNEL_ALL:
       {
 	long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
-	flops = (ghost_flops + (x ? xpay_flops : 0)) * ghost_sites;
+	flops_ = (ghost_flops + (x ? xpay_flops : 0)) * ghost_sites;
 	break;
       }
     case INTERIOR_KERNEL:
       {
 	long long sites = in->VolumeCB();
-	flops = (num_dir*(in->Nspin()/4)*in->Ncolor()*in->Nspin() +   // spin project (=0 for staggered)
+	flops_ = (num_dir*(in->Nspin()/4)*in->Ncolor()*in->Nspin() +   // spin project (=0 for staggered)
 		 num_dir*num_mv_multiply*mv_flops +                   // SU(3) matrix-vector multiplies
 		 ((num_dir-1)*2*in->Ncolor()*in->Nspin())) * sites;   // accumulation
-	if (x) flops += xpay_flops * sites;
+	if (x) flops_ += xpay_flops * sites;
 
 	// now correct for flops done by exterior kernel
 	long long ghost_sites = 0;
 	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2 * in->GhostFace()[d];
-	flops -= (ghost_flops + (x ? xpay_flops : 0)) * ghost_sites;
+	flops_ -= (ghost_flops + (x ? xpay_flops : 0)) * ghost_sites;
 	  
 	break;
       }
     }
-    return flops;
+    return flops_;
   }
 
   virtual long long bytes() const {
@@ -471,35 +471,35 @@ public:
     int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + spinor_bytes;
     int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
 
-    long long bytes;
+    long long bytes_=0;
     switch(dslashParam.kernel_type) {
     case EXTERIOR_KERNEL_X:
     case EXTERIOR_KERNEL_Y:
     case EXTERIOR_KERNEL_Z:
     case EXTERIOR_KERNEL_T:
-      bytes = (ghost_bytes + (x ? spinor_bytes : 0)) * 2 * in->GhostFace()[dslashParam.kernel_type];
+      bytes_ = (ghost_bytes + (x ? spinor_bytes : 0)) * 2 * in->GhostFace()[dslashParam.kernel_type];
       break;
     case EXTERIOR_KERNEL_ALL:
       {
 	long long ghost_sites = 2 * (in->GhostFace()[0]+in->GhostFace()[1]+in->GhostFace()[2]+in->GhostFace()[3]);
-	bytes = (ghost_bytes + (x ? spinor_bytes : 0)) * ghost_sites;
+	bytes_ = (ghost_bytes + (x ? spinor_bytes : 0)) * ghost_sites;
 	break;
       }
     case INTERIOR_KERNEL:
       {
 	long long sites = in->VolumeCB();
-	bytes = (num_dir*gauge_bytes + ((num_dir-2)*spinor_bytes + 2*proj_spinor_bytes) + spinor_bytes)*sites;
-	if (x) bytes += spinor_bytes;
+	bytes_ = (num_dir*gauge_bytes + ((num_dir-2)*spinor_bytes + 2*proj_spinor_bytes) + spinor_bytes)*sites;
+	if (x) bytes_ += spinor_bytes;
 
 	// now correct for bytes done by exterior kernel
 	long long ghost_sites = 0;
 	for (int d=0; d<4; d++) if (dslashParam.commDim[d]) ghost_sites += 2*in->GhostFace()[d];
-	bytes -= (ghost_bytes + (x ? spinor_bytes : 0)) * ghost_sites;
+	bytes_ -= (ghost_bytes + (x ? spinor_bytes : 0)) * ghost_sites;
 	  
 	break;
       }
     }
-    return bytes;
+    return bytes_;
   }
 
 

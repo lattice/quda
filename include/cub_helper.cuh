@@ -38,9 +38,9 @@ namespace quda {
     T *result_d;
     T *result_h;
     ReduceArg() :
-      partial(static_cast<T*>(getDeviceReduceBuffer())),
-      result_d(static_cast<T*>(getMappedHostReduceBuffer())),
-      result_h(static_cast<T*>(getHostReduceBuffer())) 
+      partial(static_cast<T*>(blas::getDeviceReduceBuffer())),
+      result_d(static_cast<T*>(blas::getMappedHostReduceBuffer())),
+      result_h(static_cast<T*>(blas::getHostReduceBuffer())) 
     { }
 
   };

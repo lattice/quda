@@ -5,7 +5,7 @@
 #include <test_util.h>
 #include <dslash_util.h>
 
-#include <gauge_qio.h>
+#include <qio_field.h>
 #include <util_quda.h>
 
 #ifdef QMP_COMMS

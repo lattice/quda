@@ -255,9 +255,9 @@ void init()
 
     cudaDeviceSynchronize();
     checkCudaError();
-
-    double spinor_norm2 = norm2(*spinor);
-    double cuda_spinor_norm2=  norm2(*cudaSpinor);
+	
+    double spinor_norm2 = blas::norm2(*spinor);
+    double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
     printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
     if(test_type == 2){
@@ -442,13 +442,14 @@ static int dslashTest()
     unsigned long long flops = dirac->Flops();
     printfQuda("GFLOPS = %f\n", 1.0e-9*flops/secs);
 
-    double norm2_cpu = norm2(*spinorRef);
-    double norm2_cpu_cuda= norm2(*spinorOut);
+    double spinor_ref_norm2 = blas::norm2(*spinorRef);
+    double spinor_out_norm2 =  blas::norm2(*spinorOut);
     if (!transfer) {
-      double norm2_cuda= norm2(*cudaSpinorOut);
-      printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
+      double cuda_spinor_out_norm2 =  blas::norm2(*cudaSpinorOut);
+      printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n",  spinor_ref_norm2, cuda_spinor_out_norm2,
+		 spinor_out_norm2);
     } else {
-      printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);
+      printfQuda("Result: CPU=%f , CPU-CUDA=%f", spinor_ref_norm2, spinor_out_norm2);
     }
 
     if (verify_results) {

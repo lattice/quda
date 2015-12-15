@@ -2,14 +2,17 @@ include ../make.inc
 
 QUDA = libquda.a
 
-QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
-	inv_bicgstab_quda.o inv_cg_quda.o inv_multi_cg_quda.o		\
-	inv_eigcg_quda.o inv_gmresdr_quda.o gauge_ape.o gauge_plaq.o inv_gcr_quda.o	\
-	inv_mr_quda.o inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o	\
-	inv_mre.o interface_quda.o util_quda.o color_spinor_field.o	\
+QUDA_OBJS = dirac_coarse.o dslash_coarse.o coarse_op.o			\
+	coarsecoarse_op.o multigrid.o transfer.o transfer_util.o	\
+	prolongator.o restrictor.o gauge_phase.o timer.o malloc.o	\
+	solver.o inv_bicgstab_quda.o inv_cg_quda.o			\
+	inv_multi_cg_quda.o inv_eigcg_quda.o inv_gmresdr_quda.o		\
+	gauge_ape.o gauge_plaq.o inv_gcr_quda.o inv_mr_quda.o		\
+	inv_sd_quda.o inv_xsd_quda.o inv_pcg_quda.o inv_mre.o		\
+	interface_quda.o util_quda.o color_spinor_field.o		\
 	color_spinor_util.o cpu_color_spinor_field.o			\
-	cuda_color_spinor_field.o dirac.o hw_quda.o blas_cpu.o		\
-	clover_field.o lattice_field.o gauge_field.o cpu_gauge_field.o	\
+	cuda_color_spinor_field.o dirac.o clover_field.o		\
+	lattice_field.o gauge_field.o cpu_gauge_field.o			\
 	cuda_gauge_field.o extract_gauge_ghost.o max_gauge.o		\
 	gauge_update_quda.o dirac_clover.o dirac_wilson.o		\
 	dirac_staggered.o dirac_improved_staggered.o covd.o		\
@@ -25,19 +28,27 @@ QUDA_OBJS = gauge_phase.o timer.o malloc.o solver.o			\
 	blas_quda.o copy_quda.o reduce_quda.o face_buffer.o		\
 	face_gauge.o comm_common.o ${COMM_OBJS} ${NUMA_AFFINITY_OBJS}	\
 	clover_deriv_quda.o clover_invert.o copy_gauge_extended.o	\
-	extract_gauge_ghost_extended.o copy_color_spinor.o		\
-	copy_gauge_double.o copy_gauge_single.o copy_gauge_half.o	\
-	copy_gauge.o copy_clover.o staggered_oprod.o			\
-	clover_trace_quda.o ks_force_quda.o hisq_paths_force_quda.o	\
-	fermion_force_quda.o unitarize_force_quda.o			\
-	unitarize_links_quda.o milc_interface.o				\
-	extended_color_spinor_utilities.o eig_lanczos_quda.o		\
-	ritz_quda.o eig_solver.o blas_magma.o				\
+	copy_color_spinor.o copy_color_spinor_dd.o			\
+	copy_color_spinor_ds.o copy_color_spinor_dh.o			\
+	copy_color_spinor_sd.o copy_color_spinor_ss.o			\
+	copy_color_spinor_sh.o copy_color_spinor_hd.o			\
+	copy_color_spinor_hs.o copy_color_spinor_hh.o			\
+	extract_gauge_ghost_extended.o copy_gauge_double.o		\
+	copy_gauge_single.o copy_gauge_half.o copy_gauge.o		\
+	copy_clover.o staggered_oprod.o clover_trace_quda.o		\
+	ks_force_quda.o hisq_paths_force_quda.o fermion_force_quda.o	\
+	unitarize_force_quda.o unitarize_links_quda.o			\
+	milc_interface.o extended_color_spinor_utilities.o		\
+	eig_lanczos_quda.o ritz_quda.o eig_solver.o blas_magma.o	\
 	misc_helpers.o inv_mpcg_quda.o inv_mpbicgstab_quda.o		\
 	pgauge_exchange.o pgauge_init.o pgauge_heatbath.o random.o	\
 	gauge_fix_ovr_extra.o gauge_fix_fft.o gauge_fix_ovr.o		\
 	pgauge_det_trace.o clover_outer_product.o			\
-	clover_sigma_outer_product.o momentum.o qcharge_quda.o
+	clover_sigma_outer_product.o momentum.o qcharge_quda.o		\
+	extract_gauge_ghost_mg.o copy_gauge_mg.o color_spinor_pack.o	\
+	copy_color_spinor_mg_dd.o copy_color_spinor_mg_ds.o		\
+	copy_color_spinor_mg_sd.o copy_color_spinor_mg_ss.o		\
+	${QIO_UTIL}
 
 # header files, found in include/
 QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
@@ -51,7 +62,8 @@ QUDA_HDRS = blas_quda.h clover_field.h color_spinor_field.h convert.h	\
 	random_quda.h pgauge_monte.h unitarization_links.h		\
 	index_helper.cuh atomic.cuh cub_helper.cuh eig_variables.h	\
 	numa_affinity.h misc_helpers.h texture.h object.h momentum.h	\
-	su3_project.cuh worker.h
+	su3_project.cuh worker.h transfer.h multigrid.h qio_field.h	\
+	qio_util.h
 
 # These are only inlined into blas_quda.cu
 BLAS_INLN = blas_core.h blas_mixed_core.h
@@ -121,7 +133,7 @@ wilson_pack_clover_twisted_face_dagger_core.h wilson_pack_face_core.h	\
 wilson_pack_face_dagger_core.h wilson_pack_twisted_face_core.h		\
 wilson_pack_twisted_face_dagger_core.h
 
-INC += -I../include -Idslash_core -I.
+INC += -I../include -Idslash_core -I. -I../tests
 
 HDRS = $(QUDA_HDRS:%=../include/%)
 HDRS += $(QUDA_INLN)

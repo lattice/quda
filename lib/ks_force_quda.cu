@@ -8,6 +8,8 @@
 
 namespace quda {
 
+  using namespace gauge;
+
   template<typename Oprod, typename Gauge, typename Mom>
     struct KSForceArg {
       int threads; 

@@ -35,6 +35,7 @@ BUILD_HISQ_FORCE = @BUILD_HISQ_FORCE@				# build code for hisq fermion force?
 BUILD_GAUGE_TOOLS = @BUILD_GAUGE_TOOLS@				# build auxilary gauge-field tools?
 BUILD_GAUGE_ALG = @BUILD_GAUGE_ALG@				# build gauge-fixing and pure-gauge algorithms?
 BUILD_SSTEP = @BUILD_SSTEP@                                     # build s-step linear solvers?
+BUILD_MULTIGRID = @BUILD_MULTIGRID@                                 # build multigrid linear solvers?
 
 #Dynamically invert the clover term for twisted-clover?
 DYNAMIC_CLOVER = @DYNAMIC_CLOVER@	# Dynamic inversion saves memory but decreases the flops
@@ -99,8 +100,8 @@ ifeq ($(strip $(CPU_ARCH)), x86_64)
   endif
 else
   LIB = -L$(CUDA_INSTALL_PATH)/lib -lcudart -m32
-  COPT = -malign-double -m32
-  NVCCOPT = -m32
+  COPT += -malign-double -m32
+  NVCCOPT += -m32
 endif
 
 COMP_CAP = $(GPU_ARCH:sm_%=%0)
@@ -139,12 +140,6 @@ ifeq ($(strip $(BUILD_MPI)), yes)
   COMM_OBJS = comm_mpi.o
 endif
 
-ifeq ($(strip $(BUILD_QIO)), yes)
-  INC += -DHAVE_QIO -I$(QIO_HOME)/include
-  LIB += -L$(QIO_HOME)/lib -lqio -llime
-  QIO_UTIL = qio_util.o layout_hyper.o gauge_qio.o
-endif
-
 ifeq ($(strip $(BUILD_QMP)), yes)
   QMP_CFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --cflags )
   QMP_LDFLAGS = $(shell $(QMP_HOME)/bin/qmp-config --ldflags )
@@ -152,6 +147,12 @@ ifeq ($(strip $(BUILD_QMP)), yes)
   INC += -DQMP_COMMS $(QMP_CFLAGS)
   LIB += $(QMP_LDFLAGS) $(QMP_LIBS)
   COMM_OBJS = comm_qmp.o
+endif
+
+ifeq ($(strip $(BUILD_QIO)), yes)
+  INC += -DHAVE_QIO -I$(QIO_HOME)/include
+  LIB += -L$(QIO_HOME)/lib -lqio -llime
+  QIO_UTIL = qio_field.o qio_util.o layout_hyper.o
 endif
 
 ifeq ($(strip $(MPI_NVTX)), yes)
@@ -181,6 +182,11 @@ endif
 ifeq ($(strip $(DYNAMIC_CLOVER)), yes)
   NVCCOPT += -DDYNAMIC_CLOVER
   COPT += -DDYNAMIC_CLOVER
+endif
+
+ifeq ($(strip $(BUILD_MULTIGRID)), yes)
+  NVCCOPT += -DGPU_MULTIGRID
+  COPT += -DGPU_MULTIGRID
 endif
 
 ifeq ($(strip $(BUILD_SSTEP)), yes)
@@ -369,15 +375,15 @@ ifeq ($(strip $(USE_QDPJIT)), yes)
   INC += -I$(QDP_INSTALL_PATH)/include
 
   CFLAGS = -Wall -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall $(COPT) $(INC) $(QDPXX_CXXFLAGS)
+  CXXFLAGS = -Wall -std=c++11 $(COPT) $(INC) $(QDPXX_CXXFLAGS)
   NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
-  NVCCFLAGS = $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  NVCCFLAGS = -std=c++11 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 else
   CFLAGS = -Wall -O3 -std=c99 $(COPT) $(INC)
-  CXXFLAGS = -Wall -O3 $(COPT) $(INC)
+  CXXFLAGS = -Wall -std=c++11 -O3 $(COPT) $(INC)
   NVCC = $(CUDA_INSTALL_PATH)/bin/nvcc
-  NVCCFLAGS = -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
+  NVCCFLAGS = -std=c++11 -O3 $(NVCCOPT) -arch=$(GPU_ARCH) $(INC)
   LDFLAGS = -fPIC $(LIB)
 endif
 

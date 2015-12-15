@@ -617,6 +617,7 @@ BUILD_MULTI_GPU
 DYNAMIC_CLOVER
 BUILD_CONTRACT
 BUILD_SSTEP
+BUILD_MULTIGRID
 BUILD_GAUGE_ALG
 BUILD_GAUGE_TOOLS
 BUILD_HISQ_FORCE
@@ -724,6 +725,7 @@ enable_staggered_force
 enable_hisq_force
 enable_gauge_tools
 enable_gauge_alg
+enable_multigrid
 enable_sstep
 enable_contract
 enable_dynamic_clover
@@ -1409,6 +1411,7 @@ Optional Features:
                           disabled)
   --enable-gauge-alg      Build gauge fixing and pure gauge algorithms
                           (default: disabled)
+  --enable-multigrid      Build multigrid linear solvers (default: disabled)
   --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
   --enable-dynamic-clover Invert dynamically the clover term for
@@ -2256,6 +2259,15 @@ if test "${enable_gauge_alg+set}" = set; then :
   enableval=$enable_gauge_alg;  build_gauge_alg=${enableval}
 else
    build_gauge_alg="no"
+
+fi
+
+
+# Check whether --enable-multigrid was given.
+if test "${enable_multigrid+set}" = set; then :
+  enableval=$enable_multigrid;  build_multigrid=${enableval}
+else
+   build_multigrid="no"
 
 fi
 
@@ -4192,6 +4204,13 @@ yes|no);;
   ;;
 esac
 
+case ${build_multigrid} in
+yes|no);;
+*)
+  as_fn_error $? " invalid value for --enable-multigrid " "$LINENO" 5
+  ;;
+esac
+
 case ${build_sstep} in
 yes|no);;
 *)
@@ -4430,6 +4449,11 @@ BUILD_GAUGE_TOOLS=${build_gauge_tools}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&5
 $as_echo "$as_me: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&6;}
 BUILD_GAUGE_ALG=${build_gauge_alg}
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MULTIGRID = ${build_multigrid}  " >&5
+$as_echo "$as_me: Setting BUILD_MULTIGRID = ${build_multigrid}  " >&6;}
+BUILD_MULTIGRID=${build_multigrid}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_SSTEP = ${build_sstep}  " >&5

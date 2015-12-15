@@ -123,10 +123,10 @@ namespace quda {
     }
   
     long long flops() const { 
-      ((long long)arg.length)*(0 + 144 + 36); // spin_mu_nu + spin trace + multiply-add
+      return ((long long)arg.length)*(0 + 144 + 36); // spin_mu_nu + spin trace + multiply-add
     }
     long long bytes() const { 
-      ((long long)arg.length)*(arg.inA.Bytes() + arg.inB.Bytes() + 2*arg.oprod.Bytes());
+      return ((long long)arg.length)*(arg.inA.Bytes() + arg.inB.Bytes() + 2*arg.oprod.Bytes());
     }
   
     TuneKey tuneKey() const { 
@@ -158,13 +158,13 @@ namespace quda {
     if(x.Precision() != oprod.Precision()) errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), oprod.Precision());
 
     for (int parity=0; parity<2; parity++) {
-      cudaColorSpinorField& inA = (parity&1) ? x.Odd() : x.Even();
-      cudaColorSpinorField& inB = (parity&1) ? p.Odd() : p.Even();
+      ColorSpinorField& inA = (parity&1) ? x.Odd() : x.Even();
+      ColorSpinorField& inB = (parity&1) ? p.Odd() : p.Even();
 
       if(x.Precision() == QUDA_DOUBLE_PRECISION){
 	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
 	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
-	computeCloverSigmaOprodCuda<double2>(FloatNOrder<double, 18, 2, 18>(oprod), 
+	computeCloverSigmaOprodCuda<double2>(gauge::FloatNOrder<double, 18, 2, 18>(oprod), 
 					     oprod, spinorA, spinorB, parity, coeff, mu, nu, shift);
       } else {
 	errorQuda("Unsupported precision: %d\n", x.Precision());

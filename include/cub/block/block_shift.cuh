@@ -34,6 +34,7 @@
 #pragma once
 
 #include "../util_arch.cuh"
+#include "../util_ptx.cuh"
 #include "../util_macro.cuh"
 #include "../util_type.cuh"
 #include "../util_namespace.cuh"
@@ -49,7 +50,10 @@ namespace cub {
  * \ingroup BlockModule
  *
  * \tparam T                    The data type to be exchanged.
- * \tparam BLOCK_THREADS        The thread block size in threads.
+ * \tparam BLOCK_DIM_X          The thread block length in threads along the X dimension
+ * \tparam BLOCK_DIM_Y          <b>[optional]</b> The thread block length in threads along the Y dimension (default: 1)
+ * \tparam BLOCK_DIM_Z          <b>[optional]</b> The thread block length in threads along the Z dimension (default: 1)
+ * \tparam PTX_ARCH             <b>[optional]</b> \ptxversion
  *
  * \par Overview
  * It is commonplace for blocks of threads to rearrange data items between
@@ -58,8 +62,11 @@ namespace cub {
  *
  */
 template <
-    typename        T,
-    int             BLOCK_THREADS>
+    typename            T,
+    int                 BLOCK_DIM_X,
+    int                 BLOCK_DIM_Y         = 1,
+    int                 BLOCK_DIM_Z         = 1,
+    int                 PTX_ARCH            = CUB_PTX_ARCH>
 class BlockShift
 {
 private:
@@ -70,9 +77,11 @@ private:
 
     enum
     {
-        LOG_WARP_THREADS            = CUB_PTX_LOG_WARP_THREADS,
+        BLOCK_THREADS               = BLOCK_DIM_X * BLOCK_DIM_Y * BLOCK_DIM_Z,
+
+        LOG_WARP_THREADS            = CUB_LOG_WARP_THREADS(PTX_ARCH),
         WARP_THREADS                = 1 << LOG_WARP_THREADS,
-        WARPS                       = (BLOCK_THREADS + CUB_PTX_WARP_THREADS - 1) / CUB_PTX_WARP_THREADS,
+        WARPS                       = (BLOCK_THREADS + WARP_THREADS - 1) / WARP_THREADS,
     };
 
     /******************************************************************************
@@ -80,11 +89,9 @@ private:
      ******************************************************************************/
 
     /// Shared memory storage layout type
-#if CUB_PTX_VERSION >= 300
-    typedef T _TempStorage[WARPS];              // Kepler+ only needs smem to share between warps
-#else
-    typedef T _TempStorage[BLOCK_THREADS];
-#endif
+    typedef typename If<(PTX_ARCH >= 300),
+        T[WARPS],                                   // Kepler+ only needs smem to share between warps
+        T[BLOCK_THREADS] >::Type _TempStorage;
 
 public:
 
@@ -103,7 +110,7 @@ private:
 
     /// Linear thread-id
     int linear_tid;
-    int warp_lane;
+    int lane_id;
     int warp_id;
 
 
@@ -127,54 +134,27 @@ public:
     //@{
 
     /**
-     * \brief Collective constructor for 1D thread blocks using a private static allocation of shared memory as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.
      */
     __device__ __forceinline__ BlockShift()
     :
         temp_storage(PrivateStorage()),
-        linear_tid(threadIdx.x),
-        warp_lane(linear_tid & (WARP_THREADS - 1)),
-        warp_id(linear_tid >> LOG_WARP_THREADS)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z)),
+        warp_id((WARPS == 1) ? 0 : linear_tid / WARP_THREADS),
+        lane_id(LaneId())
     {}
 
 
     /**
-     * \brief Collective constructor for 1D thread blocks using the specified memory allocation as temporary storage.  Threads are identified using <tt>threadIdx.x</tt>.
+     * \brief Collective constructor using the specified memory allocation as temporary storage.
      */
     __device__ __forceinline__ BlockShift(
         TempStorage &temp_storage)             ///< [in] Reference to memory allocation having layout type TempStorage
     :
         temp_storage(temp_storage.Alias()),
-        linear_tid(threadIdx.x),
-        warp_lane(linear_tid & (WARP_THREADS - 1)),
-        warp_id(linear_tid >> LOG_WARP_THREADS)
-    {}
-
-
-    /**
-     * \brief Collective constructor using a private static allocation of shared memory as temporary storage.  Each thread is identified using the supplied linear thread identifier
-     */
-    __device__ __forceinline__ BlockShift(
-        int linear_tid)                        ///< [in] A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(PrivateStorage()),
-        linear_tid(linear_tid),
-        warp_lane(linear_tid & (WARP_THREADS - 1)),
-        warp_id(linear_tid >> LOG_WARP_THREADS)
-    {}
-
-
-    /**
-     * \brief Collective constructor using the specified memory allocation as temporary storage.  Each thread is identified using the supplied linear thread identifier.
-     */
-    __device__ __forceinline__ BlockShift(
-        TempStorage &temp_storage,              ///< [in] Reference to memory allocation having layout type TempStorage
-        int         linear_tid)                 ///< [in] <b>[optional]</b> A suitable 1D thread-identifier for the calling thread (e.g., <tt>(threadIdx.y * blockDim.x) + linear_tid</tt> for 2D thread blocks)
-    :
-        temp_storage(temp_storage.Alias()),
-        linear_tid(linear_tid),
-        warp_lane(linear_tid & (WARP_THREADS - 1)),
-        warp_id(linear_tid >> LOG_WARP_THREADS)
+        linear_tid(RowMajorTid(BLOCK_DIM_X, BLOCK_DIM_Y, BLOCK_DIM_Z)),
+        warp_id((WARPS == 1) ? 0 : linear_tid / WARP_THREADS),
+        lane_id(LaneId())
     {}
 
 
@@ -196,14 +176,14 @@ public:
         T &output,          ///< [out] Output item
         T block_prefix)     ///< [in] Prefix item to be provided to <em>thread</em><sub>0</sub>
     {
-#if CUB_PTX_VERSION >= 300
-        if (warp_lane == WARP_THREADS - 1)
+#if CUB_PTX_ARCH >= 300
+        if (lane_id == WARP_THREADS - 1)
             temp_storage[warp_id] = input;
 
         __syncthreads();
 
         output = ShuffleUp(input, 1);
-        if (warp_lane == 0)
+        if (lane_id == 0)
         {
             output = (linear_tid == 0) ?
                 block_prefix :
@@ -233,14 +213,14 @@ public:
         T block_prefix,     ///< [in] Prefix item to be provided to <em>thread</em><sub>0</sub>
         T &block_suffix)    ///< [out] Suffix item shifted out by the <em>thread</em><sub><tt>BLOCK_THREADS-1</tt></sub> to be provided to all threads
     {
-#if CUB_PTX_VERSION >= 300
-        if (warp_lane == WARP_THREADS - 1)
+#if CUB_PTX_ARCH >= 300
+        if (lane_id == WARP_THREADS - 1)
             temp_storage[warp_id] = input;
 
         __syncthreads();
 
         output = ShuffleUp(input, 1);
-        if (warp_lane == 0)
+        if (lane_id == 0)
         {
             output = (linear_tid == 0) ?
                 block_prefix :
@@ -272,14 +252,14 @@ public:
         T &output,          ///< [out] Output item
         T block_suffix)     ///< [in] Suffix item to be provided to <em>thread</em><sub><tt>BLOCK_THREADS-1</tt></sub>
     {
-#if CUB_PTX_VERSION >= 300
-        if (warp_lane == 0)
+#if CUB_PTX_ARCH >= 300
+        if (lane_id == 0)
             temp_storage[warp_id] = input;
 
         __syncthreads();
 
         output = ShuffleDown(input, 1);
-        if (warp_lane == WARP_THREADS - 1)
+        if (lane_id == WARP_THREADS - 1)
         {
             output = (linear_tid == BLOCK_THREADS - 1) ?
                 block_suffix :
@@ -309,14 +289,14 @@ public:
         T block_suffix,     ///< [in] Suffix item to be provided to <em>thread</em><sub><tt>BLOCK_THREADS-1</tt></sub>
         T &block_prefix)    ///< [out] Prefix item shifted out by the <em>thread</em><sub>0</sub> to be provided to all threads
     {
-#if CUB_PTX_VERSION >= 300
-        if (warp_lane == 0)
+#if CUB_PTX_ARCH >= 300
+        if (lane_id == 0)
             temp_storage[warp_id] = input;
 
         __syncthreads();
 
         output = ShuffleDown(input, 1);
-        if (warp_lane == WARP_THREADS - 1)
+        if (lane_id == WARP_THREADS - 1)
         {
             output = (linear_tid == BLOCK_THREADS - 1) ?
                 block_suffix :

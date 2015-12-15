@@ -3,6 +3,8 @@
 
 namespace quda {
 
+  using namespace gauge;
+
   template <typename Order, int nDim, int dim>
   struct ExtractGhostExArg {
     Order order;
@@ -59,8 +61,7 @@ namespace quda {
 
     // need dir dependence in write
     // srcIdx is used here to determine boundary condition
-    arg.order.saveGhostEx(u, dstIdx, srcIdx, dir, dim, g, 
-			  (parity+arg.localParity[dim])&1, arg.R);
+    arg.order.saveGhostEx(u, dstIdx, srcIdx, dir, dim, g, (parity+arg.localParity[dim])&1, arg.R);
   }
 
 
@@ -73,11 +74,12 @@ namespace quda {
     
     int dstIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
 		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
+
+    int oddness = (parity+arg.localParity[dim])&1;
     
     // need dir dependence in read
     // dstIdx is used here to determine boundary condition
-    arg.order.loadGhostEx(u, srcIdx, dstIdx, dir, dim, g, 
-			  (parity+arg.localParity[dim])&1, arg.R);
+    arg.order.loadGhostEx(u, srcIdx, dstIdx, dir, dim, g, oddness, arg.R);
     
     arg.order.save(u, dstIdx, g, parity); // save the ghost element into the bulk
   }

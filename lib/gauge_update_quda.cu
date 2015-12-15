@@ -265,12 +265,12 @@ namespace quda {
     if (mom.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
       if (mom.Reconstruct() == QUDA_RECONSTRUCT_10) {
 	// FIX ME - 11 is a misnomer to avoid confusion in template instantiation
-	updateGaugeField<Float>(out, in, FloatNOrder<Float,18,2,11>(mom), dt, mom, conj_mom, exact, location);
+	updateGaugeField<Float>(out, in, gauge::FloatNOrder<Float,18,2,11>(mom), dt, mom, conj_mom, exact, location);
       } else {
 	errorQuda("Reconstruction type not supported");
       }
     } else if (mom.Order() == QUDA_MILC_GAUGE_ORDER) {
-      updateGaugeField<Float>(out, in, MILCOrder<Float,10>(mom), dt, mom, conj_mom, exact, location);
+      updateGaugeField<Float>(out, in, gauge::MILCOrder<Float,10>(mom), dt, mom, conj_mom, exact, location);
     } else {
       errorQuda("Gauge Field order %d not supported", mom.Order());
     }
@@ -301,8 +301,8 @@ namespace quda {
 	errorQuda("Reconstruction type not supported");
       }
     } else if (out.Order() == QUDA_MILC_GAUGE_ORDER) {
-      updateGaugeField<Float>(MILCOrder<Float, Nc*Nc*2>(out),
-			      MILCOrder<Float, Nc*Nc*2>(in), 
+      updateGaugeField<Float>(gauge::MILCOrder<Float, Nc*Nc*2>(out),
+			      gauge::MILCOrder<Float, Nc*Nc*2>(in), 
 			      mom, dt, conj_mom, exact, location);
     } else {
       errorQuda("Gauge Field order %d not supported", out.Order());

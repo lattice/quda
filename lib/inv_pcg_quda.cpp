@@ -15,7 +15,8 @@
 
 namespace quda {
 
-
+  using namespace blas;
+  
   // set the required parameters for the inner solver
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
@@ -63,7 +64,7 @@ namespace quda {
   }
 
 
-  void PreconCG::operator()(cudaColorSpinorField &x, cudaColorSpinorField &b)
+  void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
 
     profile.TPSTART(QUDA_PROFILE_INIT);
@@ -94,7 +95,7 @@ namespace quda {
     cudaColorSpinorField y(b,csParam);
 
     mat(r, x, y); // => r = A*x;
-    double r2 = xmyNormCuda(b,r);
+    double r2 = xmyNorm(b,r);
 
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField tmpSloppy(x,csParam);
@@ -116,7 +117,7 @@ namespace quda {
     if(param.precision_sloppy == x.Precision() ||
         !param.use_sloppy_partial_accumulator) {
       csParam.create = QUDA_REFERENCE_FIELD_CREATE;
-      x_sloppy = &x;
+      x_sloppy = &static_cast<cudaColorSpinorField&>(x);
     }else{
       csParam.create = QUDA_COPY_FIELD_CREATE;
       x_sloppy = new cudaColorSpinorField(x,csParam);
@@ -127,10 +128,10 @@ namespace quda {
     cudaColorSpinorField &rSloppy = *r_sloppy;
 
     if(&x != &xSloppy){
-      copyCuda(y, x); // copy x to y
-      zeroCuda(xSloppy);
+      copy(y, x); // copy x to y
+      zero(xSloppy);
     }else{
-      zeroCuda(y); // no reliable updates // NB: check this
+      zero(y); // no reliable updates // NB: check this
     }
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
@@ -160,7 +161,7 @@ namespace quda {
 
     double stop = stopping(param.tol, b2, param.residual_type); // stopping condition of solver
     double heavy_quark_res = 0.0; // heavy quark residual 
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNormCuda(x,r).z);
+    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x,r).z);
 
     double alpha = 0.0, beta=0.0;
     double pAp;
@@ -177,13 +178,13 @@ namespace quda {
     double delta = param.delta;
 
 
-    if(K) rMinvr = reDotProductCuda(rSloppy,*minvrSloppy);
+    if(K) rMinvr = reDotProduct(rSloppy,*minvrSloppy);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
 
-    quda::blas_flops = 0;
+    blas::flops = 0;
 
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
@@ -196,10 +197,10 @@ namespace quda {
       matSloppy(Ap, *p, tmpSloppy);
 
       double sigma;
-      pAp   = reDotProductCuda(*p,Ap);
+      pAp   = reDotProduct(*p,Ap);
 
       alpha = (K) ? rMinvr/pAp : r2/pAp;
-      Complex cg_norm = axpyCGNormCuda(-alpha, Ap, rSloppy); 
+      Complex cg_norm = axpyCGNorm(-alpha, Ap, rSloppy); 
       // r --> r - alpha*A*p
       r2_old = r2;
       r2 = real(cg_norm);
@@ -224,7 +225,7 @@ namespace quda {
       if( !(updateR || updateX) ){
 
         if(K){
-          r_new_Minvr_old = reDotProductCuda(rSloppy,*minvrSloppy);
+          r_new_Minvr_old = reDotProduct(rSloppy,*minvrSloppy);
           *rPre = rSloppy;
           globalReduce = false;
           (*K)(*minvrPre, *rPre);
@@ -233,23 +234,23 @@ namespace quda {
 
           *minvrSloppy = *minvrPre;
 
-          rMinvr = reDotProductCuda(rSloppy,*minvrSloppy);
+          rMinvr = reDotProduct(rSloppy,*minvrSloppy);
           beta = (rMinvr - r_new_Minvr_old)/rMinvr_old; 
-          axpyZpbxCuda(alpha, *p, xSloppy, *minvrSloppy, beta);
+          axpyZpbx(alpha, *p, xSloppy, *minvrSloppy, beta);
         }else{
           beta = sigma/r2_old; // use the alternative beta computation
-          axpyZpbxCuda(alpha, *p, xSloppy, rSloppy, beta);
+          axpyZpbx(alpha, *p, xSloppy, rSloppy, beta);
         }
       } else { // reliable update
 
-        axpyCuda(alpha, *p, xSloppy); // xSloppy += alpha*p
-        copyCuda(x, xSloppy);
-        xpyCuda(x, y); // y += x
+        axpy(alpha, *p, xSloppy); // xSloppy += alpha*p
+        copy(x, xSloppy);
+        xpy(x, y); // y += x
         // Now compute r 
         mat(r, y, x); // x is just a temporary here
-        r2 = xmyNormCuda(b, r);
-        copyCuda(rSloppy, r); // copy r to rSloppy
-        zeroCuda(xSloppy);
+        r2 = xmyNorm(b, r);
+        copy(rSloppy, r); // copy r to rSloppy
+        zero(xSloppy);
 
 
         // break-out check if we have reached the limit of the precision
@@ -280,18 +281,18 @@ namespace quda {
 
           *minvrSloppy = *minvrPre;
 
-          rMinvr = reDotProductCuda(rSloppy,*minvrSloppy);
+          rMinvr = reDotProduct(rSloppy,*minvrSloppy);
           beta = rMinvr/rMinvr_old;        
 
-          xpayCuda(*minvrSloppy, beta, *p); // p = minvrSloppy + beta*p
+          xpay(*minvrSloppy, beta, *p); // p = minvrSloppy + beta*p
         }else{ // standard CG - no preconditioning
 
           // explicitly restore the orthogonality of the gradient vector
-          double rp = reDotProductCuda(rSloppy, *p)/(r2);
-          axpyCuda(-rp, rSloppy, *p);
+          double rp = reDotProduct(rSloppy, *p)/(r2);
+          axpy(-rp, rSloppy, *p);
 
           beta = r2/r2_old;
-          xpayCuda(rSloppy, beta, *p);
+          xpay(rSloppy, beta, *p);
         }
       }      
       ++k;
@@ -303,12 +304,12 @@ namespace quda {
 
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    if(x.Precision() != param.precision_sloppy) copyCuda(x, xSloppy);
-    xpyCuda(y, x); // x += y
+    if(x.Precision() != param.precision_sloppy) copy(x, xSloppy);
+    xpy(y, x); // x += y
 
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (quda::blas_flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
@@ -325,11 +326,11 @@ namespace quda {
 
     // compute the true residual 
     mat(r, x, y);
-    double true_res = xmyNormCuda(b, r);
+    double true_res = xmyNorm(b, r);
     param.true_res = sqrt(true_res / b2);
 
     // reset the flops counters
-    quda::blas_flops = 0;
+    blas::flops = 0;
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();

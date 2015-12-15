@@ -267,6 +267,7 @@ namespace quda {
     }
 
   }
+
 #endif
 
   void APEStep(GaugeField &dataDs, const GaugeField& dataOr, double alpha, QudaFieldLocation location) {
@@ -299,6 +300,5 @@ namespace quda {
   errorQuda("Gauge tools are not build");
 #endif
   }
-
 
 }

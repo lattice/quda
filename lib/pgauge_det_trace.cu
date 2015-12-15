@@ -204,20 +204,19 @@ double2 computeValue(cudaGaugeField& data) {
 * @returns double2 complex Determinant value
 */
 double2 getLinkDeterminant( cudaGaugeField& data) {
+  double2 det = make_double2(0.0,0.0);
 #ifdef GPU_GAUGE_ALG
-  if(data.Precision() == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision not supported\n");
-  }
   if (data.Precision() == QUDA_SINGLE_PRECISION) {
-    return computeValue<float, 0> (data);
+    det = computeValue<float, 0> (data);
   } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
-    return computeValue<double, 0>(data);
+    det = computeValue<double, 0>(data);
   } else {
     errorQuda("Precision %d not supported", data.Precision());
   }
 #else
   errorQuda("Pure gauge code has not been built");
 #endif // GPU_GAUGE_ALG
+  return det;
 }
 
 /** @brief Calculate the Trace
@@ -226,21 +225,20 @@ double2 getLinkDeterminant( cudaGaugeField& data) {
 * @returns double2 complex trace value
 */
 double2 getLinkTrace( cudaGaugeField& data) {
+  double2 det = make_double2(0.0,0.0);
 #ifdef GPU_GAUGE_ALG
-  if(data.Precision() == QUDA_HALF_PRECISION) {
-    errorQuda("Half precision not supported\n");
-  }
   if (data.Precision() == QUDA_SINGLE_PRECISION) {
-    return computeValue<float, 1> (data);
+    det = computeValue<float, 1> (data);
   } else if(data.Precision() == QUDA_DOUBLE_PRECISION) {
-    return computeValue<double, 1>(data);
+    det = computeValue<double, 1>(data);
   } else {
     errorQuda("Precision %d not supported", data.Precision());
   }
 #else
   errorQuda("Pure gauge code has not been built");
 #endif // GPU_GAUGE_ALG
+  return det;
 }
 
 
-}
+} // namespace quda

@@ -1,6 +1,5 @@
 /**
    @file float_vector.h
-   @author M Clark
 
    @section DESCRIPTION 
    Inline device functions for elementary operations on short vectors, e.g., float4, etc. 
@@ -231,3 +230,4 @@ namespace quda {
   }
 
 }
+
