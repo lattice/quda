@@ -639,6 +639,7 @@ namespace quda {
   };
 
   struct DeflationParam;//Forward declaration
+  typedef cudaColorSpinorField cudaColorSpinorFieldSet;
 
   class IncEigCG : public DeflatedSolver {
 
@@ -651,7 +652,7 @@ namespace quda {
     const DiracMatrix *matDefl;
 
     QudaPrecision search_space_prec;
-    cudaColorSpinorField *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
+    cudaColorSpinorFieldSet *Vm;  //search vectors  (spinor matrix of size eigen_vector_length x m)
 
     SolverParam initCGparam; // parameters for initCG solver
     TimeProfile *profile;    //time profile for initCG solver
@@ -718,7 +719,7 @@ namespace quda {
 
     QudaPrecision gmres_space_prec;
 
-    cudaColorSpinorField *Vm;//arnoldi basis vectors, size (m+1)
+    cudaColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
 
     TimeProfile *profile;    //time profile for initCG solver
 

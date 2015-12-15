@@ -71,7 +71,7 @@ namespace quda {
 	 src.SiteSubset() == QUDA_FULL_SITE_SUBSET && 
 	 param.siteSubset == QUDA_PARITY_SITE_SUBSET && 
 	 typeid(src) == typeid(cudaColorSpinorField) ) || 
-         (param.create == QUDA_REFERENCE_FIELD_CREATE && param.eigv_dim > 0)) {
+         (param.create == QUDA_REFERENCE_FIELD_CREATE && (param.is_composite || param.is_component))) {
       reset(param);
     } else {
       errorQuda("Undefined behaviour"); // else silent bug possible?
@@ -86,16 +86,10 @@ namespace quda {
 	errorQuda("Cannot reference a non-cuda field");
       }
 
-      if (this->EigvDim() > 0) 
+      if (composite_descr.is_component) 
       {//setup eigenvector form the set
-         if(eigv_dim != this->EigvDim()) errorQuda("\nEigenvector set does not match..\n") ;//for debug only.
-         if(eigv_id > -1)
-         {
-           //printfQuda("\nSetting pointers for vector id %d\n", eigv_id); //for debug only.
-           v    = (void*)((char*)v + eigv_id*bytes);         
-           norm = (void*)((char*)norm + eigv_id*norm_bytes);         
-         }
-       //do nothing for the eigenvector subset...
+        v    = (void*)((char*)v    + composite_descr.id*bytes);         
+        norm = (void*)((char*)norm + composite_descr.id*norm_bytes);         
       }
     }
 
@@ -178,46 +172,74 @@ namespace quda {
     }
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      if(eigv_dim != 0) errorQuda("Eigenvectors must be parity fields!");
-      // create the associated even and odd subsets
-      ColorSpinorParam param;
-      param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      param.nDim = nDim;
-      memcpy(param.x, x, nDim*sizeof(int));
-      param.x[0] /= 2; // set single parity dimensions
-      param.create = QUDA_REFERENCE_FIELD_CREATE;
-      param.v = v;
-      param.norm = norm;
-      even = new cudaColorSpinorField(*this, param);
-      odd = new cudaColorSpinorField(*this, param);
+      if(composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) 
+      {
+        if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
 
-      // need this hackery for the moment (need to locate the odd pointers half way into the full field)
-      (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
-      if (precision == QUDA_HALF_PRECISION) 
-	(dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+        ColorSpinorParam param;
+        param.siteSubset = QUDA_FULL_SITE_SUBSET;
+        param.nDim = nDim;
+        memcpy(param.x, x, nDim*sizeof(int));
+        param.create = QUDA_REFERENCE_FIELD_CREATE;
+        param.v = v;
+        param.norm = norm;
+        param.is_composite   = false;
+        param.composite_dim  = 0;
+        param.is_component = true;
 
-      for(int i=0; i<nDim; ++i){
-        if(commDimPartitioned(i)){
-          (dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i] =
-	    static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i]) + bytes/2;
-          if(precision == QUDA_HALF_PRECISION)
-	    (dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i] =
-	      static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i]) + norm_bytes/2;
+        components.reserve(composite_descr.dim);
+        for(int cid = 0; cid < composite_descr.dim; cid++)
+        {
+            param.component_id = cid;
+            components.push_back(new cudaColorSpinorField(*this, param));
         }
       }
+      else{
+        // create the associated even and odd subsets
+        ColorSpinorParam param;
+        param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+        param.nDim = nDim;
+        memcpy(param.x, x, nDim*sizeof(int));
+        param.x[0] /= 2; // set single parity dimensions
+        param.create = QUDA_REFERENCE_FIELD_CREATE;
+        param.v = v;
+        param.norm = norm;
+        param.is_composite  = false;
+        param.composite_dim = 0;
+        param.is_component  = composite_descr.is_component;
+        param.component_id  = composite_descr.id;
+        even = new cudaColorSpinorField(*this, param);
+        odd = new cudaColorSpinorField(*this, param);
 
+        // need this hackery for the moment (need to locate the odd pointers half way into the full field)
+        (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
+        if (precision == QUDA_HALF_PRECISION) 
+	  (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+
+        for(int i=0; i<nDim; ++i){
+          if(commDimPartitioned(i)){
+            (dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i] =
+	      static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghost[i]) + bytes/2;
+            if(precision == QUDA_HALF_PRECISION)
+	      (dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i] =
+	        static_cast<char*>((dynamic_cast<cudaColorSpinorField*>(odd))->ghostNorm[i]) + norm_bytes/2;
+          }
+        }
 #ifdef USE_TEXTURE_OBJECTS
-      dynamic_cast<cudaColorSpinorField*>(even)->destroyTexObject();
-      dynamic_cast<cudaColorSpinorField*>(even)->createTexObject();
-      dynamic_cast<cudaColorSpinorField*>(odd)->destroyTexObject();
-      dynamic_cast<cudaColorSpinorField*>(odd)->createTexObject();
+        dynamic_cast<cudaColorSpinorField*>(even)->destroyTexObject();
+        dynamic_cast<cudaColorSpinorField*>(even)->createTexObject();
+        dynamic_cast<cudaColorSpinorField*>(odd)->destroyTexObject();
+        dynamic_cast<cudaColorSpinorField*>(odd)->createTexObject();
 #endif
+
+      }
     }
     else{//siteSubset == QUDA_PARITY_SITE_SUBSET
 
       //! setup an object for selected eigenvector (the 1st one as a default):
-      if ((eigv_dim > 0) && (create != QUDA_REFERENCE_FIELD_CREATE) && (eigv_id == -1)) 
+      if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) 
       {
+         if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
          //if(bytes > 1811939328) warningQuda("\nCUDA API probably won't be able to create texture object for the eigenvector set... Object size is : %u bytes\n", bytes);
          if (getVerbosity() == QUDA_DEBUG_VERBOSE) printfQuda("\nEigenvector set constructor...\n");
          // create the associated even and odd subsets
@@ -228,18 +250,20 @@ namespace quda {
          param.create = QUDA_REFERENCE_FIELD_CREATE;
          param.v = v;
          param.norm = norm;
-         param.eigv_dim  = eigv_dim;
+         param.is_composite   = false;
+         param.composite_dim  = 0;
+         param.is_component = true;
          //reserve eigvector set
-         eigenvectors.reserve(eigv_dim);
+         components.reserve(composite_descr.dim);
          //setup volume, [real_]length and stride for a single eigenvector
-         for(int id = 0; id < eigv_dim; id++)
+         for(int cid = 0; cid < composite_descr.dim; cid++)
          {
-            param.eigv_id = id;
-            eigenvectors.push_back(new cudaColorSpinorField(*this, param));
+            param.component_id = cid;
+            components.push_back(new cudaColorSpinorField(*this, param));
 
 #ifdef USE_TEXTURE_OBJECTS //(a lot of texture objects...)
-            dynamic_cast<cudaColorSpinorField*>(eigenvectors[id])->destroyTexObject();
-            dynamic_cast<cudaColorSpinorField*>(eigenvectors[id])->createTexObject();
+            dynamic_cast<cudaColorSpinorField*>(components[cid])->destroyTexObject();
+            dynamic_cast<cudaColorSpinorField*>(components[cid])->createTexObject();
 #endif
          }
       }
@@ -255,7 +279,7 @@ namespace quda {
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if((eigv_dim == 0) || (eigv_dim > 0 && eigv_id > -1))
+    if(!composite_descr.is_composite || composite_descr.is_component)
        createTexObject();
 #endif
 
@@ -350,28 +374,26 @@ namespace quda {
 #endif
 
   void cudaColorSpinorField::destroy() {
-    if (alloc) {
+   if (alloc) {
       device_free(v);
       if (precision == QUDA_HALF_PRECISION) device_free(norm);
 
-      if (siteSubset != QUDA_FULL_SITE_SUBSET) {
-        //! for deflated solvers:
-        if (eigv_dim > 0) 
-        {
-          std::vector<ColorSpinorField*>::iterator vec;
-          for(vec = eigenvectors.begin(); vec != eigenvectors.end(); vec++) delete *vec;
-        } 
-      }
       alloc = false;
     }
 
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+    if (composite_descr.is_composite) 
+    {
+       CompositeColorSpinorField::iterator vec;
+       for(vec = components.begin(); vec != components.end(); vec++) delete *vec;
+    } 
+
+    if ((siteSubset == QUDA_FULL_SITE_SUBSET && !composite_descr.is_composite) || (siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_component)) {
       delete even;
       delete odd;
     }
 
 #ifdef USE_TEXTURE_OBJECTS
-    if((eigv_dim == 0) || (eigv_dim > 0 && eigv_id > -1))
+    if(!composite_descr.is_composite || composite_descr.is_component)
        destroyTexObject();
 #endif
 
@@ -389,13 +411,13 @@ namespace quda {
     size_t pad_bytes = (stride - volume) * precision * fieldOrder;
     int Npad = nColor * nSpin * 2 / fieldOrder;
 
-    if (eigv_dim > 0 && eigv_id == -1){//we consider the whole eigenvector set:
-      Npad      *= eigv_dim;
-      pad_bytes /= eigv_dim;
+    if (composite_descr.is_composite && !composite_descr.is_component){//we consider the whole eigenvector set:
+      Npad      *= composite_descr.dim;
+      pad_bytes /= composite_descr.dim;
     }
 
-    size_t pitch = ((eigv_dim == 0 || eigv_id != -1) ? stride : eigv_stride)*fieldOrder*precision;
-    char   *dst  = (char*)v + ((eigv_dim == 0 || eigv_id != -1) ? volume : eigv_volume)*fieldOrder*precision;
+    size_t pitch = ((!composite_descr.is_composite || composite_descr.is_component) ? stride : composite_descr.stride)*fieldOrder*precision;
+    char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volume : composite_descr.volume)*fieldOrder*precision;
     if(pad_bytes) cudaMemset2D(dst, pitch, 0, pad_bytes, Npad);
 
     //for (int i=0; i<Npad; i++) {
@@ -1426,23 +1448,23 @@ namespace quda {
     return out;
   }
 
-//! for deflated solvers:
-  cudaColorSpinorField& cudaColorSpinorField::Eigenvec(const int idx) const {
+//! for composite fields:
+  cudaColorSpinorField& cudaColorSpinorField::Component(const int idx) const {
     
-    if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
-      if (idx < this->EigvDim()) {//setup eigenvector form the set
-        return *(dynamic_cast<cudaColorSpinorField*>(eigenvectors[idx])); 
+    if (this->IsComposite()) {
+      if (idx < this->CompositeDim()) {//setup eigenvector form the set
+        return *(dynamic_cast<cudaColorSpinorField*>(components[idx])); 
       }
       else{
-        errorQuda("Incorrect eigenvector index...");
+        errorQuda("Incorrect component index...");
       }
     }
-    errorQuda("Eigenvector must be a parity spinor");
+    errorQuda("Cannot get requested component");
     exit(-1);
   }
 
 //copyCuda currently cannot not work with set of spinor fields..
-  void cudaColorSpinorField::CopyEigenvecSubset(cudaColorSpinorField &dst, const int range, const int first_element) const{
+  void cudaColorSpinorField::CopySubset(cudaColorSpinorField &dst, const int range, const int first_element) const{
 #if 0
     if(first_element < 0) errorQuda("\nError: trying to set negative first element.\n");
     if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
