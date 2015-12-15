@@ -157,8 +157,6 @@ extern "C" {
    */
   void invert_quda_(void *h_x, void *h_b, QudaInvertParam *param);
 
-  void invert_md_quda_(void *hp_x, void *hp_b, QudaInvertParam *param);
-
   /**
    * Solve for multiple shifts (e.g., masses).
    * @param _hp_x    Array of solution spinor fields
