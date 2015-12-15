@@ -69,11 +69,22 @@ namespace quda {
 
       for (int d=0; d<arg.geometry; d++) {
 	for (int x=0; x<arg.volume/2; x++) {
+#ifdef FINE_GRAINED_ACCESS
+	  for (int i=0; i<Ncolor(length); i++)
+	    for (int j=0; j<Ncolor(length); j++) {
+              complex<Float> u = arg.in(d, parity, x, i, j);
+	      if (isnan(u.real()))
+	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(length)+j));
+	      if (isnan(u.imag()))
+		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(length)+j+1));
+	}
+#else
 	  RegType u[length];
 	  arg.in.load(u, x, d, parity);
 	  for (int i=0; i<length; i++) 
 	    if (isnan(u[i])) 
 	      errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
+#endif
 	}
       }
 
