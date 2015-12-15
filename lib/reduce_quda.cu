@@ -131,14 +131,14 @@ namespace quda {
   template <typename ReduceType, typename Float2, typename FloatN>
   struct Norm1 : public ReduceFunctor<ReduceType, Float2, FloatN> {
     Norm1(const Float2 &a, const Float2 &b) { ; }
-    __device__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,FloatN  &w, FloatN &v) { sum += norm1_(x); }
+    __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z,FloatN  &w, FloatN &v) { sum += norm1_(x); }
     static int streams() { return 1; } //! total number of input and output streams
     static int flops() { return 2; } //! flops per element
   };
 
   double norm1(const ColorSpinorField &x) {
 #ifdef HOST_DEBUG
-    ColorSpinorField &y = const_cast<(ColorSpinorField&>(x); // FIXME
+    ColorSpinorField &y = const_cast<ColorSpinorField&>(x); // FIXME
     return reduce::reduceCuda<double,QudaSumFloat,QudaSumFloat,Norm1,0,0,0,0,0,false>
       (make_double2(0.0, 0.0), make_double2(0.0, 0.0), y, y, y, y, y);
 #else
