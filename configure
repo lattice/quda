@@ -586,6 +586,7 @@ PACKAGE_URL=''
 
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
+MAGMA_HOME
 BUILD_MAGMA
 QDP_INSTALL_PATH
 USE_QDPJIT
@@ -606,7 +607,6 @@ BUILD_QDPJIT_INTERFACE
 BUILD_CPS_INTERFACE
 BUILD_MILC_INTERFACE
 BUILD_QDP_INTERFACE
-INTERFACE_NVTX
 MPI_NVTX
 GPU_COMMS
 GPU_DIRECT
@@ -614,11 +614,8 @@ POSIX_THREADS
 BUILD_MPI
 BUILD_QMP
 BUILD_MULTI_GPU
-DYNAMIC_CLOVER
 BUILD_CONTRACT
 BUILD_SSTEP
-BUILD_MULTIGRID
-BUILD_GAUGE_ALG
 BUILD_GAUGE_TOOLS
 BUILD_HISQ_FORCE
 BUILD_FERMION_FORCE
@@ -724,16 +721,12 @@ enable_gauge_force
 enable_staggered_force
 enable_hisq_force
 enable_gauge_tools
-enable_gauge_alg
-enable_multigrid
 enable_sstep
 enable_contract
-enable_dynamic_clover
 enable_multi_gpu
 enable_gpu_direct
 enable_gpu_comms
 enable_mpi_nvtx
-enable_interface_nvtx
 enable_device_pack
 with_mpi
 enable_pthreads
@@ -741,7 +734,7 @@ with_qmp
 with_qio
 enable_qdp_jit
 with_qdp
-enable_magma
+with_magma
 enable_blas_tex
 enable_fermi_double_tex
 enable_numa_affinity
@@ -1368,8 +1361,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-cpu-arch=arch  Set CPU arch: x86 or x86_64 (default: x86_64)
-  --enable-gpu-arch=arch  Set GPU arch: sm_20, sm_21, sm_30, sm_35, sm_50,
-                          sm_52 (default: sm_35)
+  --enable-gpu-arch=arch  Set GPU arch: sm_13, sm_20, sm_21, sm_30, sm_35,
+                          sm_50, sm_52 (default: sm_35)
   --enable-os=os          Set operating system: linux, osx (default: linux)
   --enable-host-debug     Enable debugging of host code
   --enable-device-debug   Enable debugging for device code
@@ -1407,15 +1400,10 @@ Optional Features:
                           Build asqtad fermion force (default: disabled)
   --enable-hisq-force     Build HISQ fermion force (default: disabled)
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
-                          evolver, APE, extended gauge routines (default:
+                          evolver, APE, STOUT, extended gauge routines (default:
                           disabled)
-  --enable-gauge-alg      Build gauge fixing and pure gauge algorithms
-                          (default: disabled)
-  --enable-multigrid      Build multigrid linear solvers (default: disabled)
   --enable-sstep          Build s-step linear solvers (default: disabled)
   --enable-contract       Build bilinear contraction code (default: disabled)
-  --enable-dynamic-clover Invert dynamically the clover term for
-                          twisted-clover fermions (default: disabled)
   --enable-multi-gpu      Enable Multi-GPU support (default: disabled)
   --enable-gpu-direct     Enable CUDA/NIC interop pinned memory (default:
                           enabled)
@@ -1423,16 +1411,12 @@ Optional Features:
                           default: disabled)
   --enable-mpi-nvtx       Enable NVTX markup for profiling MPI API calls in
                           the visual profiler (default: disabled)
-  --enable-interface-nvtx Enable NVTX markup for profiling interface calls in
-                          the visual profiler (default: disabled)
   --enable-device-pack    Enable the packing / unpacking of fields on the
                           device (default: disabled)
   --enable-pthreads       Enable pthreads in the multi-GPU dslash build
                           (default: disabled)
   --enable-qdp-jit        Enable QDP-JIT support, requires --with-qdp
                           (default: disabled)
-  --enable-magma          Build with MAGMA (requires pkg-config to detect
-                          magma)
   --enable-blas-tex       Enable texture reads for blas (default: enabled)
   --enable-fermi-double-tex
                           Enable double-precision texture reads on Fermi
@@ -1450,6 +1434,7 @@ Optional Packages:
   --with-qmp=QMPDIR       Specify QMP installation directory
   --with-qio=QIODIR       Specify QIO installation directory
   --with-qdp=QDPDIR       Specify QDP++ installation directory
+  --with-magma=MAGMADIR   Specify MAGMA installation directory
 
 Some influential environment variables:
   CC          C compiler command
@@ -2254,24 +2239,6 @@ else
 fi
 
 
-# Check whether --enable-gauge-alg was given.
-if test "${enable_gauge_alg+set}" = set; then :
-  enableval=$enable_gauge_alg;  build_gauge_alg=${enableval}
-else
-   build_gauge_alg="no"
-
-fi
-
-
-# Check whether --enable-multigrid was given.
-if test "${enable_multigrid+set}" = set; then :
-  enableval=$enable_multigrid;  build_multigrid=${enableval}
-else
-   build_multigrid="no"
-
-fi
-
-
 # Check whether --enable-sstep was given.
 if test "${enable_sstep+set}" = set; then :
   enableval=$enable_sstep;  build_sstep=${enableval}
@@ -2286,15 +2253,6 @@ if test "${enable_contract+set}" = set; then :
   enableval=$enable_contract;  build_contract=${enableval}
 else
    build_contract="no"
-
-fi
-
-
-# Check whether --enable-dynamic-clover was given.
-if test "${enable_dynamic_clover+set}" = set; then :
-  enableval=$enable_dynamic_clover;  dynamic_clover=${enableval}
-else
-   dynamic_clover="no"
 
 fi
 
@@ -2332,15 +2290,6 @@ if test "${enable_mpi_nvtx+set}" = set; then :
   enableval=$enable_mpi_nvtx;  mpi_nvtx=${enableval}
 else
    mpi_nvtx="no"
-
-fi
-
-
-# Check whether --enable-interface-nvtx was given.
-if test "${enable_interface_nvtx+set}" = set; then :
-  enableval=$enable_interface_nvtx;  interface_nvtx=${enableval}
-else
-   interface_nvtx="no"
 
 fi
 
@@ -3878,13 +3827,15 @@ fi
 
 
 
-# Check whether --enable-magma was given.
-if test "${enable_magma+set}" = set; then :
-  enableval=$enable_magma;  build_magma=${enableval}
+
+# Check whether --with-magma was given.
+if test "${with_magma+set}" = set; then :
+  withval=$with_magma;  magma_home=${withval}; build_magma="yes"
 else
-   build_magma="no"
+   magma_home="" ; build_magma="no"
 
 fi
+
 
 
 
@@ -4030,9 +3981,9 @@ x86 | x86_64 ) ;;
 esac
 
 case ${gpu_arch} in
-sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
+sm_13 | sm_20 | sm_21 | sm_30 | sm_35 | sm_50 | sm_52) ;;
 *)
-  as_fn_error $? " GPU arch must be one of: sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
+  as_fn_error $? " GPU arch must be one of: sm_13, sm_20, sm_21, sm_30, sm_35, sm_50, sm_52 " "$LINENO" 5
   ;;
 esac
 
@@ -4197,20 +4148,6 @@ yes|no);;
   ;;
 esac
 
-case ${build_gauge_alg} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-gauge-alg " "$LINENO" 5
-  ;;
-esac
-
-case ${build_multigrid} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-multigrid " "$LINENO" 5
-  ;;
-esac
-
 case ${build_sstep} in
 yes|no);;
 *)
@@ -4222,13 +4159,6 @@ case ${build_contract} in
 yes|no);;
 *)
   as_fn_error $? " invalid value for --enable-contract " "$LINENO" 5
-  ;;
-esac
-
-case ${dynamic_clover} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-dynamic-clover " "$LINENO" 5
   ;;
 esac
 
@@ -4260,14 +4190,6 @@ yes|no);;
   ;;
 esac
 
-case ${interface_nvtx} in
-yes|no);;
-*)
-  as_fn_error $? " invalid value for --enable-interface-nvtx " "$LINENO" 5
-  ;;
-esac
-
-
 case ${build_qdpjit} in
 yes|no);;
 *)
@@ -4291,11 +4213,6 @@ $as_echo "$as_me: Enabling Multi-GPU" >&6;}
   { $as_echo "$as_me:${as_lineno-$LINENO}: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&5
 $as_echo "$as_me: Asqtad fermion force doesn't support multi-GPU yet: disabling " >&6;}
   build_staggered_force="no";
-
-  if test "X${build_gauge_alg}X" = "XyesX"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&5
-$as_echo "$as_me: WARNING: Gauge fixing with FFTs only supported for single-GPU. Use gauge fixing with overrelaxation in multi-GPU mode. " >&2;}
-  fi
 
 
   if test "X${qmp_home}X" = "XX"; then
@@ -4446,16 +4363,6 @@ $as_echo "$as_me: Setting BUILD_GAUGE_TOOLS = ${build_gauge_tools}  " >&6;}
 BUILD_GAUGE_TOOLS=${build_gauge_tools}
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&5
-$as_echo "$as_me: Setting BUILD_GAUGE_ALG = ${build_gauge_alg}  " >&6;}
-BUILD_GAUGE_ALG=${build_gauge_alg}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MULTIGRID = ${build_multigrid}  " >&5
-$as_echo "$as_me: Setting BUILD_MULTIGRID = ${build_multigrid}  " >&6;}
-BUILD_MULTIGRID=${build_multigrid}
-
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_SSTEP = ${build_sstep}  " >&5
 $as_echo "$as_me: Setting BUILD_SSTEP = ${build_sstep}  " >&6;}
 BUILD_SSTEP=${build_sstep}
@@ -4464,11 +4371,6 @@ BUILD_SSTEP=${build_sstep}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_CONTRACT = ${build_contract}  " >&5
 $as_echo "$as_me: Setting BUILD_CONTRACT = ${build_contract}  " >&6;}
 BUILD_CONTRACT=${build_contract}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&5
-$as_echo "$as_me: Setting DYNAMIC_CLOVER = ${dynamic_clover}  " >&6;}
-DYNAMIC_CLOVER=${dynamic_clover}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_MULTI_GPU = ${multi_gpu}  " >&5
@@ -4504,11 +4406,6 @@ GPU_COMMS=${gpu_comms}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting MPI_NVTXS= ${mpi_nvtx}" >&5
 $as_echo "$as_me: Setting MPI_NVTXS= ${mpi_nvtx}" >&6;}
 MPI_NVTX=${mpi_nvtx}
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting INTERFACE_NVTXS= ${interface_nvtx}" >&5
-$as_echo "$as_me: Setting INTERFACE_NVTXS= ${interface_nvtx}" >&6;}
-INTERFACE_NVTX=${interface_nvtx}
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: Setting BUILD_QDP_INTERFACE= ${build_qdp_interface}" >&5
@@ -4610,6 +4507,10 @@ QDP_INSTALL_PATH=${qdp_home}
 $as_echo "$as_me: Setting BUILD_MAGMA = ${build_magma}" >&6;}
 BUILD_MAGMA=${build_magma}
 
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: Setting MAGMA_HOME = ${magma_home}" >&5
+$as_echo "$as_me: Setting MAGMA_HOME = ${magma_home}" >&6;}
+MAGMA_HOME=${magma_home}
 
 
 ac_config_files="$ac_config_files make.inc"
