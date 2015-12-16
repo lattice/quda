@@ -159,9 +159,15 @@ namespace quda {
 	}
     }
 
-    void preTune()	{}
-
-    void postTune()	{}
+    void preTune()      {
+      saveOut = new char[dslashParam.threads*sizeof(Float2)*32];
+      cudaMemcpy(saveOut, result, dslashParam.threads*sizeof(Float2)*32, cudaMemcpyDeviceToHost);
+    }
+ 		 
+    void postTune()     {
+      cudaMemcpy(result, saveOut, dslashParam.threads*sizeof(Float2)*32, cudaMemcpyHostToDevice);
+      delete[] saveOut;
+    }
 
     std::string paramString(const TuneParam &param) const
     {
