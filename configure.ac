@@ -162,7 +162,7 @@ AC_ARG_ENABLE(hisq-force,
 )
 
 AC_ARG_ENABLE(gauge-tools,
-  AC_HELP_STRING([--enable-gauge-tools], [ Build auxilary gauge tools: plaquette, gauge evolver, APE, extended gauge routines (default: disabled)]),
+  AC_HELP_STRING([--enable-gauge-tools], [ Build auxilary gauge tools: plaquette, gauge evolver, APE, STOUT, extended gauge routines (default: disabled)]),
   [ build_gauge_tools=${enableval} ],
   [ build_gauge_tools="no" ]
 )

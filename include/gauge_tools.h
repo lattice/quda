@@ -25,6 +25,19 @@ namespace quda {
 		double alpha,
 		QudaFieldLocation location);
 
+  /**
+     Apply STOUT smearing to the gauge field
+
+     @param dataDs Output smeared field
+     @param dataOr Input gauge field
+     @param rho smearing parameter
+     @param location Location of the computation
+  */
+  void APEStep (GaugeField &dataDs,
+		const GaugeField& dataOr,
+		double rho,
+		QudaFieldLocation location);
+
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
