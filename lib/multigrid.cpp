@@ -37,12 +37,12 @@ namespace quda {
     param_presmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
 
     param_presmooth->inv_type = param.smoother;
-    if (param_presmooth->level < param.Nlevel) param_presmooth->inv_type_precondition = QUDA_GCR_INVERTER;
+    param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
+    param_presmooth->is_preconditioner = true;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
     param_presmooth->Nkrylov = 4;
-    param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
     if (param.level==param.Nlevel-1) {
       param_presmooth->Nkrylov = 20;
       param_presmooth->maxiter = 1000;
@@ -54,18 +54,10 @@ namespace quda {
     presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
 				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
 
-    if (param.level < param.Nlevel-1) {
-
-      //Create the post smoother
-      param_postsmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
-      
-      param_postsmooth->inv_type = param.smoother;
-      if (param_postsmooth->level == 1) param_postsmooth->inv_type_precondition = QUDA_GCR_INVERTER;
-      param_postsmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
+    if (param.level < param.Nlevel-1) { //Create the post smoother
+      param_postsmooth = new MGParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       param_postsmooth->maxiter = param.nu_post;
-      param_postsmooth->Nkrylov = 4;
-      param_postsmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
       postsmoother = Solver::create(*param_postsmooth, param_postsmooth->matResidual, 
 				    param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile);
     }

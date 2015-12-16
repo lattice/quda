@@ -193,7 +193,7 @@ namespace quda {
 
     PrintStats("BiCGstab", k, r2, b2, heavy_quark_res);
     
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+    if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
       blas::flops = 0;    
     }
 
@@ -325,7 +325,7 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("BiCGstab: Reliable updates = %d\n", rUpdate);
   
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) { // do not do the below if we this is an inner solver
+    if (!param.is_preconditioner) { // do not do the below if we this is an inner solver
       // Calculate the true residual
       mat(r, x);
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);

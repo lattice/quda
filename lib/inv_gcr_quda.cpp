@@ -37,7 +37,8 @@ namespace quda {
     inner.gflops = 0;
     inner.secs = 0;
 
-    inner.inv_type_precondition = QUDA_GCR_INVERTER; // used to tell the inner solver it is an inner solver
+    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inner.is_preconditioner = true; // tell inner solver it is a preconditionis_re
 
     if (outer.inv_type == QUDA_GCR_INVERTER && outer.precision_sloppy != outer.precision_precondition) 
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;

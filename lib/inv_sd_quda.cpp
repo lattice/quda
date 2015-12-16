@@ -25,19 +25,18 @@ namespace quda {
   }
 
   SD::~SD(){
-    if(param.inv_type_precondition != QUDA_PCG_INVERTER && param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTART(QUDA_PROFILE_FREE);
+    if(!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     if(init){
       delete r;
       delete Ar; 
       delete y;
     }
-    if(param.inv_type_precondition != QUDA_PCG_INVERTER && param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTOP(QUDA_PROFILE_FREE);
+    if(!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
 
   void SD::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-
 
     globalReduce = false;
     if(!init){

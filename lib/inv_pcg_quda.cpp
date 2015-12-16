@@ -30,7 +30,8 @@ namespace quda {
     inner.gflops = 0;
     inner.secs = 0;
 
-    inner.inv_type_precondition = QUDA_PCG_INVERTER; // used to tell the inner solver it is an inner solver 
+    inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+    inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
     if(outer.inv_type == QUDA_PCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
@@ -260,12 +261,11 @@ namespace quda {
         // reuse r0Norm for this 
         warningQuda("PCG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)", sqrt(r2), r0Norm, resIncreaseTotal);
 
-        
+	if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) break;
 
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal)break;
-        }else{
-          resIncrease = 0;
-        }
+        } else {
+	  resIncrease = 0;
+	}
 
         rNorm = sqrt(r2);
         maxrr = rNorm;
