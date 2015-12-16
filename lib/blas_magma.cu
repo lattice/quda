@@ -1089,6 +1089,7 @@ void BlasMagmaArgs::BatchInvertMatrix(void *Ainv_h, void* A_h, const int n, cons
   device_free(dipiv_array);
   device_free(dinfo_array);
   host_free(info_array);
+  device_free(Ainv_d);
   device_free(A_d);
 
 #endif
