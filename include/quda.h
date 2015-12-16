@@ -941,6 +941,13 @@ extern "C" {
   void performAPEnStep(unsigned int nSteps, double alpha);
 
   /**
+   * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param rho    Rho coefficient for STOUT smearing.
+   */
+  void performSTOUTnStep(unsigned int nSteps, double rho);
+
+  /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeCuda();

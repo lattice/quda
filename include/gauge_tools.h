@@ -33,7 +33,7 @@ namespace quda {
      @param rho smearing parameter
      @param location Location of the computation
   */
-  void APEStep (GaugeField &dataDs,
+  void STOUTStep (GaugeField &dataDs,
 		const GaugeField& dataOr,
 		double rho,
 		QudaFieldLocation location);
