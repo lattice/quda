@@ -1407,7 +1407,7 @@ Optional Features:
                           Build asqtad fermion force (default: disabled)
   --enable-hisq-force     Build HISQ fermion force (default: disabled)
   --enable-gauge-tools    Build auxilary gauge tools: plaquette, gauge
-                          evolver, APE, extended gauge routines (default:
+                          evolver, APE, STOUT, extended gauge routines (default:
                           disabled)
   --enable-gauge-alg      Build gauge fixing and pure gauge algorithms
                           (default: disabled)
