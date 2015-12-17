@@ -215,49 +215,53 @@ namespace quda {
 
   /**
      Helper method that takes a vector of ColorSpinorFields and packes them into a single matrix field.
-     @param V The resulting packed matrix field
-     @param B Vector of ColorSpinorFields to be packed
-     @param Nvec Vector length
+     @param[out] V The resulting packed matrix field
+     @param[in] B Vector of ColorSpinorFields to be packed
+     @param[in] Nvec Vector length
    */
   void FillV(ColorSpinorField &V, const std::vector<ColorSpinorField*> &B, int Nvec);
 
   /**
-     Block orthogonnalize the matrix field, where the blocks are
+     @brief Block orthogonnalize the matrix field, where the blocks are
      defined by lookup tables that map the fine grid points to the
      coarse grid points, and similarly for the spin degrees of
      freedom.
-     @param V Matrix field to be orthgonalized
-     @param Nvec Vector length
-     @param geo_bs Geometric block size
-     @param fine_to_coarse Fine-to-coarse lookup table (linear indices)
-     @param spin_bs Spin block size
+     @param[in,out] V Matrix field to be orthgonalized
+     @param[in] Nvec Vector length
+     @param[in] geo_bs Geometric block size
+     @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] spin_bs Spin block size
    */
   void BlockOrthogonalize(ColorSpinorField &V, int Nvec, const int *geo_bs, 
 			  const int *fine_to_coarse, int spin_bs);
 
   /**
-     Apply the prolongation operator
-     @param out Resulting fine grid field
-     @param in Input field on coarse grid
-     @param v Matrix field containing the null-space components
-     @param Nvec Number of null-space components
-     @param fine_to_coarse Fine-to-coarse lookup table (linear indices)
-     @param spin_map Spin blocking lookup table
+     @brief Apply the prolongation operator
+     @param[out] out Resulting fine grid field
+     @param[in] in Input field on coarse grid
+     @param[in] v Matrix field containing the null-space components
+     @param[in] Nvec Number of null-space components
+     @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] spin_map Spin blocking lookup table
+     @param[in] parity of the output fine field (if single parity output field)
    */
   void Prolongate(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		  int Nvec, const int *fine_to_coarse, const int *spin_map);
+		  int Nvec, const int *fine_to_coarse, const int *spin_map,
+		  int parity=QUDA_INVALID_PARITY);
 
   /**
-     Apply the restriction operator
-     @param out Resulting coarsened field
-     @param in Input field on fine grid
-     @param v Matrix field containing the null-space components
-     @param Nvec Number of null-space components
-     @param fine_to_coarse Fine-to-coarse lookup table (linear indices)
-     @param spin_map Spin blocking lookup table
+     @brief Apply the restriction operator
+     @param[out] out Resulting coarsened field
+     @param[in] in Input field on fine grid
+     @param[in] v Matrix field containing the null-space components
+     @param[in] Nvec Number of null-space components
+     @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] spin_map Spin blocking lookup table
+     @param[in] parity of the input fine field (if single parity input field)
    */
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map);
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map,
+		int parity=QUDA_INVALID_PARITY);
   
 
 } // namespace quda
