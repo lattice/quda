@@ -44,23 +44,11 @@ endif()
 #
 project("QUDA")
 
-###### Local configuration:
-
-##CMAKE we need to support this
+#######################################################################
+# QUDA OPTIONS
+# likely to be changed by users
+#######################################################################
 set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
-set(CPU_ARCH x86_64 CACHE STRING "set the CPU architecture (currently only x86_64 supported)")
-
-# we need to check for some packages
-find_package(PythonInterp)
-
-find_package(CUDA REQUIRED)
-find_package(Threads REQUIRED)
-
-
-set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
-set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
-set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
-set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 
 # build options
 set(BUILD_WILSON_DIRAC ON CACHE BOOL "build Wilson Dirac operators")
@@ -77,7 +65,6 @@ set(BUILD_FERMION_FORCE OFF CACHE BOOL "build code for asqtad fermion force")
 set(BUILD_HISQ_FORCE OFF CACHE BOOL "build code for hisq fermion force")
 set(BUILD_GAUGE_TOOLS OFF CACHE BOOL "build auxilary gauge-field tools")
 set(BUILD_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
-set(BUILD_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 set(BUILD_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
 # Dynamic inversion saves memory but decreases the flops
 set(BUILD_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
@@ -91,13 +78,6 @@ set(POSIX_THREADS OFF CACHE BOOL "set to 'yes' to build pthread-enabled dslash")
 #BLAS library
 set(BUILD_MAGMA OFF CACHE BOOL "build magma interface")
 
-# GPUdirect options
-set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
-set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
-
-# NVTX options
-set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
-set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
 
 # Interface options
 set(BUILD_QDP_INTERFACE ON CACHE BOOL "build qdp interface")
@@ -113,14 +93,52 @@ set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking
 # QDPJIT
 set(QUDA_USE_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
 
+# Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
 set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
 
+#######################################################################
+#QUDA ADVANCED OPTIONS
+# that ususally should not be changed by users
+#######################################################################
+set(QUDA_BLAS_TEX ON CACHE BOOL "enable texture reads in BLAS?")
+set(QUDA_FERMI_DBLE_TEX ON CACHE BOOL "enable double-precision texture reads on Fermi?")
+set(QUDA_NUMA_AFFINITY ON CACHE BOOL "enable NUMA affinity")
+set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
 
-#########################################################
+# NVTX options
+set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
+set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
+
+# GPUdirect options
+set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
+set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
+
+# features in development
+set(BUILD_SSTEP OFF CACHE BOOL "build s-step linear solvers")
+
+mark_as_advanced(QUDA_BLAS_TEX)
+mark_as_advanced(QUDA_FERMI_DBLE_TEX)
+mark_as_advanced(QUDA_NUMA_AFFINITY)
+mark_as_advanced(QUDA_VERBOSE_BUILD)
+
+mark_as_advanced(QUDA_MPI_NVTX)
+mark_as_advanced(QUDA_INTERFACE_NVTX)
+
+mark_as_advanced(QUDA_GPU_DIRECT)
+mark_as_advanced(QUDA_GPU_COMMS)
+
+mark_as_advanced(BUILD_SSTEP)
+
+#######################################################################
 # everything below here is processing the setup
-#
+#######################################################################
 
+# we need to check for some packages
+find_package(PythonInterp)
+
+find_package(CUDA REQUIRED)
+find_package(Threads REQUIRED)
 
 # do all the build definitions
 #
