@@ -196,7 +196,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
     if (x_cb >= arg.volumeCB) return;
 
     // for full fields then set parity from y thread index else use arg setting
-    int parity = blockDim.y*blockIdx.y + threadIdx.y;
+    int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
     int sM = blockDim.z*blockIdx.z + threadIdx.z;
     int s = sM / (Nc/Mc);
     int color_block = (sM % (Nc/Mc)) * Mc;
