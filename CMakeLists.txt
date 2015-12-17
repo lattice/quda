@@ -63,7 +63,7 @@ set(QUDA_HISQ_LINK OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_GAUGE_FORCE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
 set(QUDA_ASQTAD_FORCE OFF CACHE BOOL "build code for asqtad fermion force")
 set(QUDA_HISQ_FORCE OFF CACHE BOOL "build code for hisq fermion force")
-set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxilary gauge-field tools")
+set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
 set(QUDA_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
 # Dynamic inversion saves memory but decreases the flops
