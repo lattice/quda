@@ -619,25 +619,50 @@ namespace quda {
 
   public:
     /**
-       @param param Parameters defining this operator
-       @param enable_gpu Whether to enable this operator for the GPU
+       @param[in] param Parameters defining this operator
+       @param[in] enable_gpu Whether to enable this operator for the GPU
      */
     DiracCoarse(const DiracParam &param, bool enable_gpu=true);
     virtual ~DiracCoarse();
 
+    /**
+       @brief Apply the coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
     void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 
+    /**
+       @brief Apply the inverse coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    /**
+       @brief Apply DslashXpay out = (D * in)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity) const;
 
+    /**
+       @brief Apply DslashXpay out = (D * in + A * x)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
 			    const ColorSpinorField &x, const double &k) const;
 
     /**
-       This is the only method implemented presently though this will
-       change once even-odd preconditioning is implemented.
-       @param out output vector, out = M * in
-       @param in input vector
+       @brief Apply the full operator
+       @param[out] out output vector, out = M * in
+       @param[in] in input vector
      */
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -670,7 +695,6 @@ namespace quda {
     DiracCoarsePC(const DiracParam &param, bool enable_gpu=true);
     virtual ~DiracCoarsePC();
 
-    void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
 		    const ColorSpinorField &x, const double &k) const;

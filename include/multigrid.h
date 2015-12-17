@@ -236,7 +236,8 @@ namespace quda {
   void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, QudaPrecision precision, const cudaGaugeField &gauge);
 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY, bool xpay=true);
+		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
+		   bool dslash=true, bool clover=true);
 
   void CoarseCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &x, const cpuGaugeField &gauge, 
 		      const cpuGaugeField &clover, double kappa);

@@ -19,9 +19,32 @@ namespace quda {
     if (Xinv_d) delete Xinv_d;
   }
 
+  void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const {
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true);
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true);
+    }
+  }
+
+  void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const {
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true);
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true);
+    }
+  }
+
   void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
 			   const QudaParity parity) const {
-    errorQuda("Not implemented");
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false);
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false);
+    }
   }
 
   void DiracCoarse::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
@@ -29,9 +52,9 @@ namespace quda {
 			       const double &k) const {
     if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity);
+      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true);
     } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity);
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true);
     }
   }
 
