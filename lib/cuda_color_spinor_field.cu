@@ -272,9 +272,15 @@ namespace quda {
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if (siteSubset != QUDA_FULL_SITE_SUBSET) {
 	zeroPad();
-      } else {
+      } else if(!composite_descr.is_composite) {
 	(dynamic_cast<cudaColorSpinorField*>(even))->zeroPad();
 	(dynamic_cast<cudaColorSpinorField*>(odd))->zeroPad();
+      } else { //temporal hack for the full spinor field sets, manual zeroPad for each component:
+         for(int cid = 0; cid < composite_descr.dim; cid++)
+         { 
+           (dynamic_cast<cudaColorSpinorField&>(components[cid]->Even())).zeroPad();
+           (dynamic_cast<cudaColorSpinorField&>(components[cid]->Odd())).zeroPad();
+         }
       }
     }
 
