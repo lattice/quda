@@ -48,7 +48,7 @@ project("QUDA")
 # QUDA OPTIONS
 # likely to be changed by users
 #######################################################################
-set(GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
+set(QUDA_GPU_ARCH sm_35 CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_50, sm_52)")
 
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
@@ -80,12 +80,12 @@ set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
 
 
 # Interface options
-set(QUDA_QDP_INTERFACE ON CACHE BOOL "build qdp interface")
-set(QUDA_MILC_INTERFACE ON CACHE BOOL "build milc interface")
-set(QUDA_CPS_INTERFACE OFF CACHE BOOL "build cps interface")
-set(QUDA_QDPJIT_INTERFACE OFF CACHE BOOL "build qdpjit interface")
-set(QUDA_BQCD_INTERFACE OFF CACHE BOOL "build bqcd interface")
-set(QUDA_TIFR_INTERFACE OFF CACHE BOOL "build tifr interface")
+set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
+set(QUDA_INTERFACE_MILC ON CACHE BOOL "build milc interface")
+set(QUDA_INTERFACE_CPS OFF CACHE BOOL "build cps interface")
+set(QUDA_INTERFACE_QDPJIT OFF CACHE BOOL "build qdpjit interface")
+set(QUDA_INTERFACE_BQCD OFF CACHE BOOL "build bqcd interface")
+set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
 
 # Packing option
 set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
@@ -286,32 +286,32 @@ if(GPU_COMMS)
   add_definitions(-DGPU_COMMS)
 endif(GPU_COMMS)
 
-if(QUDA_QDP_INTERFACE)
+if(QUDA_INTERFACE_QDP)
   add_definitions(-DBUILD_QDP_INTERFACE)
-endif(QUDA_QDP_INTERFACE)
+endif(QUDA_INTERFACE_QDP)
 
-if(QUDA_MILC_INTERFACE)
+if(QUDA_INTERFACE_MILC)
   add_definitions(-DBUILD_MILC_INTERFACE)
-endif(QUDA_MILC_INTERFACE)
+endif(QUDA_INTERFACE_MILC)
 
-if(QUDA_CPS_INTERFACE)
+if(QUDA_INTERFACE_CPS)
   add_definitions(-DBUILD_CPS_INTERFACE)
-endif(QUDA_CPS_INTERFACE)
+endif(QUDA_INTERFACE_CPS)
 
-if(QUDA_QDPJIT_INTERFACE)
+if(QUDA_INTERFACE_QDPJIT)
 add_definitions(-DBUILD_QDPJIT_INTERFACE)
-endif(QUDA_QDPJIT_INTERFACE)
+endif(QUDA_INTERFACE_QDPJIT)
 
-if(QUDA_BQCD_INTERFACE)
+if(QUDA_INTERFACE_BQCD)
   add_definitions(-DBUILD_BQCD_INTERFACE)
-endif(QUDA_BQCD_INTERFACE)
+endif(QUDA_INTERFACE_BQCD)
 
-if(QUDA_TIFR_INTERFACE)
+if(QUDA_INTERFACE_TIFR)
   add_definitions(-DBUILD_TIFR_INTERFACE)
-endif(QUDA_TIFR_INTERFACE)
+endif(QUDA_INTERFACE_TIFR)
 
 # derive whether we need to build the fortran interface
-if(QUDA_TIFR_INTERFACE OR QUDA_BQCD_INTERFACE)
+if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD)
   SET(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()
@@ -342,7 +342,7 @@ include_directories(lib)
 file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h  CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION" )
 STRING(REPLACE "\#define CUDA_VERSION " ""  CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 STRING(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG} )
-set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
+set(HASH \"cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG}\")
 add_definitions(-DQUDA_HASH=${HASH})
 
 string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
@@ -362,13 +362,13 @@ IF(GITVERSION)
 ENDIF()
 
 # GPU ARCH
-STRING(REGEX REPLACE sm_ "" COMP_CAP ${GPU_ARCH})
+STRING(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 SET(COMP_CAP "${COMP_CAP}0")
 add_definitions(-D__COMPUTE_CAPABILITY__=${COMP_CAP})
 
 
 # NVCC FLAGS independet off build type
-set(QUDA_NVCC_FLAGS -arch=${GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
+set(QUDA_NVCC_FLAGS -arch=${QUDA_GPU_ARCH} -ftz=true -prec-div=false -prec-sqrt=false)
 
 if(QUDA_VERBOSE_BUILD)
   LIST(APPEND QUDA_NVCC_FLAGS --ptxas-options=-v)
