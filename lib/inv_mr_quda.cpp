@@ -92,7 +92,7 @@ namespace quda {
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
-    double omega = 1.0;
+    double omega = param.omega;
 
     int k = 0;
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {

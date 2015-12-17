@@ -331,8 +331,11 @@ extern "C" {
     /** Number of pre-smoother applications on each level */
     int nu_pre[QUDA_MAX_MG_LEVEL];
 
-    /** Number of post-smoother applicaitons on each level */
+    /** Number of post-smoother applications on each level */
     int nu_post[QUDA_MAX_MG_LEVEL];
+
+    /** Oeer/under relaation factor for the smoother at each level */
+    double omega[QUDA_MAX_MG_LEVEL];
 
     /** Smoother / solver to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];

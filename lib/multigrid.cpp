@@ -34,7 +34,7 @@ namespace quda {
     // create the smoother for this level
     printfQuda("smoother has operator %s\n", typeid(param.matSmooth).name());
 
-    param_presmooth = new MGParam(param, param.B, param.matResidual, param.matSmooth);
+    param_presmooth = new SolverParam(param);
 
     param_presmooth->inv_type = param.smoother;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
@@ -51,15 +51,16 @@ namespace quda {
       param_presmooth->delta = 1e-2;
       param_presmooth->compute_true_res = false;
     }
-    presmoother = Solver::create(*param_presmooth, param_presmooth->matResidual,
-				 param_presmooth->matSmooth, param_presmooth->matSmooth, profile);
+
+    presmoother = Solver::create(*param_presmooth, param.matResidual,
+				 param.matSmooth, param.matSmooth, profile);
 
     if (param.level < param.Nlevel-1) { //Create the post smoother
-      param_postsmooth = new MGParam(*param_presmooth);
+      param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
       param_postsmooth->maxiter = param.nu_post;
-      postsmoother = Solver::create(*param_postsmooth, param_postsmooth->matResidual, 
-				    param_postsmooth->matSmooth, param_postsmooth->matSmooth, profile);
+      postsmoother = Solver::create(*param_postsmooth, param.matResidual,
+				    param.matSmooth, param.matSmooth, profile);
     }
 
     // create residual vectors
@@ -115,7 +116,7 @@ namespace quda {
 	(*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec);
 	blas::zero(*(*B_coarse)[i]);
 	transfer->R(*(*B_coarse)[i], *(param.B[i]));
-	#if 0
+#if 0
 	if (param.level != 99) {
 	  ColorSpinorParam csParam2(*(*B_coarse)[i]);
 	  csParam2.create = QUDA_ZERO_FIELD_CREATE;
@@ -130,9 +131,8 @@ namespace quda {
 	  delete tmp;
           (*B_coarse)[i]->Source(QUDA_RANDOM_SOURCE);                                                                                      
           printfQuda("B_coarse[%d]\n", i);
-          //for (int x=0; x<(*B_coarse)[i]->Volume(); x++) static_cast<cpuColorSpinorField*>((*B_coarse)[i])->PrintVector(x);
 	}
-	#endif
+#endif
 
       }
 

@@ -44,6 +44,9 @@ namespace quda {
       { 
 	// set the block size
 	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
+
+	// set the smoother relaxation factor
+	omega = param.omega[level];
       }
 
     MGParam(const MGParam &param, 
@@ -155,10 +158,10 @@ namespace quda {
     MGParam *param_coarse;
 
     /** Storage for the parameter struct for the pre-smoother */
-    MGParam *param_presmooth;
+    SolverParam *param_presmooth;
 
     /** Storage for the parameter struct for the post-smoother */
-    MGParam *param_postsmooth;
+    SolverParam *param_postsmooth;
 
     /** The fine-grid representation of the null space vectors */
     std::vector<ColorSpinorField*> *B;
