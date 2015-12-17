@@ -133,6 +133,11 @@ mark_as_advanced(QUDA_DEVICE_PACK)
 mark_as_advanced(QUDA_SSTEP)
 
 #######################################################################
+# options that are not exposed at all because only one option exists
+set(CPU_ARCH x86_64)
+
+
+#######################################################################
 # everything below here is processing the setup
 #######################################################################
 
