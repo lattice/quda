@@ -687,10 +687,6 @@ namespace quda {
   */
   class DiracCoarsePC : public DiracCoarse {
 
-  protected:
-    const Dirac *dirac; /** Parent Dirac operator */
-    void initializeCoarse();  /** Initialize the coarse gauge field */
-
   public:
     DiracCoarsePC(const DiracParam &param, bool enable_gpu=true);
     virtual ~DiracCoarsePC();
