@@ -87,11 +87,8 @@ set(QUDA_INTERFACE_QDPJIT OFF CACHE BOOL "build qdpjit interface")
 set(QUDA_INTERFACE_BQCD OFF CACHE BOOL "build bqcd interface")
 set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
 
-# Packing option
-set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
-
 # QDPJIT
-set(QUDA_USE_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
+set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
 
 # Locations for QIO / QMP
 set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
@@ -114,6 +111,9 @@ set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for t
 set(QUDA_GPU_DIRECT ON CACHE BOOL "set to 'yes' to allow GPU and NIC to shared pinned buffers")
 set(QUDA_GPU_COMMS OFF CACHE BOOL "set to 'yes' to allow GPU and NIC to communicate using RDMA")
 
+# Packing option
+set(QUDA_DEVICE_PACK ON CACHE BOOL "set to 'yes' to enable packing and unpacking on the device")
+
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
 
@@ -127,6 +127,8 @@ mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 mark_as_advanced(QUDA_GPU_DIRECT)
 mark_as_advanced(QUDA_GPU_COMMS)
+
+mark_as_advanced(QUDA_DEVICE_PACK)
 
 mark_as_advanced(QUDA_SSTEP)
 
