@@ -229,7 +229,6 @@ int main(int argc, char **argv)
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
-  inv_param.verbosity_precondition = QUDA_SILENT;
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
 
@@ -270,6 +269,7 @@ int main(int argc, char **argv)
   }
 
   inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity_precondition = QUDA_SILENT;
 
   QudaMultigridParam mg_param;
   
@@ -285,6 +285,9 @@ int main(int argc, char **argv)
     mg_param.nu_post[i] = nu_post;
 
     mg_param.smoother[i] = precon_type;
+
+    // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
+    mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
     mg_param.omega[i] = 1.0; // over/under relaxation factor
 
     mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;

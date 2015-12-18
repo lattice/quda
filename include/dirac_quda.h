@@ -616,6 +616,7 @@ namespace quda {
     void initializeCoarse();  /** Initialize the coarse gauge field */
 
     bool enable_gpu; /** Whether to enable this operator for the GPU */
+    bool init; /** Whether this instance did the allocation or not */
 
   public:
     /**
@@ -623,6 +624,12 @@ namespace quda {
        @param[in] enable_gpu Whether to enable this operator for the GPU
      */
     DiracCoarse(const DiracParam &param, bool enable_gpu=true);
+
+    /**
+       @param[in] dirac Another operator instance to clone from (shallow copy)
+       @param[in] param Parameters defining this operator
+     */
+    DiracCoarse(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarse();
 
     /**
@@ -689,6 +696,7 @@ namespace quda {
 
   public:
     DiracCoarsePC(const DiracParam &param, bool enable_gpu=true);
+    DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param);
     virtual ~DiracCoarsePC();
 
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;

@@ -427,15 +427,12 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover) {
 #ifdef GPU_MULTIGRID
-    if (Y.Precision() != inA.Precision() || Y.Precision() != inB.Precision() ||
-	X.Precision() != Y.Precision() || Y.Precision() != out.Precision())
-      errorQuda("Unsupported precision mix");
-
     if (inA.V() == out.V()) errorQuda("Aliasing pointers");
+
     if (out.Precision() != inA.Precision() ||
 	Y.Precision() != inA.Precision() ||
-	X.Precision() != inA.Precision()) 
-      errorQuda("Precision mismatch out=%d inA=%d inB=%dY=%d X=%d", 
+	X.Precision() != inA.Precision())
+      errorQuda("Precision mismatch out=%d inA=%d inB=%d Y=%d X=%d",
 		out.Precision(), inA.Precision(), inB.Precision(), Y.Precision(), X.Precision());
 
     // check all locations match

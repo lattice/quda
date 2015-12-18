@@ -2156,6 +2156,16 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   cudaGaugeField *cudaGauge = checkGauge(param);
   checkInvertParam(param);
 
+  // check MG params (needs to go somewhere else)
+  if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
+    errorQuda("Requested MG levels %d greater than allowed maximum %d", mg_param.n_level, QUDA_MAX_MG_LEVEL);
+  for (int i=0; i<mg_param.n_level; i++) {
+    if (mg_param.smoother_solve_type[i] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[i] != QUDA_DIRECT_PC_SOLVE)
+      errorQuda("Unsupported smoother solve type %d on level %d", mg_param.smoother_solve_type[i], i);
+  }
+  if (param->solve_type != QUDA_DIRECT_SOLVE)
+    errorQuda("Outer MG solver can only use QUDA_DIRECT_SOLVE at present");
+
   setTuning(param->tune);
   pushVerbosity(param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
@@ -2165,15 +2175,26 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
     (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+
+  bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
-  // create the dirac operators
-  createDirac(d, dSloppy, dPre, *param, pc_solve);
+  // create the dirac operators for the fine grid
 
+  // this is the Dirac operator we use for inter-grid residual computation
+  // at prsent this doesn't support preconditioning
+  DiracParam diracParam;
+  setDiracSloppyParam(diracParam, param, outer_pc_solve);
+  d = Dirac::create(diracParam);
   m = new DiracM(*d);
-  mSloppy = new DiracM(*dSloppy);
-  mPre = new DiracM(*dPre);
+
+  // this is the Dirac operator we use for smoothing
+  DiracParam diracSloppyParam;
+  bool fine_grid_pc_solve = (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE) ||
+    (mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
+  setDiracSloppyParam(diracSloppyParam, param, fine_grid_pc_solve);
+  dSmooth = Dirac::create(diracSloppyParam);
+  mSmooth = new DiracM(*dSmooth);
 
   printfQuda("Creating vector of null space fields of length %d\n", mg_param.n_vec[0]);
 
@@ -2184,7 +2205,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
 
   // fill out the MG parameters for the fine level
-  mgParam = new MGParam(mg_param, B, *mSloppy, *mSloppy);
+  mgParam = new MGParam(mg_param, B, *m, *mSmooth);
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
