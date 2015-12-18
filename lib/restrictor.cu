@@ -86,7 +86,7 @@ namespace quda {
 	for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
 	  complex<Float> tmp[fineSpin*coarse_colors_per_thread];
 	  rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>
-	    (tmp, arg.in, arg.V, parity, arg.nParity, x, coarse_color_block);
+	    (tmp, arg.in, arg.V, parity, arg.nParity, x_cb, coarse_color_block);
 
 	  for (int s=0; s<fineSpin; s++) {
 	    for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
