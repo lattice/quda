@@ -24,7 +24,7 @@ namespace quda {
     const int nParity; // number of parities of input fine field
 
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
-		  const int *geo_map, const ColorSpinorField &meta) :
+		  const int *geo_map,  const int parity, const ColorSpinorField &meta) :
       out(out), in(in), V(V), geo_map(geo_map), spin_map(),
       parity(parity), nParity(meta.SiteSubset())
     { }
@@ -228,7 +228,7 @@ namespace quda {
     // for fine grid we keep 3 colors per thread else use fine grained
     constexpr int fine_colors_per_thread = fineColor == 3 ? fineColor : 1;
 
-    Arg arg(Out, In, V, fine_to_coarse, out);
+    Arg arg(Out, In, V, fine_to_coarse, parity, out);
     ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, fine_colors_per_thread, Arg>
       prolongator(arg, out, in, Location(out, in, v));
     prolongator.apply(0);
