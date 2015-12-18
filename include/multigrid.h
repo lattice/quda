@@ -40,6 +40,7 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.smoother[level]),
+      smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level])
       { 
 	// set the block size
@@ -68,10 +69,14 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.mg_global.smoother[level]),
+      smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level])
       {
 	// set the block size
 	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
+
+	// set the smoother relaxation factor
+	omega = param.mg_global.omega[level];
       }
 
     /** This points to the parameter struct that is passed into QUDA.
@@ -116,6 +121,9 @@ namespace quda {
 
     /** What type of smoother to use */
     QudaInverterType smoother;
+
+    /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
+    QudaSolveType smoother_solve_type;
 
     /** Where to compute this level of multigrid */
     QudaFieldLocation location;
@@ -178,11 +186,17 @@ namespace quda {
     /** Coarse solution vector */
     ColorSpinorField *x_coarse;
 
-    /** The coarse grid operator */
-    DiracCoarse *diracCoarse;
+    /** The coarse operator used for computing inter-grid residuals */
+    Dirac *diracCoarseResidual;
 
-    /** Wrapper for the coarse grid operator */
-    DiracMatrix *matCoarse;
+    /** The coarse operator used for doing smoothing */
+    Dirac *diracCoarseSmoother;
+
+    /** Wrapper for the residual coarse grid operator */
+    DiracMatrix *matCoarseResidual;
+
+    /** Wrapper for the smoothing coarse grid operator */
+    DiracMatrix *matCoarseSmoother;
 
   public:
     /** 
@@ -252,12 +266,10 @@ namespace quda {
    */
   struct multigrid_solver {
     Dirac *d;
-    Dirac *dSloppy;
-    Dirac *dPre;
+    Dirac *dSmooth;
 
     DiracM *m;
-    DiracM *mSloppy;
-    DiracM *mPre;
+    DiracM *mSmooth;
 
     std::vector<ColorSpinorField*> B;
 
@@ -268,21 +280,20 @@ namespace quda {
 
     multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile);
 
-    virtual ~multigrid_solver() {
+    virtual ~multigrid_solver()
+    {
       profile.TPSTART(QUDA_PROFILE_FREE);
-      delete mg;
+      if (mg) delete mg;
 
-      delete mgParam;
+      if (mgParam) delete mgParam;
 
       for (unsigned int i=0; i<B.size(); i++) delete B[i];
 
-      delete m;
-      delete mSloppy;
-      delete mPre;
+      if (m) delete m;
+      if (mSmooth) delete mSmooth;
 
-      delete d;
-      delete dSloppy;
-      delete dPre;
+      if (d) delete d;
+      if (dSmooth) delete dSmooth;
       profile.TPSTOP(QUDA_PROFILE_FREE);
     }
   };

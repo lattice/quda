@@ -7,17 +7,30 @@ namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
     : Dirac(param), transfer(param.transfer), dirac(param.dirac),
-      Y_h(0), X_h(0), Y_d(0), X_d(0), enable_gpu(enable_gpu)
-  { initializeCoarse(); }
+      Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr),
+      enable_gpu(enable_gpu), init(true)
+  {
+    initializeCoarse();
+  }
+
+  DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param)
+    : Dirac(param), transfer(param.transfer), dirac(param.dirac),
+      Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d),
+      enable_gpu(dirac.enable_gpu), init(false)
+  {
+
+  }
 
   DiracCoarse::~DiracCoarse()
   {
-    if (Y_h) delete Y_h;
-    if (X_h) delete X_h;
-    if (Xinv_h) delete Xinv_h;
-    if (Y_d) delete Y_d;
-    if (X_d) delete X_d;
-    if (Xinv_d) delete Xinv_d;
+    if (init) {
+      if (Y_h) delete Y_h;
+      if (X_h) delete X_h;
+      if (Xinv_h) delete Xinv_h;
+      if (Y_d) delete Y_d;
+      if (X_d) delete X_d;
+      if (Xinv_d) delete Xinv_d;
+    }
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
@@ -181,6 +194,11 @@ namespace quda {
   }
 
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu) : DiracCoarse(param, enable_gpu)
+  {
+    /* do nothing */
+  }
+
+  DiracCoarsePC::DiracCoarsePC(const DiracCoarse &dirac, const DiracParam &param) : DiracCoarse(dirac, param)
   {
     /* do nothing */
   }

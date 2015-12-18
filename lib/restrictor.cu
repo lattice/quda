@@ -92,8 +92,10 @@ namespace quda {
           if(fineSpin == 1)
           {
             int staggered_coarse_spin = parity; //0 if fine parity even, 1 otherwise
-            for (int c=0; c<coarseColor; c++)
-	       arg.out(parity_coarse,x_coarse_cb,staggered_coarse_spin,c) += tmp[c];
+            for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
+               int c = coarse_color_block + coarse_color_local;
+	       arg.out(parity_coarse,x_coarse_cb,staggered_coarse_spin,c) += tmp[coarse_color_local];
+            }
           }
           else
           {

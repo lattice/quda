@@ -340,6 +340,9 @@ extern "C" {
     /** Smoother / solver to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
 
+    /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
+    QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL];
+
     /** Location where each level should be done */
     QudaFieldLocation location[QUDA_MAX_MG_LEVEL];
 

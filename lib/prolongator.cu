@@ -24,7 +24,7 @@ namespace quda {
     const int nParity; // number of parities of input fine field
 
     ProlongateArg(Out &out, const In &in, const Rotator &V, 
-		  const int *geo_map, const int parity, const ColorSpinorField &meta) :
+		  const int *geo_map,  const int parity, const ColorSpinorField &meta) :
       out(out), in(in), V(V), geo_map(geo_map), spin_map(),
       parity(parity), nParity(meta.SiteSubset())
     { }
