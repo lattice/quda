@@ -398,6 +398,9 @@ set(CUDA_NVCC_FLAGS_DEBUG ${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G CACHE STRING
     "Flags used by the C++ compiler during full (host+device) debug builds."
     FORCE )
 
+# to remain consistent with other build types
+mark_as_advanced(CUDA_NVCC_FLAGS_HOSTDEBUG)
+mark_as_advanced(CUDA_NVCC_FLAGS_DEVICEDEBUG)
 
 set(CMAKE_CXX_FLAGS_DEVEL  "${OpenMP_CXX_FLAGS} -O3 -Wall" CACHE STRING
     "Flags used by the CUDA compiler during regular development builds."
