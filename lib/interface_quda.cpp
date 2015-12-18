@@ -2193,9 +2193,11 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
 
 void* newMultigridQuda(QudaMultigridParam *mg_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  if(!InitMagma) openMagma();
 
   multigrid_solver *mg = new multigrid_solver(*mg_param, profileInvert);
 
+  closeMagma();
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
   return static_cast<void*>(mg);
 }

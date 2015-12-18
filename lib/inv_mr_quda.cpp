@@ -23,7 +23,7 @@ namespace quda {
   }
 
   MR::~MR() {
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     if (init) {
       if (allocate_r) delete rp;
       delete Arp;
@@ -31,7 +31,7 @@ namespace quda {
       if (allocate_y) delete yp;
 
     }
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void MR::operator()(ColorSpinorField &x, ColorSpinorField &b)
@@ -87,12 +87,12 @@ namespace quda {
       r2 = 1.0; // by definition by this is now true
     }
 
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
+    if (!param.is_preconditioner) {
       blas::flops = 0;
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
     }
 
-    double omega = 1.0;
+    double omega = param.omega;
 
     int k = 0;
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -136,7 +136,7 @@ namespace quda {
     }
     if (c2 > 0.0) blas::ax(sqrt(c2), r);
 
-    if (param.inv_type_precondition != QUDA_GCR_INVERTER) {
+    if (!param.is_preconditioner) {
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       profile.TPSTART(QUDA_PROFILE_EPILOGUE);
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);

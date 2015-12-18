@@ -271,7 +271,7 @@ namespace quda {
     }
 
     // only do packing if one of the dimensions is partitioned
-    bool partitioned;
+    bool partitioned = false;
     for (int d=0; d<4; d++)
       if (comm_dim_partitioned(d)) partitioned = true;
     if (!partitioned) return;

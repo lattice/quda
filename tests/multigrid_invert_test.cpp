@@ -285,12 +285,10 @@ int main(int argc, char **argv)
     mg_param.nu_post[i] = nu_post;
 
     mg_param.smoother[i] = precon_type;
+    mg_param.omega[i] = 1.0; // over/under relaxation factor
 
-    mg_param.location[i] = QUDA_CPU_FIELD_LOCATION;
+    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
-  mg_param.location[0] = QUDA_CUDA_FIELD_LOCATION;
-  mg_param.location[1] = QUDA_CUDA_FIELD_LOCATION;
-  mg_param.location[2] = QUDA_CUDA_FIELD_LOCATION;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;

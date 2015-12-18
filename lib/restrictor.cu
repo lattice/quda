@@ -22,15 +22,20 @@ namespace quda {
     const int *fine_to_coarse;
     const int *coarse_to_fine;
     const spin_mapper<fineSpin,coarseSpin> spin_map;
+    const int parity; // the parity of the input field (if single parity)
+    const int nParity; // number of parities of input fine field
 
     RestrictArg(Out &out, const In &in, const Rotator &V,
-		const int *fine_to_coarse, const int *coarse_to_fine) : 
-      out(out), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine), spin_map()
+		const int *fine_to_coarse, const int *coarse_to_fine,
+		int parity, const ColorSpinorField &meta) :
+      out(out), in(in), V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
+      spin_map(), parity(parity), nParity(meta.SiteSubset())
     { }
 
     RestrictArg(const RestrictArg<Out,In,Rotator,fineSpin,coarseSpin> &arg) :
       out(arg.out), in(arg.in), V(arg.V), 
-      fine_to_coarse(arg.fine_to_coarse), coarse_to_fine(arg.coarse_to_fine), spin_map()
+      fine_to_coarse(arg.fine_to_coarse), coarse_to_fine(arg.coarse_to_fine), spin_map(),
+      parity(arg.parity), nParity(arg.nParity)
     { }
   };
 
@@ -42,7 +47,10 @@ namespace quda {
   template <typename Float, int fineSpin, int fineColor, int coarseColor, int coarse_colors_per_thread,
 	    class FineColor, class Rotator>
   __device__ __host__ inline void rotateCoarseColor(complex<Float> out[fineSpin*coarse_colors_per_thread],
-						    const FineColor &in, const Rotator &V, int parity, int x_cb, int coarse_color_block) {
+						    const FineColor &in, const Rotator &V,
+						    int parity, int nParity, int x_cb, int coarse_color_block) {
+    const int spinor_parity = (nParity == 2) ? parity : 0;
+
     for (int s=0; s<fineSpin; s++)
       for (int coarse_color_local=0; coarse_color_local<coarse_colors_per_thread; coarse_color_local++) {
 	out[s*coarse_colors_per_thread+coarse_color_local] = 0.0;
@@ -52,7 +60,7 @@ namespace quda {
       int i = coarse_color_block + coarse_color_local;
       for (int s=0; s<fineSpin; s++) {
 	for (int j=0; j<fineColor; j++) {
-	  out[s*coarse_colors_per_thread + coarse_color_local] += conj(V(parity, x_cb, s, j, i)) * in(parity, x_cb, s, j);
+	  out[s*coarse_colors_per_thread + coarse_color_local] += conj(V(parity, x_cb, s, j, i)) * in(spinor_parity, x_cb, s, j);
 	}
       }
     }
@@ -67,7 +75,9 @@ namespace quda {
 	    arg.out(parity_coarse, x_coarse_cb, s, c) = 0.0;
 
     // loop over fine degrees of freedom
-    for (int parity=0; parity<2; parity++) {
+    for (int parity=0; parity<arg.nParity; parity++) {
+      parity = (arg.nParity == 2) ? parity : arg.parity;
+
       for (int x_cb=0; x_cb<arg.in.VolumeCB(); x_cb++) {
 
 	int x = parity*arg.in.VolumeCB() + x_cb;
@@ -77,7 +87,7 @@ namespace quda {
 
         for (int coarse_color_block=0; coarse_color_block<coarseColor; coarse_color_block+=coarse_colors_per_thread) {
           complex<Float> tmp[fineSpin*coarse_colors_per_thread];
-          rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>(tmp, arg.in, arg.V, parity, x_cb, coarse_color_block);
+          rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>(tmp, arg.in, arg.V, parity, arg.nParity, x_cb, coarse_color_block);
 
           if(fineSpin == 1)
           {
@@ -148,14 +158,15 @@ namespace quda {
     // assume that coarse_to_fine look up map is ordered as (coarse-block-id + fine-point-id)
     // and that fine-point-id is parity ordered
     int x_fine = arg.coarse_to_fine[ (blockIdx.x*blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x];
-    int parity = threadIdx.y;
+    int parity = arg.nParity == 2 ? threadIdx.y : arg.parity;
     int x_fine_cb = x_fine - parity*arg.in.VolumeCB();
 
     int coarse_color_block = (blockDim.z*blockIdx.z + threadIdx.z) * coarse_colors_per_thread;
     if (coarse_color_block >= coarseColor) return;
 
     complex<Float> tmp[fineSpin*coarse_colors_per_thread];
-    rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>(tmp, arg.in, arg.V, parity, x_fine_cb, coarse_color_block);
+    rotateCoarseColor<Float,fineSpin,fineColor,coarseColor,coarse_colors_per_thread>
+      (tmp, arg.in, arg.V, parity, arg.nParity, x_fine_cb, coarse_color_block);
 
     typedef vector_type<complex<Float>, coarseSpin*coarse_colors_per_thread> vector;
     vector reduced;
@@ -169,13 +180,23 @@ namespace quda {
         }
       }
 
-      // now lets coarse geometry across threads
-      typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
-      __shared__ typename BlockReduce::TempStorage temp_storage;
-      reduce<vector> reducer; // reduce functor
+      // now lets coarsen geometry across threads
+      if (arg.nParity == 2) {
+        typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
+        __shared__ typename BlockReduce::TempStorage temp_storage;
+        reduce<vector> reducer; // reduce functor
 
-      // note this is not safe for blockDim.z > 1
-      reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
+        // note this is not safe for blockDim.z > 1
+        reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
+      } else {
+        typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS> BlockReduce;
+        __shared__ typename BlockReduce::TempStorage temp_storage;
+        reduce<vector> reducer; // reduce functor
+
+        // note this is not safe for blockDim.z > 1
+        reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
+      }
+
     }
     else//staggered block (temporary hack)
     {
@@ -187,12 +208,21 @@ namespace quda {
       }
 
       // now lets coarsen geometry across threads
-      typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
-      __shared__ typename BlockReduce::TempStorage temp_storage;
-      reduce<vector> reducer; // reduce functor
+      if (arg.nParity == 2) {
+        typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> BlockReduce;
+        __shared__ typename BlockReduce::TempStorage temp_storage;
+        reduce<vector> reducer; // reduce functor
 
-      // note this is not safe for blockDim.z > 1
-      reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
+        // note this is not safe for blockDim.z > 1
+        reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
+      } else {
+        typedef cub::BlockReduce<vector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS> BlockReduce;
+        __shared__ typename BlockReduce::TempStorage temp_storage;
+        reduce<vector> reducer; // reduce functor
+
+        // note this is not safe for blockDim.z > 1
+        reduced = BlockReduce(temp_storage).Reduce(reduced, reducer);
+      }
     }
 
     if (threadIdx.x==0 && threadIdx.y == 0) {
@@ -243,7 +273,7 @@ namespace quda {
 	Restrict<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	tp.block.y = 2; // need factor of two for fine parity with in the block
+	tp.block.y = arg.nParity;
 
 	if (block_size == 8) {
 	  RestrictKernel<Float,fineSpin,fineColor,coarseSpin,coarseColor,coarse_colors_per_thread,Arg,8>
@@ -312,7 +342,7 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaFieldOrder order>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		const int *fine_to_coarse, const int *coarse_to_fine) {
+		const int *fine_to_coarse, const int *coarse_to_fine, int parity) {
 
     typedef FieldOrderCB<Float,fineSpin,fineColor,1,order> fineSpinor;
     typedef FieldOrderCB<Float,coarseSpin,coarseColor,1,order> coarseSpinor;
@@ -326,7 +356,7 @@ namespace quda {
     // this seems like a reasonable value for both fine and coarse grids
     constexpr int coarse_colors_per_thread = 2;
 
-    Arg arg(Out, In, V, fine_to_coarse, coarse_to_fine);
+    Arg arg(Out, In, V, fine_to_coarse, coarse_to_fine, parity, in);
     RestrictLaunch<Float, Arg, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread> restrictor(arg, out, in, Location(out, in, v));
     restrictor.apply(0);
 
@@ -335,7 +365,7 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, QudaFieldOrder order>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
+		int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map, int parity) {
 
     // first check that the spin_map matches the spin_mapper
     if(spin_map != NULL) //spin_map is undefined for the top level staggered fermions.
@@ -346,23 +376,23 @@ namespace quda {
     }
  
     if (nVec == 2) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,2,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 4) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,4,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 8) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,8,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 12) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,12,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,12,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 16) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,16,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,16,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 20) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,20,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,20,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 24) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,24,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 48) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,48,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else if (nVec == 96) {
-      Restrict<Float,fineSpin,fineColor,coarseSpin,96,order>(out, in, v, fine_to_coarse, coarse_to_fine);
+      Restrict<Float,fineSpin,fineColor,coarseSpin,96,order>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
     } else {
       errorQuda("Unsupported nVec %d", nVec);
     }
@@ -370,23 +400,22 @@ namespace quda {
 
   template <typename Float, int fineSpin, QudaFieldOrder order>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
-    if (out.Nspin() != 2) errorQuda("coarseSpin is not supported");
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map, int parity) {
 
     if (out.Nspin() != 2) errorQuda("Unsupported nSpin %d", out.Nspin());
 
     if (in.Ncolor() == 3) {
-      Restrict<Float,fineSpin,3, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,fineSpin,3, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Ncolor() == 2) {
-      Restrict<Float,fineSpin,2, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,fineSpin,2, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Ncolor() == 8) {
-      Restrict<Float,fineSpin,8, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,fineSpin,8, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Ncolor() == 16) {
-      Restrict<Float,fineSpin,16, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,fineSpin,16, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Ncolor() == 24) {
-      Restrict<Float,fineSpin,24, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,fineSpin,24, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Ncolor() == 48) {
-      Restrict<Float,fineSpin,48, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,fineSpin,48, 2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else {
       errorQuda("Unsupported nColor %d", in.Ncolor());
     }
@@ -394,15 +423,15 @@ namespace quda {
 
   template <typename Float, QudaFieldOrder order>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map, int parity) {
 
     if (in.Nspin() == 4) {
-      Restrict<Float,4,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,4,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (in.Nspin() == 2) {
-      Restrict<Float,2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,2,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 #if GPU_STAGGERED_DIRAC
     } else if (in.Nspin() == 1) {
-      Restrict<Float,1,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<Float,1,order>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 #endif
     } else {
       errorQuda("Unsupported nSpin %d", in.Nspin());
@@ -412,7 +441,7 @@ namespace quda {
 
   template <typename Float>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map, int parity) {
 
     if (out.FieldOrder() != in.FieldOrder() ||	out.FieldOrder() != v.FieldOrder())
       errorQuda("Field orders do not match (out=%d, in=%d, v=%d)", 
@@ -420,10 +449,10 @@ namespace quda {
 
     if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
       Restrict<Float,QUDA_FLOAT2_FIELD_ORDER>
-	(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+	(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
       Restrict<Float,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
-	(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+	(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else {
       errorQuda("Unsupported field type %d", out.FieldOrder());
     }
@@ -432,16 +461,16 @@ namespace quda {
 #endif // GPU_MULTIGRID
 
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map) {
+		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int *spin_map, int parity) {
 
 #ifdef GPU_MULTIGRID
     if (out.Precision() != in.Precision() || v.Precision() != in.Precision())
       errorQuda("Precision mismatch out=%d in=%d v=%d", out.Precision(), in.Precision(), v.Precision());
 
     if (out.Precision() == QUDA_DOUBLE_PRECISION) {
-      Restrict<double>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<double>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
-      Restrict<float>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+      Restrict<float>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
     } else {
       errorQuda("Unsupported precision %d", out.Precision());
     }

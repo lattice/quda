@@ -601,6 +601,113 @@ namespace quda {
 			     const QudaSolutionType) const;
   };
 
+  /**
+     This class serves as a front-end to the coarse Dslash operator,
+     similar to the other dslash operators.
+   */
+  class DiracCoarse : public Dirac {
+
+  protected:
+    const Transfer *transfer; /** restrictor / prolongator defined here */
+    const Dirac *dirac; /** Parent Dirac operator */
+
+    cpuGaugeField *Y_h; /** CPU copy of coarse gauge field */
+    cpuGaugeField *X_h; /** CPU copy of coarse clover term */
+    cpuGaugeField *Xinv_h; /** CPU copy of inverse coarse clover term */
+
+    cudaGaugeField *Y_d; /** GPU copy of coarse gauge field */
+    cudaGaugeField *X_d; /** GPU copy of coarse clover term */
+    cudaGaugeField *Xinv_d; /** GPU copy of inverse coarse clover term */
+
+    void initializeCoarse();  /** Initialize the coarse gauge field */
+
+    bool enable_gpu; /** Whether to enable this operator for the GPU */
+
+  public:
+    /**
+       @param[in] param Parameters defining this operator
+       @param[in] enable_gpu Whether to enable this operator for the GPU
+     */
+    DiracCoarse(const DiracParam &param, bool enable_gpu=true);
+    virtual ~DiracCoarse();
+
+    /**
+       @brief Apply the coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    /**
+       @brief Apply the inverse coarse clover operator
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+
+    /**
+       @brief Apply DslashXpay out = (D * in)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+			const QudaParity parity) const;
+
+    /**
+       @brief Apply DslashXpay out = (D * in + A * x)
+       @param[out] out Output field
+       @param[in] in Input field
+       @param[paraity] parity Parity which we are applying the operator to
+     */
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+			    const ColorSpinorField &x, const double &k) const;
+
+    /**
+       @brief Apply the full operator
+       @param[out] out output vector, out = M * in
+       @param[in] in input vector
+     */
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+
+    /**
+       Create the coarse operator for this coarse operator
+       @param T Transfer operator that defines the coarse grid
+       @param Y Storage for the coarsened gauge field
+       @param X Storage for the coarsened clover field
+     */
+    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+  };
+
+  /**
+     Even-odd preconditioned variant of coarse Dslash operator
+  */
+  class DiracCoarsePC : public DiracCoarse {
+
+  public:
+    DiracCoarsePC(const DiracParam &param, bool enable_gpu=true);
+    virtual ~DiracCoarsePC();
+
+    void Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+		    const ColorSpinorField &x, const double &k) const;
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
+		 const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+    void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+  };
+
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
   class DiracMatrix {
 

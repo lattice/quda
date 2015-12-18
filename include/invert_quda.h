@@ -179,6 +179,8 @@ namespace quda {
 
     bool compute_true_res; //! whether to compute the true residual or not at the end
 
+    bool is_preconditioner; //! whether the solver acting as a preconditioner for another solver
+
     /**
        Default constructor
      */
@@ -209,7 +211,8 @@ namespace quda {
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
       eigcg_min_restarts(param.eigcg_min_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
-      verbosity_precondition(param.verbosity_precondition), compute_true_res(true)
+      verbosity_precondition(param.verbosity_precondition), compute_true_res(true),
+      is_preconditioner(false)
     {
       for (int i=0; i<num_offset; i++) {
 	offset[i] = param.offset[i];
@@ -225,6 +228,45 @@ namespace quda {
         rhs_idx = param.rhs_idx;
       }
     }
+
+    SolverParam(const SolverParam &param) : inv_type(param.inv_type),
+      inv_type_precondition(param.inv_type_precondition), preconditioner(param.preconditioner),
+      residual_type(param.residual_type), use_init_guess(param.use_init_guess),
+      delta(param.delta), use_sloppy_partial_accumulator(param.use_sloppy_partial_accumulator),
+      max_res_increase(param.max_res_increase), max_res_increase_total(param.max_res_increase_total),
+      heavy_quark_check(param.heavy_quark_check), pipeline(param.pipeline),
+      tol(param.tol), tol_restart(param.tol_restart), tol_hq(param.tol_hq),
+      true_res(param.true_res), true_res_hq(param.true_res_hq),
+      maxiter(param.maxiter), iter(param.iter),
+      precision(param.precision), precision_sloppy(param.precision_sloppy),
+      precision_precondition(param.precision_precondition),
+      preserve_source(param.preserve_source), num_offset(param.num_offset),
+      Nsteps(param.Nsteps), Nkrylov(param.Nkrylov), precondition_cycle(param.precondition_cycle),
+      tol_precondition(param.tol_precondition), maxiter_precondition(param.maxiter_precondition),
+      omega(param.omega), schwarz_type(param.schwarz_type), secs(param.secs), gflops(param.gflops),
+      precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
+      deflation_grid(param.deflation_grid), rhs_idx(0), use_reduced_vector_set(param.use_reduced_vector_set),
+      use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
+      eigcg_min_restarts(param.eigcg_min_restarts), max_restart_num(param.max_restart_num),
+      inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
+      verbosity_precondition(param.verbosity_precondition), compute_true_res(param.compute_true_res),
+      is_preconditioner(param.is_preconditioner)
+    {
+      for (int i=0; i<num_offset; i++) {
+	offset[i] = param.offset[i];
+	tol_offset[i] = param.tol_offset[i];
+	tol_hq_offset[i] = param.tol_hq_offset[i];
+      }
+
+      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
+        m = (m / 16) * 16 + 16;
+        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
+      }
+      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
+        rhs_idx = param.rhs_idx;
+      }
+    }
+
     ~SolverParam() { }
 
     /**
