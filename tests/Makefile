@@ -74,7 +74,7 @@ staggered_dslash_test: staggered_dslash_test.o gtest-all.o test_util.o staggered
 staggered_invert_test: staggered_invert_test.o test_util.o staggered_dslash_reference.o misc.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
-staggered_multigrid_invert_test: staggered_multigrid_invert_test.o test_util.o staggered_dslash_reference.o  misc.o blas_reference.o $(QIO_UTIL) $(QUDA)
+staggered_multigrid_invert_test: staggered_multigrid_invert_test.o test_util.o staggered_dslash_reference.o  misc.o blas_reference.o $(QUDA)
 	$(CXX) $(LDFLAGS) $^ -o $@ $(LDFLAGS)
 
 su3_test: su3_test.o test_util.o misc.o $(QUDA)

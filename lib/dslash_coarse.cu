@@ -379,8 +379,6 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 
   };
 
-
-
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseColor,
 	    int coarseSpin, QudaFieldLocation location>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
@@ -398,13 +396,14 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
     const int colors_per_thread = 2;
     if (dslash && !staggered) {
       if (clover) {
-	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true> dslash(arg, inA);
+	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true,false> dslash(arg, inA);
 	dslash.apply(0);
       } else {
-	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,false> dslash(arg, inA);
+	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,false,false> dslash(arg, inA);
 	dslash.apply(0);
       }
-    if (staggered) {
+    }else if (dslash && staggered) {
+
       if (clover) {
 	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true,true> dslash(arg, inA);
 	dslash.apply(0);
@@ -424,7 +423,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
 
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, int coarseColor, int coarseSpin>
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-		   const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover) {
+		   const GaugeField &Y, const GaugeField &X, double kappa, int parity, bool dslash, bool clover, bool staggered) {
     if (inA.Location() == QUDA_CUDA_FIELD_LOCATION) {
       ApplyCoarse<Float,csOrder,gOrder,coarseColor,coarseSpin,QUDA_CUDA_FIELD_LOCATION>
 	(out, inA, inB, Y, X, kappa, parity, dslash, clover, staggered);
@@ -483,7 +482,6 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
       errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", inA.FieldOrder(), Y.FieldOrder());
     }
   }
-
 #endif // GPU_MULTIGRID
 
   //Apply the coarse Dirac matrix to a coarse grid vector
@@ -519,5 +517,4 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
     errorQuda("Multigrid has not been built");
 #endif
   }//ApplyCoarse
-
 } // namespace quda

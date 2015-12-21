@@ -38,6 +38,8 @@ void *longlink;
 void** ghost_fatlink, **ghost_longlink;
 #endif
 
+extern bool generate_nullspace;
+extern char vec_infile[];
 extern char vec_outfile[];
 
 extern int device;
@@ -151,8 +153,14 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
   inv_param->reliable_delta = 1e-2;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
-
-
+  //mg:
+  //Warning: Outer solver always has these parameters:
+  inv_param->solution_type = QUDA_MAT_SOLUTION;//QUDA_MATPCDAG_MATPC_SOLUTION
+  inv_param->solve_type = QUDA_DIRECT_SOLVE;//QUDA_NORMOP_PC_SOLVE
+  //
+  inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param->dagger = QUDA_DAG_NO;
+  inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;  
   
 #if __COMPUTE_CAPABILITY__ >= 200
   if(tol_hq == 0 && tol == 0){
@@ -186,12 +194,6 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
   inv_param->verbosity_precondition = QUDA_SILENT;
   inv_param->cuda_prec_precondition = prec_sloppy;
   inv_param->omega = 1.0; 
-  //mg:
-  inv_param->solution_type = QUDA_MAT_SOLUTION;//QUDA_MATPCDAG_MATPC_SOLUTION
-  inv_param->solve_type = QUDA_DIRECT_SOLVE;//QUDA_NORMOP_PC_SOLVE
-  inv_param->matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param->dagger = QUDA_DAG_NO;
-  inv_param->mass_normalization = QUDA_MASS_NORMALIZATION;
 
   inv_param->cpu_prec = cpu_prec;
   inv_param->cuda_prec = prec; 
@@ -222,19 +224,22 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
 
     mg_param->smoother[i] = precon_type;
 
-    mg_param->location[i] = QUDA_CPU_FIELD_LOCATION;
-  }
-  // only the fine level is on the GPU (for now)
-  mg_param->location[0] = QUDA_CUDA_FIELD_LOCATION;
-  mg_param->location[1] = QUDA_CUDA_FIELD_LOCATION;
+    // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
+    mg_param->smoother_solve_type[i] = QUDA_DIRECT_SOLVE;
+    mg_param->omega[i] = 1.0; // over/under relaxation factor
 
+    mg_param->location[i] = QUDA_CUDA_FIELD_LOCATION;
+  }
   // coarsen the spin on the first restriction is undefined for staggered fields
   mg_param->spin_block_size[0] = 0;
 
   // coarse grid solver is GCR
   mg_param->smoother[mg_levels-1] = QUDA_GCR_INVERTER;
-  mg_param->compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES;//default value for staggered.
+  mg_param->compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
+    : QUDA_COMPUTE_NULL_VECTOR_NO;
 
+  // set file i/o parameters
+  strcpy(mg_param->vec_infile, vec_infile);
   strcpy(mg_param->vec_outfile, vec_outfile);
 
   return;

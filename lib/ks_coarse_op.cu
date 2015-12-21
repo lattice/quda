@@ -187,7 +187,7 @@ namespace quda {
       set_zero<Float,F>(*UV);
       if( LL ) set_zero<Float,F>(*UVL);
 
-      printfQuda("Computing %d UV and VUV\n", d);
+      printfQuda("Computing KS %d UV and VUV\n", d);
       //Calculate UV and then VUV for this direction, accumulating directly into the coarse gauge field Y
       if (d==0) {
         computeKSUV<Float,0>(UV, UVL, V, FL, LL, nDim, x_size);
@@ -203,15 +203,15 @@ namespace quda {
         computeKSVUV<Float,3>(Y, X, UV, UVL, V, FL->Ncolor(), x_size, xc_size, geo_bs);
       }
 
-      printf("UV2[%d] = %e\n", d, UV->norm2());
-      printf("Y2[%d] = %e\n", d, Y.norm2(d));
+      printf("KS UV2[%d] = %e\n", d, UV->norm2());
+      printf("KS Y2[%d] = %e\n", d, Y.norm2(d));
     }
 
-    printf("X2 = %e\n", X.norm2(0));
+    printf("KS X2 = %e\n", X.norm2(0));
     printfQuda("Computing coarse diagonal\n");
     createKSCoarseLocal<Float>(X, nDim, xc_size, k);
 
-    printf("X2 = %e\n", X.norm2(0));
+    printf("KS X2 = %e\n", X.norm2(0));
 
   }
 
