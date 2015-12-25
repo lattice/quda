@@ -389,7 +389,7 @@ namespace quda {
     }
     
     if (strcmp(vec_infile,"")!=0) {
-#if 0
+#if 1
       read_spinor_field(vec_infile, &V[0], B[0]->Precision(), B[0]->X(), 
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 #else 
@@ -452,7 +452,7 @@ namespace quda {
 	}
       }
 
-#if 0
+#if 1
       write_spinor_field(vec_outfile, &V[0], B[0]->Precision(), B[0]->X(),
 			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 #else
