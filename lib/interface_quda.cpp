@@ -213,7 +213,7 @@ static TimeProfile profilePlaq("plaqQuda");
 static TimeProfile profileAPE("APEQuda");
 
 //!< Profiler for STOUTQuda
-static TimeProfile profileAPE("STOUTQuda");
+static TimeProfile profileSTOUT("STOUTQuda");
 
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
