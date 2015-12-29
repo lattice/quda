@@ -302,6 +302,8 @@ int main(int argc, char **argv)
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
 
+  mg_param.run_verify = QUDA_BOOLEAN_YES;
+
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
   strcpy(mg_param.vec_outfile, vec_outfile);

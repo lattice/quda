@@ -349,6 +349,9 @@ extern "C" {
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
 
+    /** Whether to run the verification checks once set up is complete */
+    QudaBoolean run_verify;
+
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
 
