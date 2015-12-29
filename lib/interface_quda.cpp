@@ -1223,11 +1223,6 @@ void endQuda(void)
 
   saveTuneCache(getVerbosity());
 
-#if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
-  // end this CUDA context
-  cudaDeviceReset();
-#endif
-
   initialized = false;
 
   comm_finalize();
@@ -1274,6 +1269,12 @@ void endQuda(void)
   }
 
   assertAllMemFree();
+
+#if (!defined(USE_QDPJIT) && !defined(GPU_COMMS))
+  // end this CUDA context
+  cudaDeviceReset();
+#endif
+
 }
 
 
