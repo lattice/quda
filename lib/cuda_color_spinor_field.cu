@@ -86,7 +86,7 @@ namespace quda {
 	errorQuda("Cannot reference a non-cuda field");
       }
 
-      if (composite_descr.is_component) 
+      if (composite_descr.is_component && !(src.SiteSubset() == QUDA_FULL_SITE_SUBSET && this->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) 
       {//setup eigenvector form the set
         v    = (void*)((char*)v    + composite_descr.id*bytes);         
         norm = (void*)((char*)norm + composite_descr.id*norm_bytes);         

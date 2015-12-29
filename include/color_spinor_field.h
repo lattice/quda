@@ -265,14 +265,6 @@ namespace quda {
     void *v; // the field elements
     void *norm; // the normalization field
 
-    //! used for eigcg:
-    int eigv_dim;
-    int eigv_id;
-    int eigv_volume;       // volume of a single eigenvector 
-    int eigv_stride;       // stride of a single eigenvector
-    size_t eigv_real_length;  // physical length of a single eigenvector
-    size_t eigv_length;       // length including pads (but not ghost zones)
-
     // multi-GPU parameters
     void* ghost[QUDA_MAX_DIM]; // pointers to the ghost regions - NULL by default
     void* ghostNorm[QUDA_MAX_DIM]; // pointers to ghost norms - NULL by default
@@ -290,18 +282,6 @@ namespace quda {
 
     size_t bytes; // size in bytes of spinor field
     size_t norm_bytes; // size in bytes of norm field
-
-    /*Warning: we need copies of the above params for eigenvectors*/
-    //multi_GPU parameters:
-    
-    //ghost pointers are always for single eigenvector..
-    size_t eigv_total_length;
-    size_t eigv_total_norm_length;
-    size_t eigv_ghost_length;
-    size_t eigv_ghost_norm_length;
-
-    size_t eigv_bytes;      // size in bytes of spinor field
-    size_t eigv_norm_bytes; // makes no sense but let's keep it...
 
     QudaSiteSubset siteSubset;
     QudaSiteOrder siteOrder;
