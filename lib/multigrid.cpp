@@ -85,6 +85,8 @@ namespace quda {
       printfQuda("start creating transfer operator\n");
       transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
+      for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
+
       //transfer->setTransferGPU(false); // use this to force location of transfer
       printfQuda("end creating transfer operator\n");
 
@@ -156,8 +158,8 @@ namespace quda {
 
     printfQuda("setup completed\n");
 
-    // now we can run through the verificaion
-    if (param.level < param.Nlevel-1) verify();
+    // now we can run through the verification if requested
+    if (param.level < param.Nlevel-1 && param.mg_global.run_verify) verify();
 
     setOutputPrefix("");
   }

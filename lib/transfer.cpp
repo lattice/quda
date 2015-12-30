@@ -28,19 +28,25 @@ namespace quda {
       profile(profile)
   {
     int ndim = B[0]->Ndim();
-    this->geo_bs = new int[ndim];
-    for (int d = 0; d < ndim; d++) this->geo_bs[d] = geo_bs[d];
-
-    if (B[0]->X(0) == geo_bs[0]) 
-      errorQuda("X-dimension length %d cannot block length %d\n", B[0]->X(0), geo_bs[0]);
 
     for (int d = 0; d < ndim; d++) {
-      if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
-	errorQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d\n", d, B[0]->X(d)/geo_bs[d]);
-
-      if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
-	errorQuda("cannot parition dim[%d]=%d with block length %d\n", d, B[0]->X(d), geo_bs[d]);
+      while (geo_bs[d] > 0) {
+	printfQuda("Attempting to coarsen with block size = %d\n", geo_bs[d]);
+	if (d==0 && B[0]->X(0) == geo_bs[0])
+	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
+	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)
+	  warningQuda("Indexing does not (yet) support odd coarse dimensions: X(%d) = %d", d, B[0]->X(d)/geo_bs[d]);
+	else if ( (B[0]->X(d)/geo_bs[d]) * geo_bs[d] != B[0]->X(d) )
+	  warningQuda("cannot block dim[%d]=%d with block size = %d", d, B[0]->X(d), geo_bs[d]);
+	else
+	  break; // this is a valid block size so let's use it
+	geo_bs[d] /= 2;
+      }
+      if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
     }
+
+    this->geo_bs = new int[ndim];
+    for (int d = 0; d < ndim; d++) this->geo_bs[d] = geo_bs[d];
 
     char block_str[128];
     sprintf(block_str, "%d", geo_bs[0]);

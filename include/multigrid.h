@@ -23,7 +23,7 @@ namespace quda {
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
-    MGParam(const QudaMultigridParam &param, 
+    MGParam(QudaMultigridParam &param,
 	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix &matResidual, 
 	    DiracMatrix &matSmooth,
@@ -81,7 +81,7 @@ namespace quda {
 
     /** This points to the parameter struct that is passed into QUDA.
 	We use this to set per-level parameters */
-    const QudaMultigridParam  &mg_global;
+    QudaMultigridParam  &mg_global;
 
     /** What is the level of this instance */
     int level; 
@@ -244,6 +244,12 @@ namespace quda {
        @param B Generated null-space vectors
      */
     void generateNullVectors(std::vector<ColorSpinorField*> B);
+
+    /**
+       Run performance critical routines to benchmark their
+       performance.
+     */
+    void benchmark();
 
   };
 
