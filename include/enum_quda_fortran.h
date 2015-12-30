@@ -343,6 +343,11 @@
 #define QUDA_COMPUTE_NULL_VECTOR_YES 1
 #define QUDA_COMPUTE_NULL_VECTOR_INVALID QUDA_INVALID_ENUM
 
+#define QudaBoolean integer(4)
+#define QUDA_BOOLEAN_NO 0
+#define QUDA_BOOLEAN_YES 1
+#define QUDA_BOOLEAN_INVALID QUDA_INVALID_ENUM
+
 #define QudaDirection integer(4)
 #define QUDA_BACKWARDS -1
 #define QUDA_FORWARDS  +1

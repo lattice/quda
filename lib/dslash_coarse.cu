@@ -54,17 +54,22 @@ namespace quda {
     getCoords(coord, x_cb, arg.dim, parity);
     coord[4] = 0;
 
+#pragma unroll
     for(int d = 0; d < nDim; d++) { //Ndim
       //Forward link - compute fwd offset for spinor fetch
       {
 	const int fwd_idx = linkIndexP1(coord, arg.dim, d);
 	if ( arg.commDim[d] && (coord[d] + arg.nFace >= arg.dim[d]) ) {
 	  int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
+
+#pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	    int c_row = color_block + color_local; // global color index
 	    int row = s_row*Nc + c_row;
+#pragma unroll
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
 	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
+#pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 		int col = s_col*Nc + c_col;
 		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA.Ghost(d, 1, their_spinor_parity, ghost_idx, s_col, c_col);
@@ -73,11 +78,14 @@ namespace quda {
 	  }
 	} else {
 
+#pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) { //Color row
 	    int c_row = color_block + color_local; // global color index
 	    int row = s_row*Nc + c_row;
+#pragma unroll
 	    for(int s_col = 0; s_col < Ns; s_col++) { //Spin column
 	      Float sign = (s_row == s_col) ? 1.0 : -1.0;
+#pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col++) { //Color column
 		int col = s_col*Nc + c_col;
 		out[color_local] += sign*(arg.Y(d, parity, x_cb, row, col)) * arg.inA(their_spinor_parity, fwd_idx, s_col, c_col);
@@ -94,20 +102,26 @@ namespace quda {
 	const int gauge_idx = back_idx;
 	if ( arg.commDim[d] && (coord[d] - arg.nFace < 0) ) {
 	  const int ghost_idx = ghostFaceIndex<0>(coord, arg.dim, d, arg.nFace);
+#pragma unroll
 	  for (int color_local=0; color_local<Mc; color_local++) {
 	    int c_row = color_block + color_local;
 	    int row = s_row*Nc + c_row;
+#pragma unroll
 	    for (int s_col=0; s_col<Ns; s_col++)
+#pragma unroll
 	      for (int c_col=0; c_col<Nc; c_col++) {
 		int col = s_col*Nc + c_col;
 		out[color_local] += conj(arg.Y.Ghost(d, (parity+1)&1, ghost_idx, col, row)) * arg.inA.Ghost(d, 0, their_spinor_parity, ghost_idx, s_col, c_col);
 	      }
 	  }
 	} else {
+#pragma unroll
 	  for(int color_local = 0; color_local < Mc; color_local++) {
 	    int c_row = color_block + color_local;
 	    int row = s_row*Nc + c_row;
+#pragma unroll
 	    for(int s_col = 0; s_col < Ns; s_col++)
+#pragma unroll
 	      for(int c_col = 0; c_col < Nc; c_col++) {
 		int col = s_col*Nc + c_col;
 		out[color_local] += conj(arg.Y(d, (parity+1)&1, gauge_idx, col, row)) * arg.inA(their_spinor_parity, back_idx, s_col, c_col);
@@ -120,6 +134,7 @@ namespace quda {
     }
 
     // apply kappa
+#pragma unroll
     for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -(Float)2.0*arg.kappa;
   }
 
@@ -190,10 +205,13 @@ namespace quda {
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
     // M is number of colors per thread
+#pragma unroll
     for(int color_local = 0; color_local < Mc; color_local++) {//Color out
       int c = color_block + color_local; // global color index
       int row = s*Nc + c;
+#pragma unroll
       for(int s_col = 0; s_col < Ns; s_col++) //Spin in
+#pragma unroll
 	for(int c_col = 0; c_col < Nc; c_col++) { //Color in
 	  //Factor of 2*kappa and diagonal addition now incorporated in X
 	  int col = s_col*Nc + c_col;
@@ -208,6 +226,7 @@ namespace quda {
   __device__ __host__ inline void coarseDslash(CoarseDslashArg<Float,F,G> &arg, int x_cb, int parity, int s, int color_block)
   {
     complex <Float> out[Mc];
+#pragma unroll
     for (int c=0; c<Mc; c++) out[c] = 0.0;
     if (dslash && !staggered) applyDslash<Float,F,G,nDim,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
     else if(staggered)
@@ -215,6 +234,7 @@ namespace quda {
     if (clover) applyClover<Float,F,G,Ns,Nc,Mc>(out, arg, x_cb, parity, s, color_block);
 
     const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
+#pragma unroll
     for (int color_local=0; color_local<Mc; color_local++) {
       int c = color_block + color_local; // global color index
       arg.out(my_spinor_parity, x_cb, s, c) = out[color_local];
@@ -393,7 +413,7 @@ template <typename Float, typename F, typename G, int nDim, int Ns, int Nc, int 
     G xAccessor(const_cast<GaugeField&>(X));
     CoarseDslashArg<Float,F,G> arg(outAccessor, inAccessorA, inAccessorB, yAccessor, xAccessor, (Float)kappa, parity, inA);
 
-    const int colors_per_thread = 2;
+    const int colors_per_thread = 1;
     if (dslash && !staggered) {
       if (clover) {
 	CoarseDslash<Float,F,G,4,coarseSpin,coarseColor,colors_per_thread,true,true,false> dslash(arg, inA);
