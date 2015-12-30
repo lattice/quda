@@ -105,7 +105,6 @@ void constructSpinorField(Float *res, const int Vol) {
   }
 }
 
-
 static void
 set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigridParam *mg_param,
     int X1, int  X2, int X3, int X4,
@@ -225,12 +224,19 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
     mg_param->smoother[i] = precon_type;
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
-    mg_param->smoother_solve_type[i] = QUDA_DIRECT_SOLVE;
+    //mg_param->smoother_solve_type[i] = QUDA_DIRECT_SOLVE;
+    mg_param->smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
     mg_param->omega[i] = 1.0; // over/under relaxation factor
 
     mg_param->location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
   // coarsen the spin on the first restriction is undefined for staggered fields
+  mg_param->smoother_solve_type[0] = QUDA_NORMOP_SOLVE; //QUDA_DIRECT_SOLVE;
+#if 0
+  mg_param->smoother[0] = QUDA_CG_INVERTER;
+  mg_param->nu_pre[0] = 16 ;
+  mg_param->nu_post[0] = 16;
+#endif
   mg_param->spin_block_size[0] = 0;
 
   // coarse grid solver is GCR
@@ -405,31 +411,29 @@ void mg_test(void)
 
   time0 += clock(); 
   time0 /= CLOCKS_PER_SEC;
-/*
-#ifdef MULTI_GPU    
-  matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
-          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
-#else
-  matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
-#endif
 
-  mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-  nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-  src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+//MULTI_GPU code for staggered MG is not ready.
+//#ifdef MULTI_GPU    
+//  matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, 
+//          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
+//#else
+  //matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
+  double kappa = 1.0 / (2.0*mass);
+  mat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), kappa, 0, inv_param.cpu_prec, gaugeParam.cpu_prec);
+//#endif
+  ax( kappa, in->V(), V*mySpinorSiteSize, inv_param.cpu_prec );
+  mxpy(in->V(), ref->V(), V*mySpinorSiteSize, inv_param.cpu_prec);
+  nrm2 = norm_2(ref->V(), V*mySpinorSiteSize, inv_param.cpu_prec);
+  src2 = norm_2(in->V(), V*mySpinorSiteSize, inv_param.cpu_prec);
+  double l2r = sqrt(nrm2/src2);
 
-  if (test_type <=2){
+  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g;\n",
+        inv_param.tol, inv_param.true_res, l2r);
 
-    double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
-    double l2r = sqrt(nrm2/src2);
-
-    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-        inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
-
-    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
+  printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
         time0, inv_param.secs, inv_param.iter, inv_param.secs,
         inv_param.gflops/inv_param.secs);
-  }
-*/
+
   end();
 }
 

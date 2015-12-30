@@ -271,6 +271,9 @@ namespace quda {
     DiracM *m;
     DiracM *mSmooth;
 
+    //For toplevel staggered:
+    DiracMdagM *ksmSmooth;
+
     std::vector<ColorSpinorField*> B;
 
     MGParam *mgParam;

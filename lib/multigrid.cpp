@@ -308,16 +308,30 @@ namespace quda {
       *r = b; // copy source vector since we will overwrite source with iterated residual
       const Dirac &dirac = *(param.matSmooth.Expose());
       ColorSpinorField *out=nullptr, *in=nullptr;
-      dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
-      (*presmoother)(*out, *in);
-      dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
+      if(param.smoother_solve_type == QUDA_NORMOP_SOLVE && (param.matSmooth.isStaggered() && param.level == 0))
+      {
+        out = &x;
+        Dirac &dirac = const_cast<Dirac&>(*( param.matResidual.Expose()));
+        QudaDagType curr_dagger  = param.matResidual.getMatDagger();
+        QudaDagType other_dagger = (curr_dagger == QUDA_DAG_NO) ? QUDA_DAG_YES : QUDA_DAG_NO;
+        dirac.Dagger(other_dagger);
+        param.matResidual(*r, b); //(*r) = Mdag b 
+        dirac.Dagger(curr_dagger);
+        in = r;
+        (*presmoother)(*out, *in);//solve with MdagM
+      }
+      else{
+        dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
+        (*presmoother)(*out, *in);
+        dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
+      }
 
       double r2 = 0.0;
 
       // if using preconditioned smoother then need to reconstruct full residual
       // FIXME extend this check for precision, etc.
       // also need to extend this when residual operator is itself preconditioned
-      bool use_solver_residual = param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE ? false : true;
+      bool use_solver_residual = (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_SOLVE) ? false : true;
 
       if (use_solver_residual) {
 	if (debug) r2 = norm2(*r);
@@ -357,15 +371,27 @@ namespace quda {
 
       // do the post smoothing
       *r = b;
-      dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
-      (*postsmoother)(*out, *in);
-      dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
-
+      if(param.smoother_solve_type == QUDA_NORMOP_SOLVE && (param.matSmooth.isStaggered() && param.level == 0))
+      {
+        out = &x;
+        Dirac &dirac = const_cast<Dirac&>(*( param.matResidual.Expose()));
+        QudaDagType curr_dagger  = param.matResidual.getMatDagger();
+        QudaDagType other_dagger = (curr_dagger == QUDA_DAG_NO) ? QUDA_DAG_YES : QUDA_DAG_NO;
+        dirac.Dagger(other_dagger);
+        param.matResidual(*in, *r); //(*in) = Mdag (*r)
+        dirac.Dagger(curr_dagger);
+        (*postsmoother)(*out, *in);
+      }
+      else{
+        dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
+        (*postsmoother)(*out, *in);
+        dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
+      }
     } else { // do the coarse grid solve
 
       const Dirac &dirac = *(param.matSmooth.Expose());
       ColorSpinorField *out=nullptr, *in=nullptr;
-
+      //ok for staggered.
       dirac.prepare(in, out, x, b, QUDA_MAT_SOLUTION);
       (*presmoother)(*out, *in);
       dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
@@ -485,15 +511,16 @@ namespace quda {
   void MG::generateNullVectors(std::vector<ColorSpinorField*> B) {
     printfQuda("\nGenerate null vectors\n");
     //Create spinor field parameters:
+    const Dirac &dirac = *(param.matSmooth.Expose());
 
     SolverParam solverParam(param);
 
     // set null-space generation options - need to expose these
     solverParam.maxiter = 500;
-    solverParam.tol = 5e-5;
+    solverParam.tol = 5e-4;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7;
-    solverParam.inv_type = QUDA_BICGSTAB_INVERTER;
+    solverParam.inv_type = (param.level == 0 && param.matSmooth.isStaggered() && param.smoother_solve_type == QUDA_NORMOP_SOLVE) ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
     // end setting null-space generation options
 
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
@@ -524,18 +551,24 @@ namespace quda {
 	ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, csParam));
 
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
-
+#if 1
 	Solver *solve = Solver::create(solverParam, param.matSmooth, param.matSmooth, param.matSmooth, profile);
-
-	const Dirac &dirac = *(param.matSmooth.Expose());
 	ColorSpinorField *out=nullptr, *in=nullptr;
-	dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
-	(*solve)(*out, *in);
-	dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
+
+        if(solverParam.inv_type == QUDA_CG_INVERTER)
+        {
+          printfQuda("\n Solve normal equation\n");
+          (*solve)(*x, *b);
+        }
+        else{
+          dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
+	  (*solve)(*out, *in);
+	  dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
+        }
 
 	delete solve;
-
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution = %g\n", norm2(*x));
+#endif
+	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Solution norm squared = %g\n", norm2(*x));
 
 	*curr_nullvec = *x;
 
@@ -545,13 +578,11 @@ namespace quda {
           csParam.create = QUDA_ZERO_FIELD_CREATE;
 
   	  ColorSpinorField *t = static_cast<ColorSpinorField*>(new cudaColorSpinorField(csParam));
-
           double nrm_1 = blas::norm2(*x);
           printfQuda("Solution = %g\n", nrm_1);
 
           //check null vector quality:
           param.matResidual(*b, *x, *t);
-
           double nrm_2 = blas::norm2(*b);
           printfQuda("Null vector check = %g\n", nrm_2 / nrm_1);
 
@@ -573,7 +604,6 @@ namespace quda {
 
 	delete b;
 	delete x;
-
       }//stop for-loop:
 
     saveVectors(B);

@@ -147,6 +147,7 @@ namespace quda {
 
 
     QudaMatPCType getMatPCType() const { return matpcType; }
+    QudaDagType getDagger() const { return dagger; }
     void Dagger(QudaDagType dag) { dagger = dag; }
     virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {errorQuda("Not implemented");}
   };
@@ -737,6 +738,7 @@ namespace quda {
 
 
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
+    QudaDagType getMatDagger() const { return dirac->getDagger(); }//needed for staggered MG
 
     std::string Type() const { return typeid(*dirac).name(); }
     

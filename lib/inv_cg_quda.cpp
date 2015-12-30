@@ -34,8 +34,8 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source    
-    const double b2 = blas::norm2(b);
-    if(b2 == 0){
+    double b2 = blas::norm2(b);
+    if(b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO){
       profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x=b;
@@ -52,6 +52,12 @@ namespace quda {
   
     mat(r, x, y);
     double r2 = blas::xmyNorm(b, r);
+
+    if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) 
+    {
+      b = r;
+      b2 = r2;
+    }
 
     csParam.setPrecision(param.precision_sloppy);
     cudaColorSpinorField Ap(x, csParam);
