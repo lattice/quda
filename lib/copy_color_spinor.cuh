@@ -285,7 +285,7 @@ namespace quda {
 #ifdef BUILD_QDPJIT_INTERFACE
       QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, Out);
       genericCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>
-	(outOrder, inOrder, out.VolumeCB(), out.GammaBasis(), inBasis, location);
+	(outOrder, inOrder, out.GammaBasis(), inBasis, out, location);
 #else
       errorQuda("QDPJIT interface has not been built\n");
 #endif
