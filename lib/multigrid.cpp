@@ -39,7 +39,7 @@ namespace quda {
 
     param_presmooth->inv_type = param.smoother;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
-    param_presmooth->is_preconditioner = true;
+    param_presmooth->is_preconditioner = false;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
