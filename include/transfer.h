@@ -145,6 +145,11 @@ namespace quda {
     void createSpinMap(int spin_bs);
 
     /**
+     * Internal flops accumulator
+     */
+    mutable double flops_;
+
+    /**
      * Reference to profile kept in the corresponding MG instance.
      * Use this to record restriction and prolongation overhead.
      */
@@ -189,19 +194,19 @@ namespace quda {
 
     /**
      * Returns the number of near nullvectors
-     * @retruns Nvec
+     * @return Nvec
      */
     int nvec() const {return Nvec;}
 
     /**
      * Returns the amount of spin blocking
-     * @retruns spin_bs
+     * @return spin_bs
      */
     int Spin_bs() const {return spin_bs;}
 
     /**
      * Returns the geometrical coarse grid blocking
-     * @returns geo_bs
+     * @return geo_bs
      */
     const int *Geo_bs() const {return geo_bs;}
     
@@ -211,6 +216,11 @@ namespace quda {
      */
     void setTransferGPU(bool use_gpu) const { this->use_gpu = use_gpu; }
 
+    /**
+     * Return flops
+     * @return flops expended by this operator
+     */
+    double flops() const;
   };
 
   /**

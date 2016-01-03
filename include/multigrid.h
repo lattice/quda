@@ -246,6 +246,11 @@ namespace quda {
     void generateNullVectors(std::vector<ColorSpinorField*> B);
 
     /**
+       Return the total flops done on this and all coarser levels.
+     */
+    double flops() const;
+
+    /**
        Run performance critical routines to benchmark their
        performance.
      */

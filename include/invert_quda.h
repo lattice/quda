@@ -369,6 +369,11 @@ namespace quda {
     */
     void PrintSummary(const char *name, int k, const double &r2, const double &b2);
 
+    /**
+     * Return flops
+     * @return flops expended by this operator
+     */
+    virtual double flops() const { return 0; }
   };
 
   class CG : public Solver {

@@ -469,6 +469,7 @@ namespace quda {
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
   
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+    if (K) gflops += K->flops()*1e-9;
 
     if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 
       warningQuda("Exceeded maximum iterations %d", param.maxiter);

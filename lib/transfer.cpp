@@ -25,7 +25,7 @@ namespace quda {
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
       spin_bs(spin_bs), spin_map(0),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
-      profile(profile)
+      flops_(0), profile(profile)
   {
     int ndim = B[0]->Ndim();
 
@@ -247,6 +247,8 @@ namespace quda {
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
+    flops_ += 8*in.Ncolor()*out.Ncolor()*out.VolumeCB()*out.SiteSubset();
+
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
 
@@ -283,7 +285,15 @@ namespace quda {
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
       cudaDeviceSynchronize();
 
+    flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
+
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+  }
+
+  double Transfer::flops() const {
+    double rtn = flops_;
+    flops_ = 0;
+    return rtn;
   }
 
 } // namespace quda
