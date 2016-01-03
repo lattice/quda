@@ -46,7 +46,9 @@ namespace quda {
     int parity_coarse = (x_coarse >= in.VolumeCB()) ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse*in.VolumeCB();
 
+#pragma unroll
     for (int s=0; s<fineSpin; s++) {
+#pragma unroll
       for (int c=0; c<coarseColor; c++) {
 	out[s*coarseColor+c] = in(parity_coarse, x_coarse_cb, spin_map(s), c);
       }
@@ -63,13 +65,18 @@ namespace quda {
 						  const Rotator &V, int parity, int nParity, int x_cb, int fine_color_block) {
     const int spinor_parity = (nParity == 2) ? parity : 0;
 
+#pragma unroll
     for (int s=0; s<fineSpin; s++)
+#pragma unroll
       for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++)
 	out(spinor_parity, x_cb, s, fine_color_block+fine_color_local) = 0.0; // global fine color index
     
+#pragma unroll
     for (int s=0; s<fineSpin; s++) {
+#pragma unroll
       for (int fine_color_local=0; fine_color_local<fine_colors_per_thread; fine_color_local++) {
 	int i = fine_color_block + fine_color_local; // global fine color index
+#pragma unroll
 	for (int j=0; j<coarseColor; j++) {
 	  // V is a ColorMatrixField with internal dimensions Ns * Nc * Nvec
 	  out(spinor_parity, x_cb, s, i) += V(parity, x_cb, s, i, j) * in[s*coarseColor + j];
@@ -226,7 +233,7 @@ namespace quda {
     packedSpinor V(const_cast<ColorSpinorField&>(v));
 
     // for fine grid we keep 3 colors per thread else use fine grained
-    constexpr int fine_colors_per_thread = fineColor == 3 ? fineColor : 1;
+    constexpr int fine_colors_per_thread = 1;//fineColor == 3 ? fineColor : 1;
 
     Arg arg(Out, In, V, fine_to_coarse, parity, out);
     ProlongateLaunch<Float, fineSpin, fineColor, coarseSpin, coarseColor, fine_colors_per_thread, Arg>
