@@ -10,42 +10,16 @@
 
 #include <quda_internal.h>
 #include "face_quda.h"
+#include <complex>
 
 #define XUP 0
 #define YUP 1
 #define ZUP 2
 #define TUP 3
 
-typedef struct {   
-  float real;	   
-  float imag; 
-} fcomplex;  
 
-/* specific for double complex */
-typedef struct {
-  double real;
-  double imag;
-} dcomplex;
-
-typedef struct { fcomplex e[3][3]; } fsu3_matrix;
-typedef struct { fcomplex c[3]; } fsu3_vector;
-typedef struct { dcomplex e[3][3]; } dsu3_matrix;
-typedef struct { dcomplex c[3]; } dsu3_vector;
-
-
-#define CADD(a,b,c) { (c).real = (a).real + (b).real;	\
-  (c).imag = (a).imag + (b).imag; }
-#define CMUL(a,b,c) { (c).real = (a).real*(b).real - (a).imag*(b).imag; \
-  (c).imag = (a).real*(b).imag + (a).imag*(b).real; }
-#define CSUM(a,b) { (a).real += (b).real; (a).imag += (b).imag; }
-
-/* c = a* * b */
-#define CMULJ_(a,b,c) { (c).real = (a).real*(b).real + (a).imag*(b).imag; \
-  (c).imag = (a).real*(b).imag - (a).imag*(b).real; }
-
-/* c = a * b* */
-#define CMUL_J(a,b,c) { (c).real = (a).real*(b).real + (a).imag*(b).imag; \
-  (c).imag = (a).imag*(b).real - (a).real*(b).imag; }
+template<typename real> struct su3_matrix { std::complex<real> e[3][3]; };
+template<typename real> struct su3_vector { std::complex<real> e[3]; };
 
 static int Vs[4];
 static int Vsh[4];
@@ -56,9 +30,8 @@ llfat_scalar_mult_su3_matrix( su3_matrix *a, Real s, su3_matrix *b )
 {
 
   int i,j;
-  for(i=0;i<3;i++)for(j=0;j<3;j++){
-    b->e[i][j].real = s*a->e[i][j].real;
-    b->e[i][j].imag = s*a->e[i][j].imag;
+  for(i=0;i<3;i++) for(j=0;j<3;j++){
+    b->e[i][j] = s*a->e[i][j];
   }
 
   return;
@@ -69,9 +42,8 @@ template<typename su3_matrix, typename Real>
 llfat_scalar_mult_add_su3_matrix(su3_matrix *a,su3_matrix *b, Real s, su3_matrix *c)
 {    
   int i,j;
-  for(i=0;i<3;i++)for(j=0;j<3;j++){
-    c->e[i][j].real = a->e[i][j].real + s*b->e[i][j].real;
-    c->e[i][j].imag = a->e[i][j].imag + s*b->e[i][j].imag;
+  for(i=0;i<3;i++) for(j=0;j<3;j++){
+    c->e[i][j] = a->e[i][j] + s*b->e[i][j];
   }
 
 }
@@ -81,12 +53,12 @@ template <typename su3_matrix>
 llfat_mult_su3_na(  su3_matrix *a, su3_matrix *b, su3_matrix *c )
 {
   int i,j,k;
-  typeof(a->e[0][0]) x,y;
+  typename std::remove_reference<decltype(a->e[0][0])>::type x,y;
   for(i=0;i<3;i++)for(j=0;j<3;j++){
-    x.real=x.imag=0.0;
+    x=0.0;
     for(k=0;k<3;k++){
-      CMUL_J( a->e[i][k] , b->e[j][k] , y );
-      CSUM( x , y );
+      y = a->e[i][k] * conj(b->e[j][k]);
+      x += y;
     }
     c->e[i][j] = x;
   }
@@ -97,12 +69,12 @@ template <typename su3_matrix>
 llfat_mult_su3_nn( su3_matrix *a, su3_matrix *b, su3_matrix *c )
 {
   int i,j,k;
-  typeof(a->e[0][0]) x,y;
+  typename std::remove_reference<decltype(a->e[0][0])>::type x,y;
   for(i=0;i<3;i++)for(j=0;j<3;j++){
-    x.real=x.imag=0.0;
+    x=0.0;
     for(k=0;k<3;k++){
-      CMUL( a->e[i][k] , b->e[k][j] , y );
-      CSUM( x , y );
+      y = a->e[i][k] * b->e[k][j];
+      x += y;
     }
     c->e[i][j] = x;
   }
@@ -113,12 +85,12 @@ template<typename su3_matrix>
 llfat_mult_su3_an( su3_matrix *a, su3_matrix *b, su3_matrix *c )
 {
   int i,j,k;
-  typeof(a->e[0][0]) x,y;
+  typename std::remove_reference<decltype(a->e[0][0])>::type x,y;
   for(i=0;i<3;i++)for(j=0;j<3;j++){
-    x.real=x.imag=0.0;
+    x=0.0;
     for(k=0;k<3;k++){
-      CMULJ_( a->e[k][i] , b->e[k][j], y );
-      CSUM( x , y );
+      y = conj(a->e[k][i]) * b->e[k][j];
+      x += y;
     }
     c->e[i][j] = x;
   }
@@ -134,7 +106,7 @@ llfat_add_su3_matrix( su3_matrix *a, su3_matrix *b, su3_matrix *c )
 {
   int i,j;
   for(i=0;i<3;i++)for(j=0;j<3;j++){
-    CADD( a->e[i][j], b->e[i][j], c->e[i][j] );
+    c->e[i][j] = a->e[i][j] + b->e[i][j];
   }
 }
 
@@ -391,11 +363,11 @@ void computeLongLinkCPU(void** longlink, void** sitelink, QudaPrecision prec, vo
   if(longlink){
     switch(prec){
       case QUDA_DOUBLE_PRECISION: 
-        computeLongLinkCPU((void**)longlink, (dsu3_matrix**)sitelink, (double*)act_path_coeff);
+        computeLongLinkCPU((void**)longlink, (su3_matrix<double>**)sitelink, (double*)act_path_coeff);
         break;
 
       case QUDA_SINGLE_PRECISION: 
-        computeLongLinkCPU((void**)longlink, (fsu3_matrix**)sitelink, (float*)act_path_coeff);
+        computeLongLinkCPU((void**)longlink, (su3_matrix<float>**)sitelink, (float*)act_path_coeff);
         break;
       default:
         fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
@@ -423,11 +395,11 @@ llfat_reference(void** fatlink, void** sitelink, QudaPrecision prec, void* act_p
 
   switch(prec){
     case QUDA_DOUBLE_PRECISION:
-      llfat_cpu((void**)fatlink, (dsu3_matrix**)sitelink, (double*) act_path_coeff);
+      llfat_cpu((void**)fatlink, (su3_matrix<double>**)sitelink, (double*) act_path_coeff);
       break;
 
     case QUDA_SINGLE_PRECISION:
-      llfat_cpu((void**)fatlink, (fsu3_matrix**)sitelink, (float*) act_path_coeff);
+      llfat_cpu((void**)fatlink, (su3_matrix<float>**)sitelink, (float*) act_path_coeff);
       break;
 
     default:
@@ -813,19 +785,19 @@ llfat_reference_mg(void** fatlink, void** sitelink, void** ghost_sitelink,
 
   switch(prec){
     case QUDA_DOUBLE_PRECISION:{
-                                 llfat_cpu_mg((void**)fatlink, (dsu3_matrix**)sitelink, (dsu3_matrix**)ghost_sitelink, 
-                                     (dsu3_matrix**)ghost_sitelink_diag, (double*) act_path_coeff);
+      llfat_cpu_mg((void**)fatlink, (su3_matrix<double>**)sitelink, (su3_matrix<double>**)ghost_sitelink,
+		   (su3_matrix<double>**)ghost_sitelink_diag, (double*) act_path_coeff);
                                  break;
                                }
     case QUDA_SINGLE_PRECISION:{
-                                 llfat_cpu_mg((void**)fatlink, (fsu3_matrix**)sitelink, (fsu3_matrix**)ghost_sitelink, 
-                                     (fsu3_matrix**)ghost_sitelink_diag, (float*) act_path_coeff);
-                                 break;
-                               }
-    default:
-                               fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
-                               exit(1);
-                               break;
+      llfat_cpu_mg((void**)fatlink, (su3_matrix<float>**)sitelink, (su3_matrix<float>**)ghost_sitelink,
+		   (su3_matrix<float>**)ghost_sitelink_diag, (float*) act_path_coeff);
+      break;
+    }
+  default:
+    fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
+    exit(1);
+    break;
 
   }
 
