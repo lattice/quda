@@ -13,6 +13,16 @@ namespace quda {
     initializeCoarse();
   }
 
+  DiracCoarse::DiracCoarse(const DiracParam &param,
+			   cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,    // cpu link fields
+			   cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d) // gpu link field
+    : Dirac(param), transfer(nullptr), dirac(nullptr),
+      Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d),
+      enable_gpu(Y_d && X_d && Xinv_d), init(false)
+  {
+
+  }
+
   DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param)
     : Dirac(param), transfer(param.transfer), dirac(param.dirac),
       Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d),

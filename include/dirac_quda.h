@@ -626,6 +626,19 @@ namespace quda {
     DiracCoarse(const DiracParam &param, bool enable_gpu=true);
 
     /**
+       @param[in] param Parameters defining this operator
+       @param[in] Y_h CPU coarse link field
+       @param[in] X_h CPU coarse clover field
+       @param[in] Xinv_h CPU coarse inverse clover field
+       @param[in] Y_d GPU coarse link field
+       @param[in] X_d GPU coarse clover field
+       @param[in] Xinv_d GPU coarse inverse clover field
+     */
+    DiracCoarse(const DiracParam &param,
+		cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
+		cudaGaugeField *Y_d=0, cudaGaugeField *X_d=0, cudaGaugeField *Xinv_d=0);
+
+    /**
        @param[in] dirac Another operator instance to clone from (shallow copy)
        @param[in] param Parameters defining this operator
      */
