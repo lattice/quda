@@ -558,7 +558,7 @@ namespace quda {
     // resize face only if requested size is larger than previously allocated one
     size_t faceBytes = 0;
     for (int i=0; i<nDimComms; i++) {
-      faceBytes += 2*siteSubset*num_faces*surfaceCB[i]*spinor_size;
+      if (comm_dim_partitioned(i)) faceBytes += 2*siteSubset*num_faces*surfaceCB[i]*spinor_size;
     }
 
     if (!initGhostFaceBuffer || faceBytes > ghostFaceBytes) {
@@ -577,14 +577,21 @@ namespace quda {
 
     size_t offset = 0;
     for (int i=0; i<nDimComms; i++) {
-      // use first buffer for recv and second for send
-      recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
-      send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
-      offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+      if (comm_dim_partitioned(i)) {
+	// use first buffer for recv and second for send
+	recv_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
+	send_buf[2*i+0] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
 
-      recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
-      send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
-      offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+	recv_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[0]) + offset));
+	send_buf[2*i+1] = static_cast<void*>((static_cast<char*>(ghostFaceBuffer[1]) + offset));
+	offset += siteSubset*num_faces*surfaceCB[i]*spinor_size;
+      } else {
+	recv_buf[2*i+0] = nullptr;
+	recv_buf[2*i+1] = nullptr;
+	send_buf[2*i+0] = nullptr;
+	send_buf[2*i+1] = nullptr;
+      }
     }
 
   }
