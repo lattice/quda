@@ -216,7 +216,7 @@ int main(int argc, char** argv)
 
   // enable the tuning
   setTuning(tune ? QUDA_TUNE_YES : QUDA_TUNE_NO);
-  setVerbosity(QUDA_VERBOSE);
+  setVerbosity(QUDA_SUMMARIZE);
 
   Nspin = 2;
 
