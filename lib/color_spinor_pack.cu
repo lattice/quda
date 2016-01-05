@@ -3,8 +3,6 @@
 #include <index_helper.cuh>
 #include <tune_quda.h>
 
-#define FINE_GRAINED_ACCESS
-
 namespace quda {
 
   template <typename Field>
@@ -44,68 +42,62 @@ namespace quda {
     }
   };
 
-  template <typename Float, int Ns, int Nc, typename Arg>
-  __device__ __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity) {
+  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
+  __device__ __host__ inline void packGhost(Arg &arg, int cb_idx, int parity, int spinor_parity, int color_block) {
     typedef typename mapper<Float>::type RegType;
 
     const int *X = arg.X;
     int x[5] = { };
-    if (arg.nDim == 5)  getCoords5(x, cb_idx, X, parity, arg.pc_type);
+    if (arg.nDim == 5) getCoords5(x, cb_idx, X, parity, arg.pc_type);
     else getCoords(x, cb_idx, X, parity);
 
 #pragma unroll
     for (int dim=0; dim<4; dim++) {
       if (arg.commDim[dim] && x[dim] < arg.nFace){
-#ifdef FINE_GRAINED_ACCESS
 	for (int s=0; s<Ns; s++) {
-	  for (int c=0; c<Nc; c++) {
+	  for (int color_local=0; color_local<Mc; color_local++) {
+	    int c = color_block + color_local;
 	    arg.field.Ghost(dim, 0, spinor_parity, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), s, c)
 	      = arg.field(spinor_parity, cb_idx, s, c);
 	  }
 	}
-#else
-	RegType tmp[2*Ns*Nc];
-	arg.field.load(tmp, cb_idx, spinor_parity);
-	arg.field.saveGhost(tmp, ghostFaceIndex<0>(x,arg.X,dim,arg.nFace), dim, 0, spinor_parity);
-#endif
       }
       
       if (arg.commDim[dim] && x[dim] >= X[dim] - arg.nFace){
-#ifdef FINE_GRAINED_ACCESS
 	for (int s=0; s<Ns; s++) {
-	  for (int c=0; c<Nc; c++) {
+	  for (int color_local=0; color_local<Mc; color_local++) {
+	    int c = color_block + color_local;
 	    arg.field.Ghost(dim, 1, spinor_parity, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), s, c)
 	      = arg.field(spinor_parity, cb_idx, s, c);
 	  }
 	}
-#else
-	RegType tmp[2*Ns*Nc];
-	arg.field.load(tmp, cb_idx, spinor_parity);
-	arg.field.saveGhost(tmp, ghostFaceIndex<1>(x,arg.X,dim,arg.nFace), dim, 1, spinor_parity);
-#endif
       }
     }
   }
 
-  template <typename Float, int Ns, int Nc, typename Arg>
+  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
   void GenericPackGhost(Arg &arg) {
     for (int parity=0; parity<arg.nParity; parity++) {
       parity = (arg.nParity == 2) ? parity : arg.parity;
       const int spinor_parity = (arg.nParity == 2) ? parity : 0;
-      for (int i=0; i<arg.volumeCB; i++) packGhost<Float,Ns,Nc>(arg, i, parity, spinor_parity);
+      for (int i=0; i<arg.volumeCB; i++)
+	for (int color_block=0; color_block<Nc; color_block+=Mc)
+	  packGhost<Float,Ns,Nc,Mc>(arg, i, parity, spinor_parity, color_block);
     }
   }
 
-  template <typename Float, int Ns, int Nc, typename Arg>
+  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
   __global__ void GenericPackGhostKernel(Arg arg) {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.volumeCB) return;
-    const int parity = (blockDim.y == 2) ? threadIdx.y : arg.parity;
-    const int spinor_parity = (blockDim.y == 2) ? parity : 0;
-    packGhost<Float,Ns,Nc>(arg, x_cb, parity, spinor_parity);
+    const int parity = (arg.nParity == 2) ? blockDim.y*blockIdx.y + threadIdx.y : arg.parity;
+    const int spinor_parity = (arg.nParity == 2) ? parity : 0;
+    const int color_block = (blockDim.z*blockIdx.z + threadIdx.z)*Mc;
+    if (color_block >= Nc) return;
+    packGhost<Float,Ns,Nc,Mc>(arg, x_cb, parity, spinor_parity, color_block);
   }
 
-  template <typename Float, int Ns, int Nc, typename Arg>
+  template <typename Float, int Ns, int Nc, int Mc, typename Arg>
   class GenericPackGhostLauncher : public Tunable {
 
   protected:
@@ -128,24 +120,68 @@ namespace quda {
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.volumeCB; }
 
-    bool advanceTuneParam(TuneParam &param) const
+    bool advanceBlockDim(TuneParam &param) const
     {
-      bool rtn = Tunable::advanceTuneParam(param);
-      param.block.y = arg.nParity;
-      return rtn;
+      dim3 block = param.block;
+      dim3 grid = param.grid;
+      bool ret = Tunable::advanceBlockDim(param);
+      param.block.y = block.y; param.block.z = block.z;
+      param.grid.y = grid.y; param.grid.z = grid.z;
+
+      if (ret) { // we advanced the block.x so we're done
+	return true;
+      } else { // block.x (spacetime) was reset
+
+	// y thread dimension corresponds to parity
+	// z thread dimension corresponds to block color (spin is kept thread local)
+	if (param.block.y == 1 && arg.nParity == 2) { // advance parity
+	  param.block.y = arg.nParity;
+	  param.grid.y = 1;
+	  return true;
+	} else {
+	  // reset parity
+	  param.block.y = 1;
+	  param.grid.y = arg.nParity;
+
+	  // let's try to block-color
+	  while(param.block.z <= Nc/Mc) {
+	    param.block.z++;
+	    if ( (Nc/Mc) % param.block.z == 0) {
+	      param.grid.z = (Nc/Mc) / param.block.z;
+	      break;
+	    }
+	  }
+
+	  // we can advance block-color since this is valid
+	  if (param.block.z <= Nc/Mc) { //
+	    return true;
+	  } else { // we have run off the end so let's reset
+	    param.block.z = 1;
+	    param.grid.z = Nc/Mc;
+	    return false;
+	  }
+
+	}
+      }
     }
 
     virtual void initTuneParam(TuneParam &param) const
     {
       Tunable::initTuneParam(param);
-      param.block.y = arg.nParity;
+      param.block.y = 1;
+      param.grid.y = arg.nParity;
+      param.block.z = 1;
+      param.grid.z = Nc/Mc;
     }
 
     /** sets default values for when tuning is disabled */
     virtual void defaultTuneParam(TuneParam &param) const
     {
       Tunable::defaultTuneParam(param);
-      param.block.y = arg.nParity;
+      param.block.y = 1;
+      param.grid.y = arg.nParity;
+      param.block.z = 1;
+      param.grid = Nc/Mc;
     }
 
   public:
@@ -167,10 +203,10 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	GenericPackGhost<Float,Ns,Nc,Arg>(arg);
+	GenericPackGhost<Float,Ns,Nc,Mc,Arg>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	GenericPackGhostKernel<Float,Ns,Nc,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+	GenericPackGhostKernel<Float,Ns,Nc,Mc,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
       }
     }
 
@@ -182,16 +218,12 @@ namespace quda {
   template <typename Float, QudaFieldOrder order, int Ns, int Nc>
   void genericPackGhost(void **ghost, const ColorSpinorField &a, const QudaParity parity, const int dagger) {
 
-#ifdef FINE_GRAINED_ACCESS
     typedef typename colorspinor::FieldOrderCB<Float,Ns,Nc,1,order> Q;
     Q field(a, 0, ghost);
-#else
-    typedef typename colorspinor_order_mapper<Float,order,Ns,Nc>::type Q;
-    Q field(a, (Float*)0, (float*)0, (Float**)ghost);
-#endif
 
+    const int colors_per_thread = 1;
     PackGhostArg<Q> arg(field, ghost, a, parity, dagger);
-    GenericPackGhostLauncher<Float,Ns,Nc,PackGhostArg<Q> > launch(arg, a);
+    GenericPackGhostLauncher<Float,Ns,Nc,colors_per_thread,PackGhostArg<Q> > launch(arg, a);
     launch.apply(0);
   }
 
@@ -206,6 +238,8 @@ namespace quda {
       genericPackGhost<Float,order,Ns,4>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 6) {
       genericPackGhost<Float,order,Ns,6>(ghost, a, parity, dagger);
+    } else if (a.Ncolor() == 8) {
+      genericPackGhost<Float,order,Ns,8>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 12) {
       genericPackGhost<Float,order,Ns,12>(ghost, a, parity, dagger);
     } else if (a.Ncolor() == 16) {
