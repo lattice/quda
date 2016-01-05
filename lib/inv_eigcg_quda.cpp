@@ -664,7 +664,6 @@ namespace quda {
     param.secs = profile->Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat->flops())*1e-9;
 
-    reduceDouble(gflops);
     param.gflops = gflops;
     param.iter += k;
 

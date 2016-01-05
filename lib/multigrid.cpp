@@ -9,7 +9,7 @@ namespace quda {
   static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global) 
-    : Solver(param, profile), param(param), presmoother(0), postsmoother(0), 
+    : Solver(param, profile), param(param), transfer(0), presmoother(0), postsmoother(0),
       profile_global(profile_global),
       profile( "MG level " + std::to_string(param.level+1), false ),
       coarse(0), fine(param.fine), param_coarse(0), param_presmooth(0), param_postsmooth(0), r(0), r_coarse(0), x_coarse(0), 
@@ -39,7 +39,7 @@ namespace quda {
 
     param_presmooth->inv_type = param.smoother;
     param_presmooth->inv_type_precondition = QUDA_INVALID_INVERTER;
-    param_presmooth->is_preconditioner = true;
+    param_presmooth->is_preconditioner = false;
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
     param_presmooth->maxiter = param.nu_pre;
@@ -190,6 +190,27 @@ namespace quda {
     if (param_postsmooth) delete param_postsmooth;
 
     if (getVerbosity() >= QUDA_VERBOSE) profile.Print();
+  }
+
+  double MG::flops() const {
+    double flops = 0;
+    if (param.level < param.Nlevel-1) flops += coarse->flops();
+
+    if (param_presmooth) {
+      flops += param_presmooth->gflops * 1e9;
+      param_presmooth->gflops = 0;
+    }
+
+    if (param_postsmooth) {
+      flops += param_postsmooth->gflops * 1e9;
+      param_postsmooth->gflops = 0;
+    }
+
+    if (transfer) {
+      flops += transfer->flops();
+    }
+
+    return flops;
   }
 
   /**
