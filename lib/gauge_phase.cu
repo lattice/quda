@@ -243,14 +243,6 @@ namespace quda {
       } else {
 	errorQuda("Unsupported recsontruction type");
       }
-    } else if (u.Order() == QUDA_TIFR_GAUGE_ORDER) {
-
-#ifdef BUILD_TIFR_INTERFACE
-      gaugePhase<Float,length>(TIFROrder<Float,length>(u), u, location);
-#else
-      errorQuda("TIFR interface has not been built\n");
-#endif
-
     } else {
       errorQuda("Gauge field %d order not supported", u.Order());
     }
