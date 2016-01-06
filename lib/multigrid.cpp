@@ -322,6 +322,9 @@ namespace quda {
       printfQuda("entering V-cycle with x2=%e, r2=%e\n", norm2(x), norm2(b));
     }
 
+    const Dirac &dirac = *(param.matSmooth.Expose());
+    ColorSpinorField *out=nullptr, *in=nullptr;
+
     if (param.level < param.Nlevel-1) {
       //transfer->setTransferGPU(false); // use this to force location of transfer
       
@@ -329,27 +332,17 @@ namespace quda {
       if ( debug ) printfQuda("pre-smoothing b2=%e\n", norm2(b));
 
       *r = b; // copy source vector since we will overwrite source with iterated residual
-      ColorSpinorField *out=nullptr, *in=nullptr;
-      if(param.smoother_solve_type == QUDA_NORMOP_SOLVE && (param.matSmooth.isStaggered() && param.level == 0))
-      {
-        out = &x;
-        (*param.matDagResidual)(*r, b); //(*r) = Mdag b 
-        in = r;
-        (*presmoother)(*out, *in);//solve with MdagM
-      }
-      else{
-        const Dirac &dirac = *(param.matSmooth.Expose());
-        dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
-        (*presmoother)(*out, *in);
-        dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
-      }
+      
+      dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
+      (*presmoother)(*out, *in);
+      dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
 
       double r2 = 0.0;
 
       // if using preconditioned smoother then need to reconstruct full residual
       // FIXME extend this check for precision, etc.
       // also need to extend this when residual operator is itself preconditioned
-      bool use_solver_residual = (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_SOLVE) ? false : true;
+      bool use_solver_residual = (param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE || param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) ? false : true;
 
       if (use_solver_residual) {
 	if (debug) r2 = norm2(*r);
@@ -389,23 +382,11 @@ namespace quda {
 
       // do the post smoothing
       *r = b;
-      if(param.smoother_solve_type == QUDA_NORMOP_SOLVE && (param.matSmooth.isStaggered() && param.level == 0))
-      {
-        out = &x;
-        (*param.matDagResidual)(*in, *r); //(*in) = Mdag (*r)
-        (*postsmoother)(*out, *in);
-      }
-      else{
-        const Dirac &dirac = *(param.matSmooth.Expose());
-        dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
-        (*postsmoother)(*out, *in);
-        dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
-      }
-    } else { // do the coarse grid solve
+      dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
+      (*postsmoother)(*out, *in);
+      dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
 
-      const Dirac &dirac = *(param.matSmooth.Expose());
-      ColorSpinorField *out=nullptr, *in=nullptr;
-      //ok for staggered.
+    } else { // do the coarse grid solve
       dirac.prepare(in, out, x, b, QUDA_MAT_SOLUTION);
       (*presmoother)(*out, *in);
       dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
@@ -534,7 +515,7 @@ namespace quda {
     solverParam.tol = 5e-4;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam.delta = 1e-7;
-    solverParam.inv_type = (param.level == 0 && param.matSmooth.isStaggered() && param.smoother_solve_type == QUDA_NORMOP_SOLVE) ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
+    solverParam.inv_type = (param.level == 0 && param.matSmooth.isStaggered() && param.smoother_solve_type == QUDA_NORMOP_PC_SOLVE) ? QUDA_CG_INVERTER : QUDA_BICGSTAB_INVERTER;
     // end setting null-space generation options
 
     solverParam.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
@@ -565,20 +546,13 @@ namespace quda {
 	ColorSpinorField *x = static_cast<ColorSpinorField*>(new cudaColorSpinorField(*curr_nullvec, csParam));
 
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Initial guess = %g\n", norm2(*x));
-#if 1
+#if 1 //for debug only!
 	Solver *solve = Solver::create(solverParam, param.matSmooth, param.matSmooth, param.matSmooth, profile);
 	ColorSpinorField *out=nullptr, *in=nullptr;
 
-        if(solverParam.inv_type == QUDA_CG_INVERTER)
-        {
-          printfQuda("\n Solve normal equation\n");
-          (*solve)(*x, *b);
-        }
-        else{
-          dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
-	  (*solve)(*out, *in);
-	  dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
-        }
+        dirac.prepare(in, out, *x, *b, QUDA_MAT_SOLUTION);
+        (*solve)(*out, *in);
+        dirac.reconstruct(*x, *b, QUDA_MAT_SOLUTION);
 
 	delete solve;
 #endif

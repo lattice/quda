@@ -230,14 +230,16 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param, QudaMultigrid
 
     mg_param->location[i] = QUDA_CUDA_FIELD_LOCATION;
   }
+ 
+  mg_param->smoother_solve_type[0] = QUDA_NORMOP_PC_SOLVE; //or choose QUDA_DIRECT_SOLVE;
   // coarsen the spin on the first restriction is undefined for staggered fields
-  mg_param->smoother_solve_type[0] = QUDA_NORMOP_SOLVE; //QUDA_DIRECT_SOLVE;
-#if 0
-  mg_param->smoother[0] = QUDA_CG_INVERTER;
-  mg_param->nu_pre[0] = 16 ;
-  mg_param->nu_post[0] = 16;
-#endif
   mg_param->spin_block_size[0] = 0;
+
+  if(mg_param->smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE) mg_param->smoother[0] = QUDA_CG_INVERTER; //or choose QUDA_GCR_INVERTER
+
+  //number of the top-level smoothing:
+  mg_param->nu_pre[0] = nu_pre;
+  mg_param->nu_post[0] = nu_post;
 
   // coarse grid solver is GCR
   mg_param->smoother[mg_levels-1] = QUDA_GCR_INVERTER;

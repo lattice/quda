@@ -27,7 +27,6 @@ namespace quda {
 	    std::vector<ColorSpinorField*> &B,
 	    DiracMatrix &matResidual, 
 	    DiracMatrix &matSmooth,
-            DiracMatrix *matDagResidual = nullptr,
 	    int level=0) :
       SolverParam(*(param.invert_param)), 
       mg_global(param), 
@@ -40,7 +39,6 @@ namespace quda {
       nu_post(param.nu_post[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
-      matDagResidual(matDagResidual),
       smoother(param.smoother[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level])
@@ -70,7 +68,6 @@ namespace quda {
       nu_post(param.mg_global.nu_post[level]),
       matResidual(matResidual),
       matSmooth(matSmooth),
-      matDagResidual(nullptr),
       smoother(param.mg_global.smoother[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level])
@@ -121,9 +118,6 @@ namespace quda {
 
     /** The Dirac operator to use for smoothing */
     DiracMatrix &matSmooth;
-
-    /** The Dirac operator to use for staggered fine-grid level preconditioning */
-    DiracMatrix *matDagResidual;
 
     /** What type of smoother to use */
     QudaInverterType smoother;
@@ -288,9 +282,8 @@ namespace quda {
     DiracM *m;
     DiracM *mSmooth;
 
-    //For the fine-grid level staggered:
+    //For the fine-grid level even-odd staggered:
     DiracMdagM *ksmSmooth;
-    DiracMdag  *ksmdag;
 
     std::vector<ColorSpinorField*> B;
 
@@ -313,7 +306,6 @@ namespace quda {
       if (m) delete m;
       if (mSmooth) delete mSmooth;
       if (ksmSmooth) delete ksmSmooth;
-      if (ksmdag) delete ksmdag;
 
       if (d) delete d;
       if (dSmooth) delete dSmooth;

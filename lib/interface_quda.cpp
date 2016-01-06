@@ -2154,7 +2154,7 @@ void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
 }
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)
-  : m(nullptr), mSmooth(nullptr), ksmSmooth(nullptr), ksmdag(nullptr), profile(profile) {
+  : m(nullptr), mSmooth(nullptr), ksmSmooth(nullptr), profile(profile) {
   profile.TPSTART(QUDA_PROFILE_INIT);
   QudaInvertParam *param = mg_param.invert_param;
 
@@ -2165,7 +2165,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   if (mg_param.n_level > QUDA_MAX_MG_LEVEL)
     errorQuda("Requested MG levels %d greater than allowed maximum %d", mg_param.n_level, QUDA_MAX_MG_LEVEL);
 
-  if (((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[0] != QUDA_NORMOP_SOLVE)) && ((param->dslash_type != QUDA_STAGGERED_DSLASH && param->dslash_type != QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[0] != QUDA_DIRECT_PC_SOLVE))) 
+  if (((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[0] != QUDA_NORMOP_PC_SOLVE)) && ((param->dslash_type != QUDA_STAGGERED_DSLASH && param->dslash_type != QUDA_ASQTAD_DSLASH) && (mg_param.smoother_solve_type[0] != QUDA_DIRECT_SOLVE && mg_param.smoother_solve_type[0] != QUDA_DIRECT_PC_SOLVE))) 
      errorQuda("Unsupported smoother solve type %d on level 0", mg_param.smoother_solve_type[0]);
 
   for (int i=1; i<mg_param.n_level; i++) {
@@ -2198,13 +2198,6 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   d = Dirac::create(diracParam);
   m   =  new DiracM(*d);
 
-  if((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_SOLVE){
-     ksmdag = new DiracMdag(*d);
-  }
-  else{
-     ksmdag = nullptr;
-  }
-
 
   // this is the Dirac operator we use for smoothing
   DiracParam diracSloppyParam;
@@ -2212,7 +2205,7 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
     (mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE);
   setDiracSloppyParam(diracSloppyParam, param, fine_grid_pc_solve);
   dSmooth = Dirac::create(diracSloppyParam);
-  if((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_SOLVE){
+  if((param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) && mg_param.smoother_solve_type[0] == QUDA_NORMOP_PC_SOLVE){
     ksmSmooth = new DiracMdagM(*dSmooth);
   }else{
     mSmooth   = new DiracM(*dSmooth);
@@ -2227,10 +2220,10 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   for (int i=0; i<mg_param.n_vec[0]; i++) B[i] = new cpuColorSpinorField(cpuParam);
 
   // fill out the MG parameters for the fine level
-  if( ksmSmooth == nullptr && ksmdag == nullptr )//
+  if( ksmSmooth == nullptr )//
     mgParam = new MGParam(mg_param, B, *m, *mSmooth);
   else
-    mgParam = new MGParam(mg_param, B, *m, *ksmSmooth, ksmdag);
+    mgParam = new MGParam(mg_param, B, *m, *ksmSmooth);
 
   mg = new MG(*mgParam, profile);
   mgParam->updateInvertParam(*param);
