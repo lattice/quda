@@ -45,11 +45,11 @@ namespace quda {
     create(param.create), ghostExchange(param.ghostExchange), 
     staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
   {
-    if (link_type != QUDA_COARSE_LINKS) {
-      if (nColor != 3) errorQuda("nColor must be 3, not %d for this link type", nColor);
-      if (nDim != 4) errorQuda("Number of dimensions must be 4 not %d for Nc=3 for this link type", nDim);
-    }
-    if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0) 
+    if (link_type != QUDA_COARSE_LINKS && nColor != 3)
+      errorQuda("nColor must be 3, not %d for this link type", nColor);
+    if (nDim != 4)
+      errorQuda("Number of dimensions must be 4 not %d", nDim);
+    if (link_type != QUDA_WILSON_LINKS && anisotropy != 1.0)
       errorQuda("Anisotropy only supported for Wilson links");
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
@@ -69,8 +69,8 @@ namespace quda {
       real_length = (nDim*(nDim-1)/2)*volume*nInternal;
       length = 2*(nDim*(nDim-1)/2)*stride*nInternal; // two comes from being full lattice
     } else if(geometry == QUDA_COARSE_GEOMETRY){
-      real_length = param.siteDim*volume*nInternal;
-      length = 2*param.siteDim*stride*nInternal;  //two comes from being full lattice
+      real_length = nDim*volume*nInternal;
+      length = 2*nDim*stride*nInternal;  //two comes from being full lattice
     }
 
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {

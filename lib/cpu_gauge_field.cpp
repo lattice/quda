@@ -27,7 +27,8 @@ namespace quda {
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
-    else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = param.siteDim;
+    else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else errorQuda("Unknown geometry type %d", geometry);
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
       gauge = (void**) safe_malloc(siteDim * sizeof(void*));
@@ -72,7 +73,7 @@ namespace quda {
       if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD) {
 	// exchange the boundaries if a non-trivial field
 	if (create != QUDA_NULL_FIELD_CREATE && create != QUDA_ZERO_FIELD_CREATE &&
-	    geometry == QUDA_VECTOR_GEOMETRY) 
+	    (geometry == QUDA_VECTOR_GEOMETRY || geometry == QUDA_COARSE_GEOMETRY) )
 	  exchangeGhost();
       }
     }
@@ -89,6 +90,8 @@ namespace quda {
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
     else if (geometry == QUDA_TENSOR_GEOMETRY) siteDim = nDim * (nDim-1) / 2;
+    else if (geometry == QUDA_COARSE_GEOMETRY) siteDim = 2*nDim;
+    else errorQuda("Unknown geometry type %d", geometry);
 
     if (create == QUDA_NULL_FIELD_CREATE || create == QUDA_ZERO_FIELD_CREATE) {
       if (order == QUDA_QDP_GAUGE_ORDER) {
@@ -117,6 +120,9 @@ namespace quda {
   void cpuGaugeField::exchangeGhost() {
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
+
+    if (geometry != QUDA_VECTOR_GEOMETRY)
+      errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
     // get the links into contiguous buffers
     extractGaugeGhost(*this, send);
