@@ -3,6 +3,7 @@
 #include <face_quda.h>
 #include <assert.h>
 #include <string.h>
+#include <typeinfo>
 
 namespace quda {
 
@@ -185,6 +186,46 @@ namespace quda {
       host_free(recv[d]);
     }
 
+  }
+
+  void cpuGaugeField::copy(const GaugeField &src) {
+    if (this == &src) return;
+
+    checkField(src);
+
+    if (link_type == QUDA_ASQTAD_FAT_LINKS) {
+      fat_link_max = src.LinkMax();
+      if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0)
+        errorQuda("fat_link_max has not been computed");
+    } else {
+      fat_link_max = 1.0;
+    }
+
+    if (typeid(src) == typeid(cudaGaugeField)) {
+      if (!src.isNative()) errorQuda("Only native order is supported");
+      resizeBufferPinned(bytes,0);
+
+      // this copies over both even and odd
+      cudaMemcpy(bufferPinned[0], static_cast<const cudaGaugeField&>(src).Gauge_p(),
+		 bytes, cudaMemcpyDeviceToHost);
+      checkCudaError();
+
+      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, bufferPinned[0]);
+    } else if (typeid(src) == typeid(cpuGaugeField)) {
+      // copy field and ghost zone into bufferPinned
+      copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge,
+		       const_cast<void*>(static_cast<const cpuGaugeField&>(src).Gauge_p()));
+    } else {
+      errorQuda("Invalid gauge field type");
+    }
+
+    // if we have copied from a source without a pad then we need to exchange
+    if (ghostExchange == QUDA_GHOST_EXCHANGE_PAD &&
+	src.GhostExchange() != QUDA_GHOST_EXCHANGE_PAD) {
+      exchangeGhost();
+    }
+
+    checkCudaError();
   }
 
   void cpuGaugeField::setGauge(void **gauge_)

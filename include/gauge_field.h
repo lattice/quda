@@ -252,6 +252,12 @@ namespace quda {
        Set all field elements to zero (virtual)
     */
     virtual void zero() = 0;
+
+    /**
+     * Generic gauge field copy
+     * @param[in] src Source from which we are copying
+     */
+    virtual void copy(const GaugeField &src) = 0;
   };
 
   class cudaGaugeField : public GaugeField {
@@ -286,7 +292,12 @@ namespace quda {
     */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
-    void copy(const GaugeField &);     // generic gauge field copy
+    /**
+     * Generic gauge field copy
+     * @param[in] src Source from which we are copying
+     */
+    void copy(const GaugeField &src);
+
     void loadCPUField(const cpuGaugeField &, const QudaFieldLocation &);
     void saveCPUField(cpuGaugeField &, const QudaFieldLocation &) const;
 
@@ -346,6 +357,12 @@ namespace quda {
        region in non-partitioned dimenions
     */
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
+
+    /**
+     * Generic gauge field copy
+     * @param[in] src Source from which we are copying
+     */
+    void copy(const GaugeField &src);
 
     void* Gauge_p() { return gauge; }
     const void* Gauge_p() const { return gauge; }
