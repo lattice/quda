@@ -329,21 +329,16 @@ namespace quda {
       if ( debug ) printfQuda("pre-smoothing b2=%e\n", norm2(b));
 
       *r = b; // copy source vector since we will overwrite source with iterated residual
-      const Dirac &dirac = *(param.matSmooth.Expose());
       ColorSpinorField *out=nullptr, *in=nullptr;
       if(param.smoother_solve_type == QUDA_NORMOP_SOLVE && (param.matSmooth.isStaggered() && param.level == 0))
       {
         out = &x;
-        Dirac &dirac = const_cast<Dirac&>(*( param.matResidual.Expose()));
-        QudaDagType curr_dagger  = param.matResidual.getMatDagger();
-        QudaDagType other_dagger = (curr_dagger == QUDA_DAG_NO) ? QUDA_DAG_YES : QUDA_DAG_NO;
-        dirac.Dagger(other_dagger);
-        param.matResidual(*r, b); //(*r) = Mdag b 
-        dirac.Dagger(curr_dagger);
+        (*param.matDagResidual)(*r, b); //(*r) = Mdag b 
         in = r;
         (*presmoother)(*out, *in);//solve with MdagM
       }
       else{
+        const Dirac &dirac = *(param.matSmooth.Expose());
         dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
         (*presmoother)(*out, *in);
         dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
@@ -397,15 +392,11 @@ namespace quda {
       if(param.smoother_solve_type == QUDA_NORMOP_SOLVE && (param.matSmooth.isStaggered() && param.level == 0))
       {
         out = &x;
-        Dirac &dirac = const_cast<Dirac&>(*( param.matResidual.Expose()));
-        QudaDagType curr_dagger  = param.matResidual.getMatDagger();
-        QudaDagType other_dagger = (curr_dagger == QUDA_DAG_NO) ? QUDA_DAG_YES : QUDA_DAG_NO;
-        dirac.Dagger(other_dagger);
-        param.matResidual(*in, *r); //(*in) = Mdag (*r)
-        dirac.Dagger(curr_dagger);
+        (*param.matDagResidual)(*in, *r); //(*in) = Mdag (*r)
         (*postsmoother)(*out, *in);
       }
       else{
+        const Dirac &dirac = *(param.matSmooth.Expose());
         dirac.prepare(in, out, x, *r, QUDA_MAT_SOLUTION);
         (*postsmoother)(*out, *in);
         dirac.reconstruct(x, b, QUDA_MAT_SOLUTION);
