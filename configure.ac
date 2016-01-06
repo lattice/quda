@@ -333,6 +333,13 @@ AC_ARG_ENABLE(numa-affinity,
  [ numa_affinity=${enableval}],
  [ numa_affinity="yes" ]
 )
+
+AC_ARG_ENABLE(force-ac,
+  AC_HELP_STRING([--enable-force-ac], [ Force using deprecated autoconf based build system. (default: disabled)]),
+  [ force_ac=${enableval} ],
+  [ force_ac="no" ]
+)
+
 dnl Input validation
 
 dnl CPU Arch
@@ -858,6 +865,25 @@ AC_SUBST( QDP_INSTALL_PATH, [${qdp_home} ])
 
 AC_MSG_NOTICE([Setting BUILD_MAGMA = ${build_magma}])
 AC_SUBST( BUILD_MAGMA, [${build_magma}])
+
+if test "X${force_ac}X" = "XnoX";
+  then
+    AC_MSG_WARN([
+    Note that of QUDA 0.8.0 configure (autoconf) is deprecated.
+    Please consider switching to the new cmake based build system.
+    See https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake
+
+    This warning will be turned into an error soon (use --enable-force-ac to turn it off).
+    At some point configure (autoconf) will no longer be maintained and removed from QUDA.
+    ])
+else
+  AC_MSG_WARN([
+  If you require --enable-force-ac please file a bug on https://github.com/lattice/quda
+  This will allow us to make sure you can build quda with cmake (required in the future).
+  ]
+  )
+fi
+
 
 
 AC_CONFIG_FILES(make.inc)
