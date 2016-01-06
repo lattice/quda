@@ -247,7 +247,7 @@ namespace quda {
       precision_ritz(param.precision_ritz), nev(param.nev), m(param.m),
       deflation_grid(param.deflation_grid), rhs_idx(0), use_reduced_vector_set(param.use_reduced_vector_set),
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
-      eigcg_min_restarts(param.eigcg_min_restarts), max_restart_num(param.max_restart_num),
+      eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition), compute_true_res(param.compute_true_res),
       is_preconditioner(param.is_preconditioner)
