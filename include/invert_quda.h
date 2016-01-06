@@ -170,7 +170,7 @@ namespace quda {
     bool    use_reduced_vector_set;
     bool    use_cg_updates;
     double  cg_iterref_tol;
-    int     eigcg_min_restarts;
+    int     eigcg_max_restarts;
     int     max_restart_num;
     double  inc_tol;
     double  eigenval_tol;
@@ -209,7 +209,7 @@ namespace quda {
       precision_ritz(param.cuda_prec_ritz), nev(param.nev), m(param.max_search_dim),
       deflation_grid(param.deflation_grid), rhs_idx(0), use_reduced_vector_set(param.use_reduced_vector_set),
       use_cg_updates(param.use_cg_updates), cg_iterref_tol(param.cg_iterref_tol),
-      eigcg_min_restarts(param.eigcg_min_restarts), max_restart_num(param.max_restart_num),
+      eigcg_max_restarts(param.eigcg_max_restarts), max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol), eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition), compute_true_res(true),
       is_preconditioner(false)
