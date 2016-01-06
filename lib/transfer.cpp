@@ -31,7 +31,6 @@ namespace quda {
 
     for (int d = 0; d < ndim; d++) {
       while (geo_bs[d] > 0) {
-	printfQuda("Attempting to coarsen with block size = %d\n", geo_bs[d]);
 	if (d==0 && B[0]->X(0) == geo_bs[0])
 	  warningQuda("X-dimension length %d cannot block length %d", B[0]->X(0), geo_bs[0]);
 	else if ( (B[0]->X(d)/geo_bs[d]+1)%2 == 0)

@@ -11,6 +11,7 @@ namespace quda {
    */
   static __device__ __host__ inline int linkIndexShift(int x[], int dx[], const int X[4]) {
     int y[4];
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = (x[i] + dx[i] + X[i]) % X[i];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
     return idx;
@@ -38,6 +39,7 @@ namespace quda {
    */
   static __device__ __host__ inline int linkIndexM1(int x[], const int X[4], const int mu) {
     int y[4];
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] - 1 + X[mu]) % X[mu];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -70,6 +72,7 @@ namespace quda {
    */
   static __device__ __host__ inline int linkNormalIndexP1(int x[], const int X[4], const int mu) {
     int y[4];
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
     int idx = ((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0];
@@ -86,6 +89,7 @@ namespace quda {
    */  
   static __device__ __host__ inline int linkIndexP1(int x[], const int X[4], const int mu) {
     int y[4];
+#pragma unroll
     for ( int i = 0; i < 4; i++ ) y[i] = x[i];
     y[mu] = (y[mu] + 1 + X[mu]) % X[mu];
     int idx = (((y[3] * X[2] + y[2]) * X[1] + y[1]) * X[0] + y[0]) >> 1;
@@ -122,7 +126,7 @@ namespace quda {
     //x[1] = (cb_index/(X[0]/2)) % X[1];
     //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
 
-    int za = (cb_index / (X[0] / 2));
+    int za = (cb_index / (X[0] >> 1));
     int zb =  (za / X[1]);
     x[1] = za - zb * X[1];
     x[3] = (zb / X[2]);
@@ -148,7 +152,7 @@ namespace quda {
     //x[1] = (cb_index/(X[0]/2)) % X[1];
     //x[0] = 2*(cb_index%(X[0]/2)) + ((x[3]+x[2]+x[1]+parity)&1);
 
-    int za = (cb_index / (X[0] / 2));
+    int za = (cb_index / (X[0] >> 1));
     int zb =  (za / X[1]);
     x[1] = za - zb * X[1];
     int zc = zb / X[2];

@@ -1,4 +1,4 @@
-Release Notes for QUDA v0.7.2                         07th October 2015
+Release Notes for QUDA v0.8.0                         xxth December 2015
 -----------------------------
 
 Overview:
@@ -29,10 +29,10 @@ supported throughout, with communication handled by QMP or MPI.
 Software Compatibility:
 
 The library has been tested under Linux (CentOS 5.8 and Ubuntu 14.04)
-using releases 5.5, 6.0, 6.5, 7.0 and 7.5 of the CUDA toolkit and Cray
-XK7/XC30 machines using CUDA 5.5 and 6.5.  CUDA 4.x and earlier are not
-supported.  The library also works on recent 64-bit Intel-based Macs.
-Due to issues with compilation using LLVM, under Mac OS X 10.9.x it is
+using releases 6.5, 7.0 and 7.5 of the CUDA toolkit.  CUDA 6.0 and
+earlier are not supported (though they may continue to work fine).
+The library also works on recent 64-bit Intel-based Macs.  Due to
+issues with compilation using LLVM, under Mac OS X 10.9.x it is
 required to install and use GCC instead of the default clang compiler,
 though this is unnecesary with Mac OS X 10.10.x.
 
@@ -53,16 +53,22 @@ C2075 is listed on the above website as having compute capability 2.0,
 and so to configure the library for this card, you'd run "configure
 --enable-gpu-arch=sm_20 [other options]" before typing "make".
 
-As of QUDA 0.7.0, only devices of compute capability 1.3 or greater
+As of QUDA 0.8.0, only devices of compute capability 2.0 or greater
 are supported.  See also "Known Issues" below.
 
 
 Installation:
 
-Installing the library involves running "configure" followed by
-"make".  See "./configure --help" for a list of configure options.
-At a minimum, you'll probably want to set the GPU architecture; see
-"Hardware Compatibility" above.
+The recommended method for compiling QUDA is to use cmake, and build
+QUDA in a separate directory from the source directory.  For
+instructions on how to build QUDA using cmake see this page
+https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake.
+
+Alternatively, QUDA can also be built using "configure" and "make",
+though this build approach is considered deprecated and will be
+removed in a subsequent QUDA release.  See "./configure --help" for a
+list of configure options.  At a minimum, you'll probably want to set
+the GPU architecture; see "Hardware Compatibility" above.
 
 Enabling multi-GPU support requires passing the --enable-multi-gpu
 flag to configure, as well as --with-mpi=<PATH> and optionally
@@ -93,8 +99,9 @@ application.  The QDP and MILC interfaces can be disabled with the,
 e.g., --disable-milc-interface flag.
 
 The eigen-vector solvers (eigCG and incremental eigCG) require the
-installation of the MAGMA dense linear algebra package.  Supported
-versions are MAGMA 1.5.x and 1.6.x, available from
+installation of the MAGMA dense linear algebra package.  It is
+recommended that MAGMA 1.7.x is used, though versions are 1.5.x and
+1.6.x should work.  MAGMA is available from
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
 configure option --with-magma=MAGMA_PATH.
 
@@ -134,24 +141,6 @@ enumerated in include/enum_quda.h.
 
 
 Known Issues:
-
-* Devices with compute capability 1.3 only have limited support in
-  QUDA (i.e., GPUs featuring the GT200, such as Tesla C1060).  The
-  following is a list of features that are disabled when targeting
-  these architectures (attempting to use them will result in a
-  run-time error):
-
-  1. Computation of the Fermilab heavy-quark residual (and its use as
-     a stopping condition in the solvers).
-  2. Non-degenerate twisted mass and twisted-clover fermions.
-  3. On-device gauge routines that utilize the gauge_field_order.h structs.
-
-  This essentially means that the pre-Fermi architecture only supports
-  the use of QUDA for linear solvers, with further functionality not
-  supported.  It is anticipated that QUDA 0.8.0 will drop support for
-  pre-Fermi cards completely.  QUDA 0.7.x will continue to be
-  maintained as a separate branch (with bug fixes but minimal new
-  features) for those needing this support.
 
 * For compatibility with CUDA, on 32-bit platforms the library is
   compiled with the GCC option -malign-double.  This differs from the
@@ -203,6 +192,7 @@ Mike Clark (NVIDIA)
 Justin Foley (University of Utah)
 Joel Giedt (Rensselaer Polytechnic Institute)
 Steven Gottlieb (Indiana University)
+Dean Howarth (Rensselaer Polytechnic Institute)
 Balint Joo (Jefferson Laboratory)
 Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 Claudio Rebbi (Boston University)
@@ -210,6 +200,7 @@ Guochun Shi (NCSA)
 Alexei Strelchenko (Fermi National Accelerator Laboratory)
 Alejandro Vaquero (INFN Sezione Milano Bicocca)
 Mathias Wagner (NVIDIA)
+
 
 Portions of this software were developed at the Innovative Systems Lab,
 National Center for Supercomputing Applications
