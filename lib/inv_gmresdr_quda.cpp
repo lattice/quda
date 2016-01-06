@@ -720,10 +720,8 @@ namespace quda {
     args->PrepareDeflatedRestart(givensH, g, use_deflated_cycles);
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-
-    double heavy_quark_res = 0.0; // heavy quark residual
-    if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x,r).z);
-    int heavy_quark_check = 10; // how often to check the heavy quark residual
+    if (use_heavy_quark_res) errorQuda("Heavy-quark residual not supported in this solver");
+    double heavy_quark_res = 0.0;
 
     PrintStats("GMResDR:", tot_iters, r2, b2, heavy_quark_res);
 
@@ -1153,12 +1151,8 @@ namespace quda {
      double beta = sqrt(r2);
      //
      const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
-
-     double heavy_quark_res = 0.0; // heavy quark residual
-
-     if(use_heavy_quark_res) heavy_quark_res = sqrt(HeavyQuarkResidualNorm(x,r).z);
-
-     int heavy_quark_check = 10; // how often to check the heavy quark residual
+     if (use_heavy_quark_res) errorQuda("Heavy-quark residual not supported in this solver");
+     double heavy_quark_res = 0.0;
 
      PrintStats("GMRES-Proj:", tot_iters, r2, b2, heavy_quark_res);
 
