@@ -159,7 +159,7 @@ namespace quda {
     printfQuda("setup completed\n");
 
     // now we can run through the verification if requested
-    if (param.level < param.Nlevel-1 && param.mg_global.run_verify) verify();
+    if (param.level == 0 && param.mg_global.run_verify) verify();
 
     setOutputPrefix("");
   }
@@ -213,6 +213,8 @@ namespace quda {
      Verification that the constructed multigrid operator is valid
    */
   void MG::verify() {
+    setOutputPrefix(prefix);
+
     // temporary fields used for verification
     ColorSpinorParam csParam(*r);
     csParam.create = QUDA_NULL_FIELD_CREATE;
@@ -304,6 +306,8 @@ namespace quda {
     delete tmp1;
     delete tmp2;
     delete tmp_coarse;
+
+    if (param.level < param.Nlevel-2) coarse->verify();
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
