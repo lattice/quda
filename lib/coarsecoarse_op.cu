@@ -57,6 +57,7 @@ namespace quda {
       printfQuda("UV2[%d] = %e\n", d, UV.norm2());
       printfQuda("Y2[%d] = %e\n", d, Y.norm2(d));
     }
+    createYreverse<Float,coarseSpin,coarseColor>(Y);
 
     printfQuda("Computing coarse diagonal\n");
     createCoarseLocal<Float,coarseSpin,coarseColor>(X, kappa);

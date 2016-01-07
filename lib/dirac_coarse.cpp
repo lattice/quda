@@ -165,7 +165,7 @@ namespace quda {
     gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
     gParam.nFace = 1;
 
-    gParam.geometry = QUDA_VECTOR_GEOMETRY;
+    gParam.geometry = QUDA_COARSE_GEOMETRY;
 
     Y_h = new cpuGaugeField(gParam);
 
@@ -177,7 +177,7 @@ namespace quda {
 
     if (enable_gpu) {
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-      gParam.geometry = QUDA_VECTOR_GEOMETRY;
+      gParam.geometry = QUDA_COARSE_GEOMETRY;
       int pad = std::max( { (x[0]*x[1]*x[2])/2, (x[1]*x[2]*x[3])/2, (x[0]*x[2]*x[3])/2, (x[0]*x[1]*x[3])/2 } );
       gParam.pad = gParam.nFace * pad;
       Y_d = new cudaGaugeField(gParam);

@@ -113,12 +113,13 @@ namespace quda {
 		  M(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_row,ic_c,jc_c) +=
 		    static_cast<Float>(0.5) * conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s, ic, jc_c);
 
-		  //Off-diagonal Spin
+		  //Off-diagonal Spin (backward link / positive projector applied)
 		  M(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_col,ic_c,jc_c) +=
 		    static_cast<Float>(0.5) * coupling * conj(V(parity, x_cb, s, ic, ic_c)) * UV(parity, x_cb, s_col, ic, jc_c);
 		} //Fine color
 	      } //Coarse Color column
 	    } //Coarse Color row
+
 	  } else { // fine grid operator is a coarse operator
 
 	    for(int ic_c = 0; ic_c < Y.NcolorCoarse(); ic_c++) { //Coarse Color row
@@ -135,6 +136,37 @@ namespace quda {
 	} //Fine spin
       } // c/b volume
     } // parity
+
+  }
+
+
+  //Adds the reverse links to the coarse local term, which is just
+  //the conjugate of the existing coarse local term but with
+  //plus/minus signs for off-diagonal spin components
+  //Also multiply by the appropriate factor of -2*kappa
+  template<typename Float, int nSpin, int nColor, typename Gauge>
+  void createYreverse(Gauge &Y) {
+
+    for (int d=0; d<4; d++) {
+      for (int parity=0; parity<2; parity++) {
+	for (int x_cb=0; x_cb<Y.VolumeCB(); x_cb++) {
+
+	  for(int s_row = 0; s_row < nSpin; s_row++) { //Spin row
+	    for(int s_col = 0; s_col < nSpin; s_col++) { //Spin column
+
+	      const Float sign = (s_row == s_col) ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
+
+	      for(int ic_c = 0; ic_c < nColor; ic_c++) { //Color row
+		for(int jc_c = 0; jc_c < nColor; jc_c++) { //Color column
+		  Y(d+4,parity,x_cb,s_row,s_col,ic_c,jc_c) = sign*Y(d,parity,x_cb,s_row,s_col,ic_c,jc_c);
+		} //Color column
+	      } //Color row
+	    } //Spin column
+	  } //Spin row
+
+	} // x_cb
+      } //parity
+    } // dimension
 
   }
 
