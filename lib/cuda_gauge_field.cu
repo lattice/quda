@@ -162,7 +162,7 @@ namespace quda {
       errorQuda("Cannot call exchangeGhost with ghostExchange=%d", 
 		ghostExchange);
 
-    if (geometry != QUDA_VECTOR_GEOMETRY) 
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
       errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
     void *ghost_[QUDA_MAX_DIM];

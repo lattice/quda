@@ -69,8 +69,8 @@ namespace quda {
       real_length = (nDim*(nDim-1)/2)*volume*nInternal;
       length = 2*(nDim*(nDim-1)/2)*stride*nInternal; // two comes from being full lattice
     } else if(geometry == QUDA_COARSE_GEOMETRY){
-      real_length = nDim*volume*nInternal;
-      length = 2*nDim*stride*nInternal;  //two comes from being full lattice
+      real_length = 2*nDim*volume*nInternal;
+      length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     }
 
     if (ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {

@@ -12,11 +12,11 @@ namespace quda {
     unsigned short C[nDim];
     int f[nDim][nDim];
     bool localParity[nDim];
-    ExtractGhostArg(const Order &order, int nFace, const int *X_, const int *A_,
+    ExtractGhostArg(const Order &order, const GaugeField &u, const int *A_,
 		    const int *B_, const int *C_, const int f_[nDim][nDim], const int *localParity_) 
-  : order(order), nFace(nFace) { 
+      : order(order), nFace(u.Nface()) {
       for (int d=0; d<nDim; d++) {
-	X[d] = X_[d];
+	X[d] = u.X()[d];
 	A[d] = A_[d];
 	B[d] = B_[d];
 	C[d] = C_[d];
@@ -199,7 +199,7 @@ namespace quda {
       //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
-    ExtractGhostArg<Order, nDim> arg(order, nFace, X, A, B, C, f, localParity);
+    ExtractGhostArg<Order, nDim> arg(order, u, A, B, C, f, localParity);
     if (location==QUDA_CPU_FIELD_LOCATION) {
       extractGhost<Float,length,nDim,Order>(arg);
     } else {

@@ -121,7 +121,7 @@ namespace quda {
     void *send[QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
 
-    if (geometry != QUDA_VECTOR_GEOMETRY)
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
       errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
     // get the links into contiguous buffers
