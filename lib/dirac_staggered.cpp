@@ -202,15 +202,17 @@ namespace quda {
       src = &b;
       sol = &x;
     } else {//PC staggered multigrid version:
-      // we desire solution to full system
+      // we desire solution to full system. It's a bit hacky : 1) compute -2m*be-D_eo b_o and 2) apply -1
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      // src = 2m*b_e - D_eo b_o
-        DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), 2*mass);
+      // src = 2m*b_e + D_eo b_o
+        DslashXpay(x.Odd(), b.Odd(), QUDA_EVEN_PARITY, b.Even(), -2.0*mass);
+        blas::ax(-1.0 , x.Odd());
         src = &(x.Odd());
         sol = &(x.Even());
       } else if ( matpcType == QUDA_MATPC_ODD_ODD ) { 
-      // src = 2m*b_o - D_oe b_e
-        DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), 2*mass);
+      // src = 2m*b_o + D_oe b_e
+        DslashXpay(x.Even(), b.Even(), QUDA_ODD_PARITY, b.Odd(), -2.0*mass);
+        blas::ax(-1.0 , x.Even());
         src = &(x.Even());
         sol = &(x.Odd());
       } else {
@@ -226,16 +228,16 @@ namespace quda {
 
       return;//do nothing
 
-    } else {
+    } else {//hack: 1) compute -1.0*be-D_eo b_o and 2) apply - (1 / 2m)
       checkFullSpinor(x, b);
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       // x_o = 1.0 / 2m ( b_o - D_oe x_e)
-        DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), 1.0);
-        blas::ax(1.0 / (2*mass), x.Odd());
+        DslashXpay(x.Odd(), x.Even(), QUDA_ODD_PARITY, b.Odd(), -1.0);
+        blas::ax(-1.0 / (2*mass), x.Odd());
       } else if (matpcType == QUDA_MATPC_ODD_ODD) {
       // x_e = 1.0 / 2m ( b_e - D_eo x_o)
-        DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), 1.0);
-        blas::ax(1.0 / (2*mass), x.Even());
+        DslashXpay(x.Even(), x.Odd(), QUDA_EVEN_PARITY, b.Even(), -1.0);
+        blas::ax(-1.0 / (2*mass), x.Even());
       } else {
         errorQuda("MatPCType %d not valid for DiracWilsonPC", matpcType);
       }
