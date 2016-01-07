@@ -1,7 +1,6 @@
 #include <string.h>
 #include <multigrid.h>
 #include <algorithm>
-#include <blas_magma.h>
 
 namespace quda {
 
@@ -132,9 +131,9 @@ namespace quda {
   }
 
   //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const
   {
-    CoarseCoarseOp(T, Y, X, *(this->Y_h), *(this->X_h), kappa);
+    CoarseCoarseOp(Y, X, Xinv, T, *(this->Y_h), *(this->X_h), kappa);
   }
 
   void DiracCoarse::initializeCoarse()
@@ -167,20 +166,14 @@ namespace quda {
     gParam.nFace = 1;
 
     gParam.geometry = QUDA_VECTOR_GEOMETRY;
+
     Y_h = new cpuGaugeField(gParam);
 
     gParam.geometry = QUDA_SCALAR_GEOMETRY;
     X_h = new cpuGaugeField(gParam);
     Xinv_h = new cpuGaugeField(gParam);
 
-    dirac->createCoarseOp(*transfer,*Y_h,*X_h);
-
-    {
-      // invert the clover matrix field
-      const int n = X_h->Ncolor();
-      BlasMagmaArgs magma(X_h->Precision());
-      magma.BatchInvertMatrix(((float**)Xinv_h->Gauge_p())[0], ((float**)X_h->Gauge_p())[0], n, X_h->Volume());
-    }
+    dirac->createCoarseOp(*Y_h,*X_h,*Xinv_h,*transfer);
 
     if (enable_gpu) {
       gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
@@ -360,11 +353,6 @@ namespace quda {
     }
 
     deleteTmp(&tmp1, reset);
-  }
-
-  void DiracCoarsePC::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const
-  {
-    DiracCoarse::createCoarseOp(T, Y, X);
   }
 
 }

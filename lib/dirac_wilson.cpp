@@ -155,9 +155,9 @@ namespace quda {
   grid
   */
 
-  void DiracWilson::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
+  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const {
     cudaCloverField *c = NULL;
-    CoarseOp(T, Y, X, *gauge, c,  kappa);
+    CoarseOp(Y, X, Xinv, T, *gauge, c,  kappa);
   }
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)

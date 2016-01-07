@@ -148,7 +148,16 @@ namespace quda {
 
     QudaMatPCType getMatPCType() const { return matpcType; }
     void Dagger(QudaDagType dag) { dagger = dag; }
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {errorQuda("Not implemented");}
+
+    /**
+     * @brief Create the coarse operator (virtual parent)
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param X_inv[out] Coarse clover inverse field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const {errorQuda("Not implemented");}
   };
 
   // Full Wilson
@@ -178,7 +187,16 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+
+    /**
+     * @brief Create the coarse Wilson operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param X_inv[out] Coarse clover inverse field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const;
   };
 
   // Even-odd preconditioned Wilson
@@ -227,10 +245,17 @@ namespace quda {
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
-  };
 
-  void CoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
+    /**
+     * @brief Create the coarse clover operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param X_inv[out] Coarse clover inverse field
+     */
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const;
+  };
 
   // Even-odd preconditioned clover
   class DiracCloverPC : public DiracClover {
@@ -595,6 +620,8 @@ namespace quda {
 			     const QudaSolutionType) const;
   };
 
+  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
+
   /**
      This class serves as a front-end to the coarse Dslash operator,
      similar to the other dslash operators.
@@ -694,12 +721,14 @@ namespace quda {
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
     /**
-       Create the coarse operator for this coarse operator
-       @param T Transfer operator that defines the coarse grid
-       @param Y Storage for the coarsened gauge field
-       @param X Storage for the coarsened clover field
+     * @brief Create the coarse operator from this coarse operator
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param X_inv[out] Coarse clover inverse field
      */
-    virtual void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
+    virtual void createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const;
   };
 
   /**
@@ -720,7 +749,6 @@ namespace quda {
     void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
-    void createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const;
   };
 
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)

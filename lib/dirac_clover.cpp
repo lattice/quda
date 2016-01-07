@@ -156,8 +156,8 @@ namespace quda {
     // do nothing
   }
 
-  void DiracClover::createCoarseOp(const Transfer &T, GaugeField &Y, GaugeField &X) const {
-    CoarseOp(T, Y, X, *gauge, &clover, kappa);
+  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const {
+    CoarseOp(Y, X, Xinv, T, *gauge, &clover, kappa);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
