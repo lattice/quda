@@ -181,7 +181,7 @@ namespace quda {
       param.block.y = 1;
       param.grid.y = arg.nParity;
       param.block.z = 1;
-      param.grid = Nc/Mc;
+      param.grid.z = Nc/Mc;
     }
 
   public:
