@@ -279,7 +279,7 @@ namespace quda {
     transfer->R(*x_coarse, *tmp2);
     param_coarse->matResidual(*r_coarse, *tmp_coarse);
 
-#if 0 // enable to print out emulated and actual coarse-grid operator vectors for bebugging
+#if 0 // enable to print out emulated and actual coarse-grid operator vectors for debugging
     {
       printfQuda("emulated\n");
       ColorSpinorParam param(*x_coarse);
@@ -295,6 +295,9 @@ namespace quda {
       cpuColorSpinorField *v2 = static_cast<cpuColorSpinorField*>(ColorSpinorField::Create(param));
       *v2 = *r_coarse;
       for (int x=0; x<r_coarse->Volume(); x++) v2->PrintVector(x);
+
+      delete v1;
+      delete v2;
     }
 #endif
 
