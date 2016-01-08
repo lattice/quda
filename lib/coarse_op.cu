@@ -12,6 +12,8 @@
 
 namespace quda {
 
+  extern bool preconditioned_links;
+
   //Calculates the coarse gauge field
   template<typename Float, int coarseSpin, int coarseColor,
 	   typename F, typename coarseGauge, typename fineGauge, typename fineClover>
@@ -81,10 +83,10 @@ namespace quda {
     printfQuda("X2 = %e\n", X.norm2(0));
   }
 
-
   template <typename Float, QudaFieldOrder csOrder, QudaGaugeFieldOrder gOrder, QudaCloverFieldOrder clOrder,
             int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Xinv, ColorSpinorField &uv, const Transfer &T, GaugeField &g, CloverField *c, double kappa) {
+
     typedef typename colorspinor::FieldOrderCB<Float,fineSpin,fineColor,coarseColor,csOrder> F;
     typedef typename gauge::FieldOrder<Float,fineColor,1,gOrder> gFine;
     typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,coarseSpin,gOrder> gCoarse;
@@ -117,6 +119,23 @@ namespace quda {
       const int n = X_h->Ncolor();
       BlasMagmaArgs magma(X_h->Precision());
       magma.BatchInvertMatrix(((float**)Xinv_h->Gauge_p())[0], ((float**)X_h->Gauge_p())[0], n, X_h->Volume());
+    }
+
+    // now exchange Y halos for multi-process dslash
+    Y.exchangeGhost();
+
+    if (preconditioned_links) {
+      // create the preconditioned links
+      // Y_back(x-\mu) = Y_back(x-\mu) * Xinv^dagger(x) (positive projector)
+      // Y_fwd(x) = Xinv(x) * Y_fwd(x)                  (negative projector)
+
+      // use spin-ignorant accessor to make multiplication simpler
+      typedef typename gauge::FieldOrder<Float,coarseColor*coarseSpin,1,gOrder> gCoarse;
+      gCoarse yAccessor(const_cast<GaugeField&>(Y));
+      gCoarse xInvAccessor(const_cast<GaugeField&>(Xinv));
+      int comm_dim[4];
+      for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
+      createYpreconditioned<Float,coarseSpin*coarseColor>(yAccessor, xInvAccessor, X.X(), 1, comm_dim);
     }
 
   }
@@ -216,7 +235,8 @@ namespace quda {
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
-  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa) {
+  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T,
+		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa) {
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
 
@@ -270,9 +290,6 @@ namespace quda {
     else {
       calculateY(Y, X, Xinv, uv, T, g, NULL, kappa);
     }
-
-    // now exchange Y halos for multi-process dslash
-    Y.exchangeGhost();
 
   }
 

@@ -11,6 +11,16 @@
 
 namespace quda {
 
+  extern bool preconditioned_links;
+
+  /*
+    To do setup when the source is preconditioned links we have to run
+    setup twice: once for forwards links, and once for backward links.
+    Then need to combine the resulting X fields, which would replace
+    the createCoarseLocal function that's currently done.
+   */
+
+
   template<typename Float, int coarseSpin, int coarseColor,
 	   typename F, typename coarseGauge, typename fineGauge>
   void calculateYcoarse(coarseGauge &Y, coarseGauge &X, F &UV, F &V, fineGauge &G, fineGauge &C,
@@ -184,6 +194,9 @@ namespace quda {
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cpuGaugeField &gauge, const cpuGaugeField &clover, double kappa) {
+
+    if (preconditioned_links) errorQuda("Preconditioned option not yet supported");
+
     QudaPrecision precision = Y.Precision();
     //First make a cpu gauge field from the cuda gauge field
 

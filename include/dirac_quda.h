@@ -620,8 +620,6 @@ namespace quda {
 			     const QudaSolutionType) const;
   };
 
-  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
-
   /**
      This class serves as a front-end to the coarse Dslash operator,
      similar to the other dslash operators.

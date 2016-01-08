@@ -170,6 +170,88 @@ namespace quda {
 
   }
 
+  template<typename Float, int n, typename Gauge>
+  void createYpreconditioned(Gauge &Y, Gauge &Xinv, const int *dim, int nFace, const int *commDim) {
+
+    complex<Float> Ylocal[n*n];
+
+    // first do the backwards links Y^{+\mu} * X^{-\dagger}
+    for (int d=0; d<4; d++) {
+      for (int parity=0; parity<2; parity++) {
+	for (int x_cb=0; x_cb<Y.VolumeCB(); x_cb++) {
+
+	  int coord[5];
+	  getCoords(coord, x_cb, dim, parity);
+	  coord[4] = 0;
+
+	  const int ghost_idx = ghostFaceIndex<0>(coord, dim, d, nFace);
+
+	  if ( commDim[d] && (coord[d] - nFace < 0) ) {
+	    for(int i = 0; i<n; i++) {
+	      for(int j = 0; j<n; j++) {
+		Ylocal[i*n + j] = Y.Ghost(d,1-parity,ghost_idx,i,j);
+	      }
+	    }
+
+	    for(int i = 0; i<n; i++) {
+	      for(int j = 0; j<n; j++) {
+		Y.Ghost(d,1-parity,ghost_idx,i,j) = 0.0;
+		for(int k = 0; k<n; k++) {
+		  Y.Ghost(d,1-parity,ghost_idx,i,j) += Ylocal[i*n + k] * conj(Xinv(0,parity,x_cb,j,k));
+		}
+
+	      }
+	    }
+
+	  } else {
+	    const int back_idx = linkIndexM1(coord, dim, d);
+
+	    for(int i = 0; i<n; i++) {
+	      for(int j = 0; j<n; j++) {
+		Ylocal[i*n + j] = Y(d,1-parity,back_idx,i,j);
+	      }
+	    }
+
+	    for(int i = 0; i<n; i++) {
+	      for(int j = 0; j<n; j++) {
+		Y(d,1-parity,back_idx,i,j) = 0.0;
+		for(int k = 0; k<n; k++) {
+		  Y(d,1-parity,back_idx,i,j) += Ylocal[i*n + k] * conj(Xinv(0,parity,x_cb,j,k));
+		}
+	      }
+	    }
+
+	  }
+	} // x_cb
+      } //parity
+    } // dimension
+
+    // now do the forwards links X^{-1} * Y^{-\mu}
+    for (int d=0; d<4; d++) {
+      for (int parity=0; parity<2; parity++) {
+	for (int x_cb=0; x_cb<Y.VolumeCB(); x_cb++) {
+
+	  for(int i = 0; i<n; i++) {
+	    for(int j = 0; j<n; j++) {
+	      Ylocal[i*n + j] = Y(d+4,parity,x_cb,i,j);
+	    }
+	  }
+
+	  for(int i = 0; i<n; i++) {
+	    for(int j = 0; j<n; j++) {
+	      Y(d+4,parity,x_cb,i,j) = 0.0;
+	      for(int k = 0; k<n; k++) {
+		Y(d+4,parity,x_cb,i,j) +=  Xinv(0,parity,x_cb,i,k) * Ylocal[k*n + j];
+	      }
+	    }
+	  }
+
+	} // x_cb
+      } //parity
+    } // dimension
+
+  }
+
 
   //Adds the reverse links to the coarse local term, which is just
   //the conjugate of the existing coarse local term but with

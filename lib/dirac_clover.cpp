@@ -1,6 +1,7 @@
 #include <iostream>
 #include <dirac_quda.h>
 #include <blas_quda.h>
+#include <multigrid.h>
 
 namespace quda {
 

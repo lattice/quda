@@ -4,6 +4,9 @@
 
 namespace quda {
 
+  // FIXME temporary global variable while we develop even-odd preconditioned MG
+  bool preconditioned_links = true;
+
   DiracCoarse::DiracCoarse(const DiracParam &param, bool enable_gpu)
     : Dirac(param), transfer(param.transfer), dirac(param.dirac),
       Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr),
@@ -40,100 +43,6 @@ namespace quda {
       if (X_d) delete X_d;
       if (Xinv_d) delete Xinv_d;
     }
-  }
-
-  void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
-  {
-    if (&in == &out) errorQuda("Fields cannot alias");
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true);
-    }
-    int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*in.VolumeCB();
-  }
-
-  void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
-  {
-    if (&in == &out) errorQuda("Fields cannot alias");
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true);
-    }
-    int n = in.Nspin()*in.Ncolor();
-    flops += (8*n*n-2*n)*in.VolumeCB();
-  }
-
-  void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
-			   const QudaParity parity) const
-  {
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false);
-    }
-    int n = in.Nspin()*in.Ncolor();
-    flops += (8*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
-  }
-
-  void DiracCoarse::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
-			       const QudaParity parity, const ColorSpinorField &x,
-			       const double &k) const
-  {
-    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true);
-    }
-    int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
-  }
-
-  void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
-  {
-    if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
-      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
-      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa);
-    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
-      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa);
-    }
-    int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
-  }
-
-  void DiracCoarse::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
-  {
-    errorQuda("Not implemented");
-  }
-
-  void DiracCoarse::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			    ColorSpinorField &x, ColorSpinorField &b,
-			    const QudaSolutionType solType) const
-  {
-    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
-      errorQuda("Preconditioned solution requires a preconditioned solve_type");
-    }
-
-    src = &b;
-    sol = &x;
-  }
-
-  void DiracCoarse::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-				const QudaSolutionType solType) const
-  {
-    /* do nothing */
-  }
-
-  //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
-  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const
-  {
-    CoarseCoarseOp(Y, X, Xinv, T, *(this->Y_h), *(this->X_h), kappa);
   }
 
   void DiracCoarse::initializeCoarse()
@@ -192,6 +101,126 @@ namespace quda {
     }
   }
 
+  void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    if (&in == &out) errorQuda("Fields cannot alias");
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, false, true);
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, false, true);
+    }
+    int n = in.Nspin()*in.Ncolor();
+    flops += (8*n*n-2*n)*in.VolumeCB();
+  }
+
+  void DiracCoarse::CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
+  {
+    if (&in == &out) errorQuda("Fields cannot alias");
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      ApplyCoarse(out, in, in, *Y_d, *Xinv_d, kappa, parity, false, true);
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, in, *Y_h, *Xinv_h, kappa, parity, false, true);
+    }
+    int n = in.Nspin()*in.Ncolor();
+    flops += (8*n*n-2*n)*in.VolumeCB();
+  }
+
+  void DiracCoarse::Dslash(ColorSpinorField &out, const ColorSpinorField &in,
+			   const QudaParity parity) const
+  {
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      if (!preconditioned_links) {
+	ApplyCoarse(out, in, in, *Y_d, *X_d, kappa, parity, true, false);
+      } else {
+	cudaColorSpinorField tmp(in);
+	ApplyCoarse(tmp, in, in, *Y_d, *X_d, kappa, parity, true, false);
+	ApplyCoarse(out, tmp, tmp, *Y_d, *X_d, kappa, parity, false, true);
+      }
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      if (preconditioned_links) errorQuda("bork");
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa, parity, true, false);
+    }
+    int n = in.Nspin()*in.Ncolor();
+    flops += (8*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+  }
+
+  void DiracCoarse::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in,
+			       const QudaParity parity, const ColorSpinorField &x,
+			       const double &k) const
+  {
+    if (Location(out,in) == QUDA_CUDA_FIELD_LOCATION) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      if (!preconditioned_links) {
+	ApplyCoarse(out, in, x, *Y_d, *X_d, kappa, parity, true, true);
+      } else {
+	cudaColorSpinorField tmp(in);
+	ApplyCoarse(tmp, in, in, *Y_d, *X_d, kappa, parity, true, false);
+	blas::xpay(const_cast<ColorSpinorField&>(in), 1.0, tmp);
+	ApplyCoarse(out, tmp, tmp, *Y_d, *X_d, kappa, parity, false, true);
+      }
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      ApplyCoarse(out, in, x, *Y_h, *X_h, kappa, parity, true, true);
+    }
+    int n = in.Nspin()*in.Ncolor();
+    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+  }
+
+  void DiracCoarse::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    if ( Location(out, in) == QUDA_CUDA_FIELD_LOCATION ) {
+      if (!enable_gpu) errorQuda("Cannot apply %s on GPU since enable_gpu has not been set", __func__);
+      if (!preconditioned_links) {
+	ApplyCoarse(out, in, in, *Y_d, *X_d, kappa);
+      } else {
+	ColorSpinorParam param(in);
+	bool reset = newTmp(&tmp2, in);
+
+	ApplyCoarse(*tmp2, in, in, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, true, false);
+	blas::xpay(const_cast<ColorSpinorField&>(in), 1.0, *tmp2);
+	ApplyCoarse(out, *tmp2, *tmp2, *Y_d, *X_d, kappa, QUDA_INVALID_PARITY, false, true);
+
+	deleteTmp(&tmp2, reset);
+      }
+    } else if ( Location(out, in) == QUDA_CPU_FIELD_LOCATION ) {
+      if (preconditioned_links) errorQuda("bork");
+      ApplyCoarse(out, in, in, *Y_h, *X_h, kappa);
+    }
+    int n = in.Nspin()*in.Ncolor();
+    flops += (9*(8*n*n)-2*n)*in.VolumeCB()*in.SiteSubset();
+  }
+
+  void DiracCoarse::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    errorQuda("Not implemented");
+  }
+
+  void DiracCoarse::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			    ColorSpinorField &x, ColorSpinorField &b,
+			    const QudaSolutionType solType) const
+  {
+    if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
+      errorQuda("Preconditioned solution requires a preconditioned solve_type");
+    }
+
+    src = &b;
+    sol = &x;
+  }
+
+  void DiracCoarse::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+				const QudaSolutionType solType) const
+  {
+    /* do nothing */
+  }
+
+  //Make the coarse operator one level down.  Pass both the coarse gauge field and coarse clover field.
+  void DiracCoarse::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T) const
+  {
+    CoarseCoarseOp(Y, X, Xinv, T, *(this->Y_h), *(this->X_h), kappa);
+  }
+
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool enable_gpu) : DiracCoarse(param, enable_gpu)
   {
     /* do nothing */
@@ -206,32 +235,49 @@ namespace quda {
 
   void DiracCoarsePC::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
-    ColorSpinorParam param(in);
-    bool reset = newTmp(&tmp2, in);
+    if (!preconditioned_links) {
+      ColorSpinorParam param(in);
+      bool reset = newTmp(&tmp2, in);
 
-    DiracCoarse::Dslash(*tmp2, in, parity);
-    CloverInv(out, *tmp2, parity);
+      DiracCoarse::Dslash(*tmp2, in, parity);
+      CloverInv(out, *tmp2, parity);
 
-    deleteTmp(&tmp2, reset);
+      deleteTmp(&tmp2, reset);
 
-    int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)-2*n)*in.VolumeCB();
+      int n = in.Nspin()*in.Ncolor();
+      flops += (9*(8*n*n)-2*n)*in.VolumeCB();
+    } else {
+      // hack to get naked dslash
+      preconditioned_links = false;
+      DiracCoarse::Dslash(out, in, parity);
+      preconditioned_links = true;
+    }
+
   }
 
   void DiracCoarsePC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
 				 const ColorSpinorField &x, const double &k) const
   {
-    ColorSpinorParam param(in);
-    bool reset = newTmp(&tmp2, in);
+    if (preconditioned_links) {
+      // emulated for now
+      Dslash(out, in, parity);
+      blas::xpay(const_cast<ColorSpinorField&>(x), k, out);
 
-    DiracCoarse::Dslash(*tmp2, in, parity);
-    CloverInv(out, *tmp2, parity);
-    blas::xpay(const_cast<ColorSpinorField&>(x), k, out);
+      int n = in.Nspin()*in.Ncolor();
+      flops += (9*(8*n*n)+2*n)*in.VolumeCB();
+    } else {
+      ColorSpinorParam param(in);
+      bool reset = newTmp(&tmp2, in);
 
-    deleteTmp(&tmp2, reset);
+      DiracCoarse::Dslash(*tmp2, in, parity);
+      CloverInv(out, *tmp2, parity);
+      blas::xpay(const_cast<ColorSpinorField&>(x), k, out);
 
-    int n = in.Nspin()*in.Ncolor();
-    flops += (9*(8*n*n)+2*n)*in.VolumeCB();
+      deleteTmp(&tmp2, reset);
+
+      int n = in.Nspin()*in.Ncolor();
+      flops += (9*(8*n*n)+2*n)*in.VolumeCB();
+    }
   }
 
   void DiracCoarsePC::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -240,6 +286,7 @@ namespace quda {
     bool reset1 = newTmp(&tmp1, in);
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      if (preconditioned_links) errorQuda("bork");
       // DiracCoarsePC::Dslash applies A^{-1}Dslash
       Dslash(*tmp1, in, QUDA_ODD_PARITY);
       // DiracCoarse::DslashXpay applies (A - D) // FIXME this ignores the -1
@@ -247,6 +294,7 @@ namespace quda {
       Clover(*tmp1, in, QUDA_EVEN_PARITY);
       blas::xpay(*tmp1, -1.0, out);
     } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      if (preconditioned_links) errorQuda("bork");
       // DiracCoarsePC::Dslash applies A^{-1}Dslash
       Dslash(*tmp1, in, QUDA_EVEN_PARITY);
       // DiracCoarse::DslashXpay applies (A - D) // FIXME this ignores the -1
@@ -301,6 +349,7 @@ namespace quda {
       CloverInv(*src, *tmp1, QUDA_ODD_PARITY);
       sol = &(x.Odd());
     } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      if (preconditioned_links) errorQuda("bork");
       // src = b_e - D_eo A_oo^-1 b_o
       src = &(x.Odd());
       CloverInv(*tmp1, b.Odd(), QUDA_ODD_PARITY);
@@ -308,6 +357,7 @@ namespace quda {
       blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, *src);
       sol = &(x.Even());
     } else if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      if (preconditioned_links) errorQuda("bork");
       // src = b_o - D_oe A_ee^-1 b_e
       src = &(x.Even());
       CloverInv(*tmp1, b.Even(), QUDA_EVEN_PARITY);

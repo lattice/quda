@@ -110,6 +110,11 @@ namespace quda {
       }
 
       //Backward link - compute back offset for spinor and gauge fetch
+
+      // possible optization here is to copy backward ghost into the
+      // bulk since we don't need the backwards link on the last slice
+      // making code same as above which could help thread splitting
+      // of direction
       {
 	const int back_idx = linkIndexM1(coord, arg.dim, d);
 	const int gauge_idx = back_idx;

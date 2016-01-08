@@ -228,33 +228,27 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       Load the null space vectors in from file
+       @brief Load the null space vectors in from file
        @param B Loaded null-space vectors (pre-allocated)
     */
     void loadVectors(std::vector<ColorSpinorField*> &B);
 
     /**
-       Save the null space vectors in from file
+       @brief Save the null space vectors in from file
        @param B Save null-space vectors from here
     */
     void saveVectors(std::vector<ColorSpinorField*> &B);
 
     /**
-       Generate the null-space vectors
+       @brief Generate the null-space vectors
        @param B Generated null-space vectors
      */
     void generateNullVectors(std::vector<ColorSpinorField*> B);
 
     /**
-       Return the total flops done on this and all coarser levels.
+       @brief Return the total flops done on this and all coarser levels.
      */
     double flops() const;
-
-    /**
-       Run performance critical routines to benchmark their
-       performance.
-     */
-    void benchmark();
 
   };
 
@@ -262,11 +256,30 @@ namespace quda {
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
 		   bool dslash=true, bool clover=true);
 
-  // coarse operator construction
+  /**
+     @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param Xinv[out] Coarse clover inverse field
+     @param T[in] Transfer operator that defines the coarse space
+     @param gauge[in] Gauge field from fine grid
+     @param clover[in] Clover field on fine grid (optional)
+     @param kappa[in] Kappa parameter
+   */
+  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cudaGaugeField &gauge,
+		const cudaCloverField *clover, double kappa);
 
-  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, QudaPrecision precision, const cudaGaugeField &gauge);
-
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &x, GaugeField &Xinv, const Transfer &T, const cpuGaugeField &gauge,
+  /**
+     @brief Coarse operator construction from an intermediate-grid operator (Coarse)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param Xinv[out] Coarse clover inverse field
+     @param T[in] Transfer operator that defines the new coarse space
+     @param gauge[in] Link field from fine grid
+     @param clover[in] Clover field on fine grid
+     @param kappa[in] Kappa parameter
+   */
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cpuGaugeField &gauge,
 		      const cpuGaugeField &clover, double kappa);
 
   /**
