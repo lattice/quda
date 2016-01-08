@@ -1299,7 +1299,7 @@ namespace quda {
            initCGparam.use_sloppy_partial_accumulator=0;   //enforce this value to garantee a more stable single-half solver
 
            //too messy..
-           bool cg_updates    = (param.use_cg_updates || (eigcg_restarts < param.eigcg_min_restarts) || (defl_param->cur_dim == defl_param->tot_dim) || (stop_div_r2 > param.cg_iterref_tol));
+           bool cg_updates    = (param.use_cg_updates || (eigcg_restarts < param.eigcg_max_restarts) || (defl_param->cur_dim == defl_param->tot_dim) || (stop_div_r2 > param.cg_iterref_tol));
 
            bool eigcg_updates = !cg_updates;
 
@@ -1339,7 +1339,7 @@ namespace quda {
 
               if(eigcg_updates)
               {
-                 if(((eigcg_restarts >= param.eigcg_min_restarts) || (stop_div_r2 < param.cg_iterref_tol)) && (defl_param->cur_dim < defl_param->tot_dim))
+                 if(((eigcg_restarts >= param.eigcg_max_restarts) || (stop_div_r2 < param.cg_iterref_tol)) && (defl_param->cur_dim < defl_param->tot_dim))
                  {
                    SaveEigCGRitzVecs(defl_param);//accumulate
                    //
