@@ -118,19 +118,38 @@ namespace quda {
   // This does the exchange of the gauge field ghost zone and places it
   // into the ghost array.
   void cpuGaugeField::exchangeGhost() {
-    void *send[QUDA_MAX_DIM];
-    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
-
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
       errorQuda("Cannot exchange for %d geometry gauge field", geometry);
 
+    void *send[QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) send[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
+
     // get the links into contiguous buffers
-    extractGaugeGhost(*this, send);
+    extractGaugeGhost(*this, send, true);
 
     // communicate between nodes
-    exchange(ghost, send);
+    exchange(ghost, send, QUDA_FORWARDS);
 
     for (int d=0; d<nDim; d++) host_free(send[d]);
+  }
+
+  // This does the opposite of exchnageGhost and sends back the ghost
+  // zone to the node from which it came and injeccts it back into the
+  // field
+  void cpuGaugeField::injectGhost() {
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Cannot exchange for %d geometry gauge field", geometry);
+
+    void *recv[QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) recv[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
+
+    // communicate between nodes
+    exchange(recv, ghost, QUDA_BACKWARDS);
+
+    // get the links into contiguous buffers
+    extractGaugeGhost(*this, recv, false);
+
+    for (int d=0; d<nDim; d++) host_free(recv[d]);
   }
 
   void cpuGaugeField::exchangeExtendedGhost(const int *R, bool no_comms_fill) {

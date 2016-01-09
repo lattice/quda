@@ -146,12 +146,19 @@ namespace quda {
     return false;
   }
 
-  void GaugeField::exchange(void **ghost_link, void **link_sendbuf) const {
-    MsgHandle *mh_from_back[4];
-    MsgHandle *mh_send_fwd[4];
+  void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
+    MsgHandle *mh_send[4];
+    MsgHandle *mh_recv[4];
     size_t bytes[4];
 
     for (int i=0; i<nDimComms; i++) bytes[i] = 2*nFace*surfaceCB[i]*nInternal*precision;
+
+    // in general (standard ghost exchange) we always do the exchange
+    // even if a dimension isn't partitioned.  However, this breaks
+    // GaugeField::injectGhost(), so when transferring backwards we
+    // only exchange if a dimension is partitioned.  FIXME: this
+    // should probably be cleaned up.
+    bool no_comms_fill = (dir == QUDA_BACKWARDS) ? false : true;
 
     void *send[4];
     void *receive[4];
@@ -161,7 +168,7 @@ namespace quda {
 	  send[i] = link_sendbuf[i];
 	  receive[i] = ghost_link[i];
 	} else {
-	  memcpy(ghost_link[i], link_sendbuf[i], bytes[i]);
+	  if (no_comms_fill) memcpy(ghost_link[i], link_sendbuf[i], bytes[i]);
 	}
       }
     } else { // FIXME for CUDA field copy back to the CPU
@@ -171,27 +178,35 @@ namespace quda {
 	  receive[i] = allocatePinned(bytes[i]);
 	  cudaMemcpy(send[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToHost);
 	} else {
-	  cudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
+	  if (no_comms_fill) cudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], cudaMemcpyDeviceToDevice);
 	}
       }
     }
 
     for (int i=0; i<nDimComms; i++) {
       if (!comm_dim_partitioned(i)) continue;
-      mh_send_fwd[i] = comm_declare_send_relative(send[i], i, +1, bytes[i]);
-      mh_from_back[i] = comm_declare_receive_relative(receive[i], i, -1, bytes[i]);
+      if (dir == QUDA_FORWARDS) {
+	mh_send[i] = comm_declare_send_relative(send[i], i, +1, bytes[i]);
+	mh_recv[i] = comm_declare_receive_relative(receive[i], i, -1, bytes[i]);
+      } else if (dir == QUDA_BACKWARDS) {
+	mh_send[i] = comm_declare_send_relative(send[i], i, -1, bytes[i]);
+	mh_recv[i] = comm_declare_receive_relative(receive[i], i, +1, bytes[i]);
+      } else {
+	errorQuda("Unsuported dir=%d", dir);
+      }
+
     }
 
     for (int i=0; i<nDimComms; i++) {
       if (!comm_dim_partitioned(i)) continue;
-      comm_start(mh_send_fwd[i]);
-      comm_start(mh_from_back[i]);
+      comm_start(mh_send[i]);
+      comm_start(mh_recv[i]);
     }
 
     for (int i=0; i<nDimComms; i++) {
       if (!comm_dim_partitioned(i)) continue;
-      comm_wait(mh_send_fwd[i]);
-      comm_wait(mh_from_back[i]);
+      comm_wait(mh_send[i]);
+      comm_wait(mh_recv[i]);
     }
 
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -205,8 +220,8 @@ namespace quda {
 
     for (int i=0; i<nDimComms; i++) {
       if (!comm_dim_partitioned(i)) continue;
-      comm_free(mh_send_fwd[i]);
-      comm_free(mh_from_back[i]);
+      comm_free(mh_send[i]);
+      comm_free(mh_recv[i]);
     }
 
   }

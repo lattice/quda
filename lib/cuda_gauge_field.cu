@@ -159,7 +159,7 @@ namespace quda {
   // into the ghost array.
   void cudaGaugeField::exchangeGhost() {
     if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD)
-      errorQuda("Cannot call exchangeGhost with ghostExchange=%d", 
+      errorQuda("Cannot call exchangeGhost with ghostExchange=%d",
 		ghostExchange);
 
     if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
@@ -173,10 +173,10 @@ namespace quda {
     }
 
     // get the links into contiguous buffers
-    extractGaugeGhost(*this, send);
+    extractGaugeGhost(*this, send, true);
 
     // communicate between nodes
-    exchange(ghost_, send);
+    exchange(ghost_, send, QUDA_FORWARDS);
 
     for (int d=0; d<nDim; d++) device_free(send[d]);
 
@@ -184,6 +184,41 @@ namespace quda {
       // copy from ghost into the padded region in gauge
       copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, 0, ghost_, 1);
       for (int d=0; d<nDim; d++) device_free(ghost_[d]);
+    }
+  }
+
+  // This does the opposite of exchnageGhost and sends back the ghost
+  // zone to the node from which it came and injects it back into the
+  // field
+  void cudaGaugeField::injectGhost() {
+    if (ghostExchange != QUDA_GHOST_EXCHANGE_PAD)
+      errorQuda("Cannot call exchangeGhost with ghostExchange=%d",
+		ghostExchange);
+
+    if (geometry != QUDA_VECTOR_GEOMETRY && geometry != QUDA_COARSE_GEOMETRY)
+      errorQuda("Cannot exchange for %d geometry gauge field", geometry);
+
+    void *ghost_[QUDA_MAX_DIM];
+    void *recv[QUDA_MAX_DIM];
+    for (int d=0; d<nDim; d++) {
+      ghost_[d] = isNative() ? device_malloc(nFace*surface[d]*nInternal*precision) : ghost[d];
+      recv[d] = device_malloc(nFace*surface[d]*nInternal*precision);
+    }
+
+    if (isNative()) {
+      // copy from padded region in gauge field into ghost
+      copyGenericGauge(*this, *this, QUDA_CUDA_FIELD_LOCATION, 0, 0, ghost_, 0, 1);
+    }
+
+    // communicate between nodes
+    exchange(recv, ghost_, QUDA_BACKWARDS);
+
+    // get the links into contiguous buffers
+    extractGaugeGhost(*this, recv, false);
+
+    for (int d=0; d<nDim; d++) {
+      device_free(recv[d]);
+      if (isNative()) device_free(ghost_[d]);
     }
   }
 

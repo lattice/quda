@@ -171,7 +171,13 @@ namespace quda {
     /** Whether the staggered phase factor has been applied */
     bool staggeredPhaseApplied;
 
-    void exchange(void **ghost_link, void **link_sendbuf) const;
+    /**
+       @brief Exchange the buffers across all dimensions in a given direction
+       @param recv[out] Reicve buffer
+       @param send[in] Send buffer
+       @param dir[in] Direction in which we are sending (forwards OR backwards only)
+    */
+    void exchange(void **recv, void **send, QudaDirection dir) const;
 
     /** Imaginary chemical potential */
     double i_mu;
@@ -181,6 +187,7 @@ namespace quda {
     virtual ~GaugeField();
 
     virtual void exchangeGhost() = 0;
+    virtual void injectGhost() = 0;
 
     int Length() const { return length; }
     int Ncolor() const { return nColor; }
@@ -274,10 +281,19 @@ namespace quda {
     cudaGaugeField(const GaugeFieldParam &);
     virtual ~cudaGaugeField();
 
-    void exchangeGhost(); // exchange the ghost and store store in the padded region
+    /**
+       @brief Exchange the ghost and store store in the padded region
+     */
+    void exchangeGhost();
 
     /**
-       This does routine will populate the border / halo region of a
+       @brief The opposite of exchangeGhost: take the ghost zone on x,
+       send to node x-1, and inject back into the field
+     */
+    void injectGhost();
+
+    /**
+       @brief This does routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.  
 
        @param R The thickness of the extended region in each dimension
@@ -340,10 +356,19 @@ namespace quda {
     cpuGaugeField(const GaugeFieldParam &);
     virtual ~cpuGaugeField();
 
+    /**
+       @brief Exchange the ghost and store store in the padded region
+     */
     void exchangeGhost();
 
     /**
-       This does routine will populate the border / halo region of a
+       @brief The opposite of exchangeGhost: take the ghost zone on x,
+       send to node x-1, and inject back into the field
+     */
+    void injectGhost();
+
+    /**
+       @brief This does routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.  
 
        @param R The thickness of the extended region in each dimension
@@ -415,8 +440,9 @@ namespace quda {
      gauge field array.  Defined in extract_gauge_ghost.cu.
      @param u The gauge field from which we want to extract the ghost zone
      @param ghost The array where we want to pack the ghost zone into
+     @param extract Where we are extracting into ghost or injecting from ghost
   */
-  void extractGaugeGhost(const GaugeField &u, void **ghost);
+  void extractGaugeGhost(const GaugeField &u, void **ghost, bool extract=true);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
