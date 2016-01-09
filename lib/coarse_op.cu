@@ -136,6 +136,8 @@ namespace quda {
       int comm_dim[4];
       for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
       createYpreconditioned<Float,coarseSpin*coarseColor>(yAccessor, xInvAccessor, X.X(), 1, comm_dim);
+
+      Y.injectGhost();
     }
 
   }
