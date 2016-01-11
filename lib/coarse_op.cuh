@@ -171,7 +171,7 @@ namespace quda {
   }
 
   template<typename Float, int n, typename Gauge>
-  void createYpreconditioned(Gauge &Y, Gauge &Xinv, const int *dim, int nFace, const int *commDim) {
+  void createYpreconditioned(Gauge &Yhat, Gauge &Xinv, const Gauge &Y, const int *dim, int nFace, const int *commDim) {
 
     complex<Float> Ylocal[n*n];
 
@@ -187,17 +187,12 @@ namespace quda {
 	  const int ghost_idx = ghostFaceIndex<0>(coord, dim, d, nFace);
 
 	  if ( commDim[d] && (coord[d] - nFace < 0) ) {
-	    for(int i = 0; i<n; i++) {
-	      for(int j = 0; j<n; j++) {
-		Ylocal[i*n + j] = Y.Ghost(d,1-parity,ghost_idx,i,j);
-	      }
-	    }
 
 	    for(int i = 0; i<n; i++) {
 	      for(int j = 0; j<n; j++) {
-		Y.Ghost(d,1-parity,ghost_idx,i,j) = 0.0;
+		Yhat.Ghost(d,1-parity,ghost_idx,i,j) = 0.0;
 		for(int k = 0; k<n; k++) {
-		  Y.Ghost(d,1-parity,ghost_idx,i,j) += Ylocal[i*n + k] * conj(Xinv(0,parity,x_cb,j,k));
+		  Yhat.Ghost(d,1-parity,ghost_idx,i,j) += Y.Ghost(d,1-parity,ghost_idx,i,k) * conj(Xinv(0,parity,x_cb,j,k));
 		}
 
 	      }
@@ -208,15 +203,9 @@ namespace quda {
 
 	    for(int i = 0; i<n; i++) {
 	      for(int j = 0; j<n; j++) {
-		Ylocal[i*n + j] = Y(d,1-parity,back_idx,i,j);
-	      }
-	    }
-
-	    for(int i = 0; i<n; i++) {
-	      for(int j = 0; j<n; j++) {
-		Y(d,1-parity,back_idx,i,j) = 0.0;
+		Yhat(d,1-parity,back_idx,i,j) = 0.0;
 		for(int k = 0; k<n; k++) {
-		  Y(d,1-parity,back_idx,i,j) += Ylocal[i*n + k] * conj(Xinv(0,parity,x_cb,j,k));
+		  Yhat(d,1-parity,back_idx,i,j) += Y(d,1-parity,back_idx,i,k) * conj(Xinv(0,parity,x_cb,j,k));
 		}
 	      }
 	    }
@@ -233,15 +222,9 @@ namespace quda {
 
 	  for(int i = 0; i<n; i++) {
 	    for(int j = 0; j<n; j++) {
-	      Ylocal[i*n + j] = Y(d+4,parity,x_cb,i,j);
-	    }
-	  }
-
-	  for(int i = 0; i<n; i++) {
-	    for(int j = 0; j<n; j++) {
-	      Y(d+4,parity,x_cb,i,j) = 0.0;
+	      Yhat(d+4,parity,x_cb,i,j) = 0.0;
 	      for(int k = 0; k<n; k++) {
-		Y(d+4,parity,x_cb,i,j) +=  Xinv(0,parity,x_cb,i,k) * Ylocal[k*n + j];
+		Yhat(d+4,parity,x_cb,i,j) += Xinv(0,parity,x_cb,i,k) * Y(d+4,parity,x_cb,k,j);
 	      }
 	    }
 	  }

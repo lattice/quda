@@ -261,26 +261,28 @@ namespace quda {
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
      @param Xinv[out] Coarse clover inverse field
+     @param Yhat[out] Preconditioned coarse link field
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
      @param kappa[in] Kappa parameter
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cudaGaugeField &gauge,
-		const cudaCloverField *clover, double kappa);
+  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
+		const cudaGaugeField &gauge, const cudaCloverField *clover, double kappa);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
      @param Xinv[out] Coarse clover inverse field
+     @param Y[out] Preconditioned coarse link field
      @param T[in] Transfer operator that defines the new coarse space
      @param gauge[in] Link field from fine grid
      @param clover[in] Clover field on fine grid
      @param kappa[in] Kappa parameter
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, const Transfer &T, const cpuGaugeField &gauge,
-		      const cpuGaugeField &clover, double kappa);
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
+		      const cpuGaugeField &gauge, const cpuGaugeField &clover, double kappa);
 
   /**
      This is an object that captures an entire MG preconditioner
