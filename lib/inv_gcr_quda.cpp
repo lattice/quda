@@ -284,10 +284,6 @@ namespace quda {
     ColorSpinorField &tmp = *tmpp;
     blas::zero(y);
 
-    ColorSpinorParam csParam(tmp);
-    ColorSpinorField *tmp2p = ColorSpinorField::Create(csParam);
-    ColorSpinorField &tmp2 = *tmp2p;
-
     bool precMatch = (param.precision_precondition != param.precision_sloppy || param.precondition_cycle > 1) ? false : true;
 
     // compute parity of the node
@@ -384,7 +380,7 @@ namespace quda {
 	} else { // no preconditioner
 	  *p[k] = rSloppy;
 	}
-	matSloppy(*Ap[k], *p[k], tmp, tmp2);
+	matSloppy(*Ap[k], *p[k], tmp);
 	if (getVerbosity()>= QUDA_DEBUG_VERBOSE)
 	  printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, rPre2=%e\n", 
 		     total_iter, blas::norm2(*Ap[k]), blas::norm2(*p[k]), blas::norm2(rPre));
@@ -495,8 +491,6 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();
-
-    delete tmp2p;
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);
