@@ -253,6 +253,8 @@ namespace quda {
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
+    if (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) errorQuda("WIP");
+
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);

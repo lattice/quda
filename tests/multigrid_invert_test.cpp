@@ -287,7 +287,13 @@ int main(int argc, char **argv)
     mg_param.smoother[i] = precon_type;
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
+    // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
     mg_param.smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
+
+    // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
+    // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
+    mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+
     mg_param.omega[i] = 0.85; // over/under relaxation factor
 
     mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;

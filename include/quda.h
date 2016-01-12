@@ -340,6 +340,10 @@ extern "C" {
     /** Smoother / solver to use on each level */
     QudaInverterType smoother[QUDA_MAX_MG_LEVEL];
 
+    /** The type of residual to send to the next coarse grid, and thus the
+	type of solution to receive back from this coarse grid */
+    QudaSolutionType coarse_grid_solution_type[QUDA_MAX_MG_LEVEL];
+
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
     QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL];
 

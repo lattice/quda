@@ -40,6 +40,7 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.smoother[level]),
+      coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level])
       { 
@@ -69,6 +70,7 @@ namespace quda {
       matResidual(matResidual),
       matSmooth(matSmooth),
       smoother(param.mg_global.smoother[level]),
+      coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level])
       {
@@ -121,6 +123,10 @@ namespace quda {
 
     /** What type of smoother to use */
     QudaInverterType smoother;
+
+    /** The type of residual to send to the next coarse grid, and thus the
+	type of solution to receive back from this coarse grid */
+    QudaSolutionType coarse_grid_solution_type;
 
     /** The type of smoother solve to do on each grid (e/o preconditioning or not)*/
     QudaSolveType smoother_solve_type;
