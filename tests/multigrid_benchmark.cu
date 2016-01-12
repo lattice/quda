@@ -125,6 +125,7 @@ void initFields(QudaPrecision prec)
 
   gParam.geometry = QUDA_VECTOR_GEOMETRY;
   Y_h = new cpuGaugeField(gParam);
+  Yhat_h = new cpuGaugeField(gParam);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   X_h = new cpuGaugeField(gParam);
