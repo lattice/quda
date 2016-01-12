@@ -180,12 +180,17 @@ double benchmark(int test, const int niter) {
   cudaEventRecord(start, 0);
 
   switch(test) {
-    case 0:
-      for (int i=0; i < niter; ++i) dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
-      break;
-
-    default:
-      errorQuda("Undefined test %d", test);
+  case 0:
+    for (int i=0; i < niter; ++i) dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
+    break;
+  case 1:
+    for (int i=0; i < niter; ++i) {
+      dirac->Dslash(*xD, *yD, QUDA_EVEN_PARITY);
+      dirac->Dslash(*yD, *xD, QUDA_ODD_PARITY);
+    }
+    break;
+  default:
+    errorQuda("Undefined test %d", test);
   }
 
   cudaEventRecord(end, 0);
