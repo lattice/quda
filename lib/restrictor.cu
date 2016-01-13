@@ -293,7 +293,7 @@ namespace quda {
     }
 
     long long bytes() const {
-      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes() + arg.in.Volume()*sizeof(int);
+      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.in.Volume()*sizeof(int);
     }
 
   };
