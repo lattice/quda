@@ -94,6 +94,7 @@ namespace quda {
 	      arg.out(parity_coarse,x_coarse_cb,arg.spin_map(s),c) += tmp[s*coarse_colors_per_thread+coarse_color_local];
 	    }
 	  }
+
 	}
       }
     }
@@ -147,7 +148,7 @@ namespace quda {
     // blockIdx.x  - which coarse block are we working on
     // assume that coarse_to_fine look up map is ordered as (coarse-block-id + fine-point-id)
     // and that fine-point-id is parity ordered
-    int x_fine = arg.coarse_to_fine[ (blockIdx.x*blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x];
+    int x_fine = arg.coarse_to_fine[ (blockIdx.x*2 + threadIdx.y) * blockDim.x + threadIdx.x];
     int parity = arg.nParity == 2 ? threadIdx.y : arg.parity;
     int x_fine_cb = x_fine - parity*arg.in.VolumeCB();
 
@@ -193,7 +194,6 @@ namespace quda {
 	}
       }
     }
-
   }
 
   template <typename Float, typename Arg, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
