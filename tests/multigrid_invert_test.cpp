@@ -220,11 +220,10 @@ int main(int argc, char **argv)
     inv_param.tol_offset[i] = inv_param.tol;
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
-  inv_param.maxiter = 10000;
+  inv_param.maxiter = niter;
   inv_param.reliable_delta = 1e-4;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
@@ -292,7 +291,7 @@ int main(int argc, char **argv)
 
     // set to QUDA_MAT_SOLUTION to inject a full field into coarse grid
     // set to QUDA_MATPC_SOLUTION to inject single parity field into coarse grid
-    mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+    mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
 
     mg_param.omega[i] = 0.85; // over/under relaxation factor
 
@@ -392,6 +391,9 @@ int main(int argc, char **argv)
   // setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
+
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
 
   const int nSrc = 1;
   for (int i=0; i<nSrc; i++) {
