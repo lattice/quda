@@ -57,6 +57,8 @@ extern int geo_block_size[];
 
 extern QudaInverterType precon_type;
 
+extern QudaMatPCType matpc_type;
+
 extern char vec_infile[];
 extern char vec_outfile[];
 
@@ -175,7 +177,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
+  inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
@@ -269,17 +271,17 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-
-  inv_param.solution_type = QUDA_MATPC_SOLUTION; // EVEN-ODD for full outer set this to QUDA_MAT_SOLUTION;
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;   // EVEN-ODD for non-preconditioned solve set to QUDA_DIRECT_PC_SOLVE'
+  // do we want full solution or single-parity solution
+  inv_param.solution_type = QUDA_MATPC_SOLUTION;
+  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  inv_param.matpc_type = matpc_type;
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.verbosity_precondition = QUDA_SILENT;
 
-  inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.gcrNkrylov = 20;
   inv_param.tol = tol;
@@ -346,6 +348,8 @@ int main(int argc, char **argv)
   QudaMultigridParam mg_param;
   mg_param.invert_param = &mg_inv_param;
   setMultigridParam(mg_param);
+
+
 
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
