@@ -322,6 +322,8 @@ namespace quda {
     QudaSolutionType outer_solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
     QudaSolutionType inner_solution_type = param.coarse_grid_solution_type;
 
+    if (debug) printfQuda("outer_solve_type = %d, inner_solver_type = %d\n", outer_solution_type, inner_solution_type);
+
     if ( outer_solution_type == QUDA_MATPC_SOLUTION && inner_solution_type == QUDA_MAT_SOLUTION)
       errorQuda("Unsupported solution type combination");
 
@@ -389,8 +391,9 @@ namespace quda {
       // prolongate back to this grid
       residual = inner_solution_type == QUDA_MAT_SOLUTION ? *r : r->Even(); // define according to inner solution type
       transfer->P(residual, *x_coarse); // repurpose residual storage
+
       // FIXME - sum should be done inside the transfer operator
-      xpy(*r, solution); // sum to solution
+      xpy(residual, solution); // sum to solution
 
       if ( debug ) {
 	printfQuda("Prolongated coarse solution y2 = %e\n", norm2(*r));
