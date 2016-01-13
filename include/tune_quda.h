@@ -118,6 +118,7 @@ namespace quda {
 	const int max_blocks_per_sm = 8; // FIXME: derive from deviceProp
 	int blocks_per_sm = max_shared / (param.shared_bytes ? param.shared_bytes : 1);
 	if (blocks_per_sm > max_blocks_per_sm) blocks_per_sm = max_blocks_per_sm;
+	if (blocks_per_sm == 0) return false;
 	param.shared_bytes = max_shared / blocks_per_sm + 1;
 	if (param.shared_bytes > max_shared) {
 	  TuneParam next(param);

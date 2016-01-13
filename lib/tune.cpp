@@ -383,9 +383,12 @@ namespace quda {
 	tunable.checkLaunchParam(param);
 	cudaEventRecord(start, 0);
 	for (int i=0; i<tunable.tuningIter(); i++) {
-    if (verbosity >= QUDA_DEBUG_VERBOSE) {
-          printfQuda("About to call tunable.apply\n");
-        }
+	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
+	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d\n",
+		       param.block.x, param.block.y, param.block.z,
+		       param.grid.x, param.grid.y, param.grid.z,
+		       param.shared_bytes);
+	  }
 	  tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	}
 	cudaEventRecord(end, 0);
