@@ -228,11 +228,12 @@ namespace quda {
 
     if (use_gpu) {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
-      if (out.Location() == QUDA_CPU_FIELD_LOCATION ||
-	  out.GammaBasis() != V->GammaBasis()) output = fine_tmp_d;
+      if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
+	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
-      output = (out.Location() == QUDA_CUDA_FIELD_LOCATION) ? fine_tmp_h : &out;
+      if (out.Location() == QUDA_CUDA_FIELD_LOCATION)
+	output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
     *input = in; // copy result to input field (aliasing handled automatically)
@@ -242,7 +243,8 @@ namespace quda {
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
     }
 
-    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map);
+    // FIXME this will break for transferring on the odd sites
+    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, QUDA_EVEN_PARITY);
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
@@ -253,7 +255,6 @@ namespace quda {
 
   // apply the restrictor
   void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
-    if (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) errorQuda("WIP");
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -265,20 +266,22 @@ namespace quda {
 
     if (use_gpu) {
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION ||
-	  in.GammaBasis() != V->GammaBasis()) input = fine_tmp_d;
+      if (in.Location() == QUDA_CPU_FIELD_LOCATION || in.GammaBasis() != V->GammaBasis())
+	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
       if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
     } else {
-      if (in.Location() == QUDA_CUDA_FIELD_LOCATION) input = fine_tmp_h;
+      if (in.Location() == QUDA_CUDA_FIELD_LOCATION)
+	input = (in.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_h : &fine_tmp_h->Even();
     }
 
-    *input = in; // copy result to input field (aliasing handled automatically)  
-    
+    *input = in;
+
     if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map);
+    // FIXME this will break for transferring on the odd sites
+    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, QUDA_EVEN_PARITY);
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
