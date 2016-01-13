@@ -245,19 +245,19 @@ namespace quda {
       printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("failed");
     }
-#if 0
-    printfQuda("Checking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", 
+#if 1
+    printfQuda("Checking 1 > || (1 - P (P^\\dagger D P) P^\\dagger D v_k || / || v_k || for %d vectors\n", 
 	       param.Nvec);
 
     for (int i=0; i<param.Nvec; i++) {
-      transfer->R(*r_coarse, *(param.B[i]));
+      *tmp1 = *param.B[i];
+      param.matResidual(*tmp2,*tmp1);
+      transfer->R(*r_coarse, *tmp2);
       (*coarse)(*x_coarse, *r_coarse); // this needs to be an exact solve to pass
       setOutputPrefix(prefix); // restore output prefix
       transfer->P(*tmp2, *x_coarse);
-      param.matResidual(*tmp1,*tmp2);
-      *tmp2 = *(param.B[i]);
-      printfQuda("Vector %d: norms %e %e ", i, norm2(*param.B[i]), norm2(*tmp1));
-      printfQuda("relative residual = %e\n", sqrt(xmyNorm(*tmp2, *tmp1) / norm2(*param.B[i])) );
+      printfQuda("Vector %d: norms %e %e ", i, norm2(*param.B[i]), norm2(*tmp2));
+      printfQuda("relative residual = %e\n", sqrt(xmyNorm(*tmp1, *tmp2) / norm2(*param.B[i])) );
     }
 #endif
 
