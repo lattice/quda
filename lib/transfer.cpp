@@ -18,12 +18,12 @@ namespace quda {
   * however we do even-odd to preserve chirality (that is straightforward)
   */
 
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
+  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaParity parity,
 		     bool enable_gpu, TimeProfile &profile)
     : B(B), Nvec(Nvec), V_h(0), V_d(0), fine_tmp_h(0), fine_tmp_d(0), coarse_tmp_h(0), coarse_tmp_d(0), geo_bs(0),
       fine_to_coarse_h(0), coarse_to_fine_h(0), 
       fine_to_coarse_d(0), coarse_to_fine_d(0), 
-      spin_bs(spin_bs), spin_map(0),
+      spin_bs(spin_bs), spin_map(0), parity(parity),
       enable_gpu(enable_gpu), use_gpu(enable_gpu), // by default we apply the transfer operator according to enable_gpu flag but can be overridden
       flops_(0), profile(profile)
   {
@@ -243,8 +243,7 @@ namespace quda {
 		output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
     }
 
-    // FIXME this will break for transferring on the odd sites
-    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, QUDA_EVEN_PARITY);
+    Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
     out = *output; // copy result to out field (aliasing handled automatically)
 
@@ -280,8 +279,7 @@ namespace quda {
       errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
 		out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
-    // FIXME this will break for transferring on the odd sites
-    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, QUDA_EVEN_PARITY);
+    Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
     out = *output; // copy result to out field (aliasing handled automatically)
 

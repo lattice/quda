@@ -81,9 +81,12 @@ namespace quda {
 
     // if not on the coarsest level, construct it
     if (param.level < param.Nlevel-1) {
+      QudaMatPCType matpc_type = param.mg_global.invert_param->matpc_type;
+      QudaParity parity = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY;
+
       // create transfer operator
       printfQuda("start creating transfer operator\n");
-      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize,
+      transfer = new Transfer(param.B, param.Nvec, param.geoBlockSize, param.spinBlockSize, parity,
 			      param.location == QUDA_CUDA_FIELD_LOCATION ? true : false, profile);
       for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -103,7 +106,7 @@ namespace quda {
       diracParam.dirac = const_cast<Dirac*>(param.matResidual.Expose());
       diracParam.kappa = param.matResidual.Expose()->Kappa();
       diracParam.dagger = QUDA_DAG_NO;
-      diracParam.matpcType = QUDA_MATPC_EVEN_EVEN; // FIXME should probably expose this
+      diracParam.matpcType = matpc_type;
       printfQuda("Kappa = %e\n", diracParam.kappa);
       // use even-odd preconditioning for the coarse grid solver
       diracCoarseResidual = new DiracCoarse(diracParam);
@@ -240,6 +243,7 @@ namespace quda {
       printfQuda("L2 relative deviation = %e\n", deviation);
       if (deviation > tol) errorQuda("failed");
     }
+
 #if 0
     printfQuda("Checking 1 > || (1 - D P (P^\\dagger D P) P^\\dagger v_k || / || v_k || for %d vectors\n", 
 	       param.Nvec);

@@ -40,8 +40,8 @@ namespace quda {
   */
   template <typename Float, int fineSpin, int coarseColor, class Coarse, typename S>
   __device__ __host__ inline void prolongate(complex<Float> out[fineSpin*coarseColor], const Coarse &in, 
-					     int parity, int x_cb, const int *geo_map, const S& spin_map, int fineVolume) {
-    int x = parity*fineVolume/2 + x_cb;
+					     int parity, int x_cb, const int *geo_map, const S& spin_map, int fineVolumeCB) {
+    int x = parity*fineVolumeCB + x_cb;
     int x_coarse = geo_map[x];
     int parity_coarse = (x_coarse >= in.VolumeCB()) ? 1 : 0;
     int x_coarse_cb = x_coarse - parity_coarse*in.VolumeCB();
@@ -88,12 +88,12 @@ namespace quda {
 
   template <typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, int fine_colors_per_thread, typename Arg>
   void Prolongate(Arg &arg) {
-    for (int parity=0; parity<2; parity++) {
+    for (int parity=0; parity<arg.nParity; parity++) {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb=0; x_cb<arg.out.VolumeCB(); x_cb++) {
 	complex<Float> tmp[fineSpin*coarseColor];
-	prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.Volume());
+	prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.VolumeCB());
 	for (int fine_color_block=0; fine_color_block<fineColor; fine_color_block+=fine_colors_per_thread) {
 	  rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>
 	    (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
@@ -112,7 +112,7 @@ namespace quda {
     if (fine_color_block >= fineColor) return;
 
     complex<Float> tmp[fineSpin*coarseColor];
-    prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.Volume());
+    prolongate<Float,fineSpin,coarseColor>(tmp, arg.in, parity, x_cb, arg.geo_map, arg.spin_map, arg.out.VolumeCB());
     rotateFineColor<Float,fineSpin,fineColor,coarseColor,fine_colors_per_thread>
       (arg.out, tmp, arg.V, parity, arg.nParity, x_cb, fine_color_block);
   }
@@ -214,7 +214,7 @@ namespace quda {
     }
 
     long long bytes() const {
-      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.out.Volume()*sizeof(int);
+      return arg.in.Bytes() + arg.out.Bytes() + arg.V.Bytes()/(3-arg.nParity) + arg.nParity&arg.out.VolumeCB()*sizeof(int);
     }
 
   };
