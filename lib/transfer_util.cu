@@ -132,7 +132,7 @@ namespace quda {
     int x[QUDA_MAX_DIM]; // global coordinates
     int y[QUDA_MAX_DIM]; // local coordinates within a block (full site ordering)
 
-    int checkLength = in.Volume() * in.Ncolor() * in.Nspin() * in.Nvec();
+    int checkLength = in.Nparity() * in.VolumeCB() * in.Ncolor() * in.Nspin() * in.Nvec();
     int *check = new int[checkLength];
     int count = 0;
 
@@ -213,7 +213,7 @@ namespace quda {
     int x[QUDA_MAX_DIM]; // global coordinates
     int y[QUDA_MAX_DIM]; // local coordinates within a block (full site ordering)
 
-    int checkLength = in.Volume() * in.Ncolor() * in.Nvec();
+    int checkLength = in.Nparity() * in.VolumeCB() * in.Ncolor() * in.Nvec();
     int *check = new int[checkLength];
     int count = 0;
 
