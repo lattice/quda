@@ -95,8 +95,6 @@ namespace quda {
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
-//      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-
       warningQuda("inverting on zero-field source\n");
       if(param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO)
       {
@@ -104,6 +102,7 @@ namespace quda {
         x = b;
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
+	profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         return;
       }
       else if(param.use_init_guess == QUDA_USE_INIT_GUESS_YES)
@@ -314,7 +313,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    //param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
+    param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
 
     param.gflops += gflops;
